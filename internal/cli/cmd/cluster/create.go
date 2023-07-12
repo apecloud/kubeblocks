@@ -35,7 +35,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -143,6 +142,7 @@ var clusterCreateExample = templates.Examples(`
 const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
+	apeCloudMysql   = "apecloud-mysql"
 )
 
 type setKey string
@@ -194,8 +194,6 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
-	shouldCreateDependencies bool `json:"-"`
-
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
 	RestoreTime   string `json:"restoreTime,omitempty"`
@@ -227,9 +225,9 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
-	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
+	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
+	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
 	// add required
 	_ = cmd.MarkFlagRequired("cluster-definition")
@@ -237,10 +235,13 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o.UpdatableFlags.addFlags(cmd)
 
 	// add print flags
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	printer.AddOutputFlagForCreate(cmd, &o.Format, true)
 
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
+
+	// add all subcommands for supported cluster type
+	cmd.AddCommand(buildCreateSubCmds(&o.CreateOptions)...)
 
 	return cmd
 }
@@ -254,7 +255,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
-	o.CreateOptions.CreateDependencies = o.CreateDependencies
+	// o.CreateOptions.CreateDependencies = o.CreateDependencies
 	return o
 }
 
@@ -333,6 +334,12 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 	if err != nil {
 		return err
 	}
+	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
+	if backupCluster.Spec.ClusterDefRef == apeCloudMysql && o.RestoreTime != "" {
+		for _, c := range backupCluster.Spec.ComponentSpecs {
+			c.Replicas = 1
+		}
+	}
 	curCluster := *cls
 	if curCluster == nil {
 		curCluster = backupCluster
@@ -375,10 +382,20 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	return nil
 }
 
-func setRestoreTime(o *CreateOptions) error {
+func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error {
 	if o.RestoreTime == "" || o.SourceCluster == "" {
 		return nil
 	}
+
+	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
+	if o.ClusterDefRef == apeCloudMysql {
+		for _, c := range components {
+			if c["replicas"].(int64) > 1 {
+				return fmt.Errorf("apecloud-mysql only support one replica for point-in-time recovery")
+			}
+		}
+	}
+
 	if o.Annotations == nil {
 		o.Annotations = map[string]string{}
 	}
@@ -446,7 +463,6 @@ func (o *CreateOptions) Complete() error {
 			clusterCompSpecs = cls.Spec.ComponentSpecs
 		}
 	}
-	//
 	if err = fillClusterInfoFromBackup(o, &cls); err != nil {
 		return err
 	}
@@ -456,14 +472,10 @@ func (o *CreateOptions) Complete() error {
 
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
-		name, err := generateClusterName(o.Dynamic, o.Namespace)
+		o.Name, err = generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}
-		if name == "" {
-			return fmt.Errorf("failed to generate a random cluster name")
-		}
-		o.Name = name
 	}
 
 	// build annotation
@@ -487,7 +499,7 @@ func (o *CreateOptions) Complete() error {
 	if err = setBackup(o, components); err != nil {
 		return err
 	}
-	if err = setRestoreTime(o); err != nil {
+	if err = setRestoreTime(o, components); err != nil {
 		return err
 	}
 	o.ComponentSpecs = components
@@ -521,28 +533,61 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		compSpecs []*appsv1alpha1.ClusterComponentSpec
 	)
 
-	compClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
-	if err != nil {
-		return nil, err
-	}
-
 	cd, err = cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return nil, err
 	}
+	clsMgr, err := class.GetManager(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return nil, err
+	}
+
+	compSets, err := buildCompSetsMap(o.Values, cd)
+	if err != nil {
+		return nil, err
+	}
+	overrideComponentBySets := func(comp, setComp *appsv1alpha1.ClusterComponentSpec, setValues map[setKey]string) {
+		for k := range setValues {
+			switch k {
+			case keyReplicas:
+				comp.Replicas = setComp.Replicas
+			case keyCPU:
+				comp.Resources.Requests[corev1.ResourceCPU] = setComp.Resources.Requests[corev1.ResourceCPU]
+				comp.Resources.Limits[corev1.ResourceCPU] = setComp.Resources.Limits[corev1.ResourceCPU]
+			case keyClass:
+				comp.ClassDefRef = setComp.ClassDefRef
+			case keyMemory:
+				comp.Resources.Requests[corev1.ResourceMemory] = setComp.Resources.Requests[corev1.ResourceMemory]
+				comp.Resources.Limits[corev1.ResourceMemory] = setComp.Resources.Limits[corev1.ResourceMemory]
+			case keyStorage:
+				if len(comp.VolumeClaimTemplates) > 0 && len(setComp.VolumeClaimTemplates) > 0 {
+					comp.VolumeClaimTemplates[0].Spec.Resources.Requests = setComp.VolumeClaimTemplates[0].Spec.Resources.Requests
+				}
+			case keyStorageClass:
+				if len(comp.VolumeClaimTemplates) > 0 && len(setComp.VolumeClaimTemplates) > 0 {
+					comp.VolumeClaimTemplates[0].Spec.StorageClassName = setComp.VolumeClaimTemplates[0].Spec.StorageClassName
+				}
+			case keySwitchPolicy:
+				comp.SwitchPolicy = setComp.SwitchPolicy
+			}
+		}
+	}
 
 	if clusterCompSpecs != nil {
-		for _, comp := range clusterCompSpecs {
-			compSpecs = append(compSpecs, &comp)
-		}
-	} else {
-		// build components from set values or environment variables
-		compSets, err := buildCompSetsMap(o.Values, cd)
+		setsCompSpecs, err := buildClusterComp(cd, compSets, clsMgr)
 		if err != nil {
 			return nil, err
 		}
-
-		compSpecs, err = buildClusterComp(cd, compSets, compClasses)
+		setsCompSpecsMap := map[string]*appsv1alpha1.ClusterComponentSpec{}
+		for _, setComp := range setsCompSpecs {
+			setsCompSpecsMap[setComp.Name] = setComp
+		}
+		for _, comp := range clusterCompSpecs {
+			overrideComponentBySets(&comp, setsCompSpecsMap[comp.Name], compSets[comp.Name])
+			compSpecs = append(compSpecs, &comp)
+		}
+	} else {
+		compSpecs, err = buildClusterComp(cd, compSets, clsMgr)
 		if err != nil {
 			return nil, err
 		}
@@ -551,7 +596,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	var comps []map[string]interface{}
 	for _, compSpec := range compSpecs {
 		// validate component classes
-		if _, err = class.ValidateComponentClass(compSpec, compClasses); err != nil {
+		if err = clsMgr.ValidateResources(compSpec); err != nil {
 			return nil, err
 		}
 
@@ -570,9 +615,9 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 }
 
 const (
-	saNamePrefix          = "kb-sa-"
-	roleNamePrefix        = "kb-role-"
-	roleBindingNamePrefix = "kb-rolebinding-"
+	saNamePrefix          = "kb-"
+	roleNamePrefix        = "kb-"
+	roleBindingNamePrefix = "kb-"
 )
 
 // buildDependenciesFn creates dependencies function for components, e.g. postgresql depends on
@@ -582,7 +627,6 @@ func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
-	o.shouldCreateDependencies = true
 	return nil
 }
 
@@ -592,10 +636,6 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
-
-	if !o.shouldCreateDependencies {
-		return nil
-	}
 
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account
@@ -812,8 +852,7 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string,
-	componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string, clsMgr *class.Manager) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
@@ -883,7 +922,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
 		// does not specify any set, so we only build the first component.
 		// TODO(ldm): remove this hack and use helm chart to render the cluster.
-		if i > 0 && len(sets) == 0 && cd.Name == "apecloud-mysql" {
+		if i > 0 && len(sets) == 0 && cd.Name == apeCloudMysql {
 			continue
 		}
 
@@ -908,15 +947,21 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 
 		// class has higher priority than other resource related parameters
 		resourceList := make(corev1.ResourceList)
-		if _, ok := componentClasses[c.Name]; ok {
+		if clsMgr.HasClass(compObj.ComponentDefRef, class.Any) {
 			if className := getVal(&c, keyClass, sets); className != "" {
-				compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
-			} else {
-				if cpu, ok := sets[keyCPU]; ok {
-					resourceList[corev1.ResourceCPU] = resource.MustParse(cpu)
+				clsDefRef := appsv1alpha1.ClassDefRef{}
+				parts := strings.SplitN(className, ":", 2)
+				if len(parts) == 1 {
+					clsDefRef.Class = parts[0]
+				} else {
+					clsDefRef.Name = parts[0]
+					clsDefRef.Class = parts[1]
 				}
-				if mem, ok := sets[keyMemory]; ok {
-					resourceList[corev1.ResourceMemory] = resource.MustParse(mem)
+				compObj.ClassDefRef = &clsDefRef
+			} else {
+				resourceList = corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse(getVal(&c, keyCPU, sets)),
+					corev1.ResourceMemory: resource.MustParse(getVal(&c, keyMemory, sets)),
 				}
 			}
 		} else {
@@ -1055,7 +1100,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 			return "", err
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("failed to generate cluster name")
 }
 
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
@@ -1147,8 +1192,19 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 // validateClusterVersion checks the existence of declared cluster version,
 // if not set, check the existence of default cluster version
 func (o *CreateOptions) validateClusterVersion() error {
-	existedClusterVersions, defaultVersion, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
-	if err != nil {
+	var err error
+
+	// cluster version is specified, validate if exists
+	if o.ClusterVersionRef != "" {
+		if err = cluster.ValidateClusterVersion(o.Dynamic, o.ClusterDefRef, o.ClusterVersionRef); err != nil {
+			return fmt.Errorf("cluster version \"%s\" does not exist, run following command to get the available cluster versions\n\tkbcli cv list --cluster-definition=%s",
+				o.ClusterVersionRef, o.ClusterDefRef)
+		}
+		return nil
+	}
+
+	// cluster version is not specified, get the default cluster version
+	if o.ClusterVersionRef, err = cluster.GetDefaultVersion(o.Dynamic, o.ClusterDefRef); err != nil {
 		return err
 	}
 
@@ -1156,62 +1212,13 @@ func (o *CreateOptions) validateClusterVersion() error {
 	if err != nil {
 		return err
 	}
-
-	printCvInfo := func(cv string) {
-		// if dryRun is set, run in quiet mode, avoid to output yaml file with the info
-		if dryRun != create.DryRunNone {
-			return
-		}
-		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", cv)
+	// if dryRun is set, run in quiet mode, avoid to output yaml file with the info
+	if dryRun != create.DryRunNone {
+		return nil
 	}
 
-	switch {
-	case o.ClusterVersionRef != "":
-		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
-			return fmt.Errorf("failed to find the specified cluster version \"%s\"", o.ClusterVersionRef)
-		}
-	case !existedDefault:
-		// if default version is not set and there is only one version, pick it
-		if len(existedClusterVersions) == 1 {
-			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
-			printCvInfo(o.ClusterVersionRef)
-		} else {
-			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
-		}
-	case existedDefault:
-		// TODO: achieve this in operator
-		if existedDefault {
-			o.ClusterVersionRef = defaultVersion
-			printCvInfo(o.ClusterVersionRef)
-		}
-	}
-
+	fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
 	return nil
-}
-
-// getClusterVersions returns all cluster versions in K8S and return true if the cluster has a default cluster version
-func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
-	allClusterVersions := make(map[string]struct{})
-	existedDefault := false
-	defaultVersion := ""
-	list, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.Background(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
-	})
-	if err != nil {
-		return nil, defaultVersion, false, err
-	}
-	for _, item := range list.Items {
-		allClusterVersions[item.GetName()] = struct{}{}
-		annotations := item.GetAnnotations()
-		if annotations != nil && annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
-			if existedDefault {
-				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
-			}
-			existedDefault = true
-			defaultVersion = item.GetName()
-		}
-	}
-	return allClusterVersions, defaultVersion, existedDefault, nil
 }
 
 func buildResourceLabels(clusterName string) map[string]string {

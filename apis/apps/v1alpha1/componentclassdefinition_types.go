@@ -146,3 +146,15 @@ func (r *ComponentClass) ToResourceRequirements() corev1.ResourceRequirements {
 	}
 	return corev1.ResourceRequirements{Requests: requests, Limits: requests}
 }
+
+func (r *ComponentClassInstance) Cmp(b *ComponentClassInstance) int {
+	if out := r.CPU.Cmp(b.CPU); out != 0 {
+		return out
+	}
+
+	if out := r.Memory.Cmp(b.Memory); out != 0 {
+		return out
+	}
+
+	return 0
+}

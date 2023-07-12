@@ -61,6 +61,7 @@ const (
 const (
 	KBToolsImage      = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
+	KBChartsImage     = "KUBEBLOCKS_CHARTS_IMAGE"
 )
 
 const (
@@ -105,6 +106,7 @@ const (
 	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
+	OpsRequestNameLabelKey                 = "ops.kubeblocks.io/ops-name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -126,6 +128,7 @@ const (
 	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
 	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
+	DefaultBackupRepoAnnotationKey              = "dataprotection.kubeblocks.io/is-default-repo"            // DefaultBackupRepoAnnotationKey specifies the default backup repo.
 	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
 	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
 	DataProtectionLabelClusterUIDKey            = "dataprotection.kubeblocks.io/cluster-uid"
@@ -153,8 +156,8 @@ const (
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
-	// ClassAnnotationKey is used to specify the class of components
-	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
+	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
+	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
 )
 
 const (

@@ -49,14 +49,17 @@ type ComponentTemplateSpec struct {
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
 	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:default="default"
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration
+	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
 	// defaultMode is optional: mode bits used to set permissions on created files by default.
@@ -79,8 +82,9 @@ type LazyRenderedTemplateSpec struct {
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:default="default"
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
@@ -108,6 +112,11 @@ type ComponentConfigSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
+
+	// asEnvFrom is optional: the list of containers will be injected into EnvFrom.
+	// +listType=set
+	// +optional
+	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
 }
 
 // MergedPolicy defines how to merge external imported templates into component templates.
@@ -202,7 +211,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript}
 type OpsType string
 
 const (
@@ -216,6 +225,7 @@ const (
 	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
 	ExposeType            OpsType = "Expose"
+	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
 )
 
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.

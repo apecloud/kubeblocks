@@ -64,5 +64,6 @@ type SynthesizedComponent struct {
 	SwitchoverSpec        *v1alpha1.SwitchoverSpec               `json:"switchoverSpec,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
-	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
+	StatefulSetWorkload   v1alpha1.StatefulSetWorkload           `json:"statefulSetWorkload,omitempty"`
+	ComponentRefEnvs      []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
 }

@@ -27,12 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
+	clsMgr *class.Manager,
 	cluster *appsv1alpha1.Cluster,
 	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
@@ -40,12 +42,13 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, clsMgr, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func buildComponent(reqCtx intctrlutil.RequestCtx,
+	clsMgr *class.Manager,
 	cluster *appsv1alpha1.Cluster,
 	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
@@ -130,6 +133,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	var err error
+	// make a copy of clusterCompDef
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
@@ -193,9 +197,15 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
 	}
+
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
+	if err = updateResources(cluster, component, *clusterCompSpec, clsMgr); err != nil {
+		reqCtx.Log.Error(err, "update class resources failed")
+		return nil, err
+	}
+
 	if clusterCompDefObj.Service != nil {
 		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
@@ -225,13 +235,18 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	//	 }
 	// }
 
-	buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
+	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
 	if err = buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
+
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
 
+	if err = buildComponentRef(clusterDef, cluster, clusterCompDefObj, clusterCompSpec, component); err != nil {
+		reqCtx.Log.Error(err, "failed to merge componentRef")
+		return nil, err
+	}
 	return component, nil
 }
 
@@ -390,10 +405,43 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 			cmdExecutorConfig.Env = cvSwitchoverSpec.CmdExecutorConfig.Env
 		}
 	}
-	applyCmdExecutorConfig(switchoverSpec.WithCandidate)
-	applyCmdExecutorConfig(switchoverSpec.WithoutCandidate)
+	if switchoverSpec.WithCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithCandidate.CmdExecutorConfig)
+	}
+	if switchoverSpec.WithoutCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithoutCandidate.CmdExecutorConfig)
+	}
 }
 
 func GenerateComponentEnvName(clusterName, componentName string) string {
 	return fmt.Sprintf("%s-%s-env", clusterName, componentName)
+}
+
+func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec, clsMgr *class.Manager) error {
+	if ignoreResourceConstraint(cluster) {
+		return nil
+	}
+
+	if clsMgr == nil {
+		return nil
+	}
+
+	expectResources, err := clsMgr.GetResources(&clusterCompSpec)
+	if err != nil {
+		return err
+	}
+
+	actualResources := component.PodSpec.Containers[0].Resources
+	if actualResources.Requests == nil {
+		actualResources.Requests = corev1.ResourceList{}
+	}
+	if actualResources.Limits == nil {
+		actualResources.Limits = corev1.ResourceList{}
+	}
+	for k, v := range expectResources {
+		actualResources.Requests[k] = v
+		actualResources.Limits[k] = v
+	}
+	component.PodSpec.Containers[0].Resources = actualResources
+	return nil
 }

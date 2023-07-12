@@ -67,6 +67,8 @@ LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
+# build tags
+BUILD_TAGS="containers_image_openpgp"
 
 
 TAG_LATEST ?= false
@@ -125,7 +127,7 @@ all: manager kbcli probe reloader ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(MAKE) client-sdk-gen
@@ -135,7 +137,7 @@ preflight-manifests: generate ## Generate external Preflight API
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen build-kbcli-embed-chart ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
 
 .PHONY: client-sdk-gen
@@ -160,7 +162,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=linux $(GO) vet -mod=mod ./...
+	GOOS=$(GOOS) $(GO) vet -tags $(BUILD_TAGS) -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -175,12 +177,12 @@ lint: test-go-generate generate ## Run default lint job against code.
 	$(MAKE) golangci-lint
 
 .PHONY: golangci-lint
-golangci-lint: golangci ## Run golangci-lint against code.
+golangci-lint: golangci generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
 
 .PHONY: staticcheck
-staticcheck: staticchecktool ## Run staticcheck against code.
-	$(STATICCHECK) ./...
+staticcheck: staticchecktool test-go-generate generate ## Run staticcheck against code.
+	$(STATICCHECK) -tags $(BUILD_TAGS) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports lint-fast ## Run build checks.
@@ -209,24 +211,26 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
+
+OUTPUT_COVERAGE=-coverprofile cover.out.tmp && grep -v "zz_generated.deepcopy.go" cover.out.tmp > cover.out && rm cover.out.tmp
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -p 1 $(TEST_PACKAGES) $(OUTPUT_COVERAGE)
 
 .PHONY: test-fast
 test-fast: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -short $(TEST_PACKAGES)  $(OUTPUT_COVERAGE)
 
 .PHONY: test
 test: manifests generate test-go-generate add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
 .PHONY: race
 race:
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -race $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -race $(TEST_PACKAGES)
 
 .PHONY: test-integration
 test-integration: manifests generate envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./test/integration
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) ./test/integration
 
 .PHONY: test-delve
 test-delve: manifests generate envtest ## Run tests.
@@ -265,14 +269,39 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
 bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -tags $(BUILD_TAGS) -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
-kbcli-fast:
+kbcli-fast: build-kbcli-embed-chart
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+
+create-kbcli-embed-charts-dir:
+	mkdir -p internal/cli/cluster/charts/
+build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
+build-single-kbcli-embed-chart.%:
+	$(HELM) dependency update deploy/$(chart) --skip-refresh
+ifeq ($(VERSION), latest)
+	$(HELM) package deploy/$(chart)
+else
+	$(HELM) package deploy/$(chart) --version $(VERSION)
+endif
+	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
+
+.PHONY: build-kbcli-embed-chart
+build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
+	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
+	build-single-kbcli-embed-chart.redis-cluster \
+	build-single-kbcli-embed-chart.postgresql-cluster \
+	build-single-kbcli-embed-chart.kafka-cluster \
+	build-single-kbcli-embed-chart.mongodb-cluster
+#	build-single-kbcli-embed-chart.postgresql-cluster \
+#	build-single-kbcli-embed-chart.clickhouse-cluster \
+#	build-single-kbcli-embed-chart.milvus-cluster \
+#	build-single-kbcli-embed-chart.qdrant-cluster \
+#	build-single-kbcli-embed-chart.weaviate-cluster
 
 .PHONY: kbcli
 kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
@@ -283,9 +312,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 
 .PHONY: kbcli-doc
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
-
-
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
@@ -296,7 +323,7 @@ api-doc:  ## generate API reference manual.
 
 .PHONY: manager
 manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
+	$(GO) build -tags $(BUILD_TAGS) -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
@@ -374,7 +401,7 @@ fix-license-header: ## Run license header fix.
 
 ##@ Helm Chart Tasks
 
-bump-single-chart-appver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-appver.%: chart=$*
 bump-single-chart-appver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -382,7 +409,7 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
-bump-single-chart-ver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-ver.%: chart=$*
 bump-single-chart-ver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -414,20 +441,13 @@ bump-chart-ver: \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
 	bump-single-chart-ver.weaviate-cluster \
-	bump-single-chart-ver.chatgpt-retrieval-plugin
+	bump-single-chart-ver.chatgpt-retrieval-plugin \
+	bump-single-chart-ver.tdengine \
+	bump-single-chart-ver.tdengine-cluster
 bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
-## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
-## before dependency update.
-	# cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
-	#$(HELM) dependency update --skip-refresh $(CHART_PATH)
-	$(HELM) package deploy/apecloud-mysql
-	mv apecloud-mysql-*.tgz deploy/helm/depend-charts/
-	$(HELM) package deploy/postgresql
-	mv postgresql-*.tgz deploy/helm/depend-charts/
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
@@ -445,7 +465,6 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
-HELM_VERSION ?= v3.9.0
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -543,7 +562,9 @@ helmtool: ## Download helm locally if necessary.
 ifeq (, $(shell which helm))
 	@{ \
 	set -e ;\
-	go install github.com/helm/helm@$(HELM_VERSION);\
+	echo 'installing helm' ;\
+	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
+	echo 'Successfully installed' ;\
 	}
 HELM=$(GOBIN)/helm
 else
@@ -566,15 +587,19 @@ KUBECTL=$(shell which kubectl)
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) dependency build deploy/apecloud-mysql-cluster --skip-refresh
-	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	$(HELM) dependency build deploy/redis-cluster --skip-refresh
+	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
+	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
+	$(HELM) template mysql-cluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	$(HELM) template pg-cluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template redis-cluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

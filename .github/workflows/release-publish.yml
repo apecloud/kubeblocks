@@ -57,7 +57,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libbtrfs-dev \
-            libdevmapper-dev
+            libdevmapper-dev \
+            libgpgme-dev
 
       - name: Setup Go
         uses: actions/setup-go@v4

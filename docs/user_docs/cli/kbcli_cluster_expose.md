@@ -30,7 +30,7 @@ kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
       --enable string                  Enable or disable the expose, values can be true or false
   -h, --help                           help for expose
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
       --type string                    Expose type, currently supported types are 'vpc', 'internet'
 ```

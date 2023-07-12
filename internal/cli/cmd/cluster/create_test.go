@@ -35,6 +35,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -60,7 +61,7 @@ func getResource(res corev1.ResourceRequirements, name corev1.ResourceName) inte
 }
 
 var _ = Describe("create", func() {
-	var componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance
+	var clsMgr = &class.Manager{}
 
 	Context("setMonitor", func() {
 		var components []map[string]interface{}
@@ -164,7 +165,7 @@ var _ = Describe("create", func() {
 	It("build default cluster component without environment", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
-		comps, err := buildClusterComp(cd, nil, componentClasses)
+		comps, err := buildClusterComp(cd, nil, clsMgr)
 		Expect(err).ShouldNot(HaveOccurred())
 		checkComponent(comps, "20Gi", 1, "1", "1Gi", "", 0)
 	})
@@ -176,7 +177,7 @@ var _ = Describe("create", func() {
 		viper.Set(types.CfgKeyClusterDefaultMemory, "2Gi")
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
-		comps, err := buildClusterComp(cd, nil, componentClasses)
+		comps, err := buildClusterComp(cd, nil, clsMgr)
 		Expect(err).ShouldNot(HaveOccurred())
 		checkComponent(comps, "5Gi", 1, "2", "2Gi", "", 0)
 	})
@@ -193,13 +194,13 @@ var _ = Describe("create", func() {
 				keyStorageClass: "test",
 			},
 		}
-		comps, err := buildClusterComp(cd, setsMap, componentClasses)
+		comps, err := buildClusterComp(cd, setsMap, clsMgr)
 		Expect(err).Should(Succeed())
 		checkComponent(comps, "10Gi", 10, "10", "2Gi", "test", 0)
 
 		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
 		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
-		_, err = buildClusterComp(cd, setsMap, componentClasses)
+		_, err = buildClusterComp(cd, setsMap, clsMgr)
 		Expect(err).Should(HaveOccurred())
 	})
 
@@ -221,13 +222,13 @@ var _ = Describe("create", func() {
 				keyStorageClass: "test-other",
 			},
 		}
-		comps, err := buildClusterComp(cd, setsMap, componentClasses)
+		comps, err := buildClusterComp(cd, setsMap, clsMgr)
 		Expect(err).Should(Succeed())
 		checkComponent(comps, "10Gi", 10, "10", "2Gi", "test", 0)
 		checkComponent(comps, "5Gi", 5, "5", "1Gi", "test-other", 1)
 		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
 		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
-		_, err = buildClusterComp(cd, setsMap, componentClasses)
+		_, err = buildClusterComp(cd, setsMap, clsMgr)
 		Expect(err).Should(HaveOccurred())
 	})
 
@@ -429,8 +430,13 @@ var _ = Describe("create", func() {
 		o.Namespace = testing.Namespace
 		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
 		o.SourceCluster = testing.ClusterName
+		components := []map[string]interface{}{
+			{
+				"name": testing.ClusterName,
+			},
+		}
 		By("test setRestoreTime")
-		Expect(setRestoreTime(o)).Should(Succeed())
+		Expect(setRestoreTime(o, components)).Should(Succeed())
 	})
 
 	It("test fillClusterMetadataFromBackup", func() {

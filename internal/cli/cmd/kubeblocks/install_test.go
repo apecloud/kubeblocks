@@ -112,4 +112,22 @@ var _ = Describe("kubeblocks install", func() {
 		v.Kubernetes = "v1.25.0"
 		Expect(o.checkVersion(v)).Should(Succeed())
 	})
+
+	It("CompleteInstallOptions test", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.NewFakeConfig(namespace),
+				Client:    testing.FakeClientSet(),
+				Dynamic:   testing.FakeDynamicClient(),
+			},
+			Version:         version.DefaultKubeBlocksVersion,
+			CreateNamespace: true,
+		}
+		Expect(o.TolerationsRaw).Should(BeNil())
+		Expect(o.ValueOpts.JSONValues).Should(BeNil())
+		Expect(o.CompleteInstallOptions()).ShouldNot(HaveOccurred())
+		Expect(o.TolerationsRaw).Should(Equal([]string{defaultTolerationsForInstallation}))
+		Expect(o.ValueOpts.JSONValues).ShouldNot(BeNil())
+	})
 })

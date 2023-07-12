@@ -25,20 +25,16 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var showAllConfig = false
@@ -50,6 +46,11 @@ var keyWhiteList = []string{
 	"dataProtection",
 	"affinity",
 	"tolerations",
+}
+
+var sensitiveValues = []string{
+	"cloudProvider.accessKey",
+	"cloudProvider.secretKey",
 }
 
 var backupConfigExample = templates.Examples(`
@@ -161,7 +162,36 @@ func getHelmValues(release string, opt *Options) (map[string]interface{}, error)
 	for _, item := range list.Items {
 		delete(values, item.GetName())
 	}
+	// encrypted the sensitive values
+	for _, key := range sensitiveValues {
+		sp := strings.Split(key, ".")
+		rootKey := sp[0]
+		if node, ok := values[rootKey]; ok {
+			encryptNodeData(values, node, sp, 0)
+		}
+	}
 	return pruningConfigResults(values), nil
+}
+
+// encryptNodeData encrypts the specified key of helm values. will ignore the key if the type of the value is in [map, slice].
+func encryptNodeData(parentNode map[string]interface{}, node interface{}, sp []string, index int) {
+	switch v := node.(type) {
+	case map[string]interface{}:
+		// do nothing, if target node is not the leaf node
+		if len(sp)-1 == index {
+			return
+		}
+		index += 1
+		encryptNodeData(v, v[sp[index]], sp, index)
+	case []interface{}:
+		// ignore slice ?
+	default:
+		// reach the leaf node, encrypt the value
+		key := sp[index]
+		if _, ok := parentNode[key]; ok {
+			parentNode[key] = "******"
+		}
+	}
 }
 
 // pruningConfigResults prunes the configs results by options
@@ -207,26 +237,7 @@ func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 	if err != nil {
 		return err
 	}
-	if len(pods.Items) == 0 {
-		return nil
-	}
-	condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
-	if condition == nil {
-		return nil
-	}
-	podBelongToKubeBlocks := func(pod corev1.Pod) bool {
-		for _, v := range pod.OwnerReferences {
-			if v.Kind == constant.ReplicaSetKind && strings.Contains(condition.Message, v.Name) {
-				return true
-			}
-		}
-		return false
-	}
 	for _, pod := range pods.Items {
-		belongToKubeBlocks := podBelongToKubeBlocks(pod)
-		if !belongToKubeBlocks {
-			continue
-		}
 		// mark the pod to load configmap
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}

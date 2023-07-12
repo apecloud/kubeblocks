@@ -29,6 +29,8 @@ builds:
     env:
       - ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.20
       - CGO_ENABLED=0
+    tags:
+      - containers_image_openpgp
     ldflags:
       - -s -w -X github.com/apecloud/kubeblocks/version.BuildDate={{ .Date }}
       - -s -w -X github.com/apecloud/kubeblocks/version.GitCommit={{ .FullCommit }}

@@ -2,27 +2,27 @@
 Define the service account name
 */}}
 {{- define "kblib.serviceAccountName" -}}
-{{- printf "kb-sa-%s" (include "kblib.clusterName" .) }}
+{{- printf "kb-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the role name
 */}}
 {{- define "kblib.roleName" -}}
-{{- printf "kb-role-%s" (include "kblib.clusterName" .) }}
+{{- printf "kb-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the rolebinding name
 */}}
 {{- define "kblib.roleBindingName" -}}
-{{- printf "kb-rolebinding-%s" (include "kblib.clusterName" .) }}
+{{- printf "kb-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the service account
 */}}
-{{- define "kblib.serviceAccount" -}}
+{{- define "kblib.serviceAccount" }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -35,7 +35,7 @@ metadata:
 {{/*
 Define the role
 */}}
-{{- define "kblib.role" -}}
+{{- define "kblib.role" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -55,7 +55,7 @@ rules:
 {{/*
 Define the rolebinding
 */}}
-{{- define "kblib.roleBinding" -}}
+{{- define "kblib.roleBinding" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -75,7 +75,7 @@ subjects:
 {{/*
 Define the whole rbac
 */}}
-{{- define "kblib.rbac" -}}
+{{- define "kblib.rbac" }}
 ---
 {{- include "kblib.serviceAccount" . }}
 ---

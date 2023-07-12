@@ -33,7 +33,6 @@ spec:
     - -c
     - |
       #!/bin/bash
-      set -e
       mkdir -p ${BACKUP_DIR} && cd ${BACKUP_DIR}
       # retention 8 days by default
       retention_minute=11520
@@ -68,7 +67,7 @@ spec:
           echo $errorLog && exit 1
         fi
         # check role of the connected mongodb
-        isPrimary=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().ismaster' --quiet)
+        isPrimary=$(mongosh -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().ismaster' --quiet)
         if [ "${isPrimary}" != "true" ]; then
           echo "isPrimary: ${isPrimary}"
           retryTimes=$(($retryTimes+1))
@@ -76,7 +75,7 @@ spec:
           retryTimes=0
         fi
         if [ $retryTimes -ge 3 ]; then
-           echo "ERROR: the current mongo instance is not a primary node, 3 attempts have been made!" && exit 1
+           echo "ERROR: the current mongo instance is not a primary node, 3 attempts have been made!" && kill $wal_g_pid
         fi
       }
 

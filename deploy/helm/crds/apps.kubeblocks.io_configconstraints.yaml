@@ -236,6 +236,7 @@ spec:
                           script ConfigMap object. An empty namespace is equivalent
                           to the "default" namespace.
                         maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                         type: string
                       scriptConfigMapRef:
                         description: scriptConfigMapRef used to execute for reload.
@@ -253,7 +254,6 @@ spec:
                       processName:
                         description: processName is process name, sends unix signal
                           to proc.
-                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       signal:
                         description: 'signal is valid for unix signal. e.g: SIGHUP
@@ -307,6 +307,7 @@ spec:
                         script ConfigMap object. An empty namespace is equivalent
                         to the "default" namespace.
                       maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     scriptConfigMapRef:
                       description: scriptConfigMapRef used to execute for reload.
@@ -390,9 +391,10 @@ spec:
                           description: tools Container image name.
                           type: string
                         name:
-                          description: Specify the name of initContainer.
+                          description: Specify the name of initContainer. Must be
+                            a DNS_LABEL name.
                           maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
                       required:
                       - command

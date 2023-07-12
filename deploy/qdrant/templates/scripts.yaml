@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qdrant-scripts
+  labels:
+    {{- include "qdrant.labels" . | nindent 4 }}
+data:
+  setup.sh: |-
+    {{- .Files.Get "scripts/qdrant-setup.sh" | nindent 4 }}
+  pre-stop.sh: |-
+    {{- .Files.Get "scripts/qdrant-pre-stop.sh" | nindent 4 }}

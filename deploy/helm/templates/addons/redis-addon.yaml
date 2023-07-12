@@ -17,6 +17,9 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/redis
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/redis-{{ default .Chart.Version .Values.versionOverride }}/redis-{{ default .Chart.Version .Values.versionOverride }}.tgz
+
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/redis-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- end }}

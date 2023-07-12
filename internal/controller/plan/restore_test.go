@@ -279,8 +279,19 @@ var _ = Describe("PITR Functions", func() {
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("when base backup restore job completed")
-			baseBackupJobName := fmt.Sprintf("base-%s-%s-0", clusterName, mysqlCompName)
+			baseBackupJobName := fmt.Sprintf("base-%s", fmt.Sprintf("%s-%s-%s-%d", "data", clusterName, synthesizedComponent.Name, 0))
 			baseBackupJobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: baseBackupJobName}
+			Eventually(testapps.CheckObj(&testCtx, baseBackupJobKey, func(g Gomega, fetched *batchv1.Job) {
+				envs := fetched.Spec.Template.Spec.Containers[0].Env
+				var existsTargetENV bool
+				for _, env := range envs {
+					if env.Name == "KB_POD_NAME" {
+						existsTargetENV = true
+						break
+					}
+				}
+				g.Expect(existsTargetENV).Should(BeTrue())
+			})).Should(Succeed())
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, baseBackupJobKey, func(fetched *batchv1.Job) {
 				fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}
 			})).Should(Succeed())

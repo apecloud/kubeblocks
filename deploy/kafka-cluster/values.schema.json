@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "version": {
+      "title": "Version",
+      "description": "Cluster version.",
+      "type": "string",
+      "default": "kafka-3.3.2"
+    },
+    "mode": {
+      "title": "Mode",
+      "description": "Mode for Kafka kraft cluster, 'combined' is combined Kafka controller and broker,'separated' is broker and controller running independently.",
+      "type": "string",
+      "default": "combined",
+      "enum": [
+        "combined",
+        "separated"
+      ]
+    },
+    "saslEnable": {
+      "title": "SaslEnable",
+      "description": "Enable authentication using SASL/PLAIN for Kafka.",
+      "type": "boolean",
+      "default": false
+    },
+    "monitorEnable": {
+      "title": "MonitorEnable",
+      "description": "Enable monitor for Kafka.",
+      "type": "boolean",
+      "default": false
+    },
+    "storageEnable": {
+      "title": "StorageEnable",
+      "description": "Enable storage for Kafka.",
+      "type": "boolean",
+      "default": false
+    },
+    "storage": {
+      "title": "Storage(Gi)",
+      "description": "Data Storage size, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 10,
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "storageClass": {
+      "title": "StorageClass",
+      "description": "The StorageClass for Kafka Data Storage.",
+      "type": "string",
+      "default": ""
+    },
+    "metaStorage": {
+      "title": "MetaStorage(Gi)",
+      "description": "Metadata Storage size, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 5,
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "metaStorageClass": {
+      "title": "MetaStorageClass",
+      "description": "The StorageClass for Kafka Metadata Storage.",
+      "type": "string",
+      "default": ""
+    },
+    "replicas": {
+      "title": "Replicas",
+      "description": "The number of Kafka broker replicas for combined mode.",
+      "type": "integer",
+      "default": 1,
+      "enum": [
+        1,
+        3,
+        5
+      ]
+    },
+    "brokerReplicas": {
+      "title": "BrokerReplicas",
+      "description": "The number of Kafka broker replicas for separated mode.",
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "controllerReplicas": {
+      "title": "ControllerReplicas",
+      "description": "The number of Kafka controller replicas for separated mode.",
+      "type": "integer",
+      "default": 1,
+      "enum": [
+        1,
+        3,
+        5
+      ]
+    },
+    "monitorReplicas": {
+      "title": "MonitorReplicas",
+      "description": "The number of Kafka monitor replicas.",
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 5
+    },
+    "cpu": {
+      "title": "CPU",
+      "description": "CPU cores.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 0.5,
+      "minimum": 0.5,
+      "maximum": 64,
+      "multipleOf": 0.5
+    },
+    "memory": {
+      "title": "Memory(Gi)",
+      "description": "Memory, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 0.5,
+      "minimum": 0.5,
+      "maximum": 1000
+    },
+    "brokerHeap": {
+      "title": "BrokerHeap",
+      "description": "Kafka broker's jvm heap setting.",
+      "type": "string",
+      "default": "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+    },
+    "controllerHeap": {
+      "title": "ControllerHeap",
+      "description": "Kafka controller's jvm heap setting for separated mode",
+      "type": "string",
+      "default": "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+    }
+  }
+}

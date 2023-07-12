@@ -105,6 +105,7 @@ func (mgr *Manager) newProcessFromPidFile() error {
 	proc, err := process.NewProcess(mgr.PidFile.pid)
 	if err != nil {
 		mgr.Logger.Errorf("new process failed, err:%v", err)
+		mgr.PidFile = nil
 		return err
 	}
 

@@ -12,6 +12,167 @@ spec:
     httpEndpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
     pulsarEndpoint: "pulsar://$(SVC_FQDN):$(SVC_PORT_pulsar)"
   componentDefs:
+    - name: pulsar-broker
+      workloadType: Stateful
+      characterType: pulsar-broker
+      statefulSpec:
+        updateStrategy: BestEffortParallel
+      componentDefRef:
+      - componentDefName: zookeeper
+        componentRefEnv:
+        - name: zookeeperSVC
+          valueFrom:
+            type: ServiceRef
+      # TODO: support monitor
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 8080
+      logConfigs:
+      # TODO: refer to broker configuration
+      configSpecs:
+        - name: broker-env
+          templateRef: {{ include "pulsar.name" . }}-broker-env
+          namespace: {{ .Release.Namespace }}
+          keys:
+            - conf
+          asEnvFrom:
+            - init-broker-cluster
+            - broker
+          volumeName: broker-env
+        - name: broker-conf
+          templateRef: {{ include "pulsar.name" . }}-broker-conf-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: config
+      scriptSpecs:
+        - name: pulsar-scripts
+          templateRef: {{ include "pulsar.name" . }}-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
+      service:
+        ports:
+        - name: pulsar
+          port: 6650
+          targetPort: pulsar
+        - name: http
+          port: 80
+          targetPort: http
+      podSpec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10000
+          fsGroup: 0
+          runAsGroup: 0
+        initContainers:
+          - name: init-broker-cluster
+            command:
+              - /kb-scripts/init-broker.sh
+            env:
+            - name: brokerServiceUrl
+              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
+            - name: clusterName
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
+            - name: webServiceUrl
+              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
+            - name: zookeeperServers
+              value: $(zookeeperSVC):2181
+            - name: configurationStoreServers
+              value: $(zookeeperSVC):2181
+            volumeMounts:
+              - name: scripts
+                mountPath: /kb-scripts
+          - name: init-sysctl
+            command:
+              - /kb-scripts/init-broker-sysctl.sh
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            volumeMounts:
+              - name: scripts
+                mountPath: /kb-scripts
+        containers:
+          - name: broker
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 10000
+              capabilities:
+                drop:
+                - ALL
+              privileged: false
+              runAsGroup: 0
+            command:
+              - /kb-scripts/start-broker.sh
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+            env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: PULSAR_PREFIX_brokerServicePort
+              value: "6650"
+            - name: PULSAR_PREFIX_internalListenerName
+              value: cluster
+            - name: PULSAR_PREFIX_advertisedListeners
+              value: cluster:pulsar://$(POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.pulsar.svc.cluster.local:6650
+            - name: PULSAR_PREFIX_bindAddresses
+            - name: brokerServiceUrl
+              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
+            - name: clusterName
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
+            - name: webServiceUrl
+              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
+            - name: zookeeperServers
+              value: $(zookeeperSVC):2181
+            - name: configurationStoreServers
+              value: $(zookeeperSVC):2181
+            ports:
+              - containerPort: 6650
+                name: pulsar
+              - containerPort: 8080
+                name: http
+            livenessProbe:
+              failureThreshold: 30
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            startupProbe:
+              failureThreshold: 30
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            volumeMounts:
+            - name: config
+              mountPath: /pulsar/config-broker
+            - name: scripts
+              mountPath: /kb-scripts
     - name: pulsar-proxy
       workloadType: Stateful
       characterType: pulsar-proxy
@@ -33,7 +194,7 @@ spec:
       # TODO: refer to broker configuration
       configSpecs:
         - name: proxy-config
-          templateRef: pulsar-proxy-config
+          templateRef: {{ include "pulsar.name" . }}-proxy-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: config
           keys:
@@ -42,7 +203,7 @@ spec:
             - proxy
       scriptSpecs:
         - name: pulsar-scripts
-          templateRef: pulsar-scripts
+          templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777
@@ -127,166 +288,6 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /kb-scripts
-    - name: pulsar-broker
-      workloadType: Stateful
-      characterType: pulsar-broker
-      statefulSpec:
-        updateStrategy: BestEffortParallel
-      componentDefRef:
-      - componentDefName: zookeeper
-        componentRefEnv:
-        - name: zookeeperSVC
-          valueFrom:
-            type: ServiceRef
-      # TODO: support monitor
-      monitor:
-        builtIn: false
-        exporterConfig:
-          scrapePath: /metrics
-          scrapePort: 9141
-      logConfigs:
-      # TODO: refer to broker configuration
-      configSpecs:
-        - name: broker-env
-          templateRef: broker-env
-          namespace: {{ .Release.Namespace }}
-          keys:
-            - conf
-          asEnvFrom:
-            - init-broker-cluster
-            - broker
-        - name: broker-conf
-          templateRef: broker-conf
-          namespace: {{ .Release.Namespace }}
-          volumeName: config
-      scriptSpecs:
-        - name: pulsar-scripts
-          templateRef: pulsar-scripts
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 0777
-      service:
-        ports:
-        - name: pulsar
-          port: 6650
-          targetPort: pulsar
-        - name: http
-          port: 80
-          targetPort: http
-      podSpec:
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 10000
-          fsGroup: 0
-          runAsGroup: 0
-        initContainers:
-          - name: init-broker-cluster
-            command:
-              - /kb-scripts/init-broker.sh
-            env:
-            - name: brokerServiceUrl
-              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
-            - name: clusterName
-              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
-            - name: webServiceUrl
-              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
-            - name: zookeeperServers
-              value: $(zookeeperSVC):2181
-            - name: configurationStoreServers
-              value: $(zookeeperSVC):2181
-            volumeMounts:
-              - name: scripts
-                mountPath: /kb-scripts
-          - name: init-sysctl
-            command:
-              - /kb-scripts/init-broker-sysctl.sh
-            securityContext:
-              privileged: true
-              runAsNonRoot: false
-              runAsUser: 0
-            volumeMounts:
-              - name: scripts
-                mountPath: /kb-scripts
-        containers:
-          - name: broker
-            securityContext:
-              allowPrivilegeEscalation: false
-              runAsNonRoot: true
-              runAsUser: 10000
-              capabilities:
-                drop:
-                - ALL
-              privileged: false
-              runAsGroup: 0
-            command:
-              - /kb-scripts/start-broker.sh
-            resources:
-              requests:
-                cpu: 200m
-                memory: 512Mi
-            env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
-            - name: PULSAR_PREFIX_brokerServicePort
-              value: "6650"
-            - name: PULSAR_PREFIX_internalListenerName
-              value: cluster
-            - name: PULSAR_PREFIX_advertisedListeners
-              value: cluster:pulsar://$(POD_NAME).pulsar1-broker-headless.pulsar.svc.cluster.local:6650
-            - name: PULSAR_PREFIX_bindAddresses
-            - name: brokerServiceUrl
-              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
-            - name: clusterName
-              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
-            - name: webServiceUrl
-              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
-            - name: zookeeperServers
-              value: $(zookeeperSVC):2181
-            - name: configurationStoreServers
-              value: $(zookeeperSVC):2181
-            ports:
-              - containerPort: 6650
-                name: pulsar
-              - containerPort: 8080
-                name: http
-            livenessProbe:
-              failureThreshold: 30
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            readinessProbe:
-              failureThreshold: 3
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            startupProbe:
-              failureThreshold: 30
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            volumeMounts:
-            - name: config
-              mountPath: /pulsar/config-broker
-            - name: scripts
-              mountPath: /kb-scripts
     - name: bookies
       workloadType: Stateful
       characterType: bookies
@@ -294,7 +295,7 @@ spec:
         updateStrategy: BestEffortParallel
       configSpecs:
         - name: bookies-config
-          templateRef: pulsar-bookies-config
+          templateRef: {{ include "pulsar.name" . }}-bookies-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: bookies-config
           keys:
@@ -304,7 +305,7 @@ spec:
             - bookies
       scriptSpecs:
         - name: pulsar-scripts
-          templateRef: pulsar-scripts
+          templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777
@@ -363,6 +364,73 @@ spec:
                 name: ledgers
               - name: scripts
                 mountPath: /kb-scripts
+    - name: bookies-recovery
+      workloadType: Stateful
+      characterType: pulsar-bookie-recovery
+      statefulSpec:
+        updateStrategy: BestEffortParallel
+      # TODO: support monitor
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 8000
+      logConfigs:
+      # TODO: refer to broker configuration
+      configSpecs:
+      - name: bookies-recovery-config
+        templateRef: {{ include "pulsar.name" . }}-recovery-conf-tpl
+        namespace: {{ .Release.Namespace }}
+        asEnvFrom: ["bookies-recovery"]
+        volumeName: recovery-config
+      scriptSpecs:
+        - name: pulsar-scripts
+          templateRef: {{ include "pulsar.name" . }}-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
+      podSpec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10000
+          fsGroup: 0
+          runAsGroup: 0
+        initContainers:
+          - name: check-bookies
+            command:
+            - /kb-scripts/check-bookies.sh
+        containers:
+          - name: bookies-recovery
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 10000
+              capabilities:
+                drop:
+                - ALL
+              privileged: false
+              runAsGroup: 0
+            command:
+              - /kb-scripts/start-bookies-recovery.sh
+            env:
+            - name: httpServerEnabled
+              value: "true"
+            - name: httpServerPort
+              value: "8000"
+            - name: prometheusStatsHttpPort
+              value: "8000"
+            - name: useHostNameAsBookieID
+              value: "true"
+            ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+            - containerPort: 3181
+              name: bookie
+              protocol: TCP
+            volumeMounts:
+            - name: scripts
+              mountPath: /kb-scripts
     - name: zookeeper
       workloadType: Stateful
       characterType: zookeeper
@@ -380,7 +448,7 @@ spec:
         {{- end }}
       configSpecs:
         - name: zookeeper-config
-          templateRef: pulsar-zookeeper-config
+          templateRef: {{ include "pulsar.name" . }}-zookeeper-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: zookeeper-config
           keys:
@@ -389,7 +457,7 @@ spec:
             - zookeeper
       scriptSpecs:
         - name: pulsar-scripts
-          templateRef: pulsar-scripts
+          templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777

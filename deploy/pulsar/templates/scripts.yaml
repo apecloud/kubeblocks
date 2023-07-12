@@ -1,25 +1,22 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pulsar-scripts
+  name: {{ include "pulsar.name" . }}-scripts
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:
   init-proxy.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
     while [ "$(curl -s -o /dev/null -w '%{http_code}' ${brokerSVC}:8080/status.html)"
         -ne "200" ]; do echo "pulsar cluster isn't initialized yet..."; sleep 3;
     done
   start-proxy.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
     bin/apply-config-from-env.py conf/proxy.conf && echo 'OK' > status && exec bin/pulsar proxy
   init-broker.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
     set -x
     echo "INFO: wait for zookeeper ready..."
@@ -52,18 +49,15 @@ data:
     (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
   init-broker-sysctl.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
     sysctl -w net.ipv4.tcp_keepalive_time=1 &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_intvl=11 &&\n\t\t\t sysctl -w net.ipv4.tcp_keepalive_probes=3
   start-broker.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
     bin/apply-config-from-env.py conf/broker.conf && bin/apply-config-from-env.py
       conf/client.conf && echo 'OK' > status;exec bin/pulsar broker
   init-bookies.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
 
     echo "waiting zookeeper ready..."
@@ -85,15 +79,25 @@ data:
     done; bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
   start-bookies.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
 
     bin/apply-config-from-env.py conf/bookkeeper.conf;
     OPTS="${OPTS} -Dlog4j2.formatMsgNoLookups=true" exec bin/pulsar bookie;
   start-zookeeper.sh: |-
     #!/bin/bash
-    set -o errexit
     set -e
 
     bin/apply-config-from-env.py conf/zookeeper.conf;
     bin/generate-zookeeper-config.sh conf/zookeeper.conf; exec bin/pulsar zookeeper;
+  check-bookies.sh: |-
+    #!/bin/bash
+    bin/apply-config-from-env.py conf/bookkeeper.conf
+    until bin/bookkeeper shell whatisinstanceid; do
+      sleep 3;
+    done;
+    sysctl -w net.ipv4.tcp_keepalive_time=1 && sysctl -w net.ipv4.tcp_keepalive_intvl=11 && sysctl -w net.ipv4.tcp_keepalive_probes=3
+  start-bookies-recovery.sh: |-
+    #!/bin/bash
+    set -e
+    bin/apply-config-from-env.py conf/bookkeeper.conf
+    exec bin/bookkeeper autorecovery

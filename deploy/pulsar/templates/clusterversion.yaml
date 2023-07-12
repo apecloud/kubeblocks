@@ -17,6 +17,16 @@ spec:
           - name: bookies
             image: {{ .Values.bookies.image.repository }}:{{ .Values.bookies.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.bookies.image.pullPolicy }}
+    - componentDefRef: bookies-recovery
+      versionsContext:
+        initContainers:
+          - name: init-bookies
+            image: {{ .Values.bookies.image.repository }}:{{ .Values.bookies.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.bookies.image.pullPolicy }}
+        containers:
+          - name: bookies-recovery
+            image: {{ .Values.bookies.image.repository }}:{{ .Values.bookies.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.bookies.image.pullPolicy }}
     - componentDefRef: zookeeper
       versionsContext:
         containers:

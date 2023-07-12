@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pulsar-proxy-config
+  name: {{ include "pulsar.name" . }}-proxy-conf-tpl
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:

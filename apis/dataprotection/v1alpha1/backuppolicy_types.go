@@ -143,7 +143,7 @@ type PersistentVolumeClaim struct {
 	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
 	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
 	// support the following built-in Objects:
-	// - $(GENERATE_NAME): generate a specific format "<PVC NAME>-<PVC NAMESPACE>".
+	// - $(GENERATE_NAME): generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
 	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
 	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
 	// +optional

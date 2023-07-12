@@ -3198,7 +3198,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.ClusterComponentStatus
+map[string]..ClusterComponentStatus
 </a>
 </em>
 </td>
@@ -3911,6 +3911,18 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specify the name of the referenced the configuration constraints object.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>asEnvFrom</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>asEnvFrom is optional: the list of containers will be injected into EnvFrom.</p><br />
 </td>
 </tr>
 </tbody>
@@ -5660,7 +5672,7 @@ ClassDefRef
 <td>
 <code>targetResources</code><br/>
 <em>
-map[apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]string
+map[..ComponentResourceKey][]string
 </em>
 </td>
 <td>
@@ -5702,7 +5714,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfiguration
+map[string]..LastComponentConfiguration
 </a>
 </em>
 </td>
@@ -6444,7 +6456,7 @@ LastConfiguration
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponentStatus
+map[string]..OpsRequestComponentStatus
 </a>
 </em>
 </td>

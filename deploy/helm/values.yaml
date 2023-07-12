@@ -20,6 +20,8 @@ image:
   imagePullSecrets: []
   tools:
     repository: apecloud/kubeblocks-tools
+  charts:
+    repository: apecloud/kubeblocks-charts
 
 ## @param separatedDeployment separated the KubeBlocks deployment into two deployments.
 ## This switch is used to isolate the apps controller and dataprotection controller

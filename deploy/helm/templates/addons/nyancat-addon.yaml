@@ -17,6 +17,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- end }}

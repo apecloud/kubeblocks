@@ -12,7 +12,7 @@ spec:
     httpEndpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
     pulsarEndpoint: "pulsar://$(SVC_FQDN):$(SVC_PORT_pulsar)"
   componentDefs:
-    - name: proxy
+    - name: pulsar-proxy
       workloadType: Stateful
       characterType: pulsar-proxy
       statefulSpec:
@@ -28,26 +28,32 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9141
+          scrapePort: http
       logConfigs:
       # TODO: refer to broker configuration
       configSpecs:
-      {{- if .Values.proxy.configuration }}
         - name: proxy-config
-          templateRef: proxy-tpl
+          templateRef: pulsar-proxy-config
           namespace: {{ .Release.Namespace }}
           volumeName: config
-      {{- end }}
+          keys:
+            - conf
+          asEnvFrom:
+            - proxy
+      scriptSpecs:
+        - name: pulsar-scripts
+          templateRef: pulsar-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
       service:
         ports:
         - name: pulsar
           port: 6650
-          protocol: TCP
-          targetPort: 6650
+          targetPort: pulsar
         - name: http
-          port: 8080
-          protocol: TCP
-          targetPort: 8080
+          port: 80
+          targetPort: http
       podSpec:
         securityContext:
           runAsNonRoot: true
@@ -56,15 +62,15 @@ spec:
           runAsGroup: 0
         initContainers:
           - name: check-broker
-            args:
-            - set -e; while [ "$(curl -s -o /dev/null -w '%{http_code}' ${brokerSVC}:8080/status.html)"
-                  -ne "200" ]; do echo "pulsar cluster isn't initialized yet..."; sleep 3;
-              done
             command:
-              - sh
-              - -c
+              - /kb-scripts/init-proxy.sh
+            volumeMounts:
+              - name: scripts
+                mountPath: /kb-scripts
         containers:
           - name: proxy
+            command:
+              - /kb-scripts/start-proxy.sh
             securityContext:
               allowPrivilegeEscalation: false
               runAsNonRoot: true
@@ -74,11 +80,6 @@ spec:
                 - ALL
               privileged: false
               runAsGroup: 0
-            args:
-            - bin/apply-config-from-env.py conf/proxy.conf && echo 'OK' > status && exec bin/pulsar proxy
-            command:
-              - sh
-              - -c
             env:
             - name: brokerWebServiceURL
               value: http://$(brokerSVC):8080
@@ -88,22 +89,11 @@ spec:
               value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
             - name: webServicePort
               value: "8080"
-            envFrom:
-              - configMapRef:
-                  name: proxy-test-config
             ports:
             - containerPort: 6650
               name: pulsar
-              protocol: TCP
-            - containerPort: 6651
-              name: pulsarssl
-              protocol: TCP
-            - containerPort: 8443
-              name: https
-              protocol: TCP
             - containerPort: 8080
               name: http
-              protocol: TCP
             livenessProbe:
               failureThreshold: 3
               httpGet:
@@ -134,7 +124,10 @@ spec:
               periodSeconds: 10
               successThreshold: 1
               timeoutSeconds: 100
-    - name: broker
+            volumeMounts:
+              - name: scripts
+                mountPath: /kb-scripts
+    - name: pulsar-broker
       workloadType: Stateful
       characterType: pulsar-broker
       statefulSpec:
@@ -154,24 +147,32 @@ spec:
       logConfigs:
       # TODO: refer to broker configuration
       configSpecs:
-        - name: broker-interceptors
-          templateRef: broker-interceptors-tpl
+        - name: broker-env
+          templateRef: broker-env
           namespace: {{ .Release.Namespace }}
-          volumeName: interceptors
-      {{- if .Values.broker.configuration }}
-        - name: broker-tpl
-          templateRef: broker-tpl
+          keys:
+            - conf
+          asEnvFrom:
+            - init-broker-cluster
+            - broker
+        - name: broker-conf
+          templateRef: broker-conf
           namespace: {{ .Release.Namespace }}
           volumeName: config
-      {{- end }}
+      scriptSpecs:
+        - name: pulsar-scripts
+          templateRef: pulsar-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
       service:
         ports:
-        - name: tcp-pulsar
+        - name: pulsar
           port: 6650
-          targetPort: 6650
+          targetPort: pulsar
         - name: http
-          port: 8080
-          targetPort: 8080
+          port: 80
+          targetPort: http
       podSpec:
         securityContext:
           runAsNonRoot: true
@@ -180,40 +181,8 @@ spec:
           runAsGroup: 0
         initContainers:
           - name: init-broker-cluster
-            args:
-            - |2-
-              set -x
-              echo "INFO: wait for zookeeper ready..."
-              until bin/pulsar zookeeper-shell -server ${zookeeperServers} --run-once "ls /"; do
-                sleep 3;
-              done;
-              idx=${KB_POD_NAME##*-}
-              if [ $idx -ne 0 ]; then
-                # if not the first pod, do it
-                until bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; do
-                  echo "INFO: wait for init the meta cluster..."
-                  sleep 3;
-                done
-                echo "INFO: cluster already initialized" && exit 0
-              fi
-              # if the pod is the first pod, do it
-              if bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; then
-                echo "INFO: cluster already initialized" && exit 0
-              fi
-              echo "INFO: init cluster metadata for cluster: ${clusterName}"
-              bin/pulsar initialize-cluster-metadata \
-              --cluster ${clusterName} \
-              --zookeeper ${zookeeperServers} \
-              --configuration-store ${zookeeperServers} \
-              --web-service-url ${webServiceUrl}
-              # --web-service-url-tls https://pulsar-mini-broker.pulsar.svc.cluster.local:8443/ \
-              # --broker-service-url ${brokerServiceUrl} \
-              # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
-
-              (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
             command:
-              - sh
-              - -c
+              - /kb-scripts/init-broker.sh
             env:
             - name: brokerServiceUrl
               value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
@@ -225,20 +194,19 @@ spec:
               value: $(zookeeperSVC):2181
             - name: configurationStoreServers
               value: $(zookeeperSVC):2181
-            envFrom:
-            - configMapRef:
-                name: broker-test-config
+            volumeMounts:
+              - name: scripts
+                mountPath: /kb-scripts
           - name: init-sysctl
-            args:
-            - "sysctl -w net.ipv4.tcp_keepalive_time=1 &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_intvl=11
-               &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_probes=3"
             command:
-            - /bin/sh
-            - -c
+              - /kb-scripts/init-broker-sysctl.sh
             securityContext:
               privileged: true
               runAsNonRoot: false
               runAsUser: 0
+            volumeMounts:
+              - name: scripts
+                mountPath: /kb-scripts
         containers:
           - name: broker
             securityContext:
@@ -250,12 +218,8 @@ spec:
                 - ALL
               privileged: false
               runAsGroup: 0
-            args:
-            - bin/apply-config-from-env.py conf/broker.conf && bin/apply-config-from-env.py
-                conf/client.conf && echo 'OK' > status;exec bin/pulsar broker
             command:
-              - sh
-              - -c
+              - /kb-scripts/start-broker.sh
             resources:
               requests:
                 cpu: 200m
@@ -283,18 +247,11 @@ spec:
               value: $(zookeeperSVC):2181
             - name: configurationStoreServers
               value: $(zookeeperSVC):2181
-            envFrom:
-              - configMapRef:
-                 # TODO: replace it when kb supports inject configMap
-                  name: broker-test-config
-              # TODO: using componentDefRef to inject zookeeper or keeper env
             ports:
               - containerPort: 6650
-                name: tcp-pulsar
-                protocol: TCP
+                name: pulsar
               - containerPort: 8080
                 name: http
-                protocol: TCP
             livenessProbe:
               failureThreshold: 30
               httpGet:
@@ -326,64 +283,45 @@ spec:
               successThreshold: 1
               timeoutSeconds: 100
             volumeMounts:
-            - name: interceptors
-              mountPath: /pulsar/plugin_configs/interceptors
-              readOnly: true
-           #   - name: conf
-           #     mountPath: /pulsar/conf
+            - name: config
+              mountPath: /pulsar/config-broker
+            - name: scripts
+              mountPath: /kb-scripts
     - name: bookies
       workloadType: Stateful
       characterType: bookies
       statefulSpec:
         updateStrategy: BestEffortParallel
       configSpecs:
-        - name: pulsar-bookies-config
+        - name: bookies-config
           templateRef: pulsar-bookies-config
           namespace: {{ .Release.Namespace }}
-          volumeName: pulsar-bookies-config
+          volumeName: bookies-config
+          keys:
+            - conf
+          asEnvFrom:
+            - init-bookies
+            - bookies
+      scriptSpecs:
+        - name: pulsar-scripts
+          templateRef: pulsar-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
       podSpec:
         initContainers:
           - name: init-bookies
             command:
-              - bash
-              - -c
-            args:
-            - |
-              echo "waiting zookeeper ready..."
-              zkDomain="${zkServers%%:*}"
-              until nslookup $zkDomain; do
-                sleep 3;
-              done;
-              echo "zk is ready, start to config bookkeeper..."
-              bin/apply-config-from-env.py conf/bookkeeper.conf;
-              if bin/bookkeeper shell whatisinstanceid; then
-                echo "bookkeeper cluster already initialized";
-              else
-                echo "bookkeeper init new cluster."
-                bin/bookkeeper shell initnewcluster;
-              fi
-              echo "verify bookkeeper cluster id"
-              bin/apply-config-from-env.py conf/bookkeeper.conf;until bin/bookkeeper shell whatisinstanceid; do
-                sleep 3;
-              done; bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
-            envFrom:
-              - configMapRef:
-                  name: pulsar-bookies-pulsar-bookies-config
+              - /kb-scripts/init-bookies.sh
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
+            volumeMounts:
+              - name: scripts
+                mountPath: /kb-scripts
         containers:
           - name: bookies
             command:
-              - bash
-              - -c
-            args:
-            - |
-              bin/apply-config-from-env.py conf/bookkeeper.conf;
-              OPTS="${OPTS} -Dlog4j2.formatMsgNoLookups=true" exec bin/pulsar bookie;
-            envFrom:
-              - configMapRef:
-                  ## name: bookies-bk-config
-                  name: pulsar-bookies-pulsar-bookies-config
+              - /kb-scripts/start-bookies.sh
             livenessProbe:
               failureThreshold: 60
               httpGet:
@@ -397,15 +335,13 @@ spec:
             ports:
               - containerPort: 8000
                 name: http
-                protocol: TCP
               - containerPort: 3181
                 name: bookie
-                protocol: TCP
             readinessProbe:
               failureThreshold: 60
               httpGet:
                 path: /api/v1/bookie/is_ready
-                port: 8000
+                port: http
                 scheme: HTTP
               initialDelaySeconds: 10
               periodSeconds: 30
@@ -425,6 +361,8 @@ spec:
                 name: journal
               - mountPath: /pulsar/data/bookkeeper/ledgers
                 name: ledgers
+              - name: scripts
+                mountPath: /kb-scripts
     - name: zookeeper
       workloadType: Stateful
       characterType: zookeeper
@@ -441,10 +379,20 @@ spec:
           filePathPattern: {{ $pattern }}
         {{- end }}
       configSpecs:
-        - name: pulsar-zookeeper-config
+        - name: zookeeper-config
           templateRef: pulsar-zookeeper-config
           namespace: {{ .Release.Namespace }}
-          volumeName: pulsar-zookeeper-config
+          volumeName: zookeeper-config
+          keys:
+            - conf
+          asEnvFrom:
+            - zookeeper
+      scriptSpecs:
+        - name: pulsar-scripts
+          templateRef: pulsar-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
       service:
         ports:
           - name: client
@@ -462,37 +410,23 @@ spec:
         containers:
           - name: zookeeper
             command:
-              - bash
-              - -c
-            args:
-              - |-
-                bin/apply-config-from-env.py conf/zookeeper.conf;
-                bin/generate-zookeeper-config.sh conf/zookeeper.conf; exec bin/pulsar zookeeper;
+              - /kb-scripts/start-zookeeper.sh
             env:
               - name: EXTERNAL_PROVIDED_SERVERS
                 value: "false"
               - name: OPTS
                 value: "-Dlog4j2.formatMsgNoLookups=true -XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
-            envFrom:
-              - configMapRef:
-                  ## name: zookeepers-zk-config
-                  name: pulsar-zookeeper-pulsar-zookeeper-config
             ports:
               - containerPort: 2181
                 name: client
-                protocol: TCP
               - containerPort: 2888
                 name: tcp-quorum
-                protocol: TCP
               - containerPort: 3888
                 name: tcp-election
-                protocol: TCP
               - containerPort: 9141
                 name: metrics
-                protocol: TCP
               - containerPort: 9990
                 name: http-admin
-                protocol: TCP
             livenessProbe:
               exec:
                 command:
@@ -539,3 +473,5 @@ spec:
                 name: data
               - mountPath: /pulsar/data-log
                 name: data-log
+              - name: scripts
+                mountPath: /kb-scripts

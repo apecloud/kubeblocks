@@ -1,43 +1,19 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: broker-interceptors-tpl
+  name: broker-env
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  conf: |-
+    {{- .Files.Get "config/broker-env.tpl" | nindent 4 }}
 ---
-apiVersion: v1
+  apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: broker-test-config
+  name: broker-conf
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
 data:
-  PULSAR_EXTRA_OPTS: -Dpulsar.allocator.exit_on_oom=true -Dio.netty.recycler.maxCapacity.default=1000
-    -Dio.netty.recycler.linkCapacity=1024 -Dnetworkaddress.cache.ttl=60 -XX:ActiveProcessorCount=1
-  PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions
-    -XX:+DoEscapeAnalysis -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB
-  PULSAR_MEM: -Xms153m -Xmx153m -XX:MaxDirectMemorySize=307m
-  PULSAR_PREFIX_acknowledgmentAtBatchIndexLevelEnabled: "false"
-  PULSAR_PREFIX_backlogQuotaDefaultLimitGB: "-1"
-  PULSAR_PREFIX_backlogQuotaDefaultRetentionPolicy: producer_request_hold
-  PULSAR_PREFIX_bookkeeperClientReorderReadSequenceEnabled: "true"
-  PULSAR_PREFIX_bookkeeperDiskWeightBasedPlacementEnabled: "true"
-  PULSAR_PREFIX_bookkeeperEnableStickyReads: "true"
-  PULSAR_PREFIX_brokerDeleteInactiveTopicsEnabled: "false"
-  PULSAR_PREFIX_brokerInterceptors: ""
-  PULSAR_PREFIX_defaultNamespaceBundleSplitAlgorithm: topic_count_equally_divide
-  PULSAR_PREFIX_defaultNumPartitions: "1"
-  PULSAR_PREFIX_defaultNumberOfNamespaceBundles: "4"
-  PULSAR_PREFIX_delayedDeliveryEnabled: "true"
-  PULSAR_PREFIX_dispatcherMaxReadBatchSize: "1000"
-  PULSAR_PREFIX_enableReplicatedSubscriptions: "false"
-  PULSAR_PREFIX_managedLedgerNumSchedulerThreads: "2"
-  PULSAR_PREFIX_managedLedgerNumWorkerThreads: "2"
-  PULSAR_PREFIX_maxConcurrentLookupRequest: "1000"
-  PULSAR_PREFIX_maxConcurrentTopicLoadRequest: "1000"
-  PULSAR_PREFIX_maxConsumersPerSubscription: "5000"
-  PULSAR_PREFIX_maxConsumersPerTopic: "50000"
-  PULSAR_PREFIX_maxNumPartitionsPerPartitionedTopic: "2048"
-  PULSAR_PREFIX_maxProducersPerTopic: "10000"
-  PULSAR_PREFIX_maxUnackedMessagesPerConsumer: "10000"
-  PULSAR_PREFIX_maxUnackedMessagesPerSubscription: "50000"
-  PULSAR_PREFIX_preciseDispatcherFlowControl: "true"
-  PULSAR_PREFIX_subscriptionKeySharedUseConsistentHashing: "true"
-  PULSAR_PREFIX_transactionCoordinatorEnabled: "false"
-  statusFilePath: /pulsar/status
+  broker.conf: |-
+    {{- .Files.Get "config/broker-config.tpl" | nindent 4 }}

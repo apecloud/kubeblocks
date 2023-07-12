@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package hsm
 
 type ActionInterface[E Event, C any] interface {
-	Execute(ctx *C) error
+	Execute(ctx *C) (State, error)
 }
 
 type Guard[C any] interface {
@@ -40,24 +40,30 @@ type basicTransition[E Event, C any] struct {
 	Guards transitionGuard[C]
 }
 
-type internalTransition[E Event, C any] struct {
-	// ActionInterface[E, C]
-	basicTransition[E, C]
-	actions []func(ctx *C) error
+type actionTransition[S StateInterface[C], E Event, C any] struct {
+	action func(ctx *C) (State, error)
 }
 
-type NormalTransition[S StateInterface[C], E Event, C any] struct {
+type internalTransition[S StateInterface[C], E Event, C any] struct {
+	// ActionInterface[E, C]
+	basicTransition[E, C]
+	actionTransition[S, E, C]
+}
+
+type normalTransition[S StateInterface[C], E Event, C any] struct {
 	destination S
 	basicTransition[E, C]
 }
 
-func (t internalTransition[E, C]) Execute(ctx *C) error {
-	for _, action := range t.actions {
-		if err := action(ctx); err != nil {
-			return err
-		}
+func (t actionTransition[S, E, C]) Execute(ctx *C) (State, error) {
+	dState, err := t.action(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	if _, ok := dState.(S); !ok {
+		return nil, nil
+	}
+	return dState, nil
 }
 
 func newTransitionGuard[C any](guards ...func(ctx *C) bool) transitionGuard[C] {

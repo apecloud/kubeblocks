@@ -19,10 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package hsm
 
-type StateInterface[C any] interface {
-	comparable
+type State interface{}
 
+type StateInterface[C any] interface {
+	State
 	StateTransitionAction[C]
+
+	comparable
 }
 
 type StateTransitionAction[C any] interface {
@@ -41,6 +44,8 @@ type StateDefinition[S StateInterface[C], E, C any] struct {
 	// TODO support sub fsm
 	// Superstate *StateDefinition[S, E, C]
 	// Substates  []*StateDefinition[S, E, C]
+
+	DefaultAction actionTransition[S, E, C]
 
 	// transitions
 	Transitions  []Transition

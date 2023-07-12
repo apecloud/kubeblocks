@@ -29,7 +29,7 @@ type BuilderInterface[S StateInterface[C], E, C any] interface {
 	OnExit(action func(ctx *C) error) BuilderInterface[S, E, C]
 
 	Transition(event E, destinationState S, guards ...func(ctx *C) bool) BuilderInterface[S, E, C]
-	InternalTransition(event E, action func(ctx *C) error, guards ...func(ctx *C) bool) BuilderInterface[S, E, C]
+	InternalTransition(event E, action func(ctx *C) (State, error), guards ...func(ctx *C) bool) BuilderInterface[S, E, C]
 
 	Build() error
 }
@@ -61,11 +61,17 @@ func NewStateMachine[S StateInterface[C], E, C any](id string, initialState S, _
 	}
 }
 
-func (smDef *StateMachineDefinition[S, E, C]) StateBuilder(state S) BuilderInterface[S, E, C] {
-	return &StateBuilder[S, E, C]{
+func (smDef *StateMachineDefinition[S, E, C]) StateBuilder(state S, action ...func(ctx *C) (State, error)) BuilderInterface[S, E, C] {
+	builder := &StateBuilder[S, E, C]{
 		State:           state,
 		StateMachineRef: smDef,
 	}
+	if len(action) > 0 {
+		builder.DefaultAction = actionTransition[S, E, C]{
+			action: action[0],
+		}
+	}
+	return builder
 }
 
 func (smDef *StateMachineDefinition[S, E, C]) stateDefinition(state S) (stateDef *StateDefinition[S, E, C]) {
@@ -96,7 +102,7 @@ func (builder *StateBuilder[S, E, C]) OnExit(action func(ctx *C) error) BuilderI
 // Transition adds a transition from the current state to the destination state
 func (builder *StateBuilder[S, E, C]) Transition(event E, destinationState S, guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
 	buildFn := func() Transition {
-		return &NormalTransition[S, E, C]{
+		return &normalTransition[S, E, C]{
 			destination: destinationState,
 			basicTransition: basicTransition[E, C]{
 				Event:  event,
@@ -107,10 +113,12 @@ func (builder *StateBuilder[S, E, C]) Transition(event E, destinationState S, gu
 }
 
 // InternalTransition adds an internal transition from the current state
-func (builder StateBuilder[S, E, C]) InternalTransition(event E, action func(ctx *C) error, guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
+func (builder StateBuilder[S, E, C]) InternalTransition(event E, action func(ctx *C) (State, error), guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
 	buildFn := func() Transition {
-		return &internalTransition[E, C]{
-			actions: []func(ctx *C) error{action},
+		return &internalTransition[S, E, C]{
+			actionTransition: actionTransition[S, E, C]{
+				action: action,
+			},
 			basicTransition: basicTransition[E, C]{
 				Event:  event,
 				Guards: newTransitionGuard(guards...),

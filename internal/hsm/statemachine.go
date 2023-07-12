@@ -34,6 +34,7 @@ type StateMachineInterface interface {
 
 type StatelessStateMachine[S StateInterface[C], E Event, C any] interface {
 	OnRecover(recoverFn func(ctx *C) (S, error))
+	StateBuilder(state S, action ...func(ctx *C) (State, error)) BuilderInterface[S, E, C]
 }
 
 type StateMachineInstance[S StateInterface[C], E Event, C any] interface {

@@ -39,6 +39,7 @@ spec:
           spec:
             properties:
               componentSpecs:
+                description: default value of cluster.spec.componentSpecs
                 items:
                   description: ClusterComponentSpec defines the cluster component
                     spec.

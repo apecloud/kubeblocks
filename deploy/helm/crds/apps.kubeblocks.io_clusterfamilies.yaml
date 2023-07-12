@@ -37,14 +37,22 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClusterFamilySpec defines the desired state of ClusterFamily
+            description: spec of clusterfamily which defines what kind of clustertemplate
+              to use in some conditions
             properties:
               clusterTemplateRefs:
+                description: list of clustertemplates
                 items:
                   properties:
                     expression:
+                      description: if the evaluated result equals to value, the clustertemplate
+                        defined in templateRef will be chosen, when this field is
+                        set, key will be ignored
                       type: string
                     key:
+                      description: key defines which parameters in cluster should
+                        be checked, if key equals to value, the clustertemplate defined
+                        in templateRef will be chosen
                       type: string
                     selector:
                       items:
@@ -58,14 +66,17 @@ spec:
                         type: object
                       type: array
                     templateRef:
+                      description: clustertemplate name referenced to, when value
+                        is match
                       type: string
                     value:
+                      description: the value of the key or the expression
                       type: string
                   type: object
                 type: array
             type: object
           status:
-            description: ClusterFamilyStatus defines the observed state of ClusterFamily
+            description: status of clusterfamily
             type: object
         type: object
     served: true

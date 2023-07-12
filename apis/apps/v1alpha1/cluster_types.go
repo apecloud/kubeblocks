@@ -66,7 +66,7 @@ type ClusterSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// +optional
 	Resources ClusterResources `json:"resources,omitempty"`

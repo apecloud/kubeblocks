@@ -54,26 +54,18 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 
-	renderClusterTpl := func() {
-		if clusterCompSpec != nil {
-			return
-		}
+	fillClusterTemplate := func() {
 		if clusterTpl == nil || len(clusterTpl.Spec.ComponentSpecs) == 0 {
 			return
 		}
 		for _, compSpecTpl := range clusterTpl.Spec.ComponentSpecs {
 			if compSpecTpl.ComponentDefRef == clusterCompDef.Name {
-				clusterCompSpec = &compSpecTpl
+				clusterCompSpec = compSpecTpl.DeepCopy()
 			}
 		}
 	}
 
-	// priority: cluster.spec.componentSpecs > simplified api (e.g. cluster.spec.storage etc.) > cluster template
-	fillClusterCompSpec := func() {
-		if clusterCompSpec != nil {
-			return
-		}
-		renderClusterTpl()
+	fillSimplifiedAPI := func() {
 		// fill simplified api only to first defined component
 		if len(clusterDef.Spec.ComponentDefs) == 0 ||
 			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
@@ -83,31 +75,40 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
 			clusterCompSpec.Name = clusterCompDef.Name
 		}
-		clusterCompSpec.Replicas = cluster.Spec.Replicas
+		if cluster.Spec.Replicas != nil {
+			clusterCompSpec.Replicas = *cluster.Spec.Replicas
+		}
 		dataVolumeName := "data"
 		for _, v := range clusterCompDef.VolumeTypes {
 			if v.Type == appsv1alpha1.VolumeTypeData {
 				dataVolumeName = v.Name
 			}
 		}
-		clusterCompSpec.Resources.Limits = corev1.ResourceList{
-			"cpu":    cluster.Spec.Resources.CPU,
-			"memory": cluster.Spec.Resources.Memory,
+		if !cluster.Spec.Resources.CPU.IsZero() || !cluster.Spec.Resources.Memory.IsZero() {
+			clusterCompSpec.Resources.Limits = corev1.ResourceList{}
 		}
-		clusterCompSpec.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-			{
-				Name: dataVolumeName,
-				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteOnce,
-					},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							"storage": cluster.Spec.Storage.Size,
+		if !cluster.Spec.Resources.CPU.IsZero() {
+			clusterCompSpec.Resources.Limits["cpu"] = cluster.Spec.Resources.CPU
+		}
+		if !cluster.Spec.Resources.Memory.IsZero() {
+			clusterCompSpec.Resources.Limits["memory"] = cluster.Spec.Resources.Memory
+		}
+		if !cluster.Spec.Storage.Size.IsZero() {
+			clusterCompSpec.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+				{
+					Name: dataVolumeName,
+					Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								"storage": cluster.Spec.Storage.Size,
+							},
 						},
 					},
 				},
-			},
+			}
 		}
 	}
 
@@ -119,7 +120,11 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		return affinity
 	}
 
-	fillClusterCompSpec()
+	// priority: cluster.spec.componentSpecs > simplified api (e.g. cluster.spec.storage etc.) > cluster template
+	if clusterCompSpec == nil {
+		fillClusterTemplate()
+		fillSimplifiedAPI()
+	}
 	if clusterCompSpec == nil {
 		return nil, nil
 	}

@@ -31,7 +31,6 @@ type ClusterFamilySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ClusterFamily. Edit clusterfamily_types.go to remove/update
 	ClusterTemplateRefs []ClusterFamilyTemplateRef `json:"clusterTemplateRefs,omitempty"`
 }
 

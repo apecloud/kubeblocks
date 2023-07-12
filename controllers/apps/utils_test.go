@@ -14,7 +14,7 @@ var _ = Describe("utils", func() {
 		It("should succeed", func() {
 			cts := []appsv1alpha1.ClusterTemplate{
 				{
-					Spec: appsv1alpha1.ClusterSpec{
+					Spec: appsv1alpha1.ClusterTemplateSpec{
 						ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 							{
 								Name:            "mysql",
@@ -25,7 +25,7 @@ var _ = Describe("utils", func() {
 					},
 				},
 				{
-					Spec: appsv1alpha1.ClusterSpec{
+					Spec: appsv1alpha1.ClusterTemplateSpec{
 						ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 							{
 								Name:            "etcd",
@@ -52,7 +52,7 @@ var _ = Describe("utils", func() {
 				},
 			}
 			finalClusterTpl := &appsv1alpha1.ClusterTemplate{
-				Spec: appsv1alpha1.ClusterSpec{
+				Spec: appsv1alpha1.ClusterTemplateSpec{
 					ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 						{
 							Name:            "mysql",

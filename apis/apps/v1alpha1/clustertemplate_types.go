@@ -41,8 +41,22 @@ type ClusterTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterSpec           `json:"spec,omitempty"`
+	Spec   ClusterTemplateSpec   `json:"spec,omitempty"`
 	Status ClusterTemplateStatus `json:"status,omitempty"`
+}
+
+type ClusterTemplateSpec struct {
+	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty"`
+}
+
+// GetComponentByName gets component by name.
+func (r ClusterTemplateSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
+	for _, v := range r.ComponentSpecs {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	return nil
 }
 
 //+kubebuilder:object:root=true

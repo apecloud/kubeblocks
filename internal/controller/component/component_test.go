@@ -177,7 +177,8 @@ spec:
 			clusterTpl := appsv1alpha1.ClusterTemplate{}
 			Expect(yaml.Unmarshal([]byte(clusterTplStr), &clusterTpl)).Should(Succeed())
 			By("fill simplified fields")
-			cluster.Spec.Replicas = 3
+			r := int32(3)
+			cluster.Spec.Replicas = &r
 			cluster.Spec.Resources.CPU = resource.MustParse("1000m")
 			cluster.Spec.Resources.Memory = resource.MustParse("2Gi")
 			cluster.Spec.Storage.Size = resource.MustParse("20Gi")

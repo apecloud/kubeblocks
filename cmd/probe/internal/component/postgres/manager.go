@@ -53,23 +53,12 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Pool: pool,
 	}
 
-	pidFile, err := Mgr.readPidFile()
-	if err != nil {
-		return nil, errors.Wrap(err, "read pid file")
-	}
-	Mgr.PidFile = pidFile
-	err = Mgr.newProcessFromPidFile()
-	if err != nil {
-		return nil, errors.Wrap(err, "new process from pid file")
-	}
-
 	component.RegisterManager("postgresql", Mgr)
 	return Mgr, nil
 }
 
 func (mgr *Manager) readPidFile() (*PidFile, error) {
 	file := &PidFile{}
-	mgr.Logger.Infof("postgresql data dir:%s, os data dir:%s", mgr.DataDir, os.Getenv("PGDATA"))
 	f, err := os.Open(mgr.DataDir + "/postmaster.pid")
 	if err != nil {
 		return nil, err
@@ -87,6 +76,7 @@ func (mgr *Manager) readPidFile() (*PidFile, error) {
 		text = append(text, scanner.Text())
 	}
 
+	mgr.Logger.Infof("postmaster file text: %v", text)
 	pid, err := strconv.ParseInt(text[0], 10, 32)
 	if err != nil {
 		return nil, err
@@ -102,8 +92,19 @@ func (mgr *Manager) readPidFile() (*PidFile, error) {
 }
 
 func (mgr *Manager) newProcessFromPidFile() error {
+	if mgr.PidFile == nil {
+		pidFile, err := Mgr.readPidFile()
+		if err != nil {
+			mgr.Logger.Errorf("read pid file failed, err:%v", err)
+			return errors.Wrap(err, "read pid file")
+		}
+		mgr.PidFile = pidFile
+	}
+
+	mgr.Logger.Infof("pidFile: %v", mgr.PidFile)
 	proc, err := process.NewProcess(mgr.PidFile.pid)
 	if err != nil {
+		mgr.Logger.Errorf("new process failed, err:%v", err)
 		return err
 	}
 
@@ -232,6 +233,14 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 }
 
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		if cluster.Leader.Name == mgr.CurrentMemberName {
+			return true, nil
+		} else {
+			return false, nil
+		}
+	}
+
 	return mgr.IsLeaderWithPool(ctx, nil)
 }
 
@@ -284,8 +293,6 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 				return false
 			}
 		}
-	} else {
-		pools[0] = mgr.Pool
 	}
 
 	// Typically, the synchronous_commit parameter remains consistent between the primary and standby
@@ -401,6 +408,7 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 	lsnStr := strings.TrimFunc(string(resp), func(r rune) bool {
 		return !unicode.IsDigit(r)
 	})
+	mgr.Logger.Infof("lsn str: %s", lsnStr)
 
 	lsn, err := strconv.ParseInt(lsnStr, 10, 64)
 	if err != nil {
@@ -411,6 +419,10 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 }
 
 func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
+	// TODO: for test
+	if cluster == nil {
+		return false
+	}
 	lag := cluster.GetOpTime() - walPosition
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
@@ -467,7 +479,7 @@ func (mgr *Manager) postPromote() error {
 
 func (mgr *Manager) Demote() error {
 	var stdout, stderr bytes.Buffer
-	stopCmd := exec.Command("su", "-c", `'pg_ctl stop -m fast'`, "postgres")
+	stopCmd := exec.Command("su", "-c", "pg_ctl stop -m fast", "postgres")
 	stopCmd.Stdout = &stdout
 	stopCmd.Stderr = &stderr
 
@@ -720,7 +732,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	primaryInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s application_name=my-application\n",
 		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, config.password)
 
-	pgConf, err := os.OpenFile("/postgresql/conf/postgresql.conf", os.O_APPEND, 0644)
+	pgConf, err := os.OpenFile("/postgresql/conf/postgresql.conf", os.O_APPEND, 0777)
 	if err != nil {
 		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
 		return err
@@ -861,5 +873,5 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	return true, nil
+	return cluster.GetLeaderMember() == member, nil
 }

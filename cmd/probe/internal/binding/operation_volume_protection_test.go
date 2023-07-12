@@ -76,6 +76,10 @@ var _ = Describe("Volume Protection Operation", func() {
 		podName                      = rand.String(8)
 		volumeName                   = rand.String(8)
 		defaultThreshold             = 90
+		zeroThreshold                = 0
+		fullThreshold                = 100
+		invalidThresholdLower        = -1
+		invalidThresholdHigher       = 101
 		capacityBytes                = uint64(10 * 1024 * 1024 * 1024)
 		usedBytesUnderThreshold      = capacityBytes * uint64(defaultThreshold-3) / 100
 		usedBytesOverThreshold       = capacityBytes * uint64(defaultThreshold+3) / 100
@@ -85,7 +89,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			Volumes: []appsv1alpha1.ProtectedVolume{
 				{
 					Name:          volumeName,
-					HighWatermark: defaultThreshold,
+					HighWatermark: &defaultThreshold,
 				},
 			},
 		}
@@ -189,19 +193,19 @@ var _ = Describe("Volume Protection Operation", func() {
 				Volumes: []appsv1alpha1.ProtectedVolume{
 					{
 						Name:          "01",
-						HighWatermark: -1,
+						HighWatermark: &invalidThresholdLower,
 					},
 					{
 						Name:          "02",
-						HighWatermark: 101,
+						HighWatermark: &invalidThresholdHigher,
 					},
 					{
 						Name:          "03",
-						HighWatermark: 0,
+						HighWatermark: &zeroThreshold,
 					},
 					{
 						Name:          "04",
-						HighWatermark: 100,
+						HighWatermark: &fullThreshold,
 					},
 				},
 			}
@@ -210,8 +214,8 @@ var _ = Describe("Volume Protection Operation", func() {
 			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
 			Expect(obj.HighWatermark).Should(Equal(spec.HighWatermark))
 			for _, v := range spec.Volumes {
-				if v.HighWatermark >= 0 && v.HighWatermark <= 100 {
-					Expect(obj.Volumes[v.Name].HighWatermark).Should(Equal(v.HighWatermark))
+				if *v.HighWatermark >= 0 && *v.HighWatermark <= 100 {
+					Expect(obj.Volumes[v.Name].HighWatermark).Should(Equal(*v.HighWatermark))
 				} else {
 					Expect(obj.Volumes[v.Name].HighWatermark).Should(Equal(obj.HighWatermark))
 				}
@@ -243,7 +247,7 @@ var _ = Describe("Volume Protection Operation", func() {
 				Volumes: []appsv1alpha1.ProtectedVolume{
 					{
 						Name:          "data",
-						HighWatermark: 0,
+						HighWatermark: &zeroThreshold,
 					},
 				},
 			})

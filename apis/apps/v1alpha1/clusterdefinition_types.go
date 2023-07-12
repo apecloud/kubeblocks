@@ -265,9 +265,8 @@ type ProtectedVolume struct {
 	// If the value is invalid, it will be ignored and the component level threshold will be used.
 	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=0
 	// +optional
-	HighWatermark int `json:"highWatermark,omitempty"`
+	HighWatermark *int `json:"highWatermark,omitempty"`
 }
 
 // ClusterComponentDefinition provides a workload component specification template,

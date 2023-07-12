@@ -122,7 +122,7 @@ func (o *operationVolumeProtection) initVolumes() error {
 		return err
 	}
 
-	o.HighWatermark = normalizeVolumeWatermark(spec.HighWatermark, 0)
+	o.HighWatermark = normalizeVolumeWatermark(&spec.HighWatermark, 0)
 
 	if o.Volumes == nil {
 		o.Volumes = make(map[string]volumeExt)
@@ -458,9 +458,9 @@ func kubeletEndpointPort(ctx context.Context) (string, error) {
 	return strconv.Itoa(int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)), nil
 }
 
-func normalizeVolumeWatermark(watermark int, defaultVal int) int {
-	if watermark < 0 || watermark > 100 {
+func normalizeVolumeWatermark(watermark *int, defaultVal int) int {
+	if watermark == nil || *watermark < 0 || *watermark > 100 {
 		return defaultVal
 	}
-	return watermark
+	return *watermark
 }

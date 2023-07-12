@@ -9193,7 +9193,6 @@ spec:
                           items:
                             properties:
                               highWatermark:
-                                default: 0
                                 description: Volume specified high watermark threshold,
                                   it will override the component level threshold.
                                   If the value is invalid, it will be ignored and

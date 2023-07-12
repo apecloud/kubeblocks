@@ -61,17 +61,25 @@ func NewStateMachine[S StateInterface[C], E, C any](id string, initialState S, _
 	}
 }
 
-func (smDef *StateMachineDefinition[S, E, C]) StateBuilder(state S, action ...func(ctx *C) (State, error)) BuilderInterface[S, E, C] {
-	builder := &StateBuilder[S, E, C]{
+func (smDef *StateMachineDefinition[S, E, C]) StateBuilder(state S) BuilderInterface[S, E, C] {
+	return &StateBuilder[S, E, C]{
 		State:           state,
 		StateMachineRef: smDef,
 	}
-	if len(action) > 0 {
-		builder.DefaultAction = actionTransition[S, E, C]{
-			action: action[0],
-		}
+}
+
+func (smDef *StateMachineDefinition[S, E, C]) TemplateStateBuilder(state S, action func(ctx *C) (State, error)) StatelessStateMachine[S, E, C] {
+	builder := StateBuilder[S, E, C]{
+		State:           state,
+		StateMachineRef: smDef,
+		StateDefinition: StateDefinition[S, E, C]{
+			DefaultAction: actionTransition[S, E, C]{
+				action: action,
+			},
+		},
 	}
-	return builder
+	_ = builder.Build()
+	return smDef
 }
 
 func (smDef *StateMachineDefinition[S, E, C]) stateDefinition(state S) (stateDef *StateDefinition[S, E, C]) {
@@ -154,6 +162,7 @@ func (smDef *StateMachineDefinition[S, E, C]) ID() string {
 }
 
 // OnRecover adds a recover function to the state machine
-func (smDef *StateMachineDefinition[S, E, C]) OnRecover(recoverFn func(ctx *C) (S, error)) {
+func (smDef *StateMachineDefinition[S, E, C]) OnRecover(recoverFn func(ctx *C) (S, error)) StatelessStateMachine[S, E, C] {
 	smDef.recoverFn = recoverFn
+	return smDef
 }

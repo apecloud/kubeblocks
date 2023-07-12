@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"time"
 
 	"github.com/spf13/viper"
@@ -55,7 +56,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
-		if !viper.GetBool("ENABLE_RBAC_MANAGER") {
+		if !viper.GetBool(constant.ENABLE_RBAC_MANAGER) {
 			transCtx.Logger.V(1).Info("rbac manager is not enabled")
 			if serviceAccountName != "" && !isServiceAccountExist(transCtx, serviceAccountName, true) {
 				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")

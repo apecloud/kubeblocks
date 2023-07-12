@@ -97,7 +97,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		probeContainers = append(probeContainers, *runningProbeContainer)
 	}
 
-	if component.VolumeProtection != nil {
+	if volumeProtectionEnabled(component) {
 		c := container.DeepCopy()
 		buildVolumeProtectionProbeContainer(component.CharacterType, c, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *c)
@@ -181,7 +181,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		}}
 
 	// pass the volume protection spec to probe container through env.
-	if component.VolumeProtection != nil {
+	if volumeProtectionEnabled(component) {
 		container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
 	}
 }
@@ -247,6 +247,10 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+}
+
+func volumeProtectionEnabled(component *SynthesizedComponent) bool {
+	return component.VolumeProtection != nil && viper.GetBool(constant.ENABLE_RBAC_MANAGER)
 }
 
 func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {

@@ -140,7 +140,7 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
-	viper.SetDefault("ENABLE_RBAC_MANAGER", true)
+	viper.SetDefault(constant.ENABLE_RBAC_MANAGER, true)
 
 	clusterRecorder = k8sManager.GetEventRecorderFor("db-cluster-controller")
 	err = (&ClusterReconciler{

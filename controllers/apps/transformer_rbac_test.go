@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/constant"
 
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
@@ -83,11 +84,11 @@ var _ = Describe("object rbac transformer test.", func() {
 		dag = mockDAG(cluster)
 		transformer = &RBACTransformer{}
 		allSettings = viper.AllSettings()
-		viper.SetDefault("ENABLE_RBAC_MANAGER", true)
+		viper.SetDefault(constant.ENABLE_RBAC_MANAGER, true)
 	})
 
 	AfterEach(func() {
-		viper.SetDefault("ENABLE_RBAC_MANAGER", false)
+		viper.SetDefault(constant.ENABLE_RBAC_MANAGER, false)
 		if allSettings != nil {
 			Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
 			allSettings = nil

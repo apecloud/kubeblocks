@@ -191,6 +191,7 @@ spec:
 			By("call build")
 			component, err := buildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				&clusterTpl,
 				clusterDef,
@@ -203,6 +204,7 @@ spec:
 			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
 			component, err = buildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				&clusterTpl,
 				clusterDef,

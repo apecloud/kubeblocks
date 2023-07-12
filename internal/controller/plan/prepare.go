@@ -28,8 +28,8 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -144,22 +144,30 @@ func generateEnvMap(cluster *appsv1alpha1.Cluster, template appsv1alpha1.Compone
 		return nil, err
 	}
 
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      strings.Join([]string{cmName, fileName}, "-"),
-			Namespace: cluster.Namespace,
-		},
-		Data: make(map[string]string, len(keyValue)),
-	}
+	envMap := make(map[string]string, len(keyValue))
 	for key, v := range keyValue {
-		cm.Data[key] = cast.ToString(v)
+		envMap[key] = cast.ToString(v)
 	}
-	if err := cli.Update(ctx, cm); err != nil {
+	cmKey := client.ObjectKey{
+		Name:      strings.Join([]string{cmName, fileName}, "-"),
+		Namespace: cluster.Namespace,
+	}
+	cm := &corev1.ConfigMap{}
+	if err := cli.Get(ctx, cmKey, cm); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		cm.Name = cmKey.Name
+		cm.Namespace = cmKey.Namespace
+		cm.Data = envMap
+		if err := controllerutil.SetOwnerReference(cluster, cm, scheme); err != nil {
+			return nil, err
+		}
+		return cm, cli.Create(ctx, cm)
 	}
-	return cm, cli.Create(ctx, cm)
+	cm.Data = envMap
+	return cm, cli.Update(ctx, cm)
 }
 
 func checkEnvFrom(container *corev1.Container, cmName string) bool {

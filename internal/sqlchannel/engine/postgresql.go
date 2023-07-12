@@ -21,15 +21,18 @@ package engine
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
+
+var _ Interface = &postgresql{}
 
 type postgresql struct {
 	info     EngineInfo
 	examples map[ClientType]buildConnectExample
 }
-
-var _ Interface = &postgresql{}
 
 func newPostgreSQL() *postgresql {
 	return &postgresql{
@@ -255,4 +258,15 @@ func (m *postgresql) ConnectExample(info *ConnectionInfo, client string) string 
 		info.Database = m.info.Database
 	}
 	return buildExample(info, client, m.examples)
+}
+
+func (m *postgresql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
+	cmd := []string{}
+	cmd = append(cmd, "/bin/sh", "-c", "-ex")
+	args := []string{}
+	for _, script := range scripts {
+		args = append(args, fmt.Sprintf("-c %s", strconv.Quote(script)))
+	}
+	cmd = append(cmd, fmt.Sprintf("PGHOST=%s PGUSER=%s PGPASSWORD=%s PGDATABASE=%s %s %s ", envVarMap[host], envVarMap[user], envVarMap[password], m.info.Database, m.info.Client, strings.Join(args, " ")))
+	return cmd, nil, nil
 }

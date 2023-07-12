@@ -323,6 +323,13 @@ type PointInTimeRefSpec struct {
 // ScriptSpec defines the script to be executed.
 type ScriptSpec struct {
 	ComponentOps `json:",inline"`
+	// // exec command with image, by default use the image of kubeblocks-clients
+	// // +optional
+	// Image *string `json:"image,omitempty"`
+	// secret defines the secret to be used to execute the script.
+	// If not specified, the default cluster root credential secret will be used.
+	// +optional
+	Secret *ScriptSecret `json:"secret,omitempty"`
 	// script defines the script to be executed.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script"
@@ -331,6 +338,23 @@ type ScriptSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
 	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
+}
+
+// ScriptSecret defines the secret to be used to execute the script.
+type ScriptSecret struct {
+	// name is the name of the secret.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+	// usernameKey field is used to specify the username of the secret.
+	// +kubebuilder:default:="username"
+	// +optional
+	UsernameKey string `json:"usernameKey,omitempty"`
+	// passwordKey field is used to specify the password of the secret.
+	// +kubebuilder:default:="password"
+	// +optional
+	PasswordKey string `json:"passwordKey,omitempty"`
 }
 
 // ScriptFrom defines the script to be executed from configMap or secret.

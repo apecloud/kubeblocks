@@ -36,6 +36,7 @@ TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tools
 CLI_IMG ?= docker.io/apecloud/kbcli
 CHARTS_IMG ?= docker.io/apecloud/$(APP_NAME)-charts
 CLI_TAG ?= v$(CLI_VERSION)
+CLIENTS_IMG ?= docker.io/apecloud/$(APP_NAME)-clients
 
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest
@@ -154,5 +155,35 @@ ifeq ($(TAG_LATEST), true)
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:latest --push
 else
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:${VERSION} --push
+endif
+endif
+
+.PHONY: build-clients-image
+build-clients-image: DOCKER_BUILD_ARGS += --cache-to type=gha,mode=max,scope=${GITHUB_REF_NAME}-clients-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-clients-image
+build-clients-image: install-docker-buildx ## Build clients container image.
+ifneq ($(BUILDX_ENABLED), true)
+	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-clients --tag ${CLIENTS_IMG}:${VERSION} --tag ${CLIENTS_IMG}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-clients --platform $(BUILDX_PLATFORMS) --tag ${CLIENTS_IMG}:latest
+else
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-clients --platform $(BUILDX_PLATFORMS) --tag ${CLIENTS_IMG}:${VERSION}
+endif
+endif
+
+.PHONY: push-clients-image
+push-clients-image: DOCKER_BUILD_ARGS += --cache-to type=gha,mode=max,scope=${GITHUB_REF_NAME}-clients-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-clients-image
+push-clients-image: install-docker-buildx  ## Push clients container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) push ${CLIENTS_IMG}:latest
+else
+	$(DOCKER) push ${CLIENTS_IMG}:${VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-clients --platform $(BUILDX_PLATFORMS) --tag ${CLIENTS_IMG}:latest --push
+else
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-clients --platform $(BUILDX_PLATFORMS) --tag ${CLIENTS_IMG}:${VERSION} --push
 endif
 endif

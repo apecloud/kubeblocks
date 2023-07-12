@@ -22,7 +22,11 @@ package engine
 import (
 	"fmt"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
+
+var _ Interface = &mongodb{}
 
 type mongodb struct {
 	info     EngineInfo
@@ -73,4 +77,6 @@ func (r mongodb) ConnectExample(info *ConnectionInfo, client string) string {
 	return buildExample(info, client, r.examples)
 }
 
-var _ Interface = &mongodb{}
+func (r mongodb) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
+}

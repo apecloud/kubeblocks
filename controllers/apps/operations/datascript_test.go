@@ -203,7 +203,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
+			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
 
@@ -228,7 +228,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
+			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
 			// patch job to running
@@ -270,7 +270,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
+			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
 			// patch job to running

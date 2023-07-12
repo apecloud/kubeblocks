@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -31,6 +33,23 @@ const (
 	stateRedis      = "redis"
 	stateMongoDB    = "mongodb"
 	stateNebula     = "nebula"
+)
+
+const (
+	host     = "host"
+	port     = "port"
+	user     = "user"
+	password = "password"
+	command  = "command"
+)
+
+var (
+	envVarMap = map[string]string{
+		host:     "$KB_HOST",
+		port:     "$KB_PORT",
+		user:     "$KB_USER",
+		password: "$KB_PASSWD",
+	}
 )
 
 // AuthInfo is the authentication information for the database
@@ -43,6 +62,7 @@ type Interface interface {
 	ConnectCommand(info *AuthInfo) []string
 	Container() string
 	ConnectExample(info *ConnectionInfo, client string) string
+	ExecuteCommand([]string) ([]string, []corev1.EnvVar, error)
 }
 
 type EngineInfo struct {

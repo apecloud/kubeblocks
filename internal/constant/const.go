@@ -68,6 +68,10 @@ const (
 )
 
 const (
+	KBClientsImage = "KUBEBLOCKS_CLIENTS_IMAGE"
+)
+
+const (
 	APIGroup = "kubeblocks.io"
 
 	AppName = "kubeblocks"

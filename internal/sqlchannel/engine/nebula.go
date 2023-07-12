@@ -22,14 +22,16 @@ package engine
 import (
 	"fmt"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
+
+var _ Interface = &nebula{}
 
 type nebula struct {
 	info     EngineInfo
 	examples map[ClientType]buildConnectExample
 }
-
-var _ Interface = &nebula{}
 
 func newNebula() *nebula {
 	return &nebula{
@@ -67,4 +69,8 @@ func (m *nebula) Container() string {
 
 func (m *nebula) ConnectExample(info *ConnectionInfo, client string) string {
 	return buildExample(info, client, m.examples)
+}
+
+func (m *nebula) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+	return nil, nil, fmt.Errorf("%s not implemented", m.info.Client)
 }

@@ -28,37 +28,43 @@ import (
 	"github.com/apecloud/kubeblocks/internal/hsm"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type ConfigStateType string
 
 const (
-	CInitPhase       ConfigStateType = "Init"
-	CRunningPhase    ConfigStateType = "Running"
-	CInitFailedPhase ConfigStateType = "InitFailed"
-	CFailedPhase     ConfigStateType = "Failed"
-	CRollbackPhase   ConfigStateType = "Rollback"
-	CDeletingPhase   ConfigStateType = "Deleting"
-	CFinishedPhase   ConfigStateType = "Finished"
+	CInitPhase              ConfigStateType = "Init"
+	CRenderingPhase         ConfigStateType = "Rendering"
+	CGeneratingSidecarPhase ConfigStateType = "GeneratingSidecar"
+	CCreatingConfigmapPhase ConfigStateType = "CreatingConfigmap"
+	CRunningPhase           ConfigStateType = "Running"
+	CInitFailedPhase        ConfigStateType = "InitFailed"
+	CFailedPhase            ConfigStateType = "Failed"
+	CRollbackPhase          ConfigStateType = "Rollback"
+	CDeletingPhase          ConfigStateType = "Deleting"
+	CFinishedPhase          ConfigStateType = "Finished"
 )
 
 const (
-	Creating        = "creating"
-	RenderedSucceed = "rendered-succeed"
-	RenderedFailed  = "rendered-failed"
-	Reconfiguring   = "reconfiguring"
-	ReRendering     = "rerendering"
+	CreatingOrUpdating = "upgrading"
+	RenderedSucceed    = "rendered-succeed"
+	RenderedFailed     = "rendered-failed"
+	Reconfiguring      = "reconfiguring"
+	ReRendering        = "rerendering"
 )
 
 const ConfigFSMID = "config-fsm"
 
 var ConfigFSMSignature = func(_ ConfigStateType, _ string, _ ConfigFSMContext) {}
 
-func (c ConfigStateType) OnEnter(_ *ConfigFSMContext) error {
+func (c ConfigStateType) OnEnter(ctx *ConfigFSMContext) error {
+	log.FromContext(ctx.ctx).Info(fmt.Sprintf("entering state: %s", c))
 	return nil
 }
 
-func (c ConfigStateType) OnExit(_ *ConfigFSMContext) error {
+func (c ConfigStateType) OnExit(ctx *ConfigFSMContext) error {
+	log.FromContext(ctx.ctx).Info(fmt.Sprintf("exiting state: %s", c))
 	return nil
 }
 
@@ -112,36 +118,24 @@ func init() {
 			state = CRunningPhase
 		}
 		return state, prepareConfigurationResource(ctx)
-	})
+	}).
+		TemplateStateBuilder(CRenderingPhase, func(ctx *ConfigFSMContext) (hsm.State, error) {
+			return CGeneratingSidecarPhase, createConfigmapResource(ctx)
+		}).
+		TemplateStateBuilder(CGeneratingSidecarPhase, func(ctx *ConfigFSMContext) (hsm.State, error) {
+			return CCreatingConfigmapPhase, buildConfigManager(ctx)
+		}).
+		TemplateStateBuilder(CCreatingConfigmapPhase, func(ctx *ConfigFSMContext) (hsm.State, error) {
+			return CRunningPhase, createConfigObjects(ctx.cli, ctx.ctx, ctx.renderWrapper.renderedObjs)
+		})
+
+	// construct the state machine
 	sm.StateBuilder(CInitPhase).
-		Transition(RenderedSucceed, CRunningPhase).
-		Transition(RenderedFailed, CInitFailedPhase).
-		InternalTransition(Creating, func(ctx *ConfigFSMContext) error {
-			return generateConfigurationResource(ctx)
-		}).
-		InternalTransition(Creating, func(ctx *ConfigFSMContext) error {
-			return createConfigmapResource(ctx)
-		}, func(ctx *ConfigFSMContext) bool {
-			return checkConfigmapResource(ctx)
-		}).
-		InternalTransition(Creating, func(ctx *ConfigFSMContext) error {
-			return buildConfigManager(ctx)
-		}).
-		InternalTransition(Creating, func(ctx *ConfigFSMContext) error {
-			return createConfigObjects(ctx.cli, ctx.ctx, ctx.renderWrapper.renderedObjs)
-		}).
-		OnEnter(func(ctx *ConfigFSMContext) error {
-			fmt.Printf("enter state: %s", ctx.GetState())
-			return nil
-		}).
-		OnExit(func(ctx *ConfigFSMContext) error {
-			fmt.Printf("exit state: %s", ctx.GetState())
-			return nil
+		InternalTransition(CreatingOrUpdating, func(ctx *ConfigFSMContext) (hsm.State, error) {
+			return CRenderingPhase, generateConfigurationResource(ctx)
 		}).
 		Build()
 	sm.StateBuilder(CRunningPhase).
-		Transition(RenderedSucceed, CRunningPhase).
-		Transition(RenderedFailed, CFailedPhase).
 		Build()
 
 	hsm.RegisterStateMachine(sm)

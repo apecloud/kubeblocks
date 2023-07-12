@@ -28,7 +28,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9141
+          scrapePort: http
       logConfigs:
       # TODO: refer to broker configuration
       configSpecs:
@@ -42,12 +42,16 @@ spec:
         ports:
         - name: pulsar
           port: 6650
-          protocol: TCP
-          targetPort: 6650
+          targetPort: pulsar
         - name: http
-          port: 8080
-          protocol: TCP
-          targetPort: 8080
+          port: 80
+          targetPort: http
+        - name: pulsarssl
+          port: 6651
+          targetPort: pulsarssl
+        - name: https
+          port: 443
+          targetPort: https
       podSpec:
         securityContext:
           runAsNonRoot: true
@@ -91,19 +95,19 @@ spec:
             envFrom:
               - configMapRef:
                   name: proxy-test-config
+            resources:
+              # JVM application must have memory resource requests
+              requests:
+                memory: 128Mi
             ports:
             - containerPort: 6650
               name: pulsar
-              protocol: TCP
             - containerPort: 6651
               name: pulsarssl
-              protocol: TCP
             - containerPort: 8443
               name: https
-              protocol: TCP
             - containerPort: 8080
               name: http
-              protocol: TCP
             livenessProbe:
               failureThreshold: 3
               httpGet:
@@ -150,28 +154,25 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9141
+          scrapePort: http
       logConfigs:
       # TODO: refer to broker configuration
       configSpecs:
-        - name: broker-interceptors
-          templateRef: broker-interceptors-tpl
-          namespace: {{ .Release.Namespace }}
-          volumeName: interceptors
-      {{- if .Values.broker.configuration }}
         - name: broker-tpl
           templateRef: broker-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: config
-      {{- end }}
       service:
         ports:
-        - name: tcp-pulsar
+        - name: pulsar
           port: 6650
-          targetPort: 6650
+          targetPort: pulsar
         - name: http
           port: 8080
-          targetPort: 8080
+          targetPort: http
+        - name: kafka-client
+          port: 9092
+          targetPort: kafka-client
       podSpec:
         securityContext:
           runAsNonRoot: true
@@ -257,9 +258,9 @@ spec:
               - sh
               - -c
             resources:
+              # JVM application must have memory resource requests
               requests:
-                cpu: 200m
-                memory: 512Mi
+                memory: 128Mi
             env:
             - name: POD_NAME
               valueFrom:
@@ -290,11 +291,13 @@ spec:
               # TODO: using componentDefRef to inject zookeeper or keeper env
             ports:
               - containerPort: 6650
-                name: tcp-pulsar
-                protocol: TCP
+                name: pulsar
               - containerPort: 8080
                 name: http
-                protocol: TCP
+              - name: kafka-client
+                containerPort: 9092
+              - name: kafka-internal
+                containerPort: 9094
             livenessProbe:
               failureThreshold: 30
               httpGet:
@@ -326,11 +329,8 @@ spec:
               successThreshold: 1
               timeoutSeconds: 100
             volumeMounts:
-            - name: interceptors
-              mountPath: /pulsar/plugin_configs/interceptors
-              readOnly: true
-           #   - name: conf
-           #     mountPath: /pulsar/conf
+            - name: config
+              mountPath: /pulsar/conf
     - name: bookies
       workloadType: Stateful
       characterType: bookies
@@ -412,9 +412,9 @@ spec:
               successThreshold: 1
               timeoutSeconds: 5
             resources:
+              # JVM application must have memory resource requests
               requests:
-                cpu: 200m
-                memory: 512Mi
+                memory: 128Mi
             securityContext:
               runAsUser: 0
               runAsGroup: 10000
@@ -434,7 +434,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9141
+          scrapePort: metrics
       logConfigs:
         {{- range $name,$pattern := .Values.zookeeper.logConfigs }}
         - name: {{ $name }}
@@ -480,19 +480,14 @@ spec:
             ports:
               - containerPort: 2181
                 name: client
-                protocol: TCP
               - containerPort: 2888
                 name: tcp-quorum
-                protocol: TCP
               - containerPort: 3888
                 name: tcp-election
-                protocol: TCP
               - containerPort: 9141
                 name: metrics
-                protocol: TCP
               - containerPort: 9990
                 name: http-admin
-                protocol: TCP
             livenessProbe:
               exec:
                 command:
@@ -520,9 +515,9 @@ spec:
               successThreshold: 1
               timeoutSeconds: 30
             resources:
+              # JVM application must have memory resource requests
               requests:
-                cpu: 50m
-                memory: 256Mi
+                memory: 128Mi
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:

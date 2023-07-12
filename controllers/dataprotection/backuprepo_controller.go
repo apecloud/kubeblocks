@@ -67,9 +67,9 @@ type BackupRepoReconciler struct {
 }
 
 // full access on BackupRepos
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepoes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepoes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepoes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos/finalizers,verbs=update
 
 // watch StorageProviders
 // +kubebuilder:rbac:groups=storage.kubeblocks.io,resources=storageproviders,verbs=get;list;watch

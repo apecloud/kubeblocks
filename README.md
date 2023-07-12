@@ -1,12 +1,13 @@
 # KubeBlocks
 
-[![Build status](https://github.com/apecloud/kubeblocks/workflows/CICD-PUSH/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml)
 [![Documentation status](https://github.com/apecloud/kubeblocks.io/workflows/Documentation/badge.svg)](https://kubeblocks.io)
+[![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/7544/badge)](https://bestpractices.coreinfrastructure.org/projects/7544)
+[![Releases](https://img.shields.io/github/v/release/apecloud/kubeblocks)](https://github.com/apecloud/kubeblocks/releases/latest)
+[![LICENSE](https://img.shields.io/github/license/apecloud/kubeblocks.svg?style=flat-square)](/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/apecloud/kubeblocks)](https://goreportcard.com/report/github.com/apecloud/kubeblocks)
 [![Docker Pulls](https://img.shields.io/docker/pulls/apecloud/kubeblocks)](https://hub.docker.com/r/apecloud/kubeblocks)
 [![codecov](https://codecov.io/gh/apecloud/kubeblocks/branch/main/graph/badge.svg?token=GEH4I1C80Y)](https://codecov.io/gh/apecloud/kubeblocks)
-[![LICENSE](https://img.shields.io/github/license/apecloud/kubeblocks.svg?style=flat-square)](/LICENSE)
-[![Releases](https://img.shields.io/github/v/release/apecloud/kubeblocks)](https://github.com/apecloud/kubeblocks/releases/latest)
+[![Build status](https://github.com/apecloud/kubeblocks/workflows/CICD-PUSH/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml)
 ![maturity](https://img.shields.io/static/v1?label=maturity&message=alpha&color=red)
 
 ![image](./docs/img/banner-readme.png)
@@ -19,6 +20,7 @@
   - [Get started with KubeBlocks](#get-started-with-kubeblocks)
   - [Community](#community)
   - [Contributing to KubeBlocks](#contributing-to-kubeblocks)
+  - [Report Vulnerability](#report-vulnerability)
   - [License](#license)
 
 ## What is KubeBlocks
@@ -68,6 +70,10 @@ Your contributions are welcomed and appreciated.
 
 - See the [Contributor Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
 - See the [Developer Guide](docs/DEVELOPING.md) to get started with building and developing.
+
+## Report Vulnerability
+
+We consider security is a top priority issue. If you come across a related issue, please create a [Report a security vulnerability](https://github.com/apecloud/kubeblocks/security/advisories/new) issue.
 
 ## License
 

@@ -39,6 +39,7 @@ type BackupRepoSpec struct {
 	PVReclaimPolicy corev1.PersistentVolumeReclaimPolicy `json:"pvReclaimPolicy"`
 
 	// Non-secret configurations for the storage provider.
+	// +optional
 	Config map[string]string `json:"config,omitempty"`
 
 	// A secret that contains the credentials needed by the storage provider.

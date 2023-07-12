@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-metrics-config
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+data:
+  metrics-config.yaml: |-
+    extensions:
+      memory_ballast:
+        size_mib: 32
+
+    receivers:
+      apecloudredis:
+        endpoint: ${env:ENDPOINT}
+        username: ${env:REDIS_USER}
+        password: ${env:REDIS_PASSWORD}
+        password_file: ""
+        lua_script: ""
+        tls:
+          insecure: true
+          insecure_skip_verify: true
+        collection_interval: 10s
+
+    processors:
+      memory_limiter:
+        limit_mib: 128
+        spike_limit_mib: 32
+        check_interval: 10s
+
+    exporters:
+      prometheus:
+        endpoint: 0.0.0.0:{{ .Values.metrics.service.port }}
+        send_timestamps: false
+        metric_expiration: 20s
+        enable_open_metrics: false
+        resource_to_telemetry_conversion:
+          enabled: true
+
+    service:
+      telemetry:
+        logs:
+          level: info
+      pipelines:
+        metrics:
+          receivers: [ apecloudredis ]
+          processors: [ memory_limiter ]
+          exporters: [ prometheus ]
+      extensions: [ ]

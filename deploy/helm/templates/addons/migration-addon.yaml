@@ -18,12 +18,12 @@ spec:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/dt-platform
     {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/dt-platform-0.1.0.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/dt-platform-0.1.1-test.1.tgz
     {{- end }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 0.1.0
+      version: 0.1.1
       {{- end }}
 
     valuesMapping:

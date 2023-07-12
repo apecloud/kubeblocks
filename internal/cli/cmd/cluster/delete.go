@@ -129,11 +129,6 @@ func deleteDependencies(client kubernetes.Interface, ns string, name string) err
 		return false
 	}
 
-	// delete cluster roles and bindings
-	if errs := deleteClusterRoleAndBinding(ctx, client, name, deleteOptions); len(errs) > 0 {
-		allErr = append(allErr, errs...)
-	}
-
 	// delete rolebinding
 	klog.V(1).Infof("delete rolebinding %s", roleBindingName)
 	if err := client.RbacV1().RoleBindings(ns).Delete(ctx, roleBindingName, deleteOptions); checkErr(err) {
@@ -152,29 +147,6 @@ func deleteDependencies(client kubernetes.Interface, ns string, name string) err
 		allErr = append(allErr, err)
 	}
 	return errors.NewAggregate(allErr)
-}
-
-func deleteClusterRoleAndBinding(ctx context.Context, client kubernetes.Interface, name string, opts metav1.DeleteOptions) []error {
-	var (
-		clusterRoleName        = clusterRoleNamePrefix + name
-		clusterRoleBindingName = clusterRoleBindingNamePrefix + name
-		errs                   = make([]error, 0)
-	)
-	// delete cluster role binding
-	klog.V(1).Infof("delete cluster role binding %s", clusterRoleBindingName)
-	if err := client.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, opts); err != nil {
-		if !apierrors.IsNotFound(err) {
-			errs = append(errs, err)
-		}
-	}
-	// delete cluster role
-	klog.V(1).Infof("delete cluster role %s", clusterRoleName)
-	if err := client.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, opts); err != nil {
-		if !apierrors.IsNotFound(err) {
-			errs = append(errs, err)
-		}
-	}
-	return errs
 }
 
 func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) {

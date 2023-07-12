@@ -394,7 +394,7 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 		return appsv1alpha1.KBAccountInvalid, err
 	}
 
-	detectedFacts := getAccountFacts(secrets, jobs)
+	detectedFacts := getAcctFromSecretAndJobs(secrets, jobs)
 	reqCtx.Log.V(1).Info("Detected account facts", "facts", detectedFacts)
 	return detectedFacts, nil
 }

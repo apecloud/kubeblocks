@@ -3,7 +3,8 @@ Define the cluster componnets with proxy.
 The proxy cpu cores is 1/6 of the cluster total cpu cores.
 */}}
 {{- define "apecloud-mysql-cluster.proxyComponents" }}
-{{- $proxyCPU := (int (ceil (div (mul .Values.replicas .Values.cpu) 6))) }}
+{{- $replicas := (include "apecloud-mysql-cluster.replicas" .) }}
+{{- $proxyCPU := (int (ceil (div (mul $replicas .Values.cpu) 6))) }}
 {{- if lt $proxyCPU 2 }}
 {{- $proxyCPU = 2 }}
 {{- end }}
@@ -13,15 +14,21 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 {{- if eq (mod $proxyCPU 2) 1 }}
 {{- $proxyCPU = add $proxyCPU 1 }}
 {{- end }}
-- name: etcd
-  componentDefRef: etcd # ref clusterdefinition componentDefs.name
+- name: vtcontroller
+  componentDefRef: vtcontroller # ref clusterdefinition componentDefs.name
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
   replicas: 1
-- name: vtctld
-  componentDefRef: vtctld # ref clusterdefinition componentDefs.name
-  replicas: 1
-- name: vtconsensus
-  componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
-  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
 - name: vtgate
   componentDefRef: vtgate # ref clusterdefinition componentDefs.name
   replicas: 1
@@ -33,17 +40,14 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 {{- end }}
 
 {{/*
-Define replica count.
+Define replicas.
 standalone mode: 1
-replication mode: 2
-raftGroup mode: 3 or more
+raftGroup mode: max(replicas, 3)
 */}}
-{{- define "apecloud-mysql-cluster.replicaCount" -}}
+{{- define "apecloud-mysql-cluster.replicas" }}
 {{- if eq .Values.mode "standalone" }}
-replicas: 1
-{{- else if eq .Values.mode "replication" }}
-replicas: {{ max .Values.replicas 2 }}
-{{- else }}
-replicas: {{ max .Values.replicas 3 }}
+{{- 1 }}
+{{- else if eq .Values.mode "raftGroup" }}
+{{- max .Values.replicas 3 }}
 {{- end }}
 {{- end -}}

@@ -148,7 +148,7 @@ env:
   PROMETHEUS_MONITORING_ENABLED: false
 
   # Set a MEM limit for the Weaviate Pod so it can help you both increase GC-related
-  # performance as well as avoid GC-related out-of-memory (“OOM”) situations
+  # performance as well as avoid GC-related out-of-memory ("OOM") situations
   # GOMEMLIMIT: 6GiB
 
   # Maximum results Weaviate can query with/without pagination

@@ -58,6 +58,20 @@ const (
 	OperationFailed         = "Failed"
 
 	HTTPRequestPrefx string = "curl -X POST -H 'Content-Type: application/json' http://localhost:%d/v1.0/bindings/%s"
+
+	// this is a general script template, which can be used for all kinds of exec request to databases.
+	DataScriptRequestTpl string = `
+		response=$(curl -s -X POST -H 'Content-Type: application/json' http://%s:3501/v1.0/bindings/%s -d '%s')
+		result=$(echo $response | jq -r '.event')
+		message=$(echo $response | jq -r '.message')
+		if [ "$result" == "Failed" ]; then
+			echo $message
+			exit 1
+		else
+			echo "$result"
+			exit 0
+		fi
+			`
 )
 
 type RoleType string

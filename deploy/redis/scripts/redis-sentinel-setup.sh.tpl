@@ -1,5 +1,5 @@
 #!/bin/sh
-set -ex
+set -e
 {{- $clusterName := $.cluster.metadata.name }}
 {{- $namespace := $.cluster.metadata.namespace }}
 {{- /* find redis-sentinel component */}}

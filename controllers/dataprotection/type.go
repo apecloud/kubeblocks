@@ -30,6 +30,10 @@ import (
 )
 
 const (
+	trueVal = "true"
+)
+
+const (
 	// name of our custom finalizer
 	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
 	// settings keys
@@ -48,7 +52,6 @@ const (
 	dataProtectionNeedRepoPVCKey = "dataprotection.kubeblocks.io/need-repo-pvc"
 
 	// annotation keys
-	dataProtectionRepoPVCNameAnnotationKey       = "dataprotection.kubeblocks.io/repo-pvc-name"
 	dataProtectionSecretTemplateMD5AnnotationKey = "dataprotection.kubeblocks.io/secret-template-md5"
 	dataProtectionTemplateValuesMD5AnnotationKey = "dataprotection.kubeblocks.io/template-values-md5"
 

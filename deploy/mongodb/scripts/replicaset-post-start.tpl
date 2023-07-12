@@ -19,6 +19,12 @@ if [ $INDEX -ne 0 ]; then
   exit 0
 fi
 
+BACKUPFILE=$MONGODB_ROOT/db/mongodb.backup
+until [ ! -f ${BACKUPFILE} ]
+do
+   sleep 1
+done
+
 until mongosh --quiet --port $PORT --eval "print('I am ready')"; do sleep 1; done
 
 until is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().set" -u root --password $MONGODB_ROOT_PASSWORD || \

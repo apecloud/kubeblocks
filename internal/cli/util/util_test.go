@@ -252,7 +252,7 @@ var _ = Describe("util", func() {
 	})
 
 	It("get IP location", func() {
-		_, _ = getIPLocation()
+		_, _ = GetIPLocation()
 	})
 
 	It("get helm chart repo url", func() {

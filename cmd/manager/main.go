@@ -99,8 +99,9 @@ func init() {
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
 
-	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 100)
+	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
+	viper.SetDefault("ENABLE_RBAC_MANAGER", true)
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
@@ -116,9 +117,17 @@ func init() {
 type flagName string
 
 const (
-	probeAddrFlagKey   flagName = "health-probe-bind-address"
-	metricsAddrFlagKey flagName = "metrics-bind-address"
-	leaderElectFlagKey flagName = "leader-elect"
+	probeAddrFlagKey     flagName = "health-probe-bind-address"
+	metricsAddrFlagKey   flagName = "metrics-bind-address"
+	leaderElectFlagKey   flagName = "leader-elect"
+	leaderElectIDFlagKey flagName = "leader-elect-id"
+
+	// switch flags key for API groups
+	appsFlagKey           flagName = "apps"
+	dataProtectionFlagKey flagName = "dataprotection"
+	extensionsFlagKey     flagName = "extensions"
+	workloadsFlagKey      flagName = "workloads"
+	storageFlagKey        flagName = "storage"
 )
 
 func (r flagName) String() string {
@@ -175,12 +184,28 @@ func validateRequiredToParseConfigs() error {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var enableLeaderElectionID string
 	var probeAddr string
 	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
 	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
 	flag.Bool(leaderElectFlagKey.String(), false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
+	flag.String(leaderElectIDFlagKey.String(), "001c317f",
+		"The leader election ID prefix for controller manager. "+
+			"This ID must be unique to controller manager.")
+
+	flag.Bool(appsFlagKey.String(), true,
+		"Enable the apps controller manager.")
+	flag.Bool(dataProtectionFlagKey.String(), true,
+		"Enable the dataprotection controller manager. ")
+	flag.Bool(extensionsFlagKey.String(), true,
+		"Enable the extensions controller manager. ")
+	flag.Bool(workloadsFlagKey.String(), true,
+		"Enable the workloads controller manager. ")
+	flag.Bool(storageFlagKey.String(), true,
+		"Enable the storage controller manager. ")
 
 	opts := zap.Options{
 		Development: true,
@@ -220,6 +245,7 @@ func main() {
 	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())
 	probeAddr = viper.GetString(probeAddrFlagKey.viperName())
 	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
+	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
 
 	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
 	if err := validateRequiredToParseConfigs(); err != nil {
@@ -237,7 +263,7 @@ func main() {
 		// following LeaderElectionID is generated via hash/fnv (FNV-1 and FNV-1a), in
 		// pattern of '{{ hashFNV .Repo }}.{{ .Domain }}', make sure regenerate this ID
 		// if you have forked from this project template.
-		LeaderElectionID: "001c317f.kubeblocks.io",
+		LeaderElectionID: enableLeaderElectionID + ".kubeblocks.io",
 
 		// NOTES:
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
@@ -260,105 +286,165 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&appscontrollers.ClusterReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cluster-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
-		os.Exit(1)
+	if viper.GetBool(appsFlagKey.viperName()) {
+		if err = (&appscontrollers.ClusterReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("cluster-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ClusterDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("cluster-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ClusterDefinition")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ClusterVersionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("cluster-version-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ClusterVersion")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.OpsRequestReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigConstraintReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ReconfigureRequestReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.SystemAccountReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("system-account-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "SystemAccount")
+			os.Exit(1)
+		}
+
+		if err = (&k8scorecontrollers.EventReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("event-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Event")
+			os.Exit(1)
+		}
+
+		if err = (&k8scorecontrollers.PersistentVolumeClaimReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("pvc-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
+			os.Exit(1)
+		}
+
+		if err = components.NewStatefulSetReconciler(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
+			os.Exit(1)
+		}
+
+		if err = components.NewDeploymentReconciler(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Deployment")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ComponentClassReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("class-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Class")
+			os.Exit(1)
+		}
 	}
 
-	if err = (&appscontrollers.ClusterDefinitionReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cluster-definition-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ClusterDefinition")
-		os.Exit(1)
+	if viper.GetBool(dataProtectionFlagKey.viperName()) {
+		if err = (&dataprotectioncontrollers.BackupToolReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
+			os.Exit(1)
+		}
+
+		if err = (&dataprotectioncontrollers.BackupPolicyReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
+			os.Exit(1)
+		}
+
+		if err = (&dataprotectioncontrollers.CronJobReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "CronJob")
+			os.Exit(1)
+		}
+
+		if err = (&dataprotectioncontrollers.BackupReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("backup-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Backup")
+			os.Exit(1)
+		}
+
+		if err = (&dataprotectioncontrollers.RestoreJobReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
+			os.Exit(1)
+		}
+
+		if err = (&dataprotectioncontrollers.BackupRepoReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("backup-repo-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
+			os.Exit(1)
+		}
 	}
 
-	if err = (&appscontrollers.ClusterVersionReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cluster-version-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ClusterVersion")
-		os.Exit(1)
-	}
-
-	if err = (&dataprotectioncontrollers.BackupToolReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
-		os.Exit(1)
-	}
-
-	if err = (&dataprotectioncontrollers.BackupPolicyReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
-		os.Exit(1)
-	}
-
-	if err = (&dataprotectioncontrollers.CronJobReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CronJob")
-		os.Exit(1)
-	}
-
-	if err = (&dataprotectioncontrollers.BackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Backup")
-		os.Exit(1)
-	}
-
-	if err = (&dataprotectioncontrollers.RestoreJobReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
-		os.Exit(1)
-	}
-
-	if err = (&dataprotectioncontrollers.BackupRepoReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-repo-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
-		os.Exit(1)
-	}
-
-	if err = (&appscontrollers.OpsRequestReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
-		os.Exit(1)
-	}
-
-	if err = (&configuration.ConfigConstraintReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-		os.Exit(1)
-	}
-	if !viper.GetBool("DISABLE_ADDON_CTRLER") {
+	if viper.GetBool(extensionsFlagKey.viperName()) {
 		if err = (&extensionscontrollers.AddonReconciler{
 			Client:     mgr.GetClient(),
 			Scheme:     mgr.GetScheme(),
@@ -370,79 +456,28 @@ func main() {
 		}
 	}
 
-	if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
-		os.Exit(1)
+	if viper.GetBool(workloadsFlagKey.viperName()) {
+		if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
+			os.Exit(1)
+		}
 	}
 
-	if err = (&storagecontrollers.StorageProviderReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
-		os.Exit(1)
+	if viper.GetBool(storageFlagKey.viperName()) {
+		if err = (&storagecontrollers.StorageProviderReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
-
-	if err = (&configuration.ReconfigureRequestReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-		os.Exit(1)
-	}
-
-	if err = (&appscontrollers.SystemAccountReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("system-account-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SystemAccount")
-		os.Exit(1)
-	}
-
-	if err = (&k8scorecontrollers.EventReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("event-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Event")
-		os.Exit(1)
-	}
-
-	if err = (&k8scorecontrollers.PersistentVolumeClaimReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("pvc-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
-		os.Exit(1)
-	}
-
-	if err = components.NewStatefulSetReconciler(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
-		os.Exit(1)
-	}
-
-	if err = components.NewDeploymentReconciler(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
-		os.Exit(1)
-	}
-
-	if err = (&appscontrollers.ComponentClassReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("class-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Class")
-		os.Exit(1)
-	}
 
 	if viper.GetBool("enable_webhooks") {
 

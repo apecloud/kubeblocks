@@ -94,7 +94,6 @@ var _ = Describe("bench", func() {
 	It("sysbench command", func() {
 		cmd := NewSysBenchCmd(tf, streams)
 		Expect(cmd != nil).Should(BeTrue())
-		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
 	It("test sysbench run", func() {
@@ -107,12 +106,11 @@ var _ = Describe("bench", func() {
 				User:     "test",
 				Password: "test",
 			},
-			Mode:      "prepare",
 			Type:      []string{"oltp_read_only"},
 			Tables:    1,
 			Size:      100,
-			Times:     1,
 			factory:   tf,
+			Duration:  60,
 			namespace: namespace,
 			IOStreams: streams,
 		}
@@ -125,7 +123,6 @@ var _ = Describe("bench", func() {
 	It("pgbench command", func() {
 		cmd := NewPgBenchCmd(tf, streams)
 		Expect(cmd != nil).Should(BeTrue())
-		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
 	It("test pgbench run", func() {
@@ -138,11 +135,11 @@ var _ = Describe("bench", func() {
 				User:     "test",
 				Password: "test",
 			},
-			Mode:      "prepare",
 			Scale:     100,
 			factory:   tf,
 			namespace: namespace,
 			IOStreams: streams,
+			Clients:   []int{1},
 		}
 		o.dynamic, _ = tf.DynamicClient()
 		o.client, _ = tf.KubernetesClientSet()

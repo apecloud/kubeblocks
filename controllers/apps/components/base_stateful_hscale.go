@@ -21,7 +21,6 @@ package components
 
 import (
 	"fmt"
-	"strings"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -37,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -272,18 +272,8 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 
 	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
 	err := d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backupPolicyTplName}, backupPolicyTemplate)
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
-	}
-	// no backuppolicytemplate, then try native volumesnapshot
 	if err != nil {
-		pvcName := strings.Join([]string{d.backupVCT().Name, d.stsObj.Name, "0"}, "-")
-		snapshot, err := builder.BuildVolumeSnapshot(d.key, pvcName, d.stsObj)
-		if err != nil {
-			return nil, err
-		}
-		d.reqCtx.Eventf(d.cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", d.key.Name)
-		return []client.Object{snapshot}, nil
+		return nil, err
 	}
 
 	// if there is backuppolicytemplate created by provider
@@ -304,49 +294,26 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 }
 
 func (d *snapshotDataClone) checkBackupStatus() (backupStatus, error) {
-	hasBackupPolicyTemplate := true
 	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
 	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
 	err := d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backupPolicyTplName}, backupPolicyTemplate)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil {
 		return backupStatusFailed, err
 	}
-	if errors.IsNotFound(err) {
-		hasBackupPolicyTemplate = false
-	}
-	// if no backuppolicytemplate, do not check backup
-	if hasBackupPolicyTemplate {
-		backup := dataprotectionv1alpha1.Backup{}
-		if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
-			if errors.IsNotFound(err) {
-				return backupStatusNotCreated, nil
-			} else {
-				return backupStatusFailed, err
-			}
-		}
-		if backup.Status.Phase == dataprotectionv1alpha1.BackupFailed {
-			return backupStatusFailed, intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
-				backup.Status.FailureReason)
-		}
-		if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
-			return backupStatusProcessing, nil
-		}
-	} else {
-		vsExists, err := d.isVolumeSnapshotExists()
-		if err != nil {
-			return backupStatusFailed, err
-		}
-		if !vsExists {
+	backup := dataprotectionv1alpha1.Backup{}
+	if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
+		if errors.IsNotFound(err) {
 			return backupStatusNotCreated, nil
-		}
-		// volumesnapshot exists, check if it is ready for use.
-		ready, err := d.isVolumeSnapshotReadyToUse()
-		if err != nil {
+		} else {
 			return backupStatusFailed, err
 		}
-		if !ready {
-			return backupStatusProcessing, nil
-		}
+	}
+	if backup.Status.Phase == dataprotectionv1alpha1.BackupFailed {
+		return backupStatusFailed, intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
+			backup.Status.FailureReason)
+	}
+	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+		return backupStatusProcessing, nil
 	}
 	return backupStatusReadyToUse, nil
 }
@@ -377,43 +344,19 @@ func (d *snapshotDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (bac
 	return backupStatusReadyToUse, nil
 }
 
-// check snapshot existence
-func (d *snapshotDataClone) isVolumeSnapshotExists() (bool, error) {
-	ml := d.getBackupMatchingLabels()
-	vsList := snapshotv1.VolumeSnapshotList{}
+func (d *snapshotDataClone) listVolumeSnapshotByLabels(vsList *snapshotv1.VolumeSnapshotList, ml client.MatchingLabels) error {
 	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
-	if err := compatClient.List(&vsList, ml); err != nil {
-		return false, client.IgnoreNotFound(err)
+	// get vs from backup.
+	backupList := dataprotectionv1alpha1.BackupList{}
+	if err := d.cli.List(d.reqCtx.Ctx, &backupList, ml); err != nil {
+		return err
+	} else if len(backupList.Items) == 0 {
+		// ignore not found
+		return nil
 	}
-	for _, vs := range vsList.Items {
-		// when do h-scale very shortly after last h-scale,
-		// the last volume snapshot could not be deleted completely
-		if vs.DeletionTimestamp.IsZero() {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// check snapshot ready to use
-func (d *snapshotDataClone) isVolumeSnapshotReadyToUse() (bool, error) {
-	ml := d.getBackupMatchingLabels()
-	vsList := snapshotv1.VolumeSnapshotList{}
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
-	if err := compatClient.List(&vsList, ml); err != nil {
-		return false, client.IgnoreNotFound(err)
-	}
-	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
-		return false, nil
-	}
-	status := vsList.Items[0].Status
-	if status.Error != nil {
-		return false, fmt.Errorf("VolumeSnapshot/" + vsList.Items[0].Name + ": " + *status.Error.Message)
-	}
-	if status.ReadyToUse == nil {
-		return false, nil
-	}
-	return *status.ReadyToUse, nil
+	return compatClient.List(vsList, client.MatchingLabels{
+		constant.DataProtectionLabelBackupNameKey: backupList.Items[0].Name,
+	})
 }
 
 func (d *snapshotDataClone) checkedCreatePVCFromSnapshot(pvcKey types.NamespacedName,
@@ -426,8 +369,7 @@ func (d *snapshotDataClone) checkedCreatePVCFromSnapshot(pvcKey types.Namespaced
 		}
 		ml := d.getBackupMatchingLabels()
 		vsList := snapshotv1.VolumeSnapshotList{}
-		compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
-		if err := compatClient.List(&vsList, ml); err != nil {
+		if err = d.listVolumeSnapshotByLabels(&vsList, ml); err != nil {
 			return nil, err
 		}
 		if len(vsList.Items) == 0 {
@@ -465,17 +407,6 @@ func (d *snapshotDataClone) deleteSnapshot() ([]client.Object, error) {
 	}
 	if len(objs) > 0 {
 		d.reqCtx.Recorder.Eventf(d.cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", d.key.Name)
-	}
-	// delete volumesnapshot separately since backup may not exist if backuppolicytemplate not configured
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
-	vs := &snapshotv1.VolumeSnapshot{}
-	err = compatClient.Get(d.key, vs)
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
-	}
-	if err == nil {
-		objs = append(objs, vs)
-		d.reqCtx.Recorder.Eventf(d.cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", d.key.Name)
 	}
 
 	return objs, nil
@@ -604,38 +535,29 @@ func (d *backupDataClone) checkBackupStatus() (backupStatus, error) {
 
 func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object, error) {
 	objs := make([]client.Object, 0)
-	restoreJobKey := d.restoreKeyFromPVCKey(pvcKey)
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
 		return nil, err
-	}
-	ml := client.MatchingLabels{
-		constant.ClusterDefLabelKey: d.component.ClusterDefName,
-	}
-	backupToolList := dataprotectionv1alpha1.BackupToolList{}
-	if err := d.cli.List(d.reqCtx.Ctx, &backupToolList, ml); err != nil {
-		return nil, err
-	}
-	if len(backupToolList.Items) == 0 {
-		return nil, fmt.Errorf("backuptool not found for clusterdefinition: %s", d.component.ClusterDefName)
 	}
 	pvc, err := builder.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
 	if err != nil {
 		return nil, err
 	}
 	objs = append(objs, pvc)
-	// TODO: @dengshao refactor it to backup api
-	job, err := builder.BuildRestoreJobForFullBackup(restoreJobKey.Name, d.component, &backup, &backupToolList.Items[0], pvcKey.Name)
+	restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
+	restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, []string{pvc.Name}, d.getBackupMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
-	objs = append(objs, job)
+	objs = append(objs, restoreJobs...)
 	return objs, nil
 }
 
 func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backupStatus, error) {
 	job := v1.Job{}
-	if err := d.cli.Get(d.reqCtx.Ctx, d.restoreKeyFromPVCKey(pvcKey), &job); err != nil {
+	restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
+	jobName := restoreMgr.GetDatafileRestoreJobName(pvcKey.Name)
+	if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: pvcKey.Namespace, Name: jobName}, &job); err != nil {
 		if errors.IsNotFound(err) {
 			return backupStatusNotCreated, nil
 		} else {
@@ -646,14 +568,6 @@ func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backu
 		return backupStatusReadyToUse, nil
 	}
 	return backupStatusProcessing, nil
-}
-
-func (d *backupDataClone) restoreKeyFromPVCKey(pvcKey types.NamespacedName) types.NamespacedName {
-	restoreJobKey := types.NamespacedName{
-		Namespace: pvcKey.Namespace,
-		Name:      "restore-" + pvcKey.Name,
-	}
-	return restoreJobKey
 }
 
 // getBackupPolicyFromTemplate gets backup policy from template policy template.

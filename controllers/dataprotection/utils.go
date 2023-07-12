@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -83,21 +84,6 @@ func getCreatedCRNameByBackupPolicy(backupPolicyName, backupPolicyNamespace stri
 		name = strings.TrimRight(name[:30], "-")
 	}
 	return fmt.Sprintf("%s-%s", name, string(backupType))
-}
-
-// getBackupBatchV1Job gets the v1 job which is created by backup.
-func getBackupBatchV1Job(reqCtx intctrlutil.RequestCtx, cli client.Client, backup *dataprotectionv1alpha1.Backup) (*batchv1.Job, error) {
-	job := &batchv1.Job{}
-	jobNameSpaceName := types.NamespacedName{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      backup.Name,
-	}
-	if err := cli.Get(reqCtx.Ctx, jobNameSpaceName, job); err != nil {
-		// not found backup, do nothing
-		reqCtx.Log.Info(err.Error())
-		return nil, err
-	}
-	return job, nil
 }
 
 func getClusterLabelKeys() []string {
@@ -214,6 +200,7 @@ func sendWarningEventForError(recorder record.EventRecorder, backup *dataprotect
 var configVolumeSnapshotError = []string{
 	"Failed to set default snapshot class with error",
 	"Failed to get snapshot class with error",
+	"Failed to create snapshot content with error cannot find CSI PersistentVolumeSource for volume",
 }
 
 func isVolumeSnapshotConfigError(snap *snapshotv1.VolumeSnapshot) bool {
@@ -267,6 +254,32 @@ func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Back
 		jobName = jobName[:63]
 	}
 	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
+}
+
+func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dataprotectionv1alpha1.BackupRepo, error) {
+	backupRepoList := &dataprotectionv1alpha1.BackupRepoList{}
+	err := cli.List(ctx, backupRepoList)
+	if err != nil {
+		return nil, err
+	}
+	var defaultRepo *dataprotectionv1alpha1.BackupRepo
+	for idx := range backupRepoList.Items {
+		repo := &backupRepoList.Items[idx]
+		// skip non-default repo
+		if !(repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal &&
+			repo.Status.Phase == dataprotectionv1alpha1.BackupRepoReady) {
+			continue
+		}
+		if defaultRepo != nil {
+			return nil, fmt.Errorf("multiple default BackupRepo found, both %s and %s are default",
+				defaultRepo.Name, repo.Name)
+		}
+		defaultRepo = repo
+	}
+	if defaultRepo == nil {
+		return nil, fmt.Errorf("no default BackupRepo found")
+	}
+	return defaultRepo, nil
 }
 
 // ============================================================================
@@ -369,4 +382,13 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 		name = flatten
 	}
 	return
+}
+
+func containsJobCondition(job *batchv1.Job, jobCondType batchv1.JobConditionType) bool {
+	for _, jobCond := range job.Status.Conditions {
+		if jobCond.Type == jobCondType {
+			return true
+		}
+	}
+	return false
 }

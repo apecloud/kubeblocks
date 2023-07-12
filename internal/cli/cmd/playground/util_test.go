@@ -32,7 +32,7 @@ var _ = Describe("util", func() {
 	})
 
 	It("cloud provider repo dir", func() {
-		dir, err := cloudProviderRepoDir()
+		dir, err := cloudProviderRepoDir("")
 		Expect(err).Should(Succeed())
 		Expect(dir).ShouldNot(BeEmpty())
 	})

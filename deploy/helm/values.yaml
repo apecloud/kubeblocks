@@ -21,6 +21,11 @@ image:
   tools:
     repository: apecloud/kubeblocks-tools
 
+## @param separatedDeployment separated the KubeBlocks deployment into two deployments.
+## This switch is used to isolate the apps controller and dataprotection controller
+##
+separatedDeployment: true
+
 ## @param replicaCount
 ##
 replicaCount: 1
@@ -32,6 +37,29 @@ nameOverride: ""
 ## @param fullnameOverride
 ##
 fullnameOverride: ""
+
+
+## KubeBlocks RBAC access priority setting
+## 
+## @param rbac.enabled is used to enable or disable KubeBlocks RBAC access priority. 
+## By enabling this feature, KubeBlocks can ensure resource accessibility for the 
+## cluster's pods, which are required to efficiently manage the cluster. By default,
+## it is set to true. When RBAC access priority is enabled, KubeBlocks will have 
+## the following permissions:
+##   groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+##   groups=core,resources=serviceaccounts/status,verbs=get;update;patch
+##   groups=core,resources=serviceaccounts/finalizers,verbs=update
+##
+##   groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+##   groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get;update;patch
+##   groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update
+##
+## If it is set to false, then you will need to create the service account 
+## named `cluster.ComponentSpec.ServiceAccountName` and the corresponding role binding 
+## manually or through the cluster's Helm template, as shown in the example:
+##   helm install mysql apecloud-mysql-cluster
+rbac:
+  enabled: true
 
 ## Deployment update strategy.
 ## Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
@@ -268,6 +296,7 @@ admissionWebhooks:
 
 ## Data protection settings
 ##
+## @param dataProtection.enabled - set the dataProtection controllers for backup functions
 ## @param dataProtection.enableVolumeSnapshot - set this to true if cluster does have snapshot.storage.k8s.io API installed
 ## @param dataProtection.backupPVCName - set the default pvc to store the file for backup
 ## @param dataProtection.backupPVCInitCapacity - set the default pvc initCapacity if the pvc need to be created by backup controller
@@ -276,6 +305,7 @@ admissionWebhooks:
 ## @param dataProtection.backupPVConfigMapName - set the default configmap name which contains key "persistentVolume" and value of the persistentVolume struct.
 ## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
 dataProtection:
+  enabled: true
   enableVolumeSnapshot: false
   backupPVCName: kb-backup-data
   backupPVCInitCapacity: ""
@@ -696,3 +726,12 @@ storageClass:
       fsType: xfs
     tke:
       volumeType: CLOUD_SSD
+
+external-dns:
+  enabled: false
+  domain: kubeblocks.io
+  tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule

@@ -21,6 +21,7 @@ package kubeblocks
 
 import (
 	"bytes"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -70,7 +71,7 @@ var _ = Describe("backupconfig", func() {
 	}
 
 	mockHelmConfig := func(release string, opt *Options) (map[string]interface{}, error) {
-		return map[string]interface{}{
+		values := map[string]interface{}{
 			"updateStrategy": map[string]interface{}{
 				"rollingUpdate": map[string]interface{}{
 					"maxSurge":       1,
@@ -86,6 +87,9 @@ var _ = Describe("backupconfig", func() {
 				"encoder":         "console",
 				"timeEncoding":    "iso8601",
 			},
+			"cloudProvider": map[string]interface{}{
+				"accessKey": "testAK",
+			},
 			"priorityClassName": nil,
 			"nameOverride":      "",
 			"fullnameOverride":  "",
@@ -93,7 +97,15 @@ var _ = Describe("backupconfig", func() {
 			"replicaCount":      1,
 			"hostNetwork":       false,
 			"keepAddons":        false,
-		}, nil
+		}
+		for _, key := range sensitiveValues {
+			sp := strings.Split(key, ".")
+			rootKey := sp[0]
+			if node, ok := values[rootKey]; ok {
+				encryptNodeData(values, node, sp, 0)
+			}
+		}
+		return values, nil
 	}
 
 	BeforeEach(func() {
@@ -186,6 +198,7 @@ var _ = Describe("backupconfig", func() {
 			err := describeConfig(o, output, mockHelmConfig)
 			Expect(err).Should(Succeed())
 			expect := `KEY                                VALUE                                   
+cloudProvider.accessKey            "******"                                
 dnsPolicy                          "ClusterFirst"                          
 fullnameOverride                   ""                                      
 hostNetwork                        false                                   
@@ -206,6 +219,9 @@ updateStrategy.type                "RollingUpdate"
 		It("describe-config --output json", func() {
 			output = printer.JSON
 			expect := `{
+  "cloudProvider": {
+    "accessKey": "******"
+  },
   "dnsPolicy": "ClusterFirst",
   "fullnameOverride": "",
   "hostNetwork": false,
@@ -237,7 +253,9 @@ updateStrategy.type                "RollingUpdate"
 
 		It("describe-config --output yaml", func() {
 			output = printer.YAML
-			expect := `dnsPolicy: ClusterFirst
+			expect := `cloudProvider:
+  accessKey: '******'
+dnsPolicy: ClusterFirst
 fullnameOverride: ""
 hostNetwork: false
 keepAddons: false

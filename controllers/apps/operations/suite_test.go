@@ -42,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -67,6 +68,7 @@ const (
 
 func init() {
 	viper.AutomaticEnv()
+	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 }
 
 func TestAPIs(t *testing.T) {

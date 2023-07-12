@@ -104,6 +104,7 @@ const (
 	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
+	OpsRequestNameLabelKey                 = "ops.kubeblocks.io/ops-name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -153,8 +154,8 @@ const (
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
-	// ClassAnnotationKey is used to specify the class of components
-	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
+	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
+	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
 )
 
 const (

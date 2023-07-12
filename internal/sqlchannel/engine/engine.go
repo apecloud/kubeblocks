@@ -26,11 +26,13 @@ import (
 )
 
 const (
-	stateMysql      = "mysql"
-	statePostgreSQL = "postgresql"
-	stateRedis      = "redis"
-	stateMongoDB    = "mongodb"
-	stateNebula     = "nebula"
+	stateMysql        = "mysql"
+	statePostgreSQL   = "postgresql"
+	stateRedis        = "redis"
+	stateMongoDB      = "mongodb"
+	stateNebula       = "nebula"
+	statePulsarBroker = "pulsar-broker"
+	statePulsarProxy  = "pulsar-proxy"
 )
 
 // AuthInfo is the authentication information for the database
@@ -65,6 +67,10 @@ func New(typeName string) (Interface, error) {
 		return newMongoDB(), nil
 	case stateNebula:
 		return newNebula(), nil
+	case statePulsarBroker:
+		return newPulsar("broker"), nil
+	case statePulsarProxy:
+		return newPulsar("proxy"), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}

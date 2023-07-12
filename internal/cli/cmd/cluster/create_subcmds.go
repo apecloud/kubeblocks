@@ -79,7 +79,6 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 			Use:     t.String() + " NAME",
 			Short:   fmt.Sprintf("Create a %s cluster.", t),
 			Example: buildCreateSubCmdsExamples(t),
-			Aliases: []string{o.chartInfo.Alias},
 			Run: func(cmd *cobra.Command, args []string) {
 				o.Args = args
 				cmdutil.CheckErr(o.CreateOptions.Complete())
@@ -87,6 +86,10 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 				cmdutil.CheckErr(o.validate())
 				cmdutil.CheckErr(o.run())
 			},
+		}
+
+		if o.chartInfo.Alias != "" {
+			cmd.Aliases = []string{o.chartInfo.Alias}
 		}
 
 		util.CheckErr(addCreateFlags(cmd, o.Factory, o.chartInfo))
@@ -122,8 +125,14 @@ func (o *createSubCmdsOptions) run() error {
 	// move values that belong to sub chart to sub map
 	values := buildHelmValues(o.chartInfo, o.values)
 
+	// get Kubernetes version
+	kubeVersion, err := util.GetK8sVersion(o.Client.Discovery())
+	if err != nil || kubeVersion == "" {
+		return fmt.Errorf("failed to get Kubernetes version %v", err)
+	}
+
 	// get cluster manifests
-	manifests, err := cluster.GetManifests(o.chartInfo.Chart, o.Namespace, o.Name, values)
+	manifests, err := cluster.GetManifests(o.chartInfo.Chart, o.Namespace, o.Name, kubeVersion, values)
 	if err != nil {
 		return err
 	}

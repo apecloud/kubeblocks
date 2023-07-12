@@ -56,5 +56,6 @@ if __name__ == "__main__":
             if schema_key == yaml_key:
                 for yaml in yamls.values():
                     jsonschema.validate(schemas.values(), yaml)
+    print("test cases validate pass")
 
 

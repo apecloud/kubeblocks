@@ -379,7 +379,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object. Built-in objects are:<br /><code>$(RANDOM_PASSWD)</code> - random 8 characters.<br /><code>$(UUID)</code> - generate a random UUID v4 string.<br /><code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br /><code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br /><code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br /><code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br /><code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br /><code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
+<p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object.</p><br /><br /><p>Built-in objects are:<br />- <code>$(RANDOM_PASSWD)</code> - random 8 characters.<br />- <code>$(UUID)</code> - generate a random UUID v4 string.<br />- <code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br />- <code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br />- <code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br />- <code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
 </td>
 </tr>
 </table>
@@ -725,6 +725,48 @@ ReloadOptions
 </tr>
 <tr>
 <td>
+<code>toolsImageSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ToolsImageSpec">
+ToolsImageSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>toolConfig used to config init container.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>downwardAPIOptions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DownwardAPIOption">
+[]DownwardAPIOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>downwardAPIOptions is used to watch pod fields.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptConfig">
+[]ScriptConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>cfgSchemaTopLevelName</code><br/>
 <em>
 string
@@ -984,7 +1026,21 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>restart the specified component.</p><br />
+<p>restart the specified components.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>switchover</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Switchover">
+[]Switchover
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>switchover the specified components.</p><br />
 </td>
 </tr>
 <tr>
@@ -1041,6 +1097,32 @@ RestoreFromSpec
 <td>
 <em>(Optional)</em>
 <p>cluster RestoreFrom backup or point in time</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>ttlSecondsBeforeAbort</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.<br />If not specified, the default value is 0, which means that the start-conditions must be met immediately.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
+ScriptSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scriptSpec defines the script to be executed.</p><br />
 </td>
 </tr>
 </table>
@@ -1202,7 +1284,7 @@ string
 </em>
 </td>
 <td>
-<p>componentDefRef references componentDef defined in ClusterDefinition spec.</p><br />
+<p>componentDefRef references componentDef defined in ClusterDefinition spec. Need to<br />comply with IANA Service Naming rule.</p><br />
 </td>
 </tr>
 <tr>
@@ -1489,6 +1571,18 @@ string
 </tr>
 <tr>
 <td>
+<code>useTargetPodServiceAccount</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.<br />if true, will use the service account of the backup target pod. otherwise, will use the system service account.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>updateStage</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.BackupStatusUpdateStage">
@@ -1497,7 +1591,6 @@ BackupStatusUpdateStage
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>when to update the backup status, pre: before backup, post: after backup</p><br />
 </td>
 </tr>
@@ -1720,7 +1813,7 @@ Kubernetes resource.Quantity
 <h3 id="apps.kubeblocks.io/v1alpha1.ClassDefRef">ClassDefRef
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>)
 </p>
 <div>
 </div>
@@ -1781,7 +1874,7 @@ string
 </em>
 </td>
 <td>
-<p>name of the component, it can be any valid string.</p><br />
+<p>A component definition name, this name could be used as default name of <code>Cluster.spec.componentSpecs.name</code>,<br />and so this name is need to conform with same validation rules as <code>Cluster.spec.componentSpecs.name</code>, that<br />is currently comply with IANA Service Naming rule. This name will apply to &ldquo;apps.kubeblocks.io/component-name&rdquo;<br />object label value.</p><br />
 </td>
 </tr>
 <tr>
@@ -2031,6 +2124,34 @@ SystemAccountSpec
 <p>customLabelSpecs is used for custom label tags which you want to add to the component resources.</p><br />
 </td>
 </tr>
+<tr>
+<td>
+<code>switchoverSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverSpec">
+SwitchoverSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>switchoverSpec defines command to do switchover.<br />in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">
+[]ComponentDefRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>componentDefRef is used to inject values from other components into the current component.<br />values will be saved and updated in a configmap and mounted to the current component.</p><br />
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentPhase">ClusterComponentPhase
@@ -2122,6 +2243,7 @@ map[string]string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
 </p>
 <div>
+<p>ClusterComponentSpec defines the cluster component spec.</p><br />
 </div>
 <table>
 <thead>
@@ -2139,7 +2261,7 @@ string
 </em>
 </td>
 <td>
-<p>name defines cluster&rsquo;s component name.</p><br />
+<p>name defines cluster&rsquo;s component name, this name is also part of Service DNS name, so this name will<br />comply with IANA Service Naming rule.</p><br />
 </td>
 </tr>
 <tr>
@@ -2150,7 +2272,7 @@ string
 </em>
 </td>
 <td>
-<p>componentDefRef references the componentDef defined in ClusterDefinition spec.</p><br />
+<p>componentDefRef references componentDef defined in ClusterDefinition spec. Need to<br />comply with IANA Service Naming rule.</p><br />
 </td>
 </tr>
 <tr>
@@ -2270,18 +2392,6 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <em>(Optional)</em>
 <p>Services expose endpoints that can be accessed by clients.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>primaryIndex</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>primaryIndex determines which index is primary when workloadType is Replication. Index number starts from zero.</p><br />
 </td>
 </tr>
 <tr>
@@ -2515,6 +2625,20 @@ VersionsContext
 </td>
 <td>
 <p>versionContext defines containers images&rsquo; context for component versions,<br />this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>switchoverSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverShortSpec">
+SwitchoverShortSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>switchoverSpec defines images for the component to do switchover.<br />It overrides <code>image</code> and <code>env</code> attributes defined in ClusterDefinition.spec.componentDefs.SwitchoverSpec.CommandExecutorEnvItem.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2831,7 +2955,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object. Built-in objects are:<br /><code>$(RANDOM_PASSWD)</code> - random 8 characters.<br /><code>$(UUID)</code> - generate a random UUID v4 string.<br /><code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br /><code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br /><code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br /><code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br /><code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br /><code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
+<p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object.</p><br /><br /><p>Built-in objects are:<br />- <code>$(RANDOM_PASSWD)</code> - random 8 characters.<br />- <code>$(UUID)</code> - generate a random UUID v4 string.<br />- <code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br />- <code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br />- <code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br />- <code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
 </td>
 </tr>
 </tbody>
@@ -3137,7 +3261,7 @@ SwitchPolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>clusterSwitchPolicy type defined by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type</p><br />
+<p>clusterSwitchPolicy defines type of the switchPolicy when workloadType is Replication.<br />MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. It will be available in future versions.<br />MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. It will be available in future versions.<br />Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.</p><br />
 </td>
 </tr>
 </tbody>
@@ -3255,7 +3379,7 @@ int64
 <h3 id="apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
 </p>
 <div>
 <p>CmdExecutorConfig specifies how to perform creation and deletion statements.</p><br />
@@ -3303,7 +3427,7 @@ CommandExecutorItem
 <h3 id="apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">CommandExecutorEnvItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchCmdExecutorConfig">SwitchCmdExecutorConfig</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountShortSpec">SystemAccountShortSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverShortSpec">SwitchoverShortSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountShortSpec">SystemAccountShortSpec</a>)
 </p>
 <div>
 </div>
@@ -3345,7 +3469,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.CommandExecutorItem">CommandExecutorItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchStep">SwitchStep</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>)
 </p>
 <div>
 </div>
@@ -3765,6 +3889,20 @@ ComponentTemplateSpec
 </tr>
 <tr>
 <td>
+<code>lazyRenderedConfigSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.LazyRenderedTemplateSpec">
+LazyRenderedTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>constraintRef</code><br/>
 <em>
 string
@@ -3773,6 +3911,75 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specify the name of the referenced the configuration constraints object.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>asEnvFrom</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>asEnvFrom is optional: the list of containers will be injected into EnvFrom.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
+</p>
+<div>
+<p>ComponentDefRef is used to select the component and its fields to be referenced.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>componentDefName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>componentDefName is the name of the componentDef to select.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>failurePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.FailurePolicyType">
+FailurePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>failurePolicy is the failure policy of the component.<br />If failed to find the component, the failure policy will be used.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>componentRefEnv</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentRefEnv">
+[]ComponentRefEnv
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>componentRefEnv specifies a list of values to be injected as env variables to each component.</p><br />
 </td>
 </tr>
 </tbody>
@@ -3791,7 +3998,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Expose">Expose</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps defines the common variables of component scope operations.</p><br />
@@ -3813,6 +4020,61 @@ string
 </td>
 <td>
 <p>componentName cluster component name.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentRefEnv">ComponentRefEnv
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef</a>)
+</p>
+<div>
+<p>ComponentRefEnv specifies name and value of an env.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>name is the name of the env to be injected, and it must be a C identifier.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>value is the value of the env to be injected.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentValueFrom">
+ComponentValueFrom
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>valueFrom specifies the source of the env to be injected.</p><br />
 </td>
 </tr>
 </tbody>
@@ -3921,7 +4183,7 @@ string
 </em>
 </td>
 <td>
-<p>volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.<br />The volume name must be defined in podSpec.containers[*].volumeMounts.</p><br />
+<p>volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration<br />template will be mounted to the corresponding volume. Must be a DNS_LABEL name.<br />The volume name must be defined in podSpec.containers[*].volumeMounts.</p><br />
 </td>
 </tr>
 <tr>
@@ -3937,6 +4199,95 @@ int32
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentValueFrom">ComponentValueFrom
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentRefEnv">ComponentRefEnv</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentValueFromType">
+ComponentValueFromType
+</a>
+</em>
+</td>
+<td>
+<p>type is the type of the source to select. There are three types: <code>FieldRef</code>, <code>ServiceRef</code>, <code>HeadlessServiceRef</code>.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>fieldPath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>fieldRef is the jsonpath of the source to select when type is <code>FieldRef</code>.<br />there are two objects registered in the jsonpath: <code>componentDef</code> and <code>components</code>.<br />componentDef is the component definition object specified in <code>componentRef.componentDefName</code>.<br />components is the component list objects referring to the component definition object.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>format</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>format is the format of each headless service address.<br />there are three builtin variables can be used as placerholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME<br />$POD_ORDINAL is the ordinal of the pod.<br />$POD_FQDN is the fully qualified domain name of the pod.<br />$POD_NAME is the name of the pod</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>joinWith</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>joinWith is the string to join the values of headless service addresses.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentValueFromType">ComponentValueFromType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentValueFrom">ComponentValueFrom</a>)
+</p>
+<div>
+<p>ComponentValueFromType specifies the type of component value from.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;FieldRef&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;HeadlessServiceRef&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ServiceRef&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigConstraintPhase">ConfigConstraintPhase
 (<code>string</code> alias)</h3>
@@ -3989,6 +4340,48 @@ ReloadOptions
 <td>
 <em>(Optional)</em>
 <p>reloadOptions indicates whether the process supports reload.<br />if set, the controller will determine the behavior of the engine instance based on the configuration templates,<br />restart or reload depending on whether any parameters in the StaticParameters have been modified.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>toolsImageSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ToolsImageSpec">
+ToolsImageSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>toolConfig used to config init container.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>downwardAPIOptions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.DownwardAPIOption">
+[]DownwardAPIOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>downwardAPIOptions is used to watch pod fields.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptConfig">
+[]ScriptConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image</p><br />
 </td>
 </tr>
 <tr>
@@ -4665,6 +5058,70 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.DownwardAPIOption">DownwardAPIOption
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specify the name of the field.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>mountPoint</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>mountPoint is the mount point of the scripts file.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>items</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#downwardapivolumefile-v1-core">
+[]Kubernetes core/v1.DownwardAPIVolumeFile
+</a>
+</em>
+</td>
+<td>
+<p>Items is a list of downward API volume file</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>command used to execute for downwrad api.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig
 </h3>
 <p>
@@ -4751,6 +5208,27 @@ ComponentOps
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.FailurePolicyType">FailurePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef</a>)
+</p>
+<div>
+<p>FailurePolicyType specifies the type of failure policy</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Fail&#34;</p></td>
+<td><p>ReportError means that an error will be reported.</p><br /></td>
+</tr><tr><td><p>&#34;Ignore&#34;</p></td>
+<td><p>Ignore means that an error will be ignored but logged.</p><br /></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.FormatterConfig">FormatterConfig
 </h3>
@@ -4886,7 +5364,7 @@ map[string]string
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Backup&#34;</p></td>
+<tbody><tr><td><p>&#34;CloneVolume&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Snapshot&#34;</p></td>
 <td></td>
@@ -4920,7 +5398,7 @@ HScaleDataClonePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>type controls what kind of data synchronization do when component scale out.<br />Policy is in enum of &#123;None, Snapshot&#125;. The default policy is <code>None</code>.<br />None: Default policy, do nothing.<br />Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.<br />          Prefer backup job to create snapshot if can find a backupPolicy from &lsquo;BackupPolicyTemplateName&rsquo;.<br />          Notice that &lsquo;Snapshot&rsquo; policy will only take snapshot on one volumeMount, default is<br />          the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),<br />          since take multiple snapshots at one time might cause consistency problem.</p><br />
+<p>type controls what kind of data synchronization do when component scale out.<br />Policy is in enum of &#123;None, CloneVolume&#125;. The default policy is <code>None</code>.<br />None: Default policy, create empty volume and no data clone.<br />CloneVolume: Do data clone to newly scaled pods. Prefer to use volume snapshot first,<br />        and will try backup tool if volume snapshot is not enabled, finally<br />	       report error if both above cannot work.<br />Snapshot: Deprecated, alias for CloneVolume.</p><br />
 </td>
 </tr>
 <tr>
@@ -5150,14 +5628,16 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 <tr>
 <td>
-<code>class</code><br/>
+<code>classDefRef</code><br/>
 <em>
-string
+<a href="#apps.kubeblocks.io/v1alpha1.ClassDefRef">
+ClassDefRef
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>the last class name of the component.</p><br />
+<p>classDefRef reference class defined in ComponentClassDefinition.</p><br />
 </td>
 </tr>
 <tr>
@@ -5241,6 +5721,60 @@ map[string]..LastComponentConfiguration
 <td>
 <em>(Optional)</em>
 <p>components records last configuration of the component.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.LazyRenderedTemplateSpec">LazyRenderedTemplateSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>templateRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specify the name of the referenced the configuration template ConfigMap object.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specify the namespace of the referenced the configuration template ConfigMap object.<br />An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>policy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.MergedPolicy">
+MergedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>policy defines how to merge external imported templates into component templates.</p><br />
 </td>
 </tr>
 </tbody>
@@ -5365,6 +5899,31 @@ Kubernetes resource.Quantity
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.MergedPolicy">MergedPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LazyRenderedTemplateSpec">LazyRenderedTemplateSpec</a>)
+</p>
+<div>
+<p>MergedPolicy defines how to merge external imported templates into component templates.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;none&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;add&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;patch&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;replace&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
 </h3>
@@ -5583,6 +6142,30 @@ WorkloadType
 <p>workloadType references workload type of component in ClusterDefinition.</p><br />
 </td>
 </tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>reason describes the reason for the component phase.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>message is a human-readable message indicating details about this operation.</p><br />
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec
@@ -5702,7 +6285,21 @@ Upgrade
 </td>
 <td>
 <em>(Optional)</em>
-<p>restart the specified component.</p><br />
+<p>restart the specified components.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>switchover</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Switchover">
+[]Switchover
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>switchover the specified components.</p><br />
 </td>
 </tr>
 <tr>
@@ -5759,6 +6356,32 @@ RestoreFromSpec
 <td>
 <em>(Optional)</em>
 <p>cluster RestoreFrom backup or point in time</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>ttlSecondsBeforeAbort</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.<br />If not specified, the default value is 0, which means that the start-conditions must be met immediately.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
+ScriptSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scriptSpec defines the script to be executed.</p><br />
 </td>
 </tr>
 </tbody>
@@ -5970,7 +6593,9 @@ string
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Expose&#34;</p></td>
+<tbody><tr><td><p>&#34;DataScript&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Expose&#34;</p></td>
 <td><p>StartType the start operation will start the pods which is deleted in stop operation.</p><br /></td>
 </tr><tr><td><p>&#34;HorizontalScaling&#34;</p></td>
 <td></td>
@@ -5982,6 +6607,8 @@ string
 <td><p>StopType the stop operation will delete all pods in a cluster concurrently.</p><br /></td>
 </tr><tr><td><p>&#34;Stop&#34;</p></td>
 <td><p>RestartType the restart operation is a special case of the rolling update operation.</p><br /></td>
+</tr><tr><td><p>&#34;Switchover&#34;</p></td>
+<td></td>
 </tr><tr><td><p>&#34;Upgrade&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;VerticalScaling&#34;</p></td>
@@ -6439,7 +7066,7 @@ ProvisionScope
 </em>
 </td>
 <td>
-<p>scope is the scope to provision account, and the scope could be <code>anyPod</code> or <code>allPods</code>.</p><br />
+<p>scope is the scope to provision account, and the scope could be <code>AnyPods</code> or <code>AllPods</code>.</p><br />
 </td>
 </tr>
 <tr>
@@ -6840,32 +7467,6 @@ StatefulSetSpec
 </p>
 </td>
 </tr>
-<tr>
-<td>
-<code>switchPolicies</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchPolicy">
-[]SwitchPolicy
-</a>
-</em>
-</td>
-<td>
-<p>switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>switchCmdExecutorConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchCmdExecutorConfig">
-SwitchCmdExecutorConfig
-</a>
-</em>
-</td>
-<td>
-<p>switchCmdExecutorConfig configs how to get client SDK and perform switch statements.</p><br />
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ReplicationSetStatus">ReplicationSetStatus
@@ -6951,6 +7552,20 @@ MemoryConstraint
 </td>
 <td>
 <p>The constraint for memory size.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>storage</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.StorageConstraint">
+StorageConstraint
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The constraint for storage size.</p><br />
 </td>
 </tr>
 </tbody>
@@ -7046,6 +7661,18 @@ string
 <tbody>
 <tr>
 <td>
+<code>startWindowMinutes</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>startWindowMinutes defines the time window for starting the job if it misses scheduled<br />time for any reason. the unit of time is minute.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>snapshot</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SchedulePolicy">
@@ -7123,6 +7750,179 @@ bool
 </td>
 <td>
 <p>enable or disable the schedule.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScriptConfig">ScriptConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.TPLScriptTrigger">TPLScriptTrigger</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>scriptConfigMapRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>scriptConfigMapRef used to execute for reload.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specify the namespace of the referenced the tpl script ConfigMap object.<br />An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScriptFrom">ScriptFrom
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>)
+</p>
+<div>
+<p>ScriptFrom defines the script to be executed from configMap or secret.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>configMapRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmapkeyselector-v1-core">
+[]Kubernetes core/v1.ConfigMapKeySelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>configMapRef defines the configMap to be executed.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretkeyselector-v1-core">
+[]Kubernetes core/v1.SecretKeySelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>secretRef defines the secret to be executed.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+</p>
+<div>
+<p>ScriptSpec defines the script to be executed.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentOps</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+ComponentOps
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentOps</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>script</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>script defines the script to be executed.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptFrom">
+ScriptFrom
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scriptFrom defines the script to be executed from configMap or secret.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">ScriptSpecSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ScriptSpec name of the referent, refer to componentDefs[x].scriptSpecs[y].Name.</p><br />
 </td>
 </tr>
 </tbody>
@@ -7254,36 +8054,13 @@ Kubernetes api utils intstr.IntOrString
 <tbody>
 <tr>
 <td>
-<code>exec</code><br/>
+<code>command</code><br/>
 <em>
-string
+[]string
 </em>
 </td>
 <td>
-<p>exec used to execute for reload.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptConfigMapRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>scriptConfigMapRef used to execute for reload.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specify the namespace of the referenced the tpl script ConfigMap object.<br />An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p><br />
+<p>command used to execute for reload.</p><br />
 </td>
 </tr>
 </tbody>
@@ -7508,10 +8285,10 @@ Kubernetes apps/v1.DeploymentStrategy
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SwitchCmdExecutorConfig">SwitchCmdExecutorConfig
+<h3 id="apps.kubeblocks.io/v1alpha1.StorageConstraint">StorageConstraint
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReplicationSetSpec">ReplicationSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraint">ResourceConstraint</a>)
 </p>
 <div>
 </div>
@@ -7525,75 +8302,30 @@ Kubernetes apps/v1.DeploymentStrategy
 <tbody>
 <tr>
 <td>
-<code>CommandExecutorEnvItem</code><br/>
+<code>min</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">
-CommandExecutorEnvItem
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>CommandExecutorEnvItem</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>switchSteps</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchStep">
-[]SwitchStep
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#quantity-resource-core">
+Kubernetes resource.Quantity
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.<br />the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.<br />if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.</p><br />
+<p>The minimum size of storage.</p><br />
 </td>
 </tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SwitchPolicy">SwitchPolicy
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReplicationSetSpec">ReplicationSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
 <tr>
 <td>
-<code>type</code><br/>
+<code>max</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchPolicyType">
-SwitchPolicyType
-</a>
-</em>
-</td>
-<td>
-<p>switchPolicyType defines type of the switchPolicy.<br />MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.<br />MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.<br />Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>switchStatements</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchStatements">
-SwitchStatements
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#quantity-resource-core">
+Kubernetes resource.Quantity
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role=&#123;Promote,Demote,Follow&#125;.<br />Promote: candidate primary after elected, which to be promoted<br />Demote: primary before switch, which to be demoted<br />Follow: the other secondaries that are not selected as the primary, which to follow the new primary<br />if switchStatements is not set，we will try to use the built-in switchStatements for the database engine with built-in support.</p><br />
+<p>The maximum size of storage.</p><br />
 </td>
 </tr>
 </tbody>
@@ -7601,10 +8333,10 @@ SwitchStatements
 <h3 id="apps.kubeblocks.io/v1alpha1.SwitchPolicyType">SwitchPolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSwitchPolicy">ClusterSwitchPolicy</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchPolicy">SwitchPolicy</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSwitchPolicy">ClusterSwitchPolicy</a>)
 </p>
 <div>
-<p>SwitchPolicyType defines switchPolicy type.</p><br />
+<p>SwitchPolicyType defines switchPolicy type.<br />Currently, only Noop is supported. MaximumAvailability and MaximumDataProtection will be supported in the future.</p><br />
 </div>
 <table>
 <thead>
@@ -7621,109 +8353,8 @@ SwitchStatements
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SwitchStatements">SwitchStatements
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchPolicy">SwitchPolicy</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>promote</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>promote defines the switching actions for the candidate primary which to be promoted.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>demote</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>demote defines the switching actions for the old primary which to be demoted.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>follow</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>follow defines the switching actions for the other secondaries which are not selected as the primary.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SwitchStep">SwitchStep
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchCmdExecutorConfig">SwitchCmdExecutorConfig</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>CommandExecutorItem</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CommandExecutorItem">
-CommandExecutorItem
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>CommandExecutorItem</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>role</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchStepRole">
-SwitchStepRole
-</a>
-</em>
-</td>
-<td>
-<p>role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SwitchStepRole">SwitchStepRole
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchStep">SwitchStep</a>)
-</p>
 <div>
 <p>SwitchStepRole defines the role to execute the switch command.</p><br />
 </div>
@@ -7741,6 +8372,169 @@ SwitchStepRole
 </tr><tr><td><p>&#34;Secondaries&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Switchover">Switchover
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentOps</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+ComponentOps
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentOps</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>instanceName is used to specify the candidate primary or leader instanceName for switchover.<br />If instanceName is set to &ldquo;<em>&rdquo;, it means that no specific primary or leader is specified for the switchover,<br />and the switchoverAction defined in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate will be executed,<br />It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate is not empty.<br />If instanceName is set to a valid instanceName other than &ldquo;</em>&rdquo;, it means that a specific candidate primary or leader is specified for the switchover.<br />the value of instanceName can be obtained using <code>kbcli cluster list-instances</code>, any other value is invalid.<br />In this case, the <code>switchoverAction</code> defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,<br />and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not empty.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchoverSpec">SwitchoverSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>cmdExecutorConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">
+CmdExecutorConfig
+</a>
+</em>
+</td>
+<td>
+<p>cmdExecutorConfig is the executor configuration of the switchover command.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>scriptSpecSelectors</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">
+[]ScriptSpecSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.<br />Once ScriptSpecSelectors is defined, the scripts defined in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SwitchoverShortSpec">SwitchoverShortSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>)
+</p>
+<div>
+<p>SwitchoverShortSpec is a short version of SwitchoverSpec, with only CommandExecutorEnvItem field.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>cmdExecutorConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">
+CommandExecutorEnvItem
+</a>
+</em>
+</td>
+<td>
+<p>CmdExecutorConfig is the command executor config.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SwitchoverSpec">SwitchoverSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>withCandidate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">
+SwitchoverAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>withCandidate corresponds to the switchover of the specified candidate primary or leader instance.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>withoutCandidate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">
+SwitchoverAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.</p><br />
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SystemAccountConfig">SystemAccountConfig
 </h3>
@@ -7953,25 +8747,17 @@ string
 <tbody>
 <tr>
 <td>
-<code>scriptConfigMapRef</code><br/>
+<code>ScriptConfig</code><br/>
 <em>
-string
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptConfig">
+ScriptConfig
+</a>
 </em>
 </td>
 <td>
-<p>scriptConfigMapRef used to execute for reload.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specify the namespace of the referenced the tpl script ConfigMap object.<br />An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p><br />
+<p>
+(Members of <code>ScriptConfig</code> are embedded into this type.)
+</p>
 </td>
 </tr>
 <tr>
@@ -8087,6 +8873,99 @@ ConnectionCredentialKey
 </tr><tr><td><p>&#34;WipeOut&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ToolConfig">ToolConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ToolsImageSpec">ToolsImageSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specify the name of initContainer. Must be a DNS_LABEL name.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>tools Container image name.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>exec used to execute for init containers.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ToolsImageSpec">ToolsImageSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>mountPoint</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>mountPoint is the mount point of the scripts file.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>toolConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ToolConfig">
+[]ToolConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>toolConfig used to config init container.</p><br />
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.UnixSignalTrigger">UnixSignalTrigger
 </h3>
@@ -8357,14 +9236,16 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 <tr>
 <td>
-<code>class</code><br/>
+<code>classDefRef</code><br/>
 <em>
-string
+<a href="#apps.kubeblocks.io/v1alpha1.ClassDefRef">
+ClassDefRef
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>class specifies the class name of the component</p><br />
+<p>classDefRef reference class defined in ComponentClassDefinition.</p><br />
 </td>
 </tr>
 </tbody>

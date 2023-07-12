@@ -10,6 +10,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/Shopify/sarama v1.30.0
 	github.com/StudioSol/set v1.0.0
+	github.com/apecloud/kubebench v0.0.0-20230707050327-28ffebd6bf30
 	github.com/authzed/controller-idioms v0.7.0
 	github.com/aws/aws-sdk-go v1.44.180
 	github.com/benbjohnson/clock v1.3.0

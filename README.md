@@ -59,7 +59,7 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 
 ## Community
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-1wuhvfww0-WMZOCSvgnAByQ0joAGUi4Q)
+- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-1yyjf0rnn-bdYnuXLmjI_USzshhrWgKg)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 
 ## Contributing to KubeBlocks

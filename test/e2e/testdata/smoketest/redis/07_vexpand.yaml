@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-vexpand
 spec:
-  clusterRef: mycluster-redis-cluster
+  clusterRef: redis-cluster
   type: VolumeExpansion
   volumeExpansion:
     - componentName: redis

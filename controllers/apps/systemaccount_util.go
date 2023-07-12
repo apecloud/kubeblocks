@@ -205,7 +205,7 @@ func retrieveEndpoints(scope appsv1alpha1.ProvisionScope, svcEP *corev1.Endpoint
 	return endpoints
 }
 
-func getAccountFacts(secrets *corev1.SecretList, jobs *batchv1.JobList) (detectedFacts appsv1alpha1.KBAccountType) {
+func getAcctFromSecretAndJobs(secrets *corev1.SecretList, jobs *batchv1.JobList) (detectedFacts appsv1alpha1.KBAccountType) {
 	detectedFacts = appsv1alpha1.KBAccountInvalid
 	// parse account name from secret's label
 	for _, secret := range secrets.Items {

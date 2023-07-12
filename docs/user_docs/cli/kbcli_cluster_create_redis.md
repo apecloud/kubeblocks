@@ -21,11 +21,11 @@ kbcli cluster create redis NAME [flags]
 ### Options
 
 ```
-      --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "none")
-      --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)
+      --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "node")
+      --cpu float                    CPU cores. Value range [0.5, 64]. (default 0.5)
   -h, --help                         help for redis
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
-      --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 1)
+      --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
       --mode string                  Cluster topology mode. Legal values [standalone, replication]. (default "standalone")
       --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.

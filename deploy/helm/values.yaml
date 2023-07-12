@@ -38,6 +38,29 @@ nameOverride: ""
 ##
 fullnameOverride: ""
 
+
+## KubeBlocks RBAC access priority setting
+## 
+## @param rbac.enabled is used to enable or disable KubeBlocks RBAC access priority. 
+## By enabling this feature, KubeBlocks can ensure resource accessibility for the 
+## cluster's pods, which are required to efficiently manage the cluster. By default,
+## it is set to true. When RBAC access priority is enabled, KubeBlocks will have 
+## the following permissions:
+##   groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+##   groups=core,resources=serviceaccounts/status,verbs=get;update;patch
+##   groups=core,resources=serviceaccounts/finalizers,verbs=update
+##
+##   groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+##   groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get;update;patch
+##   groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update
+##
+## If it is set to false, then you will need to create the service account 
+## named `cluster.ComponentSpec.ServiceAccountName` and the corresponding role binding 
+## manually or through the cluster's Helm template, as shown in the example:
+##   helm install mysql apecloud-mysql-cluster
+rbac:
+  enabled: true
+
 ## Deployment update strategy.
 ## Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
 ##

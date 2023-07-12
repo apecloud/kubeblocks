@@ -514,6 +514,24 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(obj).ShouldNot(BeEmpty())
 		})
+
+		It("builds serviceaccount correctly", func() {
+			_, cluster, _ := newClusterObjs(nil)
+			expectName := fmt.Sprintf("kb-%s", cluster.Name)
+			serviceAccount, err := BuildServiceAccount(cluster)
+			Expect(err).Should(BeNil())
+			Expect(serviceAccount).ShouldNot(BeNil())
+			Expect(serviceAccount.Name).Should(Equal(expectName))
+		})
+
+		It("builds rolebinding correctly", func() {
+			_, cluster, _ := newClusterObjs(nil)
+			expectName := fmt.Sprintf("kb-%s", cluster.Name)
+			rb, err := BuildServiceAccount(cluster)
+			Expect(err).Should(BeNil())
+			Expect(rb).ShouldNot(BeNil())
+			Expect(rb.Name).Should(Equal(expectName))
+		})
 	})
 
 })

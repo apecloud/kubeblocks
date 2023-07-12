@@ -170,6 +170,13 @@ spec:
                         user's own configuration file according to the user's cluster.
                       items:
                         properties:
+                          asEnvFrom:
+                            description: 'asEnvFrom is optional: the list of containers
+                              will be injected into EnvFrom.'
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: set
                           constraintRef:
                             description: Specify the name of the referenced the configuration
                               constraints object.

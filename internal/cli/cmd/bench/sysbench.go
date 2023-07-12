@@ -125,7 +125,7 @@ func (o *SysBenchOptions) Complete(args []string) error {
 		o.name = args[0]
 	}
 	if o.name == "" {
-		o.name = util.RandRFC1123String(8)
+		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
 	}
 
 	if o.ClusterName == "" {

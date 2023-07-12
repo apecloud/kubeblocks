@@ -20,6 +20,7 @@
   - [Get started with KubeBlocks](#get-started-with-kubeblocks)
   - [Community](#community)
   - [Contributing to KubeBlocks](#contributing-to-kubeblocks)
+  - [Report Vulnerability](#report-vulnerability)
   - [License](#license)
 
 ## What is KubeBlocks
@@ -69,6 +70,10 @@ Your contributions are welcomed and appreciated.
 
 - See the [Contributor Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
 - See the [Developer Guide](docs/DEVELOPING.md) to get started with building and developing.
+
+## Report Vulnerability
+
+We consider security is a top priority issue. If you come across a related issue, please create a [Report a security vulnerability](https://github.com/apecloud/kubeblocks/security/advisories/new) issue.
 
 ## License
 

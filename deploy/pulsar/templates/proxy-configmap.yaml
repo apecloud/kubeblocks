@@ -1,11 +1,10 @@
 apiVersion: v1
-data:
-  PULSAR_EXTRA_OPTS: -Dpulsar.allocator.exit_on_oom=true -Dio.netty.recycler.maxCapacity.default=1000
-    -Dio.netty.recycler.linkCapacity=1024 -Dnetworkaddress.cache.ttl=60 -XX:ActiveProcessorCount=1
-  PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions
-    -XX:+DoEscapeAnalysis -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB
-  PULSAR_MEM: -Xms153m -Xmx153m -XX:MaxDirectMemorySize=307m
-  statusFilePath: /pulsar/status
 kind: ConfigMap
 metadata:
-  name: proxy-test-config
+  name: pulsar-proxy-config
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  conf: |-
+    {{- .Files.Get "config/proxy-config.tpl" | nindent 4 }}
+

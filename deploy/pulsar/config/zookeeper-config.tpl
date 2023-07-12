@@ -1,3 +1,8 @@
+PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -Dcom.sun.management.jmxremote -Djute.maxbuffer=10485760 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+DoEscapeAnalysis -XX:+DisableExplicitGC -XX:+ExitOnOutOfMemoryError -XX:+PerfDisableSharedMem
+PULSAR_MEM: -Xms64m -Xmx128m
+PULSAR_PREFIX_serverCnxnFactory: org.apache.zookeeper.server.NIOServerCnxnFactory
+dataDir: /pulsar/data/zookeeper
+serverCnxnFactory: org.apache.zookeeper.server.NIOServerCnxnFactory
 {{- $clusterName := $.cluster.metadata.name }}
 {{- $namespace := $.cluster.metadata.namespace }}
 {{- $pulsar_zk_component := fromJson "{}" }}
@@ -17,4 +22,4 @@
     {{- $zk_servers = printf "%s" $zk_server_i }}
   {{- end }}
 {{- end }}
-{{- $zk_servers }}
+ZOOKEEPER_SERVERS: {{ $zk_servers }}

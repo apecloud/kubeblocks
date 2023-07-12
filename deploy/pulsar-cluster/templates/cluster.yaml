@@ -16,6 +16,28 @@ spec:
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
   componentSpecs:
+    - componentDefRef: proxy
+      name: proxy
+      replicas: {{ .Values.proxy.replicaCount | default 3 }}
+      {{- with  .Values.proxy.resources }}
+      resources:
+      {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- end }}
+    - componentDefRef: broker
+      name: broker
+      replicas: {{ .Values.broker.replicaCount | default 3 }}
+      {{- with  .Values.broker.resources }}
+      resources:
+      {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- end }}
     - name: bookies
       componentDefRef: bookies
       replicas: {{ .Values.bookies.replicaCount | default 3 }}
@@ -70,26 +92,4 @@ spec:
             resources:
               requests:
                 storage: {{ .Values.zookeeper.persistence.data.size }}
-      {{- end }}
-    - componentDefRef: broker
-      name: broker
-      replicas: {{ .Values.broker.replicaCount | default 3 }}
-      {{- with  .Values.broker.resources }}
-      resources:
-      {{- if .requests }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- end }}
-    - componentDefRef: proxy
-      name: proxy
-      replicas: {{ .Values.proxy.replicaCount | default 3 }}
-      {{- with  .Values.proxy.resources }}
-      resources:
-      {{- if .requests }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
       {{- end }}

@@ -14,7 +14,7 @@ spec:
   componentDefs:
     - name: proxy
       workloadType: Stateful
-      characterType: proxy
+      characterType: pulsar-proxy
       statefulSpec:
         updateStrategy: BestEffortParallel
       componentDefRef:
@@ -134,6 +134,203 @@ spec:
               periodSeconds: 10
               successThreshold: 1
               timeoutSeconds: 100
+    - name: broker
+      workloadType: Stateful
+      characterType: pulsar-broker
+      statefulSpec:
+        updateStrategy: BestEffortParallel
+      componentDefRef:
+      - componentDefName: zookeeper
+        componentRefEnv:
+        - name: zookeeperSVC
+          valueFrom:
+            type: ServiceRef
+      # TODO: support monitor
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9141
+      logConfigs:
+      # TODO: refer to broker configuration
+      configSpecs:
+        - name: broker-interceptors
+          templateRef: broker-interceptors-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: interceptors
+      {{- if .Values.broker.configuration }}
+        - name: broker-tpl
+          templateRef: broker-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: config
+      {{- end }}
+      service:
+        ports:
+        - name: tcp-pulsar
+          port: 6650
+          targetPort: 6650
+        - name: http
+          port: 8080
+          targetPort: 8080
+      podSpec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10000
+          fsGroup: 0
+          runAsGroup: 0
+        initContainers:
+          - name: init-broker-cluster
+            args:
+            - |2-
+              set -x
+              echo "INFO: wait for zookeeper ready..."
+              until bin/pulsar zookeeper-shell -server ${zookeeperServers} --run-once "ls /"; do
+                sleep 3;
+              done;
+              idx=${KB_POD_NAME##*-}
+              if [ $idx -ne 0 ]; then
+                # if not the first pod, do it
+                until bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; do
+                  echo "INFO: wait for init the meta cluster..."
+                  sleep 3;
+                done
+                echo "INFO: cluster already initialized" && exit 0
+              fi
+              # if the pod is the first pod, do it
+              if bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; then
+                echo "INFO: cluster already initialized" && exit 0
+              fi
+              echo "INFO: init cluster metadata for cluster: ${clusterName}"
+              bin/pulsar initialize-cluster-metadata \
+              --cluster ${clusterName} \
+              --zookeeper ${zookeeperServers} \
+              --configuration-store ${zookeeperServers} \
+              --web-service-url ${webServiceUrl}
+              # --web-service-url-tls https://pulsar-mini-broker.pulsar.svc.cluster.local:8443/ \
+              # --broker-service-url ${brokerServiceUrl} \
+              # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
+
+              (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
+            command:
+              - sh
+              - -c
+            env:
+            - name: brokerServiceUrl
+              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
+            - name: clusterName
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
+            - name: webServiceUrl
+              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
+            - name: zookeeperServers
+              value: $(zookeeperSVC):2181
+            - name: configurationStoreServers
+              value: $(zookeeperSVC):2181
+            envFrom:
+            - configMapRef:
+                name: broker-test-config
+          - name: init-sysctl
+            args:
+            - "sysctl -w net.ipv4.tcp_keepalive_time=1 &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_intvl=11
+               &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_probes=3"
+            command:
+            - /bin/sh
+            - -c
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+        containers:
+          - name: broker
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 10000
+              capabilities:
+                drop:
+                - ALL
+              privileged: false
+              runAsGroup: 0
+            args:
+            - bin/apply-config-from-env.py conf/broker.conf && bin/apply-config-from-env.py
+                conf/client.conf && echo 'OK' > status;exec bin/pulsar broker
+            command:
+              - sh
+              - -c
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+            env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: PULSAR_PREFIX_brokerServicePort
+              value: "6650"
+            - name: PULSAR_PREFIX_internalListenerName
+              value: cluster
+            - name: PULSAR_PREFIX_advertisedListeners
+              value: cluster:pulsar://$(POD_NAME).pulsar1-broker-headless.pulsar.svc.cluster.local:6650
+            - name: PULSAR_PREFIX_bindAddresses
+            - name: brokerServiceUrl
+              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
+            - name: clusterName
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
+            - name: webServiceUrl
+              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
+            - name: zookeeperServers
+              value: $(zookeeperSVC):2181
+            - name: configurationStoreServers
+              value: $(zookeeperSVC):2181
+            envFrom:
+              - configMapRef:
+                 # TODO: replace it when kb supports inject configMap
+                  name: broker-test-config
+              # TODO: using componentDefRef to inject zookeeper or keeper env
+            ports:
+              - containerPort: 6650
+                name: tcp-pulsar
+                protocol: TCP
+              - containerPort: 8080
+                name: http
+                protocol: TCP
+            livenessProbe:
+              failureThreshold: 30
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            startupProbe:
+              failureThreshold: 30
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            volumeMounts:
+            - name: interceptors
+              mountPath: /pulsar/plugin_configs/interceptors
+              readOnly: true
+           #   - name: conf
+           #     mountPath: /pulsar/conf
     - name: bookies
       workloadType: Stateful
       characterType: bookies
@@ -342,200 +539,3 @@ spec:
                 name: data
               - mountPath: /pulsar/data-log
                 name: data-log
-    - name: broker
-      workloadType: Stateful
-      characterType: broker
-      statefulSpec:
-        updateStrategy: BestEffortParallel
-      componentDefRef:
-      - componentDefName: zookeeper
-        componentRefEnv:
-        - name: zookeeperSVC
-          valueFrom:
-            type: ServiceRef
-      # TODO: support monitor
-      monitor:
-        builtIn: false
-        exporterConfig:
-          scrapePath: /metrics
-          scrapePort: 9141
-      logConfigs:
-      # TODO: refer to broker configuration
-      configSpecs:
-        - name: broker-interceptors
-          templateRef: broker-interceptors-tpl
-          namespace: {{ .Release.Namespace }}
-          volumeName: interceptors
-      {{- if .Values.broker.configuration }}
-        - name: broker-tpl
-          templateRef: broker-tpl
-          namespace: {{ .Release.Namespace }}
-          volumeName: config
-      {{- end }}
-      service:
-        ports:
-        - name: tcp-pulsar
-          port: 6650
-          targetPort: 6650
-        - name: http
-          port: 8080
-          targetPort: 8080
-      podSpec:
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 10000
-          fsGroup: 0
-          runAsGroup: 0
-        initContainers:
-          - name: init-broker-cluster
-            args:
-            - |2-
-              set -x
-              echo "INFO: wait for zookeeper ready..."
-              until bin/pulsar zookeeper-shell -server ${zookeeperServers} --run-once "ls /"; do
-                sleep 3;
-              done;
-              idx=${KB_POD_NAME##*-}
-              if [ $idx -ne 0 ]; then
-                # if not the first pod, do it
-                until bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; do
-                  echo "INFO: wait for init the meta cluster..."
-                  sleep 3;
-                done
-                echo "INFO: cluster already initialized" && exit 0
-              fi
-              # if the pod is the first pod, do it
-              if bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; then
-                echo "INFO: cluster already initialized" && exit 0
-              fi
-              echo "INFO: init cluster metadata for cluster: ${clusterName}"
-              bin/pulsar initialize-cluster-metadata \
-              --cluster ${clusterName} \
-              --zookeeper ${zookeeperServers} \
-              --configuration-store ${zookeeperServers} \
-              --web-service-url ${webServiceUrl}
-              # --web-service-url-tls https://pulsar-mini-broker.pulsar.svc.cluster.local:8443/ \
-              # --broker-service-url ${brokerServiceUrl} \
-              # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
-
-              (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
-            command:
-              - sh
-              - -c
-            env:
-            - name: brokerServiceUrl
-              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
-            - name: clusterName
-              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
-            - name: webServiceUrl
-              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
-            - name: zookeeperServers
-              value: $(zookeeperSVC):2181
-            - name: configurationStoreServers
-              value: $(zookeeperSVC):2181
-            envFrom:
-            - configMapRef:
-                name: broker-test-config
-          - name: init-sysctl
-            args:
-            - "sysctl -w net.ipv4.tcp_keepalive_time=1 &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_intvl=11
-               &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_probes=3"
-            command:
-            - /bin/sh
-            - -c
-            securityContext:
-              privileged: true
-              runAsNonRoot: false
-              runAsUser: 0
-        containers:
-          - name: broker
-            securityContext:
-              allowPrivilegeEscalation: false
-              runAsNonRoot: true
-              runAsUser: 10000
-              capabilities:
-                drop:
-                - ALL
-              privileged: false
-              runAsGroup: 0
-            args:
-            - bin/apply-config-from-env.py conf/broker.conf && bin/apply-config-from-env.py
-                conf/client.conf && echo 'OK' > status;exec bin/pulsar broker
-            command:
-              - sh
-              - -c
-            resources:
-              requests:
-                cpu: 200m
-                memory: 512Mi
-            env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
-            - name: PULSAR_PREFIX_brokerServicePort
-              value: "6650"
-            - name: PULSAR_PREFIX_internalListenerName
-              value: cluster
-            - name: PULSAR_PREFIX_advertisedListeners
-              value: cluster:pulsar://$(POD_NAME).pulsar1-broker-headless.pulsar.svc.cluster.local:6650
-            - name: PULSAR_PREFIX_bindAddresses
-            - name: brokerServiceUrl
-              value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
-            - name: clusterName
-              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
-            - name: webServiceUrl
-              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
-            - name: zookeeperServers
-              value: $(zookeeperSVC):2181
-            - name: configurationStoreServers
-              value: $(zookeeperSVC):2181
-            envFrom:
-              - configMapRef:
-                 # TODO: replace it when kb supports inject configMap
-                  name: broker-test-config
-              # TODO: using componentDefRef to inject zookeeper or keeper env
-            ports:
-              - containerPort: 6650
-                name: tcp-pulsar
-                protocol: TCP
-              - containerPort: 8080
-                name: http
-                protocol: TCP
-            livenessProbe:
-              failureThreshold: 30
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            readinessProbe:
-              failureThreshold: 3
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            startupProbe:
-              failureThreshold: 30
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            volumeMounts:
-            - name: interceptors
-              mountPath: /pulsar/plugin_configs/interceptors
-              readOnly: true
-           #   - name: conf
-           #     mountPath: /pulsar/conf

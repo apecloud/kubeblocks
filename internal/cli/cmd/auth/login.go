@@ -27,7 +27,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -64,7 +63,11 @@ func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func (o *LoginOptions) complete() error {
-	o.Provider = authorize.NewTokenProvider(o.Options)
+	var err error
+	o.Provider, err = authorize.NewTokenProvider(o.Options)
+	if err != nil {
+		return err
+	}
 	if o.ClientID == "" {
 		return o.loadConfig()
 	}
@@ -80,7 +83,7 @@ func (o *LoginOptions) validate() error {
 
 func (o *LoginOptions) run(ctx context.Context) error {
 	if !utils.IsTTY() {
-		return errors.New("the 'login' command requires an interactive shell")
+		return fmt.Errorf("the 'login' command requires an interactive shell")
 	}
 
 	userInfo, err := o.Provider.Login(ctx)
@@ -104,7 +107,10 @@ func (o *LoginOptions) loadConfig() error {
 		return err
 	}
 
-	o.Provider = authorize.NewTokenProvider(o.Options)
+	o.Provider, err = authorize.NewTokenProvider(o.Options)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

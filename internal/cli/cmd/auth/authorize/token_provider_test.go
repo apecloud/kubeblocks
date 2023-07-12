@@ -25,71 +25,61 @@ import (
 
 	"context"
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 )
 
 type MockIssued struct {
-	tokenResponse    *TokenResponse
-	userInfoResponse *UserInfoResponse
+	tokenResponse    *authenticator.TokenResponse
+	userInfoResponse *authenticator.UserInfoResponse
 }
 
-var tokenResponse = TokenResponse{
+var tokenResponse = authenticator.TokenResponse{
 	AccessToken:  "test_access_token",
 	RefreshToken: "test_refresh_token",
 	IDToken:      "test_id_token",
 	ExpiresIn:    3600000000000,
 }
 
-var userInfoResponse = UserInfoResponse{
+var userInfoResponse = authenticator.UserInfoResponse{
 	Name:    "test_name",
 	Email:   "test_email",
 	Locale:  "test_locale",
 	Subject: "test_subject",
 }
 
-func (m *MockIssued) DeviceAuthenticate() (*TokenResponse, error) {
+func (m *MockIssued) authenticate(ctx context.Context) (*authenticator.TokenResponse, error) {
 	return m.tokenResponse, nil
 }
 
-func (m *MockIssued) PKCEAuthenticate(ctx context.Context) (*TokenResponse, error) {
-	return m.tokenResponse, nil
+func (m *MockIssued) refreshToken(refreshToken string) (*authenticator.TokenResponse, error) {
+	if refreshToken == m.tokenResponse.RefreshToken {
+		m.tokenResponse.AccessToken = "newAccessToken"
+		return m.tokenResponse, nil
+	}
+	return nil, fmt.Errorf("refresh token not match")
 }
 
-func (m *MockIssued) refreshTokenFromPKCE(refreshToken string) (*TokenResponse, error) {
-	m.tokenResponse.AccessToken = "test_refreshed_access_token"
-	return m.tokenResponse, nil
-}
-
-func (m *MockIssued) getUserInfoForDevice(token string) (*UserInfoResponse, error) {
+func (m *MockIssued) getUserInfo(token string) (*authenticator.UserInfoResponse, error) {
 	if token == m.tokenResponse.AccessToken {
 		return m.userInfoResponse, nil
 	}
 	return nil, fmt.Errorf("token not match")
 }
 
-func (m *MockIssued) getUserInfoFromPKCE(token string) (*UserInfoResponse, error) {
-	if token == m.tokenResponse.AccessToken {
-		return m.userInfoResponse, nil
-	}
-	return nil, fmt.Errorf("token not match")
-}
-
-func (m *MockIssued) logoutForDevice(token string) error {
+func (m *MockIssued) logout(ctx context.Context, token string) error {
 	if token == m.tokenResponse.IDToken {
 		return nil
 	}
 	return fmt.Errorf("token not match")
 }
 
-func (m *MockIssued) logoutForPKCE(ctx context.Context, token string) error {
-	return nil
-}
-
 type MockCached struct {
-	tokenResponse    *TokenResponse
-	userInfoResponse *UserInfoResponse
+	tokenResponse    *authenticator.TokenResponse
+	userInfoResponse *authenticator.UserInfoResponse
 }
 
-func (m *MockCached) cacheTokens(tokenResponse *TokenResponse) error {
+func (m *MockCached) cacheTokens(tokenResponse *authenticator.TokenResponse) error {
 	m.tokenResponse = tokenResponse
 	return nil
 }
@@ -99,16 +89,16 @@ func (m *MockCached) deleteTokens() error {
 	return nil
 }
 
-func (m *MockCached) cacheUserInfo(userInfoResponse *UserInfoResponse) error {
+func (m *MockCached) cacheUserInfo(userInfoResponse *authenticator.UserInfoResponse) error {
 	m.userInfoResponse = userInfoResponse
 	return nil
 }
 
-func (m *MockCached) GetTokens() (*TokenResponse, error) {
+func (m *MockCached) GetTokens() (*authenticator.TokenResponse, error) {
 	return m.tokenResponse, nil
 }
 
-func (m *MockCached) getUserInfo() (*UserInfoResponse, error) {
+func (m *MockCached) getUserInfo() (*authenticator.UserInfoResponse, error) {
 	return m.userInfoResponse, nil
 }
 
@@ -151,6 +141,10 @@ var _ = Describe("token provider", func() {
 				err := tokenProvider.Logout(context.Background())
 				return err
 			}()).To(BeNil())
+		})
+
+		It("test IsValidToken", func() {
+			Expect(IsValidToken("test_token")).To(BeFalse())
 		})
 	})
 })

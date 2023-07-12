@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package authorize
+package authenticator
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestProvider(t *testing.T) {
+func TestAuthenticator(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Provider Suite")
+	RunSpecs(t, "Authenticator Suite")
 }

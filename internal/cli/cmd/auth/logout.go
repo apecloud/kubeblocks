@@ -56,7 +56,11 @@ func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func (o *LogOutOptions) complete() error {
-	o.Provider = authorize.NewTokenProvider(o.Options)
+	var err error
+	o.Provider, err = authorize.NewTokenProvider(o.Options)
+	if err != nil {
+		return err
+	}
 	if o.ClientID == "" {
 		return o.loadConfig()
 	}
@@ -102,6 +106,9 @@ func (o *LogOutOptions) loadConfig() error {
 		return err
 	}
 
-	o.Provider = authorize.NewTokenProvider(o.Options)
+	o.Provider, err = authorize.NewTokenProvider(o.Options)
+	if err != nil {
+		return err
+	}
 	return nil
 }

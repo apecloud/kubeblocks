@@ -22,6 +22,8 @@ package authorize
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 )
 
 type MockKeyring struct {
@@ -52,11 +54,11 @@ var _ = Describe("cache", func() {
 	var (
 		mockKeyring   KeyringProvider
 		cached        *KeyringCachedTokenProvider
-		tokenResponse TokenResponse
+		tokenResponse authenticator.TokenResponse
 	)
 
 	BeforeEach(func() {
-		tokenResponse = TokenResponse{
+		tokenResponse = authenticator.TokenResponse{
 			AccessToken:  "test",
 			RefreshToken: "test",
 		}

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package authorize
+package authenticator
 
 import (
 	"context"
@@ -75,7 +75,7 @@ func (e ErrorResponse) Error() string {
 	return e.Description
 }
 
-func newAuthenticator(client *http.Client, clientID string, authURL string) (*DeviceAuthenticator, error) {
+func newDeviceAuthenticator(client *http.Client, clientID string, authURL string) (*DeviceAuthenticator, error) {
 	if client == nil {
 		client = cleanhttp.DefaultClient()
 	}
@@ -95,8 +95,8 @@ func newAuthenticator(client *http.Client, clientID string, authURL string) (*De
 	return authenticator, nil
 }
 
-// VerifyDevice performs the device verification API calls.
-func (d *DeviceAuthenticator) verifyDevice(ctx context.Context) (*DeviceVerification, error) {
+// GetAuthorization performs the device verification API calls.
+func (d *DeviceAuthenticator) GetAuthorization(ctx context.Context, openURLFunc func(URL string), states ...string) (interface{}, error) {
 	req, err := d.newRequest(ctx, "oauth/device/code", url.Values{
 		"client_id": []string{d.ClientID},
 		"audience":  []string{d.AuthAudience},
@@ -130,6 +130,8 @@ func (d *DeviceAuthenticator) verifyDevice(ctx context.Context) (*DeviceVerifica
 
 	expiresAt := d.Clock.Now().Add(time.Duration(deviceCodeRes.ExpiresIn) * time.Second)
 
+	openURLFunc(deviceCodeRes.VerificationURI)
+
 	return &DeviceVerification{
 		DeviceCode:              deviceCodeRes.DeviceCode,
 		UserCode:                deviceCodeRes.UserCode,
@@ -140,7 +142,12 @@ func (d *DeviceAuthenticator) verifyDevice(ctx context.Context) (*DeviceVerifica
 	}, nil
 }
 
-func (d *DeviceAuthenticator) getToken(ctx context.Context, v DeviceVerification) (*TokenResponse, error) {
+func (d *DeviceAuthenticator) GetToken(ctx context.Context, authorization interface{}) (*TokenResponse, error) {
+	v, ok := authorization.(*DeviceVerification)
+	if !ok {
+		return nil, errors.New("invalid authorization")
+	}
+
 	for {
 		// This loop begins right after we open the user's browser to send an
 		// authentication code. We don't request a token immediately because the
@@ -201,7 +208,36 @@ func (d *DeviceAuthenticator) requestToken(ctx context.Context, deviceCode strin
 	return tokenRes, nil
 }
 
-func (d *DeviceAuthenticator) logout(ctx context.Context, token string) error {
+func (d *DeviceAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
+	req, err := d.newRequest(ctx, "userinfo", url.Values{
+		"access_token": []string{token},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating request")
+	}
+
+	res, err := d.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error performing http request")
+	}
+	defer res.Body.Close()
+
+	userInfo := &UserInfoResponse{}
+	err = json.NewDecoder(res.Body).Decode(userInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, "error decoding userinfo")
+	}
+
+	return userInfo, err
+}
+
+// RefreshToken The device authenticator needs the clientSecret when refreshing the token,
+// and the kbcli client does not hold it, so this method does not need to be implemented.
+func (d *DeviceAuthenticator) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
+	return nil, nil
+}
+
+func (d *DeviceAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
 	req, err := d.newRequest(ctx, "oidc/logout", url.Values{
 		"id_token_hint": []string{token},
 		"client_id":     []string{d.ClientID},
@@ -219,6 +255,9 @@ func (d *DeviceAuthenticator) logout(ctx context.Context, token string) error {
 	if _, err = checkErrorResponse(res); err != nil {
 		return err
 	}
+
+	logoutURL := fmt.Sprintf(d.AuthURL.Path + "/oidc/logout?federated")
+	openURLFunc(logoutURL)
 
 	return nil
 }
@@ -242,29 +281,6 @@ func (d *DeviceAuthenticator) newRequest(ctx context.Context, path string, paylo
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	return req, nil
-}
-
-func (d *DeviceAuthenticator) getUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
-	req, err := d.newRequest(ctx, "userinfo", url.Values{
-		"access_token": []string{token},
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating request")
-	}
-
-	res, err := d.client.Do(req)
-	if err != nil {
-		return nil, errors.Wrap(err, "error performing http request")
-	}
-	defer res.Body.Close()
-
-	userInfo := &UserInfoResponse{}
-	err = json.NewDecoder(res.Body).Decode(userInfo)
-	if err != nil {
-		return nil, errors.Wrap(err, "error decoding userinfo")
-	}
-
-	return userInfo, err
 }
 
 // CheckErrorResponse returns whether the error is retryable or not and the error itself.

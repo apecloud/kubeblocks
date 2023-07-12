@@ -21,14 +21,16 @@ package authorize
 
 import (
 	"context"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 )
 
 type CachedTokenProvider interface {
-	GetTokens() (*TokenResponse, error)
-	cacheTokens(*TokenResponse) error
+	GetTokens() (*authenticator.TokenResponse, error)
+	cacheTokens(*authenticator.TokenResponse) error
 	deleteTokens() error
-	cacheUserInfo(info *UserInfoResponse) error
-	getUserInfo() (*UserInfoResponse, error)
+	cacheUserInfo(info *authenticator.UserInfoResponse) error
+	getUserInfo() (*authenticator.UserInfoResponse, error)
 }
 
 type KeyringProvider interface {
@@ -39,38 +41,13 @@ type KeyringProvider interface {
 }
 
 type IssuedTokenProvider interface {
-	DeviceAuthenticate() (*TokenResponse, error)
-	PKCEAuthenticate(ctx context.Context) (*TokenResponse, error)
-	refreshTokenFromPKCE(refreshToken string) (*TokenResponse, error)
-	getUserInfoForDevice(token string) (*UserInfoResponse, error)
-	getUserInfoFromPKCE(token string) (*UserInfoResponse, error)
-	logoutForDevice(token string) error
-	logoutForPKCE(ctx context.Context, token string) error
+	authenticate(ctx context.Context) (*authenticator.TokenResponse, error)
+	refreshToken(refreshToken string) (*authenticator.TokenResponse, error)
+	getUserInfo(token string) (*authenticator.UserInfoResponse, error)
+	logout(ctx context.Context, token string) error
 }
 
 type Provider interface {
-	Login(ctx context.Context) (*UserInfoResponse, error)
+	Login(ctx context.Context) (*authenticator.UserInfoResponse, error)
 	Logout(ctx context.Context) error
-}
-
-type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	IDToken      string `json:"id_token"`
-	ExpiresIn    int    `json:"expires_in"`
-}
-
-type RefreshTokenResponse struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int    `json:"expires_in"`
-	Scope       string `json:"scope"`
-	IDToken     string `json:"id_token"`
-	TokenType   string `json:"token_type"`
-}
-
-type UserInfoResponse struct {
-	Name    string `json:"name"`
-	Email   string `json:"email"`
-	Locale  string `json:"locale"`
-	Subject string `json:"sub"`
 }

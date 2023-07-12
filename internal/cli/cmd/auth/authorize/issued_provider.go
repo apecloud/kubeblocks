@@ -29,10 +29,11 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/pkg/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
 )
 
@@ -45,61 +46,29 @@ type Options struct {
 
 type CloudIssuedTokenProvider struct {
 	Options
+	Authenticator authenticator.Authenticator
 }
 
-func newCloudIssuedTokenProvider(o Options) *CloudIssuedTokenProvider {
+func newDefaultIssuedTokenProvider(o Options) (*CloudIssuedTokenProvider, error) {
+	authenticator, err := authenticator.NewAuthenticator(authenticator.PKCE, cleanhttp.DefaultClient(), o.ClientID, o.AuthURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create authenticator")
+	}
 	return &CloudIssuedTokenProvider{
-		Options: o,
-	}
+		Options:       o,
+		Authenticator: authenticator,
+	}, nil
 }
 
-func (c *CloudIssuedTokenProvider) DeviceAuthenticate() (*TokenResponse, error) {
-	authenticator, err := newAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
-	if err != nil {
-		return nil, err
-	}
-
-	deviceVerification, err := authenticator.verifyDevice(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-
-	bold := color.New(color.Bold)
-	bold.Printf("\nConfirmation Code: ")
-	boldGreen := bold.Add(color.FgGreen)
-	boldGreen.Fprintln(color.Output, deviceVerification.UserCode)
-
-	if !c.NoBrowser {
-		openCmd := utils.OpenBrowser(runtime.GOOS, deviceVerification.VerificationCompleteURL)
-		err = openCmd.Run()
-		if err != nil {
-			msg := fmt.Sprintf("failed to open a browser: %s", utils.BoldRed(err.Error()))
-			fmt.Fprint(c.Out, msg)
-		}
-		msg := fmt.Sprintf("\nIf something goes wrong, copy and paste this URL into your browser: %s\n\n", utils.Bold(deviceVerification.VerificationCompleteURL))
-		fmt.Fprint(c.Out, msg)
-	} else {
-		msg := fmt.Sprintf("\nPlease paste this URL into your browser: %s\n\n", utils.Bold(deviceVerification.VerificationCompleteURL))
-		fmt.Fprint(c.Out, msg)
-	}
-
-	end := c.printProgress("Waiting for confirmation...")
-	defer end()
-
-	tokenResponse, err := authenticator.getToken(context.TODO(), *deviceVerification)
-	if err != nil {
-		return nil, err
-	}
-	return tokenResponse, nil
+func newIssuedTokenProvider(o Options, authenticator authenticator.Authenticator) (*CloudIssuedTokenProvider, error) {
+	return &CloudIssuedTokenProvider{
+		Options:       o,
+		Authenticator: authenticator,
+	}, nil
 }
 
-func (c *CloudIssuedTokenProvider) PKCEAuthenticate(ctx context.Context) (*TokenResponse, error) {
-	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
-	if err != nil {
-		return nil, err
-	}
-
-	authorizeResponse, err := authenticator.getAuthorizationCode(c.openURLFunc)
+func (c *CloudIssuedTokenProvider) authenticate(ctx context.Context) (*authenticator.TokenResponse, error) {
+	authorizeResponse, err := c.Authenticator.GetAuthorization(ctx, c.openURLFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -107,66 +76,29 @@ func (c *CloudIssuedTokenProvider) PKCEAuthenticate(ctx context.Context) (*Token
 	end := c.printProgress("Waiting for confirmation...")
 	defer end()
 
-	tokenResponse, err := authenticator.getToken(ctx, authorizeResponse)
+	tokenResponse, err := c.Authenticator.GetToken(ctx, authorizeResponse)
 	if err != nil {
 		return nil, err
 	}
 	return tokenResponse, nil
 }
 
-func (c *CloudIssuedTokenProvider) getUserInfoForDevice(token string) (*UserInfoResponse, error) {
-	authenticator, err := newAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
-	if err != nil {
-		return nil, err
-	}
-	return authenticator.getUserInfo(context.TODO(), token)
+func (c *CloudIssuedTokenProvider) getUserInfo(token string) (*authenticator.UserInfoResponse, error) {
+	return c.Authenticator.GetUserInfo(context.TODO(), token)
 }
 
-func (c *CloudIssuedTokenProvider) getUserInfoFromPKCE(token string) (*UserInfoResponse, error) {
-	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
-	if err != nil {
-		return nil, err
-	}
-	return authenticator.getUserInfo(context.TODO(), token)
-}
-
-func (c *CloudIssuedTokenProvider) refreshTokenFromPKCE(refreshToken string) (*TokenResponse, error) {
-	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
-	if err != nil {
-		return nil, err
-	}
-
-	tokenResponse, err := authenticator.refreshToken(context.TODO(), refreshToken)
+func (c *CloudIssuedTokenProvider) refreshToken(refreshToken string) (*authenticator.TokenResponse, error) {
+	tokenResponse, err := c.Authenticator.RefreshToken(context.TODO(), refreshToken)
 	if err != nil {
 		return nil, err
 	}
 	return tokenResponse, nil
 }
 
-func (c *CloudIssuedTokenProvider) logoutForDevice(token string) error {
-	authenticator, err := newAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
-	if err != nil {
-		return err
-	}
-
+func (c *CloudIssuedTokenProvider) logout(ctx context.Context, token string) error {
 	end := c.printProgress("Logging out...")
 	defer end()
-	err = authenticator.logout(context.TODO(), token)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *CloudIssuedTokenProvider) logoutForPKCE(ctx context.Context, token string) error {
-	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
-	if err != nil {
-		return err
-	}
-
-	end := c.printProgress("Logging out...")
-	defer end()
-	err = authenticator.logout(ctx, token, c.openURLFunc)
+	err := c.Authenticator.Logout(ctx, token, c.openURLFunc)
 	if err != nil {
 		return err
 	}

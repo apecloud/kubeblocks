@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
 )
@@ -34,14 +36,16 @@ type TokenProvider struct {
 }
 
 // NewTokenProvider default constructor.
-func NewTokenProvider(o Options) Provider {
+func NewTokenProvider(o Options) (Provider, error) {
 	cached := NewKeyringCachedTokenProvider(nil)
-	issued := newCloudIssuedTokenProvider(o)
-
+	issued, err := newDefaultIssuedTokenProvider(o)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create cloud issued token provider")
+	}
 	return &TokenProvider{
 		cached: cached,
 		issued: issued,
-	}
+	}, nil
 }
 
 // Abstract constructor
@@ -52,25 +56,25 @@ func newTokenProvider(cached CachedTokenProvider, issued IssuedTokenProvider) Pr
 	}
 }
 
-func (p *TokenProvider) Login(ctx context.Context) (*UserInfoResponse, error) {
-	isAccessTokenValid := func(tokenResponse TokenResponse) bool { return IsValidToken(tokenResponse.AccessToken) }
+func (p *TokenProvider) Login(ctx context.Context) (*authenticator.UserInfoResponse, error) {
+	isAccessTokenValid := func(tokenResponse authenticator.TokenResponse) bool { return IsValidToken(tokenResponse.AccessToken) }
 	tokenResult, err := p.getTokenFromCache(isAccessTokenValid)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not refresh from cache")
 	}
 
-	var userInfo *UserInfoResponse
+	var userInfo *authenticator.UserInfoResponse
 	if tokenResult != nil {
 		userInfo, err = p.cached.getUserInfo()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not get user info from cache")
 		}
 	} else {
-		tokenResult, err = p.issued.PKCEAuthenticate(ctx)
+		tokenResult, err = p.issued.authenticate(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not authenticate with cloud")
 		}
-		userInfo, err = p.issued.getUserInfoFromPKCE(tokenResult.AccessToken)
+		userInfo, err = p.issued.getUserInfo(tokenResult.AccessToken)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not get user info from cloud")
 		}
@@ -102,14 +106,14 @@ func (p *TokenProvider) Logout(ctx context.Context) error {
 		return err
 	}
 
-	err = p.issued.logoutForPKCE(ctx, tokenResult.IDToken)
+	err = p.issued.logout(ctx, tokenResult.IDToken)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *TokenProvider) getTokenFromCache(isTokenValid func(TokenResponse) bool) (*TokenResponse, error) {
+func (p *TokenProvider) getTokenFromCache(isTokenValid func(authenticator.TokenResponse) bool) (*authenticator.TokenResponse, error) {
 	tokenResult, err := p.cached.GetTokens()
 	if err != nil {
 		return nil, errors.Wrap(err, "could get tokens from the cache")
@@ -131,8 +135,8 @@ func (p *TokenProvider) getTokenFromCache(isTokenValid func(TokenResponse) bool)
 }
 
 // getRefreshToken gets a new token from the refresh token
-func (p *TokenProvider) getRefreshToken(refreshToken string) *TokenResponse {
-	tokenResult, err := p.issued.refreshTokenFromPKCE(refreshToken)
+func (p *TokenProvider) getRefreshToken(refreshToken string) *authenticator.TokenResponse {
+	tokenResult, err := p.issued.refreshToken(refreshToken)
 	if err != nil {
 		return nil
 	}

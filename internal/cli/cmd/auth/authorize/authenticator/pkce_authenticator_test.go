@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package authorize
+package authenticator
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -173,7 +173,6 @@ var _ = Describe("PKCE_Authenticator", func() {
 
 	BeforeEach(func() {
 		mockServer = NewMockServer()
-		fmt.Println(mockServer.Port)
 		go mockServer.Start()
 
 		authURL := fmt.Sprintf("http://localhost:%s", mockServer.Port)
@@ -193,14 +192,14 @@ var _ = Describe("PKCE_Authenticator", func() {
 				Code:        "test_code",
 			}
 			ExpectWithOffset(1, func() error {
-				_, err := a.getToken(context.TODO(), authorizationResponse)
+				_, err := a.GetToken(context.TODO(), authorizationResponse)
 				return err
 			}()).To(BeNil())
 		})
 
 		It("test get userInfo", func() {
 			ExpectWithOffset(1, func() error {
-				_, err := a.getUserInfo(context.TODO(), "test_token")
+				_, err := a.GetUserInfo(context.TODO(), "test_token")
 				return err
 			}()).To(BeNil())
 		})
@@ -211,7 +210,7 @@ var _ = Describe("PKCE_Authenticator", func() {
 				Code:        "test_code",
 			}
 			ExpectWithOffset(1, func() error {
-				_, err := a.getToken(context.TODO(), authorizationResponse)
+				_, err := a.GetToken(context.TODO(), authorizationResponse)
 				return err
 			}()).To(BeNil())
 		})
@@ -221,7 +220,7 @@ var _ = Describe("PKCE_Authenticator", func() {
 				fmt.Println(URL)
 			}
 			ExpectWithOffset(1, func() error {
-				err := a.logout(context.TODO(), "test_token", openFunc)
+				err := a.Logout(context.TODO(), "test_token", openFunc)
 				return err
 			}()).To(BeNil())
 		})

@@ -29,6 +29,8 @@ import (
 	"github.com/99designs/keyring"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 )
 
 const (
@@ -128,7 +130,7 @@ func defaultKeyring() (keyring.Keyring, bool) {
 	return k, true
 }
 
-func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
+func (k *KeyringCachedTokenProvider) GetTokens() (*authenticator.TokenResponse, error) {
 	if !k.keyringCached.isValid() {
 		token, tokenErr := k.fileCached.readToken()
 		if os.IsNotExist(tokenErr) {
@@ -145,7 +147,7 @@ func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
 		return nil, errors.Wrap(err, "error getting token information from keyring")
 	}
 
-	var tokenResponse TokenResponse
+	var tokenResponse authenticator.TokenResponse
 	err = json.Unmarshal(data, &tokenResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not unmarshal token data from keyring")
@@ -154,7 +156,7 @@ func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
 	return &tokenResponse, nil
 }
 
-func (k *KeyringCachedTokenProvider) cacheTokens(tokenResponse *TokenResponse) error {
+func (k *KeyringCachedTokenProvider) cacheTokens(tokenResponse *authenticator.TokenResponse) error {
 	data, err := json.Marshal(tokenResponse)
 	if err != nil {
 		return errors.Wrap(err, "could not marshal token data for keyring")
@@ -175,7 +177,7 @@ func (k *KeyringCachedTokenProvider) deleteTokens() error {
 	return k.keyringCached.remove()
 }
 
-func (k *KeyringCachedTokenProvider) cacheUserInfo(userInfo *UserInfoResponse) error {
+func (k *KeyringCachedTokenProvider) cacheUserInfo(userInfo *authenticator.UserInfoResponse) error {
 	saveDir, err := k.fileCached.getConfigDir()
 	if err != nil {
 		return err
@@ -197,7 +199,7 @@ func (k *KeyringCachedTokenProvider) cacheUserInfo(userInfo *UserInfoResponse) e
 	return nil
 }
 
-func (k *KeyringCachedTokenProvider) getUserInfo() (*UserInfoResponse, error) {
+func (k *KeyringCachedTokenProvider) getUserInfo() (*authenticator.UserInfoResponse, error) {
 	saveDir, err := k.fileCached.getConfigDir()
 	if err != nil {
 		return nil, err
@@ -208,7 +210,7 @@ func (k *KeyringCachedTokenProvider) getUserInfo() (*UserInfoResponse, error) {
 		return nil, errors.Wrap(err, "failed to read user info file")
 	}
 
-	var userInfo UserInfoResponse
+	var userInfo authenticator.UserInfoResponse
 	if err := json.Unmarshal(data, &userInfo); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal user info")
 	}
@@ -259,7 +261,7 @@ func (f *FileCached) writeToken(data []byte) error {
 	return nil
 }
 
-func (f *FileCached) readToken() (*TokenResponse, error) {
+func (f *FileCached) readToken() (*authenticator.TokenResponse, error) {
 	var data []byte
 	tokenPath, err := f.getTokenPath()
 	if err != nil {
@@ -285,7 +287,7 @@ func (f *FileCached) readToken() (*TokenResponse, error) {
 		}
 	}
 
-	var tokenResponse *TokenResponse
+	var tokenResponse *authenticator.TokenResponse
 	err = json.Unmarshal(data, tokenResponse)
 	if err != nil {
 		return nil, err

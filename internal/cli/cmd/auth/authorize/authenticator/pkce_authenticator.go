@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package authorize
+package authenticator
 
 import (
 	"context"
@@ -92,8 +92,8 @@ func newPKCEAuthenticator(client *http.Client, clientID string, authURL string) 
 	return p, nil
 }
 
-func (p *PKCEAuthenticator) getAuthorizationCode(openURLFunc func(URL string), states ...string) (*AuthorizationResponse, error) {
-	callback := newCallbackService("7001")
+func (p *PKCEAuthenticator) GetAuthorization(ctx context.Context, openURLFunc func(URL string), states ...string) (interface{}, error) {
+	callback := newCallbackService("8000")
 	codeReceiverCh := make(chan CallbackResponse)
 	defer close(codeReceiverCh)
 
@@ -136,7 +136,12 @@ func (p *PKCEAuthenticator) getAuthorizationCode(openURLFunc func(URL string), s
 	}, nil
 }
 
-func (p *PKCEAuthenticator) getToken(ctx context.Context, authorize *AuthorizationResponse) (*TokenResponse, error) {
+func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorization interface{}) (*TokenResponse, error) {
+	authorize, ok := authorization.(*AuthorizationResponse)
+	if !ok {
+		return nil, errors.New("invalid authorization response")
+	}
+
 	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
 		"grant_type":    []string{"authorization_code"},
 		"code_verifier": []string{p.Challenge.Verifier},
@@ -167,7 +172,7 @@ func (p *PKCEAuthenticator) getToken(ctx context.Context, authorize *Authorizati
 	return tokenRes, nil
 }
 
-func (p *PKCEAuthenticator) getUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
+func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
 	URL := fmt.Sprintf("%s/userinfo", p.AuthURL)
 	req, err := utils.NewRequest(ctx, URL, url.Values{
 		"access_token": []string{token},
@@ -195,7 +200,7 @@ func (p *PKCEAuthenticator) getUserInfo(ctx context.Context, token string) (*Use
 	return userInfo, err
 }
 
-func (p *PKCEAuthenticator) refreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
+func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
 	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
 		"grant_type":    []string{"refresh_token"},
 		"client_id":     []string{p.ClientID},
@@ -229,7 +234,7 @@ func (p *PKCEAuthenticator) refreshToken(ctx context.Context, refreshToken strin
 	}, nil
 }
 
-func (p *PKCEAuthenticator) logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
+func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
 	URL := fmt.Sprintf("%s/oidc/logout", p.AuthURL)
 	req, err := utils.NewRequest(ctx, URL, url.Values{
 		"id_token_hint": []string{token},
@@ -249,16 +254,9 @@ func (p *PKCEAuthenticator) logout(ctx context.Context, token string, openURLFun
 		return err
 	}
 
-	if err = p.secondLogout(openURLFunc); err != nil {
-		return errors.Wrap(err, "error performing second logout")
-	}
-
-	return nil
-}
-
-func (p *PKCEAuthenticator) secondLogout(openURLFunc func(URL string)) error {
 	logoutURL := fmt.Sprintf(p.AuthURL + "/oidc/logout?federated")
 	openURLFunc(logoutURL)
+
 	return nil
 }
 

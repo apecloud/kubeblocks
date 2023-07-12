@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package authorize
+package authenticator
 
 import (
 	"context"
@@ -83,7 +83,6 @@ func (s *callbackServer) shutdown() {
 }
 
 func (c *CallbackService) getCallbackURL() string {
-	fmt.Println("callback url: ", fmt.Sprintf("http://%s/callback", c.addr))
 	return fmt.Sprintf("http://%s/callback", c.addr)
 }
 

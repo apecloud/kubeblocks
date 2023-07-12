@@ -110,6 +110,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				Ctx: testCtx.Ctx,
 				Log: logger,
 			},
+			nil,
 			cluster,
 			nil,
 			clusterDef,

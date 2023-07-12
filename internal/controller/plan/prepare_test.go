@@ -249,6 +249,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -298,6 +299,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -361,6 +363,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -422,6 +425,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -488,6 +492,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -544,6 +549,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,

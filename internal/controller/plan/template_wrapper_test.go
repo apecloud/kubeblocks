@@ -112,6 +112,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 				Ctx: testCtx.Ctx,
 				Log: logger,
 			},
+			nil,
 			cluster,
 			nil,
 			clusterDef,

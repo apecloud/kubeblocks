@@ -168,6 +168,7 @@ var _ = Describe("builder", func() {
 		By("assign every available fields")
 		component, err := component.BuildComponent(
 			reqCtx,
+			nil,
 			cluster,
 			nil,
 			clusterDef,

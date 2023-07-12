@@ -89,6 +89,7 @@ var _ = Describe("affinity utils", func() {
 			}
 			component, _ = BuildComponent(
 				reqCtx,
+				nil,
 				clusterObj,
 				nil,
 				clusterDefObj,

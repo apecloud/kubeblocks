@@ -86,6 +86,7 @@ var _ = Describe("component module", func() {
 			}
 			component, err := BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -100,6 +101,7 @@ var _ = Describe("component module", func() {
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
 			component, err = BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -112,6 +114,7 @@ var _ = Describe("component module", func() {
 			By("new container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,
@@ -124,6 +127,7 @@ var _ = Describe("component module", func() {
 			By("new init container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(
 				reqCtx,
+				nil,
 				cluster,
 				nil,
 				clusterDef,

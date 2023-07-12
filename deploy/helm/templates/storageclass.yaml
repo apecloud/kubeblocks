@@ -1,9 +1,12 @@
-{{- if (.Capabilities.KubeVersion.GitVersion | contains "-eks") }}
+{{- $scName := (include "kubeblocks.defaultStorageClass" .) }}
+{{- if and $scName .Values.storageClass.create }}
+{{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
+{{- if eq $cloudProvider "aws" }}
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-sc
+  name: {{ $scName }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
@@ -15,12 +18,12 @@ provisioner: ebs.csi.aws.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
-{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-gke") }}
+{{- else if eq $cloudProvider "gcp" }}
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-sc
+  name: {{ $scName }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
@@ -32,12 +35,12 @@ provisioner: pd.csi.storage.gke.io
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
-{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-aliyun") }}
+{{- else if eq $cloudProvider "aliyun" }}
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-sc
+  name: {{ $scName }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
@@ -49,12 +52,12 @@ provisioner: diskplugin.csi.alibabacloud.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
-{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-tke") }}
+{{- else if eq $cloudProvider "tencentCloud" }}
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-sc
+  name: {{ $scName }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:
@@ -64,14 +67,14 @@ reclaimPolicy: Delete
 provisioner: com.tencent.cloud.csi.cbs
 volumeBindingMode: WaitForFirstConsumer
 ---
-{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-aks") }}
+{{- else if eq $cloudProvider "azure" }}
 ---
 ## it doesn't work here because aks does not support .Capabilities.KubeVersion.GitVersion to judge the provider.
 ## refer: https://github.com/Azure/AKS/issues/3375
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-sc
+  name: {{ $scName }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:
@@ -83,4 +86,5 @@ provisioner: kubernetes.io/azure-disk
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
+{{- end }}
 {{- end }}

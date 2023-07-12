@@ -13,7 +13,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/dapr/kit/logger"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,9 +28,8 @@ import (
 
 type Manager struct {
 	component.DBManagerBase
-	Pool    *pgxpool.Pool
-	PidFile *PidFile
-	Proc    *process.Process
+	Pool *pgxpool.Pool
+	Proc *process.Process
 }
 
 var Mgr *Manager
@@ -92,20 +90,16 @@ func (mgr *Manager) readPidFile() (*PidFile, error) {
 }
 
 func (mgr *Manager) newProcessFromPidFile() error {
-	if mgr.PidFile == nil {
-		pidFile, err := Mgr.readPidFile()
-		if err != nil {
-			mgr.Logger.Errorf("read pid file failed, err:%v", err)
-			return errors.Wrap(err, "read pid file")
-		}
-		mgr.PidFile = pidFile
+	pidFile, err := Mgr.readPidFile()
+	if err != nil {
+		mgr.Logger.Errorf("read pid file failed, err:%v", err)
+		return errors.Wrap(err, "read pid file")
 	}
 
-	mgr.Logger.Infof("pidFile: %v", mgr.PidFile)
-	proc, err := process.NewProcess(mgr.PidFile.pid)
+	mgr.Logger.Infof("pidFile: %v", pidFile)
+	proc, err := process.NewProcess(pidFile.pid)
 	if err != nil {
 		mgr.Logger.Errorf("new process failed, err:%v", err)
-		mgr.PidFile = nil
 		return err
 	}
 
@@ -851,17 +845,15 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 		return nil, errors.New("Get other pool without hosts")
 	}
 
-	var tempConfig *pgxpool.Config
-	err := util.DeepCopy(tempConfig, config.pool)
-	if err != nil {
-		return nil, err
-	}
+	tempConfig := *config.pool
+	mgr.Logger.Infof("tempConfig addr:%p, config pool addr:%p", &tempConfig, config.pool)
 
 	var tempPool *pgxpool.Pool
+	var err error
 	resp := make([]*pgxpool.Pool, 0, len(hosts))
 	for i, host := range hosts {
 		tempConfig.ConnConfig.Host = host
-		tempPool, err = pgxpool.NewWithConfig(ctx, tempConfig)
+		tempPool, err = pgxpool.NewWithConfig(ctx, &tempConfig)
 		if err != nil {
 			mgr.Logger.Errorf("unable to ping the DB: %v, host:%s", err, host)
 			resp[i] = nil

@@ -69,7 +69,7 @@ jobs:
           echo 'release-result='${release_result} >> $GITHUB_OUTPUT
           
           CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0error"
-          if [[ "${{ needs.release-chart.result }}" == "success" ]]; then
+          if [[ "${{ needs.release-charts-image.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0success"
               echo "success" > ${release_result}
           else

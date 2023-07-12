@@ -20,5 +20,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
-	ENABLE_RBAC_MANAGER = "ENABLE_RBAC_MANAGER"
+	EnableRBACManager = "EnableRBACManager"
 )

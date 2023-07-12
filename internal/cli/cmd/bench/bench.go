@@ -89,10 +89,6 @@ func (o *BenchBaseOptions) BaseValidate() error {
 		return fmt.Errorf("user is required")
 	}
 
-	if o.Password == "" {
-		return fmt.Errorf("password is required")
-	}
-
 	return nil
 }
 

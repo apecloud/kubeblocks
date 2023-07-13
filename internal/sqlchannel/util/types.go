@@ -38,6 +38,7 @@ const (
 	CheckRoleOperation    bindings.OperationKind = "checkRole"
 	GetRoleOperation      bindings.OperationKind = "getRole"
 	GetLagOperation       bindings.OperationKind = "getLag"
+	SwitchoverOperation   bindings.OperationKind = "switchover"
 	ExecOperation         bindings.OperationKind = "exec"
 	QueryOperation        bindings.OperationKind = "query"
 	CloseOperation        bindings.OperationKind = "close"

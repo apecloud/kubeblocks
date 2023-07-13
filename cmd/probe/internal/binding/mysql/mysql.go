@@ -21,13 +21,10 @@ package mysql
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -36,21 +33,23 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
-	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // MysqlOperations represents MySQL output bindings.
 type MysqlOperations struct {
-	db *sql.DB
-	mu sync.Mutex
+	manager *mysql.Manager
+	mu      sync.Mutex
 	BaseOperations
 }
+
+type QueryRes []map[string]interface{}
 
 var _ BaseInternalOps = &MysqlOperations{}
 
@@ -72,6 +71,9 @@ const (
 	maxOpenConnsKey    = "maxOpenConns"
 	connMaxLifetimeKey = "connMaxLifetime"
 	connMaxIdleTimeKey = "connMaxIdleTime"
+	workloadTypeKey    = "workloadType"
+	Replication        = "Replication"
+	Consensus          = "Consensus"
 )
 
 const (
@@ -107,128 +109,92 @@ func NewMysql(logger logger.Logger) bindings.OutputBinding {
 
 // Init initializes the MySQL binding.
 func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
-	mysqlOps.BaseOperations.Init(metadata)
-	if viper.IsSet("KB_SERVICE_USER") {
-		dbUser = viper.GetString("KB_SERVICE_USER")
-	}
-
-	if viper.IsSet("KB_SERVICE_PASSWORD") {
-		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
-	}
-
 	mysqlOps.Logger.Debug("Initializing MySQL binding")
+	mysqlOps.BaseOperations.Init(metadata)
+	config, _ := mysql.NewConfig(metadata.Properties)
+	manager, err := mysql.NewManager(mysqlOps.Logger)
+	if err != nil {
+		mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)
+		return err
+	}
+	mysqlOps.manager = manager
 	mysqlOps.DBType = "mysql"
-	mysqlOps.InitIfNeed = mysqlOps.initIfNeed
+	//mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
-	mysqlOps.DBPort = mysqlOps.GetRunningPort()
-	mysqlOps.RegisterOperation(GetRoleOperation, mysqlOps.GetRoleOps)
-	mysqlOps.RegisterOperation(GetLagOperation, mysqlOps.GetLagOps)
-	mysqlOps.RegisterOperation(CheckStatusOperation, mysqlOps.CheckStatusOps)
-	mysqlOps.RegisterOperation(ExecOperation, mysqlOps.ExecOps)
-	mysqlOps.RegisterOperation(QueryOperation, mysqlOps.QueryOps)
+	mysqlOps.DBPort = config.GetDBPort()
+
+	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(CheckRoleOperation, mysqlOps.CheckRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(GetLagOperation, mysqlOps.GetLagOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(ExecOperation, mysqlOps.ExecOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(QueryOperation, mysqlOps.QueryOps, manager)
 
 	// following are ops for account management
-	mysqlOps.RegisterOperation(ListUsersOp, mysqlOps.listUsersOps)
-	mysqlOps.RegisterOperation(CreateUserOp, mysqlOps.createUserOps)
-	mysqlOps.RegisterOperation(DeleteUserOp, mysqlOps.deleteUserOps)
-	mysqlOps.RegisterOperation(DescribeUserOp, mysqlOps.describeUserOps)
-	mysqlOps.RegisterOperation(GrantUserRoleOp, mysqlOps.grantUserRoleOps)
-	mysqlOps.RegisterOperation(RevokeUserRoleOp, mysqlOps.revokeUserRoleOps)
-	mysqlOps.RegisterOperation(ListSystemAccountsOp, mysqlOps.listSystemAccountsOps)
+	mysqlOps.RegisterOperationOnDBReady(ListUsersOp, mysqlOps.listUsersOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(CreateUserOp, mysqlOps.createUserOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(DeleteUserOp, mysqlOps.deleteUserOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(DescribeUserOp, mysqlOps.describeUserOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(GrantUserRoleOp, mysqlOps.grantUserRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(RevokeUserRoleOp, mysqlOps.revokeUserRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(ListSystemAccountsOp, mysqlOps.listSystemAccountsOps, manager)
 	return nil
-}
-
-func (mysqlOps *MysqlOperations) initIfNeed() bool {
-	if mysqlOps.db == nil {
-		go func() {
-			err := mysqlOps.InitDelay()
-			if err != nil {
-				mysqlOps.Logger.Errorf("MySQL connection init failed: %v", err)
-			} else {
-				mysqlOps.Logger.Info("MySQL connection init succeeded.")
-			}
-		}()
-		return true
-	}
-	return false
-}
-
-func (mysqlOps *MysqlOperations) InitDelay() error {
-	mysqlOps.mu.Lock()
-	defer mysqlOps.mu.Unlock()
-	if mysqlOps.db != nil {
-		return nil
-	}
-
-	p := mysqlOps.Metadata.Properties
-	url, ok := p[connectionURLKey]
-	if !ok || url == "" {
-		return fmt.Errorf("missing MySQL connection string")
-	}
-
-	db, err := initDB(url, mysqlOps.Metadata.Properties[pemPathKey])
-	if err != nil {
-		return err
-	}
-
-	err = propertyToInt(p, maxIdleConnsKey, db.SetMaxIdleConns)
-	if err != nil {
-		return err
-	}
-
-	err = propertyToInt(p, maxOpenConnsKey, db.SetMaxOpenConns)
-	if err != nil {
-		return err
-	}
-
-	err = propertyToDuration(p, connMaxIdleTimeKey, db.SetConnMaxIdleTime)
-	if err != nil {
-		return err
-	}
-
-	err = propertyToDuration(p, connMaxLifetimeKey, db.SetConnMaxLifetime)
-	if err != nil {
-		return err
-	}
-
-	// test if db is ready to connect or not
-	err = db.Ping()
-	if err != nil {
-		mysqlOps.Logger.Infof("unable to ping the DB")
-		return errors.Wrap(err, "unable to ping the DB")
-	}
-	mysqlOps.db = db
-
-	return nil
-}
-
-func (mysqlOps *MysqlOperations) GetRunningPort() int {
-	p := mysqlOps.Metadata.Properties
-	url, ok := p[connectionURLKey]
-	if !ok || url == "" {
-		return defaultDBPort
-	}
-
-	config, err := mysql.ParseDSN(url)
-	if err != nil {
-		return defaultDBPort
-	}
-	index := strings.LastIndex(config.Addr, ":")
-	if index < 0 {
-		return defaultDBPort
-	}
-	port, err := strconv.Atoi(config.Addr[index+1:])
-	if err != nil {
-		return defaultDBPort
-	}
-
-	return port
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	workloadType := request.Metadata[workloadTypeKey]
+	if strings.EqualFold(workloadType, Replication) {
+		return mysqlOps.GetRoleForReplication(ctx, request, response)
+	}
+	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+}
+
+func (mysqlOps *MysqlOperations) GetRunningPort() int {
+	return 0
+}
+
+func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	dcsStore := dcs.GetStore()
+	if dcsStore == nil {
+		return "", nil
+	}
+	k8sStore := dcsStore.(*dcs.KubernetesStore)
+	cluster := k8sStore.GetClusterFromCache()
+	if cluster == nil || !cluster.IsLocked() {
+		return "", nil
+	} else if !dcsStore.HasLock() {
+		return SECONDARY, nil
+	}
+
+	getReadOnlySql := `show global variables like 'read_only';`
+	data, err := mysqlOps.query(ctx, getReadOnlySql)
+	if err != nil {
+		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySql, err)
+		return "", errors.Wrapf(err, "error executing %s", getReadOnlySql)
+	}
+
+	queryRes := &QueryRes{}
+	err = json.Unmarshal(data, queryRes)
+	if err != nil {
+		return "", errors.Errorf("parse query failed, err:%v", err)
+	}
+
+	for _, mapVal := range *queryRes {
+		if mapVal["Variable_name"] == "read_only" {
+			if mapVal["Value"].(string) == "OFF" {
+				return PRIMARY, nil
+			} else if mapVal["Value"].(string) == "ON" {
+				return SECONDARY, nil
+			}
+		}
+	}
+	return "", errors.Errorf("parse query failed, no records")
+}
+
+func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
-	rows, err := mysqlOps.db.QueryContext(ctx, sql)
+	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)
@@ -399,43 +365,9 @@ func propertyToDuration(props map[string]string, key string, setter func(time.Du
 	return nil
 }
 
-func initDB(url, pemPath string) (*sql.DB, error) {
-	config, err := mysql.ParseDSN(url)
-	if err != nil {
-		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
-	}
-	config.User = dbUser
-	config.Passwd = dbPasswd
-
-	if pemPath != "" {
-		rootCertPool := x509.NewCertPool()
-		pem, err := os.ReadFile(pemPath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Error reading PEM file from %s", pemPath)
-		}
-
-		ok := rootCertPool.AppendCertsFromPEM(pem)
-		if !ok {
-			return nil, fmt.Errorf("failed to append PEM")
-		}
-
-		err = mysql.RegisterTLSConfig("custom", &tls.Config{RootCAs: rootCertPool, MinVersion: tls.VersionTLS12})
-		if err != nil {
-			return nil, errors.Wrap(err, "Error register TLS config")
-		}
-	}
-
-	db, err := sql.Open("mysql", config.FormatDSN())
-	if err != nil {
-		return nil, errors.Wrap(err, "error opening DB connection")
-	}
-
-	return db, nil
-}
-
 func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte, error) {
 	mysqlOps.Logger.Debugf("query: %s", sql)
-	rows, err := mysqlOps.db.QueryContext(ctx, sql)
+	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error executing %s", sql)
 	}
@@ -452,7 +384,7 @@ func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte,
 
 func (mysqlOps *MysqlOperations) exec(ctx context.Context, sql string) (int64, error) {
 	mysqlOps.Logger.Debugf("exec: %s", sql)
-	res, err := mysqlOps.db.ExecContext(ctx, sql)
+	res, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error executing %s", sql)
 	}

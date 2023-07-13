@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -303,4 +304,15 @@ source:
 	event.LastTimestamp = metav1.Now()
 
 	return event, nil
+}
+
+func StartupCheckWraper(manager component.DBManager, operation Operation) Operation {
+	return func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
+		if !manager.IsDBStartupReady() {
+			opsRes := OpsResult{"event": OperationFailed, "message": "db not ready"}
+			return opsRes, nil
+		}
+
+		return operation(ctx, request, response)
+	}
 }

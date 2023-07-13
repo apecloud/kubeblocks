@@ -56,12 +56,14 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
 var (
 	log        = logger.NewLogger("dapr.runtime")
 	logContrib = logger.NewLogger("dapr.contrib")
+	logHa      = logger.NewLogger("sqlchannel.highavailability")
 )
 
 func init() {
@@ -125,6 +127,13 @@ func main() {
 	)
 	if err != nil {
 		log.Fatalf("fatal error from runtime: %s", err)
+	}
+
+	// ha dependent on dbmanager which is initialized by rt.Run
+	ha := highavailability.NewHa(logHa)
+	if ha != nil {
+		defer ha.ShutdownWithWait()
+		go ha.Start()
 	}
 
 	stop := make(chan os.Signal, 1)

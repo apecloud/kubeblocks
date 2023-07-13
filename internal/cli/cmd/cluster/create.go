@@ -42,8 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -143,6 +141,7 @@ const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
 	apeCloudMysql   = "apecloud-mysql"
+	saNamePrefix    = "kb-sa-"
 )
 
 type setKey string
@@ -518,11 +517,7 @@ func (o *CreateOptions) Complete() error {
 }
 
 func (o *CreateOptions) CleanUp() error {
-	if o.Client == nil {
-		return nil
-	}
-
-	return deleteDependencies(o.Client, o.Namespace, o.Name)
+	return nil
 }
 
 // buildComponents builds components from file or set values
@@ -600,11 +595,8 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 			return nil, err
 		}
 
-		// create component dependencies
-		if err = o.buildDependenciesFn(cd, compSpec); err != nil {
-			return nil, err
-		}
-
+		// set component service account name
+		compSpec.ServiceAccountName = saNamePrefix + o.Name
 		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compSpec)
 		if err != nil {
 			return nil, err

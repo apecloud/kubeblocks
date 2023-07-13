@@ -55,8 +55,6 @@ sqlctl switchover  --primary xxx --candidate xxx
 		}
 
 		payload := fmt.Sprintf(`{"operation": "switchover", "metadata": {"leader": "%s", "candidate": "%s"}}`, primary, candidate)
-		// fmt.Println(payload)
-
 		client := http.Client{}
 		// Insert order using Dapr output binding via HTTP Post
 		req, err := http.NewRequest("POST", url, strings.NewReader(payload))

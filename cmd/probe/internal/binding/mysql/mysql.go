@@ -261,19 +261,13 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 func (mysqlOps *MysqlOperations) LockInstance(ctx context.Context) error {
 	sql := "set global read_only=1"
 	_, err := mysqlOps.db.ExecContext(ctx, sql)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (mysqlOps *MysqlOperations) UnlockInstance(ctx context.Context) error {
 	sql := "set global read_only=0"
 	_, err := mysqlOps.db.ExecContext(ctx, sql)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

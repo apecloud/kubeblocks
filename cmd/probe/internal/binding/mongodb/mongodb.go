@@ -146,6 +146,8 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 	mongoOps.InitIfNeed = mongoOps.initIfNeed
 	mongoOps.DBPort = mongoOps.GetRunningPort()
 	mongoOps.BaseOperations.GetRole = mongoOps.GetRole
+	mongoOps.BaseOperations.LockInstance = mongoOps.LockInstance
+	mongoOps.BaseOperations.UnlockInstance = mongoOps.UnlockInstance
 	mongoOps.LegacyOperations[GetRoleOperation] = mongoOps.GetRoleOps
 	return nil
 }
@@ -262,6 +264,16 @@ func (mongoOps *MongoDBOperations) GetRoleOps(ctx context.Context, req *bindings
 	opsRes := OpsResult{}
 	opsRes["role"] = role
 	return opsRes, nil
+}
+
+func (mongoOps *MongoDBOperations) LockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
+
+func (mongoOps *MongoDBOperations) UnlockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
 }
 
 func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {

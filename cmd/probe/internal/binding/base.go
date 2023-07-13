@@ -78,10 +78,11 @@ type BaseOperations struct {
 	Metadata               bindings.Metadata
 	InitIfNeed             func() bool
 	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
-	LockInstance           func(ctx context.Context) error
-	UnlockInstance         func(ctx context.Context) error
-	LegacyOperations       map[bindings.OperationKind]LegacyOperation
-	Ops                    map[bindings.OperationKind]Operation
+	// TODO: need a better way to support the extension for engines.
+	LockInstance     func(ctx context.Context) error
+	UnlockInstance   func(ctx context.Context) error
+	LegacyOperations map[bindings.OperationKind]LegacyOperation
+	Ops              map[bindings.OperationKind]Operation
 }
 
 func init() {

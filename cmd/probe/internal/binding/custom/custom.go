@@ -78,6 +78,8 @@ func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
 
 	h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
+	h.BaseOperations.LockInstance = h.LockInstance
+	h.BaseOperations.UnlockInstance = h.UnlockInstance
 	h.LegacyOperations[CheckRoleOperation] = h.CheckRoleOps
 
 	return nil
@@ -112,6 +114,16 @@ func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest
 	opsRes := OpsResult{}
 	opsRes["role"] = role
 	return opsRes, nil
+}
+
+func (h *HTTPCustom) LockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
+
+func (h *HTTPCustom) UnlockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
 }
 
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort

@@ -60,10 +60,6 @@ data:
       echo "bookkeeper init new cluster."
       bin/bookkeeper shell initnewcluster;
     fi
-    echo "verify bookkeeper cluster id"
-    bin/apply-config-from-env.py conf/bookkeeper.conf;until bin/bookkeeper shell whatisinstanceid; do
-      sleep 3;
-    done; bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
   start-bookies.sh: |-
     #!/bin/bash
     set -e

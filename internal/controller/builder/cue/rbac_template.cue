@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 cluster: {
+<<<<<<< HEAD
     metadata: {
         namespace: string
         name:      string
@@ -23,6 +24,15 @@ cluster: {
     spec: {
         clusterDefinitionRef: string
     }
+=======
+	metadata: {
+		namespace: "default"
+		name:      string
+	}
+	spec: {
+		clusterDefinitionRef: string
+	}
+>>>>>>> 183962e13 (update testcase)
 }
 
 serviceaccount: {

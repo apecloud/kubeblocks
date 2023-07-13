@@ -65,10 +65,7 @@ const (
 	KBToolsImage      = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBChartsImage     = "KUBEBLOCKS_CHARTS_IMAGE"
-)
-
-const (
-	KBClientsImage = "KUBEBLOCKS_CLIENTS_IMAGE"
+	KBClientsImage    = "KUBEBLOCKS_CLIENTS_IMAGE"
 )
 
 const (

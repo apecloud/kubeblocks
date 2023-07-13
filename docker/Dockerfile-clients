@@ -1,18 +1,6 @@
-# Build the kubeblocks tools binaries
-# includes kbcli, kubectl, and manager tools.
-
-## docker buildx build injected build-args:
-#BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
-#BUILDOS — os component of BUILDPLATFORM, e.g. linux
-#BUILDARCH — e.g. amd64, arm64, riscv64
-#BUILDVARIANT — used to set build ARM variant, e.g. v7
-#TARGETPLATFORM — The value set with --platform flag on build
-#TARGETOS - OS component from --platform, e.g. linux
-#TARGETARCH - Architecture from --platform, e.g. arm64
-#TARGETVARIANT - used to set target ARM variant, e.g. v7
-
+# Build client images for mysql and postgres to support datascripts
 # Use alpine with tag 20230329 is corresponding to "edge" tag (latest release to date is 3.18) as of 20230625
-FROM docker.io/alpine:3.18 as dist
+FROM docker.io/alpine:edge as dist
 # ARG APK_MIRROR
 
 # install tools via apk
@@ -21,11 +9,10 @@ RUN if [ -n "${APK_MIRROR}" ]; then sed -i "s/dl-cdn.alpinelinux.org/${APK_MIRRO
 
 RUN apk add --no-cache jq --allow-untrusted
 
-RUN apk add --no-cache postgresql-client mysql-client --allow-untrusted
+RUN apk add --no-cache postgresql-client --allow-untrusted
 
-RUN apk add --no-cache mongodb-tools redis --allow-untrusted
+RUN apk add --no-cache mysql-client --allow-untrusted
 
-RUN apk add --no-cache redis --allow-untrusted \
-    && rm -rf /var/cache/apk/*
+RUN rm -rf /var/cache/apk/*
 
 USER 65532:65532

@@ -3198,7 +3198,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">
-map[string]..ClusterComponentStatus
+map[string]apecloud/kubeblocks/apis/apps/v1alpha1.ClusterComponentStatus
 </a>
 </em>
 </td>
@@ -5672,7 +5672,7 @@ ClassDefRef
 <td>
 <code>targetResources</code><br/>
 <em>
-map[..ComponentResourceKey][]string
+map[apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]string
 </em>
 </td>
 <td>
@@ -5714,7 +5714,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
-map[string]..LastComponentConfiguration
+map[string]apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfiguration
 </a>
 </em>
 </td>
@@ -6456,7 +6456,7 @@ LastConfiguration
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">
-map[string]..OpsRequestComponentStatus
+map[string]apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponentStatus
 </a>
 </em>
 </td>
@@ -7840,13 +7840,66 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScriptSecret">ScriptSecret
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>)
+</p>
+<div>
+<p>ScriptSecret defines the secret to be used to execute the script.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>name is the name of the secret.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>usernameKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>usernameKey field is used to specify the username of the secret.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>passwordKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>passwordKey field is used to specify the password of the secret.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
-<p>ScriptSpec defines the script to be executed.</p><br />
+<p>ScriptSpec defines the script to be executed. It is not a general purpose script executor.<br />It is designed to execute the script to perform some specific operations, such as create database, create user, etc.<br />It is appliable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.</p><br />
 </div>
 <table>
 <thead>
@@ -7869,6 +7922,32 @@ ComponentOps
 <p>
 (Members of <code>ComponentOps</code> are embedded into this type.)
 </p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>exec command with image, by default use the image of kubeblocks-clients</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>secret</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ScriptSecret">
+ScriptSecret
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>secret defines the secret to be used to execute the script.<br />If not specified, the default cluster root credential secret will be used.</p><br />
 </td>
 </tr>
 <tr>

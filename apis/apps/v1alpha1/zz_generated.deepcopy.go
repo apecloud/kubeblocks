@@ -3255,6 +3255,11 @@ func (in *ScriptSecret) DeepCopy() *ScriptSecret {
 func (in *ScriptSpec) DeepCopyInto(out *ScriptSpec) {
 	*out = *in
 	out.ComponentOps = in.ComponentOps
+	if in.Image != nil {
+		in, out := &in.Image, &out.Image
+		*out = new(string)
+		**out = **in
+	}
 	if in.Secret != nil {
 		in, out := &in.Secret, &out.Secret
 		*out = new(ScriptSecret)

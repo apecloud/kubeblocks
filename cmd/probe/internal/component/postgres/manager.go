@@ -228,14 +228,6 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 }
 
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		if cluster.Leader.Name == mgr.CurrentMemberName {
-			return true, nil
-		} else {
-			return false, nil
-		}
-	}
-
 	return mgr.IsLeaderWithPool(ctx, nil)
 }
 
@@ -403,7 +395,7 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 	lsnStr := strings.TrimFunc(string(resp), func(r rune) bool {
 		return !unicode.IsDigit(r)
 	})
-	mgr.Logger.Infof("lsn str: %s", lsnStr)
+	mgr.Logger.Infof("%s lsn str: %s", types, lsnStr)
 
 	lsn, err := strconv.ParseInt(lsnStr, 10, 64)
 	if err != nil {
@@ -449,7 +441,7 @@ func (mgr *Manager) Premote() error {
 	}
 
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("su", "-c", `'pg_ctl promote'`, "postgres")
+	cmd := exec.Command("su", "-c", "pg_ctl promote", "postgres")
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -473,6 +465,18 @@ func (mgr *Manager) postPromote() error {
 }
 
 func (mgr *Manager) Demote() error {
+	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
+	standbySignal, err := os.Create("/postgresql/data/standby.signal")
+	if err != nil {
+		mgr.Logger.Errorf("touch standby signal failed, err:%v", err)
+		return err
+	}
+	defer standbySignal.Close()
+
+	return mgr.Stop()
+}
+
+func (mgr *Manager) Stop() error {
 	var stdout, stderr bytes.Buffer
 	stopCmd := exec.Command("su", "-c", "pg_ctl stop -m fast", "postgres")
 	stopCmd.Stdout = &stdout
@@ -724,10 +728,10 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	primaryInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s application_name=my-application\n",
+	primaryInfo := fmt.Sprintf("\nhost=%s port=%s user=%s password=%s application_name=my-application\n",
 		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, config.password)
 
-	pgConf, err := os.OpenFile("/postgresql/conf/postgresql.conf", os.O_APPEND, 0777)
+	pgConf, err := os.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
 		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
 		return err
@@ -749,7 +753,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 
 	if !needRestart {
 		var stdout, stderr bytes.Buffer
-		cmd := exec.Command("su", "-c", `'pg_ctl reload'`, "reload")
+		cmd := exec.Command("su", "-c", "pg_ctl reload", "postgres")
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
@@ -763,35 +767,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	return mgr.Start()
-}
-
-func (mgr *Manager) Start() error {
-	standbySignal, err := os.Create("/postgresql/data/standby.signal")
-	if err != nil {
-		mgr.Logger.Errorf("touch standby signal failed, err:%v", err)
-		return err
-	}
-	defer standbySignal.Close()
-
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("docker-entrypoint.sh", "--config-file=/postgresql/conf/postgresql.conf", "--hba_file=postgresql/conf/pg_hba.conf", "&")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("start postgresql failed, err:%v", err)
-		return err
-	}
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), config.pool)
-	if err != nil {
-		return errors.Errorf("unable to ping the DB: %v", err)
-	}
-	mgr.Pool = pool
-
-	return nil
+	return mgr.Stop()
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
@@ -846,11 +822,10 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 	}
 
 	tempConfig := *config.pool
-	mgr.Logger.Infof("tempConfig addr:%p, config pool addr:%p", &tempConfig, config.pool)
 
 	var tempPool *pgxpool.Pool
 	var err error
-	resp := make([]*pgxpool.Pool, 0, len(hosts))
+	resp := make([]*pgxpool.Pool, len(hosts), len(hosts))
 	for i, host := range hosts {
 		tempConfig.ConnConfig.Host = host
 		tempPool, err = pgxpool.NewWithConfig(ctx, &tempConfig)

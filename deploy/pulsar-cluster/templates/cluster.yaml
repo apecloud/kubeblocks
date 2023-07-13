@@ -21,6 +21,11 @@ spec:
       replicas: {{ .Values.proxy.replicaCount | default 3 }}
       {{- with  .Values.proxy.resources }}
       resources:
+      {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+      {{- end }}
       {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}
@@ -32,6 +37,11 @@ spec:
       replicas: {{ .Values.broker.replicaCount | default 3 }}
       {{- with  .Values.broker.resources }}
       resources:
+      {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+      {{- end }}
       {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}
@@ -43,6 +53,11 @@ spec:
       replicas: {{ .Values.bookiesRecovery.replicaCount | default 3 }}
       {{- with  .Values.bookiesRecovery.resources }}
       resources:
+      {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+      {{- end }}
       {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}
@@ -88,6 +103,11 @@ spec:
       replicas: {{ .Values.zookeeper.replicaCount | default 3 }}
       {{- with  .Values.zookeeper.resources }}
       resources:
+        {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        {{- end }}
         {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}

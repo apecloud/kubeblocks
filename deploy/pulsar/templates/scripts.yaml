@@ -6,18 +6,15 @@ metadata:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:
   init-proxy.sh: |-
-    #!/bin/bash
-    set -e
-    while [ "$(curl -s -o /dev/null -w '%{http_code}' ${brokerSVC}:8080/status.html)"
-        -ne "200" ]; do echo "pulsar cluster isn't initialized yet..."; sleep 3;
+    #!/bin/sh
+    while [ "$(curl -s -o /dev/null -w '%{http_code}' http://${brokerSVC}:80/status.html)" -ne "200" ]; do
+      echo "pulsar cluster isn't initialized yet..."; sleep 3;
     done
   start-proxy.sh: |-
-    #!/bin/bash
-    set -e
+    #!/bin/sh
     bin/apply-config-from-env.py conf/proxy.conf && echo 'OK' > status && exec bin/pulsar proxy
   init-broker.sh: |-
-    #!/bin/bash
-    set -e
+    #!/bin/sh
     set -x
     echo "INFO: wait for zookeeper ready..."
     until bin/pulsar zookeeper-shell -server ${zookeeperServers} --run-once "ls /"; do
@@ -48,18 +45,10 @@ data:
 
     (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
   init-broker-sysctl.sh: |-
-    #!/bin/bash
-    set -e
-    sysctl -w net.ipv4.tcp_keepalive_time=1 &&\n\t\t\tsysctl -w net.ipv4.tcp_keepalive_intvl=11 &&\n\t\t\t sysctl -w net.ipv4.tcp_keepalive_probes=3
-  start-broker.sh: |-
-    #!/bin/bash
-    set -e
-    bin/apply-config-from-env.py conf/broker.conf && bin/apply-config-from-env.py
-      conf/client.conf && echo 'OK' > status;exec bin/pulsar broker
+    #!/bin/sh
+    sysctl -w net.ipv4.tcp_keepalive_time=1 && sysctl -w net.ipv4.tcp_keepalive_intvl=11 && sysctl -w net.ipv4.tcp_keepalive_probes=3
   init-bookies.sh: |-
     #!/bin/bash
-    set -e
-
     echo "waiting zookeeper ready..."
     zkDomain="${zkServers%%:*}"
     until nslookup $zkDomain; do
@@ -91,13 +80,13 @@ data:
     bin/generate-zookeeper-config.sh conf/zookeeper.conf; exec bin/pulsar zookeeper;
   check-bookies.sh: |-
     #!/bin/bash
+    set -x
     bin/apply-config-from-env.py conf/bookkeeper.conf
     until bin/bookkeeper shell whatisinstanceid; do
       sleep 3;
     done;
     sysctl -w net.ipv4.tcp_keepalive_time=1 && sysctl -w net.ipv4.tcp_keepalive_intvl=11 && sysctl -w net.ipv4.tcp_keepalive_probes=3
   start-bookies-recovery.sh: |-
-    #!/bin/bash
-    set -e
+    #!/bin/sh
     bin/apply-config-from-env.py conf/bookkeeper.conf
     exec bin/bookkeeper autorecovery

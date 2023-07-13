@@ -20,7 +20,7 @@ spec:
     - componentDefRef: bookies-recovery
       versionsContext:
         initContainers:
-          - name: init-bookies
+          - name: check-bookies
             image: {{ .Values.bookies.image.repository }}:{{ .Values.bookies.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.bookies.image.pullPolicy }}
         containers:

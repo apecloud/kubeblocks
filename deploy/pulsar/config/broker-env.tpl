@@ -28,3 +28,4 @@ PULSAR_PREFIX_maxUnackedMessagesPerSubscription: "50000"
 PULSAR_PREFIX_preciseDispatcherFlowControl: "true"
 PULSAR_PREFIX_subscriptionKeySharedUseConsistentHashing: "true"
 PULSAR_PREFIX_transactionCoordinatorEnabled: "false"
+PULSAR_PREFIX_statusFilePath: /pulsar/status

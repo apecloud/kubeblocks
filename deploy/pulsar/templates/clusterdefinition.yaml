@@ -33,7 +33,7 @@ spec:
       # TODO: refer to broker configuration
       configSpecs:
         - name: broker-env
-          templateRef: {{ include "pulsar.name" . }}-broker-env
+          templateRef: {{ include "pulsar.name" . }}-broker-env-tpl
           namespace: {{ .Release.Namespace }}
           constraintRef: pulsar-config-constraints
           keys:
@@ -76,7 +76,7 @@ spec:
             - name: clusterName
               value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
             - name: webServiceUrl
-              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
+              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:80
             - name: zookeeperServers
               value: $(zookeeperSVC):2181
             - name: configurationStoreServers
@@ -106,7 +106,12 @@ spec:
               privileged: false
               runAsGroup: 0
             command:
-              - /kb-scripts/start-broker.sh
+              - sh
+              - -c
+            args:
+            - |
+              set -x
+              bin/apply-config-from-env.py conf/broker.conf && bin/apply-config-from-env.py conf/client.conf && echo 'OK' > status;exec bin/pulsar broker
             resources:
               requests:
                 cpu: 200m
@@ -129,7 +134,7 @@ spec:
             - name: clusterName
               value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
             - name: webServiceUrl
-              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
+              value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:80
             - name: zookeeperServers
               value: $(zookeeperSVC):2181
             - name: configurationStoreServers
@@ -180,7 +185,7 @@ spec:
       statefulSpec:
         updateStrategy: BestEffortParallel
       componentDefRef:
-      - componentDefName: broker
+      - componentDefName: pulsar-broker
         componentRefEnv:
         - name: brokerSVC
           valueFrom:
@@ -245,7 +250,7 @@ spec:
               runAsGroup: 0
             env:
             - name: brokerWebServiceURL
-              value: http://$(brokerSVC):8080
+              value: http://$(brokerSVC):80
             - name: brokerServiceURL
               value: pulsar://$(brokerSVC):6650
             - name: clusterName
@@ -406,6 +411,9 @@ spec:
           - name: check-bookies
             command:
             - /kb-scripts/check-bookies.sh
+            volumeMounts:
+            - name: scripts
+              mountPath: /kb-scripts
         containers:
           - name: bookies-recovery
             securityContext:

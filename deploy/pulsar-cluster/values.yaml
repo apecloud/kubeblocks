@@ -47,8 +47,8 @@ bookies:
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     limits:
-      cpu: 500m
-      memory: 3Gi
+      cpu: 200m
+      memory: 512Mi
     requests:
       cpu: 200m
       memory: 512Mi
@@ -73,8 +73,8 @@ bookiesRecovery:
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     limits:
-      cpu: 500m
-      memory: 3Gi
+      cpu: 200m
+      memory: 512Mi
     requests:
       cpu: 200m
       memory: 512Mi
@@ -93,9 +93,9 @@ zookeeper:
     ## resources, such as Minikube. If you do want to specify resources, uncomment the following
     ## lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     ##
-    ##limits:
-    ##  cpu: 500m
-    ##  memory: 3Gi
+    limits:
+      cpu: 200m
+      memory: 512Mi
     requests:
       cpu: 100m
       memory: 512Mi
@@ -120,6 +120,9 @@ broker:
     # choice for the user. This also increases chances charts run on environments with little
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    limits:
+      cpu: 200m
+      memory: 512Mi
     requests:
       cpu: 200m
       memory: 512Mi
@@ -134,6 +137,9 @@ proxy:
     # choice for the user. This also increases chances charts run on environments with little
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    limits:
+      cpu: 200m
+      memory: 512Mi
     requests:
       cpu: 200m
       memory: 512Mi

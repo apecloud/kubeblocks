@@ -8,9 +8,9 @@ spec:
   type: pulsar
   connectionCredential:
     username: "admin"
-    admin-password: "$(RANDOM_PASSWD)"
     httpEndpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
     pulsarEndpoint: "pulsar://$(SVC_FQDN):$(SVC_PORT_pulsar)"
+    kafkaEndpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-client)"
   componentDefs:
     - name: pulsar-broker
       workloadType: Stateful
@@ -39,10 +39,6 @@ spec:
             - init-broker-cluster
             - broker
           volumeName: broker-env
-        - name: broker-conf
-          templateRef: {{ include "pulsar.name" . }}-broker-conf-tpl
-          namespace: {{ .Release.Namespace }}
-          volumeName: config
       scriptSpecs:
         - name: pulsar-scripts
           templateRef: {{ include "pulsar.name" . }}-scripts
@@ -60,9 +56,6 @@ spec:
         - name: kafka-client
           port: 9092
           targetPort: kafka-client
-        - name: kafka-internal
-          port: 9094
-          targetPort: kafka-internal
       podSpec:
         securityContext:
           runAsNonRoot: true
@@ -114,7 +107,9 @@ spec:
             args:
             - |
               set -x
-              bin/apply-config-from-env.py conf/broker.conf && bin/apply-config-from-env.py conf/client.conf && echo 'OK' > status;exec bin/pulsar broker
+              bin/apply-config-from-env.py conf/broker.conf && \
+              bin/apply-config-from-env.py conf/client.conf && \
+              echo 'OK' > status;exec bin/pulsar broker
             resources:
               requests:
                 cpu: 200m
@@ -149,8 +144,6 @@ spec:
                 containerPort: 8080
               - name: kafka-client
                 containerPort: 9092
-              - name: kafka-internal
-                containerPort: 9094
             livenessProbe:
               failureThreshold: 30
               httpGet:
@@ -182,8 +175,6 @@ spec:
               successThreshold: 1
               timeoutSeconds: 100
             volumeMounts:
-            - name: config
-              mountPath: /pulsar/config-broker
             - name: scripts
               mountPath: /kb-scripts
     - name: pulsar-proxy

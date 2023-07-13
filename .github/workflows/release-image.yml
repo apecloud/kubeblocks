@@ -40,7 +40,7 @@ jobs:
 
   release-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
@@ -52,7 +52,7 @@ jobs:
 
   release-tools-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
     with:
       MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"

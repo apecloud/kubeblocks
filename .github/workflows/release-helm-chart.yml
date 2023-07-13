@@ -46,7 +46,7 @@ jobs:
 
   release-charts-image:
     needs: [ chart-version, release-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
     with:
       MAKE_OPS_PRE: "helm-package"
       IMG: "apecloud/kubeblocks-charts"

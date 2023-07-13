@@ -55,12 +55,6 @@ const (
 	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
 )
 
-const (
-	probeEventOperationNotImpl probeEventType = "OperationNotImplemented"
-	probeEventCheckRoleFailed  probeEventType = "checkRoleFailed"
-	probeEventRoleInvalid      probeEventType = "roleInvalid"
-)
-
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
@@ -100,7 +94,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 
 	// if probe event operation is not impl, check role failed or role invalid, ignore it
-	if message.Event == probeEventOperationNotImpl || message.Event == probeEventCheckRoleFailed || message.Event == probeEventRoleInvalid {
+	if message.Event != "Success" {
 		reqCtx.Log.Info("probe event failed", "message", message.Message)
 		return "", nil
 	}
@@ -119,7 +113,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	if pod.UID != event.InvolvedObject.UID {
 		return role, nil
 	}
-	name := pod.Labels[constant.AppInstanceLabelKey]
+	name := fmt.Sprintf("%s-%s", pod.Labels[constant.AppInstanceLabelKey], pod.Labels[constant.KBAppComponentLabelKey])
 	rsm := &workloads.ReplicatedStateMachine{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
 		return "", err

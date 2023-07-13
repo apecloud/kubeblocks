@@ -406,6 +406,31 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	service, alternativeServices := separateServices(component.Services)
 	rsmBuilder.SetService(service.Spec).SetAlternativeServices(alternativeServices)
 
+	secretName := fmt.Sprintf("%s-conn-credential", cluster.Name)
+	credential := workloads.Credential{
+		Username: workloads.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			},
+		},
+		Password: workloads.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountPasswdForSecret,
+				},
+			},
+		},
+	}
+	rsmBuilder.SetCredential(credential)
+
 	roles, roleObservation, membershipReconfiguration, memberUpdateStrategy := buildRoleInfo(component)
 	rsm := rsmBuilder.SetRoles(roles).
 		SetRoleObservation(roleObservation).

@@ -120,7 +120,7 @@ var _ = Describe("probe_utils", func() {
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 
-		FIt("build volume protection probe container without RBAC", func() {
+		It("build volume protection probe container without RBAC", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -142,7 +142,7 @@ var _ = Describe("probe_utils", func() {
 			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 		})
 
-		FIt("build volume protection probe container with RBAC", func() {
+		It("build volume protection probe container with RBAC", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,

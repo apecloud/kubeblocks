@@ -86,9 +86,7 @@ spec:
               - name: tcp-postgresql
                 containerPort: 5432
             command:
-              - bash
-              - -c
-              - "docker-entrypoint.sh --config-file=/postgresql/conf/postgresql.conf --hba_file=/postgresql/conf/pg_hba.conf"
+              - /scripts/setup.sh
             env:
               - name: POSTGRESQL_PORT_NUMBER
                 value: "5432"

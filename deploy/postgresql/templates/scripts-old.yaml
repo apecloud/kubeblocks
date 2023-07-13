@@ -7,3 +7,7 @@ metadata:
 data:
   setup.sh: |
     #!/bin/bash
+    if [ ! -d "/kubeblocks/conf" ];then
+      cp -r postgresql/conf/ kubeblocks/
+    fi
+    docker-entrypoint.sh --config-file=/kubeblocks/conf/postgresql.conf --hba_file=/kubeblocks/conf/pg_hba.conf

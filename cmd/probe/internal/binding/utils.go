@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -250,10 +251,10 @@ source:
 `
 
 	// get pod object
-	podName := os.Getenv("KB_POD_NAME")
-	podUID := os.Getenv("KB_POD_UID")
-	nodeName := os.Getenv("KB_NODENAME")
-	namespace := os.Getenv("KB_NAMESPACE")
+	podName := os.Getenv(constant.KBEnvPodName)
+	podUID := os.Getenv(constant.KBEnvPodUID)
+	nodeName := os.Getenv(constant.KBEnvNodeName)
+	namespace := os.Getenv(constant.KBEnvNamespace)
 	msg, _ := json.Marshal(opsResult)
 	seq := rand.String(16)
 	roleValue := map[string]string{
@@ -298,7 +299,7 @@ func sendEvent(ctx context.Context, log logger.Logger, event *corev1.Event) erro
 		log.Infof("k8s client create failed: %v", err)
 		return err
 	}
-	namespace := os.Getenv("KB_NAMESPACE")
+	namespace := os.Getenv(constant.KBEnvNamespace)
 	for i := 0; i < 30; i++ {
 		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
 		if err == nil {

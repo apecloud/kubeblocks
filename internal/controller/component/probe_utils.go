@@ -273,7 +273,7 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 		panic(fmt.Sprintf("marshal volume protection spec error: %s", err.Error()))
 	}
 	return corev1.EnvVar{
-		Name:  "KB_VOLUME_PROTECTION_SPEC",
+		Name:  constant.KBEnvVolumeProtectionSpec,
 		Value: string(value),
 	}
 }

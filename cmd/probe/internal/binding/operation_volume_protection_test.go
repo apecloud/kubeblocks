@@ -34,6 +34,7 @@ import (
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type mockVolumeStatsRequester struct {
@@ -98,17 +99,17 @@ var _ = Describe("Volume Protection Operation", func() {
 		unlockTimes    = 0
 	)
 	setup := func() {
-		os.Setenv(envPodName, podName)
+		os.Setenv(constant.KBEnvPodName, podName)
 		raw, _ := json.Marshal(volumeProtectionSpec)
-		os.Setenv(envVolumesProtectionSpec, string(raw))
+		os.Setenv(constant.KBEnvVolumeProtectionSpec, string(raw))
 		instanceLocked = false
 		lockTimes = 0
 		unlockTimes = 0
 	}
 
 	cleanAll := func() {
-		os.Unsetenv(envPodName)
-		os.Unsetenv(envVolumesProtectionSpec)
+		os.Unsetenv(constant.KBEnvPodName)
+		os.Unsetenv(constant.KBEnvVolumeProtectionSpec)
 		instanceLocked = false
 		lockTimes = 0
 		unlockTimes = 0
@@ -140,7 +141,7 @@ var _ = Describe("Volume Protection Operation", func() {
 
 	resetVolumeProtectionSpecEnv := func(spec appsv1alpha1.VolumeProtectionSpec) {
 		raw, _ := json.Marshal(spec)
-		os.Setenv(envVolumesProtectionSpec, string(raw))
+		os.Setenv(constant.KBEnvVolumeProtectionSpec, string(raw))
 	}
 
 	newVolumeProtectionObj := func() *operationVolumeProtection {
@@ -165,7 +166,7 @@ var _ = Describe("Volume Protection Operation", func() {
 		})
 
 		It("init - invalid volume protection spec env", func() {
-			os.Setenv(envVolumesProtectionSpec, "")
+			os.Setenv(constant.KBEnvVolumeProtectionSpec, "")
 			obj := newVolumeProtectionObj()
 			Expect(obj.Init(bindings.Metadata{})).Should(HaveOccurred())
 		})
@@ -223,7 +224,7 @@ var _ = Describe("Volume Protection Operation", func() {
 		})
 
 		It("disabled - empty pod name", func() {
-			os.Setenv(envPodName, "")
+			os.Setenv(constant.KBEnvPodName, "")
 			obj := newVolumeProtectionObj()
 			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
 			Expect(obj.disabled()).Should(BeTrue())

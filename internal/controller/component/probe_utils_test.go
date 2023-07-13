@@ -20,12 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"encoding/json"
+	"reflect"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -112,6 +118,59 @@ var _ = Describe("probe_utils", func() {
 		It("should build running probe container", func() {
 			buildRunningProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
+		})
+
+		FIt("build volume protection probe container without RBAC", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: logger,
+			}
+			zeroWatermark := 0
+			component.VolumeProtection = &appsv1alpha1.VolumeProtectionSpec{
+				HighWatermark: 90,
+				Volumes: []appsv1alpha1.ProtectedVolume{
+					{
+						Name: "volume-001",
+					},
+					{
+						Name:          "volume-002",
+						HighWatermark: &zeroWatermark,
+					},
+				},
+			}
+			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+		})
+
+		FIt("build volume protection probe container with RBAC", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: logger,
+			}
+			zeroWatermark := 0
+			component.VolumeProtection = &appsv1alpha1.VolumeProtectionSpec{
+				HighWatermark: 90,
+				Volumes: []appsv1alpha1.ProtectedVolume{
+					{
+						Name: "volume-001",
+					},
+					{
+						Name:          "volume-002",
+						HighWatermark: &zeroWatermark,
+					},
+				},
+			}
+			viper.SetDefault(constant.EnableRBACManager, true)
+			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
+			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
+			spec := &appsv1alpha1.VolumeProtectionSpec{}
+			for _, e := range component.PodSpec.Containers[0].Env {
+				if e.Name == constant.KBEnvVolumeProtectionSpec {
+					Expect(json.Unmarshal([]byte(e.Value), spec)).Should(Succeed())
+					break
+				}
+			}
+			Expect(reflect.DeepEqual(component.VolumeProtection, spec)).Should(BeTrue())
 		})
 	})
 })

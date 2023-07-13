@@ -41,6 +41,7 @@ import (
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -49,13 +50,6 @@ const (
 
 	certFile  = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-
-	envNamespace             = "KB_NAMESPACE"
-	envHostIP                = "KB_HOST_IP"
-	envNodeName              = "KB_NODENAME"
-	envPodName               = "KB_POD_NAME"
-	envPodUID                = "KB_POD_UID"
-	envVolumesProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 
 	reasonLock   = "HighVolumeWatermark"
 	reasonUnlock = "LowVolumeWatermark" // TODO
@@ -105,7 +99,7 @@ func (o *operationVolumeProtection) Init(metadata bindings.Metadata) error {
 		return err
 	}
 
-	o.Pod = os.Getenv(envPodName)
+	o.Pod = os.Getenv(constant.KBEnvPodName)
 	if err := o.initVolumes(); err != nil {
 		o.Logger.Warnf("init volumes to monitor error: %s", err.Error())
 		return err
@@ -116,7 +110,7 @@ func (o *operationVolumeProtection) Init(metadata bindings.Metadata) error {
 
 func (o *operationVolumeProtection) initVolumes() error {
 	spec := &appsv1alpha1.VolumeProtectionSpec{}
-	raw := os.Getenv(envVolumesProtectionSpec)
+	raw := os.Getenv(constant.KBEnvVolumeProtectionSpec)
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
 		o.Logger.Warnf("unmarshal volume protection spec error: %s, raw spec: %s", err.Error(), raw)
 		return err
@@ -324,21 +318,21 @@ func (o *operationVolumeProtection) sendEvent(ctx context.Context, reason, msg s
 func (o *operationVolumeProtection) createEvent(reason, msg string) *corev1.Event {
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%s", os.Getenv(envPodName), rand.String(16)),
-			Namespace: os.Getenv(envNamespace),
+			Name:      fmt.Sprintf("%s.%s", os.Getenv(constant.KBEnvPodName), rand.String(16)),
+			Namespace: os.Getenv(constant.KBEnvNamespace),
 		},
 		InvolvedObject: corev1.ObjectReference{
 			Kind:      "Pod",
-			Namespace: os.Getenv(envNamespace),
-			Name:      os.Getenv(envPodName),
-			UID:       types.UID(os.Getenv(envPodUID)),
+			Namespace: os.Getenv(constant.KBEnvNamespace),
+			Name:      os.Getenv(constant.KBEnvPodName),
+			UID:       types.UID(os.Getenv(constant.KBEnvPodUID)),
 			FieldPath: "spec.containers{sqlchannel}",
 		},
 		Reason:  reason,
 		Message: msg,
 		Source: corev1.EventSource{
 			Component: "sqlchannel",
-			Host:      os.Getenv(envNodeName),
+			Host:      os.Getenv(constant.KBEnvNodeName),
 		},
 		FirstTimestamp: metav1.Now(),
 		LastTimestamp:  metav1.Now(),
@@ -439,7 +433,7 @@ func httpRequest(ctx context.Context) (*http.Request, error) {
 }
 
 func kubeletEndpointHost(ctx context.Context) (string, error) {
-	return os.Getenv(envHostIP), nil
+	return os.Getenv(constant.KBEnvHostIP), nil
 }
 
 func kubeletEndpointPort(ctx context.Context) (string, error) {
@@ -451,7 +445,7 @@ func kubeletEndpointPort(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	node, err := cliset.CoreV1().Nodes().Get(ctx, os.Getenv(envNodeName), metav1.GetOptions{})
+	node, err := cliset.CoreV1().Nodes().Get(ctx, os.Getenv(constant.KBEnvNodeName), metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

@@ -60,7 +60,8 @@ func TestGetRole(t *testing.T) {
 	m := &MongoDBOperations{
 		BaseOperations: BaseOperations{Logger: logger.NewLogger("mongodb-test")},
 	}
-	m.Init(bm)
+	err := m.Init(bm)
+	assert.Nil(t, err)
 	m.manager.Client = mt.Client
 	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {

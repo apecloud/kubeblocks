@@ -154,6 +154,10 @@ func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 
 func (config *Config) GetDBPort() int {
 	mysqlConfig, err := mysql.ParseDSN(config.url)
+	if err != nil {
+		return defaultDBPort
+	}
+
 	_, portStr, err := net.SplitHostPort(mysqlConfig.Addr)
 	if err != nil {
 		return defaultDBPort

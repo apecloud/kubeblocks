@@ -389,11 +389,6 @@ loki:
   enabled: false
   singleBinary:
     replicas: 1
-    tolerations:
-      - key: kb-controller
-        operator: Equal
-        value: "true"
-        effect: NoSchedule
   monitoring:
     lokiCanary:
       enabled: false
@@ -418,6 +413,18 @@ loki:
     podSecurityContext:
       runAsNonRoot: false
       runAsUser: 0
+    limits_config:
+      max_query_lookback: 72h
+      retention_period: 72h
+    compactor:
+      working_directory: /var/loki/retention
+      shared_store: filesystem
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+      delete_request_cancel_period: 2h
+
 
 grafana:
   ## If false, grafana sub-chart will not be installed

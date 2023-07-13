@@ -141,7 +141,6 @@ jobs:
               --runner-name ${{ needs.make-test.outputs.runner-name }}
 
   check-image:
-    name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
     uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
@@ -154,7 +153,6 @@ jobs:
     secrets: inherit
 
   check-tools-image:
-    name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
     uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
@@ -180,7 +178,6 @@ jobs:
     secrets: inherit
 
   check-kbcli:
-    name: check kbcli
     needs: trigger-mode
     runs-on: ubuntu-latest
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[cli]')

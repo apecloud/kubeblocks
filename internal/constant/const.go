@@ -207,11 +207,12 @@ const (
 
 const (
 	// Container port name
-	ProbeHTTPPortName         = "probe-http-port"
-	ProbeGRPCPortName         = "probe-grpc-port"
-	RoleProbeContainerName    = "kb-checkrole"
-	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-checkrunning"
+	ProbeHTTPPortName                  = "probe-http-port"
+	ProbeGRPCPortName                  = "probe-grpc-port"
+	RoleProbeContainerName             = "kb-checkrole"
+	StatusProbeContainerName           = "kb-checkstatus"
+	RunningProbeContainerName          = "kb-checkrunning"
+	VolumeProtectionProbeContainerName = "kb-volume-protection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"

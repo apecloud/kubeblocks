@@ -89,6 +89,9 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 				case CheckRoleOperation:
 					body = fmt.Sprintf(bodyFmt, CheckRoleOperation)
 					ctx.Request.SetBody([]byte(body))
+				case VolumeProtection:
+					body = fmt.Sprintf(bodyFmt, VolumeProtection)
+					ctx.Request.SetBody([]byte(body))
 				default:
 					m.logger.Infof("unknown probe operation: %v", string(operation))
 				}

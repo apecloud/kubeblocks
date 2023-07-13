@@ -9176,6 +9176,39 @@ spec:
                       - cmdExecutorConfig
                       - passwordConfig
                       type: object
+                    volumeProtectionSpec:
+                      properties:
+                        highWatermark:
+                          default: 90
+                          description: The high watermark threshold for volume space
+                            usage. If there is any specified volumes who's space usage
+                            is over the threshold, the pre-defined "LOCK" action will
+                            be triggered to degrade the service to protect volume
+                            from space exhaustion, such as to set the instance as
+                            read-only. And after that, if all volumes' space usage
+                            drops under the threshold later, the pre-defined "UNLOCK"
+                            action will be performed to recover the service normally.
+                          maximum: 100
+                          minimum: 0
+                          type: integer
+                        volumes:
+                          description: Volumes to protect.
+                          items:
+                            properties:
+                              highWatermark:
+                                description: Volume specified high watermark threshold,
+                                  it will override the component level threshold.
+                                  If the value is invalid, it will be ignored and
+                                  the component level threshold will be used.
+                                maximum: 100
+                                minimum: 0
+                                type: integer
+                              name:
+                                description: Name of volume to protect.
+                                type: string
+                            type: object
+                          type: array
+                      type: object
                     volumeTypes:
                       description: "volumeTypes is used to describe the purpose of
                         the volumes mapping the name of the VolumeMounts in the PodSpec.Container

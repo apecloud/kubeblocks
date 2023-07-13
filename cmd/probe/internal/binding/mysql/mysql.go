@@ -120,6 +120,8 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.DBType = "mysql"
 	mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
+	mysqlOps.BaseOperations.LockInstance = mysqlOps.LockInstance
+	mysqlOps.BaseOperations.UnlockInstance = mysqlOps.UnlockInstance
 	mysqlOps.DBPort = mysqlOps.GetRunningPort()
 	mysqlOps.RegisterOperation(GetRoleOperation, mysqlOps.GetRoleOps)
 	mysqlOps.RegisterOperation(GetLagOperation, mysqlOps.GetLagOps)
@@ -254,6 +256,18 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 		return role, nil
 	}
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
+}
+
+func (mysqlOps *MysqlOperations) LockInstance(ctx context.Context) error {
+	sql := "set global read_only=1"
+	_, err := mysqlOps.db.ExecContext(ctx, sql)
+	return err
+}
+
+func (mysqlOps *MysqlOperations) UnlockInstance(ctx context.Context) error {
+	sql := "set global read_only=0"
+	_, err := mysqlOps.db.ExecContext(ctx, sql)
+	return err
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

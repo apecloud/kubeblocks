@@ -285,7 +285,7 @@ var _ = Describe("PITR Functions", func() {
 				envs := fetched.Spec.Template.Spec.Containers[0].Env
 				var existsTargetENV bool
 				for _, env := range envs {
-					if env.Name == "KB_POD_NAME" {
+					if env.Name == constant.KBEnvPodName {
 						existsTargetENV = true
 						break
 					}

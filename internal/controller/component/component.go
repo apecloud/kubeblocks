@@ -154,6 +154,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ConfigTemplates:       clusterCompDefObj.ConfigSpecs,
 		ScriptTemplates:       clusterCompDefObj.ScriptSpecs,
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		VolumeProtection:      clusterCompDefObj.VolumeProtectionSpec,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		SwitchoverSpec:        clusterCompDefObj.SwitchoverSpec,
 		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
@@ -224,16 +225,6 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
-
-	// TODO: (zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
-	// At present, it is not possible to distinguish between ConfigMap volume and normal volume,
-	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
-	//
-	// if component.VolumeClaimTemplates == nil {
-	//	 for i := range component.PodSpec.Containers {
-	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
-	//	 }
-	// }
 
 	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
 	if err = buildProbeContainers(reqCtx, component); err != nil {

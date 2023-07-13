@@ -106,6 +106,7 @@ require (
 	k8s.io/klog/v2 v2.90.1
 	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a
 	k8s.io/kubectl v0.26.0
+	k8s.io/kubelet v0.26.1
 	k8s.io/metrics v0.26.0
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/controller-runtime v0.14.4

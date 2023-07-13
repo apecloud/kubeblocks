@@ -149,6 +149,11 @@ func (builder *ReplicatedStateMachineBuilder) SetService(service corev1.ServiceS
 	return builder
 }
 
+func (builder *ReplicatedStateMachineBuilder) SetAlternativeServices(services []corev1.Service) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.AlternativeServices = services
+	return builder
+}
+
 func (builder *ReplicatedStateMachineBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.MembershipReconfiguration = reconfiguration
 	return builder

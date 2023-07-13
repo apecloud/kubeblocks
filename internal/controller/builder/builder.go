@@ -403,6 +403,9 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		rsmBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
 	}
 
+	service, alternativeServices := separateServices(component.Services)
+	rsmBuilder.SetService(service.Spec).SetAlternativeServices(alternativeServices)
+
 	roles, roleObservation, membershipReconfiguration, memberUpdateStrategy := buildRoleInfo(component)
 	rsm := rsmBuilder.SetRoles(roles).
 		SetRoleObservation(roleObservation).
@@ -425,12 +428,22 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	return rsm, nil
 }
 
+// separateServices separates 'services' to a main service from cd and alternative services from cluster
+func separateServices(services []corev1.Service) (*corev1.Service, []corev1.Service) {
+	if len(services) == 0 {
+		return nil, nil
+	}
+	// from component.buildComponent (which contains component.Services' building process), the first item should be the main service
+	// TODO(free6om): make two fields in component(i.e. Service and AlternativeServices) after RSM passes all testes.
+	return &services[0], services[1:]
+}
+
 func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleObservation, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
 	var (
-		roles []workloads.ReplicaRole
-		observation *workloads.RoleObservation
+		roles           []workloads.ReplicaRole
+		observation     *workloads.RoleObservation
 		reconfiguration *workloads.MembershipReconfiguration
-		strategy *workloads.MemberUpdateStrategy
+		strategy        *workloads.MemberUpdateStrategy
 	)
 
 	actions := buildActionFromCharacterType(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
@@ -481,7 +494,7 @@ func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([
 	}
 
 	var (
-		roles []workloads.ReplicaRole
+		roles    []workloads.ReplicaRole
 		strategy *workloads.MemberUpdateStrategy
 	)
 
@@ -493,17 +506,17 @@ func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([
 	})
 	for _, follower := range consensusSpec.Followers {
 		roles = append(roles, workloads.ReplicaRole{
-			Name: follower.Name,
-			IsLeader: false,
-			CanVote: true,
+			Name:       follower.Name,
+			IsLeader:   false,
+			CanVote:    true,
 			AccessMode: workloads.AccessMode(follower.AccessMode),
 		})
 	}
 	if consensusSpec.Learner != nil {
 		roles = append(roles, workloads.ReplicaRole{
-			Name: consensusSpec.Learner.Name,
-			IsLeader: false,
-			CanVote: false,
+			Name:       consensusSpec.Learner.Name,
+			IsLeader:   false,
+			CanVote:    false,
 			AccessMode: workloads.AccessMode(consensusSpec.Learner.AccessMode),
 		})
 	}

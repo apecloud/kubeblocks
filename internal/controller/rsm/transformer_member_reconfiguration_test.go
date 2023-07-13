@@ -101,7 +101,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
-			SetMembershipReconfiguration(reconfiguration).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()
 

@@ -53,3 +53,8 @@ func (b *rsmComponentWorkloadBuilder) BuildWorkload() internal.ComponentWorkload
 	}
 	return b.BuildWrapper(buildfn)
 }
+
+// BuildEnv overrides internal.ComponentWorkloadBuilderBase as env has been pushed down to rsm
+func (b *rsmComponentWorkloadBuilder) BuildEnv() internal.ComponentWorkloadBuilder {
+	return b.ConcreteBuilder
+}

@@ -136,6 +136,22 @@ var _ = Describe("replicated_state_machine builder", func() {
 				},
 			},
 		}
+		alternativeServices := []corev1.Service{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "bar",
+							Protocol: corev1.ProtocolTCP,
+							Port:     port,
+						},
+					},
+				},
+			},
+		}
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
 			Password: workloads.CredentialVar{Value: "bar"},
@@ -147,18 +163,19 @@ var _ = Describe("replicated_state_machine builder", func() {
 			AddMatchLabelsInMap(selectors).
 			SetServiceName(serviceName).
 			SetRoles([]workloads.ReplicaRole{role}).
-			SetMembershipReconfiguration(reconfiguration).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(vcs...).
 			AddVolumeClaimTemplates(vc).
 			SetPodManagementPolicy(policy).
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
-			SetRoleObservation(observation).
+			SetRoleObservation(&observation).
 			SetObservationActions(actions).
 			AddObservationAction(action).
-			SetMemberUpdateStrategy(memberUpdateStrategy).
+			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetService(service).
+			SetAlternativeServices(alternativeServices).
 			SetCredential(credential).
 			GetObject()
 
@@ -197,6 +214,8 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(*rsm.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(rsm.Spec.Service).ShouldNot(BeNil())
 		Expect(*rsm.Spec.Service).Should(Equal(service))
+		Expect(rsm.Spec.AlternativeServices).ShouldNot(BeNil())
+		Expect(rsm.Spec.AlternativeServices).Should(Equal(alternativeServices))
 		Expect(rsm.Spec.Credential).ShouldNot(BeNil())
 		Expect(*rsm.Spec.Credential).Should(Equal(credential))
 	})

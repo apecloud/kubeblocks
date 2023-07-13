@@ -43,7 +43,7 @@ var _ = Describe("object status transformer test.", func() {
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
-			SetMembershipReconfiguration(reconfiguration).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()
 

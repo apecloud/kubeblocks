@@ -59,7 +59,6 @@ func (c *RSMComponentBase) init(reqCtx intctrlutil.RequestCtx, cli client.Client
 			BuildConfig().
 			BuildTLSVolume().
 			BuildVolumeMount().
-			BuildService().
 			BuildTLSCert().
 			Complete(); err != nil {
 			return err

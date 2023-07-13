@@ -23,14 +23,11 @@ spec:
         - name: zookeeperSVC
           valueFrom:
             type: ServiceRef
-      # TODO: support monitor
       monitor:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 8080
-      logConfigs:
-      # TODO: refer to broker configuration
+          scrapePort: http
       configSpecs:
         - name: broker-env
           templateRef: {{ include "pulsar.name" . }}-broker-env-tpl
@@ -60,6 +57,12 @@ spec:
         - name: http
           port: 80
           targetPort: http
+        - name: kafka-client
+          port: 9092
+          targetPort: kafka-client
+        - name: kafka-internal
+          port: 9094
+          targetPort: kafka-internal
       podSpec:
         securityContext:
           runAsNonRoot: true
@@ -140,10 +143,14 @@ spec:
             - name: configurationStoreServers
               value: $(zookeeperSVC):2181
             ports:
-              - containerPort: 6650
-                name: pulsar
-              - containerPort: 8080
-                name: http
+              - name: pulsar
+                containerPort: 6650
+              - name: http
+                containerPort: 8080
+              - name: kafka-client
+                containerPort: 9092
+              - name: kafka-internal
+                containerPort: 9094
             livenessProbe:
               failureThreshold: 30
               httpGet:
@@ -190,14 +197,11 @@ spec:
         - name: brokerSVC
           valueFrom:
             type: ServiceRef
-      # TODO: support monitor
       monitor:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
           scrapePort: http
-      logConfigs:
-      # TODO: refer to broker configuration
       configSpecs:
         - name: proxy-config
           templateRef: {{ include "pulsar.name" . }}-proxy-conf-tpl
@@ -258,10 +262,10 @@ spec:
             - name: webServicePort
               value: "8080"
             ports:
-            - containerPort: 6650
-              name: pulsar
-            - containerPort: 8080
-              name: http
+            - name: pulsar
+              containerPort: 6650
+            - name: http
+              containerPort: 8080
             livenessProbe:
               failureThreshold: 3
               httpGet:
@@ -342,10 +346,10 @@ spec:
               successThreshold: 1
               timeoutSeconds: 5
             ports:
-              - containerPort: 8000
-                name: http
-              - containerPort: 3181
-                name: bookie
+              - name: http
+                containerPort: 8000
+              - name: bookie
+                containerPort: 3181
             readinessProbe:
               failureThreshold: 60
               httpGet:
@@ -377,14 +381,11 @@ spec:
       characterType: pulsar-bookie-recovery
       statefulSpec:
         updateStrategy: BestEffortParallel
-      # TODO: support monitor
       monitor:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 8000
-      logConfigs:
-      # TODO: refer to broker configuration
+          scrapePort: http
       configSpecs:
       - name: bookies-recovery-config
         templateRef: {{ include "pulsar.name" . }}-recovery-conf-tpl
@@ -442,12 +443,10 @@ spec:
             - name: useHostNameAsBookieID
               value: "true"
             ports:
-            - containerPort: 8000
-              name: http
-              protocol: TCP
-            - containerPort: 3181
-              name: bookie
-              protocol: TCP
+            - name: http
+              containerPort: 8000
+            - name: bookie
+              containerPort: 3181
             volumeMounts:
             - name: scripts
               mountPath: /kb-scripts
@@ -460,12 +459,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9141
-      logConfigs:
-        {{- range $name,$pattern := .Values.zookeeper.logConfigs }}
-        - name: {{ $name }}
-          filePathPattern: {{ $pattern }}
-        {{- end }}
+          scrapePort: metrics
       configSpecs:
         - name: zookeeper-config
           templateRef: {{ include "pulsar.name" . }}-zookeeper-conf-tpl
@@ -487,9 +481,6 @@ spec:
           - name: client
             port: 2181
             targetPort: client
-          - name: metrics
-            port: 9141
-            targetPort: metrics
       podSpec:
         securityContext:
           fsGroup: 0
@@ -506,16 +497,16 @@ spec:
               - name: OPTS
                 value: "-Dlog4j2.formatMsgNoLookups=true -XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
             ports:
-              - containerPort: 2181
-                name: client
-              - containerPort: 2888
-                name: tcp-quorum
-              - containerPort: 3888
-                name: tcp-election
-              - containerPort: 9141
-                name: metrics
-              - containerPort: 9990
-                name: http-admin
+              - name: client
+                containerPort: 2181
+              - name: tcp-quorum
+                containerPort: 2888
+              - name: tcp-election
+                containerPort: 3888
+              - name: metrics
+                containerPort: 9141
+              - name: http-admin
+                containerPort: 9990
             livenessProbe:
               exec:
                 command:
@@ -525,7 +516,7 @@ spec:
                   - -c
                   - echo ruok | nc -q 1 localhost 2181 | grep imok
               failureThreshold: 10
-              initialDelaySeconds: 20
+              initialDelaySeconds: 5
               periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 30
@@ -538,7 +529,7 @@ spec:
                   - -c
                   - echo ruok | nc -q 1 localhost 2181 | grep imok
               failureThreshold: 10
-              initialDelaySeconds: 20
+              initialDelaySeconds: 5
               periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 30

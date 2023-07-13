@@ -12,8 +12,6 @@ commonLabels: {}
 
 commonAnnotations: {}
 
-logConfigs: {}
-
 bookies:
   image:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
@@ -27,7 +25,6 @@ zookeeper:
     # Overrides the image tag whose default is the chart appVersion.
     tag: 2.11.1
 
-  logConfigs: {}
   roleProbe:
     failureThreshold: 2
     periodSeconds: 1

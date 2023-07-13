@@ -40,24 +40,26 @@ jobs:
 
   release-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.11
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.12
     with:
-      MAKE_OPS: "push-manager-image"
+      MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
-      APECD_REF: "v0.1.11"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
 
   release-tools-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.11
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.12
     with:
-      MAKE_OPS: "push-tools-image"
+      MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
-      APECD_REF: "v0.1.11"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
   send-message:

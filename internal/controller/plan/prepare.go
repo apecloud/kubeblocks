@@ -113,7 +113,7 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 				}
 				envConfigMap, err := generateEnvMap(cluster, component.Name, template, cmName, key, cm.Data[key], ctx, cli)
 				if err != nil {
-					return cfgcore.WrapError(err, "failed to generate env configmap key:%s, fileContext:[%s]", key, cm.Data[key])
+					return cfgcore.WrapError(err, "failed to generate env configmap[%s] key:%s, fileContext:[%s]", cmName, key, cm.Data[key])
 				}
 				injectEnvFrom(podSpec.Containers, template.AsEnvFrom, envConfigMap.Name)
 				injectEnvFrom(podSpec.InitContainers, template.AsEnvFrom, envConfigMap.Name)

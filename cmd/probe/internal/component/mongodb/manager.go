@@ -148,14 +148,14 @@ func (mgr *Manager) GetReplSetStatusWithClient(ctx context.Context, client *mong
 	return status, nil
 }
 
-func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dcsMember *dcs.Member) (bool, error) {
 	status, err := mgr.GetReplSetStatus(ctx)
 	if err != nil {
 		mgr.Logger.Errorf("rs.status() error: %", err)
 		return false, err
 	}
 	for _, member := range status.Members {
-		if strings.HasPrefix(member.Name, member.Name) {
+		if strings.HasPrefix(member.Name, dcsMember.Name) {
 			if member.StateStr == "PRIMARY" {
 				return true, nil
 			}
@@ -274,7 +274,7 @@ func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 		return nil
 	}
 
-	defer client.Disconnect(context.TODO())
+	defer _ = client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
@@ -342,7 +342,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 		return true
 	}
 
-	defer client.Disconnect(context.TODO())
+	defer _ = client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
@@ -392,7 +392,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 		return err
 	}
 
-	defer client.Disconnect(context.TODO())
+	defer _ = client.Disconnect(context.TODO())
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)

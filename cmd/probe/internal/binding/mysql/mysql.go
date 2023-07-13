@@ -123,7 +123,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	}
 	mysqlOps.manager = manager
 	mysqlOps.DBType = "mysql"
-	//mysqlOps.InitIfNeed = mysqlOps.initIfNeed
+	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
 	mysqlOps.DBPort = config.GetDBPort()
 

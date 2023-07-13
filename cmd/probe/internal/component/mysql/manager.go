@@ -210,7 +210,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	mgr.EnsureServerID(context.TODO())
+	_, _ =mgr.EnsureServerID(context.TODO())
 	return mgr.IsMemberHealthy(nil, nil)
 }
 

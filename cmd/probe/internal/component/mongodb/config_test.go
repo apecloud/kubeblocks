@@ -23,9 +23,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-)
-
 func TestGetMongoDBMetadata(t *testing.T) {
 	t.Run("With defaults", func(t *testing.T) {
 		properties := map[string]string{
@@ -72,7 +69,7 @@ func TestGetMongoDBMetadata(t *testing.T) {
 		_, err := NewConfig(properties)
 		assert.NotNil(t, err)
 
-		expected := "must set 'host' in metadata or KB_SERVICE_PORT enviroment variable"
+		expected := "must set 'host' in metadata or KB_SERVICE_PORT environment variable"
 		assert.Equal(t, expected, err.Error())
 	})
 }

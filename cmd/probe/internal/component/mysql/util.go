@@ -30,8 +30,8 @@ func (this *CellData) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	(*this).String = s
-	(*this).Valid = true
+	this.String = s
+	this.Valid = true
 
 	return nil
 }
@@ -47,7 +47,7 @@ type RowData []CellData
 func (this *RowData) MarshalJSON() ([]byte, error) {
 	cells := make([](*CellData), len(*this), len(*this))
 	for i, val := range *this {
-		d := CellData(val)
+		d := val
 		cells[i] = &d
 	}
 	return json.Marshal(cells)
@@ -132,7 +132,7 @@ func (this *RowMap) GetUint64D(key string, def uint64) uint64 {
 	if err != nil {
 		return def
 	}
-	return uint64(res)
+	return res
 }
 
 func (this *RowMap) GetBool(key string) bool {
@@ -152,7 +152,7 @@ func RowToArray(rows *sql.Rows, columns []string) []CellData {
 	for i := range buff {
 		buff[i] = data[i].NullString()
 	}
-	rows.Scan(buff...)
+	_ = rows.Scan(buff...)
 	return data
 }
 

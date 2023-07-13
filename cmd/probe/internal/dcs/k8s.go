@@ -23,16 +23,15 @@ import (
 )
 
 type KubernetesStore struct {
-	ctx               context.Context
-	clusterName       string
-	componentName     string
-	clusterCompName   string
-	currentMemberName string
-	namespace         string
-	cluster           *Cluster
-	client            *rest.RESTClient
-	clientset         *kubernetes.Clientset
-	//LeaderObservedRecord *LeaderRecord
+	ctx                context.Context
+	clusterName        string
+	componentName      string
+	clusterCompName    string
+	currentMemberName  string
+	namespace          string
+	cluster            *Cluster
+	client             *rest.RESTClient
+	clientset          *kubernetes.Clientset
 	LeaderObservedTime int64
 	logger             logger.Logger
 }

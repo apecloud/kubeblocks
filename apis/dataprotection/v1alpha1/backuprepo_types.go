@@ -80,7 +80,7 @@ type BackupRepoStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster
+// +kubebuilder:resource:path=backuprepos,categories={kubeblocks},scope=Cluster
 
 // BackupRepo is the Schema for the backuprepos API
 type BackupRepo struct {

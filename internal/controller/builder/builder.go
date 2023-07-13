@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -201,13 +202,18 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
 			return err
 		}
-		for k, v := range udeMap {
-			if k == "" || v == "" {
+		keys := make([]string, 0)
+		for k := range udeMap {
+			if k == "" || udeMap[k] == "" {
 				continue
 			}
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
 			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
 				Name:  k,
-				Value: v,
+				Value: udeMap[k],
 			})
 		}
 	}

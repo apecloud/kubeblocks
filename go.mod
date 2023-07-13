@@ -37,6 +37,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
 	github.com/golang/mock v1.6.0
+	github.com/google/cel-go v0.12.6
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-version v1.6.0
@@ -217,7 +218,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/goodhosts/hostsfile v0.1.1 // indirect
 	github.com/google/btree v1.0.1 // indirect
-	github.com/google/cel-go v0.12.6 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-containerregistry v0.12.1 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect

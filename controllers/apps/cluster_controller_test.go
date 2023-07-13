@@ -1141,6 +1141,7 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(3).
 			SetServiceAccountName("test-service-account").
+			WithRandomName().
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1669,6 +1670,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
+			cleanEnv()
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)
 		})
@@ -1804,7 +1806,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
 				factory.AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetReplicas(initialReplicas)
-			})
+			}, false)
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
@@ -1945,6 +1947,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
+		})
+		AfterEach(func() {
+			cleanEnv()
 		})
 
 		for compName, compDefName := range compNameNDef {

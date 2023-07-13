@@ -3,7 +3,6 @@ package apps
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,15 +49,6 @@ var _ = Describe("cluster plan builder test", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
-		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefName, clusterVersionName).GetObject()
-		clusterObj.Spec.Mode = mode
-		clusterObj.Spec.Parameters = map[string]string{
-			"proxyEnabled": "true",
-		}
-		Expect(testCtx.Cli.Create(testCtx.Ctx, clusterObj)).Should(Succeed())
-		clusterKey := client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 	})
 
 	AfterEach(func() {
@@ -67,11 +57,17 @@ var _ = Describe("cluster plan builder test", func() {
 
 	Context("test init", func() {
 		It("should init successfully", func() {
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDefName, clusterVersionName).WithRandomName().GetObject()
+			clusterObj.Spec.Mode = mode
+			clusterObj.Spec.Parameters = map[string]string{
+				"proxyEnabled": "true",
+			}
+			Expect(testCtx.Cli.Create(testCtx.Ctx, clusterObj)).Should(Succeed())
+			clusterKey := client.ObjectKeyFromObject(clusterObj)
+			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 			req := ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      clusterName,
-				},
+				NamespacedName: clusterKey,
 			}
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: testCtx.Ctx,

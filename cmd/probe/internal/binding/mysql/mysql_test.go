@@ -62,7 +62,6 @@ func TestInit(t *testing.T) {
 
 	// Verify that the object is in the expected state after initialization
 	assert.Equal(t, "mysql", mysqlOps.DBType)
-	assert.NotNil(t, mysqlOps.InitIfNeed)
 	assert.NotNil(t, mysqlOps.GetRole)
 	assert.Equal(t, 3306, mysqlOps.DBPort)
 	assert.NotNil(t, mysqlOps.OperationMap[GetRoleOperation])
@@ -79,57 +78,6 @@ func TestInit(t *testing.T) {
 	assert.NotNil(t, mysqlOps.OperationMap[RevokeUserRoleOp])
 	// Clear out previously set viper variables
 	viper.Reset()
-}
-
-func TestInitDelay(t *testing.T) {
-	// Initialize a new instance of MysqlOperations.
-	mysqlOps, _, _ := mockDatabase(t)
-	// mysqlOps.initIfNeed()
-	t.Run("Invalid url", func(t *testing.T) {
-		mysqlOps.db = nil
-		mysqlOps.Metadata.Properties["url"] = "invalid_url"
-		err := mysqlOps.InitDelay()
-		if err == nil {
-			t.Errorf("Expected error but got none")
-		}
-	})
-
-	t.Run("Invalid listen", func(t *testing.T) {
-		mysqlOps.db = nil
-		mysqlOps.Metadata.Properties["url"] = urlWithPort
-		mysqlOps.Metadata.Properties[maxIdleConnsKey] = "100"
-		mysqlOps.Metadata.Properties[connMaxIdleTimeKey] = "100ms"
-		err := mysqlOps.InitDelay()
-		if err == nil {
-			t.Errorf("Expected error but got none")
-		}
-	})
-
-	t.Run("Invalid pem", func(t *testing.T) {
-		mysqlOps.db = nil
-		mysqlOps.Metadata.Properties[pemPathKey] = "invalid.pem"
-		mysqlOps.Metadata.Properties["url"] = urlWithPort
-		err := mysqlOps.InitDelay()
-		if err == nil {
-			t.Errorf("Expected error but got none")
-		}
-	})
-}
-
-func TestGetRunningPort(t *testing.T) {
-	mysqlOps, _, _ := mockDatabase(t)
-
-	t.Run("Get port from url", func(t *testing.T) {
-		mysqlOps.Metadata.Properties["url"] = urlWithPort
-		port := mysqlOps.GetRunningPort()
-		assert.Equal(t, 3306, port)
-	})
-
-	t.Run("Get default port if url has no port", func(t *testing.T) {
-		mysqlOps.Metadata.Properties["url"] = urlWithNoPort
-		port := mysqlOps.GetRunningPort()
-		assert.Equal(t, defaultDBPort, port)
-	})
 }
 
 func TestGetRole(t *testing.T) {
@@ -624,6 +572,7 @@ func TestMySQLAccounts(t *testing.T) {
 }
 func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
+	viper.Set("KB_POD_NAME", "test-pod-0")
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -634,9 +583,10 @@ func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 			Properties: map[string]string{},
 		},
 	}
+	metadata.Properties["url"] = urlWithPort
 	mysqlOps := NewMysql(logger.NewLogger("test")).(*MysqlOperations)
 	_ = mysqlOps.Init(metadata)
-	mysqlOps.db = db
+	mysqlOps.manager.DB = db
 
 	return mysqlOps, mock, err
 }

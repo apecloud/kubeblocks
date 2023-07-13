@@ -111,7 +111,11 @@ func NewMysql(logger logger.Logger) bindings.OutputBinding {
 func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.Logger.Debug("Initializing MySQL binding")
 	mysqlOps.BaseOperations.Init(metadata)
-	config, _ := mysql.NewConfig(metadata.Properties)
+	config, err := mysql.NewConfig(metadata.Properties)
+	if err != nil {
+		mysqlOps.Logger.Errorf("MySQL config initialize failed: %v", err)
+		return err
+	}
 	manager, err := mysql.NewManager(mysqlOps.Logger)
 	if err != nil {
 		mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)

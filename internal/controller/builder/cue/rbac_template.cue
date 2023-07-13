@@ -26,40 +26,39 @@ cluster: {
 }
 
 serviceaccount: {
-    apiVersion: "v1"
-    kind: "ServiceAccount"
-    metadata: {
-        namespace: cluster.metadata.namespace
-        name: "kb-\(cluster.metadata.name)"
-        labels: {
+	apiVersion: "v1"
+	kind:       "ServiceAccount"
+	metadata: {
+		namespace: cluster.metadata.namespace
+		name:      "kb-\(cluster.metadata.name)"
+		labels: {
 			"app.kubernetes.io/name":       cluster.spec.clusterDefinitionRef
 			"app.kubernetes.io/instance":   cluster.metadata.name
-            "app.kubernetes.io/managed-by": "kubeblocks"
-        }
-    }
+			"app.kubernetes.io/managed-by": "kubeblocks"
+		}
+	}
 }
 
-
 rolebinding: {
-    apiVersion: "rbac.authorization.k8s.io/v1"
-    kind: "RoleBinding"
-    metadata: {
-        name: "kb-\(cluster.metadata.name)"
-        namespace: cluster.metadata.namespace
-        labels: {
+	apiVersion: "rbac.authorization.k8s.io/v1"
+	kind:       "RoleBinding"
+	metadata: {
+		name:      "kb-\(cluster.metadata.name)"
+		namespace: cluster.metadata.namespace
+		labels: {
 			"app.kubernetes.io/name":       cluster.spec.clusterDefinitionRef
 			"app.kubernetes.io/instance":   cluster.metadata.name
-            "app.kubernetes.io/managed-by": "kubeblocks"
-        }
-    }
-    roleRef: {
-        apiGroup: "rbac.authorization.k8s.io"
-        kind: "ClusterRole"
-        name: "kubeblocks-cluster-pod-role"
-    }
-    subjects: [{
-        kind: "ServiceAccount"
-        name: "kb-\(cluster.metadata.name)"
-        namespace: cluster.metadata.namespace
-    }]
+			"app.kubernetes.io/managed-by": "kubeblocks"
+		}
+	}
+	roleRef: {
+		apiGroup: "rbac.authorization.k8s.io"
+		kind:     "ClusterRole"
+		name:     "kubeblocks-cluster-pod-role"
+	}
+	subjects: [{
+		kind:      "ServiceAccount"
+		name:      "kb-\(cluster.metadata.name)"
+		namespace: cluster.metadata.namespace
+	}]
 }

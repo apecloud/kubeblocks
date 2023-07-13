@@ -28,8 +28,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -45,7 +43,6 @@ import (
 // MysqlOperations represents MySQL output bindings.
 type MysqlOperations struct {
 	manager *mysql.Manager
-	mu      sync.Mutex
 	BaseOperations
 }
 
@@ -54,18 +51,6 @@ type QueryRes []map[string]interface{}
 var _ BaseInternalOps = &MysqlOperations{}
 
 const (
-	// configurations to connect to MySQL, either a data source name represent by URL.
-	connectionURLKey = "url"
-
-	// To connect to MySQL running over SSL you have to download a
-	// SSL certificate. If this is provided the driver will connect using
-	// SSL. If you have disabled SSL you can leave this empty.
-	// When the user provides a pem path their connection string must end with
-	// &tls=custom
-	// The connection string should be in the following format
-	// "%s:%s@tcp(%s:3306)/%s?allowNativePasswords=true&tls=custom",'myadmin@mydemoserver', 'yourpassword', 'mydemoserver.mysql.database.azure.com', 'targetdb'.
-	pemPathKey = "pemPath"
-
 	// other general settings for DB connections.
 	maxIdleConnsKey    = "maxIdleConns"
 	maxOpenConnsKey    = "maxOpenConns"
@@ -96,12 +81,6 @@ const (
 	listSystemAccountsTpl = "SELECT user AS userName FROM mysql.user WHERE host = '%' and user like 'kb%';"
 )
 
-var (
-	defaultDBPort = 3306
-	dbUser        = "root"
-	dbPasswd      = ""
-)
-
 // NewMysql returns a new MySQL output binding.
 func NewMysql(logger logger.Logger) bindings.OutputBinding {
 	return &MysqlOperations{BaseOperations: BaseOperations{Logger: logger}}
@@ -125,6 +104,8 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.DBType = "mysql"
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
+	mysqlOps.BaseOperations.LockInstance = mysqlOps.LockInstance
+	mysqlOps.BaseOperations.UnlockInstance = mysqlOps.UnlockInstance
 	mysqlOps.DBPort = config.GetDBPort()
 
 	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
@@ -170,11 +151,11 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 		return SECONDARY, nil
 	}
 
-	getReadOnlySql := `show global variables like 'read_only';`
-	data, err := mysqlOps.query(ctx, getReadOnlySql)
+	getReadOnlySQL := `show global variables like 'read_only';`
+	data, err := mysqlOps.query(ctx, getReadOnlySQL)
 	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySql, err)
-		return "", errors.Wrapf(err, "error executing %s", getReadOnlySql)
+		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySQL, err)
+		return "", errors.Wrapf(err, "error executing %s", getReadOnlySQL)
 	}
 
 	queryRes := &QueryRes{}
@@ -224,6 +205,18 @@ func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, reques
 		return role, nil
 	}
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
+}
+
+func (mysqlOps *MysqlOperations) LockInstance(ctx context.Context) error {
+	sql := "set global read_only=1"
+	_, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
+	return err
+}
+
+func (mysqlOps *MysqlOperations) UnlockInstance(ctx context.Context) error {
+	sql := "set global read_only=0"
+	_, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
+	return err
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -343,30 +336,6 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 		mysqlOps.CheckStatusFailedCount = 0
 	}
 	return result, nil
-}
-
-func propertyToInt(props map[string]string, key string, setter func(int)) error {
-	if v, ok := props[key]; ok {
-		if i, err := strconv.Atoi(v); err == nil {
-			setter(i)
-		} else {
-			return errors.Wrapf(err, "error converting %s:%s to int", key, v)
-		}
-	}
-
-	return nil
-}
-
-func propertyToDuration(props map[string]string, key string, setter func(time.Duration)) error {
-	if v, ok := props[key]; ok {
-		if d, err := time.ParseDuration(v); err == nil {
-			setter(d)
-		} else {
-			return errors.Wrapf(err, "error converting %s:%s to time duration", key, v)
-		}
-	}
-
-	return nil
 }
 
 func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte, error) {

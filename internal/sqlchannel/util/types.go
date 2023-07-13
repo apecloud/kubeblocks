@@ -42,6 +42,7 @@ const (
 	ExecOperation         bindings.OperationKind = "exec"
 	QueryOperation        bindings.OperationKind = "query"
 	CloseOperation        bindings.OperationKind = "close"
+	VolumeProtection      bindings.OperationKind = "volumeProtection"
 
 	// actions for cluster accounts management
 	ListUsersOp          bindings.OperationKind = "listUsers"

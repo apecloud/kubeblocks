@@ -76,6 +76,7 @@ func TestOperations(t *testing.T) {
 
 	if len(ops) <= 4 {
 		t.Errorf("p.OperationMap init failed, count of ops: %d", len(ops))
+
 	}
 }
 

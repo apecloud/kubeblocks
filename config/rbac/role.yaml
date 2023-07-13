@@ -115,6 +115,32 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
+  - clusterfamilies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusterfamilies/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusterfamilies/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
   - clusters
   verbs:
   - create
@@ -134,6 +160,32 @@ rules:
   - apps.kubeblocks.io
   resources:
   - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clustertemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clustertemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clustertemplates/status
   verbs:
   - get
   - patch

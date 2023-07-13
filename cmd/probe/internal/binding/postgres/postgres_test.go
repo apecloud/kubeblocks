@@ -61,17 +61,17 @@ func TestOperations(t *testing.T) {
 	assert.NotNil(t, pgOps.InitIfNeed)
 	assert.NotNil(t, pgOps.GetRole)
 	assert.Equal(t, 5432, pgOps.DBPort)
-	assert.NotNil(t, pgOps.OperationMap[GetRoleOperation])
-	assert.NotNil(t, pgOps.OperationMap[ExecOperation])
-	assert.NotNil(t, pgOps.OperationMap[QueryOperation])
-	assert.NotNil(t, pgOps.OperationMap[CheckStatusOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[GetRoleOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[ExecOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[QueryOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[CheckStatusOperation])
 
-	assert.NotNil(t, pgOps.OperationMap[ListUsersOp])
-	assert.NotNil(t, pgOps.OperationMap[CreateUserOp])
-	assert.NotNil(t, pgOps.OperationMap[DeleteUserOp])
-	assert.NotNil(t, pgOps.OperationMap[DescribeUserOp])
-	assert.NotNil(t, pgOps.OperationMap[GrantUserRoleOp])
-	assert.NotNil(t, pgOps.OperationMap[RevokeUserRoleOp])
+	assert.NotNil(t, pgOps.LegacyOperations[ListUsersOp])
+	assert.NotNil(t, pgOps.LegacyOperations[CreateUserOp])
+	assert.NotNil(t, pgOps.LegacyOperations[DeleteUserOp])
+	assert.NotNil(t, pgOps.LegacyOperations[DescribeUserOp])
+	assert.NotNil(t, pgOps.LegacyOperations[GrantUserRoleOp])
+	assert.NotNil(t, pgOps.LegacyOperations[RevokeUserRoleOp])
 
 }
 

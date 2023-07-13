@@ -86,7 +86,7 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 
 				args := uri.QueryArgs()
 				switch operation := args.Peek(operationKey); bindings.OperationKind(operation) {
-				case CheckStatusOperation, CheckRunningOperation, CheckRoleOperation:
+				case CheckStatusOperation, CheckRunningOperation, CheckRoleOperation, VolumeProtection:
 					body := GetRequestBody(string(operation), args)
 					ctx.Request.SetBody(body)
 				default:

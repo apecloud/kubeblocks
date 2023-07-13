@@ -84,6 +84,7 @@ const (
 	BackupToolTypeLabelKey                 = "kubeblocks.io/backup-tool-type"
 	AddonProviderLabelKey                  = "kubeblocks.io/provider" // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                           = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
+	ModeKey                                = "kubeblocks.io/mode"     // ModeKey is in enum of standalone/replication/raftGroup
 	VolumeTypeLabelKey                     = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
 	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"
@@ -206,12 +207,13 @@ const (
 
 const (
 	// Container port name
-	ProbeHTTPPortName         = "probe-http-port"
-	ProbeGRPCPortName         = "probe-grpc-port"
-	ProbeInitContainerName    = "kb-initprobe"
-	RoleProbeContainerName    = "kb-checkrole"
-	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-checkrunning"
+	ProbeHTTPPortName                  = "probe-http-port"
+	ProbeGRPCPortName                  = "probe-grpc-port"
+	ProbeInitContainerName             = "kb-initprobe"
+	RoleProbeContainerName             = "kb-checkrole"
+	StatusProbeContainerName           = "kb-checkstatus"
+	RunningProbeContainerName          = "kb-checkrunning"
+	VolumeProtectionProbeContainerName = "kb-volume-protection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"

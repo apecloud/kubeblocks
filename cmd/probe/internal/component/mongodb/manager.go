@@ -423,7 +423,6 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 		return err
 	}
 
-	defer client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
@@ -440,6 +439,7 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 
 	rsConfig.Members = configMembers
 	rsConfig.Version++
+	_ = client.Disconnect(context.TODO())
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
@@ -449,7 +449,6 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		mgr.Logger.Debugf("Get leader client failed: %v", err)
 		return false
 	}
-	defer client.Disconnect(ctx)
 	status, err := mgr.GetReplSetStatusWithClient(ctx, client)
 	if err != nil {
 		return false
@@ -458,6 +457,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	if status.OK != 0 {
 		return true
 	}
+	_ = client.Disconnect(ctx)
 	return false
 }
 
@@ -468,12 +468,12 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 		return true, err
 	}
 
-	defer client.Disconnect(ctx)
 	rsConfig, err := mgr.GetReplSetConfigWithClient(ctx, client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return false, err
 	}
+	_ = client.Disconnect(ctx)
 	return rsConfig.ID != "", nil
 }
 
@@ -486,7 +486,6 @@ func (mgr *Manager) Premote() error {
 
 	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
 	client, _ := mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
-	defer client.Disconnect(context.TODO())
 	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
 			rsConfig.Members[i].Priority = 2
@@ -496,6 +495,7 @@ func (mgr *Manager) Premote() error {
 	}
 
 	rsConfig.Version++
+	_ = client.Disconnect(context.TODO())
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 

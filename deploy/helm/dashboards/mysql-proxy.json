@@ -133,7 +133,7 @@
          "tableColumn": "",
          "targets": [
             {
-               "expr": "100 \n-\nsum(\n  rate(\n    vtgate_api_error_counts{\n      namespace=~\"$namespace\",\n      app_kubernetes_io_instance=~\"$cluster\",\n    }[$interval]\n  ) OR vector(0)\n)\n/\nsum(\n  rate(\n    vtgate_api_count{\n      namespace=~\"$namespace\",\n      app_kubernetes_io_instance=~\"$cluster\",\n    }[$interval]\n  )\n)\n",
+               "expr": "100 \n-\nsum(\n  rate(\n    vtgate_api_error_counts{\n      namespace=~\"$namespace\",\n      app_kubernetes_io_instance=~\"$cluster\",\n    }[$__rate_interval]\n  ) OR vector(0)\n)\n/\nsum(\n  rate(\n    vtgate_api_count{\n      namespace=~\"$namespace\",\n      app_kubernetes_io_instance=~\"$cluster\",\n    }[$__rate_interval]\n  )\n)\n",
                "format": "time_series",
                "instant": true,
                "intervalFactor": 1,
@@ -4341,21 +4341,6 @@
         "tagsQuery": "",
         "type": "query",
         "useTags": false
-      },
-      {
-         "auto": true,
-         "auto_count": 300,
-         "auto_min": "1m",
-         "current": {
-            "text": "auto",
-            "value": "$__auto_interval"
-         },
-         "hide": 0,
-         "label": "Interval",
-         "name": "interval",
-         "query": "1m,5m,10m,30m,1h,6h,12h",
-         "refresh": 2,
-         "type": "interval"
       }
       ]
    },

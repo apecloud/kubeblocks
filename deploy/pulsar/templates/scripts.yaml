@@ -60,10 +60,13 @@ data:
       echo "bookkeeper init new cluster."
       bin/bookkeeper shell initnewcluster;
     fi
-    echo "verify bookkeeper cluster id"
-    bin/apply-config-from-env.py conf/bookkeeper.conf;until bin/bookkeeper shell whatisinstanceid; do
-      sleep 3;
-    done; bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
+  prestop-bookies.sh: |-
+    #!/bin/bash
+    current_component_replicas=`cat /etc/annotations/component-replicas`
+    idx=${KB_POD_NAME##*-}
+    if [ $idx -ge $current_component_replicas ]; then
+       bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
+    fi
   start-bookies.sh: |-
     #!/bin/bash
     set -e

@@ -1669,6 +1669,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
+			cleanEnv()
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)
 		})
@@ -1945,6 +1946,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
+		})
+		AfterEach(func() {
+			cleanEnv()
 		})
 
 		for compName, compDefName := range compNameNDef {

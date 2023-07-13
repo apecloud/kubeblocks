@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -113,7 +112,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	if pod.UID != event.InvolvedObject.UID {
 		return role, nil
 	}
-	name := fmt.Sprintf("%s-%s", pod.Labels[constant.AppInstanceLabelKey], pod.Labels[constant.KBAppComponentLabelKey])
+	name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
 	rsm := &workloads.ReplicatedStateMachine{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
 		return "", err

@@ -294,7 +294,7 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 {{- else if contains "-aks" $kubeVersion }}
 {{- "azure" -}}
 {{- else }}
-{{- "aws" -}}
+{{- "" -}}
 {{- end }}
 {{- end }}
 
@@ -303,7 +303,7 @@ Define default storage class name, if cloud provider is known, specify a default
 */}}
 {{- define "kubeblocks.defaultStorageClass" }}
 {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
-{{- if .Values.storageClass.name }}
+{{- if and .Values.storageClass .Values.storageClass.name }}
 {{- .Values.storageClass.name }}
 {{- else if $cloudProvider }}
 {{- "kb-default-sc"  }}

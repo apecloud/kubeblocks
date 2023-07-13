@@ -261,8 +261,6 @@ spec:
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
-            - name: DEFAULT_STORAGE_CLASS
-              value: {{ include "kubeblocks.defaultStorageClass" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
             - name: VOLUMESNAPSHOT
               value: "true"

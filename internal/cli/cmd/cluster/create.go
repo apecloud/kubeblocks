@@ -42,6 +42,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -141,7 +143,6 @@ const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
 	apeCloudMysql   = "apecloud-mysql"
-	saNamePrefix    = "kb-sa-"
 )
 
 type setKey string

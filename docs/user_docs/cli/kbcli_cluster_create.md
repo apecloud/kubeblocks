@@ -97,6 +97,7 @@ kbcli cluster create [NAME] [flags]
       --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --rbac-enabled                   Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources
       --restore-to-time string         Set a time for point in time recovery
       --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
   -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource

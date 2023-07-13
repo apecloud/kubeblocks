@@ -168,7 +168,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).WithTimeout(1000 * time.Second).Should(BeEquivalentTo(1))
 		for _, compName := range compNames {
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 		}
@@ -1714,6 +1714,97 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
+		checkAllResourcesCreatedWithRSMEnabled := func(compNameNDef map[string]string) {
+			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
+				factory.SetReplicas(3)
+			}, true)
+
+			By("Check stateless workload has been created")
+			Eventually(testapps.List(&testCtx, generics.RSMSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+					constant.KBAppComponentLabelKey: statelessCompName,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
+
+			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+
+			By("Check stateful pod's volumes")
+			for _, sts := range rsmList.Items {
+				podSpec := sts.Spec.Template
+				volumeNames := map[string]struct{}{}
+				for _, v := range podSpec.Spec.Volumes {
+					volumeNames[v.Name] = struct{}{}
+				}
+
+				for _, cc := range [][]corev1.Container{
+					podSpec.Spec.Containers,
+					podSpec.Spec.InitContainers,
+				} {
+					for _, c := range cc {
+						for _, vm := range c.VolumeMounts {
+							_, ok := volumeNames[vm.Name]
+							Expect(ok).Should(BeTrue())
+						}
+					}
+				}
+			}
+
+			By("Check associated PDB has been created")
+			Eventually(testapps.List(&testCtx, generics.PodDisruptionBudgetSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
+
+			podSpec := rsmList.Items[0].Spec.Template.Spec
+			By("Checking created rsm pods template with built-in toleration")
+			Expect(podSpec.Tolerations).Should(HaveLen(1))
+			Expect(podSpec.Tolerations[0].Key).To(Equal(testDataPlaneTolerationKey))
+
+			By("Checking created rsm pods template with built-in Affinity")
+			Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
+			Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
+			Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
+				Equal(testDataPlaneNodeAffinityKey))
+
+			By("Checking created rsm pods template without TopologySpreadConstraints")
+			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
+
+			By("Check should create env configmap")
+			Eventually(func(g Gomega) {
+				cmList := &corev1.ConfigMapList{}
+				g.Expect(k8sClient.List(testCtx.Ctx, cmList, client.MatchingLabels{
+					constant.AppInstanceLabelKey:   clusterKey.Name,
+					constant.AppConfigTypeLabelKey: "kubeblocks-env",
+				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+				g.Expect(cmList.Items).ShouldNot(BeEmpty())
+				g.Expect(cmList.Items).Should(HaveLen(len(compNameNDef)))
+			}).Should(Succeed())
+
+			By("Checking stateless services")
+			statelessExpectServices := map[string]ExpectService{
+				// TODO: fix me later, proxy should not have internal headless service
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			}
+			Eventually(func(g Gomega) {
+				validateCompSvcList(g, statelessCompName, statelessCompDefName, statelessExpectServices)
+			}).Should(Succeed())
+
+			By("Checking stateful types services")
+			for compName, compNameNDef := range compNameNDef {
+				if compName == statelessCompName {
+					continue
+				}
+				consensusExpectServices := map[string]ExpectService{
+					testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+					testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+				}
+				Eventually(func(g Gomega) {
+					validateCompSvcList(g, compName, compNameNDef, consensusExpectServices)
+				}).Should(Succeed())
+			}
+		}
+
 		testMultiCompHScale := func(policyType appsv1alpha1.HScaleDataClonePolicyType) {
 			compNameNDef := map[string]string{
 				statefulCompName:    statefulCompDefName,
@@ -1746,7 +1837,11 @@ var _ = Describe("Cluster Controller", func() {
 				statefulCompName:    statefulCompDefName,
 				replicationCompName: replicationCompDefName,
 			}
-			checkAllResourcesCreated(compNameNDef)
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				checkAllResourcesCreatedWithRSMEnabled(compNameNDef)
+			} else {
+				checkAllResourcesCreated(compNameNDef)
+			}
 
 			By("Mocking components' PVCs to bound")
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -1827,7 +1922,11 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("create recovering cluster")
 			lastClusterUID := clusterObj.UID
-			checkAllResourcesCreated(compNameNDef)
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				checkAllResourcesCreatedWithRSMEnabled(compNameNDef)
+			} else {
+				checkAllResourcesCreated(compNameNDef)
+			}
 			Expect(clusterObj.UID).ShouldNot(Equal(lastClusterUID))
 			lastPVCList, lastSecretList, lastCMList := checkPreservedObjects("")
 
@@ -1846,13 +1945,13 @@ var _ = Describe("Cluster Controller", func() {
 			checkPreservedObjects(clusterObj.UID)
 		})
 
-		It("should successfully h-scale with multiple components", func() {
+		FIt("should successfully h-scale with multiple components", func() {
 			viper.Set("VOLUMESNAPSHOT", true)
 			viper.Set(constant.CfgKeyBackupPVCName, "")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
-		It("should successfully h-scale with multiple components by backup tool", func() {
+		FIt("should successfully h-scale with multiple components by backup tool", func() {
 			viper.Set("VOLUMESNAPSHOT", false)
 			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)

@@ -472,8 +472,8 @@ func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.Repli
 	)
 
 	actions := buildActionFromCharacterType(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
-	observation = &workloads.RoleObservation{ObservationActions: actions}
-	if component.Probes != nil && component.Probes.RoleProbe != nil {
+	if actions != nil && component.Probes != nil && component.Probes.RoleProbe != nil {
+		observation = &workloads.RoleObservation{ObservationActions: actions}
 		roleProbe := component.Probes.RoleProbe
 		observation.PeriodSeconds = roleProbe.PeriodSeconds
 		observation.TimeoutSeconds = roleProbe.TimeoutSeconds

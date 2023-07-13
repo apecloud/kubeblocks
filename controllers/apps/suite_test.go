@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	workloads2 "github.com/apecloud/kubeblocks/controllers/workloads"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -207,6 +208,13 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("class-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&workloads2.ReplicatedStateMachineReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("rsm-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

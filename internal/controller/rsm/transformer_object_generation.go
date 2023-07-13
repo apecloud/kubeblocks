@@ -131,7 +131,8 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 		return nil
 	}
 	svcBuilder := builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.AppInstanceLabelKey, rsm.Labels[constant.AppInstanceLabelKey]).
+		AddLabels(constant.KBAppComponentLabelKey, rsm.Labels[constant.KBAppComponentLabelKey]).
 		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
 		// AddAnnotationsInMap(rsm.Annotations).
 		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
@@ -148,7 +149,8 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.AppInstanceLabelKey, rsm.Labels[constant.AppInstanceLabelKey]).
+		AddLabels(constant.KBAppComponentLabelKey, rsm.Labels[constant.KBAppComponentLabelKey]).
 		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
 		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
 		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine)
@@ -195,9 +197,12 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
+
+	// TODO(free6om): refactor labels
 	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-env").
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.AppInstanceLabelKey, rsm.Labels[constant.AppInstanceLabelKey]).
 		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabels(constant.AppConfigTypeLabelKey, "kubeblocks-env").
 		SetData(envData).GetObject()
 }
 

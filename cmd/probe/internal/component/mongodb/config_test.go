@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+)
+
 func TestGetMongoDBMetadata(t *testing.T) {
 	t.Run("With defaults", func(t *testing.T) {
 		properties := map[string]string{

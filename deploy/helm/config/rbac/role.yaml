@@ -545,7 +545,7 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuprepoes
+  - backuprepos
   verbs:
   - create
   - delete
@@ -557,13 +557,13 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuprepoes/finalizers
+  - backuprepos/finalizers
   verbs:
   - update
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuprepoes/status
+  - backuprepos/status
   verbs:
   - get
   - patch

@@ -54,14 +54,14 @@ func TestGetRole(t *testing.T) {
 		"username":     "username",
 		"password":     "password",
 	}
-	m := bindings.Metadata{
+	bm := bindings.Metadata{
 		Base: metadata.Base{Properties: properties},
 	}
 	m := &MongoDBOperations{
 		BaseOperations: BaseOperations{Logger: logger.NewLogger("mongodb-test")},
 	}
-	m.Init(m)
-	m.manager.DB = mt.Client.Database(adminDatabase)
+	m.Init(bm)
+	m.manager.Client = mt.Client
 	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {
 		t.Errorf("getRole error: %s", err)

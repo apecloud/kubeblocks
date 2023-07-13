@@ -2,7 +2,11 @@
 Define the service account name
 */}}
 {{- define "kblib.serviceAccountName" -}}
+{{- if .Values.extra.rbacEnabled }}
 {{- printf "kb-%s" (include "kblib.clusterName" .) }}
+{{- else }}
+{{- "" }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -76,10 +80,14 @@ subjects:
 Define the whole rbac
 */}}
 {{- define "kblib.rbac" }}
+{{- if .Values.extra.rbacEnabled }}
 ---
 {{- include "kblib.serviceAccount" . }}
 ---
 {{- include "kblib.role" . }}
 ---
 {{- include "kblib.roleBinding" . }}
+{{- else }}
+{{- "" }}
+{{- end }}
 {{- end }}

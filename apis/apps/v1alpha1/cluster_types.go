@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -24,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ClusterSpec defines the desired state of Cluster.
@@ -729,4 +731,19 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 // ComponentPodsAreReady checks if the pods of component are ready.
 func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
+}
+
+// GetComponentDefByCluster gets component from ClusterDefinition with compDefName
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster Cluster,
+	compDefName string) (*ClusterComponentDefinition, error) {
+	clusterDef := &ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+	for _, component := range clusterDef.Spec.ComponentDefs {
+		if component.Name == compDefName {
+			return &component, nil
+		}
+	}
+	return nil, ErrNotMatchingCompDef
 }

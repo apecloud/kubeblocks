@@ -146,7 +146,12 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
-	root.Action = ictrltypes.ActionDeletePtr()
+	// set cluster action to noop until all the sub-resources deleted
+	if len(objs) == 0 {
+		root.Action = ictrltypes.ActionDeletePtr()
+	} else {
+		root.Action = ictrltypes.ActionNoopPtr()
+	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop

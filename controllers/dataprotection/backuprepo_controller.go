@@ -25,10 +25,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"html/template"
 	"reflect"
 	"sort"
 	"strings"
+	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -828,7 +828,7 @@ func isOwned(owner client.Object, dependent client.Object) bool {
 func randomNameForDerivedObject(repo *dpv1alpha1.BackupRepo, prefix string) string {
 	// the final name should not exceed 63 characters
 	const maxBaseNameLength = 56
-	baseName := fmt.Sprintf("%s-backuprepo-%s", prefix, repo.Name)
+	baseName := fmt.Sprintf("%s-%s", prefix, repo.Name)
 	if len(baseName) > maxBaseNameLength {
 		baseName = baseName[:maxBaseNameLength]
 	}

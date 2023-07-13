@@ -16,6 +16,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/agamotto
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/agamotto-0.1.2-beta.1/agamotto-0.1.2-beta.1.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/agamotto-0.1.2-beta.1.tgz
     {{- end }}

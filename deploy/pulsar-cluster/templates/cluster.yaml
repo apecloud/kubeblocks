@@ -38,6 +38,17 @@ spec:
           memory: {{ .requests.memory | quote }}
       {{- end }}
       {{- end }}
+    - name: bookies-recovery
+      componentDefRef: bookies-recovery
+      replicas: {{ .Values.bookiesRecovery.replicaCount | default 3 }}
+      {{- with  .Values.bookiesRecovery.resources }}
+      resources:
+      {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- end }}
     - name: bookies
       componentDefRef: bookies
       replicas: {{ .Values.bookies.replicaCount | default 3 }}

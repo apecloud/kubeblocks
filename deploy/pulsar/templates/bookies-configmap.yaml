@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pulsar-bookies-config
+  name: {{ include "pulsar.name" . }}-bookies-conf-tpl
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:

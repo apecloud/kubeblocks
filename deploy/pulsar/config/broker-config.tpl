@@ -11,7 +11,7 @@ kafkaProtocolMap=kafka_internal:PLAINTEXT,kafka_external:PLAINTEXT
 {{- $namespace := $.cluster.metadata.namespace }}
 {{- $pulsar_broker_component := fromJson "{}" }}
 {{- range $i, $e := $.cluster.spec.componentSpecs }}
-  {{- if eq $e.componentDefRef "broker" }}
+  {{- if eq $e.componentDefRef "pulsar-broker" }}
     {{- $pulsar_broker_component = $e }}
   {{- end }}
 {{- end }}

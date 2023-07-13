@@ -20,3 +20,5 @@ spec:
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
+    datafile:
+      backupToolName: qdrant-snapshot

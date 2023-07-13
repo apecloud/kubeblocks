@@ -65,13 +65,19 @@ spec:
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       switchoverSpec:
         withCandidate:
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
-          command:
-            - /scripts/switchover-with-candidate.sh
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /scripts/switchover-with-candidate.sh
+          scriptSpecSelectors:
+            - name: mongodb-scripts
         withoutCandidate:
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
-          command:
-            - /scripts/switchover-without-candidate.sh
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /scripts/switchover-without-candidate.sh
+          scriptSpecSelectors:
+            - name: mongodb-scripts
       service:
         ports:
           - name: mongodb

@@ -531,6 +531,32 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
+  - backuprepoes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuprepoes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuprepoes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
   - backups
   verbs:
   - create
@@ -693,11 +719,47 @@ rules:
 - apiGroups:
   - storage.k8s.io
   resources:
-  - storageclasses
+  - csidrivers
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.kubeblocks.io
+  resources:
+  - storageproviders
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - storage.kubeblocks.io
+  resources:
+  - storageproviders/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - storage.kubeblocks.io
+  resources:
+  - storageproviders/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - workloads.kubeblocks.io
   resources:

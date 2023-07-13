@@ -22,7 +22,7 @@ Define the rolebinding name
 {{/*
 Define the service account
 */}}
-{{- define "kblib.serviceAccount" -}}
+{{- define "kblib.serviceAccount" }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -35,7 +35,7 @@ metadata:
 {{/*
 Define the role
 */}}
-{{- define "kblib.role" -}}
+{{- define "kblib.role" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -55,7 +55,7 @@ rules:
 {{/*
 Define the rolebinding
 */}}
-{{- define "kblib.roleBinding" -}}
+{{- define "kblib.roleBinding" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:

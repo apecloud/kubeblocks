@@ -45,11 +45,6 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	/*
-		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
-			return nil, err
-		}
-	*/
 	return synthesizedComp, nil
 }
 
@@ -73,6 +68,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 	var err error
+	// make a copy of clusterCompDef
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
@@ -171,12 +167,18 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	//	 }
 	// }
 
-	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
+	buildMonitorConfig(clusterCompDefObj, &clusterCompSpec, component)
 	if err = buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
+
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+
+	if err = buildComponentRef(&clusterDef, &cluster, clusterCompDefObj, &clusterCompSpec, component); err != nil {
+		reqCtx.Log.Error(err, "failed to merge componentRef")
+		return nil, err
+	}
 	return component, nil
 }
 
@@ -335,8 +337,12 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 			cmdExecutorConfig.Env = cvSwitchoverSpec.CmdExecutorConfig.Env
 		}
 	}
-	applyCmdExecutorConfig(switchoverSpec.WithCandidate)
-	applyCmdExecutorConfig(switchoverSpec.WithoutCandidate)
+	if switchoverSpec.WithCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithCandidate.CmdExecutorConfig)
+	}
+	if switchoverSpec.WithoutCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithoutCandidate.CmdExecutorConfig)
+	}
 }
 
 func GenerateComponentEnvName(clusterName, componentName string) string {

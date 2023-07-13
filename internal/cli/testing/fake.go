@@ -289,13 +289,15 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 				},
 			},
 			SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{
-				WithCandidate: &appsv1alpha1.CmdExecutorConfig{
-					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
-						Image: "",
-					},
-					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
-						Command: []string{"mysql"},
-						Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+				WithCandidate: &appsv1alpha1.SwitchoverAction{
+					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+						CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+							Image: "",
+						},
+						CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+							Command: []string{"mysql"},
+							Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+						},
 					},
 				},
 			},
@@ -365,7 +367,7 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 					BackupsHistoryLimit: 1,
 				},
 				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: "test1",
+					Name: pointer.String("test1"),
 				},
 			},
 			Logfile: &dpv1alpha1.CommonBackupPolicy{
@@ -373,7 +375,7 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 					BackupsHistoryLimit: 1,
 				},
 				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: "test1",
+					Name: pointer.String("test1"),
 				},
 			},
 			Schedule: dpv1alpha1.Schedule{

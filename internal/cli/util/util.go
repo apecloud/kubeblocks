@@ -559,7 +559,7 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 	return true, nil
 }
 
-func getIPLocation() (string, error) {
+func GetIPLocation() (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", "https://ifconfig.io/country_code", nil)
 	if err != nil {
@@ -595,7 +595,7 @@ func GetHelmChartRepoURL() string {
 	// if helm repo url is not specified, choose one from GitHub and GitLab based on the IP location
 	// if location is CN, or we can not get location, use GitLab helm chart repo
 	repo := types.KubeBlocksChartURL
-	location, _ := getIPLocation()
+	location, _ := GetIPLocation()
 	if location == "CN" || location == "" {
 		repo = types.GitLabHelmChartRepo
 	}
@@ -783,13 +783,16 @@ func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
 }
 
-func GetUnifiedDiffString(original, edited string) (string, error) {
+func GetUnifiedDiffString(original, edited string, from, to string, contextLine int) (string, error) {
+	if contextLine <= 0 {
+		contextLine = 3
+	}
 	diff := difflib.UnifiedDiff{
 		A:        difflib.SplitLines(original),
 		B:        difflib.SplitLines(edited),
-		FromFile: "Original",
-		ToFile:   "Current",
-		Context:  3,
+		FromFile: from,
+		ToFile:   to,
+		Context:  contextLine,
 	}
 	return difflib.GetUnifiedDiffString(diff)
 }

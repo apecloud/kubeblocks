@@ -72,7 +72,7 @@ var _ = Describe("Backup Policy Controller", func() {
 
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
-		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
@@ -143,6 +143,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		Context("creates a backup policy", func() {
 			var backupPolicyKey types.NamespacedName
 			var backupPolicy *dpv1alpha1.BackupPolicy
+			var startWindowMinutes int64 = 60
 			BeforeEach(func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
@@ -150,6 +151,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupToolName(backupToolName).
 					SetBackupsHistoryLimit(1).
 					SetSchedule(defaultSchedule, true).
+					SetScheduleStartWindowMinutes(&startWindowMinutes).
 					SetTTL(defaultTTL).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
@@ -169,6 +171,8 @@ var _ = Describe("Backup Policy Controller", func() {
 					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
 					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
 					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
+					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())
+					g.Expect(*fetched.Spec.StartingDeadlineSeconds).Should(Equal(startWindowMinutes * 60))
 				})).Should(Succeed())
 			})
 			It("limit backups to 1", func() {
@@ -335,7 +339,8 @@ var _ = Describe("Backup Policy Controller", func() {
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
-					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
+					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).ToNot(BeNil())
+					g.Expect(*fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
 					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
 				})).Should(Succeed())
 			})
@@ -367,7 +372,6 @@ var _ = Describe("Backup Policy Controller", func() {
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					fmt.Printf("backupPolicy: %v", fetched.Status)
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 				})).Should(Succeed())
 				By("enable schedule for reconfigure")

@@ -21,10 +21,10 @@ kbcli builder template [flags]
 ### Options
 
 ```
-  -a, --all                         template all config specs
       --clean                       specify whether to clear the output dir
       --cluster string              the cluster yaml file
-      --cluster-definition string   the cluster definition yaml file
+      --cluster-definition string   specify the cluster definition name
+      --cluster-version string      specify the cluster version name
       --component-name string       specify the component name of the clusterdefinition
       --config-spec string          specify the config spec to be rendered
       --cpu string                  specify the cpu of the component

@@ -6,7 +6,7 @@
 ##
 version: ac-mysql-8.0.30
 
-## @param mode MySQL cluster topology mode, standalone, replication or raftGroup
+## @param mode MySQL cluster topology mode, standalone, raftGroup
 ##
 mode: standalone
 
@@ -34,7 +34,7 @@ requests:
 storage: 20
 
 ## @param proxyEnabled if true, enable the proxy
-## if mode is standalone or replication, proxyEnabled is always false
+## if mode is standalone, proxyEnabled is always false
 ## if mode is raftGroup, proxyEnabled can be true or false
 ##
 proxyEnabled: false

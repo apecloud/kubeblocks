@@ -6,7 +6,7 @@ metadata:
   name: kb-mycluster-redis-cluster
   labels:
     
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+    helm.sh/chart: redis-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"
@@ -20,7 +20,7 @@ metadata:
   namespace: default
   labels:
     
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+    helm.sh/chart: redis-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"
@@ -40,7 +40,7 @@ metadata:
   name: kb-mycluster-redis-cluster
   labels:
     
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+    helm.sh/chart: redis-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"
@@ -60,7 +60,7 @@ kind: Cluster
 metadata:
   name: mycluster-redis-cluster
   labels: 
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+    helm.sh/chart: redis-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"

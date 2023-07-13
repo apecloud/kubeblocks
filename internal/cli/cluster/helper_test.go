@@ -20,11 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -76,34 +73,37 @@ var _ = Describe("helper", func() {
 	})
 
 	It("get version by cluster def", func() {
-		oldVersion := testing.FakeClusterVersion()
-		oldVersion.Name = "test-old-version"
-		oldVersion.SetCreationTimestamp(metav1.NewTime(time.Now().AddDate(0, 0, -1)))
-		dynamic := testing.FakeDynamicClient(testing.FakeClusterVersion(), oldVersion)
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterVersion())
 		version, err := GetVersionByClusterDef(dynamic, testing.ClusterDefName)
 		Expect(err).Should(Succeed())
 		Expect(version).ShouldNot(BeNil())
-		Expect(len(version.Items)).Should(Equal(2))
+		Expect(version.Items).Should(HaveLen(1))
 	})
 
-	It("find latest version", func() {
+	It("get default version", func() {
 		const clusterDefName = "test-cluster-def"
-		genVersion := func(name string, t time.Time) appsv1alpha1.ClusterVersion {
-			v := appsv1alpha1.ClusterVersion{}
+		genVersion := func(name string) *appsv1alpha1.ClusterVersion {
+			v := &appsv1alpha1.ClusterVersion{}
 			v.Name = name
 			v.SetLabels(map[string]string{constant.ClusterDefLabelKey: clusterDefName})
-			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}
 
-		versionList := &appsv1alpha1.ClusterVersionList{}
-		versionList.Items = append(versionList.Items,
-			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
-			genVersion("now-version", time.Now()))
+		cv1 := genVersion("version1")
+		cv2 := genVersion("version2")
 
-		latestVer := findLatestVersion(versionList)
-		Expect(latestVer).ShouldNot(BeNil())
-		Expect(latestVer.Name).Should(Equal("now-version"))
+		By("no default version, should throw error")
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterVersion(), cv1, cv2)
+		defaultVer, err := GetDefaultVersion(dynamic, clusterDefName)
+		Expect(err).Should(HaveOccurred())
+		Expect(defaultVer).Should(BeEmpty())
+
+		By("set default version, should return default version")
+		cv1.Annotations = map[string]string{constant.DefaultClusterVersionAnnotationKey: "true"}
+		dynamic = testing.FakeDynamicClient(testing.FakeClusterVersion(), cv1, cv2)
+		defaultVer, err = GetDefaultVersion(dynamic, clusterDefName)
+		Expect(err).Should(Succeed())
+		Expect(defaultVer).Should(Equal(cv1.Name))
 	})
 
 	It("get configmap by name", func() {

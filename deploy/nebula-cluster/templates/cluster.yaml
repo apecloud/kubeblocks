@@ -12,7 +12,7 @@ spec:
     - name: nebula-console
       componentDefRef: nebula-console
       replicas: 1
-      {{- with  .Values.nebula.metad.resources }}
+      {{- with  .Values.nebula.console.resources }}
       resources:
         {{- with .limits }}
         limits:
@@ -25,6 +25,31 @@ spec:
           memory: {{ .memory | quote }}
         {{- end }}
       {{- end }}
+    - name: nebula-graphd
+      componentDefRef: nebula-graphd
+      replicas: {{ .Values.nebula.graphd.replicas }}
+      {{- with  .Values.nebula.graphd.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: logs # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.nebula.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.nebula.graphd.logStorage }}
     - name: nebula-metad
       componentDefRef: nebula-metad
       replicas: {{ .Values.nebula.metad.replicas }}
@@ -50,31 +75,14 @@ spec:
             resources:
               requests:
                 storage: {{ .Values.nebula.metad.dataStorage }}
-    - name: nebula-graphd
-      componentDefRef: nebula-graphd
-      replicas: {{ .Values.nebula.graphd.replicas }}
-      {{- with  .Values.nebula.graphd.resources }}
-      resources:
-        {{- with .limits }}
-        limits:
-          cpu: {{ .cpu | quote }}
-          memory: {{ .memory | quote }}
-        {{- end }}
-        {{- with .requests }}
-        requests:
-          cpu: {{ .cpu | quote }}
-          memory: {{ .memory | quote }}
-        {{- end }}
-      {{- end }}
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+        - name: logs # ref clusterdefinition components.containers.volumeMounts.name
           spec:
             storageClassName: {{ .Values.nebula.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .Values.nebula.metad.dataStorage }}
+                storage: {{ .Values.nebula.metad.logStorage }}
     - name: nebula-storaged
       componentDefRef: nebula-storaged
       replicas: {{ .Values.nebula.storaged.replicas }}
@@ -100,3 +108,11 @@ spec:
             resources:
               requests:
                 storage: {{ .Values.nebula.storaged.dataStorage }}
+        - name: logs # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.nebula.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.nebula.storaged.logStorage }}

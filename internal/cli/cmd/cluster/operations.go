@@ -129,7 +129,8 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 // addCommonFlags adds common flags for operations command
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	// add print flags
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	printer.AddOutputFlagForCreate(cmd, &o.Format, false)
+
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)

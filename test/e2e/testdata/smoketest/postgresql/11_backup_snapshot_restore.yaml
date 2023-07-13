@@ -1,25 +1,21 @@
 ---
-# Source: pgcluster/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kb-mycluster-pgcluster
   labels:
-
     helm.sh/chart: pgcluster-0.5.1-beta.3
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
     app.kubernetes.io/managed-by: Helm
 ---
-# Source: pgcluster/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: kb-mycluster-pgcluster
   namespace: default
   labels:
-
     helm.sh/chart: pgcluster-0.5.1-beta.3
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
@@ -69,7 +65,6 @@ rules:
     verbs:
       - create
 ---
-# Source: pgcluster/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:

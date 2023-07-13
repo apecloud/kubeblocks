@@ -5,6 +5,30 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
+  wait-for-service.sh: |
+    #!/bin/sh
+    echo "wait for $1"
+    while ! nc -z $2 $3
+    do sleep 1
+    printf "-"
+    done
+    echo -e "  >> $1 has started"
+  set_config_variables.sh: |
+    #!/bin/bash
+    function set_config_variables(){
+      echo "set config variables [$1]"
+      config_file="/conf/wesql-scale.cnf"
+      config_content=$(sed -n '/\['$1'\]/,/\[/ { /\['$1'\]/d; /\[/q; p; }' $config_file)
+      while read line
+      do
+        if [[ $line =~ ^[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9_]*$ ]]; then
+          echo $line
+          eval "export $line"
+        elif ! [[ $line =~ ^[[:space:]]*# ]]; then 
+          echo "bad format: $line"
+        fi
+      done <<< "$(echo -e "$config_content")"
+    }
   setup.sh: |
     #!/bin/bash
     exec docker-entrypoint.sh
@@ -154,6 +178,10 @@ data:
     do
       sleep 60
     done
+
+    . /scripts/set_config_variables.sh
+    set_config_variables vttablet
+
     cell=${CELL:-'zone1'}
     uid="${KB_POD_NAME##*-}"
     mysql_root=${MYSQL_ROOT_USER:-'root'}
@@ -182,10 +210,10 @@ data:
     --tablet-path $alias \
     --tablet_hostname "$tablet_hostname" \
     --init_tablet_type $tablet_type \
-    --health_check_interval 1s \
-    --shard_sync_retry_delay 1s \
-    --remote_operation_timeout 1s \
-    --db_connect_timeout_ms 500 \
+    --health_check_interval $health_check_interval \
+    --shard_sync_retry_delay $shard_sync_retry_delay \
+    --remote_operation_timeout $remote_operation_timeout \
+    --db_connect_timeout_ms $db_connect_timeout_ms \
     --enable_replication_reporter \
     --backup_storage_implementation file \
     --file_backup_storage_root $VTDATAROOT/backups \
@@ -205,4 +233,117 @@ data:
     --pid_file $VTDATAROOT/vttablet.pid \
     --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
     --disable_active_reparents
+    EOF
+  etcd.sh: |-
+    #!/bin/bash
+    echo "staring etcd."
+    etcd_port=${ETCD_PORT:-'2379'}
+    etcd_server=${ETCD_SERVER:-'127.0.0.1'}
+
+    cell=${CELL:-'zone1'}
+    export ETCDCTL_API=2
+
+    etcd --enable-v2=true --data-dir "${VTDATAROOT}/etcd/"  \
+      --listen-client-urls "http://0.0.0.0:${etcd_port}" \
+      --advertise-client-urls "http://0.0.0.0:${etcd_port}"
+  etcd-post-start.sh: |-
+    #!/bin/bash
+    etcd_port=${ETCD_PORT:-'2379'}
+    etcd_server=${ETCD_SERVER:-'127.0.0.1'}
+
+    cell=${CELL:-'zone1'}
+    export ETCDCTL_API=2
+
+    echo "add /vitess/global"
+    etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/global
+
+    echo "add /vitess/$cell"
+    etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/$cell
+
+    # And also add the CellInfo description for the cell.
+    # If the node already exists, it's fine, means we used existing data.
+    echo "add $cell CellInfo"
+    set +e
+    vtctl --topo_implementation etcd2 \
+      --topo_global_server_address "127.0.0.1:${etcd_port}" \
+      --topo_global_root /vitess/global VtctldCommand AddCellInfo \
+      --root /vitess/$cell \
+      --server-address "${etcd_server}:${etcd_port}" \
+      $cell
+  vtctld.sh: |-
+    #!/bin/bash
+    echo "starting vtctld"
+    cell=${CELL:-'zone1'}
+    grpc_port=${VTCTLD_GRPC_PORT:-'15999'}
+    vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
+    topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+    su vitess <<EOF
+    exec vtctld \
+    $topology_fags \
+    --alsologtostderr \
+    --cell $cell \
+    --service_map 'grpc-vtctl,grpc-vtctld' \
+    --backup_storage_implementation file \
+    --file_backup_storage_root $VTDATAROOT/backups \
+    --log_dir $VTDATAROOT \
+    --port $vtctld_web_port \
+    --grpc_port $grpc_port \
+    --pid_file $VTDATAROOT/vtctld.pid
+    EOF
+  vtconsensus.sh: |-
+    #!/bin/bash
+    . /scripts/set_config_variables.sh
+    set_config_variables vtconsensus
+
+    echo "starting vtconsensus"
+    cell=${CELL:-'zone1'}
+
+    vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
+    topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+    su vitess <<EOF
+    exec vtconsensus \
+      $topology_fags \
+      --alsologtostderr \
+      --refresh_interval $refresh_interval \
+      --scan_repair_timeout $scan_repair_timeout \
+      --log_dir ${VTDATAROOT} \
+      --db_username "$MYSQL_ROOT_USER" \
+      --db_password "$MYSQL_ROOT_PASSWORD"
+    EOF
+  vtgate.sh: |-
+    #!/bin/bash
+    . /scripts/set_config_variables.sh
+    set_config_variables vtgate
+
+    cell=${CELL:-'zone1'}
+    web_port=${VTGATE_WEB_PORT:-'15001'}
+    grpc_port=${VTGATE_GRPC_PORT:-'15991'}
+    mysql_server_port=${VTGATE_MYSQL_PORT:-'15306'}
+    mysql_server_socket_path="/tmp/mysql.sock"
+
+    echo "starting vtgate."
+    su vitess <<EOF
+    exec vtgate \
+      $TOPOLOGY_FLAGS \
+      --alsologtostderr \
+      --gateway_initial_tablet_timeout $gateway_initial_tablet_timeout \
+      --healthcheck_timeout $healthcheck_timeout \
+      --srv_topo_timeout $srv_topo_timeout \
+      --grpc_keepalive_time $grpc_keepalive_time \
+      --grpc_keepalive_timeout $grpc_keepalive_timeout \
+      --log_dir $VTDATAROOT \
+      --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
+      --port $web_port \
+      --grpc_port $grpc_port \
+      --mysql_server_port $mysql_server_port \
+      --mysql_server_socket_path $mysql_server_socket_path \
+      --cell $cell \
+      --cells_to_watch $cell \
+      --tablet_types_to_wait PRIMARY,REPLICA \
+      --tablet_refresh_interval $tablet_refresh_interval \
+      --service_map 'grpc-vtgateservice' \
+      --pid_file $VTDATAROOT/vtgate.pid \
+      --mysql_auth_server_impl none
     EOF

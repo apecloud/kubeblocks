@@ -45,7 +45,8 @@ sqlctl switchover  --primary xxx --candidate xxx
 	Run: func(cmd *cobra.Command, args []string) {
 		var characterType string
 		if characterType = os.Getenv("KB_SERVICE_CHARACTER_TYPE"); characterType == "" {
-			characterType = "mysql"
+			fmt.Println("KB_SERVICE_CHARACTER_TYPE must be set")
+			return
 		}
 
 		url := "http://" + sqlchannelAddr + "/v1.0/bindings/" + characterType

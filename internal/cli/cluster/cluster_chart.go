@@ -32,6 +32,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -68,26 +69,36 @@ type ChartInfo struct {
 
 	// Chart is the cluster helm chart object
 	Chart *chart.Chart
+
+	// Alias is the alias of the cluster chart, will be used as the command alias
+	Alias string
 }
 
 type (
 	// ClusterType is the type of the cluster
 	ClusterType string
 
-	// chartFile is the helm chart file information
-	chartFile struct {
+	// chartConfig is the helm chart config
+	chartConfig struct {
 		chartFS embed.FS
-		name    string
+
+		// chart file name, include the extension
+		name string
+
+		// chart alias, this alias will be used as the command alias
+		alias string
 	}
 )
 
-var clusterTypeCharts = map[ClusterType]chartFile{}
+var clusterTypeCharts = map[ClusterType]chartConfig{}
 
-func registerClusterType(t ClusterType, chartFS embed.FS, name string) {
+// registerClusterType registers the cluster type, the ClusterType t will be used as
+// the command name, the alias will be used as the command alias.
+func registerClusterType(t ClusterType, chartFS embed.FS, name string, alias string) {
 	if _, ok := clusterTypeCharts[t]; ok {
 		panic(fmt.Sprintf("cluster type %s already registered", t))
 	}
-	clusterTypeCharts[t] = chartFile{chartFS: chartFS, name: name}
+	clusterTypeCharts[t] = chartConfig{chartFS: chartFS, name: name, alias: alias}
 }
 
 func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
@@ -95,7 +106,7 @@ func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 
 	c := &ChartInfo{}
 	// load helm chart from embed tgz file
-	if c.Chart, err = loadHelmChart(t); err != nil {
+	if err = loadHelmChart(c, t); err != nil {
 		return nil, err
 	}
 
@@ -110,14 +121,24 @@ func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 }
 
 // GetManifests gets the cluster manifests
-func GetManifests(c *chart.Chart, namespace, name string, values map[string]interface{}) (map[string]string, error) {
+func GetManifests(c *chart.Chart, namespace, name, kubeVersion string, values map[string]interface{}) (map[string]string, error) {
 	// get the helm chart manifest
-	actionCfg, err := helm.NewActionConfig(helm.NewFakeConfig(namespace))
+	actionCfg, err := helm.NewActionConfig(helm.NewConfig(namespace, "", "", false))
 	if err != nil {
 		return nil, err
 	}
 	actionCfg.Log = func(format string, v ...interface{}) {
 		fmt.Printf(format, v...)
+	}
+
+	// Parse Kubernetes version to fit the helm action config.
+	//
+	// We must set a valid Kubernetes version to render the manifests, otherwise
+	// helm will use a fake one that will cause the .Capabilities.KubeVersion.GitVersion
+	// return the fake version that is not expected.
+	v, err := chartutil.ParseKubeVersion(kubeVersion)
+	if err != nil {
+		return nil, err
 	}
 
 	client := action.NewInstall(actionCfg)
@@ -126,6 +147,7 @@ func GetManifests(c *chart.Chart, namespace, name string, values map[string]inte
 	client.ClientOnly = true
 	client.ReleaseName = name
 	client.Namespace = namespace
+	client.KubeVersion = v
 
 	rel, err := client.Run(c, values)
 	if err != nil {
@@ -222,29 +244,32 @@ func ValidateValues(c *ChartInfo, values map[string]interface{}) error {
 	return validateFn(c.SubSchema, values)
 }
 
-func loadHelmChart(t ClusterType) (*chart.Chart, error) {
+func loadHelmChart(ci *ChartInfo, t ClusterType) error {
 	cf, ok := clusterTypeCharts[t]
 	if !ok {
-		return nil, fmt.Errorf("failed to find the helm chart of %s", t)
+		return fmt.Errorf("failed to find the helm chart of %s", t)
 	}
 
 	file, err := cf.chartFS.Open(fmt.Sprintf("charts/%s", cf.name))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer file.Close()
 
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {
-			return nil, fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.name, err)
+			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.name, err)
 		}
 	}
 
 	if c == nil {
-		return nil, fmt.Errorf("failed to load cluster helm chart %s", t)
+		return fmt.Errorf("failed to load cluster helm chart %s", t)
 	}
-	return c, err
+
+	ci.Chart = c
+	ci.Alias = cf.alias
+	return nil
 }
 
 func SupportedTypes() []ClusterType {

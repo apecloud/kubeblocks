@@ -200,7 +200,7 @@ func sendWarningEventForError(recorder record.EventRecorder, backup *dataprotect
 var configVolumeSnapshotError = []string{
 	"Failed to set default snapshot class with error",
 	"Failed to get snapshot class with error",
-	"Failed to create snapshot content with error",
+	"Failed to create snapshot content with error cannot find CSI PersistentVolumeSource for volume",
 }
 
 func isVolumeSnapshotConfigError(snap *snapshotv1.VolumeSnapshot) bool {

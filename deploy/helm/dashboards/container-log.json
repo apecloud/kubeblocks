@@ -112,11 +112,11 @@
             "uid": "loki-kubeblocks"
           },
           "editorMode": "builder",
-          "expr": "sum(count_over_time({namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"} |~ `$search` [$__interval]))",
+          "expr": "sum(count_over_time({namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"} |~ `(?i)$search` [$__interval]))",
           "legendFormat": "{{container}}",
           "queryType": "range",
           "refId": "A",
-          "resolution": 4
+          "resolution": 1
         }
       ],
       "title": "Logs Trend",
@@ -190,7 +190,7 @@
           "stream": "",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 5,
@@ -220,7 +220,7 @@
           "stream": "{namespace=~\"$namespace\"}",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 5,
@@ -250,7 +250,7 @@
           "stream": "{namespace=~\"$namespace\", pod=~\"$pod\"}",
           "type": 1
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 5,
@@ -259,8 +259,8 @@
       {
         "current": {
           "selected": false,
-          "text": "",
-          "value": ""
+          "text": ".+",
+          "value": ".+"
         },
         "hide": 0,
         "label": "Search Term",
@@ -268,11 +268,11 @@
         "options": [
           {
             "selected": true,
-            "text": "",
-            "value": ""
+            "text": ".+",
+            "value": ".+"
           }
         ],
-        "query": "",
+        "query": ".+",
         "skipUrlSync": false,
         "type": "textbox"
       }

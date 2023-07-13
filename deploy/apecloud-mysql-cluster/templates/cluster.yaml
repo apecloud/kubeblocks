@@ -2,6 +2,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ include "kblib.clusterName" . }}
+  namespace: {{ .Release.Namespace }}
   labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
   {{- if and (eq .Values.mode "raftGroup") .Values.proxyEnabled }}
   annotations:
@@ -16,12 +17,13 @@ spec:
     - name: mysql
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
       {{- include "kblib.componentMonitor" . | indent 6 }}
-      {{- include "apecloud-mysql-cluster.replicaCount" . | indent 6 }}
+      replicas: {{ include "apecloud-mysql-cluster.replicas" . }}
       enabledLogs:
         - slow
         - error
       serviceAccountName: {{ include "kblib.serviceAccountName" . }}
       {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentStorages" . | indent 6 }}
       {{- include "kblib.componentServices" . | indent 6 }}
     {{- if and (eq .Values.mode "raftGroup") .Values.proxyEnabled }}
     {{- include "apecloud-mysql-cluster.proxyComponents" . | indent 4 }}

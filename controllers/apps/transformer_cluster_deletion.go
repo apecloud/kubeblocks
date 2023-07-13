@@ -27,6 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -163,6 +164,8 @@ func kindsForHalt() []client.ObjectList {
 		&appsv1.StatefulSetList{},
 		&appsv1.DeploymentList{},
 		&corev1.ServiceList{},
+		&corev1.ServiceAccountList{},
+		&rbacv1.RoleBindingList{},
 		&policyv1.PodDisruptionBudgetList{},
 	}
 	return append(kinds, kindsPlus...)

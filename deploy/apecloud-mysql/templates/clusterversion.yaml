@@ -19,27 +19,21 @@ spec:
     switchoverSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
-  - componentDefRef: etcd
+  - componentDefRef: vtcontroller
     versionsContext:
       containers:
         - name: etcd
           image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-          imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
-  - componentDefRef: vtctld
-    versionsContext:
-      containers:
+          imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
         - name: vtctld
           image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-          imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
-  - componentDefRef: vtconsensus
-    versionsContext:
-      containers:
+          imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
         - name: vtconsensus
           image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-          imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
+          imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
   - componentDefRef: vtgate
     versionsContext:
       containers:
         - name: vtgate
           image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-          imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
+          imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}

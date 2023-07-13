@@ -1,0 +1,130 @@
+# permissions for end users to edit clusters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeblocks-cluster-pod-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/required-by: pod
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeblocks-sqlchannel-pod-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    app.kubernetes.io/required-by: pod
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - delete
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusters/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeblocks-patroni-pod-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    app.kubernetes.io/required-by: pod
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+  # delete is required only for 'patronictl remove'
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+  - patch
+  - update
+  - create
+  - list
+  - watch
+  # delete is required only for 'patronictl remove'
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeblocks-backup-pod-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    app.kubernetes.io/required-by: pod
+rules:
+- apiGroups:
+  - "dataprotection.kubeblocks.io"
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - "dataprotection.kubeblocks.io"
+  resources:
+  - backups
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - patch

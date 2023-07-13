@@ -5,7 +5,7 @@ name: tdengine
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.6.0-alpha.21
+version: 0.6.0-alpha.33
 
 description: A Specific Implementation of TDengine Chart for Kubernetes, and provides by KubeBlocks' ClusterDefinition API manifests.
 

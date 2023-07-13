@@ -4,7 +4,7 @@ description: A PostgreSQL (with Patroni HA) cluster definition Helm chart for Ku
 
 type: application
 
-version: 0.6.0-alpha.28
+version: 0.6.0-alpha.33
 
 # The helm chart contains multiple kernel versions of PostgreSQL (with Patroni HA),
 # and each PostgreSQL (with Patroni HA) version corresponds to a clusterVersion object.

@@ -204,9 +204,7 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-            command:
-              - "/bin/agamotto"
-              - "--config=/opt/agamotto/agamotto-config.yaml"
+            command: ["/scripts/agamotto.sh"]
             ports:
               - name: http-metrics
                 containerPort: {{ .Values.metrics.service.port }}
@@ -218,6 +216,8 @@ spec:
               - name: log-data
                 mountPath: /var/log/kubeblocks
                 readOnly: false
+              - name: scripts
+                mountPath: /scripts
           - name: vttablet
             image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
@@ -469,6 +469,11 @@ spec:
           constraintRef: mysql-scale-vtgate-config-constraints
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 15001
       service:
         ports:
           - name: webport

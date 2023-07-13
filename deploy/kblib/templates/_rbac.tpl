@@ -76,10 +76,14 @@ subjects:
 Define the whole rbac
 */}}
 {{- define "kblib.rbac" }}
+{{- if .Values.extra.rbacEnabled }}
 ---
 {{- include "kblib.serviceAccount" . }}
 ---
 {{- include "kblib.role" . }}
 ---
 {{- include "kblib.roleBinding" . }}
+{{- else }}
+{{- "" }}
+{{- end }}
 {{- end }}

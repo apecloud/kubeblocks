@@ -427,40 +427,61 @@ func injectObservationActionContainer(rsm workloads.ReplicatedStateMachine, temp
 
 func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string {
 	envData := map[string]string{}
+	svcName := getHeadlessSvcName(set)
+	uid := string(set.UID)
+	strReplicas := strconv.Itoa(int(*set.Spec.Replicas))
+	generateReplicaEnv := func(prefix string) {
+		for i := 0; i < int(*set.Spec.Replicas); i++ {
+			hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
+			hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+		}
+	}
+	// build member related envs from set.Status.MembersStatus
+	generateMemberEnv := func(prefix string) {
+		followers := ""
+		for _, memberStatus := range set.Status.MembersStatus {
+			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
+				continue
+			}
+			switch {
+			case memberStatus.IsLeader:
+				envData[prefix+"LEADER"] = memberStatus.PodName
+			case memberStatus.CanVote:
+				if len(followers) > 0 {
+					followers += ","
+				}
+				followers += memberStatus.PodName
+			}
+		}
+		if followers != "" {
+			envData[prefix+"FOLLOWERS"] = followers
+		}
+	}
 
 	prefix := constant.KBPrefix + "_RSM_"
-	svcName := getHeadlessSvcName(set)
-	envData[prefix+"N"] = strconv.Itoa(int(*set.Spec.Replicas))
-	for i := 0; i < int(*set.Spec.Replicas); i++ {
-		hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
-		hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
-		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-	}
-
-	// build member related envs from set.Status.MembersStatus
-	followers := ""
-	for _, memberStatus := range set.Status.MembersStatus {
-		if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
-			continue
-		}
-		switch {
-		case memberStatus.IsLeader:
-			envData[prefix+"LEADER"] = memberStatus.PodName
-		case memberStatus.CanVote:
-			if len(followers) > 0 {
-				followers += ","
-			}
-			followers += memberStatus.PodName
-		}
-	}
-	if followers != "" {
-		envData[prefix+"FOLLOWERS"] = followers
-	}
-
+	envData[prefix+"N"] = strReplicas
+	generateReplicaEnv(prefix)
+	generateMemberEnv(prefix)
 	// set owner uid to let pod know if the owner is recreated
-	uid := string(set.UID)
 	envData[prefix+"OWNER_UID"] = uid
 	envData[prefix+"OWNER_UID_SUFFIX8"] = uid[len(uid)-4:]
+
+	// have backward compatible handling for env generated in version prior 0.6.0
+	prefix = constant.KBPrefix + "_"
+	envData[prefix+"REPLICA_COUNT"] = strReplicas
+	generateReplicaEnv(prefix)
+	generateMemberEnv(prefix)
+	envData[prefix+"CLUSTER_UID"] = uid
+
+	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
+	// and introduce env/cm key naming reference complexity
+	componentDefName := set.Labels[constant.AppComponentLabelKey]
+	prefixWithCompDefName := prefix + strings.ToUpper(componentDefName) + "_"
+	envData[prefixWithCompDefName+"N"] = strReplicas
+	generateReplicaEnv(prefixWithCompDefName)
+	generateMemberEnv(prefixWithCompDefName)
+	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 
 	return envData
 }

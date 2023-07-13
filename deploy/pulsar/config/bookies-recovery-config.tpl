@@ -8,7 +8,7 @@
 {{- end }}
 {{- $zk_server := "" }}
 {{- $zk_server = printf "%s-%s.%s.svc" $clusterName $pulsar_zk_component.name $namespace }}
-zkServers: {{- $zk_server }}:2181
+zkServers: {{ $zk_server }}:2181
 httpServerEnabled: "true"
 httpServerPort: "8000"
 prometheusStatsHttpPort: "8000"

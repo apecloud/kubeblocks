@@ -15,7 +15,7 @@ serverCnxnFactory: org.apache.zookeeper.server.NIOServerCnxnFactory
 {{- $zk_server_i := "" }}
 {{- $replicas := $pulsar_zk_component.replicas | int }}
 {{- range $i, $e := until $replicas }}
-  {{- $zk_server_i = printf "%s-%s-%d\n" $clusterName $pulsar_zk_component.name $i }}
+  {{- $zk_server_i = printf "%s-%s-%d" $clusterName $pulsar_zk_component.name $i }}
   {{- if ne $zk_servers "" }}
     {{- $zk_servers = printf "%s,%s" $zk_servers $zk_server_i }}
   {{- else }}

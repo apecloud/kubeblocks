@@ -5,5 +5,5 @@ metadata:
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:
-  recovery_conf: |-
+  conf: |-
     {{- .Files.Get "config/bookies-recovery-config.tpl" | nindent 4 }}

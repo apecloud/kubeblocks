@@ -22,8 +22,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("", func() {
@@ -52,7 +56,16 @@ var _ = Describe("", func() {
 		pvcSpec := r.ToV1PersistentVolumeClaimSpec()
 		Expect(pvcSpec.AccessModes).Should(BeEquivalentTo(r.AccessModes))
 		Expect(pvcSpec.Resources).Should(BeEquivalentTo(r.Resources))
-		Expect(pvcSpec.StorageClassName).Should(BeEquivalentTo(r.StorageClassName))
+		Expect(pvcSpec.StorageClassName).Should(BeEquivalentTo(r.GetStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass))))
+	})
+
+	It("test ToV1PersistentVolumeClaimSpec with default storage class", func() {
+		scName := "test-sc"
+		viper.Set(constant.CfgKeyDefaultStorageClass, scName)
+		r := PersistentVolumeClaimSpec{}
+		pvcSpec := r.ToV1PersistentVolumeClaimSpec()
+		Expect(pvcSpec.StorageClassName).Should(BeEquivalentTo(&scName))
+		viper.Set(constant.CfgKeyDefaultStorageClass, "")
 	})
 
 	It("test GetStorageClassName", func() {

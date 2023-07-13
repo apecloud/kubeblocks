@@ -717,6 +717,16 @@ agamotto:
 
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:
+  ## @param storageClass.name -- Specifies the name of the default storage class.
+  ## If name is not specified and KubeBlocks deployed in a cloud, a default name will be generated.
+  ##
+  name: ""
+
+  ## @param storageClass.create -- Specifies whether the storage class should be created. If storageClass.name is not
+  ## specified or generated, this value will be ignored.
+  ##
+  create: true
+
   mountOptions:
     - noatime
     - nobarrier

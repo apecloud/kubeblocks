@@ -65,9 +65,9 @@ spec:
               - name: TZ
                 value: {{ .Values.timeZone }}
               - name: TAOS_FQDN
-                value: "$(KB_POD_FQDN).cluster.local"
+                value: "$(KB_POD_FQDN)"
               - name: TAOS_FIRST_EP
-                value: "$(KB_0_HOSTNAME).$(KB_NAMESPACE).svc.cluster.local:$(SVC_PORT)"
+                value: "$(KB_0_HOSTNAME).$(KB_NAMESPACE).svc:$(SVC_PORT)"
               - name: TAOS_ADAPTER_USERNAME
                 valueFrom:
                   secretKeyRef:

@@ -39,9 +39,7 @@ data:
     --zookeeper ${zookeeperServers} \
     --configuration-store ${zookeeperServers} \
     --web-service-url ${webServiceUrl}
-    # --web-service-url-tls https://pulsar-mini-broker.pulsar.svc.cluster.local:8443/ \
     # --broker-service-url ${brokerServiceUrl} \
-    # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
 
     (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
   init-broker-sysctl.sh: |-

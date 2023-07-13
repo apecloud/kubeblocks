@@ -18,7 +18,7 @@
         <server>
           <id>{{ $i | int | add1 }}</id>
            # TODO: clusterDomain 'cluster.local' requires configurable
-          <hostname>{{ $clusterName }}-{{ $.component.name }}-{{ $i }}.{{ $clusterName }}-{{ $.component.name }}-headless.{{ $namespace }}.svc.cluster.local</hostname>
+          <hostname>{{ $clusterName }}-{{ $.component.name }}-{{ $i }}.{{ $clusterName }}-{{ $.component.name }}-headless.{{ $namespace }}.svc{{ .Values.clusterDomain }}</hostname>
           <port from_env="CLICKHOUSE_KEEPER_RAFT_PORT"></port>
         </server>
 {{- end }}

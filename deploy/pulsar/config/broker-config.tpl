@@ -4,7 +4,7 @@ subscriptionKeySharedEnable=true
 statusFilePath=/pulsar/status
 
 # KoP config
-# ref: 
+# ref: https://github.com/streamnative/kop/blob/master/docs/configuration.md 
 kafkaListeners=kafka_internal://0.0.0.0:9094,kafka_external://0.0.0.0:9092
 kafkaProtocolMap=kafka_internal:PLAINTEXT,kafka_external:PLAINTEXT
 {{- $clusterName := $.cluster.metadata.name }}
@@ -15,5 +15,5 @@ kafkaProtocolMap=kafka_internal:PLAINTEXT,kafka_external:PLAINTEXT
     {{- $pulsar_broker_component = $e }}
   {{- end }}
 {{- end }}
-{{- $brokerSvcFDQN := printf "%s-%s.%s.svc.cluster.local" $clusterName $pulsar_broker_component.name $namespace }}
+{{- $brokerSvcFDQN := printf "%s-%s.%s.svc" $clusterName $pulsar_broker_component.name $namespace }}
 kafkaAdvertisedListeners=kafka_internal://{{ $brokerSvcFDQN }}:9094,kafka_external://{{ $brokerSvcFDQN }}:9092

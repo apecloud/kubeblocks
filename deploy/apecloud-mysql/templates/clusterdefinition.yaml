@@ -595,46 +595,11 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+              - name: MYSQL_UNIX_PORT
+                value: "/tmp/mysql.sock"
             command: ["/scripts/vtgate.sh"]
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
               - name: mysql-scale-config
                 mountPath: /conf
-
-              - name: MYSQL_UNIX_PORT
-                value: "/tmp/mysql.sock"
-            command:
-              - /bin/bash
-              - -c
-              - |
-                cell=${CELL:-'zone1'}
-                web_port=${VTGATE_WEB_PORT:-'15001'}
-                grpc_port=${VTGATE_GRPC_PORT:-'15991'}
-                mysql_server_port=${VTGATE_MYSQL_PORT:-'15306'}
-                mysql_server_socket_path="/tmp/mysql.sock"
-
-                echo "starting vtgate."
-                su vitess <<EOF
-                exec vtgate \
-                  $TOPOLOGY_FLAGS \
-                  --alsologtostderr \
-                  --gateway_initial_tablet_timeout 30s \
-                  --healthcheck_timeout 2s \
-                  --srv_topo_timeout 1s \
-                  --grpc_keepalive_time 10s \
-                  --grpc_keepalive_timeout 10s \
-                  --log_dir $VTDATAROOT \
-                  --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
-                  --port $web_port \
-                  --grpc_port $grpc_port \
-                  --mysql_server_port $mysql_server_port \
-                  --mysql_server_socket_path $mysql_server_socket_path \
-                  --cell $cell \
-                  --cells_to_watch $cell \
-                  --tablet_types_to_wait PRIMARY,REPLICA \
-                  --service_map 'grpc-vtgateservice' \
-                  --pid_file $VTDATAROOT/vtgate.pid \
-                  --mysql_auth_server_impl none
-                EOF
-=

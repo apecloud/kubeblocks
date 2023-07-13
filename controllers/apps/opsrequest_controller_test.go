@@ -68,6 +68,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.VolumeSnapshotSignature, true, inNS)
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// TODO(review): why finalizers not removed
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
 

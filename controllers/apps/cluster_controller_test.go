@@ -2314,6 +2314,46 @@ var _ = Describe("Cluster Controller", func() {
 				})).Should(Succeed())
 		})
 	})
+
+	Context("cluster deletion", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+		It("should deleted after all the sub-resources", func() {
+			createClusterObj(consensusCompName, consensusCompDefName)
+
+			By("Waiting for the cluster enter running phase")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+			stsKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      clusterKey.Name + "-" + consensusCompName,
+			}
+			By("checking sts exists")
+			Eventually(testapps.CheckObjExists(&testCtx, stsKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+
+			finalizerName := "test/finalizer"
+			By("set finalizer for sts to prevent it from deletion")
+			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+				sts.ObjectMeta.Finalizers = append(sts.ObjectMeta.Finalizers, finalizerName)
+			})()).ShouldNot(HaveOccurred())
+
+			By("Delete the cluster")
+			testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+			By("checking cluster keep existing")
+			Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+			By("remove finalizer of sts to get it deleted")
+			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+				sts.ObjectMeta.Finalizers = nil
+			})()).ShouldNot(HaveOccurred())
+
+			By("Wait for the cluster to terminate")
+			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+		})
+	})
 })
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {

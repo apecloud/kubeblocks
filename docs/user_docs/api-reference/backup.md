@@ -280,7 +280,7 @@ BackupPolicyStatus
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo
 </h3>
 <div>
-<p>BackupRepo is the Schema for the backuprepoes API</p><br />
+<p>BackupRepo is the Schema for the backuprepos API</p><br />
 </div>
 <table>
 <thead>

@@ -37,6 +37,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -67,7 +68,6 @@ type PgBenchOptions struct {
 	name      string
 	namespace string
 
-	ClusterName  string   // specify the name of the cluster to run benchmark test
 	Scale        int      // specify the scale factor for the benchmark test
 	Clients      []int    // specify the number of clients to run
 	Threads      int      // specify the number of threads per client
@@ -105,7 +105,6 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().IntVar(&o.Transactions, "transactions", 0, "The number of transactions to run for pgbench")
 	cmd.Flags().IntVar(&o.Duration, "duration", 60, "The seconds to run pgbench for")
 	cmd.Flags().BoolVar(&o.Select, "select", false, "Run pgbench with select only")
-	cmd.Flags().StringVar(&o.ClusterName, "cluster", "", "The name of the cluster to run pgbench against")
 	return cmd
 }
 
@@ -114,14 +113,13 @@ func (o *PgBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	// TODO if don't give pgbench name, generate a random name
-	if len(args) == 0 {
-		return fmt.Errorf("pgbench name should be specified")
+	// use the first argument as the name of the benchmark
+	if len(args) > 0 {
+		o.name = args[0]
 	}
-	if len(args) > 1 {
-		return fmt.Errorf("only support to create one pgbench at a time")
+	if o.name == "" {
+		o.name = fmt.Sprintf("pgbench-%s", util.RandRFC1123String(6))
 	}
-	o.name = args[0]
 
 	if o.ClusterName == "" {
 		return fmt.Errorf("cluster name should be specified")

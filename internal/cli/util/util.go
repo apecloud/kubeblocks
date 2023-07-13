@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	mrand "math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -947,4 +948,14 @@ func WritePogStreamingLog(ctx context.Context, client kubernetes.Interface, pod 
 		_, err := writer.Write(data)
 		return err
 	}
+}
+
+// RandRFC1123String generate a random string with length n, which fulfills RFC1123
+func RandRFC1123String(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[mrand.Intn(len(letters))]
+	}
+	return string(b)
 }

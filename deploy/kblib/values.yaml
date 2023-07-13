@@ -27,6 +27,6 @@ hostNetworkAccessible: false
 ##
 publiclyAccessible: false
 
-## @param rbacEnabled if true, will create and use RBAC resources
+## @param rbacEnabled if true, rbac resources will be created
 ##
 rbacEnabled: true

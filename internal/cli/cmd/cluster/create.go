@@ -189,6 +189,7 @@ type CreateOptions struct {
 	Annotations       map[string]string        `json:"annotations,omitempty"`
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
+	RBACEnabled       bool                     `json:"-"`
 
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
@@ -221,6 +222,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
+	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
 	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
@@ -622,7 +624,7 @@ const (
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
 
-	if !rbacEnabled() {
+	if !o.RBACEnabled {
 		return nil
 	}
 
@@ -638,7 +640,7 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
 
-	if !rbacEnabled() {
+	if !o.RBACEnabled {
 		return nil
 	}
 
@@ -1302,8 +1304,4 @@ func setKeys() []string {
 		string(keyStorageClass),
 		string(keySwitchPolicy),
 	}
-}
-
-func rbacEnabled() bool {
-	return viper.GetBool(types.CfgKeyRBACEnabled)
 }

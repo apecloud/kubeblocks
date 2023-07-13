@@ -267,6 +267,24 @@ func (m *postgresql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar
 	for _, script := range scripts {
 		args = append(args, fmt.Sprintf("-c %s", strconv.Quote(script)))
 	}
-	cmd = append(cmd, fmt.Sprintf("PGHOST=%s PGUSER=%s PGPASSWORD=%s PGDATABASE=%s %s %s ", envVarMap[host], envVarMap[user], envVarMap[password], m.info.Database, m.info.Client, strings.Join(args, " ")))
-	return cmd, nil, nil
+	cmd = append(cmd, fmt.Sprintf("%s %s", m.info.Client, strings.Join(args, " ")))
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "PGHOST",
+			Value: fmt.Sprintf("$(%s)", envVarMap[host]),
+		},
+		{
+			Name:  "PGUSER",
+			Value: fmt.Sprintf("$(%s)", envVarMap[user]),
+		},
+		{
+			Name:  "PGPASSWORD",
+			Value: fmt.Sprintf("$(%s)", envVarMap[password]),
+		},
+		{
+			Name:  "PGDATABASE",
+			Value: m.info.Database,
+		},
+	}
+	return cmd, envVars, nil
 }

@@ -45,10 +45,10 @@ const (
 
 var (
 	envVarMap = map[string]string{
-		host:     "$KB_HOST",
-		port:     "$KB_PORT",
-		user:     "$KB_USER",
-		password: "$KB_PASSWD",
+		host:     "KB_HOST",
+		port:     "KB_PORT",
+		user:     "KB_USER",
+		password: "KB_PASSWD",
 	}
 )
 

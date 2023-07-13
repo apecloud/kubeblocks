@@ -284,6 +284,16 @@ func (m *mysql) ConnectExample(info *ConnectionInfo, client string) string {
 func (m *mysql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
 	cmd := []string{}
 	cmd = append(cmd, "/bin/sh", "-c", "-ex")
-	cmd = append(cmd, fmt.Sprintf("%s -h%s -u%s -p%s -e %s", m.info.Client, envVarMap[host], envVarMap[user], envVarMap[password], strconv.Quote(strings.Join(scripts, " "))))
-	return cmd, nil, nil
+	cmd = append(cmd, fmt.Sprintf("%s -u%s -p%s -e %s", m.info.Client,
+		fmt.Sprintf("$%s", envVarMap[user]),
+		fmt.Sprintf("$%s", envVarMap[password]),
+		strconv.Quote(strings.Join(scripts, " "))))
+
+	envs := []corev1.EnvVar{
+		{
+			Name:  "MYSQL_HOST",
+			Value: fmt.Sprintf("$(%s)", envVarMap[host]),
+		},
+	}
+	return cmd, envs, nil
 }

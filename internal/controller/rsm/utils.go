@@ -32,6 +32,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -237,9 +238,13 @@ func deletionKinds() []client.ObjectList {
 
 func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
+	selector, err := metav1.LabelSelectorAsMap(stsObj.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels(stsObj.Spec.Selector.MatchLabels)); err != nil {
+		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}
 	var pods []corev1.Pod

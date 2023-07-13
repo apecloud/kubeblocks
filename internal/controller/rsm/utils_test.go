@@ -169,8 +169,8 @@ var _ = Describe("utils test", func() {
 	Context("getPodsOfStatefulSet function", func() {
 		It("should work well", func() {
 			sts := builder.NewStatefulSetBuilder(namespace, name).
-				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
-				AddLabels(constant.AppInstanceLabelKey, name).
+				AddMatchLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+				AddMatchLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
 				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).

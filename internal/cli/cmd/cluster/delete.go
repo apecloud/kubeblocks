@@ -20,12 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -81,6 +87,68 @@ func clusterPreDeleteHook(o *delete.DeleteOptions, object runtime.Object) error 
 	return nil
 }
 
+func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	if object == nil {
+		return nil
+	}
+
+	c, err := getClusterFromObject(object)
+	if err != nil {
+		return err
+	}
+
+	client, err := o.Factory.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	// HACK: for a postgresql cluster, we need to delete the sa, role and rolebinding
+	if err = deleteDependencies(client, c.Namespace, c.Name); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteDependencies(client kubernetes.Interface, ns string, name string) error {
+	klog.V(1).Infof("delete dependencies for cluster %s", name)
+	var (
+		saName          = saNamePrefix + name
+		roleName        = roleNamePrefix + name
+		roleBindingName = roleBindingNamePrefix + name
+		allErr          []error
+	)
+
+	// now, delete the dependencies, for postgresql, we delete sa, role and rolebinding
+	ctx := context.TODO()
+	gracePeriod := int64(0)
+	deleteOptions := metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
+	checkErr := func(err error) bool {
+		if err != nil && !apierrors.IsNotFound(err) {
+			return true
+		}
+		return false
+	}
+
+	// delete rolebinding
+	klog.V(1).Infof("delete rolebinding %s", roleBindingName)
+	if err := client.RbacV1().RoleBindings(ns).Delete(ctx, roleBindingName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete service account
+	klog.V(1).Infof("delete service account %s", saName)
+	if err := client.CoreV1().ServiceAccounts(ns).Delete(ctx, saName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete role
+	klog.V(1).Infof("delete role %s", roleName)
+	if err := client.RbacV1().Roles(ns).Delete(ctx, roleName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+	return errors.NewAggregate(allErr)
+}
+
 func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) {
 	if object.GetObjectKind().GroupVersionKind().Kind != appsv1alpha1.ClusterKind {
 		return nil, fmt.Errorf("object %s is not of kind %s", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
@@ -91,16 +159,4 @@ func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) 
 		return nil, err
 	}
 	return cluster, nil
-}
-
-func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
-	if object == nil {
-		return nil
-	}
-
-	_, err := getClusterFromObject(object)
-	if err != nil {
-		return err
-	}
-	return nil
 }

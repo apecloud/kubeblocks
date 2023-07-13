@@ -45,7 +45,8 @@ sqlctl switchover  --primary xxx --candidate xxx
 	Run: func(cmd *cobra.Command, args []string) {
 		var characterType string
 		if characterType = os.Getenv("KB_SERVICE_CHARACTER_TYPE"); characterType == "" {
-			characterType = "mysql"
+			fmt.Println("KB_SERVICE_CHARACTER_TYPE must be set")
+			return
 		}
 
 		url := "http://" + sqlchannelAddr + "/v1.0/bindings/" + characterType
@@ -55,7 +56,7 @@ sqlctl switchover  --primary xxx --candidate xxx
 		}
 
 		payload := fmt.Sprintf(`{"operation": "switchover", "metadata": {"leader": "%s", "candidate": "%s"}}`, primary, candidate)
-		//fmt.Println(payload)
+		// fmt.Println(payload)
 
 		client := http.Client{}
 		// Insert order using Dapr output binding via HTTP Post
@@ -71,8 +72,10 @@ sqlctl switchover  --primary xxx --candidate xxx
 		}
 		fmt.Println("SQLChannel Response:")
 		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Printf("request error: %v", err)
+		}
 		fmt.Println(string(bodyBytes))
-		return
 	},
 }
 

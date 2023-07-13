@@ -120,6 +120,17 @@ type OpsRequestSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreFrom"
 	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
+
+	// ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.
+	// If not specified, the default value is 0, which means that the start-conditions must be met immediately.
+	// +kubebuilder:default=0
+	// +optional
+	TTLSecondsBeforeAbort *int32 `json:"ttlSecondsBeforeAbort,omitempty"`
+
+	// scriptSpec defines the script to be executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec"
+	ScriptSpec *ScriptSpec `json:"scriptSpec,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -159,9 +170,9 @@ type VerticalScaling struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
 
-	// class specifies the class name of the component
+	// classDefRef reference class defined in ComponentClassDefinition.
 	// +optional
-	Class string `json:"class,omitempty"`
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 }
 
 // VolumeExpansion defines the variables of volume expansion operation.
@@ -309,6 +320,31 @@ type PointInTimeRefSpec struct {
 	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
+// ScriptSpec defines the script to be executed.
+type ScriptSpec struct {
+	ComponentOps `json:",inline"`
+	// script defines the script to be executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script"
+	Script []string `json:"script,omitempty"`
+	// scriptFrom defines the script to be executed from configMap or secret.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
+	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
+}
+
+// ScriptFrom defines the script to be executed from configMap or secret.
+type ScriptFrom struct {
+	// configMapRef defines the configMap to be executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.configMapRef"
+	ConfigMapRef []corev1.ConfigMapKeySelector `json:"configMapRef,omitempty"`
+	// secretRef defines the secret to be executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.secretRef"
+	SecretRef []corev1.SecretKeySelector `json:"secretRef,omitempty"`
+}
+
 // OpsRequestStatus defines the observed state of OpsRequest
 type OpsRequestStatus struct {
 
@@ -393,9 +429,9 @@ type LastComponentConfiguration struct {
 	// +optional
 	corev1.ResourceRequirements `json:",inline,omitempty"`
 
-	// the last class name of the component.
+	// classDefRef reference class defined in ComponentClassDefinition.
 	// +optional
-	Class string `json:"class,omitempty"`
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional
@@ -604,6 +640,13 @@ func (r OpsRequestSpec) GetVolumeExpansionComponentNameSet() ComponentNameSet {
 	return set
 }
 
+// GetDataScriptComponentNameSet gets the component name map with switchover operation.
+func (r OpsRequestSpec) GetDataScriptComponentNameSet() ComponentNameSet {
+	set := make(ComponentNameSet)
+	set[r.ScriptSpec.ComponentName] = struct{}{}
+	return set
+}
+
 // ToVolumeExpansionListToMap converts volumeExpansionList to map
 func (r OpsRequestSpec) ToVolumeExpansionListToMap() map[string]VolumeExpansion {
 	volumeExpansionMap := make(map[string]VolumeExpansion)
@@ -671,6 +714,8 @@ func (r *OpsRequest) GetComponentNameSet() ComponentNameSet {
 		return r.Spec.GetExposeComponentNameSet()
 	case SwitchoverType:
 		return r.Spec.GetSwitchoverComponentNameSet()
+	case DataScriptType:
+		return r.Spec.GetDataScriptComponentNameSet()
 	default:
 		return nil
 	}

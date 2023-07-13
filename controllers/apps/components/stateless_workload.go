@@ -33,7 +33,7 @@ var _ componentWorkloadBuilder = &statelessComponentWorkloadBuilder{}
 
 func (b *statelessComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		deploy, err := builder.BuildDeploy(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		deploy, err := builder.BuildDeploy(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}

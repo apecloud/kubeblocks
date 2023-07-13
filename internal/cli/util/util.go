@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	mrand "math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -559,7 +560,7 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 	return true, nil
 }
 
-func getIPLocation() (string, error) {
+func GetIPLocation() (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", "https://ifconfig.io/country_code", nil)
 	if err != nil {
@@ -595,7 +596,7 @@ func GetHelmChartRepoURL() string {
 	// if helm repo url is not specified, choose one from GitHub and GitLab based on the IP location
 	// if location is CN, or we can not get location, use GitLab helm chart repo
 	repo := types.KubeBlocksChartURL
-	location, _ := getIPLocation()
+	location, _ := GetIPLocation()
 	if location == "CN" || location == "" {
 		repo = types.GitLabHelmChartRepo
 	}
@@ -947,4 +948,14 @@ func WritePogStreamingLog(ctx context.Context, client kubernetes.Interface, pod 
 		_, err := writer.Write(data)
 		return err
 	}
+}
+
+// RandRFC1123String generate a random string with length n, which fulfills RFC1123
+func RandRFC1123String(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[mrand.Intn(len(letters))]
+	}
+	return string(b)
 }

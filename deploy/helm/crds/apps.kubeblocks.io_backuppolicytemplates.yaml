@@ -312,6 +312,14 @@ spec:
                           - cronExpression
                           - enable
                           type: object
+                        startWindowMinutes:
+                          description: startWindowMinutes defines the time window
+                            for starting the job if it misses scheduled time for any
+                            reason. the unit of time is minute.
+                          format: int64
+                          maximum: 1440
+                          minimum: 0
+                          type: integer
                       type: object
                     snapshot:
                       description: the policy for snapshot backup.

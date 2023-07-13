@@ -4,7 +4,7 @@
   "properties": {
     "version": {
       "title": "Version",
-      "description": "Cluster version, run \"kbcli cv list --devel\" to see all versions.",
+      "description": "Cluster version.",
       "type": "string",
       "default": "ac-mysql-8.0.30"
     },
@@ -15,13 +15,12 @@
       "default": "standalone",
       "enum": [
         "standalone",
-        "replication",
         "raftGroup"
       ]
     },
     "replicas": {
       "title": "Replicas",
-      "description": "The number of replicas.",
+      "description": "The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3.",
       "type": "integer",
       "default": 1,
       "minimum": 1,
@@ -34,7 +33,7 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 64,
       "multipleOf": 0.5
@@ -46,7 +45,7 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 1000
     },

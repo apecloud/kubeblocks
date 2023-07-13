@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-restart
 spec:
-  clusterRef: mycluster-apecloud-mysql-cluster
+  clusterRef: mysql-cluster
   ttlSecondsAfterSucceed: 3600
   type: Restart
   restart:

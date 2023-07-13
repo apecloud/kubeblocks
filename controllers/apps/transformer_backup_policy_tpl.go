@@ -214,7 +214,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			TTL: policyTPL.Retention.TTL,
 		}
 	}
-
+	bpSpec.Schedule.StartWindowMinutes = policyTPL.Schedule.StartWindowMinutes
 	bpSpec.Schedule.Snapshot = r.convertSchedulePolicy(policyTPL.Schedule.Snapshot)
 	bpSpec.Schedule.Datafile = r.convertSchedulePolicy(policyTPL.Schedule.Datafile)
 	bpSpec.Schedule.Logfile = r.convertSchedulePolicy(policyTPL.Schedule.Logfile)

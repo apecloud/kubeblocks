@@ -56,7 +56,7 @@ var _ = Describe("", func() {
 			Create(&testCtx).GetObject()
 
 		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", "mysql").
-			AddClasses(constraint.Name, []string{testapps.Class1c1gName}).
+			AddClasses(constraint.Name, []v1alpha1.ComponentClass{testapps.Class1c1g}).
 			Create(&testCtx).GetObject()
 
 		key := client.ObjectKeyFromObject(componentClassDefinition)

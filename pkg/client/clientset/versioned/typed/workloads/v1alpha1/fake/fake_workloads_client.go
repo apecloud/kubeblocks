@@ -19,12 +19,17 @@ limitations under the License.
 package fake
 
 import (
+	v1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
 type FakeWorkloadsV1alpha1 struct {
 	*testing.Fake
+}
+
+func (c *FakeWorkloadsV1alpha1) ReplicatedStateMachines(namespace string) v1alpha1.ReplicatedStateMachineInterface {
+	return &FakeReplicatedStateMachines{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

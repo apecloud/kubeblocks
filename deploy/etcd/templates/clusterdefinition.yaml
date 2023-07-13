@@ -45,6 +45,7 @@ spec:
               - |
                 echo "start etcd..."
                 PEERS=""
+                # TODO: clusterDomain 'cluster.local' requires configurable
                 DOMAIN=$KB_NAMESPACE".svc.cluster.local"
                 i=0
                 while [ $i -lt $KB_REPLICA_COUNT ]; do
@@ -53,13 +54,13 @@ spec:
                 	fi;
                 	host=$(eval echo \$KB_"$i"_HOSTNAME)
                     host=$host"."$DOMAIN
-                	PEERS="$PEERS$host=http://$host:2380"
+                    hostname=${KB_CLUSTER_COMP_NAME}-${i}
+                	PEERS="$PEERS$hostname=http://$host:2380"
                     i=$(( i + 1))
                 done
-                SVC_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
-                SVC_NAME=$SVC_NAME"headless";
-                MY_PEER=$KB_POD_NAME"."$SVC_NAME"."$DOMAIN
-                exec etcd --name ${MY_PEER} \
+                # TODO: clusterDomain 'cluster.local' requires configurable
+                MY_PEER=$KB_POD_FQDN.cluster.local
+                exec etcd --name ${HOSTNAME} \
                 --listen-peer-urls http://0.0.0.0:2380 \
                 --listen-client-urls http://0.0.0.0:2379 \
                 --advertise-client-urls http://${MY_PEER}:2379 \

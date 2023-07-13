@@ -195,7 +195,7 @@ func (commands *Commands) RestartDBServiceIfExited() {
 		return
 	}
 	commands.WaitGroup.Add(1)
-	for true {
+	for {
 		select {
 		case <-commands.ctx.Done():
 			commands.WaitGroup.Done()
@@ -279,8 +279,8 @@ func (commands *Commands) StopSQLChannel() bool {
 			fmt.Fprintln(os.Stdout, "Send SIGTERM to SQLChannel")
 		}
 	}
-	//state, err = commands.SQLChannelCMD.Process.Wait()
-	//fmt.Printf("state: %v, err: %v\n", state, err)
+	// state, err = commands.SQLChannelCMD.Process.Wait()
+	// fmt.Printf("state: %v, err: %v\n", state, err)
 	commands.WaitSQLChannel()
 	return exitWithError
 }

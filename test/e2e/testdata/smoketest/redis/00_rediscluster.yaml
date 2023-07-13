@@ -1,30 +1,25 @@
 ---
-# Source: redis-cluster/templates/serviceaccount.yaml
+# Source: redis-cluster/templates/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-mycluster-redis-cluster
+  name: kb-sa-redis-cluster
+  namespace: default
   labels:
-    
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: redis-cluster
 ---
-# Source: redis-cluster/templates/role.yaml
+# Source: redis-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-mycluster-redis-cluster
+  name: kb-role-redis-cluster
   namespace: default
   labels:
-    
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: redis-cluster
 rules:
   - apiGroups:
       - ""
@@ -33,84 +28,57 @@ rules:
     verbs:
       - create
 ---
-# Source: redis-cluster/templates/rolebinding.yaml
+# Source: redis-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-mycluster-redis-cluster
+  name: kb-rolebinding-redis-cluster
   labels:
-    
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: redis-cluster
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-mycluster-redis-cluster
+  name: kb-role-redis-cluster
 subjects:
   - kind: ServiceAccount
-    name: kb-mycluster-redis-cluster
+    name: kb-sa-redis-cluster
     namespace: default
 ---
 # Source: redis-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-redis-cluster
+  name: redis-cluster
+  namespace: default
   labels: 
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: redis-cluster
 spec:
-  clusterDefinitionRef: redis  # ref clusterDefinition.name
-  clusterVersionRef: redis-7.0.6 # ref clusterVersion.name
-  terminationPolicy: Delete
+  clusterVersionRef: redis-7.0.6
+  terminationPolicy: Delete  
   affinity:
-    topologyKeys: 
+    podAntiAffinity: Preferred
+    topologyKeys:
       - kubernetes.io/hostname
+    tenancy: SharedNode
+  clusterDefinitionRef: redis  # ref clusterDefinition.name
   componentSpecs:
-    - name: redis # user-defined
-      componentDefRef: redis # ref clusterDefinition componentDefs.name
-      monitor: false
-      enabledLogs:     ["running"]
-      replicas: 2
-      serviceAccountName: kb-mycluster-redis-cluster
+    - name: redis
+      componentDefRef: redis # ref clusterDefinition componentDefs.name      
+      monitor: false      
+      replicas: 1
+      enabledLogs:
+        - running
+      serviceAccountName: kb-sa-redis-cluster
       switchPolicy:
-        type: Noop
+        type: Noop      
       resources:
         limits:
-          cpu: "500m"
-          memory: "3Gi"
-        requests:
-          cpu: "500m"
+          cpu: "0.5"
           memory: "1Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
-    - name: redis-sentinel # user-defined
-      componentDefRef: redis-sentinel # ref clusterDefinition componentDefs.name
-      replicas: 3
-      resources:
-        limits:
-          cpu: "500m"
-          memory: "3Gi"
         requests:
-          cpu: "500m"
+          cpu: "0.5"
           memory: "1Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi

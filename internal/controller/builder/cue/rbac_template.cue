@@ -17,7 +17,7 @@
 
 cluster: {
     metadata: {
-        namespace: "default"
+        namespace: string
         name:      string
     }
     spec: {

@@ -25,6 +25,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -57,42 +58,65 @@ spec:
       maxPerCPU: 8Gi
 `
 
-func TestResourceConstraint_ByClassCPUAndMemory(t *testing.T) {
-	buildClass := func(cpu string, memory string) *appsv1alpha1.ComponentClassInstance {
-		return &appsv1alpha1.ComponentClassInstance{
+var buildClass = func(cpu string, memory string) *ComponentClassWithRef {
+	return &ComponentClassWithRef{
+		ComponentClassInstance: appsv1alpha1.ComponentClassInstance{
 			ComponentClass: appsv1alpha1.ComponentClass{
 				CPU:    resource.MustParse(cpu),
 				Memory: resource.MustParse(memory),
 			},
-		}
+		},
 	}
-	classes := []*appsv1alpha1.ComponentClassInstance{
+}
+
+var buildResourceList = func(cpu string, memory string) corev1.ResourceList {
+	return corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse(cpu),
+		corev1.ResourceMemory: resource.MustParse(memory),
+	}
+}
+
+func TestComponentClass(t *testing.T) {
+	classes := []*ComponentClassWithRef{
 		buildClass("1", "2Gi"),
 		buildClass("1", "1Gi"),
 		buildClass("2", "0.5Gi"),
 		buildClass("1", "1Gi"),
 		buildClass("0.5", "10Gi"),
 	}
-	sort.Sort(ByClassCPUAndMemory(classes))
+	sort.Sort(ByClassResource(classes))
 	candidate := classes[0]
 	if !candidate.CPU.Equal(resource.MustParse("0.5")) || !candidate.Memory.Equal(resource.MustParse("10Gi")) {
 		t.Errorf("case failed")
 	}
 }
 
-func TestResourceConstraint_ConstraintList(t *testing.T) {
+func TestComponentResourceConstraint(t *testing.T) {
 	var cf appsv1alpha1.ComponentResourceConstraint
 	err := yaml.Unmarshal([]byte(resourceConstraintBytes), &cf)
 	if err != nil {
 		panic("Failed to unmarshal resource constraint: %v" + err.Error())
 	}
-	var constraints []ConstraintWithName
-	for _, constraint := range cf.Spec.Constraints {
-		constraints = append(constraints, ConstraintWithName{Name: cf.Name, Constraint: constraint})
-	}
-	resource.MustParse("200Mi")
+	var constraints []appsv1alpha1.ResourceConstraint
+	constraints = append(constraints, cf.Spec.Constraints...)
 	sort.Sort(ByConstraintList(constraints))
-	cpu, memory := GetMinCPUAndMemory(constraints[0].Constraint)
-	assert.Equal(t, cpu.Cmp(resource.MustParse("0.1")) == 0, true)
-	assert.Equal(t, memory.Cmp(resource.MustParse("20Mi")) == 0, true)
+	resources := constraints[0].GetMinimalResources()
+	assert.Equal(t, resources.Cpu().Cmp(resource.MustParse("0.1")) == 0, true)
+	assert.Equal(t, resources.Memory().Cmp(resource.MustParse("20Mi")) == 0, true)
+}
+
+func TestResourceList(t *testing.T) {
+	rl := []corev1.ResourceList{
+		buildResourceList("1", "2Gi"),
+		buildResourceList("1", "1Gi"),
+		buildResourceList("2", "0.5Gi"),
+		buildResourceList("1", "1Gi"),
+		buildResourceList("0.5", "10Gi"),
+	}
+	sort.Sort(ByResourceList(rl))
+
+	candidate := rl[0]
+	if !candidate.Cpu().Equal(resource.MustParse("0.5")) || !candidate.Memory().Equal(resource.MustParse("10Gi")) {
+		t.Errorf("case failed")
+	}
 }

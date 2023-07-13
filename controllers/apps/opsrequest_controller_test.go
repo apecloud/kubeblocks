@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -67,7 +68,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.VolumeSnapshotSignature, true, inNS)
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		// TODO(review): why finalizers not removed
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
 
 		// non-namespaced
@@ -152,7 +154,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Create(&testCtx).GetObject()
 
 		testapps.NewComponentClassDefinitionFactory("custom", clusterDefObj.Name, mysqlCompDefName).
-			AddClasses(constraint.Name, []string{testapps.Class1c1gName, testapps.Class2c4gName}).
+			AddClasses(constraint.Name, []appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
 			Create(&testCtx)
 
 		By("Create a cluster obj")
@@ -199,7 +201,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			verticalScalingOpsRequest.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Class:        scalingCtx.target.class.Name,
+					ClassDefRef: &appsv1alpha1.ClassDefRef{
+						Class: scalingCtx.target.class.Name,
+					},
 				},
 			}
 		} else {
@@ -254,9 +258,9 @@ var _ = Describe("OpsRequest Controller", func() {
 		} else {
 			targetRequests = scalingCtx.target.resource.Requests
 		}
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-			g.Expect(fetched.Spec.ComponentSpecs[0].Resources.Requests).To(Equal(targetRequests))
-		})).Should(Succeed())
+		stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+		mysqlSts = stsList.Items[0]
+		Expect(reflect.DeepEqual(mysqlSts.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
 
 		By("check OpsRequest reclaimed after ttl")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
@@ -549,6 +553,46 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			})).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("HorizontalScaling when the number of pods is inconsistent with the number of replicates", func() {
+			By("create a cluster with 3 pods")
+			createMysqlCluster(3)
+			By("mock component replicas to 4 and actual pods is 3")
+			Expect(testapps.ChangeObj(&testCtx, clusterObj, func(clusterObj *appsv1alpha1.Cluster) {
+				clusterObj.Spec.ComponentSpecs[0].Replicas = 4
+			})).Should(Succeed())
+
+			By("scale down the cluster replicas to 2")
+			replicas := int32(2)
+			ops := createClusterHscaleOps(replicas)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
+				g.Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			})).Should(Succeed())
+
+			// wait for cluster and component phase are Updating
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			})).Should(Succeed())
+
+			By("check the underlying workload been updated")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
+				func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				})).Should(Succeed())
+
+			By("mock scale down successfully by deleting one pod ")
+			podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, 2)
+			dPodKeys := types.NamespacedName{Name: podName, Namespace: testCtx.DefaultNamespace}
+			testapps.DeleteObject(&testCtx, dPodKeys, &corev1.Pod{})
+
+			By("expect opsRequest phase to Succeed after cluster is Running")
+			mockCompRunning(replicas)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
+				g.Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+				g.Expect(ops.Status.Progress).Should(Equal("1/1"))
+			})).Should(Succeed())
 		})
 
 		It("delete Running opsRequest", func() {

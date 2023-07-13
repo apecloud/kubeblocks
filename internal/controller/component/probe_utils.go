@@ -38,7 +38,7 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat    = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
+	checkRoleURIFormat    = "/v1.0/bindings/%s?operation=checkRole"
 	checkRunningURIFormat = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat  = "/v1.0/bindings/%s?operation=checkStatus"
 )
@@ -73,7 +73,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
+		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -89,18 +89,13 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		probeContainers = append(probeContainers, *runningProbeContainer)
 	}
 
-	initContainer := container.DeepCopy()
-	buildProbeInitContainer(component, initContainer)
-	modifyMainContainerForProbe(component, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
-	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, *initContainer)
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(component, container)
+		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
 	}
 
 	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
-	// component.PodSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
 }
 
@@ -123,107 +118,52 @@ func buildProbeContainer() (*corev1.Container, error) {
 	return container, nil
 }
 
-func buildProbeInitContainer(component *SynthesizedComponent, container *corev1.Container) {
+func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
-	container.Name = constant.ProbeInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"cp", "-r", "/bin/sqlctl", "/bin/probe", "/config", "/kubeblocks/"}
-	container.StartupProbe = nil
-	container.ReadinessProbe = nil
-	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
-	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
-}
-
-func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPort int, probeSvcGRPCPort int) {
-	container := component.PodSpec.Containers[0]
-	command := []string{"/kubeblocks/sqlctl", "run",
+	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
+	container.Command = []string{"probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
 		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
-		"--"}
-	container.Command = append(command, container.Command...)
-	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
-	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+		"--log-level", logLevel,
+		"--config", "/config/probe/config.yaml",
+		"--components-path", "/config/probe/components"}
+
+	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
+		mainContainer := component.PodSpec.Containers[0]
+		port := mainContainer.Ports[0]
+		dbPort := port.ContainerPort
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:      constant.KBPrefix + "_SERVICE_PORT",
+			Value:     strconv.Itoa(int(dbPort)),
+			ValueFrom: nil,
+		})
+	}
+
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
 		Name:      constant.KBPrefix + "_SERVICE_ROLES",
 		Value:     string(rolesJSON),
 		ValueFrom: nil,
-	},
-		corev1.EnvVar{
-			Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
-			Value:     component.CharacterType,
-			ValueFrom: nil,
-		},
-		corev1.EnvVar{
-			Name: constant.KBPrefix + "_SERVICE_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{Key: "username", LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"}},
-			},
-		},
-		corev1.EnvVar{
-			Name: constant.KBPrefix + "_SERVICE_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{Key: "password", LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"}},
-			},
-		})
+	})
 
-	container.Ports = append(container.Ports, corev1.ContainerPort{
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
+		Value:     component.CharacterType,
+		ValueFrom: nil,
+	})
+
+	container.Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(probeSvcHTTPPort),
 		Name:          constant.ProbeHTTPPortName,
 		Protocol:      "TCP",
 	},
-		corev1.ContainerPort{
+		{
 			ContainerPort: int32(probeSvcGRPCPort),
 			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
-		})
-	component.PodSpec.Containers[0] = container
-}
-
-func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container) {
-	container.Image = viper.GetString(constant.KBToolsImage)
-	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	// logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"/bin/sh", "-c", "cp -r /bin/sqlctl /bin/probe /config /kubeblocks/; while true; do sleep 10; done"}
-
-	// if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
-	// 	mainContainer := component.PodSpec.Containers[0]
-	// 	port := mainContainer.Ports[0]
-	// 	dbPort := port.ContainerPort
-	// 	container.Env = append(container.Env, corev1.EnvVar{
-	// 		Name:      constant.KBPrefix + "_SERVICE_PORT",
-	// 		Value:     strconv.Itoa(int(dbPort)),
-	// 		ValueFrom: nil,
-	// 	})
-	// }
-
-	// volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
-	// container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-	// roles := getComponentRoles(component)
-	// rolesJSON, _ := json.Marshal(roles)
-	// container.Env = append(container.Env, corev1.EnvVar{
-	// 	Name:      constant.KBPrefix + "_SERVICE_ROLES",
-	// 	Value:     string(rolesJSON),
-	// 	ValueFrom: nil,
-	// })
-
-	// container.Env = append(container.Env, corev1.EnvVar{
-	// 	Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
-	// 	Value:     component.CharacterType,
-	// 	ValueFrom: nil,
-	// })
-
-	// container.Ports = []corev1.ContainerPort{{
-	// 	ContainerPort: int32(probeSvcHTTPPort),
-	// 	Name:          constant.ProbeHTTPPortName,
-	// 	Protocol:      "TCP",
-	// },
-	// 	{
-	// 		ContainerPort: int32(probeSvcGRPCPort),
-	// 		Name:          constant.ProbeGRPCPortName,
-	// 		Protocol:      "TCP",
-	// 	}}
+		}}
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {
@@ -243,14 +183,13 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 	return roles
 }
 
-func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
+func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
-	bindingType := strings.ToLower(component.CharacterType)
-	workloadType := component.WorkloadType
+	bindingType := strings.ToLower(characterType)
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
+	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

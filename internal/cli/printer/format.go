@@ -93,8 +93,12 @@ func AddOutputFlag(cmd *cobra.Command, varRef *Format) {
 		}))
 }
 
-func AddOutputFlagForCreate(cmd *cobra.Command, varRef *Format) {
-	cmd.Flags().VarP(newOutputValue(YAML, varRef), "output", "o", "prints the output in the specified format. Allowed values: JSON and YAML")
+func AddOutputFlagForCreate(cmd *cobra.Command, varRef *Format, persistent bool) {
+	fs := cmd.Flags()
+	if persistent {
+		fs = cmd.PersistentFlags()
+	}
+	fs.VarP(newOutputValue(YAML, varRef), "output", "o", "Prints the output in the specified format. Allowed values: JSON and YAML")
 }
 
 type outputValue Format

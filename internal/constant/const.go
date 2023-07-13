@@ -42,6 +42,9 @@ const (
 	// data plane config key
 	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
 	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
+
+	// storage config keys
+	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 )
 
 const (
@@ -61,6 +64,7 @@ const (
 const (
 	KBToolsImage      = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
+	KBChartsImage     = "KUBEBLOCKS_CHARTS_IMAGE"
 )
 
 const (
@@ -104,6 +108,7 @@ const (
 	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
+	OpsRequestNameLabelKey                 = "ops.kubeblocks.io/ops-name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -153,8 +158,8 @@ const (
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
-	// ClassAnnotationKey is used to specify the class of components
-	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
+	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
+	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
 )
 
 const (

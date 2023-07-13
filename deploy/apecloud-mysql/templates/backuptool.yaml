@@ -6,7 +6,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+  image: {{ .Values.image.registry | default "docker.io" }}/apecloud/apecloud-xtrabackup:latest
   deployKind: job
   env:
     - name: DATA_DIR
@@ -23,14 +23,14 @@ spec:
           echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
           exit 1
         fi
-        mkdir -p /tmp/data/ && cd /tmp/data
+        TMP_DIR=/data/mysql/temp
+        mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
         xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
-        xtrabackup --decompress  --target-dir=/tmp/data/
-        xtrabackup --prepare --target-dir=/tmp/data/
-        find . -name "*.qp"|xargs rm -f
-        xtrabackup --move-back --target-dir=/tmp/data/ --datadir=${DATA_DIR}/
+        xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
+        xtrabackup --prepare --target-dir=${TMP_DIR}
+        xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/
         touch ${DATA_DIR}/.xtrabackup_restore_new_cluster
-        rm -rf /tmp/data/
+        rm -rf ${TMP_DIR}
         chmod -R 0777 ${DATA_DIR}
     incrementalRestoreCommands: []
   logical:
@@ -40,7 +40,8 @@ spec:
     - sh
     - -c
     - |
-      set -e
-      mkdir -p ${BACKUP_DIR}
-      xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+      set -e;
+      mkdir -p ${BACKUP_DIR};
+      xtrabackup --compress=zstd --backup  --safe-slave-backup --slave-info --stream=xbstream \
+      --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
   incrementalBackupCommands: []

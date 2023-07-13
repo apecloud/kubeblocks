@@ -40,7 +40,9 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -243,18 +245,18 @@ var _ = Describe("DataProtection", func() {
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
 		clusterDef := testing.FakeClusterDef()
-		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		clusterObj := testing.FakeCluster(clusterName, testing.Namespace)
 		clusterDefLabel := map[string]string{
 			constant.ClusterDefLabelKey: clusterDef.Name,
 		}
-		cluster.SetLabels(clusterDefLabel)
-		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
+		clusterObj.SetLabels(clusterDefLabel)
+		backupPolicy := testing.FakeBackupPolicy("backPolicy", clusterObj.Name)
 
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterObj, backupPolicy)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, backupPolicy)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, clusterObj, backupPolicy)
 		tf.Client = &clientfake.RESTClient{}
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)
@@ -270,7 +272,9 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
 		cmdRestore.Run(nil, []string{newClusterName})
-
+		newClusterObj := &appsv1alpha1.Cluster{}
+		Expect(cluster.GetK8SClientObject(tf.FakeDynamicClient, newClusterObj, types.ClusterGVR(), testing.Namespace, newClusterName)).Should(Succeed())
+		Expect(clusterObj.Spec.ComponentSpecs[0].Replicas).Should(Equal(int32(1)))
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
 		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil, "")
@@ -353,6 +357,44 @@ var _ = Describe("DataProtection", func() {
 		o.SourceCluster = clusterName
 		Expect(o.Complete()).Should(Succeed())
 		Expect(o.validateRestoreTime().Error()).Should(ContainSubstring("restore-to-time is out of time range"))
+	})
+
+	It("describe-backup", func() {
+		cmd := NewDescribeBackupCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		By("test describe-backup cmd with no backup")
+		tf.FakeDynamicClient = testing.FakeDynamicClient()
+		o := describeBackupOptions{
+			factory:   tf,
+			IOStreams: streams,
+			gvr:       types.BackupGVR(),
+		}
+		args := []string{}
+		Expect(o.complete(args)).Should(HaveOccurred())
+
+		By("test describe-backup")
+		backupName := "test1"
+		backup1 := testing.FakeBackup(backupName)
+		args = append(args, backupName)
+		availableReplicas := int32(1)
+		backup1.Status.Phase = dpv1alpha1.BackupCompleted
+		logNow := metav1.Now()
+		backup1.Status.StartTimestamp = &logNow
+		backup1.Status.CompletionTimestamp = &logNow
+		backup1.Status.Expiration = &logNow
+		backup1.Status.Duration = &metav1.Duration{Duration: logNow.Sub(logNow.Time)}
+		backup1.Status.AvailableReplicas = &availableReplicas
+		backup1.Status.Manifests = &dpv1alpha1.ManifestsStatus{
+			BackupLog:   &dpv1alpha1.BackupLogStatus{StartTime: &logNow, StopTime: &logNow},
+			BackupTool:  &dpv1alpha1.BackupToolManifestsStatus{FilePath: "/backupdata/test1"},
+			Snapshot:    &dpv1alpha1.BackupSnapshotStatus{VolumeSnapshotName: backupName},
+			UserContext: map[string]string{"user_define_key": "user_define_value"},
+		}
+		backup1.Status.SourceCluster = "mycluster"
+		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
+		Expect(o.complete(args)).Should(Succeed())
+		o.client = testing.FakeClientSet()
+		Expect(o.run()).Should(Succeed())
 	})
 })
 

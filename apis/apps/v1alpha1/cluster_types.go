@@ -21,9 +21,12 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // ClusterSpec defines the desired state of Cluster.
@@ -354,7 +357,7 @@ func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.Persis
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes:      r.AccessModes,
 		Resources:        r.Resources,
-		StorageClassName: r.StorageClassName,
+		StorageClassName: r.GetStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
 	}
 }
 

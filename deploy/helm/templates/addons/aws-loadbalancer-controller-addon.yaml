@@ -15,6 +15,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/aws-load-balancer-controller
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/aws-load-balancer-controller-1.4.8/aws-load-balancer-controller-1.4.8.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/aws-load-balancer-controller-1.4.8.tgz
     {{- end }}

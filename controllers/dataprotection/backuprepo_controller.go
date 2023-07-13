@@ -25,10 +25,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"html/template"
 	"reflect"
 	"sort"
 	"strings"
+	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -56,10 +56,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-const (
-	trueVal = "true"
-)
-
 // BackupRepoReconciler reconciles a BackupRepo object
 type BackupRepoReconciler struct {
 	client.Client
@@ -71,9 +67,9 @@ type BackupRepoReconciler struct {
 }
 
 // full access on BackupRepos
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepoes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepoes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepoes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuprepos/finalizers,verbs=update
 
 // watch StorageProviders
 // +kubebuilder:rbac:groups=storage.kubeblocks.io,resources=storageproviders,verbs=get;list;watch
@@ -245,7 +241,6 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(
 		Parameters: parameters,
 	}
 	oldRepo := repo.DeepCopy()
-	patch := client.MergeFrom(oldRepo)
 
 	// create secret for the CSI driver if it's not exist,
 	// or update the secret if the template or values are updated
@@ -284,7 +279,7 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(
 	}
 
 	if !reflect.DeepEqual(oldRepo.Status, repo.Status) {
-		err := r.Client.Status().Patch(reqCtx.Ctx, repo, patch)
+		err := r.Client.Status().Patch(reqCtx.Ctx, repo, client.MergeFrom(oldRepo))
 		if err != nil {
 			return fmt.Errorf("failed to patch backup repo: %w", err)
 		}
@@ -430,11 +425,12 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 	}
 	err := r.Client.List(reqCtx.Ctx, backupList, selectors)
 	var filtered []*dpv1alpha1.Backup
-	for _, backup := range backupList.Items {
+	for idx := range backupList.Items {
+		backup := &backupList.Items[idx]
 		if backup.Status.Phase == dpv1alpha1.BackupFailed {
 			continue
 		}
-		filtered = append(filtered, &backup)
+		filtered = append(filtered, backup)
 	}
 	return filtered, err
 }
@@ -455,17 +451,15 @@ func (r *BackupRepoReconciler) createPVCForAssociatedBackups(
 			retErr = err
 			continue
 		}
-		patch := client.MergeFrom(backup.DeepCopy())
-		if backup.Annotations == nil {
-			backup.Annotations = make(map[string]string)
-		}
-		delete(backup.Annotations, dataProtectionNeedRepoPVCKey)
-		backup.Annotations[dataProtectionRepoPVCNameAnnotationKey] = repo.Status.BackupPVCName
-		if err = r.Client.Patch(reqCtx.Ctx, backup, patch); err != nil {
-			reqCtx.Log.Error(err, "failed to patch backup",
-				"backup", client.ObjectKeyFromObject(backup))
-			retErr = err
-			continue
+		if backup.Labels[dataProtectionNeedRepoPVCKey] != "" {
+			patch := client.MergeFrom(backup.DeepCopy())
+			delete(backup.Labels, dataProtectionNeedRepoPVCKey)
+			if err = r.Client.Patch(reqCtx.Ctx, backup, patch); err != nil {
+				reqCtx.Log.Error(err, "failed to patch backup",
+					"backup", client.ObjectKeyFromObject(backup))
+				retErr = err
+				continue
+			}
 		}
 	}
 	return retErr
@@ -834,7 +828,7 @@ func isOwned(owner client.Object, dependent client.Object) bool {
 func randomNameForDerivedObject(repo *dpv1alpha1.BackupRepo, prefix string) string {
 	// the final name should not exceed 63 characters
 	const maxBaseNameLength = 56
-	baseName := fmt.Sprintf("%s-backuprepo-%s", prefix, repo.Name)
+	baseName := fmt.Sprintf("%s-%s", prefix, repo.Name)
 	if len(baseName) > maxBaseNameLength {
 		baseName = baseName[:maxBaseNameLength]
 	}

@@ -16,13 +16,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 cluster: {
-	metadata: {
-		namespace: "default"
-		name:      string
-	}
-	spec: {
-		clusterDefinitionRef: string
-	}
+    metadata: {
+        namespace: string
+        name:      string
+    }
+    spec: {
+        clusterDefinitionRef: string
+    }
 }
 
 serviceaccount: {

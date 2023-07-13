@@ -74,7 +74,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 func getIndex(memberName string) (int, error) {
 	i := strings.LastIndex(memberName, "-")
 	if i < 0 {
-		return 0, fmt.Errorf("The format of Member name is wrong: %s", memberName)
+		return 0, fmt.Errorf("the format of member name is wrong: %s", memberName)
 	}
 	return strconv.Atoi(memberName[i+1:])
 }
@@ -368,11 +368,7 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	}
 
 	masterHost := rowMap.GetString("Master_Host")
-	if strings.HasPrefix(masterHost, leader) {
-		return false
-	}
-
-	return true
+	return strings.HasPrefix(masterHost, leader)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
@@ -400,7 +396,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-// Are there any healthy members other than the leader?
+// HasOtherHealthyMembers checks if there are any healthy members, excluding the leader
 func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 	for _, member := range cluster.Members {

@@ -62,7 +62,6 @@ var (
 	cliVersion            string
 	versionFlag           bool
 	sqlChannelVer         sqlChannelVersion
-	logAsJSON             bool
 	sqlChannelRuntimePath string
 )
 

@@ -37,7 +37,6 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
       cpu: {{ $proxyCPU }}
     limits:
       cpu: {{ $proxyCPU }}
-  isConnAgent: true
 {{- end }}
 
 {{/*

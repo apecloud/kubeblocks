@@ -190,12 +190,6 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
-
-	// IsConnAgent define the component will be the cluster connection endpoint explicitly, if all component's IsConnAgents are false we will
-	// choose the main component as the connection endpoint
-	// +kubebuilder:default=false
-	// +optional
-	IsConnAgent bool `json:"isConnAgent"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

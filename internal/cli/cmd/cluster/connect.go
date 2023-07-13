@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel/engine"
 )
@@ -106,7 +107,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	cmd.Flags().StringVar(&o.componentName, "component", "", "The component to connect. If not specified, pick up the first one.")
+	flags.AddComponentsFlag(f, cmd, false, &o.componentName, "The component to connect. If not specified, pick up the first one.")
 	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster/instance from different clients.")
 	cmd.Flags().StringVar(&o.clientType, "client", "", "Which client connection example should be output, only valid if --show-example is true.")
 
@@ -211,9 +212,7 @@ func (o *ConnectOptions) complete() error {
 
 	// 2.2 fill component name, use the first component by default
 	if len(o.componentName) == 0 {
-		if o.component, err = o.getConnectComponent(); err != nil {
-			return err
-		}
+		o.component = &o.targetCluster.Spec.ComponentSpecs[0]
 		o.componentName = o.component.Name
 	} else {
 		// verify component
@@ -443,24 +442,4 @@ func getOneHeadlessEndpoint(clusterDef *appsv1alpha1.ClusterDefinition, secrets 
 		return ""
 	}
 	return string(val)
-}
-
-// getConnectComponent return the cluster connect endpoint component
-func (o *ConnectOptions) getConnectComponent() (*appsv1alpha1.ClusterComponentSpec, error) {
-	if o.targetCluster.Spec.ComponentSpecs == nil || len(o.targetCluster.Spec.ComponentSpecs) == 0 {
-		return nil, fmt.Errorf("cluster %s doesn't have a component, please cheeckout the resourse", o.clusterName)
-	}
-	res := &o.targetCluster.Spec.ComponentSpecs[0]
-	already := false
-	for i := range o.targetCluster.Spec.ComponentSpecs {
-		if o.targetCluster.Spec.ComponentSpecs[i].IsConnAgent {
-			if !already {
-				res = &o.targetCluster.Spec.ComponentSpecs[i]
-				already = true
-			} else {
-				return nil, fmt.Errorf("cluster %s have two connection endpoints, please checkout the resourse", o.clusterName)
-			}
-		}
-	}
-	return res, nil
 }

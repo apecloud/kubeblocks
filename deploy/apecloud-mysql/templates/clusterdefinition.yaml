@@ -454,7 +454,7 @@ spec:
               - name: mysql-scale-config
                 mountPath: /conf
     - name: vtgate
-      characterType: vtgate
+      characterType: mysql
       workloadType: Stateless
       scriptSpecs:
         - name: apecloud-mysql-scripts

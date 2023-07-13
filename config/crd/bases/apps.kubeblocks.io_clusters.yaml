@@ -193,13 +193,6 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
-                    isConnAgent:
-                      default: false
-                      description: IsConnAgent define the component will be the cluster
-                        connection endpoint explicitly, if all component's IsConnAgents
-                        are false we will choose the main component as the connection
-                        endpoint
-                      type: boolean
                     issuer:
                       description: issuer defines provider context for TLS certs.
                         required when TLS enabled

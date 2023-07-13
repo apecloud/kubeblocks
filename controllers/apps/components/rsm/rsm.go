@@ -23,7 +23,6 @@ import (
 	"context"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
@@ -94,31 +93,34 @@ func (r *RSM) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1al
 func (r *RSM) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string,
 	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
-	stsList := &appsv1.StatefulSetList{}
-	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
-	if err != nil || len(stsList.Items) == 0 {
+	rsmList := &workloads.ReplicatedStateMachineList{}
+	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, rsmList)
+	if err != nil || len(rsmList.Items) == 0 {
 		return "", nil, err
 	}
 	statusMessages := appsv1alpha1.ComponentMessageMap{}
 	// if the failed pod is not controlled by the latest revision
+	podIsControlledByLatestRevision := func(pod *corev1.Pod, rsm *workloads.ReplicatedStateMachine) bool {
+		return rsm.Status.ObservedGeneration == rsm.Generation && intctrlutil.GetPodRevision(pod) == rsm.Status.UpdateRevision
+	}
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
-		sts := workload.(*appsv1.StatefulSet)
+		rsm := workload.(*workloads.ReplicatedStateMachine)
 		// if component is up running but pod is not ready, this pod should be failed.
 		// for example: full disk cause readiness probe failed and serve is not available.
 		// but kubelet only sets the container is not ready and pod is also Running.
 		if originPhaseIsUpRunning {
-			return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+			return !intctrlutil.PodIsReady(pod) && podIsControlledByLatestRevision(pod, rsm)
 		}
 		isFailed, _, message := internal.IsPodFailedAndTimedOut(pod)
-		existLatestRevisionFailedPod := isFailed && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+		existLatestRevisionFailedPod := isFailed && podIsControlledByLatestRevision(pod, rsm)
 		if existLatestRevisionFailedPod {
 			statusMessages.SetObjectMessage(pod.Kind, pod.Name, message)
 		}
 		return existLatestRevisionFailedPod
 	}
-	stsObj := stsList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),
-		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), statusMessages, nil
+	rsmObj := rsmList.Items[0]
+	return util.GetComponentPhaseWhenPodsNotReady(podList, &rsmObj, r.getReplicas(),
+		rsmObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), statusMessages, nil
 }
 
 func (r *RSM) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {

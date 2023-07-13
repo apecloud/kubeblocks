@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -93,6 +94,16 @@ func MockConsensusComponentStatefulSet(
 	consensusCompName string) *appsv1.StatefulSet {
 	stsName := clusterName + "-" + consensusCompName
 	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(ConsensusReplicas).
+		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
+}
+
+// MockRSMComponent mocks the component rsm, just using in envTest
+func MockRSMComponent(
+	testCtx *testutil.TestContext,
+	clusterName,
+	rsmCompName string) *workloads.ReplicatedStateMachine {
+	rsmName := clusterName + "-" + rsmCompName
+	return NewRSMFactory(testCtx.DefaultNamespace, rsmName, clusterName, rsmCompName).SetReplicas(ConsensusReplicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 

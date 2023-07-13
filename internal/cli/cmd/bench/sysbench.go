@@ -226,7 +226,7 @@ func (o *SysBenchOptions) Run() error {
 	sysbench := v1alpha1.Sysbench{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Sysbench",
-			APIVersion: "benchmark.kubebench.io/v1alpha1",
+			APIVersion: types.SysbenchGVR().GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      o.name,

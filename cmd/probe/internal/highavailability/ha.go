@@ -122,13 +122,15 @@ func (ha *Ha) RunCycle() {
 		// there is no healthy leader node and the lock remains unreleased, attempt to acquire the leader lock.
 
 		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
-			ha.logger.Infof("I am the real leader, wait for lock released")
+			//ha.logger.Infof("I am the real leader, wait for lock released")
+			ha.logger.Infof("i am not the leader, demote myself")
+			ha.dbManager.Demote()
 			// if ha.dcs.AttempAcquireLock() == nil {
 			// 	ha.dbManager.Premote()
 			// }
 		} else {
 			// make sure sync source is leader when role changed
-			ha.dbManager.Demote()
+			//ha.dbManager.Demote()
 			ha.dbManager.Follow(cluster)
 		}
 	}

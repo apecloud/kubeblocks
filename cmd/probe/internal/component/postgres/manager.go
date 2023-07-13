@@ -728,8 +728,8 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	primaryInfo := fmt.Sprintf("\nhost=%s port=%s user=%s password=%s application_name=my-application\n",
-		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, config.password)
+	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
+		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, viper.GetString("POSTGRES_PASSWORD"))
 
 	pgConf, err := os.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {

@@ -99,12 +99,13 @@ var _ = Describe("bench", func() {
 	It("test sysbench run", func() {
 		o := &SysBenchOptions{
 			BenchBaseOptions: BenchBaseOptions{
-				Driver:   "mysql",
-				Database: "test",
-				Host:     "svc-1",
-				Port:     3306,
-				User:     "test",
-				Password: "test",
+				Driver:      "mysql",
+				Database:    "test",
+				Host:        "svc-1",
+				Port:        3306,
+				User:        "test",
+				Password:    "test",
+				ClusterName: "test",
 			},
 			Type:      []string{"oltp_read_only"},
 			Tables:    1,
@@ -128,12 +129,13 @@ var _ = Describe("bench", func() {
 	It("test pgbench run", func() {
 		o := &PgBenchOptions{
 			BenchBaseOptions: BenchBaseOptions{
-				Driver:   pgBenchDriver,
-				Database: "test",
-				Host:     "svc-1",
-				Port:     3306,
-				User:     "test",
-				Password: "test",
+				Driver:      pgBenchDriver,
+				Database:    "test",
+				Host:        "svc-1",
+				Port:        3306,
+				User:        "test",
+				Password:    "test",
+				ClusterName: "test",
 			},
 			Scale:     100,
 			factory:   tf,

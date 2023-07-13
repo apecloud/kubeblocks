@@ -1,3 +1,4 @@
+{{- if .Values.extra.rbacEnabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -51,3 +52,4 @@ rules:
 {{- include "kblib.serviceAccount" . }}
 ---
 {{- include "kblib.roleBinding" . }}
+{{- end }}

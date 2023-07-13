@@ -31,7 +31,7 @@ kbcli bench pgbench [flags]
 
 ```
       --clients ints       The number of clients to use for pgbench (default [1])
-      --cluster string     The name of the cluster to run pgbench against
+      --cluster string     the cluster of database
       --database string    database name
       --duration int       The seconds to run pgbench for (default 60)
   -h, --help               help for pgbench

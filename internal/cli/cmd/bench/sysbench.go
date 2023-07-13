@@ -79,7 +79,6 @@ type SysBenchOptions struct {
 	ExtraArgs    []string
 	ReadPercent  int
 	WritePercent int
-	ClusterName  string
 
 	BenchBaseOptions
 	*cluster.ClusterObjects     `json:"-"`
@@ -111,7 +110,6 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd.Flags().IntSliceVar(&o.Threads, "threads", []int{4}, "the number of threads, you can set multiple values, like 4,8")
 	cmd.Flags().IntVar(&o.ReadPercent, "read-percent", 0, "the percent of read, only useful when type is oltp_read_write_pct")
 	cmd.Flags().IntVar(&o.WritePercent, "write-percent", 0, "the percent of write, only useful when type is oltp_read_write_pct")
-	cmd.Flags().StringVar(&o.ClusterName, "cluster", "", "the name of the cluster to run sysbench test")
 	o.BenchBaseOptions.AddFlags(cmd)
 
 	return cmd
@@ -122,14 +120,13 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	// TODO if don't give sysbench name, generate a random name
-	if len(args) == 0 {
-		return fmt.Errorf("sysbench name should be specified")
+	// use the first argument as the name of the benchmark
+	if len(args) > 0 {
+		o.name = args[0]
 	}
-	if len(args) > 1 {
-		return fmt.Errorf("only support to create one sysbench at a time")
+	if o.name == "" {
+		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
 	}
-	o.name = args[0]
 
 	if o.ClusterName == "" {
 		return fmt.Errorf("cluster name should be specified")

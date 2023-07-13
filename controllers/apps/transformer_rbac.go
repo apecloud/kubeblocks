@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -55,7 +56,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
-		if !viper.GetBool("ENABLE_RBAC_MANAGER") {
+		if !viper.GetBool(constant.EnableRBACManager) {
 			transCtx.Logger.V(1).Info("rbac manager is not enabled")
 			if serviceAccountName != "" && !isServiceAccountExist(transCtx, serviceAccountName, true) {
 				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")

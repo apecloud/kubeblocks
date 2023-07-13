@@ -276,3 +276,38 @@ Define addon agamotto name
 {{- define "addon.agamotto.name" -}}
 {{- print "agamotto" }}
 {{- end }}
+
+{{/*
+Get cloud provider, now support aws, gcp, aliyun and tencentCloud.
+TODO: For azure, we should get provider from node.Spec.ProviderID
+*/}}
+{{- define "kubeblocks.cloudProvider" }}
+{{- $kubeVersion := .Capabilities.KubeVersion.GitVersion }}
+{{- if contains "-eks" $kubeVersion }}
+{{- "aws" -}}
+{{- else if contains "-gke" $kubeVersion }}
+{{- "gcp" -}}
+{{- else if contains "-aliyun" $kubeVersion }}
+{{- "aliyun" -}}
+{{- else if contains "-tke" $kubeVersion }}
+{{- "tencentCloud" -}}
+{{- else if contains "-aks" $kubeVersion }}
+{{- "azure" -}}
+{{- else }}
+{{- "" -}}
+{{- end }}
+{{- end }}
+
+{{/*
+Define default storage class name, if cloud provider is known, specify a default storage class name.
+*/}}
+{{- define "kubeblocks.defaultStorageClass" }}
+{{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
+{{- if and .Values.storageClass .Values.storageClass.name }}
+{{- .Values.storageClass.name }}
+{{- else if $cloudProvider }}
+{{- "kb-default-sc"  }}
+{{- else }}
+{{- "" }}
+{{- end }}
+{{- end }}

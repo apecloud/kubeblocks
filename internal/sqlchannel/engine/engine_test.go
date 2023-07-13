@@ -38,7 +38,13 @@ var _ = Describe("Engine", func() {
 			// it is a tricky way to check the container name
 			// for the moment, we only support mysql, postgresql and redis
 			// and the container name is the same as the state name
-			Expect(engine.Container()).Should(Equal(typeName))
+			if typeName == stateMysql {
+				// for wesql vtgate component we wuold use the first container, but its name is not mysql
+				Expect(engine.Container()).Should(Equal(""))
+			} else {
+				Expect(engine.Container()).Should(Equal(typeName))
+			}
+
 		}
 	})
 

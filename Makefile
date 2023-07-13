@@ -314,6 +314,10 @@ clean-kbcli: ## Clean bin/kbcli*.
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
+.PHONY: sqlctl-doc
+sqlctl-doc: generate test-go-generate ## generate CLI command reference manual.
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/sqlctl/main.go ./docs/user_docs/sqlctl
+
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
 	@./hack/docgen/api/generate.sh

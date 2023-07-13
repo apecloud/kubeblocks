@@ -21,6 +21,7 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -64,6 +65,8 @@ func (kafkaOps *KafkaOperations) Init(metadata bindings.Metadata) error {
 	kafkaOps.DBType = "kafka"
 	kafkaOps.InitIfNeed = kafkaOps.initIfNeed
 	// kafkaOps.BaseOperations.GetRole = kafkaOps.GetRole
+	kafkaOps.BaseOperations.LockInstance = kafkaOps.LockInstance
+	kafkaOps.BaseOperations.UnlockInstance = kafkaOps.UnlockInstance
 	// kafkaOps.DBPort = kafkaOps.GetRunningPort()
 	// kafkaOps.RegisterOperation(GetRoleOperation, kafkaOps.GetRoleOps)
 	// kafkaOps.RegisterOperation(GetLagOperation, kafkaOps.GetLagOps)
@@ -131,4 +134,14 @@ func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *bindin
 	}
 
 	return result, nil
+}
+
+func (kafkaOps *KafkaOperations) LockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
+
+func (kafkaOps *KafkaOperations) UnlockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
 }

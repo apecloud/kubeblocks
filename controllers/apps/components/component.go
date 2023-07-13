@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -29,6 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -55,6 +59,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	definition *appsv1alpha1.ClusterDefinition,
 	version *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
+	clusterTpl *appsv1alpha1.ClusterTemplate,
 	compName string,
 	dag *graph.DAG) (Component, error) {
 	var compDef *appsv1alpha1.ClusterComponentDefinition
@@ -69,15 +74,23 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		if version != nil {
 			compVer = version.Spec.GetDefNameMappingComponents()[compSpec.ComponentDefRef]
 		}
+	} else {
+		compDef = definition.GetComponentDefByName(compName)
+		if version != nil {
+			compVer = version.Spec.GetDefNameMappingComponents()[compName]
+		}
 	}
 
-	if compSpec == nil || compDef == nil {
+	if compDef == nil {
 		return nil, nil
 	}
 
-	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, definition, compDef, compSpec, compVer)
+	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, clusterTpl, definition, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
+	}
+	if synthesizedComp == nil {
+		return nil, nil
 	}
 
 	switch compDef.WorkloadType {
@@ -97,13 +110,34 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
+	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	compVer *appsv1alpha1.ClusterComponentVersion) (*component.SynthesizedComponent, error) {
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *cluster, *clusterDef, *compDef, *compSpec, compVer)
+	clsMgr, err := getClassManager(reqCtx.Ctx, cli, cluster)
+	if err != nil {
+		return nil, err
+	}
+	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, clusterTpl, clusterDef, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
 	}
 	return synthesizedComp, nil
+}
+
+func getClassManager(ctx context.Context, cli types2.ReadonlyClient, cluster *appsv1alpha1.Cluster) (*class.Manager, error) {
+	var classDefinitionList appsv1alpha1.ComponentClassDefinitionList
+	ml := []client.ListOption{
+		client.MatchingLabels{constant.ClusterDefLabelKey: cluster.Spec.ClusterDefRef},
+	}
+	if err := cli.List(ctx, &classDefinitionList, ml...); err != nil {
+		return nil, err
+	}
+
+	var constraintList appsv1alpha1.ComponentResourceConstraintList
+	if err := cli.List(ctx, &constraintList); err != nil {
+		return nil, err
+	}
+	return class.NewManager(classDefinitionList, constraintList)
 }

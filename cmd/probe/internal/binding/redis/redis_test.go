@@ -59,12 +59,12 @@ func TestRedisInit(t *testing.T) {
 	defer r.Close()
 	// make sure operations are inited
 	assert.NotNil(t, r.client)
-	assert.NotNil(t, r.OperationMap[ListUsersOp])
-	assert.NotNil(t, r.OperationMap[CreateUserOp])
-	assert.NotNil(t, r.OperationMap[DeleteUserOp])
-	assert.NotNil(t, r.OperationMap[DescribeUserOp])
-	assert.NotNil(t, r.OperationMap[GrantUserRoleOp])
-	assert.NotNil(t, r.OperationMap[RevokeUserRoleOp])
+	assert.NotNil(t, r.LegacyOperations[ListUsersOp])
+	assert.NotNil(t, r.LegacyOperations[CreateUserOp])
+	assert.NotNil(t, r.LegacyOperations[DeleteUserOp])
+	assert.NotNil(t, r.LegacyOperations[DescribeUserOp])
+	assert.NotNil(t, r.LegacyOperations[GrantUserRoleOp])
+	assert.NotNil(t, r.LegacyOperations[RevokeUserRoleOp])
 }
 func TestRedisInvokeCreate(t *testing.T) {
 	r, mock := mockRedisOps(t)

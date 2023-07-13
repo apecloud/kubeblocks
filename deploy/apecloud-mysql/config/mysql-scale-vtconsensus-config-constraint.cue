@@ -18,10 +18,10 @@
 #VtConsensusParameter: {
 
 	// Refresh interval to load tablets. (default 10s)
-	refresh_interval: =~ "[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
+	refresh_interval: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
 	// Time to wait for a diagnose and repair operation. (default 3s)
-	scan_repair_timeout: =~ "[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
+	scan_repair_timeout: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
 	...
 }

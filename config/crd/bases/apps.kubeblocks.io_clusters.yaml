@@ -520,6 +520,54 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              mode:
+                description: 'mode specifies the mode of this cluster, the value of
+                  this can be one of the following: Standalone, Replication, RaftGroup.'
+                type: string
+              parameters:
+                additionalProperties:
+                  type: string
+                description: customized parameters that is used in different clusterdefinition
+                type: object
+              replicas:
+                description: replicas specifies the replicas of the first componentSpec,
+                  if the replicas of the first componentSpec is specified, this value
+                  will be ignored.
+                format: int32
+                type: integer
+              resources:
+                description: resources specifies the resources of the first componentSpec,
+                  if the resources of the first componentSpec is specified, this value
+                  will be ignored.
+                properties:
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: 'cpu resource needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: 'memory resource needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
+              storage:
+                description: storage specifies the storage of the first componentSpec,
+                  if the storage of the first componentSpec is specified, this value
+                  will be ignored.
+                properties:
+                  size:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: 'storage size needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
               terminationPolicy:
                 description: Cluster termination policy. Valid values are DoNotTerminate,
                   Halt, Delete, WipeOut. DoNotTerminate will block delete operation.

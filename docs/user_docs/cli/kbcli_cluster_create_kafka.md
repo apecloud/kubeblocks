@@ -37,6 +37,7 @@ kbcli cluster create kafka NAME [flags]
       --monitor-replicas int         The number of Kafka monitor replicas. Value range [1, 5]. (default 1)
       --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
+      --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
       --replicas int                 The number of Kafka broker replicas for combined mode. Legal values [1, 3, 5]. (default 1)
       --sasl-enable                  Enable authentication using SASL/PLAIN for Kafka.
       --storage float                Data Storage size, the unit is Gi. Value range [1, 10000]. (default 10)

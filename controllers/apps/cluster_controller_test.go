@@ -1806,7 +1806,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
 				factory.AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetReplicas(initialReplicas)
-			})
+			}, false)
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)

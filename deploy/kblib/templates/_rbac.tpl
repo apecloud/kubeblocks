@@ -37,7 +37,7 @@ Define the role
 */}}
 {{- define "kblib.role" }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: {{ include "kblib.roleName" . }}
   namespace: {{ .Release.Namespace }}
@@ -50,14 +50,6 @@ rules:
       - events
     verbs:
       - create
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-      - nodes/stats
-    verbs:
-      - get
-      - list
 {{- end }}
 
 {{/*
@@ -72,7 +64,7 @@ metadata:
     {{- include "kblib.clusterLabels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: {{ include "kblib.roleName" . }}
 subjects:
   - kind: ServiceAccount

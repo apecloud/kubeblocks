@@ -1,6 +1,7 @@
 rule_files:
   - /etc/config-rule/recording_rules.yml
   - /etc/config-rule/alerting_rules.yml
+  - /etc/config-rule/kubelet_alert_rules.yml
   - /etc/config-rule/mysql_alert_rules.yml
   - /etc/config-rule/postgresql_alert_rules.yml
   - /etc/config-rule/redis_alert_rules.yml

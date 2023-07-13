@@ -77,6 +77,23 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 	return updatedParams, nil
 }
 
+// ValidateConfigPatch Verifies if the changed parameters have been removed
+func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1alpha1.FormatterConfig) error {
+	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
+		return nil
+	}
+
+	vParams := GenerateVisualizedParamsList(patch, formatCfg, nil)
+	for _, param := range vParams {
+		for _, p := range param.Parameters {
+			if p.Value == "" {
+				return MakeError("delete config parameter [%s] is not support!", p.Key)
+			}
+		}
+	}
+	return nil
+}
+
 // IsUpdateDynamicParameters checks if the changed parameters require a restart
 func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {

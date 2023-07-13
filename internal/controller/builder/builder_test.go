@@ -168,10 +168,12 @@ var _ = Describe("builder", func() {
 		By("assign every available fields")
 		component, err := component.BuildComponent(
 			reqCtx,
-			*cluster,
-			*clusterDef,
-			clusterDef.Spec.ComponentDefs[0],
-			cluster.Spec.ComponentSpecs[0],
+			nil,
+			cluster,
+			nil,
+			clusterDef,
+			&clusterDef.Spec.ComponentDefs[0],
+			&cluster.Spec.ComponentSpecs[0],
 			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(err).Should(Succeed())
 		Expect(component).ShouldNot(BeNil())

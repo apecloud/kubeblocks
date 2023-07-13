@@ -5,7 +5,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: backuprepoes.dataprotection.kubeblocks.io
+  name: backuprepos.dataprotection.kubeblocks.io
 spec:
   group: dataprotection.kubeblocks.io
   names:
@@ -13,14 +13,14 @@ spec:
     - kubeblocks
     kind: BackupRepo
     listKind: BackupRepoList
-    plural: backuprepoes
+    plural: backuprepos
     singular: backuprepo
   scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BackupRepo is the Schema for the backuprepoes API
+        description: BackupRepo is the Schema for the backuprepos API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

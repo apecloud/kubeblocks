@@ -325,6 +325,24 @@ var _ = Describe("Consensus Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 		})
+
+		It("test GetComponentInfoByPod with no cluster componentSpec", func() {
+			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
+			By("set componentSpec to nil")
+			cluster.Spec.ComponentSpecs = nil
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						constant.KBAppComponentLabelKey: consensusCompName,
+					},
+				},
+			}
+			componentName, componentDef, err := GetComponentInfoByPod(ctx, k8sClient, *cluster, &pod)
+			Expect(err).Should(Succeed())
+			Expect(componentName).Should(Equal(consensusCompName))
+			Expect(componentDef).ShouldNot(BeNil())
+		})
 	})
 })
 

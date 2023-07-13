@@ -61,6 +61,9 @@ type ClusterDefinitionSpec struct {
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
+
+	// reference name of clusterfamily
+	ClusterFamilyRef string `json:"clusterFamilyRef,omitempty"`
 }
 
 // SystemAccountSpec specifies information to create system accounts.

@@ -42,6 +42,9 @@ const (
 	// data plane config key
 	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
 	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
+
+	// storage config keys
+	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 )
 
 const (
@@ -81,6 +84,7 @@ const (
 	BackupToolTypeLabelKey                 = "kubeblocks.io/backup-tool-type"
 	AddonProviderLabelKey                  = "kubeblocks.io/provider" // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                           = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
+	ModeKey                                = "kubeblocks.io/mode"     // ModeKey is in enum of standalone/replication/raftGroup
 	VolumeTypeLabelKey                     = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
 	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"

@@ -274,14 +274,13 @@ func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 		return nil
 	}
 
-	//nolint
-	defer client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return nil
 	}
 
+	_ = client.Disconnect(context.TODO())
 	return mgr.GetMemberAddrsFromRSConfig(rsConfig)
 }
 
@@ -343,8 +342,6 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 		return true
 	}
 
-	//nolint
-	defer client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
@@ -358,6 +355,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 		}
 	}
 
+	_ = client.Disconnect(context.TODO())
 	return false
 }
 
@@ -394,8 +392,6 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 		return err
 	}
 
-	//nolint
-	defer client.Disconnect(context.TODO())
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
@@ -417,6 +413,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	rsConfig.Members = append(rsConfig.Members, configMember)
 
 	rsConfig.Version++
+	_ = client.Disconnect(context.TODO())
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 

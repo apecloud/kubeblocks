@@ -394,6 +394,7 @@ spec:
           - conf
         asEnvFrom:
           - bookies-recovery
+          - check-bookies
         volumeName: recovery-config
       scriptSpecs:
         - name: pulsar-scripts
@@ -414,6 +415,10 @@ spec:
             volumeMounts:
             - name: scripts
               mountPath: /kb-scripts
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
         containers:
           - name: bookies-recovery
             securityContext:

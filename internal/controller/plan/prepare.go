@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
@@ -88,22 +89,18 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 		return cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
-	if err := createConfigObjects(cli, ctx, renderWrapper.renderedObjs); err != nil {
+	if err := injectTemplateEnvFrom(cluster, component, podSpec, cli, ctx, renderWrapper.renderedObjs); err != nil {
 		return err
 	}
-	return injectTemplateEnvFrom(cluster, component, podSpec, cli, ctx)
+	return createConfigObjects(cli, ctx, renderWrapper.renderedObjs)
 }
 
-func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec, cli client.Client, ctx context.Context) error {
+func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec, cli client.Client, ctx context.Context, localObjs []client.Object) error {
 	for _, template := range component.ConfigTemplates {
 		if len(template.AsEnvFrom) != 0 && template.ConfigConstraintRef != "" {
 			cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, template.Name)
-			cm := &corev1.ConfigMap{}
-			cmKey := client.ObjectKey{
-				Name:      cmName,
-				Namespace: cluster.Namespace,
-			}
-			if err := cli.Get(ctx, cmKey, cm); err != nil {
+			cm, err := fetchConfigMap(localObjs, cmName, cluster.Namespace, cli, ctx)
+			if err != nil {
 				return err
 			}
 			keys := template.Keys
@@ -114,7 +111,7 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 				if _, ok := cm.Data[key]; !ok {
 					continue
 				}
-				envConfigMap, err := generateEnvMap(cluster, template, cmName, key, cm.Data[key], ctx, cli)
+				envConfigMap, err := generateEnvMap(cluster, component.Name, template, cmName, key, cm.Data[key], ctx, cli)
 				if err != nil {
 					return err
 				}
@@ -126,7 +123,23 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 	return nil
 }
 
-func generateEnvMap(cluster *appsv1alpha1.Cluster, template appsv1alpha1.ComponentConfigSpec, cmName, fileName, fileContext string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+func fetchConfigMap(localObjs []client.Object, cmName, namespace string, cli client.Client, ctx context.Context) (*corev1.ConfigMap, error) {
+	var (
+		cmObj = &corev1.ConfigMap{}
+		cmKey = client.ObjectKey{Name: cmName, Namespace: namespace}
+	)
+
+	localObject := findMatchedLocalObject(localObjs, cmKey, generics.ToGVK(cmObj))
+	if localObject != nil {
+		return localObject.(*corev1.ConfigMap), nil
+	}
+	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
+		return nil, err
+	}
+	return cmObj, nil
+}
+
+func generateEnvMap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1alpha1.ComponentConfigSpec, cmName, fileName, fileContext string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	ccKey := client.ObjectKey{
 		Namespace: "",
 		Name:      template.ConfigConstraintRef,
@@ -149,7 +162,7 @@ func generateEnvMap(cluster *appsv1alpha1.Cluster, template appsv1alpha1.Compone
 		envMap[key] = cast.ToString(v)
 	}
 	cmKey := client.ObjectKey{
-		Name:      strings.Join([]string{cmName, fileName}, "-"),
+		Name:      strings.Join([]string{cmName, fileName, "env"}, "-"),
 		Namespace: cluster.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
@@ -161,6 +174,12 @@ func generateEnvMap(cluster *appsv1alpha1.Cluster, template appsv1alpha1.Compone
 		cm.Name = cmKey.Name
 		cm.Namespace = cmKey.Namespace
 		cm.Data = envMap
+		cm.Labels = map[string]string{
+			constant.CMTemplateNameLabelKey: template.Name,
+			constant.AppNameLabelKey:        cluster.Spec.ClusterDefRef,
+			constant.AppInstanceLabelKey:    cluster.Name,
+			constant.KBAppComponentLabelKey: componentName,
+		}
 		if err := controllerutil.SetOwnerReference(cluster, cm, scheme); err != nil {
 			return nil, err
 		}

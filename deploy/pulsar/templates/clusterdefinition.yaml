@@ -297,6 +297,7 @@ spec:
         - name: bookies-config
           templateRef: {{ include "pulsar.name" . }}-bookies-conf-tpl
           namespace: {{ .Release.Namespace }}
+          constraintRef: pulsar-config-constraints
           volumeName: bookies-config
           keys:
             - conf

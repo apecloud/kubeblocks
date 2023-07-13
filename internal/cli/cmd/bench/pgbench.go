@@ -188,7 +188,7 @@ func (o *PgBenchOptions) Run() error {
 	pgbench := v1alpha1.Pgbench{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pgbench",
-			APIVersion: "benchmark.kubebench.io/v1alpha1",
+			APIVersion: types.PgBenchGVR().GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: o.namespace,

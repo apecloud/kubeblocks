@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -90,7 +92,11 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+			} else {
+				Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			}
 			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})
 

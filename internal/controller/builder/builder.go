@@ -359,7 +359,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 }
 
 func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent, envConfigName string) (*workloads.ReplicatedStateMachine, error) {
+	component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
@@ -422,7 +422,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 
 	// TODO(free6om): refactor out rsm related envs
-	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &rsm.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, cluster, component, "", &rsm.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return rsm, nil

@@ -47,7 +47,6 @@ bookies:
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     limits:
-      cpu: 200m
       memory: 512Mi
     requests:
       cpu: 200m
@@ -73,7 +72,6 @@ bookiesRecovery:
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     limits:
-      cpu: 200m
       memory: 512Mi
     requests:
       cpu: 200m
@@ -94,15 +92,17 @@ zookeeper:
     ## lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     ##
     limits:
-      cpu: 200m
       memory: 512Mi
     requests:
       cpu: 100m
       memory: 512Mi
 
   persistence:
-    enabled: false
+    enabled: true
     data:
+      storageClassName:
+      size: 2Gi
+    log:
       storageClassName:
       size: 2Gi
 
@@ -121,7 +121,6 @@ broker:
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     limits:
-      cpu: 200m
       memory: 512Mi
     requests:
       cpu: 200m
@@ -138,7 +137,6 @@ proxy:
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
     # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     limits:
-      cpu: 200m
       memory: 512Mi
     requests:
       cpu: 200m

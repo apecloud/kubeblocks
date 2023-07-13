@@ -331,6 +331,10 @@ spec:
           - name: bookies
             command:
               - /kb-scripts/start-bookies.sh
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/kb-scripts/prestop-bookies.sh"]
             livenessProbe:
               failureThreshold: 60
               httpGet:
@@ -372,6 +376,15 @@ spec:
                 name: ledgers
               - name: scripts
                 mountPath: /kb-scripts
+              - name: annotations
+                mountPath: /etc/annotations
+        volumes:
+          - name: annotations
+            downwardAPI:
+              items:
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
     - name: bookies-recovery
       workloadType: Stateful
       characterType: pulsar-bookie-recovery

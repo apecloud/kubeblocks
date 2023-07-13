@@ -321,7 +321,7 @@ type PointInTimeRefSpec struct {
 
 // ScriptSpec defines the script to be executed. It is not a general purpose script executor.
 // It is designed to execute the script to perform some specific operations, such as create database, create user, etc.
-// It is appliable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.
+// It is applicable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.
 type ScriptSpec struct {
 	ComponentOps `json:",inline"`
 	// exec command with image, by default use the image of kubeblocks-clients

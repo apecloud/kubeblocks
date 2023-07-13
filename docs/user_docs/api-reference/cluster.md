@@ -7899,7 +7899,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
-<p>ScriptSpec defines the script to be executed. It is not a general purpose script executor.<br />It is designed to execute the script to perform some specific operations, such as create database, create user, etc.<br />It is appliable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.</p><br />
+<p>ScriptSpec defines the script to be executed. It is not a general purpose script executor.<br />It is designed to execute the script to perform some specific operations, such as create database, create user, etc.<br />It is applicable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.</p><br />
 </div>
 <table>
 <thead>

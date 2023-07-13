@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/stoewer/go-strcase"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -193,5 +194,9 @@ func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[st
 			newValues[k] = v
 		}
 	}
+
+	// set rbacEnabled prop value by environment variable
+	newValues[c.SubChartName].(map[string]interface{})[cluster.RBACEnabledProp.String()] = viper.GetBool(types.CfgKeyRBACEnabled)
+
 	return newValues
 }

@@ -118,6 +118,10 @@ func deleteDependencies(client kubernetes.Interface, ns string, name string) err
 		allErr          []error
 	)
 
+	if !rbacEnabled() {
+		return nil
+	}
+
 	// now, delete the dependencies, for postgresql, we delete sa, role and rolebinding
 	ctx := context.TODO()
 	gracePeriod := int64(0)

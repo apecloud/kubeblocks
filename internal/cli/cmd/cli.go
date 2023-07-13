@@ -222,6 +222,7 @@ func initConfig() {
 	viper.SetDefault(types.CfgKeyClusterDefaultMemory, "1Gi")
 
 	viper.SetDefault(types.CfgKeyHelmRepoURL, "")
+	viper.SetDefault(types.CfgKeyRBACEnabled, false)
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

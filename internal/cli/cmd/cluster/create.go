@@ -98,10 +98,6 @@ var clusterCreateExample = templates.Examples(`
 	# the default storage class will be used
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
 
-	# Create a cluster and set the class to general-1c1g
-	# run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
-
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
 
@@ -221,7 +217,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
 	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
-	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
+	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
@@ -255,7 +251,8 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
-	// o.CreateOptions.CreateDependencies = o.CreateDependencies
+	o.CreateOptions.CreateDependencies = o.CreateDependencies
+	o.CreateOptions.CleanUpFn = o.CleanUp
 	return o
 }
 
@@ -625,6 +622,10 @@ const (
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
 
+	if !rbacEnabled() {
+		return nil
+	}
+
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
 	return nil
@@ -636,6 +637,10 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
+
+	if !rbacEnabled() {
+		return nil
+	}
 
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account
@@ -1297,4 +1302,8 @@ func setKeys() []string {
 		string(keyStorageClass),
 		string(keySwitchPolicy),
 	}
+}
+
+func rbacEnabled() bool {
+	return viper.GetBool(types.CfgKeyRBACEnabled)
 }

@@ -76,7 +76,6 @@ sqlctl switchover  --primary xxx --candidate xxx
 			fmt.Printf("request error: %v", err)
 		}
 		fmt.Println(string(bodyBytes))
-		return
 	},
 }
 

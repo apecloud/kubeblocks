@@ -195,7 +195,7 @@ func (commands *Commands) RestartDBServiceIfExited() {
 		return
 	}
 	commands.WaitGroup.Add(1)
-	for true {
+	for {
 		select {
 		case <-commands.ctx.Done():
 			commands.WaitGroup.Done()

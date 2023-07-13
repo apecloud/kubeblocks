@@ -40,10 +40,6 @@ var (
 	enableAppHealth  bool
 )
 
-const (
-	runtimeWaitTimeoutInSeconds = 60
-)
-
 var RunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run sqlchannel and db service.",
@@ -68,7 +64,7 @@ sqlctl run  -- mysqld
 			InternalGRPCPort: internalGRPCPort,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, err.Error())
+			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(1)
 		}
 

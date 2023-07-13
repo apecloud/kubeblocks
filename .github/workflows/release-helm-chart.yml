@@ -46,13 +46,14 @@ jobs:
 
   release-charts-image:
     needs: [ chart-version, release-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.12
     with:
-      MAKE_OPS: "push-charts-image"
+      MAKE_OPS_PRE: "helm-package"
       IMG: "apecloud/kubeblocks-charts"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
       GO_VERSION: "1.20"
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile-charts"
     secrets: inherit
 
   send-message:

@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -55,6 +57,14 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		clusterVersionName = "test-clusterversion"
 		clusterName        = "test-cluster"
 		controllerRevision = fmt.Sprintf("%s-%s-%s", clusterName, compName, "6fdd48d9cd1")
+
+		clusterDef *appsv1alpha1.ClusterDefinition
+		cluster    *appsv1alpha1.Cluster
+		component  types.Component
+		rsm        *workloads.ReplicatedStateMachine
+		reqCtx     *intctrlutil.RequestCtx
+		dag        *graph.DAG
+		err        error
 	)
 
 	cleanAll := func() {
@@ -75,6 +85,10 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.DeploymentSignature, inNS, ml)
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			testapps.ClearResources(&testCtx, generics.RSMSignature, inNS, ml)
+		}
+
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -83,15 +97,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 	AfterEach(cleanAll)
 
 	Context("with stateless component", func() {
-		var (
-			clusterDef *appsv1alpha1.ClusterDefinition
-			cluster    *appsv1alpha1.Cluster
-			component  types.Component
-			reqCtx     *intctrlutil.RequestCtx
-			dag        *graph.DAG
-			err        error
-		)
-
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatelessNginxComponent, compDefName).
@@ -131,8 +136,18 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					SetReplicas(int32(1)).
 					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
 					Create(&testCtx).GetObject()
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
+						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+						SetReplicas(int32(1)).
+						AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
+						Create(&testCtx).GetObject()
+				}
 
 				podName := fmt.Sprintf("%s-%s-%s", clusterName, compName, testCtx.GetRandomStr())
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					podName = rsm.Name + "-0"
+				}
 				pod = testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 					SetOwnerReferences("apps/v1", constant.DeploymentKind, deployment).
 					AddAppInstanceLabel(clusterName).
@@ -153,6 +168,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, deployment, func() {
 					testk8s.MockDeploymentReady(deployment, stateless.NewRSAvailableReason, deployment.Name)
 				})).Should(Succeed())
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+						testk8s.MockRSMReady(rsm)
+					})).Should(Succeed())
+				}
 
 				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
@@ -161,15 +181,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 	})
 
 	Context("with statefulset component", func() {
-		var (
-			clusterDef *appsv1alpha1.ClusterDefinition
-			cluster    *appsv1alpha1.Cluster
-			component  types.Component
-			reqCtx     *intctrlutil.RequestCtx
-			dag        *graph.DAG
-			err        error
-		)
-
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, compDefName).
@@ -228,6 +239,15 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					})).Should(Succeed())
 					pods = append(pods, pod)
 				}
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+						SetReplicas(int32(3)).
+						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						Create(&testCtx).GetObject()
+					// init rsm status
+					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
+				}
 			})
 
 			It("should set component status to failed if container is not ready and have error message", func() {
@@ -242,6 +262,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+						testk8s.MockRSMReady(rsm)
+					})).Should(Succeed())
+				}
 
 				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
@@ -250,15 +275,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 	})
 
 	Context("with consensusset component", func() {
-		var (
-			clusterDef *appsv1alpha1.ClusterDefinition
-			cluster    *appsv1alpha1.Cluster
-			component  types.Component
-			reqCtx     *intctrlutil.RequestCtx
-			dag        *graph.DAG
-			err        error
-		)
-
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, compDefName).
@@ -316,6 +332,14 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					})).Should(Succeed())
 					pods = append(pods, pod)
 				}
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+						SetReplicas(int32(3)).
+						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						Create(&testCtx).GetObject()
+					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
+				}
 			})
 
 			It("should set component status to failed if container is not ready and have error message", func() {
@@ -329,6 +353,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+						testk8s.MockRSMReady(rsm)
+					})).Should(Succeed())
+				}
 
 				Expect(setPodRole(pods[0], "leader")).Should(Succeed())
 				Expect(setPodRole(pods[1], "follower")).Should(Succeed())
@@ -341,15 +370,6 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 	})
 
 	Context("with replicationset component", func() {
-		var (
-			clusterDef *appsv1alpha1.ClusterDefinition
-			cluster    *appsv1alpha1.Cluster
-			component  types.Component
-			reqCtx     *intctrlutil.RequestCtx
-			dag        *graph.DAG
-			err        error
-		)
-
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
@@ -417,6 +437,14 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					Expect(testCtx.Cli.Status().Patch(testCtx.Ctx, pod, patch)).Should(Succeed())
 					pods = append(pods, pod)
 				}
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+						SetReplicas(int32(replicas)).
+						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+						Create(&testCtx).GetObject()
+					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
+				}
 			})
 
 			It("should set component status to failed if container is not ready and have error message", func() {
@@ -430,6 +458,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+						testk8s.MockRSMReady(rsm)
+					})).Should(Succeed())
+				}
 
 				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))

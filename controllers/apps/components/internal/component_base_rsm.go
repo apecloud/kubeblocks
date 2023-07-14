@@ -657,9 +657,9 @@ func (c *RSMComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestC
 	if err := c.UpdatePDB(reqCtx, cli); err != nil {
 		return err
 	}
-	if err := c.UpdateService(reqCtx, cli); err != nil {
-		return err
-	}
+	// if err := c.UpdateService(reqCtx, cli); err != nil {
+	//	return err
+	// }
 	return nil
 }
 
@@ -680,6 +680,13 @@ func (c *RSMComponentBase) updateWorkload(rsmObj *workloads.ReplicatedStateMachi
 	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
 	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
 	rsmObjCopy.Spec.UpdateStrategy = rsmProto.Spec.UpdateStrategy
+	rsmObjCopy.Spec.Service = rsmProto.Spec.Service
+	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
+	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
+	rsmObjCopy.Spec.RoleObservation = rsmProto.Spec.RoleObservation
+	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
+	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
+	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 
 	util.ResolvePodSpecDefaultFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 

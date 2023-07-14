@@ -384,11 +384,11 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *component.PodSpec,
 	}
-	name := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
-	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, name).
+	rsmName := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
+	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
 		AddLabelsInMap(commonLabels).
 		AddMatchLabelsInMap(commonLabels).
-		SetServiceName(name + "-headless").
+		SetServiceName(rsmName + "-headless").
 		SetReplicas(component.Replicas).
 		SetTemplate(template)
 
@@ -404,6 +404,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 
 	service, alternativeServices := separateServices(component.Services)
+	alternativeServices = fixService(cluster.Namespace, rsmName, component, alternativeServices...)
 	rsmBuilder.SetService(service.Spec).SetAlternativeServices(alternativeServices)
 
 	secretName := fmt.Sprintf("%s-conn-credential", cluster.Name)
@@ -451,6 +452,45 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		return nil, err
 	}
 	return rsm, nil
+}
+
+func fixService(namespace, prefix string, component *component.SynthesizedComponent, alternativeServices ...corev1.Service) []corev1.Service {
+	leaderName := getLeaderName(component)
+	for i := range alternativeServices {
+		if len(alternativeServices[i].Name) > 0 {
+			alternativeServices[i].Name = prefix + "-" + alternativeServices[i].Name
+		}
+		if len(alternativeServices[i].Namespace) == 0 {
+			alternativeServices[i].Namespace = namespace
+		}
+		if alternativeServices[i].Spec.Type == corev1.ServiceTypeLoadBalancer {
+			alternativeServices[i].Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
+		}
+		if len(leaderName) > 0 {
+			selector := alternativeServices[i].Spec.Selector
+			if selector == nil {
+				selector = make(map[string]string, 0)
+			}
+			selector[constant.RoleLabelKey] = leaderName
+			alternativeServices[i].Spec.Selector = selector
+		}
+	}
+	return alternativeServices
+}
+
+func getLeaderName(component *component.SynthesizedComponent) string {
+	if component == nil {
+		return ""
+	}
+	switch component.WorkloadType {
+	case appsv1alpha1.Consensus:
+		if component.ConsensusSpec != nil {
+			return component.ConsensusSpec.Leader.Name
+		}
+	case appsv1alpha1.Replication:
+		return constant.Primary
+	}
+	return ""
 }
 
 // separateServices separates 'services' to a main service from cd and alternative services from cluster

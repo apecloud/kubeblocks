@@ -55,12 +55,16 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// generate objects by current spec
 	svc := buildSvc(*rsm)
+	altSvs := buildAlternativeSvs(*rsm)
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
 	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
 	objects := []client.Object{headLessSvc, envConfig, sts}
 	if svc != nil {
 		objects = append(objects, svc)
+	}
+	for _, s := range altSvs {
+		objects = append(objects, s)
 	}
 
 	for _, object := range objects {
@@ -138,10 +142,35 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 		SetType(rsm.Spec.Service.Type)
 	for _, role := range rsm.Spec.Roles {
 		if role.IsLeader && len(role.Name) > 0 {
-			svcBuilder.AddSelectors(rsmAccessModeLabelKey, string(role.AccessMode))
+			k, v := getSvcSelector(&role)
+			svcBuilder.AddSelectors(k, v)
 		}
 	}
 	return svcBuilder.GetObject()
+}
+
+func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service {
+	if rsm.Spec.Service == nil {
+		return nil
+	}
+	svcLabels := getLabels(&rsm)
+	var services []*corev1.Service
+	for i := range rsm.Spec.AlternativeServices {
+		service := rsm.Spec.AlternativeServices[i]
+		if len(service.Namespace) == 0 {
+			service.Namespace = rsm.Namespace
+		}
+		labels := service.Labels
+		if labels == nil {
+			labels = make(map[string]string, 0)
+		}
+		for k, v := range svcLabels {
+			labels[k] = v
+		}
+		service.Labels = labels
+		services = append(services, &service)
+	}
+	return services
 }
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {

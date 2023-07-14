@@ -523,12 +523,35 @@ func getFinalizer() string {
 
 func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		return rsm.Labels
+		labels := make(map[string]string, 0)
+		keys := []string{
+			constant.AppManagedByLabelKey,
+			constant.AppNameLabelKey,
+			constant.AppComponentLabelKey,
+			constant.AppInstanceLabelKey,
+			constant.KBAppComponentLabelKey,
+		}
+		for _, key := range keys {
+			if value, ok := rsm.Labels[key]; ok {
+				labels[key] = value
+			}
+		}
+		return labels
 	}
 	return map[string]string{
 		constant.AppInstanceLabelKey: rsm.Name,
 		constant.KBManagedByKey:      kindReplicatedStateMachine,
 	}
+}
+
+func getSvcSelector(leader *workloads.ReplicaRole) (string, string) {
+	if leader == nil {
+		return "", ""
+	}
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		return constant.RoleLabelKey, leader.Name
+	}
+	return rsmAccessModeLabelKey, string(leader.AccessMode)
 }
 
 func setOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {

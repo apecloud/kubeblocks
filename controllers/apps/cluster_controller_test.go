@@ -1945,13 +1945,13 @@ var _ = Describe("Cluster Controller", func() {
 			checkPreservedObjects(clusterObj.UID)
 		})
 
-		FIt("should successfully h-scale with multiple components", func() {
+		It("should successfully h-scale with multiple components", func() {
 			viper.Set("VOLUMESNAPSHOT", true)
 			viper.Set(constant.CfgKeyBackupPVCName, "")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
-		FIt("should successfully h-scale with multiple components by backup tool", func() {
+		It("should successfully h-scale with multiple components by backup tool", func() {
 			viper.Set("VOLUMESNAPSHOT", false)
 			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
@@ -1979,7 +1979,7 @@ var _ = Describe("Cluster Controller", func() {
 				testDoNotTermintate(compName, compDefName)
 			})
 
-			It(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {
+			FIt(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {
 				testServiceAddAndDelete(compName, compDefName)
 			})
 

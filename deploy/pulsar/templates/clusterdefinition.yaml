@@ -27,8 +27,12 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: http
+          scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
+        - name: agamotto-configuration
+          templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
         - name: broker-env
           templateRef: {{ include "pulsar.name" . }}-broker-env-tpl
           namespace: {{ .Release.Namespace }}
@@ -177,6 +181,36 @@ spec:
             volumeMounts:
             - name: scripts
               mountPath: /kb-scripts
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+            env:
+              - name: JOB_NAME
+                value: broker
+              - name: SERVICE_PORT
+                value: "8080"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
     - name: pulsar-proxy
       workloadType: Stateful
       characterType: pulsar-proxy
@@ -192,8 +226,12 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: http
+          scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
+        - name: agamotto-configuration
+          templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
         - name: proxy-config
           templateRef: {{ include "pulsar.name" . }}-proxy-conf-tpl
           namespace: {{ .Release.Namespace }}
@@ -290,12 +328,51 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /kb-scripts
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+            env:
+              - name: JOB_NAME
+                value: proxy
+              - name: SERVICE_PORT
+                value: "8080"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
     - name: bookies
       workloadType: Stateful
       characterType: bookies
       statefulSpec:
         updateStrategy: BestEffortParallel
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
+        - name: agamotto-configuration
+          templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
         - name: bookies-config
           templateRef: {{ include "pulsar.name" . }}-bookies-conf-tpl
           namespace: {{ .Release.Namespace }}
@@ -373,6 +450,36 @@ spec:
                 mountPath: /kb-scripts
               - name: annotations
                 mountPath: /etc/annotations
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+            env:
+              - name: JOB_NAME
+                value: bookie
+              - name: SERVICE_PORT
+                value: "8000"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
         volumes:
           - name: annotations
             downwardAPI:
@@ -389,8 +496,12 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: http
+          scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
+      - name: agamotto-configuration
+        templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
+        namespace: {{ .Release.Namespace }}
+        volumeName: agamotto-configuration
       - name: bookies-recovery-config
         templateRef: {{ include "pulsar.name" . }}-recovery-conf-tpl
         namespace: {{ .Release.Namespace }}
@@ -454,6 +565,36 @@ spec:
             volumeMounts:
             - name: scripts
               mountPath: /kb-scripts
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+            env:
+              - name: JOB_NAME
+                value: recovery
+              - name: SERVICE_PORT
+                value: "8000"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
     - name: zookeeper
       workloadType: Stateful
       characterType: zookeeper
@@ -463,8 +604,12 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: metrics
+          scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
+        - name: agamotto-configuration
+          templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
         - name: zookeeper-config
           templateRef: {{ include "pulsar.name" . }}-zookeeper-conf-tpl
           namespace: {{ .Release.Namespace }}
@@ -559,3 +704,33 @@ spec:
                 name: data-log
               - name: scripts
                 mountPath: /kb-scripts
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+            env:
+              - name: JOB_NAME
+                value: zookeeper
+              - name: SERVICE_PORT
+                value: "8000"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto

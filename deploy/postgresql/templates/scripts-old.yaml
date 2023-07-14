@@ -302,7 +302,7 @@ data:
          postgresql_set_property "primary_conninfo" "$primary_conninfo" "$POSTGRESQL_CONF_FILE"
       fi
       touch "$POSTGRESQL_DATA_DIR"/standby.signal
-    else:
+    else
       if [ -d ${PGDATA} ]; then
          touch "$POSTGRESQL_DATA_DIR"/standby.signal
       fi

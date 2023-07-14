@@ -40,3 +40,17 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
+
+{{/*
+Create full image name
+*/}}
+{{- define "pulsar.imageFullName" -}}
+{{- printf "%s:%s" ( .image.repository | default .root.Values.defaultPulsarImage.repository ) ( .image.tag | default .root.Values.defaultPulsarImage.tag | default .root.Chart.AppVersion ) -}}
+{{- end -}}
+
+{{/*
+Create image pull policy
+*/}}
+{{- define "pulsar.imagePullPolicy" -}}
+{{- printf "%s" ( .image.pullPolicy | default .root.Values.defaultPulsarImage.pullPolicy | default "IfNotPresent" ) -}}
+{{- end -}}

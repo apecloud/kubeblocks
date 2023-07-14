@@ -41,8 +41,9 @@ PULSAR_PREFIX_messagingProtocols: kafka
 #PULSAR_PREFIX_protocolHandlerDirectory: ./protocols
 #PULSAR_PREFIX_narExtractionDirectory: /tmp/pulsar-nar
 PULSAR_PREFIX_allowAutoTopicCreationType: partitioned 
-PULSAR_PREFIX_kafkaListeners: kafka_external://0.0.0.0:9092
-PULSAR_PREFIX_kafkaProtocolMap: kafka_external:PLAINTEXT
+PULSAR_PREFIX_kafkaListeners: PLAINTEXT://0.0.0.0:9092
+#PULSAR_PREFIX_kafkaListeners: kafka_external://0.0.0.0:9092
+#PULSAR_PREFIX_kafkaProtocolMap: kafka_external:PLAINTEXT
 {{- $clusterName := $.cluster.metadata.name }}
 {{- $namespace := $.cluster.metadata.namespace }}
 {{- $pulsar_broker_component := fromJson "{}" }}
@@ -52,12 +53,11 @@ PULSAR_PREFIX_kafkaProtocolMap: kafka_external:PLAINTEXT
   {{- end }}
 {{- end }}
 {{- $brokerSvcFDQN := printf "%s-%s.%s.svc" $clusterName $pulsar_broker_component.name $namespace }}
-PULSAR_PREFIX_kafkaAdvertisedListeners: kafka_external://{{ $brokerSvcFDQN }}:9092
+#PULSAR_PREFIX_kafkaAdvertisedListeners: kafka_external://{{ $brokerSvcFDQN }}:9092
 
 # Set offset management as below, since offset management for KoP depends on Pulsar "Broker Entry Metadata".
 # It’s required for KoP 2.8.0 or higher version.
 PULSAR_PREFIX_brokerEntryMetadataInterceptors: org.apache.pulsar.common.intercept.AppendIndexMetadataInterceptor
-
 # Disable the deletion of inactive topics. It’s not required but very important in KoP. Currently, 
 # Pulsar deletes inactive partitions of a partitioned topic while the metadata of the partitioned topic is not deleted.
 # KoP cannot create missed partitions in this case.

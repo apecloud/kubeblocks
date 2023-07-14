@@ -64,11 +64,13 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
-		if serviceAccountName == "" && !hasProbes {
-			return nil
+		if serviceAccountName == "" {
+			if !hasProbes {
+				return nil
+			}
+			serviceAccountName = "kb-" + cluster.Name
 		}
 
-		serviceAccountName = "kb-" + cluster.Name
 		if !viper.GetBool(constant.EnableRBACManager) {
 			transCtx.Logger.V(1).Info("rbac manager is not enabled")
 			if !isServiceAccountExist(transCtx, serviceAccountName, true) {

@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -102,6 +103,12 @@ import (
 
 // componentresourceconstraint get list
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
+
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/status,verbs=get
+
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -218,12 +225,20 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
 		Owns(&dataprotectionv1alpha1.Backup{}).
 		Owns(&batchv1.Job{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
+		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
+
+	if viper.GetBool(constant.EnableRBACManager) {
+		b.Owns(&rbacv1.RoleBinding{}).
+			Owns(&corev1.ServiceAccount{})
+	} else {
+		b.Watches(&source.Kind{Type: &rbacv1.RoleBinding{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
+			Watches(&source.Kind{Type: &corev1.ServiceAccount{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
+	}
 
 	return b.Complete(r)
 }
 
-func (r *ClusterReconciler) filterClusterPods(obj client.Object) []reconcile.Request {
+func (r *ClusterReconciler) filterClusterResources(obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}

@@ -3,10 +3,10 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-sa-pg-cluster
+  name: kb-pg-cluster
   namespace: default
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.33
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 ---
@@ -14,9 +14,9 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-role-pg-cluster
+  name: kb-pg-cluster
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.33
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 rules:
@@ -67,18 +67,18 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-rolebinding-pg-cluster
+  name: kb-pg-cluster
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.33
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-role-pg-cluster
+  name: kb-pg-cluster
 subjects:
   - kind: ServiceAccount
-    name: kb-sa-pg-cluster
+    name: kb-pg-cluster
     namespace: default
 ---
 # Source: postgresql-cluster/templates/cluster.yaml
@@ -88,7 +88,7 @@ metadata:
   name: pg-cluster
   namespace: default
   labels: 
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.33
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 spec:
@@ -107,13 +107,22 @@ spec:
       replicas: 1
       enabledLogs:
         - running
-      serviceAccountName: kb-sa-pg-cluster
+      serviceAccountName: kb-pg-cluster
       switchPolicy:
         type: Noop      
       resources:
         limits:
           cpu: "0.5"
-          memory: "1Gi"
+          memory: "0.5Gi"
         requests:
           cpu: "0.5"
-          memory: "1Gi"
+          memory: "0.5Gi"      
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi      
+      services:

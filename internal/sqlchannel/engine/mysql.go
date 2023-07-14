@@ -35,7 +35,6 @@ func newMySQL() *mysql {
 	return &mysql{
 		info: EngineInfo{
 			Client:      "mysql",
-			Container:   "mysql",
 			PasswordEnv: "$MYSQL_ROOT_PASSWORD",
 			UserEnv:     "$MYSQL_ROOT_USER",
 			Database:    "mysql",

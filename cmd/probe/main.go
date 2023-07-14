@@ -103,11 +103,11 @@ func main() {
 	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
-	//ha := highavailability.NewHa(logr.Logger{})
-	//if ha != nil {
-	//	defer ha.ShutdownWithWait()
-	//	go ha.Start()
-	//}
+	// ha := highavailability.NewHa(logHa)
+	// if ha != nil {
+	// 	defer ha.ShutdownWithWait()
+	// 	go ha.Start()
+	// }
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

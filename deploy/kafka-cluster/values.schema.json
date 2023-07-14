@@ -18,12 +18,6 @@
         "separated"
       ]
     },
-    "tlsEnable": {
-      "title": "TlsEnable",
-      "description": "Enable TLS for Kafka.",
-      "type": "boolean",
-      "default": false
-    },
     "saslEnable": {
       "title": "SaslEnable",
       "description": "Enable authentication using SASL/PLAIN for Kafka.",
@@ -38,23 +32,12 @@
     },
     "storageEnable": {
       "title": "StorageEnable",
-      "description": "Enable storage for Kafka meta/data/log.",
+      "description": "Enable storage for Kafka.",
       "type": "boolean",
       "default": false
     },
-    "metaStorage": {
-      "title": "MetaStorage(Gi)",
-      "description": "Meta Storage size, the unit is Gi.",
-      "type": [
-        "number",
-        "string"
-      ],
-      "default": 5,
-      "minimum": 1,
-      "maximum": 10000
-    },
-    "dataStorage": {
-      "title": "DataStorage(Gi)",
+    "storage": {
+      "title": "Storage(Gi)",
       "description": "Data Storage size, the unit is Gi.",
       "type": [
         "number",
@@ -64,20 +47,32 @@
       "minimum": 1,
       "maximum": 10000
     },
-    "logStorage": {
-      "title": "LogStorage(Gi)",
-      "description": "Log Storage size, the unit is Gi.",
+    "storageClass": {
+      "title": "StorageClass",
+      "description": "The StorageClass for Kafka Data Storage.",
+      "type": "string",
+      "default": ""
+    },
+    "metaStorage": {
+      "title": "MetaStorage(Gi)",
+      "description": "Metadata Storage size, the unit is Gi.",
       "type": [
         "number",
         "string"
       ],
-      "default": 2,
+      "default": 5,
       "minimum": 1,
       "maximum": 10000
     },
+    "metaStorageClass": {
+      "title": "MetaStorageClass",
+      "description": "The StorageClass for Kafka Metadata Storage.",
+      "type": "string",
+      "default": ""
+    },
     "replicas": {
       "title": "Replicas",
-      "description": "The number of Kafka replicas for combined mode.",
+      "description": "The number of Kafka broker replicas for combined mode.",
       "type": "integer",
       "default": 1,
       "enum": [
@@ -120,7 +115,7 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 64,
       "multipleOf": 0.5
@@ -132,9 +127,21 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 1000
+    },
+    "brokerHeap": {
+      "title": "BrokerHeap",
+      "description": "Kafka broker's jvm heap setting.",
+      "type": "string",
+      "default": "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+    },
+    "controllerHeap": {
+      "title": "ControllerHeap",
+      "description": "Kafka controller's jvm heap setting for separated mode",
+      "type": "string",
+      "default": "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
     }
   }
 }

@@ -38,9 +38,15 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
-type Operation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
+type LegacyOperation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
+
+type Operation interface {
+	Kind() OperationKind
+	Init(metadata Metadata) error
+	Invoke(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) error
+}
 
 // AccessMode defines SVC access mode enums.
 // +enum
@@ -74,7 +80,11 @@ type BaseOperations struct {
 	Metadata               map[string]string
 	InitIfNeed             func() bool
 	GetRole                func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error)
-	OperationMap           map[OperationKind]Operation
+	// TODO: need a better way to support the extension for engines.
+	LockInstance     func(ctx context.Context) error
+	UnlockInstance   func(ctx context.Context) error
+	LegacyOperations map[OperationKind]LegacyOperation
+	Ops              map[OperationKind]Operation
 }
 
 func init() {
@@ -103,33 +113,44 @@ func (ops *BaseOperations) Init() {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}
 	}
-	//ops.Metadata = metadata
-	ops.OperationMap = map[OperationKind]Operation{
+
+	ops.LegacyOperations = map[OperationKind]LegacyOperation{
 		CheckRunningOperation: ops.CheckRunningOps,
 		CheckRoleOperation:    ops.CheckRoleOps,
 		GetRoleOperation:      ops.GetRoleOps,
+		VolumeProtection:      ops.volumeProtection,
 		SwitchoverOperation:   ops.SwitchoverOps,
 	}
+
+	ops.Ops = map[OperationKind]Operation{
+		VolumeProtection: newVolumeProtectionOperation(ops.Logger, ops),
+	}
 	ops.DBAddress = ops.getAddress()
+
+	for kind, op := range ops.Ops {
+		if err := op.Init(metadata); err != nil {
+			ops.Logger.Error(err, fmt.Sprintf("init operation %s error", kind))
+			// panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
+		}
+	}
 }
 
-func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind OperationKind, operation Operation, manager component.DBManager) {
+func (ops *BaseOperations) RegisterOperation(opsKind OperationKind, operation LegacyOperation) {
+	if ops.LegacyOperations == nil {
+		ops.LegacyOperations = map[OperationKind]LegacyOperation{}
+	}
+	ops.LegacyOperations[opsKind] = operation
+}
+
+func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind OperationKind, operation LegacyOperation, manager component.DBManager) {
 	ops.RegisterOperation(opsKind, StartupCheckWraper(manager, operation))
 }
 
-func (ops *BaseOperations) RegisterOperation(opsKind OperationKind, operation Operation) {
-	if ops.OperationMap == nil {
-		ops.OperationMap = map[OperationKind]Operation{}
-	}
-	ops.OperationMap[opsKind] = operation
-}
-
 // Operations returns list of operations supported by the binding.
-// 如果没有用就删掉
 func (ops *BaseOperations) Operations() []OperationKind {
-	opsKinds := make([]OperationKind, len(ops.OperationMap))
+	opsKinds := make([]OperationKind, len(ops.LegacyOperations))
 	i := 0
-	for opsKind := range ops.OperationMap {
+	for opsKind := range ops.LegacyOperations {
 		opsKinds[i] = opsKind
 		i++
 	}
@@ -137,7 +158,7 @@ func (ops *BaseOperations) Operations() []OperationKind {
 }
 
 // getAddress returns component service address, if component is not listening on
-// 127.0.0.1, the Operation needs to overwrite this function and set ops.DBAddress
+// 127.0.0.1, the LegacyOperation needs to overwrite this function and set ops.DBAddress
 func (ops *BaseOperations) getAddress() string {
 	return "127.0.0.1"
 }
@@ -158,7 +179,7 @@ func (ops *BaseOperations) Dispatch(ctx context.Context, req *ProbeRequest) (*Pr
 		return resp, nil
 	}
 
-	operation, ok := ops.OperationMap[req.Operation]
+	operation, ok := ops.LegacyOperations[req.Operation]
 	opsRes := OpsResult{}
 	if !ok {
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
@@ -183,8 +204,10 @@ func (ops *BaseOperations) Dispatch(ctx context.Context, req *ProbeRequest) (*Pr
 	if err != nil {
 		return nil, err
 	}
-	res, _ := json.Marshal(opsRes)
-	resp.Data = res
+	if opsRes != nil {
+		res, _ := json.Marshal(opsRes)
+		resp.Data = res
+	}
 
 	return updateRespMetadata()
 }
@@ -271,6 +294,21 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 	return opsRes, nil
 }
 
+func (ops *BaseOperations) volumeProtection(ctx context.Context, req *ProbeRequest,
+	rsp *ProbeResponse) (OpsResult, error) {
+	return ops.fwdLegacyOperationCall(VolumeProtection, ctx, req, rsp)
+}
+
+func (ops *BaseOperations) fwdLegacyOperationCall(kind OperationKind, ctx context.Context,
+	req *ProbeRequest, rsp *ProbeResponse) (OpsResult, error) {
+	op, ok := ops.Ops[kind]
+	if !ok {
+		panic(fmt.Sprintf("unknown operation kind: %s", kind))
+	}
+	// since the rsp.Data has been set properly, it doesn't need to return a OpsResult here.
+	return nil, op.Invoke(ctx, req, rsp)
+}
+
 // Component may have some internal roles that needn't be exposed to end user,
 // and not configured in cluster definition, e.g. ETCD's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
@@ -332,8 +370,8 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *ProbeReques
 
 func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
-	leader, _ := req.Metadata["leader"]
-	candidate, _ := req.Metadata["candidate"]
+	leader := req.Metadata["leader"]
+	candidate := req.Metadata["candidate"]
 	if leader == "" && candidate == "" {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = "Leader or Candidate must be set"
@@ -394,7 +432,7 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 		}
 	} else if len(manager.HasOtherHealthyMembers(cluster, leader)) == 0 {
 		opsRes["event"] = OperationFailed
-		opsRes["message"] = fmt.Sprintf("candidate is not set and has no other healthy members")
+		opsRes["message"] = "candidate is not set and has no other healthy members"
 		return opsRes, nil
 	}
 

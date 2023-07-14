@@ -25,10 +25,19 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
+## [backuprepo](kbcli_backuprepo.md)
+
+BackupRepo command.
+
+* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
+
+
 ## [bench](kbcli_bench.md)
 
 Run a benchmark.
 
+* [kbcli bench delete](kbcli_bench_delete.md)	 - Delete a benchmark.
+* [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
 * [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 

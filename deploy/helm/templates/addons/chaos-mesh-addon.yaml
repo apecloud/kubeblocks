@@ -17,6 +17,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/chaos-mesh
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/chaos-mesh-2.5.2/chaos-mesh-2.5.2.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/chaos-mesh-2.5.2.tgz
     {{- end }}

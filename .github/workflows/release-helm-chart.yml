@@ -34,19 +34,31 @@ jobs:
 
   release-chart:
     needs: chart-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.8
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.10
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       DEP_CHART_DIR: "deploy/helm/depend-charts"
-      APECD_REF: "v0.1.8"
+      APECD_REF: "v0.1.10"
+    secrets: inherit
+
+  release-charts-image:
+    needs: [ chart-version, release-chart ]
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
+    with:
+      MAKE_OPS_PRE: "helm-package"
+      IMG: "apecloud/kubeblocks-charts"
+      VERSION: "${{ needs.chart-version.outputs.chart-version }}"
+      GO_VERSION: "1.20"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile-charts"
     secrets: inherit
 
   send-message:
     runs-on: ubuntu-latest
-    needs: release-chart
+    needs: release-charts-image
     if: ${{ always() && github.event.action == 'published' }}
     steps:
       - uses: actions/checkout@v3
@@ -58,7 +70,7 @@ jobs:
           echo 'release-result='${release_result} >> $GITHUB_OUTPUT
           
           CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0error"
-          if [[ "${{ needs.release-chart.result }}" == "success" ]]; then
+          if [[ "${{ needs.release-charts-image.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0success"
               echo "success" > ${release_result}
           else

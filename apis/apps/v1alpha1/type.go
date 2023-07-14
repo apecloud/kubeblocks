@@ -112,6 +112,11 @@ type ComponentConfigSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
+
+	// asEnvFrom is optional: the list of containers will be injected into EnvFrom.
+	// +listType=set
+	// +optional
+	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
 }
 
 // MergedPolicy defines how to merge external imported templates into component templates.
@@ -206,7 +211,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript}
 type OpsType string
 
 const (
@@ -220,6 +225,7 @@ const (
 	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
 	ExposeType            OpsType = "Expose"
+	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
 )
 
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.
@@ -543,6 +549,14 @@ type VolumeType string
 const (
 	VolumeTypeData VolumeType = "data"
 	VolumeTypeLog  VolumeType = "log"
+)
+
+type ClusterMode string
+
+const (
+	ClusterModeRaftGroup   ClusterMode = "raftGroup"
+	ClusterModeReplication ClusterMode = "replication"
+	ClusterModeStandAlone  ClusterMode = "standalone"
 )
 
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.

@@ -84,7 +84,9 @@ func (h *HTTPCustom) Init() error {
 
 	h.BaseOperations.Init()
 	h.BaseOperations.GetRole = h.GetRole
-	h.OperationMap[CheckRoleOperation] = h.CheckRoleOps
+	h.BaseOperations.LockInstance = h.LockInstance
+	h.BaseOperations.UnlockInstance = h.UnlockInstance
+	h.LegacyOperations[CheckRoleOperation] = h.CheckRoleOps
 
 	return nil
 }
@@ -121,10 +123,14 @@ func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *Pr
 	return opsRes, nil
 }
 
-// CmdAction 负责来执行用户自定义的行为, 比如exec或者query
-// 对应的command我们已经熟悉了
-func (h *HTTPCustom) CmdAction(ctx context.Context) {
+func (h *HTTPCustom) LockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
 
+func (h *HTTPCustom) UnlockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
 }
 
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort

@@ -17,7 +17,7 @@ spec:
     - name: mysql
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
       {{- include "kblib.componentMonitor" . | indent 6 }}
-      {{- include "apecloud-mysql-cluster.replicaCount" . | indent 6 }}
+      replicas: {{ include "apecloud-mysql-cluster.replicas" . }}
       enabledLogs:
         - slow
         - error

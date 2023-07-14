@@ -30,7 +30,7 @@ func GetRESTClient(logger logr.Logger) (*rest.RESTClient, error) {
 	if err != nil {
 		logger.Error(err, "kubeconfig not found")
 	}
-	appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
+	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
 	restConfig.GroupVersion = &appsv1alpha1.GroupVersion
 	restConfig.APIPath = "/apis"
 	restConfig.NegotiatedSerializer = clientsetscheme.Codecs.WithoutConversion()

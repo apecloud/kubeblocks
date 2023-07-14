@@ -46,10 +46,6 @@ kbcli cluster create [NAME] [flags]
   # the default storage class will be used
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
   
-  # Create a cluster and set the class to general-1c1g
-  # run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
-  
   # Create a cluster with replicationSet workloadType and set switchPolicy to Noop
   kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
   
@@ -101,8 +97,9 @@ kbcli cluster create [NAME] [flags]
       --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --rbac-enabled                   Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources
       --restore-to-time string         Set a time for point in time recovery
-      --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
+      --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
   -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource
       --source-cluster string          Set a source cluster for point in time recovery
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")

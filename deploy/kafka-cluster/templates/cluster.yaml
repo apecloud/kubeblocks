@@ -4,7 +4,7 @@ metadata:
   name: {{ include "kblib.clusterName" . }}
   labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
   annotations:
-    "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"{{ $.Values.saslEnable }}"}'
+    "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"{{ $.Values.saslEnable }}","KB_KAFKA_BROKER_HEAP":"{{ $.Values.brokerHeap }}","KB_KAFKA_CONTROLLER_HEAP":"{{ $.Values.controllerHeap }}"}'
 spec:
   clusterDefinitionRef: kafka # ref clusterdefinition.name
   clusterVersionRef: {{ .Values.version }}
@@ -26,28 +26,23 @@ spec:
       {{- include "kblib.componentServices" . | indent 6 }}
       {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
-        - name: metadata 
+        - name: data
           spec:
+            storageClassName: {{ $.Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.storage "Gi" }}
+        - name: metadata
+          spec:
+            storageClassName: {{ $.Values.metaStorageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ print $.Values.metaStorage "Gi" }}
-        - name: data 
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ print $.Values.dataStorage "Gi" }}
-        - name: log 
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ print $.Values.logStorage "Gi" }}
-        {{- end }}
+      {{- end }}
     {{- else }}
     - name: controller
       componentDefRef: controller
@@ -62,20 +57,22 @@ spec:
       {{- include "kblib.componentResources" . | indent 6 }}
       {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
-        - name: metadata 
+        - name: data
           spec:
+            storageClassName: {{ $.Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.storage "Gi" }}
+        - name: metadata
+          spec:
+            storageClassName: {{ $.Values.metaStorageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ print $.Values.metaStorage "Gi" }}
-        - name: log
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ print $.Values.logStorage "Gi" }}
       {{- end }}
     - name: broker
       componentDefRef: kafka-broker
@@ -91,22 +88,24 @@ spec:
       {{- include "kblib.componentServices" . | indent 6 }}
       {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
-        - name: data 
+        - name: data
           spec:
+            storageClassName: {{ $.Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.storage "Gi" }}
+        - name: metadata
+          spec:
+            storageClassName: {{ $.Values.metaStorageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ print $.Values.metaStorage "Gi" }}
-        - name: log
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ print $.Values.logStorage "Gi" }}
-        {{- end }}
       {{- end }}
+    {{- end }}
     {{- if .Values.monitorEnable }}
     - name: metrics-exp
       componentDefRef: kafka-exporter

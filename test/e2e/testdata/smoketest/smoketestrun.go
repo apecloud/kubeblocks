@@ -33,6 +33,7 @@ import (
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	. "github.com/apecloud/kubeblocks/test/e2e"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 )
 
@@ -103,28 +104,36 @@ func SmokeTest() {
 			if err != nil {
 				log.Println(err)
 			}
-			folders, _ := e2eutil.GetFolders(dir + "/testdata/smoketest")
-			for _, folder := range folders {
-				if folder == dir+"/testdata/smoketest" {
-					continue
-				}
-				log.Println("folder: " + folder)
-				files, _ := e2eutil.GetFiles(folder)
-				var clusterVersions []string
-				if len(clusterVersions) > 1 {
-					for _, clusterVersion := range clusterVersions {
-						if len(files) > 0 {
-							file := e2eutil.GetClusterCreateYaml(files)
-							e2eutil.ReplaceClusterVersionRef(file, clusterVersion)
-							runTestCases(files)
-						}
+			if len(TestType) == 0 {
+				folders, _ := e2eutil.GetFolders(dir + "/testdata/smoketest")
+				for _, folder := range folders {
+					if folder == dir+"/testdata/smoketest" {
+						continue
 					}
-				} else {
-					runTestCases(files)
+					log.Println("folder: " + folder)
+					getFiles(folder)
 				}
+			} else {
+				getFiles(dir + "/testdata/smoketest/" + TestType)
 			}
 		})
 	})
+}
+
+func getFiles(folder string) {
+	files, _ := e2eutil.GetFiles(folder)
+	var clusterVersions []string
+	if len(clusterVersions) > 1 {
+		for _, clusterVersion := range clusterVersions {
+			if len(files) > 0 {
+				file := e2eutil.GetClusterCreateYaml(files)
+				e2eutil.ReplaceClusterVersionRef(file, clusterVersion)
+				runTestCases(files)
+			}
+		}
+	} else {
+		runTestCases(files)
+	}
 }
 
 func runTestCases(files []string) {
@@ -133,7 +142,12 @@ func runTestCases(files []string) {
 		By("test " + file)
 		b := e2eutil.OpsYaml(file, "create")
 		if strings.Contains(file, "00") || strings.Contains(file, "restore") {
-			clusterName = e2eutil.GetName(file)
+			if strings.Contains(file, "---") {
+				clusterName = e2eutil.GetName(file)
+			} else {
+				name := e2eutil.ReadLine(file, "name:")
+				clusterName = e2eutil.StringSplit(name)
+			}
 			log.Println("clusterName is " + clusterName)
 		}
 		Expect(b).Should(BeTrue())

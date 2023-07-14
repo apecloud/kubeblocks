@@ -51,7 +51,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	}
 
 	if len(config.host) == 0 {
-		return nil, errors.New("must set 'host' in metadata or KB_SERVICE_PORT enviroment variable")
+		return nil, errors.New("must set 'host' in metadata or KB_SERVICE_PORT environment variable")
 	}
 
 	if val, ok := properties[username]; ok && val != "" {

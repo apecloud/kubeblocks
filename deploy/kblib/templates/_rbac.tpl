@@ -1,22 +1,26 @@
 {{/*
 Define the service account name
 */}}
-{{- define "kblib.serviceAccountName" }}
-{{- printf "kb-sa-%s" (include "kblib.clusterName" .) }}
+{{- define "kblib.serviceAccountName" -}}
+{{- if .Values.extra.rbacEnabled }}
+{{- printf "kb-%s" (include "kblib.clusterName" .) }}
+{{- else }}
+{{- "" }}
+{{- end }}
 {{- end }}
 
 {{/*
 Define the role name
 */}}
 {{- define "kblib.roleName" -}}
-{{- printf "kb-role-%s" (include "kblib.clusterName" .) }}
+{{- printf "kb-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the rolebinding name
 */}}
-{{- define "kblib.roleBindingName" }}
-{{- printf "kb-rolebinding-%s" (include "kblib.clusterName" .) }}
+{{- define "kblib.roleBindingName" -}}
+{{- printf "kb-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*
@@ -76,10 +80,14 @@ subjects:
 Define the whole rbac
 */}}
 {{- define "kblib.rbac" }}
+{{- if .Values.extra.rbacEnabled }}
 ---
 {{- include "kblib.serviceAccount" . }}
 ---
 {{- include "kblib.role" . }}
 ---
 {{- include "kblib.roleBinding" . }}
+{{- else }}
+{{- "" }}
+{{- end }}
 {{- end }}

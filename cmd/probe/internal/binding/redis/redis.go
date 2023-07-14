@@ -26,6 +26,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dapr/components-contrib/bindings"
+
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
 	"github.com/go-logr/logr"
@@ -102,6 +104,8 @@ func (r *Redis) Init() (err error) {
 	r.DBType = "redis"
 	r.InitIfNeed = r.initIfNeed
 	r.BaseOperations.GetRole = r.GetRole
+	r.BaseOperations.LockInstance = r.LockInstance
+	r.BaseOperations.UnlockInstance = r.UnlockInstance
 
 	// register redis operations
 	r.RegisterOperation(CreateOperation, r.createOps)
@@ -616,7 +620,17 @@ func (r *Redis) GetRole(ctx context.Context, request *ProbeRequest, response *Pr
 	return role, nil
 }
 
-func defaultRedisEntryParser(req *ProbeRequest, object *RedisEntry) error {
+func (r *Redis) LockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
+
+func (r *Redis) UnlockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
+
+func defaultRedisEntryParser(req *bindings.InvokeRequest, object *RedisEntry) error {
 	if req == nil || req.Metadata == nil {
 		return fmt.Errorf("no metadata provided")
 	}

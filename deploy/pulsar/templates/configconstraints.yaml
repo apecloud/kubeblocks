@@ -26,7 +26,7 @@ spec:
 
   # mysql configuration file format
   formatterConfig:
-    format: properties
+    format: props-plus
 
   ## define static parameter list
   {{- if hasKey $cc "staticParameters" }}

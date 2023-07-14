@@ -23,13 +23,13 @@ package probe.proto.v1;
 
 // Probe service provides APIs to kubeblocks operator to exec component operation.
 service Probe {
-  // InvokesComponent take a specify operation to a component
-  rpc InvokeComponent(InvokeComponentRequest) returns (stream InvokeComponentResponse) {}
+  // ProbeComponent take a specify operation to a component
+  rpc ProbeComponent(ProbeRequest) returns (stream ProbeResponse) {}
 }
 
-// InvokeComponentRequest is the message to send data to output bindings
-message InvokeComponentRequest {
-  // The name of the output binding to invoke.
+// ProbeRequest is the message to send data to output bindings
+message ProbeRequest {
+  // The name of the output binding to invoke. 用于区分不同类型的db
   string name = 1;
 
   // The data which will be sent to output binding.
@@ -48,8 +48,8 @@ message InvokeComponentRequest {
   string operation = 4;
 }
 
-// InvokeComponentResponse is the message returned from an output binding invocation
-message InvokeComponentResponse {
+// ProbeResponse is the message returned from an output binding invocation
+message ProbeResponse {
   // The data which will be sent to output binding.
   bytes data = 1;
 

@@ -63,6 +63,12 @@ logConfigs:
   slow: /data/mysql/log/mysqld-slowquery.log
   general: /data/mysql/log/mysqld.log
 
+vtgateLogConfigs:
+  error: /vtdataroot/vtgate.ERROR
+  warning: /vtdataroot/vtgate.WARNING
+  info: /vtdataroot/vtgate.INFO
+  queryLog: /vtdataroot/vtgate_querylog.txt
+
 roleProbe:
   failureThreshold: 2
   periodSeconds: 1

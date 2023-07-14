@@ -32,6 +32,11 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 - name: vtgate
   componentDefRef: vtgate # ref clusterdefinition componentDefs.name
   replicas: 1
+  enabledLogs:
+    - error
+    - warning
+    - info
+    - queryLog
   resources:
     requests:
       cpu: {{ $proxyCPU }}

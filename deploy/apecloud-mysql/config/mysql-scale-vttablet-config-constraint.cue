@@ -29,6 +29,9 @@
 	// Delay between retries of updates to keep the tablet and its shard record in sync. (default 30s)
 	shard_sync_retry_delay: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
+	// table acl config mode. Valid values are: simple, mysqlbased. (default simple)
+	table_acl_config_mode: string & "simple" | "mysqlbased"
+
 	...
 }
 

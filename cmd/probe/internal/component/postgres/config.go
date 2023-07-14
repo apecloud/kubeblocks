@@ -39,6 +39,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	config.host = poolConfig.ConnConfig.Host
 	config.port = int(poolConfig.ConnConfig.Port)
 	config.pool = poolConfig
+	config.url = url
 
 	return config, nil
 }

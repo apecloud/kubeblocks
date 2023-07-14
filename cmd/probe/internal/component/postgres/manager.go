@@ -199,6 +199,7 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 	var rows pgx.Rows
 	var err error
 	if pool != nil {
+		mgr.Logger.Infof("pool config host is: %s", pool.Config().ConnConfig.Host)
 		rows, err = pool.Query(ctx, sql)
 		defer pool.Close()
 	} else {
@@ -269,16 +270,12 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	ctx := context.TODO()
 
 	pools := []*pgxpool.Pool{nil}
+	var err error
 	if member != nil && cluster != nil {
-		var err error
-		if member.Name != mgr.CurrentMemberName {
-			host := cluster.GetMemberAddr(*member)
-
-			pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{host})
-			if err != nil || pools[0] == nil {
-				mgr.Logger.Errorf("Get other pools failed, err:%v", err)
-				return false
-			}
+		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{member.PodIP})
+		if err != nil || pools[0] == nil {
+			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
+			return false
 		}
 	}
 
@@ -289,6 +286,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 		return false
 	}
 
+	// TODO: cache those info
 	if replicationMode == "synchronous" {
 		if !mgr.checkStandbySynchronizedToLeader(ctx, member.Name, true, cluster) {
 			return false
@@ -395,7 +393,6 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 	lsnStr := strings.TrimFunc(string(resp), func(r rune) bool {
 		return !unicode.IsDigit(r)
 	})
-	mgr.Logger.Infof("%s lsn str: %s", types, lsnStr)
 
 	lsn, err := strconv.ParseInt(lsnStr, 10, 64)
 	if err != nil {
@@ -529,8 +526,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		return false
 	}
 
-	host := cluster.GetMemberAddr(*cluster.GetMemberWithName(cluster.Leader.Name))
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{host})
+	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetLeaderMember().PodIP})
 	if err != nil || pools[0] == nil {
 		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
 		return false
@@ -541,7 +537,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		return false
 	}
 	if role != binding.PRIMARY {
-		mgr.Logger.Warnf("Leader is still in_recovery and therefore can't be used for rewind")
+		mgr.Logger.Warnf("Leader is still in recovery and can't rewind")
 		return false
 	}
 
@@ -778,7 +774,18 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	ctx := context.TODO()
 
-	hosts := cluster.GetMemberAddrs()
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err == nil && isLeader {
+		// if current member is leader, just return
+		return nil
+	}
+
+	var hosts []string
+	for _, m := range cluster.Members {
+		if m.Name != mgr.CurrentMemberName {
+			hosts = append(hosts, m.PodIP)
+		}
+	}
 	pools, err := mgr.GetOtherPoolsWithHosts(ctx, hosts)
 	if err != nil {
 		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
@@ -787,8 +794,8 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 
 	for i, pool := range pools {
 		if pool != nil {
-			if isLeader, err := mgr.IsLeaderWithPool(ctx, pool); isLeader && err == nil {
-				return cluster.GetMemberWithHost(hosts[i])
+			if isLeader, err = mgr.IsLeaderWithPool(ctx, pool); isLeader && err == nil {
+				return cluster.GetMemberWithIP(hosts[i])
 			}
 		}
 	}
@@ -797,19 +804,11 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 }
 
 func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
-	ctx := context.TODO()
 	members := make([]*dcs.Member, 0)
-	replicationMode, err := mgr.getReplicationMode(ctx)
-	if err != nil {
-		mgr.Logger.Errorf("get db replication mode failed:%v", err)
-		return members
-	}
 
-	if replicationMode == "synchronous" {
-		for i, m := range cluster.Members {
-			if m.Name != leader && mgr.IsMemberHealthy(cluster, &m) {
-				members = append(members, &cluster.Members[i])
-			}
+	for i, m := range cluster.Members {
+		if m.Name != leader && mgr.IsMemberHealthy(cluster, &m) {
+			members = append(members, &cluster.Members[i])
 		}
 	}
 
@@ -821,25 +820,25 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 		return nil, errors.New("Get other pool without hosts")
 	}
 
-	tempConfig := *config.pool
+	tempConfig, err := pgxpool.ParseConfig(config.url)
+	if err != nil {
+		return nil, errors.Wrap(err, "new temp config")
+	}
 
-	var tempPool *pgxpool.Pool
-	var err error
 	resp := make([]*pgxpool.Pool, len(hosts), len(hosts))
 	for i, host := range hosts {
 		tempConfig.ConnConfig.Host = host
-		tempPool, err = pgxpool.NewWithConfig(ctx, &tempConfig)
+		resp[i], err = pgxpool.NewWithConfig(ctx, tempConfig)
 		if err != nil {
 			mgr.Logger.Errorf("unable to ping the DB: %v, host:%s", err, host)
-			resp[i] = nil
 			continue
 		}
-		resp[i] = tempPool
+		mgr.Logger.Infof("pool config host:%s", resp[i].Config().ConnConfig.Host)
 	}
 
 	return resp, nil
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	return cluster.GetLeaderMember() == member, nil
+	return cluster.GetLeaderMember().Name == member.Name, nil
 }

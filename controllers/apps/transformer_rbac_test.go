@@ -68,6 +68,10 @@ var _ = Describe("object rbac transformer test.", func() {
 			clusterDefName, clusterVersionName).WithRandomName().
 			AddComponent(compName, compDefName).
 			SetServiceAccountName(serviceAccountName).GetObject()
+		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(testapps.StatefulMySQLComponent, "sts").
+			GetObject()
+		clusterDefObj.Spec.ComponentDefs[0].Probes = &appsv1alpha1.ClusterDefinitionProbes{}
 		saKey = types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
 			Name:      serviceAccountName,
@@ -79,6 +83,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			EventRecorder: nil,
 			Logger:        logger,
 			Cluster:       cluster,
+			ClusterDef:    clusterDefObj,
 		}
 
 		dag = mockDAG(cluster)

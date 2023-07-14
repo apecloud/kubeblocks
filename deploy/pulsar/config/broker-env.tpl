@@ -27,7 +27,9 @@ PULSAR_PREFIX_maxUnackedMessagesPerConsumer: "10000"
 PULSAR_PREFIX_maxUnackedMessagesPerSubscription: "50000"
 PULSAR_PREFIX_preciseDispatcherFlowControl: "true"
 PULSAR_PREFIX_subscriptionKeySharedUseConsistentHashing: "true"
-PULSAR_PREFIX_transactionCoordinatorEnabled: "false"
+PULSAR_PREFIX_transactionCoordinatorEnabled: "true"
+PULSAR_PREFIX_systemTopicEnabled: "true"
+PULSAR_PREFIX_acknowledgmentAtBatchIndexLevelEnabled: "true"
 PULSAR_PREFIX_statusFilePath: /pulsar/status
 
 # @deprecated since 2.8.0 subscriptionTypesEnabled is preferred over subscriptionKeySharedEnable.

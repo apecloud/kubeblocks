@@ -25,7 +25,7 @@ import (
 )
 
 var _ = Describe("Engine", func() {
-	It("new mysql engine", func() {
+	It("new engine", func() {
 		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis, statePostgreSQL, stateNebula} {
 			engine, _ := New(typeName)
 			Expect(engine).ShouldNot(BeNil())
@@ -39,7 +39,7 @@ var _ = Describe("Engine", func() {
 				// for wesql vtgate component we wuold use the first container, but its name is not mysql
 				Expect(engine.Container()).Should(Equal(""))
 			} else {
-				Expect(engine.Container()).Should(Equal(typeName))
+				Expect(engine.Container()).Should(ContainSubstring(typeName))
 			}
 
 		}

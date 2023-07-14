@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
@@ -38,7 +38,7 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
-type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
+type Operation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
 
@@ -49,7 +49,7 @@ type AccessMode string
 type BaseInternalOps interface {
 	InternalQuery(ctx context.Context, sql string) ([]byte, error)
 	InternalExec(ctx context.Context, sql string) (int64, error)
-	GetLogger() logger.Logger
+	GetLogger() logr.Logger
 	GetRunningPort() int
 }
 
@@ -70,11 +70,11 @@ type BaseOperations struct {
 	DBType                 string
 	OriRole                string
 	DBRoles                map[string]AccessMode
-	Logger                 logger.Logger
-	Metadata               bindings.Metadata
+	Logger                 logr.Logger
+	Metadata               map[string]string
 	InitIfNeed             func() bool
-	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
-	OperationMap           map[bindings.OperationKind]Operation
+	GetRole                func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error)
+	OperationMap           map[OperationKind]Operation
 }
 
 func init() {
@@ -82,7 +82,7 @@ func init() {
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
-func (ops *BaseOperations) Init(metadata bindings.Metadata) {
+func (ops *BaseOperations) Init() {
 	ops.FailedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
 	if ops.FailedEventReportFrequency < 300 {
 		ops.FailedEventReportFrequency = 300
@@ -103,8 +103,8 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}
 	}
-	ops.Metadata = metadata
-	ops.OperationMap = map[bindings.OperationKind]Operation{
+	//ops.Metadata = metadata
+	ops.OperationMap = map[OperationKind]Operation{
 		CheckRunningOperation: ops.CheckRunningOps,
 		CheckRoleOperation:    ops.CheckRoleOps,
 		GetRoleOperation:      ops.GetRoleOps,
@@ -113,20 +113,21 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 	ops.DBAddress = ops.getAddress()
 }
 
-func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind bindings.OperationKind, operation Operation, manager component.DBManager) {
+func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind OperationKind, operation Operation, manager component.DBManager) {
 	ops.RegisterOperation(opsKind, StartupCheckWraper(manager, operation))
 }
 
-func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
+func (ops *BaseOperations) RegisterOperation(opsKind OperationKind, operation Operation) {
 	if ops.OperationMap == nil {
-		ops.OperationMap = map[bindings.OperationKind]Operation{}
+		ops.OperationMap = map[OperationKind]Operation{}
 	}
 	ops.OperationMap[opsKind] = operation
 }
 
 // Operations returns list of operations supported by the binding.
-func (ops *BaseOperations) Operations() []bindings.OperationKind {
-	opsKinds := make([]bindings.OperationKind, len(ops.OperationMap))
+// 如果没有用就删掉
+func (ops *BaseOperations) Operations() []OperationKind {
+	opsKinds := make([]OperationKind, len(ops.OperationMap))
 	i := 0
 	for opsKind := range ops.OperationMap {
 		opsKinds[i] = opsKind
@@ -141,21 +142,16 @@ func (ops *BaseOperations) getAddress() string {
 	return "127.0.0.1"
 }
 
-// Invoke handles all invoke operations.
-func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+// Dispatch handles all invoke operations.
+func (ops *BaseOperations) Dispatch(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error) {
 	if req == nil {
 		return nil, errors.Errorf("invoke request required")
 	}
 
 	startTime := time.Now()
-	resp := &bindings.InvokeResponse{
-		Metadata: map[string]string{
-			RespOpKey:        string(req.Operation),
-			RespStartTimeKey: startTime.Format(time.RFC3339Nano),
-		},
-	}
+	resp := &ProbeResponse{Metadata: map[string]string{}}
 
-	updateRespMetadata := func() (*bindings.InvokeResponse, error) {
+	updateRespMetadata := func() (*ProbeResponse, error) {
 		endTime := time.Now()
 		resp.Metadata[RespEndTimeKey] = endTime.Format(time.RFC3339Nano)
 		resp.Metadata[RespDurationKey] = endTime.Sub(startTime).String()
@@ -166,7 +162,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	opsRes := OpsResult{}
 	if !ok {
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
-		ops.Logger.Errorf(message)
+		ops.Logger.Info(message)
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
@@ -193,13 +189,13 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	return updateRespMetadata()
 }
 
-func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	opsRes["operation"] = CheckRoleOperation
 	opsRes["originalRole"] = ops.OriRole
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("checkRole operation is not implemented for %v", ops.DBType)
-		ops.Logger.Errorf(message)
+		ops.Logger.Info(message)
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
@@ -211,11 +207,11 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	defer cancel()
 	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
-		ops.Logger.Errorf("error executing checkRole: %v", err)
+		ops.Logger.Error(err, "error executing checkRole")
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
-			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
+			ops.Logger.Info("role checks failed continuously", "times", ops.CheckRoleFailedCount)
 			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
 		ops.CheckRoleFailedCount++
@@ -247,11 +243,11 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	return opsRes, nil
 }
 
-func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("getRole operation is not implemented for %v", ops.DBType)
-		ops.Logger.Errorf(message)
+		ops.Logger.Error(fmt.Errorf("not implemented"), message)
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
@@ -260,11 +256,11 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
-		ops.Logger.Infof("error executing getRole: %v", err)
+		ops.Logger.Error(err, "error executing getRole")
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
-			ops.Logger.Infof("getRole failed %v times continuously", ops.CheckRoleFailedCount)
+			ops.Logger.Info("getRole failed continuously", "failed times", ops.CheckRoleFailedCount)
 			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		ops.CheckRoleFailedCount++
@@ -301,7 +297,7 @@ func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 
 // CheckRunningOps checks whether the binding service is in running status,
 // If check fails continuously, report an event at FailedEventReportFrequency frequency
-func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var message string
 	opsRes := OpsResult{}
 	opsRes["operation"] = CheckRunningOperation
@@ -310,12 +306,12 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
-		message = fmt.Sprintf("running check %s error: %v", host, err)
-		ops.Logger.Errorf(message)
+		message = fmt.Sprintf("running check %s error", host)
+		ops.Logger.Error(err, message)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = message
 		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
-			ops.Logger.Infof("running checks failed %v times continuously", ops.CheckRunningFailedCount)
+			ops.Logger.Info("running checks failed continuously", "times", ops.CheckRunningFailedCount)
 			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
 			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
@@ -327,14 +323,14 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	message = "TCP Connection Established Successfully!"
 	if tcpCon, ok := conn.(*net.TCPConn); ok {
 		err := tcpCon.SetLinger(0)
-		ops.Logger.Infof("running check, set tcp linger failed: %v", err)
+		ops.Logger.Error(err, "running check, set tcp linger failed")
 	}
 	opsRes["event"] = OperationSuccess
 	opsRes["message"] = message
 	return opsRes, nil
 }
 
-func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	leader, _ := req.Metadata["leader"]
 	candidate, _ := req.Metadata["candidate"]

@@ -683,10 +683,8 @@ spec:
                 containerPort: 2888
               - name: tcp-election
                 containerPort: 3888
-              - name: metrics
-                containerPort: 9141
-              - name: http-admin
-                containerPort: 9990
+              - name: http
+                containerPort: 8000
             livenessProbe:
               exec:
                 command:

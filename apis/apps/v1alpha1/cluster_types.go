@@ -394,7 +394,7 @@ type PersistentVolumeClaimSpec struct {
 }
 
 // ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
-func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
+func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes:      r.AccessModes,
 		Resources:        r.Resources,
@@ -404,9 +404,13 @@ func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.Persis
 
 // GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
 // it returns preferSC argument.
-func (r PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
+func (r *PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
+	}
+
+	if preferSC == "" {
+		return nil
 	}
 	return &preferSC
 }

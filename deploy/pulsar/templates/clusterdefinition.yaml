@@ -199,6 +199,8 @@ spec:
               mountPath: /kb-scripts
             - name: pulsar-broker-config
               mountPath: /opt/pulsar/conf
+            - name: broker-env
+              mountPath: /opt/pulsar/none
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -247,7 +249,7 @@ spec:
         - name: proxy-config
           templateRef: {{ include "pulsar.name" . }}-proxy-conf-tpl
           namespace: {{ .Release.Namespace }}
-          volumeName: config
+          volumeName: config-env
           constraintRef: pulsar-env-constraints
           keys:
             - conf
@@ -353,6 +355,8 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /kb-scripts
+              - name: config-env
+                mountPath: /opt/pulsar/none
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -396,7 +400,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-bookies-conf-tpl
           namespace: {{ .Release.Namespace }}
           constraintRef: pulsar-env-constraints
-          volumeName: bookies-config
+          volumeName: bookies-config-env
           keys:
             - conf
           asEnvFrom:
@@ -483,6 +487,8 @@ spec:
                 mountPath: /kb-scripts
               - name: annotations
                 mountPath: /etc/annotations
+              - name: bookies-config-env
+                mountPath: /opt/pulsar/none
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -538,7 +544,7 @@ spec:
         asEnvFrom:
           - bookies-recovery
           - check-bookies
-        volumeName: recovery-config
+        volumeName: recovery-config-env
       scriptSpecs:
         - name: pulsar-scripts
           templateRef: {{ include "pulsar.name" . }}-scripts
@@ -605,6 +611,8 @@ spec:
             volumeMounts:
             - name: scripts
               mountPath: /kb-scripts
+            - name: recovery-config-env
+              mountPath: /opt/pulsar/none
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -647,7 +655,7 @@ spec:
         - name: zookeeper-config
           templateRef: {{ include "pulsar.name" . }}-zookeeper-conf-tpl
           namespace: {{ .Release.Namespace }}
-          volumeName: zookeeper-config
+          volumeName: zookeeper-config-env
           constraintRef: pulsar-env-constraints
           keys:
             - conf
@@ -742,6 +750,8 @@ spec:
                 name: data-log
               - name: scripts
                 mountPath: /kb-scripts
+              - name: zookeeper-config-env
+                mountPath: /opt/pulsar/none
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}

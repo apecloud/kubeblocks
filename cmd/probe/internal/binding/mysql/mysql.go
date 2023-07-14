@@ -31,13 +31,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
+	"github.com/go-logr/logr"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
+
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
@@ -103,18 +110,24 @@ var (
 )
 
 // NewMysql returns a new MySQL output binding.
-func NewMysql(logger logger.Logger) bindings.OutputBinding {
-	return &MysqlOperations{BaseOperations: BaseOperations{Logger: logger}}
+func NewMysql() (*MysqlOperations, error) {
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	logger := zapr.NewLogger(zapLogger)
+	return &MysqlOperations{BaseOperations: BaseOperations{Logger: logger}}, nil
 }
 
 // Init initializes the MySQL binding.
-func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
-	mysqlOps.Logger.Debug("Initializing MySQL binding")
-	mysqlOps.BaseOperations.Init(metadata)
-	config, _ := mysql.NewConfig(metadata.Properties)
+func (mysqlOps *MysqlOperations) Init() error {
+	mysqlOps.Logger.Info("Initializing MySQL binding")
+	mysqlOps.BaseOperations.Init()
+	mysqlOps.Metadata = component.GetProperties("mysql")
+	config, _ := mysql.NewConfig(mysqlOps.Metadata)
 	manager, err := mysql.NewManager(mysqlOps.Logger)
 	if err != nil {
-		mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)
+		mysqlOps.Logger.Error(err, "MySQL DB Manager initialize failed")
 		return err
 	}
 	mysqlOps.manager = manager
@@ -141,7 +154,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *binding.ProbeRequest, response *binding.ProbeResponse) (string, error) {
 	workloadType := request.Metadata[workloadTypeKey]
 	if strings.EqualFold(workloadType, Replication) {
 		return mysqlOps.GetRoleForReplication(ctx, request, response)
@@ -150,10 +163,10 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
-	return 0
+	return mysqlOps.DBPort
 }
 
-func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *binding.ProbeRequest, response *binding.ProbeResponse) (string, error) {
 	dcsStore := dcs.GetStore()
 	if dcsStore == nil {
 		return "", nil
@@ -167,7 +180,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 	getReadOnlySql := `show global variables like 'read_only';`
 	data, err := mysqlOps.query(ctx, getReadOnlySql)
 	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySql, err)
+		mysqlOps.Logger.Error(err, fmt.Sprintf("error executing %s", getReadOnlySql))
 		return "", errors.Wrapf(err, "error executing %s", getReadOnlySql)
 	}
 
@@ -189,12 +202,12 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 	return "", errors.Errorf("parse query failed, no records")
 }
 
-func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *binding.ProbeRequest, response *binding.ProbeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
 	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
 	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
+		mysqlOps.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
@@ -209,7 +222,7 @@ func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, reques
 	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
-			mysqlOps.Logger.Errorf("Role query error: %v", err)
+			mysqlOps.Logger.Error(err, "Role query error")
 			return role, err
 		}
 		isReady = true
@@ -220,7 +233,7 @@ func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, reques
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
-func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
@@ -230,7 +243,7 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	}
 	count, err := mysqlOps.exec(ctx, sql)
 	if err != nil {
-		mysqlOps.Logger.Infof("exec error: %v", err)
+		mysqlOps.Logger.Error(err, "sql exec error")
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
@@ -240,7 +253,7 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	return result, nil
 }
 
-func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	slaveStatus := make([]SlaveStatus, 0)
 	var err error
@@ -263,7 +276,7 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.In
 	sql := "show slave status"
 	data, err := mysqlOps.query(ctx, sql)
 	if err != nil {
-		mysqlOps.Logger.Infof("GetLagOps error: %v", err)
+		mysqlOps.Logger.Error(err, "GetLagOps error")
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
@@ -279,7 +292,7 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.In
 	return result, nil
 }
 
-func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
@@ -289,7 +302,7 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *bindings.Inv
 	}
 	data, err := mysqlOps.query(ctx, sql)
 	if err != nil {
-		mysqlOps.Logger.Infof("Query error: %v", err)
+		mysqlOps.Logger.Error(err, "Query error")
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
@@ -299,7 +312,7 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *bindings.Inv
 	return result, nil
 }
 
-func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	rwSQL := fmt.Sprintf(`begin;
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
@@ -323,11 +336,11 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 
 	result := OpsResult{}
 	if err != nil {
-		mysqlOps.Logger.Infof("CheckStatus error: %v", err)
+		mysqlOps.Logger.Error(err, "CheckStatus error")
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		if mysqlOps.CheckStatusFailedCount%mysqlOps.FailedEventReportFrequency == 0 {
-			mysqlOps.Logger.Infof("status check failed %v times continuously", mysqlOps.CheckStatusFailedCount)
+			mysqlOps.Logger.Info("status check failed continuously", "times", mysqlOps.CheckStatusFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		mysqlOps.CheckStatusFailedCount++
@@ -364,7 +377,7 @@ func propertyToDuration(props map[string]string, key string, setter func(time.Du
 }
 
 func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte, error) {
-	mysqlOps.Logger.Debugf("query: %s", sql)
+	mysqlOps.Logger.Info(fmt.Sprintf("query: %s", sql))
 	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error executing %s", sql)
@@ -381,7 +394,7 @@ func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte,
 }
 
 func (mysqlOps *MysqlOperations) exec(ctx context.Context, sql string) (int64, error) {
-	mysqlOps.Logger.Debugf("exec: %s", sql)
+	mysqlOps.Logger.Info(fmt.Sprintf("exec: %s", sql))
 	res, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error executing %s", sql)
@@ -443,7 +456,7 @@ func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values [
 			if vv, err := v.Value(); err == nil {
 				value = interface{}(vv)
 			} else {
-				mysqlOps.Logger.Warnf("error to convert value: %v", err)
+				mysqlOps.Logger.Error(err, "error to convert value")
 			}
 		case *sql.RawBytes:
 			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
@@ -470,19 +483,19 @@ func (mysqlOps *MysqlOperations) InternalExec(ctx context.Context, sql string) (
 }
 
 // GetLogger is used for getting logger, implements BaseInternalOps interface
-func (mysqlOps *MysqlOperations) GetLogger() logger.Logger {
+func (mysqlOps *MysqlOperations) GetLogger() logr.Logger {
 	return mysqlOps.Logger
 }
 
-func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	sqlTplRend := func(user UserInfo) string {
 		return listUserTpl
 	}
-
+	//return OpsResult{},nil
 	return QueryObject(ctx, mysqlOps, req, ListUsersOp, sqlTplRend, nil, UserInfo{})
 }
 
-func (mysqlOps *MysqlOperations) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) listSystemAccountsOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	sqlTplRend := func(user UserInfo) string {
 		return listSystemAccountsTpl
 	}
@@ -504,7 +517,7 @@ func (mysqlOps *MysqlOperations) listSystemAccountsOps(ctx context.Context, req 
 	return QueryObject(ctx, mysqlOps, req, ListSystemAccountsOp, sqlTplRend, dataProcessor, UserInfo{})
 }
 
-func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	var (
 		object = UserInfo{}
 
@@ -554,7 +567,7 @@ func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindi
 	return QueryObject(ctx, mysqlOps, req, DescribeUserOp, sqlTplRend, dataProcessor, object)
 }
 
-func (mysqlOps *MysqlOperations) createUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) createUserOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	var (
 		object = UserInfo{}
 
@@ -577,7 +590,7 @@ func (mysqlOps *MysqlOperations) createUserOps(ctx context.Context, req *binding
 	return ExecuteObject(ctx, mysqlOps, req, CreateUserOp, sqlTplRend, msgTplRend, object)
 }
 
-func (mysqlOps *MysqlOperations) deleteUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) deleteUserOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	var (
 		object  = UserInfo{}
 		validFn = func(user UserInfo) error {
@@ -603,21 +616,21 @@ func (mysqlOps *MysqlOperations) deleteUserOps(ctx context.Context, req *binding
 	return ExecuteObject(ctx, mysqlOps, req, DeleteUserOp, sqlTplRend, msgTplRend, object)
 }
 
-func (mysqlOps *MysqlOperations) grantUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) grantUserRoleOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s granted to user: %s"
 	)
 	return mysqlOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
 }
 
-func (mysqlOps *MysqlOperations) revokeUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) revokeUserRoleOps(ctx context.Context, req *binding.ProbeRequest, resp *binding.ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s revoked from user: %s"
 	)
 	return mysqlOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
 }
 
-func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bindings.InvokeRequest, op bindings.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *binding.ProbeRequest, op OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
 	var (
 		object     = UserInfo{}
 		sqlTplRend = func(user UserInfo) string {

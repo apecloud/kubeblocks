@@ -26,8 +26,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	v3 "go.etcd.io/etcd/client/v3"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -49,13 +52,19 @@ const (
 )
 
 // NewEtcd returns a new etcd binding instance.
-func NewEtcd(logger logger.Logger) bindings.OutputBinding {
-	return &Etcd{BaseOperations: BaseOperations{Logger: logger}}
+func NewEtcd() (*Etcd, error) {
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	logger := zapr.NewLogger(zapLogger)
+	return &Etcd{BaseOperations: BaseOperations{Logger: logger}}, nil
 }
 
-func (e *Etcd) Init(metadata bindings.Metadata) error {
-	e.endpoint = metadata.Properties[endpoint]
-	e.BaseOperations.Init(metadata)
+func (e *Etcd) Init() error {
+	e.Metadata = component.GetProperties("etcd")
+	e.endpoint = e.Metadata[endpoint]
+	e.BaseOperations.Init()
 	e.DBType = "etcd"
 	e.InitIfNeed = e.initIfNeed
 	e.DBPort = e.GetRunningPort()
@@ -68,7 +77,7 @@ func (e *Etcd) initIfNeed() bool {
 	if e.etcd == nil {
 		go func() {
 			err := e.InitDelay()
-			e.Logger.Errorf("Etcd connection init failed: %v", err)
+			e.Logger.Error(err, "Etcd connection init failed")
 		}()
 		return true
 	}
@@ -104,7 +113,7 @@ func (e *Etcd) InitDelay() error {
 	return nil
 }
 
-func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (e *Etcd) GetRole(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	etcdResp, err := e.etcd.Status(ctx, e.endpoint)
 	if err != nil {
 		return "", err
@@ -121,7 +130,7 @@ func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *b
 	return role, nil
 }
 
-func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (e *Etcd) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	role, err := e.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
@@ -144,7 +153,7 @@ func (e *Etcd) GetRunningPort() int {
 	return port
 }
 
-func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *ProbeResponse) ([]byte, error) {
 	// TODO implement me when proposal is passed
 	return nil, nil
 }

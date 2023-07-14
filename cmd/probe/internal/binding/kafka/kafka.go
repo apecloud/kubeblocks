@@ -24,8 +24,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/kafka"
@@ -47,7 +49,12 @@ type KafkaOperations struct {
 }
 
 // NewKafka returns a new kafka binding instance.
-func NewKafka(logger logger.Logger) bindings.OutputBinding {
+func NewKafka() (*KafkaOperations, error) {
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	logger := zapr.NewLogger(zapLogger)
 	k := kafka.NewKafka(logger)
 	// in kafka binding component, disable consumer retry by default
 	k.DefaultConsumeRetryEnabled = false
@@ -55,12 +62,14 @@ func NewKafka(logger logger.Logger) bindings.OutputBinding {
 		kafka:          k,
 		closeCh:        make(chan struct{}),
 		BaseOperations: BaseOperations{Logger: logger},
-	}
+	}, nil
 }
 
-func (kafkaOps *KafkaOperations) Init(metadata bindings.Metadata) error {
-	kafkaOps.BaseOperations.Init(metadata)
-	kafkaOps.Logger.Debug("Initializing kafka binding")
+func (kafkaOps *KafkaOperations) Init() error {
+	kafkaOps.Metadata = component.GetProperties("kafka")
+	kafkaOps.kafka.Init(context.Background(), kafkaOps.Metadata)
+	kafkaOps.BaseOperations.Init()
+	kafkaOps.Logger.Info("Initializing kafka binding")
 	kafkaOps.DBType = "kafka"
 	kafkaOps.InitIfNeed = kafkaOps.initIfNeed
 	// kafkaOps.BaseOperations.GetRole = kafkaOps.GetRole
@@ -77,7 +86,7 @@ func (kafkaOps *KafkaOperations) initIfNeed() bool {
 	if kafkaOps.kafka.Producer == nil {
 		go func() {
 			err := kafkaOps.InitDelay()
-			kafkaOps.Logger.Errorf("Kafka connection init failed: %v", err)
+			kafkaOps.Logger.Error(err, "Kafka connection init failed")
 		}()
 		return true
 	}
@@ -91,17 +100,17 @@ func (kafkaOps *KafkaOperations) InitDelay() error {
 		return nil
 	}
 
-	err := kafkaOps.kafka.Init(context.TODO(), kafkaOps.Metadata.Properties)
+	err := kafkaOps.kafka.Init(context.TODO(), kafkaOps.Metadata)
 	if err != nil {
 		return err
 	}
 
-	val, ok := kafkaOps.Metadata.Properties[publishTopic]
+	val, ok := kafkaOps.Metadata[publishTopic]
 	if ok && val != "" {
 		kafkaOps.publishTopic = val
 	}
 
-	val, ok = kafkaOps.Metadata.Properties[topics]
+	val, ok = kafkaOps.Metadata[topics]
 	if ok && val != "" {
 		kafkaOps.topics = strings.Split(val, ",")
 	}
@@ -109,7 +118,7 @@ func (kafkaOps *KafkaOperations) InitDelay() error {
 	return nil
 }
 
-func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	topic := "kb_health_check"
 

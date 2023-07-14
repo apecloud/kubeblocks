@@ -23,8 +23,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mongodb"
@@ -77,15 +79,21 @@ type MongoDBOperations struct {
 // }
 
 // NewMongoDB returns a new MongoDB Binding
-func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
-	return &MongoDBOperations{BaseOperations: BaseOperations{Logger: logger}}
+func NewMongoDB() (*MongoDBOperations, error) {
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	logger := zapr.NewLogger(zapLogger)
+	return &MongoDBOperations{BaseOperations: BaseOperations{Logger: logger}}, nil
 }
 
 // Init initializes the MongoDB Binding.
-func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
-	mongoOps.Logger.Debug("Initializing MongoDB binding")
-	mongoOps.BaseOperations.Init(metadata)
-	config, _ := mongodb.NewConfig(metadata.Properties)
+func (mongoOps *MongoDBOperations) Init() error {
+	mongoOps.Logger.Info("Initializing MongoDB binding")
+	mongoOps.BaseOperations.Init()
+	mongoOps.Metadata = component.GetProperties("mongo")
+	config, _ := mongodb.NewConfig(mongoOps.Metadata)
 	manager, _ := mongodb.NewManager(mongoOps.Logger)
 
 	mongoOps.DBType = "mongodb"
@@ -143,11 +151,11 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 // 	return nil
 // }
 
-func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
 	return mongoOps.manager.GetMemberState(ctx)
 }
 
-func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
+func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *ProbeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed
 	return nil, nil
 }

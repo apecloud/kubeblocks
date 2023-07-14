@@ -29,8 +29,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/spf13/viper"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -45,15 +46,20 @@ type HTTPCustom struct {
 }
 
 // NewHTTPCustom returns a new HTTPCustom.
-func NewHTTPCustom(logger logger.Logger) bindings.OutputBinding {
+func NewHTTPCustom() (*HTTPCustom, error) {
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	logger := zapr.NewLogger(zapLogger)
 	return &HTTPCustom{
 		actionSvcPorts: &[]int{},
 		BaseOperations: BaseOperations{Logger: logger},
-	}
+	}, nil
 }
 
 // Init performs metadata parsing.
-func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
+func (h *HTTPCustom) Init() error {
 	actionSvcList := viper.GetString("KB_CONSENSUS_SET_ACTION_SVC_LIST")
 	if len(actionSvcList) > 0 {
 		err := json.Unmarshal([]byte(actionSvcList), h.actionSvcPorts)
@@ -76,14 +82,14 @@ func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
 		Transport: netTransport,
 	}
 
-	h.BaseOperations.Init(metadata)
+	h.BaseOperations.Init()
 	h.BaseOperations.GetRole = h.GetRole
 	h.OperationMap[CheckRoleOperation] = h.CheckRoleOps
 
 	return nil
 }
 
-func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	if h.actionSvcPorts == nil {
 		return "", nil
 	}
@@ -94,6 +100,7 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, r
 	)
 
 	for _, port := range *h.actionSvcPorts {
+		// todo url是写死的
 		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
 		lastOutput, err = h.callAction(ctx, u)
 		if err != nil {
@@ -104,7 +111,7 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, r
 	return lastOutput, nil
 }
 
-func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	role, err := h.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
@@ -114,10 +121,17 @@ func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest
 	return opsRes, nil
 }
 
+// CmdAction 负责来执行用户自定义的行为, 比如exec或者query
+// 对应的command我们已经熟悉了
+func (h *HTTPCustom) CmdAction(ctx context.Context) {
+
+}
+
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort
+// 现在感人的是, 不一定是Get了,也可能是Post, 一种方案是全部用Post算了
 func (h *HTTPCustom) callAction(ctx context.Context, url string) (string, error) {
 	// compose http request
-	request, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	request, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return "", err
 	}

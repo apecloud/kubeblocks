@@ -36,13 +36,19 @@ spec:
         - name: broker-env
           templateRef: {{ include "pulsar.name" . }}-broker-env-tpl
           namespace: {{ .Release.Namespace }}
-          constraintRef: pulsar-config-constraints
+          constraintRef: pulsar-env-constraints
           keys:
             - conf
           asEnvFrom:
             - init-broker-cluster
             - broker
+            - init-pulsar-client-config
           volumeName: broker-env
+        - name: broker-config
+          templateRef: {{ include "pulsar.name" . }}-broker-config-tpl
+          namespace: {{ .Release.Namespace }}
+          constraintRef: brokers-config-constraints
+          volumeName: pulsar-broker-config
       scriptSpecs:
         - name: pulsar-scripts
           templateRef: {{ include "pulsar.name" . }}-scripts
@@ -117,6 +123,7 @@ spec:
             args:
             - |
               set -x
+              cp /opt/pulsar/conf/broker.conf conf/broker.conf && \
               bin/apply-config-from-env.py conf/broker.conf && \
               bin/apply-config-from-env.py conf/client.conf && \
               echo 'OK' > status;exec bin/pulsar broker
@@ -190,6 +197,8 @@ spec:
             volumeMounts:
             - name: scripts
               mountPath: /kb-scripts
+            - name: pulsar-broker-config
+              mountPath: /opt/pulsar/conf
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -239,7 +248,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-proxy-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: config
-          constraintRef: pulsar-config-constraints
+          constraintRef: pulsar-env-constraints
           keys:
             - conf
           asEnvFrom:
@@ -386,7 +395,7 @@ spec:
         - name: bookies-config
           templateRef: {{ include "pulsar.name" . }}-bookies-conf-tpl
           namespace: {{ .Release.Namespace }}
-          constraintRef: pulsar-config-constraints
+          constraintRef: pulsar-env-constraints
           volumeName: bookies-config
           keys:
             - conf
@@ -523,7 +532,7 @@ spec:
       - name: bookies-recovery-config
         templateRef: {{ include "pulsar.name" . }}-recovery-conf-tpl
         namespace: {{ .Release.Namespace }}
-        constraintRef: pulsar-config-constraints
+        constraintRef: pulsar-env-constraints
         keys:
           - conf
         asEnvFrom:
@@ -639,7 +648,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-zookeeper-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: zookeeper-config
-          constraintRef: pulsar-config-constraints
+          constraintRef: pulsar-env-constraints
           keys:
             - conf
           asEnvFrom:

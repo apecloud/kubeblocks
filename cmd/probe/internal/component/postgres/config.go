@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 )
@@ -16,6 +17,9 @@ type Config struct {
 	password string
 	host     string
 	port     int
+	database string
+	maxConns int32
+	minConns int32
 	pool     *pgxpool.Config
 }
 
@@ -40,6 +44,9 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	config.port = int(poolConfig.ConnConfig.Port)
 	config.pool = poolConfig
 	config.url = url
+	config.database = poolConfig.ConnConfig.Database
+	config.maxConns = poolConfig.MaxConns
+	config.minConns = poolConfig.MinConns
 
 	return config, nil
 }
@@ -50,4 +57,9 @@ func (config *Config) GetDBPort() int {
 	}
 
 	return config.port
+}
+
+func (config *Config) GetConnectUrlWithHost(host string) string {
+	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s pool_min_conns=%d pool_max_conns=%d",
+		config.username, config.password, host, config.port, config.database, config.minConns, config.maxConns)
 }

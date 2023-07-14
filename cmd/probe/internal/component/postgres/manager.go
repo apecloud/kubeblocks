@@ -74,7 +74,6 @@ func (mgr *Manager) readPidFile() (*PidFile, error) {
 		text = append(text, scanner.Text())
 	}
 
-	mgr.Logger.Infof("postmaster file text: %v", text)
 	pid, err := strconv.ParseInt(text[0], 10, 32)
 	if err != nil {
 		return nil, err
@@ -96,7 +95,6 @@ func (mgr *Manager) newProcessFromPidFile() error {
 		return errors.Wrap(err, "read pid file")
 	}
 
-	mgr.Logger.Infof("pidFile: %v", pidFile)
 	proc, err := process.NewProcess(pidFile.pid)
 	if err != nil {
 		mgr.Logger.Errorf("new process failed, err:%v", err)
@@ -272,7 +270,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	pools := []*pgxpool.Pool{nil}
 	var err error
 	if member != nil && cluster != nil {
-		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{member.PodIP})
+		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
 		if err != nil || pools[0] == nil {
 			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
 			return false
@@ -526,7 +524,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		return false
 	}
 
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetLeaderMember().PodIP})
+	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*cluster.GetLeaderMember())})
 	if err != nil || pools[0] == nil {
 		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
 		return false
@@ -783,7 +781,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	var hosts []string
 	for _, m := range cluster.Members {
 		if m.Name != mgr.CurrentMemberName {
-			hosts = append(hosts, m.PodIP)
+			hosts = append(hosts, cluster.GetMemberAddr(m))
 		}
 	}
 	pools, err := mgr.GetOtherPoolsWithHosts(ctx, hosts)
@@ -795,7 +793,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	for i, pool := range pools {
 		if pool != nil {
 			if isLeader, err = mgr.IsLeaderWithPool(ctx, pool); isLeader && err == nil {
-				return cluster.GetMemberWithIP(hosts[i])
+				return cluster.GetMemberWithHost(hosts[i])
 			}
 		}
 	}
@@ -820,14 +818,13 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 		return nil, errors.New("Get other pool without hosts")
 	}
 
-	tempConfig, err := pgxpool.ParseConfig(config.url)
-	if err != nil {
-		return nil, errors.Wrap(err, "new temp config")
-	}
-
 	resp := make([]*pgxpool.Pool, len(hosts), len(hosts))
 	for i, host := range hosts {
-		tempConfig.ConnConfig.Host = host
+		tempConfig, err := pgxpool.ParseConfig(config.GetConnectUrlWithHost(host))
+		if err != nil {
+			return nil, errors.Wrap(err, "new temp config")
+		}
+
 		resp[i], err = pgxpool.NewWithConfig(ctx, tempConfig)
 		if err != nil {
 			mgr.Logger.Errorf("unable to ping the DB: %v, host:%s", err, host)

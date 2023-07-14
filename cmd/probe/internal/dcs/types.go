@@ -42,9 +42,9 @@ func (c *Cluster) GetMemberWithName(name string) *Member {
 	return nil
 }
 
-func (c *Cluster) GetMemberWithIP(host string) *Member {
+func (c *Cluster) GetMemberWithHost(host string) *Member {
 	for _, m := range c.Members {
-		if host == m.PodIP {
+		if host == c.GetMemberAddr(m) {
 			return &m
 		}
 	}

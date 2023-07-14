@@ -167,7 +167,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 	}
 
-	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
+	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil && (component.WorkloadType == appsv1alpha1.Replication || component.WorkloadType == appsv1alpha1.Consensus) {
 		// only accept 1st ClusterVersion override context
 		clusterCompVer := clusterCompVers[0]
 		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, component.ConfigTemplates)
@@ -390,7 +390,7 @@ func GenerateConnCredential(clusterName string) string {
 
 // overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
 func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
-	if cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
+	if switchoverSpec == nil || cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
 		return
 	}
 	applyCmdExecutorConfig := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {

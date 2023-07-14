@@ -594,7 +594,6 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 	return runningOpsList, nil
 }
 
-
 // validateSwitchoverResourceList checks if switchover resourceList is legal.
 func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *Cluster, switchoverList []Switchover) error {
 	for _, switchover := range switchoverList {

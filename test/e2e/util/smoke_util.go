@@ -346,3 +346,15 @@ func StringSplit(str string) string {
 	s = strings.ReplaceAll(s, "\n", "")
 	return s
 }
+
+func ReadLine(fileName string, name string) string {
+	file, _ := os.Open(fileName)
+	fileScanner := bufio.NewScanner(file)
+	for fileScanner.Scan() {
+		line := fileScanner.Text()
+		if strings.Contains(line, name) {
+			return line
+		}
+	}
+	return ""
+}

@@ -165,7 +165,7 @@ const (
 
 // Kubebench API group
 const (
-	KubebenchAPIGroup   = "benchmark.kubebench.io"
+	KubebenchAPIGroup   = "benchmark.apecloud.io"
 	KubebenchAPIVersion = "v1alpha1"
 	ResourcePgBench     = "pgbenches"
 	ResourceSysBench    = "sysbenches"

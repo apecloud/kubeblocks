@@ -188,29 +188,25 @@ jobs:
   check-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
     with:
       MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
-      VERSION: "latest"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      APECD_REF: "v0.1.2"
+      DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
 
   check-tools-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
     with:
-      MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "build-tools-image"
+      MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
-      VERSION: "latest"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      APECD_REF: "v0.1.2"
+      DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
   check-helm:

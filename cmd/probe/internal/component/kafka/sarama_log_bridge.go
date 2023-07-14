@@ -14,21 +14,23 @@ limitations under the License.
 package kafka
 
 import (
-	"github.com/dapr/kit/logger"
+	"fmt"
+
+	"github.com/go-logr/logr"
 )
 
 type SaramaLogBridge struct {
-	daprLogger logger.Logger
+	logger logr.Logger
 }
 
 func (b SaramaLogBridge) Print(v ...interface{}) {
-	b.daprLogger.Debug(v...)
+	b.logger.Info(fmt.Sprint(v))
 }
 
 func (b SaramaLogBridge) Printf(format string, v ...interface{}) {
-	b.daprLogger.Debugf(format, v...)
+	b.logger.Info(fmt.Sprintf(format, v...))
 }
 
 func (b SaramaLogBridge) Println(v ...interface{}) {
-	b.daprLogger.Debug(v...)
+	b.Print(v)
 }

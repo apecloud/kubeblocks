@@ -23,8 +23,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/cenkalti/backoff/v4"
-
-	"github.com/dapr/kit/retry"
 )
 
 type consumer struct {
@@ -46,19 +44,19 @@ func (consumer *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 			}
 
 			if consumer.k.consumeRetryEnabled {
-				if err := retry.NotifyRecover(func() error {
+				if err := NotifyRecover(func() error {
 					return consumer.doCallback(session, message)
 				}, b, func(err error, d time.Duration) {
-					consumer.k.logger.Warnf("Error processing Kafka message: %s/%d/%d [key=%s]. Error: %v. Retrying...", message.Topic, message.Partition, message.Offset, asBase64String(message.Key), err)
+					consumer.k.logger.Error(err, fmt.Sprintf("Error processing Kafka message: %s/%d/%d [key=%s]. Retrying...", message.Topic, message.Partition, message.Offset, asBase64String(message.Key)))
 				}, func() {
-					consumer.k.logger.Infof("Successfully processed Kafka message after it previously failed: %s/%d/%d [key=%s]", message.Topic, message.Partition, message.Offset, asBase64String(message.Key))
+					consumer.k.logger.Info(fmt.Sprintf("Successfully processed Kafka message after it previously failed: %s/%d/%d [key=%s]", message.Topic, message.Partition, message.Offset, asBase64String(message.Key)))
 				}); err != nil {
-					consumer.k.logger.Errorf("Too many failed attempts at processing Kafka message: %s/%d/%d [key=%s]. Error: %v.", message.Topic, message.Partition, message.Offset, asBase64String(message.Key), err)
+					consumer.k.logger.Error(err, fmt.Sprintf("Too many failed attempts at processing Kafka message: %s/%d/%d [key=%s]. ", message.Topic, message.Partition, message.Offset, asBase64String(message.Key)))
 				}
 			} else {
 				err := consumer.doCallback(session, message)
 				if err != nil {
-					consumer.k.logger.Errorf("Error processing Kafka message: %s/%d/%d [key=%s]. Error: %v.", message.Topic, message.Partition, message.Offset, asBase64String(message.Key), err)
+					consumer.k.logger.Error(err, "Error processing Kafka message: %s/%d/%d [key=%s].", message.Topic, message.Partition, message.Offset, asBase64String(message.Key))
 				}
 			}
 		// Should return when `session.Context()` is done.
@@ -71,7 +69,7 @@ func (consumer *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 }
 
 func (consumer *consumer) doCallback(session sarama.ConsumerGroupSession, message *sarama.ConsumerMessage) error {
-	consumer.k.logger.Debugf("Processing Kafka message: %s/%d/%d [key=%s]", message.Topic, message.Partition, message.Offset, asBase64String(message.Key))
+	consumer.k.logger.Info(fmt.Sprintf("Processing Kafka message: %s/%d/%d [key=%s]", message.Topic, message.Partition, message.Offset, asBase64String(message.Key)))
 	handlerConfig, err := consumer.k.GetTopicHandlerConfig(message.Topic)
 	if err != nil {
 		return err
@@ -166,7 +164,7 @@ func (k *Kafka) Subscribe(ctx context.Context) error {
 	}
 
 	go func() {
-		k.logger.Debugf("Subscribed and listening to topics: %s", topics)
+		k.logger.Info("Subscribed and listening to topics", "topics", topics)
 
 		for {
 			// If the context was cancelled, as is the case when handling SIGINT and SIGTERM below, then this pops
@@ -175,29 +173,29 @@ func (k *Kafka) Subscribe(ctx context.Context) error {
 				break
 			}
 
-			k.logger.Debugf("Starting loop to consume.")
+			k.logger.Info("Starting loop to consume.")
 
 			// Consume the requested topics
 			bo := backoff.WithContext(backoff.NewConstantBackOff(k.consumeRetryInterval), ctx)
-			innerErr := retry.NotifyRecover(func() error {
+			innerErr := NotifyRecover(func() error {
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return backoff.Permanent(ctxErr)
 				}
 				return k.cg.Consume(ctx, topics, &(k.consumer))
 			}, bo, func(err error, t time.Duration) {
-				k.logger.Errorf("Error consuming %v. Retrying...: %v", topics, err)
+				k.logger.Error(err, fmt.Sprintf("Error consuming %v. Retrying...", topics))
 			}, func() {
-				k.logger.Infof("Recovered consuming %v", topics)
+				k.logger.Info(fmt.Sprintf("Recovered consuming %v", topics))
 			})
 			if innerErr != nil && !errors.Is(innerErr, context.Canceled) {
-				k.logger.Errorf("Permanent error consuming %v: %v", topics, innerErr)
+				k.logger.Error(innerErr, fmt.Sprintf("Permanent error consuming %v", topics))
 			}
 		}
 
-		k.logger.Debugf("Closing ConsumerGroup for topics: %v", topics)
+		k.logger.Info(fmt.Sprintf("Closing ConsumerGroup for topics: %v", topics))
 		err := k.cg.Close()
 		if err != nil {
-			k.logger.Errorf("Error closing consumer group: %v", err)
+			k.logger.Error(err, "Error closing consumer group")
 		}
 
 		// Ensure running channel is only closed once.
@@ -216,7 +214,7 @@ func (k *Kafka) closeSubscriptionResources() {
 	if k.cg != nil {
 		err := k.cg.Close()
 		if err != nil {
-			k.logger.Errorf("Error closing consumer group: %v", err)
+			k.logger.Error(err, "Error closing consumer group")
 		}
 
 		k.consumer.once.Do(func() {

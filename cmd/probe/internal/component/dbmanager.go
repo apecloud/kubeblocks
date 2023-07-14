@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	"github.com/dapr/kit/logger"
+
+	"github.com/go-logr/logr"
 )
 
 type DBManager interface {
@@ -31,7 +32,7 @@ type DBManager interface {
 	HasOtherHealthyMembers(*dcs.Cluster, string) []*dcs.Member
 	GetCurrentMemberName() string
 	GetMemberAddrs(*dcs.Cluster) []string
-	GetLogger() logger.Logger
+	GetLogger() logr.Logger
 }
 
 var managers = make(map[string]DBManager)
@@ -41,7 +42,7 @@ type DBManagerBase struct {
 	ClusterCompName   string
 	Namespace         string
 	DataDir           string
-	Logger            logger.Logger
+	Logger            logr.Logger
 	DBStartupReady    bool
 }
 
@@ -49,7 +50,7 @@ func (mgr *DBManagerBase) IsDBStartupReady() bool {
 	return mgr.DBStartupReady
 }
 
-func (mgr *DBManagerBase) GetLogger() logger.Logger {
+func (mgr *DBManagerBase) GetLogger() logr.Logger {
 	return mgr.Logger
 }
 

@@ -18,10 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Shopify/sarama"
+	"github.com/go-logr/logr"
 
-	"github.com/dapr/kit/logger"
-	"github.com/dapr/kit/retry"
+	"github.com/Shopify/sarama"
 )
 
 // Kafka allows reading/writing to a Kafka consumer group.
@@ -30,7 +29,7 @@ type Kafka struct {
 	broker          *sarama.Broker
 	consumerGroup   string
 	brokers         []string
-	logger          logger.Logger
+	logger          logr.Logger
 	authType        string
 	saslUsername    string
 	saslPassword    string
@@ -41,7 +40,7 @@ type Kafka struct {
 	subscribeTopics TopicHandlerConfig
 	subscribeLock   sync.Mutex
 
-	backOffConfig retry.Config
+	backOffConfig Config
 
 	// The default value should be true for kafka pubsub component and false for kafka binding component
 	// This default value can be overridden by metadata consumeRetryEnabled
@@ -50,7 +49,7 @@ type Kafka struct {
 	consumeRetryInterval       time.Duration
 }
 
-func NewKafka(logger logger.Logger) *Kafka {
+func NewKafka(logger logr.Logger) *Kafka {
 	return &Kafka{
 		logger:          logger,
 		subscribeTopics: make(TopicHandlerConfig),
@@ -111,7 +110,7 @@ func (k *Kafka) Init(_ context.Context, metadata map[string]string) error {
 	}
 
 	k.config = config
-	sarama.Logger = SaramaLogBridge{daprLogger: k.logger}
+	sarama.Logger = SaramaLogBridge{logger: k.logger}
 
 	k.Producer, err = getSyncProducer(*k.config, k.brokers, meta.MaxMessageBytes)
 	if err != nil {
@@ -120,7 +119,7 @@ func (k *Kafka) Init(_ context.Context, metadata map[string]string) error {
 
 	// Default retry configuration is used if no
 	// backOff properties are set.
-	if err := retry.DecodeConfigWithPrefix(
+	if err := DecodeConfigWithPrefix(
 		&k.backOffConfig,
 		metadata,
 		"backOff"); err != nil {
@@ -129,7 +128,7 @@ func (k *Kafka) Init(_ context.Context, metadata map[string]string) error {
 	k.consumeRetryEnabled = meta.ConsumeRetryEnabled
 	k.consumeRetryInterval = meta.ConsumeRetryInterval
 
-	k.logger.Debug("Kafka message bus initialization complete")
+	k.logger.Info("Kafka message bus initialization complete")
 
 	return nil
 }
@@ -216,13 +215,13 @@ func (k *Kafka) BrokerCreateTopics(topic string) error {
 
 	resp, err := k.broker.CreateTopics(req)
 	if err != nil {
-		k.logger.Infof("CheckStatus error: %v", err)
+		k.logger.Error(err, "CheckStatus error")
 		return err
 	} else {
 		respErr := resp.TopicErrors[topic]
 		// ErrNo details: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 		if respErr.Err != 0 {
-			k.logger.Infof("CheckStatus error, errMsg: %s errNo: %d", respErr.Error(), int16(respErr.Err))
+			k.logger.Error(respErr, "CheckStatus error", "errNo", int16(respErr.Err))
 			return respErr
 		}
 		return nil

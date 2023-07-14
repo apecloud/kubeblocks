@@ -71,6 +71,10 @@ spec:
             command:
               - /kb-scripts/init-broker.sh
             env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
             - name: brokerServiceUrl
               value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:6650
             - name: clusterName
@@ -119,11 +123,12 @@ spec:
                 cpu: 200m
                 memory: 512Mi
             env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
             - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
+              value: $(KB_POD_NAME)
             - name: PULSAR_PREFIX_brokerServicePort
               value: "6650"
             - name: PULSAR_PREFIX_internalListenerName
@@ -182,8 +187,8 @@ spec:
             - name: scripts
               mountPath: /kb-scripts
           - name: metrics
-            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -193,15 +198,9 @@ spec:
               - name: SERVICE_PORT
                 value: "8080"
               - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.name
+                value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.namespace
+                value: $(KB_NAMESPACE)
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
@@ -268,6 +267,11 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /kb-scripts
+            env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
         containers:
           - name: proxy
             command:
@@ -282,6 +286,10 @@ spec:
               privileged: false
               runAsGroup: 0
             env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
             - name: brokerWebServiceURL
               value: http://$(brokerSVC):80
             - name: brokerServiceURL
@@ -329,8 +337,8 @@ spec:
               - name: scripts
                 mountPath: /kb-scripts
           - name: metrics
-            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -340,15 +348,9 @@ spec:
               - name: SERVICE_PORT
                 value: "8080"
               - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.name
+                value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.namespace
+                value: $(KB_NAMESPACE)
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
@@ -394,6 +396,11 @@ spec:
           - name: init-bookies
             command:
               - /kb-scripts/init-bookies.sh
+            env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
@@ -403,6 +410,11 @@ spec:
           - name: bookies
             command:
               - /kb-scripts/start-bookies.sh
+            env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
             lifecycle:
               preStop:
                 exec:
@@ -451,8 +463,8 @@ spec:
               - name: annotations
                 mountPath: /etc/annotations
           - name: metrics
-            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -462,15 +474,9 @@ spec:
               - name: SERVICE_PORT
                 value: "8000"
               - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.name
+                value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.namespace
+                value: $(KB_NAMESPACE)
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
@@ -528,6 +534,11 @@ spec:
           - name: check-bookies
             command:
             - /kb-scripts/check-bookies.sh
+            env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
             volumeMounts:
             - name: scripts
               mountPath: /kb-scripts
@@ -549,6 +560,10 @@ spec:
             command:
               - /kb-scripts/start-bookies-recovery.sh
             env:
+            {{- if .Values.debugEnabled }}
+            - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            {{- end }}
             - name: httpServerEnabled
               value: "true"
             - name: httpServerPort
@@ -566,8 +581,8 @@ spec:
             - name: scripts
               mountPath: /kb-scripts
           - name: metrics
-            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -577,15 +592,9 @@ spec:
               - name: SERVICE_PORT
                 value: "8000"
               - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.name
+                value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.namespace
+                value: $(KB_NAMESPACE)
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
@@ -641,6 +650,10 @@ spec:
             command:
               - /kb-scripts/start-zookeeper.sh
             env:
+              {{- if .Values.debugEnabled }}
+              - name: PULSAR_LOG_ROOT_LEVEL
+                value: DEBUG
+              {{- end }}
               - name: EXTERNAL_PROVIDED_SERVERS
                 value: "false"
               - name: OPTS
@@ -705,8 +718,8 @@ spec:
               - name: scripts
                 mountPath: /kb-scripts
           - name: metrics
-            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -716,15 +729,9 @@ spec:
               - name: SERVICE_PORT
                 value: "8000"
               - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.name
+                value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.namespace
+                value: $(KB_NAMESPACE)
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"

@@ -1,6 +1,4 @@
-# Default values for pulsar.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Default values for Pulsar.
 
 clusterVersionOverride: ""
 nameOverride: ""
@@ -12,58 +10,52 @@ commonLabels: {}
 
 commonAnnotations: {}
 
-bookies:
-  image:
+## @param debugEnabled 
+#
+debugEnabled: false
+
+## Default Pulsar image
+##
+defaultPulsarImage:
+  repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 2.11.1
+
+## Images
+##
+## Control what images to use for each component
+images:
+  bookie:
+    repository: ""
+    pullPolicy: ""
+    tag: ""
+
+  zookeeper:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
     pullPolicy: IfNotPresent
+    # Zookeeper component is used for metadata, shouldn't need update following tag value for common 
+    # upgrade scenario
     tag: 2.11.1
 
-zookeeper:
-  image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
-    pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.11.1
+  broker:
+    repository: ""
+    pullPolicy: ""
+    tag: ""
 
-  roleProbe:
-    failureThreshold: 2
-    periodSeconds: 1
-    successThreshold: 1
+  proxy:
+    repository: ""
+    pullPolicy: ""
+    tag: ""
 
-  ## @param configuration Configure ZooKeeper with a custom zoo.cfg file
-  ## e.g:
-  ## configuration: |-
-  ##   deploy-working-dir=/bitnami/geode/data
-  ##   log-level=info
-  ##   ...
-  ##
-  configuration: ""
-
-broker:
-  configuration: ""
-  image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
-    pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.11.1
-
-proxy:
-  configuration: ""
-  image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
-    pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.11.1
-
-
-clusterDomain: ".cluster.local"
-
-metrics:
-  image:
-    registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/agamotto
+  metrics:
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/agamotto
     tag: 0.1.2-beta.2
     pullPolicy: IfNotPresent
 
+metrics:
   service:
     port: 1234
+
+
+clusterDomain: ".cluster.local"

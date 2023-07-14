@@ -460,7 +460,7 @@ spec:
               - name: JOB_NAME
                 value: bookie
               - name: SERVICE_PORT
-                value: "8080"
+                value: "8000"
               - name: POD_NAME
                 valueFrom:
                   fieldRef:
@@ -714,7 +714,7 @@ spec:
               - name: JOB_NAME
                 value: zookeeper
               - name: SERVICE_PORT
-                value: "9141"
+                value: "8000"
               - name: POD_NAME
                 valueFrom:
                   fieldRef:

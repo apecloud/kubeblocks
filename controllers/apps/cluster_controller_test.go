@@ -1979,7 +1979,7 @@ var _ = Describe("Cluster Controller", func() {
 				testDoNotTermintate(compName, compDefName)
 			})
 
-			FIt(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {
+			It(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {
 				testServiceAddAndDelete(compName, compDefName)
 			})
 
@@ -2084,11 +2084,11 @@ var _ = Describe("Cluster Controller", func() {
 			createBackupPolicyTpl(clusterDefObj)
 		})
 
-		It("Should success with one leader pod and two follower pods", func() {
+		FIt("Should success with one leader pod and two follower pods", func() {
 			testThreeReplicas(compName, compDefName)
 		})
 
-		It("test restore cluster from backup", func() {
+		FIt("test restore cluster from backup", func() {
 			By("mock backuptool object")
 			backupPolicyName := "test-backup-policy"
 			backupName := "test-backup"
@@ -2153,9 +2153,16 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("the restore container has been removed from init containers")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-			})).Should(Succeed())
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+					// container role-agent-installer will be left
+					g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
+				})).Should(Succeed())
+			} else {
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+					g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+				})).Should(Succeed())
+			}
 
 			By("clean up annotations after cluster running")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {

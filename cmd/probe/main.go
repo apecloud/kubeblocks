@@ -20,83 +20,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
-	// Register all components
-	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
-	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
-	lockLoader "github.com/dapr/dapr/pkg/components/lock"
-	httpMiddlewareLoader "github.com/dapr/dapr/pkg/components/middleware/http"
-	nrLoader "github.com/dapr/dapr/pkg/components/nameresolution"
-	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
-	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
-	stateLoader "github.com/dapr/dapr/pkg/components/state"
-	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+
+	"github.com/go-logr/logr"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
+
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/dapr/dapr/pkg/runtime"
-	"github.com/dapr/kit/logger"
-
-	dhttp "github.com/dapr/components-contrib/bindings/http"
-	"github.com/dapr/components-contrib/bindings/localstorage"
-	"github.com/dapr/components-contrib/middleware"
-	"github.com/dapr/components-contrib/nameresolution/mdns"
-
 	"go.uber.org/automaxprocs/maxprocs"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
-var (
-	log        = logger.NewLogger("dapr.runtime")
-	logContrib = logger.NewLogger("dapr.contrib")
-	logHa      = logger.NewLogger("sqlchannel.highavailability")
-)
+var mysqlOps *mysql.MysqlOperations
 
 func init() {
 	viper.AutomaticEnv()
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(postgres.NewPostgres, "postgres")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(custom.NewHTTPCustom, "custom")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(kafka.NewKafka, "kafka")
-	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
-	httpMiddlewareLoader.DefaultRegistry.RegisterComponent(func(log logger.Logger) httpMiddlewareLoader.FactoryMethod {
-		return func(metadata middleware.Metadata) (httpMiddleware.Middleware, error) {
-			return probe.NewProbeMiddleware(log).GetHandler(metadata)
-		}
-	}, "probe")
-
+	mysqlOps = mysql.NewMysql(logr.Logger{})
+	err := mysqlOps.Init()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
+	mainLogger := logr.Logger{}
 
-	rt, err := runtime.FromFlags()
-	if err != nil {
-		log.Fatal(err)
-	}
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	err = viper.BindPFlags(pflag.CommandLine)
+	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
 		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
 	}
@@ -106,38 +70,47 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
-	secretstoresLoader.DefaultRegistry.Logger = logContrib
-	stateLoader.DefaultRegistry.Logger = logContrib
-	configurationLoader.DefaultRegistry.Logger = logContrib
-	lockLoader.DefaultRegistry.Logger = logContrib
-	pubsubLoader.DefaultRegistry.Logger = logContrib
-	nrLoader.DefaultRegistry.Logger = logContrib
-	bindingsLoader.DefaultRegistry.Logger = logContrib
-	httpMiddlewareLoader.DefaultRegistry.Logger = logContrib
-
-	err = rt.Run(
-		runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
-		runtime.WithStates(stateLoader.DefaultRegistry),
-		runtime.WithConfigurations(configurationLoader.DefaultRegistry),
-		runtime.WithLocks(lockLoader.DefaultRegistry),
-		runtime.WithPubSubs(pubsubLoader.DefaultRegistry),
-		runtime.WithNameResolutions(nrLoader.DefaultRegistry),
-		runtime.WithBindings(bindingsLoader.DefaultRegistry),
-		runtime.WithHTTPMiddlewares(httpMiddlewareLoader.DefaultRegistry),
-	)
 	if err != nil {
-		log.Fatalf("fatal error from runtime: %s", err)
+		mainLogger.Error(err, "fatal error from runtime")
+		os.Exit(1)
 	}
+
+	go func() {
+		http.HandleFunc("/probe", func(writer http.ResponseWriter, req *http.Request) {
+			// Readiness 是 Get请求, CmdChannel 是 Post请求
+			probeReq := &binding.ProbeRequest{Metadata: map[string]string{}}
+			if req.Method == "GET" {
+				probeReq.Operation = "getRole"
+			} else {
+				// 获取operation
+				err := json.NewDecoder(req.Body).Decode(probeReq)
+				if err != nil {
+					mysqlOps.Logger.Error(err, "json Decode failed")
+				}
+			}
+			dispatch, err := mysqlOps.Dispatch(req.Context(), probeReq)
+			if err != nil {
+				mysqlOps.Logger.Error(err, "dispatch failed")
+			}
+			if codeStr, ok := dispatch.Metadata[binding.StatusCode]; ok && (codeStr == binding.OperationNotFoundHTTPCode || codeStr == binding.OperationFailedHTTPCode) {
+				code, _ := strconv.Atoi(codeStr)
+				writer.WriteHeader(code)
+			}
+			// todo 修改状态码
+			writer.Write(dispatch.Data)
+		})
+		http.ListenAndServe("localhost:7979", nil)
+	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
-	ha := highavailability.NewHa(logHa)
-	if ha != nil {
-		defer ha.ShutdownWithWait()
-		go ha.Start()
-	}
+	//ha := highavailability.NewHa(logr.Logger{})
+	//if ha != nil {
+	//	defer ha.ShutdownWithWait()
+	//	go ha.Start()
+	//}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
-	rt.ShutdownWithWait()
+	// 收尾
 }

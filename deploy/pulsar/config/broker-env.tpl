@@ -64,3 +64,8 @@ PULSAR_PREFIX_brokerEntryMetadataInterceptors: org.apache.pulsar.common.intercep
 # Pulsar deletes inactive partitions of a partitioned topic while the metadata of the partitioned topic is not deleted.
 # KoP cannot create missed partitions in this case.
 PULSAR_PREFIX_brokerDeleteInactiveTopicsEnabled: false
+
+# KoP is compatible with Kafka clients 0.9 or higher. For Kafka clients 3.2.0 or higher, you have to add the following 
+# configurations in KoP because of KIP-679.
+PULSAR_PREFIX_kafkaTransactionCoordinatorEnabled: true
+PULSAR_PREFIX_brokerDeduplicationEnabled: true

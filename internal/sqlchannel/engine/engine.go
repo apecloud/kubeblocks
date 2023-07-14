@@ -58,7 +58,7 @@ type AuthInfo struct {
 	UserPasswd string
 }
 
-type Interface interface {
+type ClusterCommands interface {
 	ConnectCommand(info *AuthInfo) []string
 	Container() string
 	ConnectExample(info *ConnectionInfo, client string) string
@@ -73,7 +73,7 @@ type EngineInfo struct {
 	Database    string
 }
 
-func New(typeName string) (Interface, error) {
+func New(typeName string) (ClusterCommands, error) {
 	switch typeName {
 	case stateMysql:
 		return newMySQL(), nil

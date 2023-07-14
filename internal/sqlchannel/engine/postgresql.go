@@ -27,7 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-var _ Interface = &postgresql{}
+var _ ClusterCommands = &postgresql{}
 
 type postgresql struct {
 	info     EngineInfo

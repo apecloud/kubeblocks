@@ -72,7 +72,7 @@ type ConnectOptions struct {
 
 	clientType  string
 	showExample bool
-	engine      engine.Interface
+	engine      engine.ClusterCommands
 
 	privateEndPoint bool
 	svc             *corev1.Service

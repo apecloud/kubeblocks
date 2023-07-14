@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-var _ Interface = &mongodb{}
+var _ ClusterCommands = &mongodb{}
 
 type mongodb struct {
 	info     EngineInfo

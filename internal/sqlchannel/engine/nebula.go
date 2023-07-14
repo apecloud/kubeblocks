@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-var _ Interface = &nebula{}
+var _ ClusterCommands = &nebula{}
 
 type nebula struct {
 	info     EngineInfo

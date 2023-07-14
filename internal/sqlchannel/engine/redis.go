@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-var _ Interface = &redis{}
+var _ ClusterCommands = &redis{}
 
 type redis struct {
 	info     EngineInfo

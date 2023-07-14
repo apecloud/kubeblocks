@@ -27,7 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-var _ Interface = &mysql{}
+var _ ClusterCommands = &mysql{}
 
 type mysql struct {
 	info     EngineInfo

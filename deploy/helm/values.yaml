@@ -22,6 +22,8 @@ image:
     repository: apecloud/kubeblocks-tools
   charts:
     repository: apecloud/kubeblocks-charts
+  datascript:
+    repository: apecloud/kubeblocks-datascript
 
 
 ## @param separatedDeployment separated the KubeBlocks deployment into two deployments.
@@ -756,7 +758,3 @@ external-dns:
     value: "true"
     effect: NoSchedule
 
-datascriptClients:
-  registry: registry.cn-hangzhou.aliyuncs.com
-  repository: apecloud/datascript-clients
-  tag: 0.1.0

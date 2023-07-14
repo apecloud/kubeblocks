@@ -80,7 +80,7 @@ spec:
             - name: KUBEBLOCKS_CHARTS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.charts.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE
-              value: "{{ .Values.datascriptClients.registry | default "docker.io" }}/{{ .Values.datascriptClients.repository }}:{{ .Values.datascriptClients.tag | default .Chart.AppVersion }}"
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}

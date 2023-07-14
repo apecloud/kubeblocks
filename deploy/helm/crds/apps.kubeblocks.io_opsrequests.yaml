@@ -297,7 +297,7 @@ spec:
                     type: string
                   image:
                     description: exec command with image, by default use the image
-                      of datascript-clients
+                      of kubeblocks-datascript.
                     type: string
                   script:
                     description: script defines the script to be executed.

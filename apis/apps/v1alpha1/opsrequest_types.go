@@ -324,9 +324,9 @@ type PointInTimeRefSpec struct {
 // It is applicable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.
 type ScriptSpec struct {
 	ComponentOps `json:",inline"`
-	// exec command with image, by default use the image of datascript-clients
+	// exec command with image, by default use the image of kubeblocks-datascript.
 	// +optional
-	Image *string `json:"image,omitempty"`
+	Image string `json:"image,omitempty"`
 	// secret defines the secret to be used to execute the script.
 	// If not specified, the default cluster root credential secret will be used.
 	// +optional

@@ -26,7 +26,7 @@ package v1alpha1
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -3255,11 +3255,6 @@ func (in *ScriptSecret) DeepCopy() *ScriptSecret {
 func (in *ScriptSpec) DeepCopyInto(out *ScriptSpec) {
 	*out = *in
 	out.ComponentOps = in.ComponentOps
-	if in.Image != nil {
-		in, out := &in.Image, &out.Image
-		*out = new(string)
-		**out = **in
-	}
 	if in.Secret != nil {
 		in, out := &in.Secret, &out.Secret
 		*out = new(ScriptSecret)

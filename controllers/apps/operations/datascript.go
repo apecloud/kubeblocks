@@ -268,8 +268,8 @@ func buildDataScriptJob(reqCtx intctrlutil.RequestCtx, cli client.Client, cluste
 		envs = append(envs, envVars...)
 	}
 	containerImg := viper.GetString(constant.KBDataScriptClientsImage)
-	if ops.Spec.ScriptSpec.Image != nil {
-		containerImg = *ops.Spec.ScriptSpec.Image
+	if len(ops.Spec.ScriptSpec.Image) != 0 {
+		containerImg = ops.Spec.ScriptSpec.Image
 	}
 	if len(containerImg) == 0 {
 		return nil, &FastFaileError{message: "image is empty"}

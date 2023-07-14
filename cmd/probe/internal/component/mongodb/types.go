@@ -16,10 +16,10 @@ const (
 	DefaultWriteConcern = "majority"
 )
 
-// Replica Set tags: https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#add-tag-sets-to-a-replica-set
+// ReplsetTags Set tags: https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#add-tag-sets-to-a-replica-set
 type ReplsetTags map[string]string
 
-// RSMember document from 'replSetGetConfig': https://docs.mongodb.com/manual/reference/command/replSetGetConfig/#dbcmd.replSetGetConfig
+// ConfigMember document from 'replSetGetConfig': https://docs.mongodb.com/manual/reference/command/replSetGetConfig/#dbcmd.replSetGetConfig
 type ConfigMember struct {
 	ID                 int         `bson:"_id" json:"_id"`
 	Host               string      `bson:"host" json:"host"`
@@ -57,7 +57,7 @@ type Settings struct {
 	ReplicaSetID            primitive.ObjectID     `bson:"replicaSetId,omitempty" json:"replicaSetId,omitempty"`
 }
 
-// Response document from 'replSetGetConfig': https://docs.mongodb.com/manual/reference/command/replSetGetConfig/#dbcmd.replSetGetConfig
+// ReplSetGetConfig Response document from 'replSetGetConfig': https://docs.mongodb.com/manual/reference/command/replSetGetConfig/#dbcmd.replSetGetConfig
 type ReplSetGetConfig struct {
 	Config     *RSConfig `bson:"config" json:"config"`
 	OKResponse `bson:",inline"`
@@ -143,7 +143,7 @@ type ReplSetStatus struct {
 }
 
 type Member struct {
-	Id                int                 `bson:"_id" json:"_id"`
+	ID                int                 `bson:"_id" json:"_id"`
 	Name              string              `bson:"name" json:"name"`
 	Health            MemberHealth        `bson:"health" json:"health"`
 	State             MemberState         `bson:"state" json:"state"`

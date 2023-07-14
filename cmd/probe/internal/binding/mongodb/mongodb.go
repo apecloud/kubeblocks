@@ -22,7 +22,6 @@ package mongodb
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -34,7 +33,6 @@ import (
 
 // MongoDBOperations is a binding implementation for MongoDB.
 type MongoDBOperations struct {
-	mu      sync.Mutex
 	manager *mongodb.Manager
 	BaseOperations
 }

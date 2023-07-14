@@ -81,7 +81,7 @@ type HaConfig struct {
 	maxLagOnSwitchover int64
 }
 
-func (c *HaConfig) GetTtl() int {
+func (c *HaConfig) GetTTL() int {
 	return c.ttl
 }
 
@@ -94,7 +94,7 @@ type Leader struct {
 	Name        string
 	AcquireTime int64
 	RenewTime   int64
-	Ttl         int
+	TTL         int
 	Resource    interface{}
 }
 

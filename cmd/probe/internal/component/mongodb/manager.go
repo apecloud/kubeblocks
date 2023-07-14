@@ -187,7 +187,7 @@ func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {
 	return nil
 }
 
-// InitiateMongoClusterRS is a method to create MongoDB cluster
+// InitiateReplSet is a method to create MongoDB cluster
 func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
 	configMembers := make([]ConfigMember, len(cluster.Members))
 
@@ -400,14 +400,14 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 		return err
 	}
 
-	var lastId int
+	var lastID int
 	var configMember ConfigMember
 	for _, configMember = range rsConfig.Members {
-		if configMember.ID > lastId {
-			lastId = configMember.ID
+		if configMember.ID > lastID {
+			lastID = configMember.ID
 		}
 	}
-	configMember.ID = lastId + 1
+	configMember.ID = lastID + 1
 	configMember.Host = currentHost
 	configMember.Priority = 1
 	rsConfig.Members = append(rsConfig.Members, configMember)
@@ -563,7 +563,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-// Are there any healthy members other than the leader?
+// HasOtherHealthyMembers Are there any healthy members other than the leader?
 func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())

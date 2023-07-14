@@ -62,7 +62,6 @@ import (
 var (
 	log        = logger.NewLogger("dapr.runtime")
 	logContrib = logger.NewLogger("dapr.contrib")
-	logHa      = logger.NewLogger("sqlchannel.highavailability")
 )
 
 func init() {

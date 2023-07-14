@@ -21,6 +21,8 @@ package binding
 
 import (
 	"fmt"
+
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (
@@ -87,4 +89,15 @@ var (
 
 type SlaveStatus struct {
 	SecondsBehindMaster int64 `json:"Seconds_Behind_Master"`
+}
+
+type ProbeRequest struct {
+	Data      []byte            `json:"data"`
+	Metadata  map[string]string `json:"metadata"`
+	Operation OperationKind     `json:"operation"`
+}
+
+type ProbeResponse struct {
+	Data     []byte            `json:"data"`
+	Metadata map[string]string `json:"metadata"`
 }

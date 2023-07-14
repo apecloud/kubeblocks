@@ -69,6 +69,9 @@ vtgateLogConfigs:
   info: /vtdataroot/vtgate.INFO
   queryLog: /vtdataroot/vtgate_querylog.txt
 
+etcdLogConfigs:
+  log: /vtdataroot/etcd.log
+
 roleProbe:
   failureThreshold: 2
   periodSeconds: 1

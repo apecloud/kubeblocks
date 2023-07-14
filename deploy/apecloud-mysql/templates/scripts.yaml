@@ -256,7 +256,7 @@ data:
 
     etcd --enable-v2=true --data-dir "${VTDATAROOT}/etcd/"  \
       --listen-client-urls "http://0.0.0.0:${etcd_port}" \
-      --advertise-client-urls "http://0.0.0.0:${etcd_port}"
+      --advertise-client-urls "http://0.0.0.0:${etcd_port}" 2>&1 | tee "${VTDATAROOT}/etcd.log"
   etcd-post-start.sh: |-
     #!/bin/bash
     etcd_port=${ETCD_PORT:-'2379'}

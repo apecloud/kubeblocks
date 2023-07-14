@@ -355,6 +355,11 @@ spec:
           constraintRef: mysql-scale-vtconsensus-config-constraints
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
+      logConfigs:
+        {{- range $name,$pattern := .Values.etcdLogConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       service:
         ports:
           - name: etcd-port

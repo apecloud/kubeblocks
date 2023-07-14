@@ -16,6 +16,8 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 {{- end }}
 - name: vtcontroller
   componentDefRef: vtcontroller # ref clusterdefinition componentDefs.name
+  enabledLogs:
+    - log
   volumeClaimTemplates:
     - name: data
       spec:

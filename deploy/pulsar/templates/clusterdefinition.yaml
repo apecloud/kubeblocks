@@ -74,6 +74,8 @@ spec:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
               value: DEBUG
+            - name: PULSAR_LOG_LEVEL
+              value: DEBUG
             {{- end }}
             - name: brokerServiceUrl
               value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:6650
@@ -125,6 +127,8 @@ spec:
             env:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
             - name: POD_NAME
@@ -271,6 +275,8 @@ spec:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
               value: DEBUG
+            - name: PULSAR_LOG_LEVEL
+              value: DEBUG
             {{- end }}
         containers:
           - name: proxy
@@ -288,6 +294,8 @@ spec:
             env:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
             - name: brokerWebServiceURL
@@ -400,6 +408,8 @@ spec:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
               value: DEBUG
+            - name: PULSAR_LOG_LEVEL
+              value: DEBUG
             {{- end }}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
@@ -413,6 +423,8 @@ spec:
             env:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
             lifecycle:
@@ -538,6 +550,8 @@ spec:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
               value: DEBUG
+            - name: PULSAR_LOG_LEVEL
+              value: DEBUG
             {{- end }}
             volumeMounts:
             - name: scripts
@@ -562,6 +576,8 @@ spec:
             env:
             {{- if .Values.debugEnabled }}
             - name: PULSAR_LOG_ROOT_LEVEL
+              value: DEBUG
+            - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
             - name: httpServerEnabled
@@ -652,6 +668,8 @@ spec:
             env:
               {{- if .Values.debugEnabled }}
               - name: PULSAR_LOG_ROOT_LEVEL
+                value: DEBUG
+              - name: PULSAR_LOG_LEVEL
                 value: DEBUG
               {{- end }}
               - name: EXTERNAL_PROVIDED_SERVERS

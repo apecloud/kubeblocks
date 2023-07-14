@@ -23,14 +23,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/dapr/components-contrib/bindings"
+
+	"github.com/dapr/components-contrib/metadata"
+
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
-	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -49,14 +52,9 @@ const (
 )
 
 func TestOperations(t *testing.T) {
-	pgOps := NewPostgres(logger.NewLogger("test")).(*PostgresOperations)
-	metadata := bindings.Metadata{
-		Base: metadata.Base{
-			Properties: map[string]string{},
-		},
-	}
+	pgOps := NewPostgres().(*PostgresOperations)
 	metadata.Properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
-	_ = pgOps.Init(metadata)
+	_ = pgOps.Init()
 	assert.Equal(t, "postgres", pgOps.DBType)
 	assert.NotNil(t, pgOps.InitIfNeed)
 	assert.NotNil(t, pgOps.GetRole)
@@ -89,9 +87,8 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 
 	// live DB test
-	b := NewPostgres(logger.NewLogger("test")).(*PostgresOperations)
-	m := bindings.Metadata{Base: metadata.Base{Properties: map[string]string{connectionURLKey: url}}}
-	if err := b.Init(m); err != nil {
+	b := NewPostgres().(*PostgresOperations)
+	if err := b.Init(); err != nil {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
@@ -99,99 +96,99 @@ func TestPostgresIntegration(t *testing.T) {
 	assert.False(t, b.InitIfNeed())
 
 	// create table
-	req := &bindings.InvokeRequest{
+	req := &binding.ProbeRequest{
 		Operation: ExecOperation,
 		Metadata:  map[string]string{commandSQLKey: testTableDDL},
 	}
 	ctx := context.TODO()
 	t.Run("Prepare Data", func(t *testing.T) {
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Invoke checkRole", func(t *testing.T) {
+	t.Run("Dispatch checkRole", func(t *testing.T) {
 		req.Operation = "checkRole"
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Invoke getRole", func(t *testing.T) {
+	t.Run("Dispatch getRole", func(t *testing.T) {
 		req.Operation = "getRole"
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Invoke checkStatus", func(t *testing.T) {
+	t.Run("Dispatch checkStatus", func(t *testing.T) {
 		req.Operation = "checkStatus"
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Invoke create table", func(t *testing.T) {
-		res, err := b.Invoke(ctx, req)
+	t.Run("Dispatch create table", func(t *testing.T) {
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Invoke delete", func(t *testing.T) {
+	t.Run("Dispatch delete", func(t *testing.T) {
 		req.Metadata[commandSQLKey] = testDelete
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Invoke exec with no sql", func(t *testing.T) {
+	t.Run("Dispatch exec with no sql", func(t *testing.T) {
 		req.Operation = ExecOperation
 		req.Metadata[commandSQLKey] = ""
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Invoke exec with invalid sql", func(t *testing.T) {
+	t.Run("Dispatch exec with invalid sql", func(t *testing.T) {
 		req.Operation = ExecOperation
 		req.Metadata[commandSQLKey] = "invalid sql"
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Invoke insert", func(t *testing.T) {
+	t.Run("Dispatch insert", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			req.Metadata[commandSQLKey] = fmt.Sprintf(testInsert, i, i, time.Now().Format(time.RFC3339))
-			res, err := b.Invoke(ctx, req)
+			res, err := b.Dispatch(ctx, req)
 			assertResponse(t, res, err, "Success")
 		}
 	})
 
-	t.Run("Invoke update", func(t *testing.T) {
+	t.Run("Dispatch update", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			req.Metadata[commandSQLKey] = fmt.Sprintf(testUpdate, time.Now().Format(time.RFC3339), i)
-			res, err := b.Invoke(ctx, req)
+			res, err := b.Dispatch(ctx, req)
 			assertResponse(t, res, err, "Success")
 		}
 	})
 
-	t.Run("Invoke select", func(t *testing.T) {
+	t.Run("Dispatch select", func(t *testing.T) {
 		req.Operation = QueryOperation
 		req.Metadata[commandSQLKey] = testSelect
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Invoke query with no sql", func(t *testing.T) {
+	t.Run("Dispatch query with no sql", func(t *testing.T) {
 		req.Metadata[commandSQLKey] = ""
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Invoke query with invalid sql", func(t *testing.T) {
+	t.Run("Dispatch query with invalid sql", func(t *testing.T) {
 		req.Metadata[commandSQLKey] = "invalid sql"
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Invoke delete", func(t *testing.T) {
+	t.Run("Dispatch delete", func(t *testing.T) {
 		req.Operation = ExecOperation
 		req.Metadata[commandSQLKey] = testDelete
 		req.Data = nil
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 }
@@ -208,9 +205,9 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 	}
 
 	// live DB test
-	b := NewPostgres(logger.NewLogger("test")).(*PostgresOperations)
+	b := NewPostgres().(*PostgresOperations)
 	m := bindings.Metadata{Base: metadata.Base{Properties: map[string]string{connectionURLKey: url}}}
-	if err := b.Init(m); err != nil {
+	if err := b.Init(); err != nil {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
@@ -226,122 +223,122 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			roleName = "readonly"
 		)
 		// delete user to clean up
-		req := &bindings.InvokeRequest{
+		req := &binding.ProbeRequest{
 			Operation: DeleteUserOp,
 			Metadata:  map[string]string{},
 		}
-		res, err := b.Invoke(ctx, req)
+		res, err := b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["userName"] = userName
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// create user
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: CreateUserOp,
 			Metadata:  map[string]string{},
 		}
 		req.Metadata["userName"] = userName
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["password"] = password
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// describe user
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: DescribeUserOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["userName"] = userName
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// list users
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: ListUsersOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// list system users
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: ListSystemAccountsOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// grant role
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: GrantUserRoleOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["userName"] = userName
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["roleName"] = "fakerole"
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		for _, roleType := range []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole} {
 			roleStr := (string)(roleType)
 			req.Metadata["roleName"] = roleStr
-			res, err = b.Invoke(ctx, req)
+			res, err = b.Dispatch(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 
 			req.Metadata["roleName"] = strings.ToUpper(roleStr)
-			res, err = b.Invoke(ctx, req)
+			res, err = b.Dispatch(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 		}
 
 		// revoke role
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: RevokeUserRoleOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["userName"] = userName
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["roleName"] = "fakerole"
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		for _, roleType := range []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole} {
 			roleStr := (string)(roleType)
 			req.Metadata["roleName"] = roleStr
-			res, err = b.Invoke(ctx, req)
+			res, err = b.Dispatch(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 
 			req.Metadata["roleName"] = strings.ToUpper(roleStr)
-			res, err = b.Invoke(ctx, req)
+			res, err = b.Dispatch(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 		}
 		// delete user
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: DeleteUserOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["userName"] = userName
-		res, err = b.Invoke(ctx, req)
+		res, err = b.Dispatch(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 	})
 }
 
-func assertResponse(t *testing.T, res *bindings.InvokeResponse, err error, event string) {
+func assertResponse(t *testing.T, res *binding.ProbeResponse, err error, event string) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.NotNil(t, res.Metadata)

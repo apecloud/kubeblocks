@@ -22,9 +22,6 @@ package kafka
 import (
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
-	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -34,7 +31,7 @@ import (
 func TestInit(t *testing.T) {
 	kafkaOps := mockKafkaOps(t)
 
-	err := kafkaOps.Init(kafkaOps.Metadata)
+	err := kafkaOps.Init()
 	if err != nil {
 		t.Errorf("Error during Init(): %s", err)
 	}
@@ -49,14 +46,8 @@ func TestCheckStatusOps(t *testing.T) {
 }
 
 func mockKafkaOps(t *testing.T) *KafkaOperations {
-	m := bindings.Metadata{
-		Base: metadata.Base{
-			Properties: map[string]string{},
-		},
-	}
-
-	kafkaOps := NewKafka(logger.NewLogger("test")).(*KafkaOperations)
-	_ = kafkaOps.Init(m)
-
+	// todo 没有配置文件
+	kafkaOps, _ := NewKafka()
+	_ = kafkaOps.Init()
 	return kafkaOps
 }

@@ -20,8 +20,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dapr/kit/logger"
 )
 
 var (
@@ -37,7 +35,7 @@ Y2FDZXJ0
 )
 
 func getKafka() *Kafka {
-	return &Kafka{logger: logger.NewLogger("kafka_test")}
+	return &Kafka{logger: }
 }
 
 func getBaseMetadata() map[string]string {

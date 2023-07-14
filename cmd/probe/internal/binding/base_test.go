@@ -27,8 +27,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+
 	"github.com/spf13/viper"
 
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -45,7 +45,7 @@ var (
 
 func TestInit(t *testing.T) {
 	p := mockFakeOperations()
-	p.Init(bindings.Metadata{})
+	p.Init()
 	if p.OriRole != "" {
 		t.Errorf("p.oriRole init failed: %s", p.OriRole)
 	}
@@ -71,7 +71,7 @@ func TestInit(t *testing.T) {
 
 func TestOperations(t *testing.T) {
 	p := mockFakeOperations()
-	p.Init(bindings.Metadata{})
+	p.Init()
 	ops := p.Operations()
 
 	if len(ops) != 4 {
@@ -79,22 +79,22 @@ func TestOperations(t *testing.T) {
 	}
 }
 
-func TestInvoke(t *testing.T) {
+func TestDispatch(t *testing.T) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	p := mockFakeOperations()
-	p.Init(bindings.Metadata{})
+	p.Init()
 
 	t.Run("CheckRunning", func(t *testing.T) {
 		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
-		req := &bindings.InvokeRequest{
+		req := &ProbeRequest{
 			Data:      nil,
 			Metadata:  metadata,
 			Operation: CheckRunningOperation,
 		}
 		t.Run("Failed", func(t *testing.T) {
 			p.CheckRunningFailedCount = 1
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRunning failed: %s", err)
 			}
@@ -110,7 +110,7 @@ func TestInvoke(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			server := p.startFooServer(t)
 			defer stopFooServer(server)
-			resp, _ := p.Invoke(context.Background(), req)
+			resp, _ := p.Dispatch(context.Background(), req)
 			err := json.Unmarshal(resp.Data, &opsRes)
 			if err != nil {
 				t.Errorf("CheckRunning failed: %s", err)
@@ -124,7 +124,7 @@ func TestInvoke(t *testing.T) {
 	t.Run("CheckRole", func(t *testing.T) {
 		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
-		req := &bindings.InvokeRequest{
+		req := &ProbeRequest{
 			Data:      nil,
 			Metadata:  metadata,
 			Operation: CheckRoleOperation,
@@ -133,7 +133,7 @@ func TestInvoke(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRole
 			p.BaseOperations.OriRole = testRole
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRole error: %s", err)
 			}
@@ -151,7 +151,7 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("roleInvalid", func(t *testing.T) {
 			testRole = "leader1"
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRole error: %s", err)
 			}
@@ -166,7 +166,7 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("NotImplemented", func(t *testing.T) {
 			p.BaseOperations.GetRole = nil
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -182,7 +182,7 @@ func TestInvoke(t *testing.T) {
 		t.Run("Failed", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRoleFailed
 			p.CheckRoleFailedCount = 1
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -199,7 +199,7 @@ func TestInvoke(t *testing.T) {
 	t.Run("GetRole", func(t *testing.T) {
 		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
-		req := &bindings.InvokeRequest{
+		req := &ProbeRequest{
 			Data:      nil,
 			Metadata:  metadata,
 			Operation: GetRoleOperation,
@@ -207,7 +207,7 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("Success", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRole
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -222,7 +222,7 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("NotImplemented", func(t *testing.T) {
 			p.BaseOperations.GetRole = nil
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -237,7 +237,7 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("Failed", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRoleFailed
-			resp, err := p.Invoke(context.Background(), req)
+			resp, err := p.Dispatch(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -259,15 +259,15 @@ func stopFooServer(server net.Listener) {
 }
 
 func mockFakeOperations() *fakeOperations {
-	log := logger.NewLogger("base_test")
+	log := logr.Logger{}
 	p := BaseOperations{Logger: log}
 	return &fakeOperations{BaseOperations: p}
 }
 
 // Init initializes the fake binding.
-func (fakeOps *fakeOperations) Init(metadata bindings.Metadata) {
-	fakeOps.BaseOperations.Init(metadata)
-	fakeOps.Logger.Debug("Initializing MySQL binding")
+func (fakeOps *fakeOperations) Init() {
+	fakeOps.BaseOperations.Init()
+	fakeOps.Logger.Info("Initializing MySQL binding")
 	fakeOps.DBType = "mysql"
 	fakeOps.InitIfNeed = fakeOps.initIfNeed
 	fakeOps.BaseOperations.GetRole = fakeOps.GetRole
@@ -283,15 +283,15 @@ func (fakeOps *fakeOperations) GetRunningPort() int {
 	return testDBPort
 }
 
-func (fakeOps *fakeOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (fakeOps *fakeOperations) CheckStatusOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	return OpsResult{}, nil
 }
 
-func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	return testRole, nil
 }
 
-func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	return testRole, fmt.Errorf("mock error")
 }
 

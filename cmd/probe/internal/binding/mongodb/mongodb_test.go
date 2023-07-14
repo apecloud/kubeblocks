@@ -37,7 +37,7 @@ import (
 func TestGetMongoDBMetadata(t *testing.T) {
 	t.Run("With defaults", func(t *testing.T) {
 		properties := map[string]string{
-			host: "127.0.0.1",
+			"host": "127.0.0.1",
 		}
 		m := bindings.Metadata{
 			Base: metadata.Base{Properties: properties},
@@ -45,16 +45,16 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 		metadata, err := getMongoDBMetaData(m)
 		assert.Nil(t, err)
-		assert.Equal(t, properties[host], metadata.host)
-		assert.Equal(t, adminDatabase, metadata.databaseName)
+		assert.Equal(t, properties["host"], metadata.host)
+		assert.Equal(t, "adminDatabase", metadata.databaseName)
 	})
 
 	t.Run("With custom values", func(t *testing.T) {
 		properties := map[string]string{
-			host:         "127.0.0.2",
-			databaseName: "TestDB",
-			username:     "username",
-			password:     "password",
+			"host":         "127.0.0.2",
+			"databaseName": "TestDB",
+			"username":     "username",
+			"password":     "password",
 		}
 		m := bindings.Metadata{
 			Base: metadata.Base{Properties: properties},
@@ -62,16 +62,16 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 		metadata, err := getMongoDBMetaData(m)
 		assert.Nil(t, err)
-		assert.Equal(t, properties[host], metadata.host)
-		assert.Equal(t, properties[databaseName], metadata.databaseName)
-		assert.Equal(t, properties[username], metadata.username)
-		assert.Equal(t, properties[password], metadata.password)
+		assert.Equal(t, properties["host"], metadata.host)
+		assert.Equal(t, properties["databaseName"], metadata.databaseName)
+		assert.Equal(t, properties["username"], metadata.username)
+		assert.Equal(t, properties["password"], metadata.password)
 	})
 
 	t.Run("Missing hosts", func(t *testing.T) {
 		properties := map[string]string{
-			username: "username",
-			password: "password",
+			"username": "username",
+			"password": "password",
 		}
 		m := bindings.Metadata{
 			Base: metadata.Base{Properties: properties},
@@ -121,11 +121,11 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 	t.Run("Valid connection string with params", func(t *testing.T) {
 		properties := map[string]string{
-			host:         "127.0.0.2",
-			databaseName: "TestDB",
-			username:     "username",
-			password:     "password",
-			params:       "?ssl=true",
+			"host":         "127.0.0.2",
+			"databaseName": "TestDB",
+			"username":     "username",
+			"password":     "password",
+			"params":       "?ssl=true",
 		}
 		m := bindings.Metadata{
 			Base: metadata.Base{Properties: properties},
@@ -142,9 +142,9 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 	t.Run("Valid connection string with DNS SRV", func(t *testing.T) {
 		properties := map[string]string{
-			server:       "server.example.com",
-			databaseName: "TestDB",
-			params:       "?ssl=true",
+			"server":       "server.example.com",
+			"databaseName": "TestDB",
+			"params":       "?ssl=true",
 		}
 		m := bindings.Metadata{
 			Base: metadata.Base{Properties: properties},
@@ -161,7 +161,7 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 	t.Run("Invalid without host/server", func(t *testing.T) {
 		properties := map[string]string{
-			databaseName: "TestDB",
+			"databaseName": "TestDB",
 		}
 		m := bindings.Metadata{
 			Base: metadata.Base{Properties: properties},
@@ -176,9 +176,9 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 	t.Run("Invalid with both host/server", func(t *testing.T) {
 		properties := map[string]string{
-			server:       "server.example.com",
-			host:         "127.0.0.2",
-			databaseName: "TestDB",
+			"server":       "server.example.com",
+			"host":         "127.0.0.2",
+			"databaseName": "TestDB",
 		}
 		m := bindings.Metadata{
 			Base: metadata.Base{Properties: properties},

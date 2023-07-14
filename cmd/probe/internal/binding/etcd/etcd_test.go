@@ -29,8 +29,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -51,7 +55,7 @@ func TestETCD(t *testing.T) {
 
 	t.Run("Invoke GetRole", func(t *testing.T) {
 		e := mockEtcd(etcdServer)
-		role, err := e.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+		role, err := e.GetRole(context.Background(), &binding.ProbeRequest{}, &binding.ProbeResponse{})
 		if err != nil {
 			t.Errorf("get role error: %s", err)
 		}
@@ -76,7 +80,12 @@ func mockEtcd(etcdServer *EmbeddedETCD) *Etcd {
 
 func startEtcdServer(peerAddress string) (*EmbeddedETCD, error) {
 	etcd := &EmbeddedETCD{}
-	etcd.logger = logger.NewLogger("embedded-etcd-server")
+	development, err := zap.NewDevelopment()
+	if err != nil {
+		return nil, err
+	}
+	logger := zapr.NewLogger(development)
+	etcd.logger = logger
 	return etcd, etcd.Start(peerAddress)
 }
 
@@ -87,7 +96,7 @@ func stopEtcdServer(etcdServer *EmbeddedETCD) {
 }
 
 type EmbeddedETCD struct {
-	logger logger.Logger
+	logger logr.Logger
 	tmpDir string
 	ETCD   *embed.Etcd
 	client *clientv3.Client

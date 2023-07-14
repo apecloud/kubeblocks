@@ -26,8 +26,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,9 +46,8 @@ func TestInit(t *testing.T) {
 	index := strings.LastIndex(addr, ":")
 	portStr := addr[index+1:]
 	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", "["+portStr+"]")
-	m := bindings.Metadata{}
-	hs := NewHTTPCustom(logger.NewLogger("test"))
-	err := hs.Init(m)
+	hs, err := NewHTTPCustom()
+	err = hs.Init()
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -68,10 +68,10 @@ func TestInit(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			response, err := hs.Invoke(context.TODO(), &bindings.InvokeRequest{
+			response, err := hs.Dispatch(context.TODO(), &binding.ProbeRequest{
 				Data:      []byte(tc.input),
 				Metadata:  tc.metadata,
-				Operation: bindings.OperationKind(tc.operation),
+				Operation: util.OperationKind(tc.operation),
 			})
 			if tc.err == "" {
 				require.NoError(t, err)

@@ -22,8 +22,7 @@ image:
     repository: apecloud/kubeblocks-tools
   charts:
     repository: apecloud/kubeblocks-charts
-  clients:
-    repository: apecloud/kubeblocks-clients
+
 
 ## @param separatedDeployment separated the KubeBlocks deployment into two deployments.
 ## This switch is used to isolate the apps controller and dataprotection controller
@@ -756,3 +755,8 @@ external-dns:
     operator: Equal
     value: "true"
     effect: NoSchedule
+
+datascriptClients:
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/datascript-clients
+  tag: 0.1.0

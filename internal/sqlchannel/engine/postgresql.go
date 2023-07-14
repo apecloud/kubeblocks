@@ -265,7 +265,11 @@ func (m *postgresql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar
 	cmd = append(cmd, "/bin/sh", "-c", "-ex")
 	args := []string{}
 	for _, script := range scripts {
-		args = append(args, fmt.Sprintf("-c %s", strconv.Quote(script)))
+		// split each script with a new line
+		lines := strings.Split(script, "\n")
+		for _, line := range lines {
+			args = append(args, fmt.Sprintf("-c %s", strconv.Quote(line)))
+		}
 	}
 	cmd = append(cmd, fmt.Sprintf("%s %s", m.info.Client, strings.Join(args, " ")))
 	envVars := []corev1.EnvVar{

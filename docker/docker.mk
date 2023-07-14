@@ -36,7 +36,7 @@ TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tools
 CLI_IMG ?= docker.io/apecloud/kbcli
 CHARTS_IMG ?= docker.io/apecloud/$(APP_NAME)-charts
 CLI_TAG ?= v$(CLI_VERSION)
-CLIENTS_IMG ?= docker.io/apecloud/$(APP_NAME)-clients
+CLIENTS_IMG ?= docker.io/apecloud/datascript-clients
 
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest

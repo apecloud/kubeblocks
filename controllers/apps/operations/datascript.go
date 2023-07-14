@@ -267,7 +267,7 @@ func buildDataScriptJob(reqCtx intctrlutil.RequestCtx, cli client.Client, cluste
 	if envVars != nil {
 		envs = append(envs, envVars...)
 	}
-	containerImg := viper.GetString(constant.KBClientsImage)
+	containerImg := viper.GetString(constant.KBDataScriptClientsImage)
 	if ops.Spec.ScriptSpec.Image != nil {
 		containerImg = *ops.Spec.ScriptSpec.Image
 	}

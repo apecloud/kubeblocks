@@ -261,7 +261,7 @@ var _ = Describe("DataScriptOps", func() {
 			Expect(err).Should(Succeed())
 
 			By("create job, should pass")
-			viper.Set(constant.KBClientsImage, "apecloud/kubeblocks-clients:latest")
+			viper.Set(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-clients:latest")
 			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
@@ -338,7 +338,7 @@ var _ = Describe("DataScriptOps", func() {
 			Expect(err).Should(Succeed())
 
 			By("create job, should pass")
-			viper.Set(constant.KBClientsImage, "apecloud/kubeblocks-clients:latest")
+			viper.Set(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-clients:latest")
 			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())

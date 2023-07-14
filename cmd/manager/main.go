@@ -114,7 +114,7 @@ func init() {
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 
-	viper.SetDefault(constant.KBClientsImage, "apecloud/kubeblocks-clients:latest")
+	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/datascript-clients:latest")
 }
 
 type flagName string

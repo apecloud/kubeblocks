@@ -1,7 +1,4 @@
-apiVersion: dapr.io/v1alpha1
-kind: Component
-metadata:
-  name: postgresql
+name: postgres
 spec:
   type: bindings.postgres
   version: v1

@@ -191,6 +191,7 @@ spec:
                     - toml
                     - properties
                     - redis
+                    - props-plus
                     type: string
                   iniConfig:
                     description: iniConfig represents the ini options.

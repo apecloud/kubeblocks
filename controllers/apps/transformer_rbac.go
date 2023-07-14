@@ -49,15 +49,26 @@ const (
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
+	clusterDef := transCtx.ClusterDef
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
 
+	var hasProbes bool
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		if compDef.Probes != nil {
+			hasProbes = true
+		}
+	}
+
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
 		if serviceAccountName == "" {
-			return nil
+			if !hasProbes {
+				return nil
+			}
+			serviceAccountName = "kb-" + cluster.Name
 		}
 
 		if !viper.GetBool(constant.EnableRBACManager) {

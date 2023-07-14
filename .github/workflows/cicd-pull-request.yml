@@ -37,7 +37,7 @@ jobs:
               --base-branch "${{ env.BASE_BRANCH }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
-          
+
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "$TRIGGER_MODE" \
               --test-pkgs "internal|apis|controllers|cmd" \
@@ -109,7 +109,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score" 
+              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score"
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3
@@ -164,6 +164,16 @@ jobs:
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
+  check-datascript-image:
+    needs: trigger-mode
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
+    with:
+      IMG: "apecloud/kubeblocks-datascript"
+      BUILDX_PLATFORMS: "linux/amd64"
+      DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
+    secrets: inherit
+
   check-helm:
     name: check helm
     needs: trigger-mode
@@ -212,7 +222,7 @@ jobs:
 
   pr-check:
     name: make test
-    needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-helm, check-kbcli ]
+    needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-datascript-image, check-helm, check-kbcli ]
     if: ${{ github.event.review.state == 'approved' && always() }}
     runs-on: ubuntu-latest
     steps:
@@ -238,9 +248,14 @@ jobs:
               echo "release image fail"
               exit 1
           fi
-          
+
           if [[ "${{ needs.check-tools-image.result }}" == "failure" || "${{ needs.check-tools-image.result }}" == "cancelled" ]]; then
               echo "release tools image fail"
+              exit 1
+          fi
+
+          if [[ "${{ needs.check-datascript-image.result }}" == "failure" || "${{ needs.check-datascript-image.result }}" == "cancelled" ]]; then
+              echo "release datascript image fail"
               exit 1
           fi
 

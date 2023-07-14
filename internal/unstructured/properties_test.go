@@ -74,9 +74,20 @@ brokerMaxConnectionsPerIp=0
 	assert.Nil(t, err)
 	assert.EqualValues(t, newObj.GetAllParameters(), propsConfigObj.GetAllParameters())
 
+	assert.EqualValues(t, newObj.SubConfig("test"), nil)
+
 	assert.Nil(t, propsConfigObj.Update("profiles.web.timeout_before_checking_execution_speed", 200))
 	assert.EqualValues(t, propsConfigObj.Get("profiles.web.timeout_before_checking_execution_speed"), "200")
 
 	assert.Nil(t, propsConfigObj.Update("defaultNumberOfNamespaceBundles", "600"))
 	assert.EqualValues(t, propsConfigObj.Get("defaultNumberOfNamespaceBundles"), "600")
+}
+
+func TestProperitesEmpty(t *testing.T) {
+	propsConfigObj, err := LoadConfig("props_test", "", appsv1alpha1.PropertiesPlus)
+	assert.Nil(t, err)
+
+	v, err := propsConfigObj.Marshal()
+	assert.Nil(t, err)
+	assert.EqualValues(t, v, "")
 }

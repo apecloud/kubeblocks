@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
@@ -44,7 +41,7 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: obj.Name}
+	ml := getLabels(obj)
 	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, deletionKinds()...)
 	if err != nil {
 		return err

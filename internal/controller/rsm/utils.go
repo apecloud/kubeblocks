@@ -28,14 +28,18 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -277,13 +281,12 @@ func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
 }
 
 func getActionList(transCtx *rsmTransformContext, actionScenario string) ([]*batchv1.Job, error) {
+	labels := getLabels(transCtx.rsm)
+	labels[jobScenarioLabel] = actionScenario
+	labels[jobHandledLabel] = jobHandledFalse
+	ml := client.MatchingLabels(labels)
+
 	var actionList []*batchv1.Job
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: transCtx.rsm.Name,
-		constant.KBManagedByKey:      kindReplicatedStateMachine,
-		jobScenarioLabel:             actionScenario,
-		jobHandledLabel:              jobHandledFalse,
-	}
 	jobList := &batchv1.JobList{}
 	if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
 		return nil, err
@@ -331,7 +334,7 @@ func getPodOrdinal(podName string) (int, error) {
 
 // ordinal is the ordinal of pod which this action apply to
 func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
-	if err := intctrlutil.SetOwnership(rsm, action, model.GetScheme(), rsmFinalizerName); err != nil {
+	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer()); err != nil {
 		return err
 	}
 	cli.Create(dag, action)
@@ -341,9 +344,9 @@ func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.Replicat
 func buildAction(rsm *workloads.ReplicatedStateMachine, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
 	env := buildActionEnv(rsm, leader, target)
 	template := buildActionPodTemplate(rsm, env, actionType)
+	labels := getLabels(rsm)
 	return builder.NewJobBuilder(rsm.Namespace, actionName).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabelsInMap(labels).
 		AddLabels(jobScenarioLabel, actionScenario).
 		AddLabels(jobTypeLabel, actionType).
 		AddLabels(jobHandledLabel, jobHandledFalse).
@@ -509,4 +512,91 @@ func emitAbnormalEvent(transCtx *rsmTransformContext, actionType, actionName str
 
 func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message string) {
 	transCtx.EventRecorder.Event(transCtx.rsm, eventType, strings.ToUpper(reason), message)
+}
+
+func getFinalizer() string {
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		return constant.DBClusterFinalizerName
+	}
+	return rsmFinalizerName
+}
+
+func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		return rsm.Labels
+	}
+	return map[string]string{
+		constant.AppInstanceLabelKey: rsm.Name,
+		constant.KBManagedByKey:      kindReplicatedStateMachine,
+	}
+}
+
+func setOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		return copyOwnership(owner, obj, scheme, finalizer)
+	}
+	return intctrlutil.SetOwnership(owner, obj, scheme, finalizer)
+}
+
+// copyOwnership copies owner ref fields of 'owner' to 'obj'
+// and calls controllerutil.AddFinalizer if not exists.
+func copyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+	// Returns true if a and b point to the same object.
+	referSameObject := func(a, b metav1.OwnerReference) bool {
+		aGV, err := schema.ParseGroupVersion(a.APIVersion)
+		if err != nil {
+			return false
+		}
+		bGV, err := schema.ParseGroupVersion(b.APIVersion)
+		if err != nil {
+			return false
+		}
+		return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
+	}
+	// indexOwnerRef returns the index of the owner reference in the slice if found, or -1.
+	indexOwnerRef := func(ownerReferences []metav1.OwnerReference, ref metav1.OwnerReference) int {
+		for index, r := range ownerReferences {
+			if referSameObject(r, ref) {
+				return index
+			}
+		}
+		return -1
+	}
+	upsertOwnerRef := func(ref metav1.OwnerReference, object metav1.Object) {
+		owners := object.GetOwnerReferences()
+		if idx := indexOwnerRef(owners, ref); idx == -1 {
+			owners = append(owners, ref)
+		} else {
+			owners[idx] = ref
+		}
+		object.SetOwnerReferences(owners)
+	}
+
+	ownerRefs := owner.GetOwnerReferences()
+	for _, ref := range ownerRefs {
+		if ref.Controller == nil || !*ref.Controller {
+			continue
+		}
+		// Return early with an error if the object is already controlled.
+		if existing := metav1.GetControllerOf(obj); existing != nil && !referSameObject(*existing, ref) {
+			return &controllerutil.AlreadyOwnedError{
+				Object: obj,
+				Owner:  *existing,
+			}
+		}
+
+		// Update owner references and return.
+		upsertOwnerRef(ref, obj)
+	}
+
+	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+		// pvc objects do not need to add finalizer
+		_, ok := obj.(*corev1.PersistentVolumeClaim)
+		if !ok {
+			if !controllerutil.AddFinalizer(obj, finalizer) {
+				return intctrlutil.ErrFailedToAddFinalizer
+			}
+		}
+	}
+	return nil
 }

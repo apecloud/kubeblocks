@@ -1722,7 +1722,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("Check stateless workload has been created")
 			Eventually(testapps.List(&testCtx, generics.RSMSignature,
 				client.MatchingLabels{
-					constant.AppInstanceLabelKey: clusterKey.Name,
+					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: statelessCompName,
 				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
 

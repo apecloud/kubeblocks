@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	workloads2 "github.com/apecloud/kubeblocks/controllers/workloads"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -49,6 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	workloads2 "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"

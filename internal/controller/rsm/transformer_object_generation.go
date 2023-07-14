@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ObjectGenerationTransformer struct{}
@@ -65,13 +64,13 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	for _, object := range objects {
-		if err := controllerutil.SetOwnership(rsm, object, model.GetScheme(), rsmFinalizerName); err != nil {
+		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer()); err != nil {
 			return err
 		}
 	}
 
 	// read cache snapshot
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: rsm.Name, constant.KBManagedByKey: kindReplicatedStateMachine}
+	ml := getLabels(rsm)
 	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
 	if err != nil {
 		return err
@@ -130,11 +129,9 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
+	labels := getLabels(&rsm)
 	svcBuilder := builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Labels[constant.AppInstanceLabelKey]).
-		AddLabels(constant.KBAppComponentLabelKey, rsm.Labels[constant.KBAppComponentLabelKey]).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
-		// AddAnnotationsInMap(rsm.Annotations).
+		AddLabelsInMap(labels).
 		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
 		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine).
 		AddPorts(rsm.Spec.Service.Ports...).
@@ -148,10 +145,9 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 }
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+	labels := getLabels(&rsm)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Labels[constant.AppInstanceLabelKey]).
-		AddLabels(constant.KBAppComponentLabelKey, rsm.Labels[constant.KBAppComponentLabelKey]).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabelsInMap(labels).
 		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
 		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine)
 	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
@@ -182,8 +178,9 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	template := buildStsPodTemplate(rsm, envConfig)
+	labels := getLabels(&rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
-		AddLabelsInMap(rsm.Labels).
+		AddLabelsInMap(labels).
 		AddAnnotationsInMap(rsm.Annotations).
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
@@ -197,12 +194,12 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
-
-	// TODO(free6om): refactor labels
+	labels := getLabels(&rsm)
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
+	}
 	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-env").
-		AddLabels(constant.AppInstanceLabelKey, rsm.Labels[constant.AppInstanceLabelKey]).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
-		AddLabels(constant.AppConfigTypeLabelKey, "kubeblocks-env").
+		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }
 

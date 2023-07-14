@@ -167,7 +167,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 	}
 
-	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil && (component.WorkloadType == appsv1alpha1.Replication || component.WorkloadType == appsv1alpha1.Consensus) {
+	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
 		// only accept 1st ClusterVersion override context
 		clusterCompVer := clusterCompVers[0]
 		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, component.ConfigTemplates)
@@ -179,7 +179,9 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
 		// override component.SwitchoverSpec
-		overrideSwitchoverSpecAttr(component.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
+		if component.WorkloadType == appsv1alpha1.Replication || component.WorkloadType == appsv1alpha1.Consensus {
+			overrideSwitchoverSpecAttr(component.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
+		}
 	}
 
 	// handle component.PodSpec extra settings

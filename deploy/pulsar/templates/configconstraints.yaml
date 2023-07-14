@@ -22,7 +22,8 @@ metadata:
     {{- include "pulsar.labels" . | nindent 4 }}
 spec:
   configurationSchema:
-    cue: ""
+    cue: |-
+      {{- .Files.Get "config/broker-config-constraint.cue" | nindent 6 }}
 
   # mysql configuration file format
   formatterConfig:

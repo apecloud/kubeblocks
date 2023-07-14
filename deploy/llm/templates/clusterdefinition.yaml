@@ -13,7 +13,7 @@ spec:
     port: "$(SVC_PORT_ts)"
   componentDefs:
     - name: llm
-      workloadType: Stateless
+      workloadType: Stateful
       characterType: llm
       probes:
       monitor:
@@ -38,10 +38,11 @@ spec:
           - name: ts-metrics
             port: 8082
             targetPort: ts-metrics
-      volumeTypes:
-        - name: data
-          type: data
       podSpec:
+        volumes:
+        - name: model-store
+          persistentVolumeClaim:
+            claimName: llmserver-efs-claim
         containers:
           - name: llm
             imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
@@ -80,17 +81,16 @@ spec:
               - mountPath: /llm/config/
                 name: config
               - mountPath: /llm/storage
-                name: data
+                name: model-store
             command:
             - /bin/sh
             - -c
             - |
-              sleep 100000
               cp /llm/config/config.properties /config.properties
               sed -i "s/KB_LLM_MODEL_NAME_PLACEHOLDER/${MODEL_NAME}/g" /config.properties
               echo "running config:"
-              cat /llm/config/config.properties
-              torchserve --start  --model-store /llm/storage/model-store/ --ts-config /llm/config/config.properties
+              cat /config.properties
+              torchserve --start --foreground --model-store /llm/storage/model-store/ --ts-config /config.properties
             ports:
             - name: ts
               containerPort: 8080

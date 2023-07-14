@@ -26,8 +26,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
@@ -72,13 +76,18 @@ type Redis struct {
 var _ BaseInternalOps = &Redis{}
 
 // NewRedis returns a new redis bindings instance.
-func NewRedis(logger logger.Logger) bindings.OutputBinding {
-	return &Redis{BaseOperations: BaseOperations{Logger: logger}}
+func NewRedis() (*Redis, error) {
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	logger := zapr.NewLogger(zapLogger)
+	return &Redis{BaseOperations: BaseOperations{Logger: logger}}, nil
 }
 
 // Init performs metadata parsing and connection creation.
-func (r *Redis) Init(meta bindings.Metadata) (err error) {
-	r.BaseOperations.Init(meta)
+func (r *Redis) Init() (err error) {
+	r.BaseOperations.Init()
 
 	if viper.IsSet("KB_SERVICE_USER") {
 		redisUser = viper.GetString("KB_SERVICE_USER")
@@ -88,15 +97,16 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 		redisPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
-	r.Logger.Debug("Initializing Redis binding")
+	r.Metadata = component.GetProperties("redis")
+	r.Logger.Info("Initializing Redis binding")
 	r.DBType = "redis"
 	r.InitIfNeed = r.initIfNeed
 	r.BaseOperations.GetRole = r.GetRole
 
 	// register redis operations
-	r.RegisterOperation(bindings.CreateOperation, r.createOps)
-	r.RegisterOperation(bindings.DeleteOperation, r.deleteOps)
-	r.RegisterOperation(bindings.GetOperation, r.getOps)
+	r.RegisterOperation(CreateOperation, r.createOps)
+	r.RegisterOperation(DeleteOperation, r.deleteOps)
+	r.RegisterOperation(GetOperation, r.getOps)
 
 	// following are ops for account management
 	r.RegisterOperation(ListUsersOp, r.listUsersOps)
@@ -129,7 +139,7 @@ func (r *Redis) initIfNeed() bool {
 	if r.client == nil {
 		go func() {
 			if err := r.initDelay(); err != nil {
-				r.Logger.Errorf("redis connection init failed: %v", err)
+				r.Logger.Error(err, "redis connection init failed")
 			} else {
 				r.Logger.Info("redis connection init succeeded.")
 			}
@@ -150,7 +160,7 @@ func (r *Redis) initDelay() error {
 		Password: redisPasswd,
 		Username: redisUser,
 	}
-	r.client, r.clientSettings, err = rediscomponent.ParseClientFromProperties(r.Metadata.Properties, defaultSettings)
+	r.client, r.clientSettings, err = rediscomponent.ParseClientFromProperties(r.Metadata, defaultSettings)
 	if err != nil {
 		return err
 	}
@@ -173,7 +183,7 @@ func (r *Redis) Ping() error {
 }
 
 // GetLogger returns the logger, implements BaseInternalOps interface.
-func (r *Redis) GetLogger() logger.Logger {
+func (r *Redis) GetLogger() logr.Logger {
 	return r.Logger
 }
 
@@ -206,7 +216,7 @@ func (r *Redis) query(ctx context.Context, args ...interface{}) (interface{}, er
 	return r.client.Do(ctx, args...).Result()
 }
 
-func (r *Redis) createOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) createOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object = RedisEntry{}
 
@@ -224,10 +234,10 @@ func (r *Redis) createOps(ctx context.Context, req *bindings.InvokeRequest, resp
 		result[RespTypMsg] = err.Error()
 		return result, nil
 	}
-	return ExecuteObject(ctx, r, req, bindings.CreateOperation, cmdRender, msgRender, object)
+	return ExecuteObject(ctx, r, req, CreateOperation, cmdRender, msgRender, object)
 }
 
-func (r *Redis) deleteOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) deleteOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object    = RedisEntry{}
 		cmdRender = func(redis RedisEntry) string {
@@ -244,10 +254,10 @@ func (r *Redis) deleteOps(ctx context.Context, req *bindings.InvokeRequest, resp
 		return result, nil
 	}
 
-	return ExecuteObject(ctx, r, req, bindings.DeleteOperation, cmdRender, msgRender, object)
+	return ExecuteObject(ctx, r, req, DeleteOperation, cmdRender, msgRender, object)
 }
 
-func (r *Redis) getOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) getOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object    = RedisEntry{}
 		cmdRender = func(redis RedisEntry) string {
@@ -260,10 +270,10 @@ func (r *Redis) getOps(ctx context.Context, req *bindings.InvokeRequest, resp *b
 		result[RespTypMsg] = err.Error()
 		return result, nil
 	}
-	return QueryObject(ctx, r, req, bindings.GetOperation, cmdRender, nil, object)
+	return QueryObject(ctx, r, req, GetOperation, cmdRender, nil, object)
 }
 
-func (r *Redis) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) listUsersOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	dataProcessor := func(data interface{}) (interface{}, error) {
 		// data is an array of interface{} of string
 		// parse redis user name and roles
@@ -295,7 +305,7 @@ func (r *Redis) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, r
 	return QueryObject(ctx, r, req, ListUsersOp, cmdRender, dataProcessor, UserInfo{})
 }
 
-func (r *Redis) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) listSystemAccountsOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	dataProcessor := func(data interface{}) (interface{}, error) {
 		// data is an array of interface{} of string
 		results := make([]string, 0)
@@ -322,7 +332,7 @@ func (r *Redis) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeR
 	return QueryObject(ctx, r, req, ListUsersOp, cmdRender, dataProcessor, UserInfo{})
 }
 
-func (r *Redis) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) describeUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object        = UserInfo{}
 		profile       map[string]string
@@ -443,7 +453,7 @@ func parseCommandAndKeyFromMap(data interface{}) (map[string]string, error) {
 	return profile, nil
 }
 
-func (r *Redis) createUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) createUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object = UserInfo{}
 
@@ -466,7 +476,7 @@ func (r *Redis) createUserOps(ctx context.Context, req *bindings.InvokeRequest, 
 	return ExecuteObject(ctx, r, req, CreateUserOp, cmdRender, msgTplRend, object)
 }
 
-func (r *Redis) deleteUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) deleteUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object    = UserInfo{}
 		cmdRender = func(user UserInfo) string {
@@ -487,21 +497,21 @@ func (r *Redis) deleteUserOps(ctx context.Context, req *bindings.InvokeRequest, 
 	return ExecuteObject(ctx, r, req, DeleteUserOp, cmdRender, msgTplRend, object)
 }
 
-func (r *Redis) grantUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) grantUserRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s granted to user: %s"
 	)
 	return r.managePrivillege(ctx, req, GrantUserRoleOp, succMsgTpl)
 }
 
-func (r *Redis) revokeUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (r *Redis) revokeUserRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s revoked from user: %s"
 	)
 	return r.managePrivillege(ctx, req, RevokeUserRoleOp, succMsgTpl)
 }
 
-func (r *Redis) managePrivillege(ctx context.Context, req *bindings.InvokeRequest, op bindings.OperationKind, succMsgTpl string) (OpsResult, error) {
+func (r *Redis) managePrivillege(ctx context.Context, req *ProbeRequest, op OperationKind, succMsgTpl string) (OpsResult, error) {
 	var (
 		object = UserInfo{}
 
@@ -525,7 +535,7 @@ func (r *Redis) managePrivillege(ctx context.Context, req *bindings.InvokeReques
 	return ExecuteObject(ctx, r, req, op, cmdRend, msgTplRend, object)
 }
 
-func (r *Redis) role2Priv(op bindings.OperationKind, roleName string) string {
+func (r *Redis) role2Priv(op OperationKind, roleName string) string {
 	const (
 		grantPrefix  = "+"
 		revokePrefix = "-"
@@ -574,7 +584,7 @@ func (r *Redis) Close() error {
 	return r.client.Close()
 }
 
-func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (r *Redis) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	// ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	// defer cancel()
@@ -584,7 +594,7 @@ func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, re
 	var role string
 	result, err := r.client.Info(ctx1, section).Result()
 	if err != nil {
-		r.Logger.Errorf("Role query error: %v", err)
+		r.Logger.Error(err, "Role query error")
 		return role, err
 	} else {
 		// split the result into lines
@@ -606,7 +616,7 @@ func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, re
 	return role, nil
 }
 
-func defaultRedisEntryParser(req *bindings.InvokeRequest, object *RedisEntry) error {
+func defaultRedisEntryParser(req *ProbeRequest, object *RedisEntry) error {
 	if req == nil || req.Metadata == nil {
 		return fmt.Errorf("no metadata provided")
 	}

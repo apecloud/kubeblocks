@@ -6,14 +6,10 @@ The minimum proxy cpu cores is 0.5 and the maximum cpu cores is 64.
 {{- define "apecloud-mysql-cluster.proxyComponents" }}
 {{- $replicas := (include "apecloud-mysql-cluster.replicas" .) }}
 {{- $proxyCPU := divf (mulf $replicas .Values.cpu) 6.0 }}
-{{- $mod := mod (int (mulf $proxyCPU 10)) 5 }}
-{{- if ne $mod 0 }}
-{{/* not a multiple of 0.5 */}}
 {{- $proxyCPU = divf $proxyCPU 0.5 | ceil | mulf 0.5 }}
-{{- end }}
 {{- if lt (float64 $proxyCPU) 0.5 }}
 {{- $proxyCPU = 0.5 }}
-{{- else if gt (float64 $proxyCPU) 64 }}
+{{- else if gt $proxyCPU 64.0 }}
 {{- $proxyCPU = 64 }}
 {{- end }}
 - name: vtcontroller

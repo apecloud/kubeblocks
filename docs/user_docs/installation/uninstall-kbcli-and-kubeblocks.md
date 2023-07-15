@@ -46,6 +46,25 @@ helm uninstall kubeblocks -n kb-system
 </TabItem>
 </Tabs>
 
+
+**Use Helm to uninstall KubeBlocks**
+```bash
+helm uninstall kubeblocks --namespace kb-system
+```
+
+Helm does not delete CRD objects. You can delete the ones KubeBlocks created with the following commands:
+```
+kubectl get crd -o name | grep kubeblocks.io | xargs kubectl delete
+```
+
+**Use YAML to uninstall KubeBlocks**
+
+If you prefer to not use Helm, you can generate YAMLs from the KubeBlocks chart and uninstall using kubectl.
+
+```bash
+helm template kubeblocks kubeblocks/kubeblocks --namespace kb-system | kubectl delete -f -
+```
+
 ## Uninstall kbcli
 
 Uninstall kbcli if you want to delete kbcli after your trial. Use the same option as the way you install kbcli.

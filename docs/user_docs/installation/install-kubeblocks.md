@@ -97,6 +97,22 @@ Another option is to tolerate custom taints, regardless of whether they are alre
     kbcli kubeblocks install --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
     ```
 
+Use `helm` command to install KubeBlocks:
+```bash
+helm repo add kubeblocks https://apecloud.github.io/helm-charts
+helm repo update
+helm install kubeblocks kubeblocks/kubeblocks \
+    --namespace kb-system --create-namespaces
+````
+
+If you want to install KubeBlocks with custom tolerations, you can use the following command:
+```bash
+helm install kubeblocks kubeblocks/kubeblocks \
+    --namespace kb-system --create-namespaces \
+    --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
+    --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
+```
+
 :::note
 
 When executing the `kbcli kubeblocks install` command, the `preflight` checks will automatically verify the environment. If the cluster satisfies the basic requirements, the installation process will proceed. Otherwise, the process will be terminated, and an error message will be displayed. To skip the `preflight` checks, add the `--force` flag after the `kbcli kubeblocks install` command.
@@ -108,18 +124,10 @@ When executing the `kbcli kubeblocks install` command, the `preflight` checks wi
 Run the following command to check whether KubeBlocks is installed successfully.
 
 ```bash
-kubectl get pod -n kb-system
-```
+kubectl get pods --all-namespaces -l "app.kubernetes.io/instance=kubeblocks" -w
 
-***Result***
-
-If the following pods are all `Running`, KubeBlocks has been installed successfully.
-
-```bash
 NAME                                                     READY   STATUS      RESTARTS   AGE
-kb-addon-alertmanager-webhook-adaptor-5549f94599-fsnmc   2/2     Running     0          84s
-kb-addon-grafana-5ddcd7758f-x4t5g                        3/3     Running     0          84s
-kb-addon-prometheus-alertmanager-0                       2/2     Running     0          84s
-kb-addon-prometheus-server-0                             2/2     Running     0          84s
 kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
 ```
+
+If the operator pods are all `Running`, KubeBlocks has been installed successfully. You can cancel the above command by typing `Ctrl+C`.

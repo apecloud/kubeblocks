@@ -90,4 +90,14 @@ func TestProperitesEmpty(t *testing.T) {
 	v, err := propsConfigObj.Marshal()
 	assert.Nil(t, err)
 	assert.EqualValues(t, v, "")
+
+	assert.Nil(t, propsConfigObj.Update("emptyField", ""))
+	assert.EqualValues(t, propsConfigObj.Get("emptyField"), "")
+
+	assert.Nil(t, propsConfigObj.Update("emptyField2", "\"\""))
+	assert.EqualValues(t, propsConfigObj.Get("emptyField2"), "\"\"")
+
+	dumpContext, err := propsConfigObj.Marshal()
+	assert.Nil(t, err)
+	assert.EqualValues(t, "emptyField = \nemptyField2 = \"\"\n", dumpContext)
 }

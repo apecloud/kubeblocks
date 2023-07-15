@@ -62,7 +62,7 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.CfgFileFor
 		return WrapError(err, "failed to load configuration [%s]", rawData)
 	}
 
-	return unstructuredDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.Properties)
+	return unstructuredDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.PropertiesPlus)
 }
 
 func LoadConfigObjectFromContent(cfgType appsv1alpha1.CfgFileFormat, rawData string) (map[string]interface{}, error) {

@@ -33,6 +33,8 @@ type propertiesConfig struct {
 	Properties *properties.Properties
 }
 
+const commentPrefix = "# "
+
 func init() {
 	CfgObjectRegistry().RegisterConfigCreator(appsv1alpha1.PropertiesPlus, func(name string) ConfigObject {
 		return &propertiesConfig{name: name}
@@ -77,7 +79,7 @@ func (p *propertiesConfig) Marshal() (string, error) {
 	}
 
 	var buf bytes.Buffer
-	_, err := p.Properties.WriteComment(&buf, "#", properties.UTF8)
+	_, err := p.Properties.WriteComment(&buf, commentPrefix, properties.UTF8)
 	if err != nil {
 		return "", err
 	}

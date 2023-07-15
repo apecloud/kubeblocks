@@ -97,7 +97,7 @@ Another option is to tolerate custom taints, regardless of whether they are alre
     kbcli kubeblocks install --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
     ```
 
-Use `helm` command to install KubeBlocks:
+**Use Helm to install KubeBlocks**
 ```bash
 helm repo add kubeblocks https://apecloud.github.io/helm-charts
 helm repo update
@@ -111,6 +111,17 @@ helm install kubeblocks kubeblocks/kubeblocks \
     --namespace kb-system --create-namespaces \
     --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
     --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
+```
+
+**Use YAML to install KubeBlocks**
+
+If you prefer to not use Helm, you can generate YAMLs from KubeBlocks chart and deploy using `kubectl`. 
+
+```bash
+helm repo add kubeblocks https://apecloud.github.io/helm-charts
+helm repo update
+helm template kubeblocks kubeblocks/kubeblocks \
+    --namespace kb-system --create-namespaces | kubectl apply -f -
 ```
 
 :::note

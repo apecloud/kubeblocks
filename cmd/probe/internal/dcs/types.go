@@ -111,13 +111,13 @@ func (m *Member) GetName() string {
 	return m.Name
 }
 
-func newMember(index string, name string, role string, url string) *Member {
-	return &Member{
-		Index: index,
-		Name:  name,
-		Role:  role,
-	}
-}
+// func newMember(index string, name string, role string, url string) *Member {
+// 	return &Member{
+// 		Index: index,
+// 		Name:  name,
+// 		Role:  role,
+// 	}
+// }
 
 type Switchover struct {
 	Index       string

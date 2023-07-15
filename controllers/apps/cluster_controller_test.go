@@ -168,7 +168,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).WithTimeout(1000 * time.Second).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		for _, compName := range compNames {
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 		}
@@ -1397,7 +1397,7 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(consensusStatus.Followers).Should(HaveLen(2))
 			g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
 			g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
-		}).Should(Succeed())
+		}).WithTimeout(1000 * time.Second).Should(Succeed())
 
 		By("Waiting the component be running")
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).
@@ -2088,7 +2088,7 @@ var _ = Describe("Cluster Controller", func() {
 			testThreeReplicas(compName, compDefName)
 		})
 
-		FIt("test restore cluster from backup", func() {
+		It("test restore cluster from backup", func() {
 			By("mock backuptool object")
 			backupPolicyName := "test-backup-policy"
 			backupName := "test-backup"

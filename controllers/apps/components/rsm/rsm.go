@@ -21,8 +21,10 @@ package rsm
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
@@ -32,7 +34,9 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -127,8 +131,198 @@ func (r *RSM) HandleRestart(context.Context, client.Object) ([]graph.Vertex, err
 	return nil, nil
 }
 
-func (r *RSM) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+func (r *RSM) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	if r.SynthesizedComponent.WorkloadType != appsv1alpha1.Consensus &&
+		r.SynthesizedComponent.WorkloadType != appsv1alpha1.Replication {
+		return nil, nil
+	}
+
+	rsmObj, _ := obj.(*workloads.ReplicatedStateMachine)
+	// update cluster.status.component.consensusSetStatus based on the existences for all pods
+	componentName := rsmObj.Name
+
+	switch r.SynthesizedComponent.WorkloadType {
+	case appsv1alpha1.Consensus:
+		// first, get the old status
+		var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
+		if v, ok := r.Cluster.Status.Components[componentName]; ok {
+			oldConsensusSetStatus = v.ConsensusSetStatus
+		}
+		// create the initial status
+		newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
+			Leader: appsv1alpha1.ConsensusMemberStatus{
+				Name:       "",
+				Pod:        constant.ComponentStatusDefaultPodName,
+				AccessMode: appsv1alpha1.None,
+			},
+		}
+		// then, set the new status
+		setConsensusSetStatusRoles(newConsensusSetStatus, rsmObj)
+		// if status changed, do update
+		if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
+			if err := util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, appsv1alpha1.Consensus); err != nil {
+				return nil, err
+			}
+			componentStatus := r.Cluster.Status.Components[componentName]
+			componentStatus.ConsensusSetStatus = newConsensusSetStatus
+			r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
+
+			return nil, nil
+		}
+	case appsv1alpha1.Replication:
+		sts := util.ConvertRSMToSTS(rsmObj)
+		podList, err := util.GetRunningPods(ctx, r.Cli, sts)
+		if err != nil {
+			return nil, err
+		}
+		if len(podList) == 0 {
+			return nil, nil
+		}
+		primary := ""
+		vertexes := make([]graph.Vertex, 0)
+		for _, pod := range podList {
+			role, ok := pod.Labels[constant.RoleLabelKey]
+			if !ok || role == "" {
+				continue
+			}
+			if role == constant.Primary {
+				primary = pod.Name
+			}
+		}
+
+		for _, pod := range podList {
+			needUpdate := false
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			switch {
+			case primary == "":
+				// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+				needUpdate = handlePrimaryNotExistPod(&pod)
+			default:
+				needUpdate = handlePrimaryExistPod(&pod, primary)
+			}
+			if needUpdate {
+				vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+					Obj:    &pod,
+					Action: ictrltypes.ActionUpdatePtr(),
+				})
+			}
+		}
+		// rebuild cluster.status.components.replicationSet.status
+		if err := rebuildReplicationSetClusterStatus(r.Cluster, appsv1alpha1.Replication, componentName, podList); err != nil {
+			return nil, err
+		}
+		return vertexes, nil
+	}
+
 	return nil, nil
+}
+
+// rebuildReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
+func rebuildReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
+	workloadType appsv1alpha1.WorkloadType, compName string, podList []corev1.Pod) error {
+	if len(podList) == 0 {
+		return nil
+	}
+
+	var oldReplicationStatus *appsv1alpha1.ReplicationSetStatus
+	if v, ok := cluster.Status.Components[compName]; ok {
+		oldReplicationStatus = v.ReplicationSetStatus
+	}
+
+	newReplicationStatus := &appsv1alpha1.ReplicationSetStatus{}
+	if err := genReplicationSetStatus(newReplicationStatus, podList); err != nil {
+		return err
+	}
+	// if status changed, do update
+	if !cmp.Equal(newReplicationStatus, oldReplicationStatus) {
+		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
+			return err
+		}
+		componentStatus := cluster.Status.Components[compName]
+		componentStatus.ReplicationSetStatus = newReplicationStatus
+		cluster.Status.SetComponentStatus(compName, componentStatus)
+	}
+	return nil
+}
+
+// genReplicationSetStatus generates ReplicationSetStatus from podList.
+func genReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
+	for _, pod := range podList {
+		role := pod.Labels[constant.RoleLabelKey]
+		if role == "" {
+			return fmt.Errorf("pod %s has no role label", pod.Name)
+		}
+		switch role {
+		case constant.Primary:
+			if replicationStatus.Primary.Pod != "" {
+				return fmt.Errorf("more than one primary pod found")
+			}
+			replicationStatus.Primary.Pod = pod.Name
+		case constant.Secondary:
+			replicationStatus.Secondaries = append(replicationStatus.Secondaries, appsv1alpha1.ReplicationMemberStatus{
+				Pod: pod.Name,
+			})
+		default:
+			return fmt.Errorf("unknown role %s", role)
+		}
+	}
+	return nil
+}
+
+func setConsensusSetStatusRoles(newConsensusSetStatus *appsv1alpha1.ConsensusSetStatus, rsmObj *workloads.ReplicatedStateMachine) {
+	for _, memberStatus := range rsmObj.Status.MembersStatus {
+		status := appsv1alpha1.ConsensusMemberStatus{
+			Name: memberStatus.Name,
+			Pod: memberStatus.PodName,
+			AccessMode: appsv1alpha1.AccessMode(memberStatus.AccessMode),
+		}
+		switch {
+		case memberStatus.IsLeader:
+			newConsensusSetStatus.Leader = status
+		case memberStatus.CanVote:
+			newConsensusSetStatus.Followers = append(newConsensusSetStatus.Followers, status)
+		default:
+			newConsensusSetStatus.Learner = &status
+		}
+	}
+}
+
+// handlePrimaryNotExistPod is used to handle the pod which is not exists primary pod.
+func handlePrimaryNotExistPod(pod *corev1.Pod) bool {
+	parent, o := util.ParseParentNameAndOrdinal(pod.Name)
+	defaultRole := DefaultRole(o)
+	pod.GetLabels()[constant.RoleLabelKey] = defaultRole
+	pod.Annotations[constant.PrimaryAnnotationKey] = fmt.Sprintf("%s-%d", parent, 0)
+	return true
+}
+
+// DefaultRole is used to get the default role of the Pod of the Replication workload.
+func DefaultRole(i int32) string {
+	role := constant.Secondary
+	if i == 0 {
+		role = constant.Primary
+	}
+	return role
+}
+
+// handlePrimaryExistPod is used to handle the pod which is exists primary pod.
+func handlePrimaryExistPod(pod *corev1.Pod, primary string) bool {
+	needPatch := false
+	if pod.Name != primary {
+		role, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || role != constant.Secondary {
+			pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
+			needPatch = true
+		}
+	}
+	pk, ok := pod.Annotations[constant.PrimaryAnnotationKey]
+	if !ok || pk != primary {
+		pod.Annotations[constant.PrimaryAnnotationKey] = primary
+		needPatch = true
+	}
+	return needPatch
 }
 
 func newRSM(cli client.Client,

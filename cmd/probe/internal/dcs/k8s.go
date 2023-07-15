@@ -281,7 +281,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		Name:        leader,
 		AcquireTime: acquireTime,
 		RenewTime:   renewTime,
-		Ttl:         ttl,
+		TTL:         ttl,
 		Resource:    configmap,
 	}, nil
 }
@@ -402,7 +402,7 @@ func (store *KubernetesStore) CreateSwitchover(leader, candidate string) error {
 	switchoverName := store.clusterCompName + "-switchover"
 	switchover, _ := store.GetSwitchover()
 	if switchover != nil {
-		return fmt.Errorf("There is another switchover %s unfinished", switchoverName)
+		return fmt.Errorf("there is another switchover %s unfinished", switchoverName)
 	}
 
 	labelsMap := map[string]string{

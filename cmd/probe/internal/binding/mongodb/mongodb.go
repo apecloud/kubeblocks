@@ -22,7 +22,6 @@ package mongodb
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
@@ -36,7 +35,6 @@ import (
 
 // MongoDBOperations is a binding implementation for MongoDB.
 type MongoDBOperations struct {
-	mu      sync.Mutex
 	manager *mongodb.Manager
 	BaseOperations
 }

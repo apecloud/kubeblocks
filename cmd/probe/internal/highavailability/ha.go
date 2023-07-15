@@ -167,7 +167,7 @@ func (ha *Ha) Start() {
 		isExist, _ = ha.dcs.IsLockExist()
 	}
 
-	for true {
+	for {
 		ha.RunCycle()
 		time.Sleep(1 * time.Second)
 	}

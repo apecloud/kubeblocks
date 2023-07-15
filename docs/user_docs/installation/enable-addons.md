@@ -58,30 +58,35 @@ kubectl describe addon [addon name]
 :::
 
 **To manually enable or disable add-ons**
+
+If you want to use the vector database milvus, you can enable the milvus addon through the following steps.
+
 ***Steps:***
-1. To enable the add-on, use `kbcli addon enable`.
+1. To enable the add-on.
+
+Use `kbcli addon enable`.
 
     ```bash
-    kbcli addon enable snapshot-controller
+    kbcli addon enable milvus
     ```
 
 Use `kubectl` command to enable the add-on:
 ```bash
-kubectl patch addon snapshot-controller --type=merge -p '{"spec":{"install":{"enabled":true}}}' 
+kubectl patch addon milvus --type=merge -p '{"spec":{"install":{"enabled":true}}}' 
 ```
 
     To disable the add-on, use `kbcli addon disable`.
 
 Use `kubectl` command to disable the add-on:
 ```bash
-kubectl patch addon snapshot-controller --type=merge -p '{"spec":{"install":{"enabled":false}}}' 
+kubectl patch addon milvus --type=merge -p '{"spec":{"install":{"enabled":false}}}' 
 ```
 
-You can run `kubectl get addon snapshot-controller` to check the status of the add-on.
+You can run `kubectl get addon milvus` to check the status of the add-on.
 
 
 2. List the add-ons again to check whether it is enabled.
 
     ```bash
-    kbcli addon list
+    kbcli addon list 
     ```

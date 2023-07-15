@@ -40,10 +40,20 @@ alertmanager-webhook-adaptor   Helm   Enabled                   true
 qdrant                         Helm   Enabled                   true         
 ```
 
+`kubectl` command to list all supported add-ons:
+```bash
+kubectl get addons
+```
+
 :::note
 
 Some add-ons have environment requirements. If a certain requirement is not met, the automatic installation is invalid. So you can check the *AUTO-INSTALLABLE-SELECTOR* item of the output. 
 You can use `kbcli addon describe [addon name]` command to check the installation requirement.
+
+`kubectl` command to describe the add-on.
+```bash
+kubectl describe addon [addon name]
+```
 
 :::
 
@@ -55,7 +65,21 @@ You can use `kbcli addon describe [addon name]` command to check the installatio
     kbcli addon enable snapshot-controller
     ```
 
+Use `kubectl` command to enable the add-on:
+```bash
+kubectl patch addon snapshot-controller --type=merge -p '{"spec":{"install":{"enabled":true}}}' 
+```
+
     To disable the add-on, use `kbcli addon disable`.
+
+Use `kubectl` command to disable the add-on:
+```bash
+kubectl patch addon snapshot-controller --type=merge -p '{"spec":{"install":{"enabled":false}}}' 
+```
+
+You can run `kubectl get addon snapshot-controller` to check the status of the add-on.
+
+
 2. List the add-ons again to check whether it is enabled.
 
     ```bash

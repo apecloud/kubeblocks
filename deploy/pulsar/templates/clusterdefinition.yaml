@@ -217,9 +217,17 @@ spec:
                 value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
                 value: $(KB_NAMESPACE)
+              {{- if .Values.debugEnabled }}
+              - name: LOG_LEVEL
+                value: debug
+              {{- else }}
+              - name: LOG_LEVEL
+                value: info
+              {{- end }}
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
+              - "--feature-gates=-pkg.translator.prometheus.NormalizeName"
             ports:
               - name: http-metrics
                 containerPort: {{ .Values.metrics.service.port }}
@@ -373,9 +381,17 @@ spec:
                 value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
                 value: $(KB_NAMESPACE)
+              {{- if .Values.debugEnabled }}
+              - name: LOG_LEVEL
+                value: debug
+              {{- else }}
+              - name: LOG_LEVEL
+                value: info
+              {{- end }}
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
+              - "--feature-gates=-pkg.translator.prometheus.NormalizeName"
             ports:
               - name: http-metrics
                 containerPort: {{ .Values.metrics.service.port }}
@@ -505,9 +521,17 @@ spec:
                 value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
                 value: $(KB_NAMESPACE)
+              {{- if .Values.debugEnabled }}
+              - name: LOG_LEVEL
+                value: debug
+              {{- else }}
+              - name: LOG_LEVEL
+                value: info
+              {{- end }}
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
+              - "--feature-gates=-pkg.translator.prometheus.NormalizeName"
             ports:
               - name: http-metrics
                 containerPort: {{ .Values.metrics.service.port }}
@@ -629,9 +653,17 @@ spec:
                 value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
                 value: $(KB_NAMESPACE)
+              {{- if .Values.debugEnabled }}
+              - name: LOG_LEVEL
+                value: debug
+              {{- else }}
+              - name: LOG_LEVEL
+                value: info
+              {{- end }}
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
+              - "--feature-gates=-pkg.translator.prometheus.NormalizeName"
             ports:
               - name: http-metrics
                 containerPort: {{ .Values.metrics.service.port }}
@@ -768,9 +800,17 @@ spec:
                 value: $(KB_POD_NAME)
               - name: POD_NAMESPACE
                 value: $(KB_NAMESPACE)
+              {{- if .Values.debugEnabled }}
+              - name: LOG_LEVEL
+                value: debug
+              {{- else }}
+              - name: LOG_LEVEL
+                value: info
+              {{- end }}
             command:
               - "/bin/agamotto"
               - "--config=/opt/agamotto/agamotto-config.yaml"
+              - "--feature-gates=-pkg.translator.prometheus.NormalizeName"
             ports:
               - name: http-metrics
                 containerPort: {{ .Values.metrics.service.port }}

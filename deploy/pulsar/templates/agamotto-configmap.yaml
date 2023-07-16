@@ -55,7 +55,7 @@ data:
     service:
       telemetry:
         logs:
-          level: info
+          level: ${env:LOG_LEVEL}
       extensions: [ memory_ballast ]
       pipelines:
         metrics:

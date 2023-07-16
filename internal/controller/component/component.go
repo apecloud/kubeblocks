@@ -223,6 +223,14 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			component.Services = append(component.Services, service)
 		}
 	}
+
+	// probe container requires a service account with adequate privileges.
+	// If probes are required and the serviceAccountName is not set,
+	// a default serviceAccountName will be assigned.
+	if component.ServiceAccountName == "" && component.Probes != nil {
+		component.ServiceAccountName = "kb-" + component.ClusterName
+	}
+
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 

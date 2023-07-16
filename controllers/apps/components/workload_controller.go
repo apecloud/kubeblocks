@@ -189,7 +189,7 @@ func patchWorkloadCustomLabel(ctx context.Context,
 	if cluster == nil || componentSpec == nil {
 		return nil
 	}
-	compDef, err := GetComponentDefByCluster(ctx, cli, *cluster, componentSpec.ComponentDefRef)
+	compDef, err := appsv1alpha1.GetComponentDefByCluster(ctx, cli, *cluster, componentSpec.ComponentDefRef)
 	if err != nil {
 		return err
 	}

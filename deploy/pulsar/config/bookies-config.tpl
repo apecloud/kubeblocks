@@ -1,5 +1,4 @@
-PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+DoEscapeAnalysis -XX:ParallelGCThreads=4 -XX:ConcGCThreads=4 -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB -XX:+ExitOnOutOfMemoryError -XX:+PerfDisableSharedMem 
-PULSAR_MEM: -Xms128m -Xmx256m -XX:MaxDirectMemorySize=256m
+PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+DoEscapeAnalysis -XX:ParallelGCThreads=4 -XX:ConcGCThreads=4 -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB -XX:+ExitOnOutOfMemoryError -XX:+PerfDisableSharedMem -XshowSettings:vm -Ddepth=64
 PULSAR_PREFIX_journalDirectories: /pulsar/data/bookkeeper/journal
 dbStorage_readAheadCacheMaxSizeMb: "32"
 dbStorage_rocksDB_blockCacheSize: "8388608"
@@ -24,3 +23,9 @@ zkLedgersRootPath: /ledgers
 {{- $zk_server := "" }}
 {{- $zk_server = printf "%s-%s.%s.svc" $clusterName $pulsar_zk_component.name $namespace }}
 zkServers: {{ $zk_server }}:2181
+{{- $MaxDirectMemorySize := "" }}
+{{- $phy_memory := getContainerMemory ( index $.podSpec.containers 0 ) }}
+{{- if gt $phy_memory 0 }}
+  {{- $MaxDirectMemorySize = printf "-XX:MaxDirectMemorySize=%dm" (div $phy_memory ( mul 1024 1024 2 )) }}
+{{- end }}
+PULSAR_MEM: -XX:MinRAMPercentage=25 -XX:MaxRAMPercentage=50 {{ $MaxDirectMemorySize }}

@@ -8,6 +8,7 @@ spec:
   type: pulsar
   connectionCredential:
     username: "admin"
+    password: ""
     httpEndpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
     pulsarEndpoint: "pulsar://$(SVC_FQDN):$(SVC_PORT_pulsar)"
     kafkaEndpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-client)"
@@ -692,7 +693,7 @@ spec:
               - name: EXTERNAL_PROVIDED_SERVERS
                 value: "false"
               - name: OPTS
-                value: "-Dlog4j2.formatMsgNoLookups=true -XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+                value: "-Dlog4j2.formatMsgNoLookups=true"
             ports:
               - name: client
                 containerPort: 2181

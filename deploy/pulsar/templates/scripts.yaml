@@ -17,8 +17,9 @@ data:
     #!/bin/sh
     set -x
     echo "INFO: wait for zookeeper ready..."
-    until bin/pulsar zookeeper-shell -server ${zookeeperServers} --run-once "ls /"; do
-      sleep 3;
+    zkDomain="${zookeeperServers%%:*}"
+    until echo ruok | nc -q 1 ${zkDomain} 2181 | grep imok; do
+      sleep 2;
     done;
     idx=${KB_POD_NAME##*-}
     if [ $idx -ne 0 ]; then
@@ -38,8 +39,8 @@ data:
     --cluster ${clusterName} \
     --zookeeper ${zookeeperServers} \
     --configuration-store ${zookeeperServers} \
-    --web-service-url ${webServiceUrl}
-    # --broker-service-url ${brokerServiceUrl} \
+    --web-service-url ${webServiceUrl} \
+    --broker-service-url ${brokerServiceUrl}
 
     (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
   init-broker-sysctl.sh: |-
@@ -49,8 +50,8 @@ data:
     #!/bin/bash
     echo "waiting zookeeper ready..."
     zkDomain="${zkServers%%:*}"
-    until nslookup $zkDomain; do
-      sleep 3;
+    until echo ruok | nc -q 1 ${zkDomain} 2181 | grep imok; do
+      sleep 2;
     done;
     echo "zk is ready, start to config bookkeeper..."
     bin/apply-config-from-env.py conf/bookkeeper.conf;

@@ -67,7 +67,6 @@ spec:
     - name: bookies
       componentDefRef: bookies
       replicas: {{ .Values.bookies.replicaCount | default 3 }}
-      serviceAccountName: {{ include "pulsar-cluster.serviceAccountName" . }}
       {{- with  .Values.bookies.resources }}
       resources:
         {{- if .limits }}

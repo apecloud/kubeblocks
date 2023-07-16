@@ -179,9 +179,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
 		// override component.SwitchoverSpec
-		if component.WorkloadType == appsv1alpha1.Replication || component.WorkloadType == appsv1alpha1.Consensus {
-			overrideSwitchoverSpecAttr(component.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
-		}
+		overrideSwitchoverSpecAttr(component.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
 	}
 
 	// handle component.PodSpec extra settings

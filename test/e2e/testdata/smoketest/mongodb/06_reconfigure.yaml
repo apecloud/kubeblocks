@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-reconfigure
+  generateName: mongodb-cluster-reconfigure-
 spec:
   clusterRef: mongodb-cluster
   reconfigure:

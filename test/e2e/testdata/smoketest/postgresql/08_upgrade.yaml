@@ -1,9 +1,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-upgrade
+  generateName: pg-cluster-upgrade-
 spec:
   clusterRef: pg-cluster
   type: Upgrade
   upgrade:
-    clusterVersionRef: postgresql-14.7.1-latest
+    clusterVersionRef: postgresql-14.7.2-latest

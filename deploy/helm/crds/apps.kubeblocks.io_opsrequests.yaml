@@ -295,6 +295,10 @@ spec:
                   componentName:
                     description: componentName cluster component name.
                     type: string
+                  image:
+                    description: exec command with image, by default use the image
+                      of kubeblocks-datascript.
+                    type: string
                   script:
                     description: script defines the script to be executed.
                     items:
@@ -358,12 +362,32 @@ spec:
                     x-kubernetes-validations:
                     - message: forbidden to update spec.scriptSpec.scriptFrom
                       rule: self == oldSelf
+                  secret:
+                    description: secret defines the secret to be used to execute the
+                      script. If not specified, the default cluster root credential
+                      secret will be used.
+                    properties:
+                      name:
+                        description: name is the name of the secret.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        type: string
+                      passwordKey:
+                        default: password
+                        description: passwordKey field is used to specify the password
+                          of the secret.
+                        type: string
+                      usernameKey:
+                        default: username
+                        description: usernameKey field is used to specify the username
+                          of the secret.
+                        type: string
+                    required:
+                    - name
+                    type: object
                 required:
                 - componentName
                 type: object
-                x-kubernetes-validations:
-                - message: forbidden to update spec.scriptSpec
-                  rule: self == oldSelf
               switchover:
                 description: switchover the specified components.
                 items:

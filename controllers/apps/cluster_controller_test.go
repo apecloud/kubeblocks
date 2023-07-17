@@ -184,7 +184,7 @@ var _ = Describe("Cluster Controller", func() {
 	// ClusterComponentDefinition.PodSpec, it's a subset of the real ports as some containers can be dynamically
 	// injected into the pod by the lifecycle controller, such as the probe container.
 	getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
-		comp, err := components.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
+		comp, err := appsv1alpha1.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		var headlessSvcPorts []corev1.ServicePort
 		for _, container := range comp.PodSpec.Containers {

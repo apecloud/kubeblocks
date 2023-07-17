@@ -623,11 +623,6 @@ const (
 // a service account, a role and a rolebinding
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-
-	if !o.RBACEnabled {
-		return nil
-	}
-
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
 	return nil

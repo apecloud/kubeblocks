@@ -49,23 +49,34 @@ const (
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
+	clusterDef := transCtx.ClusterDef
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
 
+	var hasProbes bool
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		if compDef.Probes != nil {
+			hasProbes = true
+		}
+	}
+
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
+		if serviceAccountName == "" {
+			if !hasProbes {
+				return nil
+			}
+			serviceAccountName = "kb-" + cluster.Name
+		}
+
 		if !viper.GetBool(constant.EnableRBACManager) {
 			transCtx.Logger.V(1).Info("rbac manager is not enabled")
-			if serviceAccountName != "" && !isServiceAccountExist(transCtx, serviceAccountName, true) {
+			if !isServiceAccountExist(transCtx, serviceAccountName, true) {
 				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")
 			}
 			return nil
-		}
-
-		if serviceAccountName == "" {
-			serviceAccountName = "kb-" + cluster.Name
 		}
 
 		if isRoleBindingExist(transCtx, serviceAccountName) {

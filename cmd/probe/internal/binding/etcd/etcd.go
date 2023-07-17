@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
+
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
 	"github.com/go-logr/zapr"
@@ -62,10 +64,9 @@ func NewEtcd() (*Etcd, error) {
 	return &Etcd{BaseOperations: BaseOperations{Logger: logger}}, nil
 }
 
-func (e *Etcd) Init() error {
-	e.Metadata = component.GetProperties("etcd")
+func (e *Etcd) Init(metadata component.Properties) error {
+	e.BaseOperations.Init(metadata)
 	e.endpoint = e.Metadata[endpoint]
-	e.BaseOperations.Init()
 	e.DBType = "etcd"
 	e.InitIfNeed = e.initIfNeed
 	e.DBPort = e.GetRunningPort()
@@ -169,4 +170,18 @@ func (e *Etcd) GetRunningPort() int {
 func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *ProbeResponse) ([]byte, error) {
 	// TODO implement me when proposal is passed
 	return nil, nil
+}
+
+func (e *Etcd) GetLogger() logr.Logger {
+	return e.Logger
+}
+
+func (e *Etcd) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
+	// TODO: impl
+	return nil, nil
+}
+
+func (e *Etcd) InternalExec(ctx context.Context, sql string) (int64, error) {
+	// TODO: impl
+	return 0, nil
 }

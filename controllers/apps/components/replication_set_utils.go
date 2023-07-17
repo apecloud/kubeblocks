@@ -128,9 +128,9 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 	// in case of adding new node
-	if newRole != "" {
-		return updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole)
-	}
+	// if newRole != "" {
+	// 	return updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole)
+	// }
 
 	// if switchPolicy is not Noop, return
 	clusterCompSpec := getClusterComponentSpecByName(*cluster, compName)

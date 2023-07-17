@@ -47,6 +47,7 @@ const (
 	ExecOperation         OperationKind = "exec"
 	QueryOperation        OperationKind = "query"
 	CloseOperation        OperationKind = "close"
+	VolumeProtection      OperationKind = "volumeProtection"
 
 	// actions for cluster accounts management
 	ListUsersOp OperationKind = "listUsers"

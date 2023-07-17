@@ -1,4 +1,3 @@
 name: probe
 spec:
-  type: middleware.http.probe
   version: v1

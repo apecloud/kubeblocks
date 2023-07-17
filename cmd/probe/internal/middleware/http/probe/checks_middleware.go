@@ -54,7 +54,7 @@ type RequestMeta struct {
 var Logger logr.Logger
 
 func init() {
-	development, err := zap.NewDevelopment()
+	development, err := zap.NewProduction()
 	if err != nil {
 		panic(err)
 	}
@@ -107,13 +107,6 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				Logger.Info("unknown probe operation", "operation", operation)
 			}
 		}
-
-		// todo 更详细的字符串
-		reqInfo := struct {
-			uri  string
-			body string
-		}{}
-		reqInfo.uri = request.RequestURI
 
 		Logger.Info("receive request", "request", request.RequestURI)
 		next(writer, request)

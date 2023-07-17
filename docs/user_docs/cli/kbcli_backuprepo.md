@@ -1,19 +1,13 @@
 ---
-title: kbcli logout
+title: kbcli backuprepo
 ---
 
-Log out of the KubeBlocks Cloud
-
-```
-kbcli logout [flags]
-```
+BackupRepo command.
 
 ### Options
 
 ```
-      --api-url string     The KubeBlocks Auth Base URL. (default "https://tenent2.jp.auth0.com")
-      --client-id string   The client ID for the KubeBlocks Cloud.
-  -h, --help               help for logout
+  -h, --help   help for backuprepo
 ```
 
 ### Options inherited from parent commands
@@ -43,6 +37,7 @@ kbcli logout [flags]
 ### SEE ALSO
 
 
+* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -1,19 +1,42 @@
 ---
-title: kbcli logout
+title: kbcli backuprepo create
 ---
 
-Log out of the KubeBlocks Cloud
+Create a backup repo
 
 ```
-kbcli logout [flags]
+kbcli backuprepo create [NAME] [flags]
+```
+
+### Examples
+
+```
+  # Create a default backup repo using S3 as the backend
+  kbcli backuprepo create \
+  --provider s3 \
+  --region us-west-1 \
+  --bucket test-kb-backup \
+  --access-key-id <ACCESS KEY> \
+  --secret-access-key <SECRET KEY> \
+  --default
+  
+  # Create a non-default backup repo with a specified name
+  kbcli backuprepo create my-backup-repo \
+  --provider s3 \
+  --region us-west-1 \
+  --bucket test-kb-backup \
+  --access-key-id <ACCESS KEY> \
+  --secret-access-key <SECRET KEY>
 ```
 
 ### Options
 
 ```
-      --api-url string     The KubeBlocks Auth Base URL. (default "https://tenent2.jp.auth0.com")
-      --client-id string   The client ID for the KubeBlocks Cloud.
-  -h, --help               help for logout
+      --default                    Specify whether to set the created backup repo as default
+  -h, --help                       help for create
+      --provider string            Specify storage provider
+      --pv-reclaim-policy string   Specify the reclaim policy for PVs created by this backup repo, the value can be "Retain" or "Delete" (default "Retain")
+      --volume-capacity string     Specify the capacity of the new created PVC" (default "100Gi")
 ```
 
 ### Options inherited from parent commands
@@ -42,7 +65,7 @@ kbcli logout [flags]
 
 ### SEE ALSO
 
-
+* [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

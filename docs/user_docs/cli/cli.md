@@ -171,13 +171,13 @@ KubeBlocks operation commands.
 
 ## [login](kbcli_login.md)
 
-Authenticate with the Kubeblocks Cloud
+Authenticate with the KubeBlocks Cloud
 
 
 
 ## [logout](kbcli_logout.md)
 
-Log out of the Kubeblocks Cloud
+Log out of the KubeBlocks Cloud
 
 
 

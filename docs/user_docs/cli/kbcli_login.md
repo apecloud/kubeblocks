@@ -2,7 +2,7 @@
 title: kbcli login
 ---
 
-Authenticate with the Kubeblocks Cloud
+Authenticate with the KubeBlocks Cloud
 
 ```
 kbcli login [flags]
@@ -11,10 +11,10 @@ kbcli login [flags]
 ### Options
 
 ```
-      --client-id string   The client ID for the Kubeblocks CLI application. (default "lYbU8d2i8WqsM1YszomQZPuvg5F4MIgS")
+      --client-id string   The client ID for the KubeBlocks cloud application.
   -h, --help               help for login
       --no-browser         Do not open the browser for authentication.
-      --site string        The Kubeblocks Auth API base URL. (default "https://dev-0cf3xqbt63n7rs7t.us.auth0.com")
+      --site string        The KubeBlocks Auth API Base URL. (default "https://tenent2.jp.auth0.com")
 ```
 
 ### Options inherited from parent commands

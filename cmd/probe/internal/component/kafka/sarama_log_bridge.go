@@ -24,7 +24,7 @@ type SaramaLogBridge struct {
 }
 
 func (b SaramaLogBridge) Print(v ...interface{}) {
-	b.logger.Info(fmt.Sprint(v))
+	b.logger.Info(fmt.Sprint(v...))
 }
 
 func (b SaramaLogBridge) Printf(format string, v ...interface{}) {
@@ -32,5 +32,5 @@ func (b SaramaLogBridge) Printf(format string, v ...interface{}) {
 }
 
 func (b SaramaLogBridge) Println(v ...interface{}) {
-	b.Print(v)
+	b.Print(v...)
 }

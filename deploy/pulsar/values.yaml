@@ -17,7 +17,7 @@ debugEnabled: false
 ## Default Pulsar image
 ##
 defaultPulsarImage:
-  repository: apecloud/pulsar
+  repository: docker.io/apecloud/pulsar
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: 2.11.1
@@ -34,7 +34,7 @@ images:
   zookeeper:
     # Zookeeper component is used for metadata, shouldn't need update following tag value for common 
     # upgrade scenario
-    repository: apecloud/pulsar
+    repository: docker.io/apecloud/pulsar
     pullPolicy: IfNotPresent
     tag: 2.11.1
 
@@ -49,7 +49,7 @@ images:
     tag: ""
 
   pulsarTools:
-    repository: apecloud/pulsartools
+    repository: docker.io/apecloud/pulsartools
     pullPolicy: ""
     tag: "2.11"
 

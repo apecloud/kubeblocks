@@ -272,7 +272,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	leader := annotations["leader"]
 
 	if ttl > 0 && time.Now().Unix()-renewTime > int64(ttl) {
-		store.logger.Infof("lock expired: %v, now: %d", annotations, time.Now().Unix())
+		store.logger.Info(fmt.Sprintf("lock expired: %v, now: %d", annotations, time.Now().Unix()))
 		leader = ""
 	}
 

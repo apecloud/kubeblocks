@@ -25,7 +25,7 @@ type kv struct {
 
 var name2Property = map[string]Properties{}
 
-func ReadConfig(filename string) (string, Properties, error) {
+func readConfig(filename string) (string, Properties, error) {
 	viper.SetConfigType("yaml")
 	viper.SetConfigFile(filename)
 	if err := viper.ReadInConfig(); err != nil {
@@ -49,7 +49,7 @@ func GetAllComponent(dir string) error {
 		return err
 	}
 	for _, file := range files {
-		name, properties, err := ReadConfig(dir + file.Name())
+		name, properties, err := readConfig(dir + "/" + file.Name())
 		if err != nil {
 			return err
 		}

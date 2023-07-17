@@ -270,7 +270,7 @@ CLI_LD_FLAGS ="-s -w \
 
 bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
 	@if [ "$(word 2,$(subst ., ,$@))" = "darwin" ]; then \
-		GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CC=o64-clang CGO_ENABLED=1 $(GO) build -tags $(BUILD_TAGS) -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go; \
+		GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CC=clang CGO_ENABLED=1 $(GO) build -tags $(BUILD_TAGS) -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go; \
 	else \
 		GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=1 $(GO) build -tags $(BUILD_TAGS) -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go; \
 	fi

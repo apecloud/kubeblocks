@@ -22,6 +22,8 @@ package kafka
 import (
 	"testing"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -30,8 +32,8 @@ import (
 // Test case for Init() function
 func TestInit(t *testing.T) {
 	kafkaOps := mockKafkaOps(t)
-
-	err := kafkaOps.Init()
+	metada := make(component.Properties)
+	err := kafkaOps.Init(metada)
 	if err != nil {
 		t.Errorf("Error during Init(): %s", err)
 	}
@@ -46,8 +48,6 @@ func TestCheckStatusOps(t *testing.T) {
 }
 
 func mockKafkaOps(t *testing.T) *KafkaOperations {
-	// todo 没有配置文件
 	kafkaOps, _ := NewKafka()
-	_ = kafkaOps.Init()
 	return kafkaOps
 }

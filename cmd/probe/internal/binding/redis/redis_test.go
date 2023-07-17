@@ -26,10 +26,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/go-redis/redismock/v9"
 
@@ -71,16 +71,16 @@ func TestRedisInvokeCreate(t *testing.T) {
 	defer r.Close()
 
 	result := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Data:      []byte(testData),
 		Metadata:  map[string]string{"key": testKey},
-		Operation: bindings.CreateOperation,
+		Operation: CreateOperation,
 	}
 	// mock expectation
 	mock.ExpectDo("SET", testKey, testData).SetVal("ok")
 
 	// invoke
-	bindingRes, err := r.Invoke(context.TODO(), request)
+	bindingRes, err := r.Dispatch(context.TODO(), request)
 	assert.Equal(t, nil, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -95,16 +95,16 @@ func TestRedisInvokeGet(t *testing.T) {
 	defer r.Close()
 
 	opsResult := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Metadata:  map[string]string{"key": testKey},
-		Operation: bindings.GetOperation,
+		Operation: GetOperation,
 	}
 	// mock expectation, set to nil
 	mock.ExpectDo("GET", testKey).RedisNil()
 	mock.ExpectDo("GET", testKey).SetVal(testData)
 
 	// invoke create
-	bindingRes, err := r.Invoke(context.TODO(), request)
+	bindingRes, err := r.Dispatch(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -113,7 +113,7 @@ func TestRedisInvokeGet(t *testing.T) {
 	assert.Equal(t, RespEveFail, opsResult[RespTypEve])
 
 	// invoke one more time
-	bindingRes, err = r.Invoke(context.TODO(), request)
+	bindingRes, err = r.Dispatch(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
@@ -129,15 +129,15 @@ func TestRedisInvokeDelete(t *testing.T) {
 	defer r.Close()
 
 	opsResult := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Metadata:  map[string]string{"key": testKey},
-		Operation: bindings.DeleteOperation,
+		Operation: DeleteOperation,
 	}
 	// mock expectation, set to err
 	mock.ExpectDo("DEL", testKey).SetVal("ok")
 
 	// invoke delete
-	bindingRes, err := r.Invoke(context.TODO(), request)
+	bindingRes, err := r.Dispatch(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -151,7 +151,7 @@ func TestRedisGetRoles(t *testing.T) {
 	defer r.Close()
 
 	opsResult := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Operation: GetRoleOperation,
 	}
 
@@ -159,7 +159,7 @@ func TestRedisGetRoles(t *testing.T) {
 	mock.ExpectInfo("Replication").SetVal("role:master\r\nconnected_slaves:1")
 	mock.ExpectInfo("Replication").SetVal("role:slave\r\nmaster_port:6379")
 	// invoke request
-	bindingRes, err := r.Invoke(context.TODO(), request)
+	bindingRes, err := r.Dispatch(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -169,7 +169,7 @@ func TestRedisGetRoles(t *testing.T) {
 	assert.Equal(t, PRIMARY, opsResult["role"])
 
 	// invoke one more time
-	bindingRes, err = r.Invoke(context.TODO(), request)
+	bindingRes, err = r.Dispatch(context.TODO(), request)
 	assert.Nil(t, err)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
@@ -187,7 +187,7 @@ func TestRedisAccounts(t *testing.T) {
 	t.Run("List Accounts", func(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
-		response, err := r.Invoke(ctx, &bindings.InvokeRequest{
+		response, err := r.Dispatch(ctx, &ProbeRequest{
 			Operation: ListUsersOp,
 		})
 
@@ -214,8 +214,8 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
-			request   = &bindings.InvokeRequest{
+			response  *ProbeResponse
+			request   = &ProbeRequest{
 				Operation: CreateUserOp,
 			}
 		)
@@ -254,7 +254,7 @@ func TestRedisAccounts(t *testing.T) {
 
 		for _, accTest := range testCases {
 			request.Metadata = accTest.testMetaData
-			response, err = r.Invoke(ctx, request)
+			response, err = r.Dispatch(ctx, request)
 			assert.Nil(t, err)
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
@@ -270,7 +270,7 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
+			response  *ProbeResponse
 		)
 
 		testCases := []redisTestCase{
@@ -308,17 +308,17 @@ func TestRedisAccounts(t *testing.T) {
 			},
 		}
 
-		for _, ops := range []bindings.OperationKind{GrantUserRoleOp, RevokeUserRoleOp} {
+		for _, ops := range []OperationKind{GrantUserRoleOp, RevokeUserRoleOp} {
 			// mock exepctation
 			args := tokenizeCmd2Args(fmt.Sprintf("ACL SETUSER %s %s", userName, r.role2Priv(ops, (string)(roleName))))
 			mock.ExpectDo(args...).SetVal("ok")
 
-			request := &bindings.InvokeRequest{
+			request := &ProbeRequest{
 				Operation: ops,
 			}
 			for _, accTest := range testCases {
 				request.Metadata = accTest.testMetaData
-				response, err = r.Invoke(ctx, request)
+				response, err = r.Dispatch(ctx, request)
 				assert.Nil(t, err)
 				assert.NotNil(t, response.Data)
 				err = json.Unmarshal(response.Data, &opsResult)
@@ -337,8 +337,8 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
-			request   = &bindings.InvokeRequest{
+			response  *ProbeResponse
+			request   = &ProbeRequest{
 				Operation: DescribeUserOp,
 			}
 			// mock a user, describing it as an array of interface{}
@@ -410,7 +410,7 @@ func TestRedisAccounts(t *testing.T) {
 
 		for _, accTest := range testCases {
 			request.Metadata = accTest.testMetaData
-			response, err = r.Invoke(ctx, request)
+			response, err = r.Dispatch(ctx, request)
 			assert.Nil(t, err)
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
@@ -438,8 +438,8 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
-			request   = &bindings.InvokeRequest{
+			response  *ProbeResponse
+			request   = &ProbeRequest{
 				Operation: DeleteUserOp,
 			}
 		)
@@ -471,7 +471,7 @@ func TestRedisAccounts(t *testing.T) {
 
 		for _, accTest := range testCases {
 			request.Metadata = accTest.testMetaData
-			response, err = r.Invoke(ctx, request)
+			response, err = r.Dispatch(ctx, request)
 			assert.Nil(t, err)
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
@@ -534,7 +534,7 @@ func TestRedisAccounts(t *testing.T) {
 	t.Run("List System Accounts", func(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
-		response, err := r.Invoke(ctx, &bindings.InvokeRequest{
+		response, err := r.Dispatch(ctx, &ProbeRequest{
 			Operation: ListSystemAccountsOp,
 		})
 
@@ -565,10 +565,11 @@ func mockRedisOps(t *testing.T) (*Redis, redismock.ClientMock) {
 		return nil, nil
 	}
 	r := &Redis{}
-	r.Logger = logger.NewLogger("test")
+	development, _ := zap.NewDevelopment()
+	r.Logger = zapr.NewLogger(development)
 	r.client = client
 	r.ctx, r.cancel = context.WithCancel(context.Background())
-	_ = r.Init(bindings.Metadata{})
+	_ = r.Init(nil)
 	r.DBPort = 6379
 	return r, mock
 }

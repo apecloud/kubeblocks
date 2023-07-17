@@ -29,8 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
 	"github.com/spf13/viper"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -52,9 +52,9 @@ func TestInit(t *testing.T) {
 	viper.Set("KB_SERVICE_PASSWORD", "testpassword")
 
 	mysqlOps, _, _ := mockDatabase(t)
-	//mysqlOps.Metadata.Properties["url"] = urlWithPort
+	mysqlOps.Metadata["url"] = urlWithPort
 	// Call the function being tested
-	err := mysqlOps.Init()
+	err := mysqlOps.Init(mysqlOps.Metadata)
 	if err != nil {
 		t.Errorf("Error during Init(): %s", err)
 	}
@@ -577,14 +577,10 @@ func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	metadata := bindings.Metadata{
-		Base: metadata.Base{
-			Properties: map[string]string{},
-		},
-	}
-	metadata.Properties["url"] = urlWithPort
-	mysqlOps := NewMysql().(*MysqlOperations)
-	_ = mysqlOps.Init(metadata)
+	properties := make(component.Properties)
+	properties["url"] = urlWithPort
+	mysqlOps, _ := NewMysql()
+	_ = mysqlOps.Init(properties)
 	mysqlOps.manager.DB = db
 
 	return mysqlOps, mock, err

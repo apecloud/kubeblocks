@@ -18,6 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/Shopify/sarama"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +38,8 @@ Y2FDZXJ0
 )
 
 func getKafka() *Kafka {
-	return &Kafka{logger: }
+	development, _ := zap.NewDevelopment()
+	return &Kafka{logger: zapr.NewLogger(development)}
 }
 
 func getBaseMetadata() map[string]string {

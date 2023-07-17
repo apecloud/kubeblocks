@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 
@@ -47,7 +49,8 @@ func TestInit(t *testing.T) {
 	portStr := addr[index+1:]
 	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", "["+portStr+"]")
 	hs, err := NewHTTPCustom()
-	err = hs.Init()
+	metadata := make(component.Properties)
+	err = hs.Init(metadata)
 	require.NoError(t, err)
 
 	tests := map[string]struct {

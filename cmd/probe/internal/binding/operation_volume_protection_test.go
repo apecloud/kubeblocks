@@ -25,11 +25,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
 	"k8s.io/apimachinery/pkg/util/rand"
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
@@ -145,8 +148,9 @@ var _ = Describe("Volume Protection Operation", func() {
 	}
 
 	newVolumeProtectionObj := func() *operationVolumeProtection {
+		development, _ := zap.NewDevelopment()
 		return &operationVolumeProtection{
-			Logger:    logger.NewLogger("volume-protection-test"),
+			Logger:    zapr.NewLogger(development),
 			Requester: &mockVolumeStatsRequester{},
 			SendEvent: false,
 			BaseOperation: &BaseOperations{
@@ -159,7 +163,7 @@ var _ = Describe("Volume Protection Operation", func() {
 	Context("Volume Protection", func() {
 		It("init - succeed", func() {
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			Expect(obj.Pod).Should(Equal(podName))
 			Expect(obj.HighWatermark).Should(Equal(volumeProtectionSpec.HighWatermark))
 			Expect(len(obj.Volumes)).Should(Equal(len(volumeProtectionSpec.Volumes)))
@@ -168,13 +172,13 @@ var _ = Describe("Volume Protection Operation", func() {
 		It("init - invalid volume protection spec env", func() {
 			os.Setenv(constant.KBEnvVolumeProtectionSpec, "")
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(HaveOccurred())
+			Expect(obj.Init(component.Properties{})).Should(HaveOccurred())
 		})
 
 		It("init - init requester error", func() {
 			obj := newVolumeProtectionObj()
 			obj.Requester = &mockErrorVolumeStatsRequester{initErr: true}
-			Expect(obj.Init(bindings.Metadata{})).Should(HaveOccurred())
+			Expect(obj.Init(component.Properties{})).Should(HaveOccurred())
 		})
 
 		It("init - normalize watermark", func() {
@@ -184,7 +188,7 @@ var _ = Describe("Volume Protection Operation", func() {
 					HighWatermark: val,
 				})
 				obj := newVolumeProtectionObj()
-				Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+				Expect(obj.Init(component.Properties{})).Should(Succeed())
 				Expect(obj.HighWatermark).Should(Equal(0))
 			}
 
@@ -212,7 +216,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			}
 			resetVolumeProtectionSpecEnv(spec)
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			Expect(obj.HighWatermark).Should(Equal(spec.HighWatermark))
 			for _, v := range spec.Volumes {
 				if *v.HighWatermark >= 0 && *v.HighWatermark <= 100 {
@@ -226,7 +230,7 @@ var _ = Describe("Volume Protection Operation", func() {
 		It("disabled - empty pod name", func() {
 			os.Setenv(constant.KBEnvPodName, "")
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			Expect(obj.disabled()).Should(BeTrue())
 			Expect(obj.Invoke(ctx, nil, nil)).Should(BeNil())
 		})
@@ -237,7 +241,7 @@ var _ = Describe("Volume Protection Operation", func() {
 				Volumes:       []appsv1alpha1.ProtectedVolume{},
 			})
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			Expect(obj.disabled()).Should(BeTrue())
 			Expect(obj.Invoke(ctx, nil, nil)).Should(BeNil())
 		})
@@ -253,7 +257,7 @@ var _ = Describe("Volume Protection Operation", func() {
 				},
 			})
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			Expect(obj.disabled()).Should(BeTrue())
 			Expect(obj.Invoke(ctx, nil, nil)).Should(BeNil())
 
@@ -262,32 +266,32 @@ var _ = Describe("Volume Protection Operation", func() {
 		It("query stats summary - request error", func() {
 			obj := newVolumeProtectionObj()
 			obj.Requester = &mockErrorVolumeStatsRequester{requestErr: true}
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			Expect(obj.Invoke(ctx, nil, nil)).Should(HaveOccurred())
 		})
 
 		It("query stats summary - format error", func() {
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			// default summary is empty string
 			Expect(obj.Invoke(ctx, nil, nil)).Should(HaveOccurred())
 		})
 
 		It("query stats summary - ok", func() {
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{}
 			mock.summary, _ = json.Marshal(stats)
 
-			rsp := &bindings.InvokeResponse{}
+			rsp := &ProbeResponse{}
 			Expect(obj.Invoke(ctx, nil, rsp)).Should(Succeed())
 		})
 
 		It("update volume stats summary", func() {
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{
@@ -313,7 +317,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			// nil capacity and used bytes
 			stats.Pods[0].VolumeStats[0].CapacityBytes = nil
 			stats.Pods[0].VolumeStats[0].UsedBytes = nil
-			rsp := &bindings.InvokeResponse{}
+			rsp := &ProbeResponse{}
 			Expect(obj.Invoke(ctx, nil, rsp)).Should(Succeed())
 
 			stats.Pods[0].VolumeStats[0].CapacityBytes = &capacityBytes
@@ -325,7 +329,7 @@ var _ = Describe("Volume Protection Operation", func() {
 
 		It("volume over high watermark", func() {
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{
@@ -348,7 +352,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			}
 			mock.summary, _ = json.Marshal(stats)
 
-			rsp := &bindings.InvokeResponse{}
+			rsp := &ProbeResponse{}
 			Expect(obj.Invoke(ctx, nil, rsp)).Should(Succeed())
 			Expect(obj.Readonly).Should(BeTrue())
 			Expect(instanceLocked).Should(BeTrue())
@@ -365,7 +369,7 @@ var _ = Describe("Volume Protection Operation", func() {
 
 		It("volume under high watermark", func() {
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{
@@ -388,7 +392,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			}
 			mock.summary, _ = json.Marshal(stats)
 
-			rsp := &bindings.InvokeResponse{}
+			rsp := &ProbeResponse{}
 			Expect(obj.Invoke(ctx, nil, rsp)).Should(Succeed())
 			Expect(obj.Readonly).Should(BeTrue())
 			Expect(instanceLocked).Should(BeTrue())
@@ -405,7 +409,7 @@ var _ = Describe("Volume Protection Operation", func() {
 
 		It("lock/unlock error", func() {
 			obj := newVolumeProtectionObj()
-			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+			Expect(obj.Init(component.Properties{})).Should(Succeed())
 
 			obj.BaseOperation.LockInstance = lockInstanceErr
 			obj.BaseOperation.UnlockInstance = unlockInstanceErr
@@ -431,7 +435,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			}
 			mock.summary, _ = json.Marshal(stats)
 
-			rsp := &bindings.InvokeResponse{}
+			rsp := &ProbeResponse{}
 			Expect(obj.Invoke(ctx, nil, rsp)).Should(HaveOccurred())
 			Expect(obj.Readonly).Should(BeFalse()) // unchanged
 

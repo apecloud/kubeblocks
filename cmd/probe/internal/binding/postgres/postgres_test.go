@@ -24,10 +24,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	"github.com/dapr/components-contrib/bindings"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
-	"github.com/dapr/components-contrib/metadata"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 
 	"os"
 	"strings"
@@ -52,9 +51,13 @@ const (
 )
 
 func TestOperations(t *testing.T) {
-	pgOps := NewPostgres().(*PostgresOperations)
-	metadata.Properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
-	_ = pgOps.Init()
+	pgOps, err := NewPostgres()
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties := make(component.Properties)
+	properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
+	_ = pgOps.Init(properties)
 	assert.Equal(t, "postgres", pgOps.DBType)
 	assert.NotNil(t, pgOps.InitIfNeed)
 	assert.NotNil(t, pgOps.GetRole)
@@ -87,8 +90,11 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 
 	// live DB test
-	b := NewPostgres().(*PostgresOperations)
-	if err := b.Init(); err != nil {
+	b, err := NewPostgres()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Init(nil); err != nil {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
@@ -205,9 +211,13 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 	}
 
 	// live DB test
-	b := NewPostgres().(*PostgresOperations)
-	m := bindings.Metadata{Base: metadata.Base{Properties: map[string]string{connectionURLKey: url}}}
-	if err := b.Init(); err != nil {
+	b, err := NewPostgres()
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties := make(component.Properties)
+	properties[connectionURLKey] = url
+	if err := b.Init(properties); err != nil {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())

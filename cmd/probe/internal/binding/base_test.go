@@ -27,6 +27,11 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
 	"github.com/go-logr/logr"
 
 	"github.com/spf13/viper"
@@ -267,7 +272,9 @@ func mockFakeOperations() *fakeOperations {
 
 // Init initializes the fake binding.
 func (fakeOps *fakeOperations) Init() {
-	fakeOps.BaseOperations.Init()
+	development, _ := zap.NewDevelopment()
+	fakeOps.Logger = zapr.NewLogger(development)
+	fakeOps.BaseOperations.Init(component.Properties{})
 	fakeOps.Logger.Info("Initializing MySQL binding")
 	fakeOps.DBType = "mysql"
 	fakeOps.InitIfNeed = fakeOps.initIfNeed

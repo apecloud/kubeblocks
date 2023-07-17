@@ -19,12 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package engine
 
+import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+)
+
 type pulsar struct {
 	info     EngineInfo
 	examples map[ClientType]buildConnectExample
 }
 
-var _ Interface = &pulsar{}
+var _ ClusterCommands = &pulsar{}
 
 func newPulsar(containName string) *pulsar {
 	return &pulsar{
@@ -40,14 +46,18 @@ func newPulsar(containName string) *pulsar {
 	}
 }
 
-func (p *pulsar) ConnectCommand(connectInfo *AuthInfo) []string {
+func (r *pulsar) ConnectCommand(connectInfo *AuthInfo) []string {
 	return []string{"sh", "-c", "bin/pulsar-shell"}
 }
 
-func (p *pulsar) Container() string {
-	return p.info.Container
+func (r *pulsar) Container() string {
+	return r.info.Container
 }
 
-func (p *pulsar) ConnectExample(info *ConnectionInfo, client string) string {
-	return buildExample(info, client, p.examples)
+func (r *pulsar) ConnectExample(info *ConnectionInfo, client string) string {
+	return buildExample(info, client, r.examples)
+}
+
+func (r *pulsar) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
 }

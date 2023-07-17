@@ -40,5 +40,4 @@ FROM docker.io/alpine:3.18 as dist
 
 # copy probe and config
 COPY --from=builder /out/probe  /bin/probe
-COPY config/probe/components/binding_mysql.yaml /config/component/binding_mysql.yaml
-#COPY --from=builder /out/grpc_client /bin/grpc_client
+COPY config/probe/components config/probe

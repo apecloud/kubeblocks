@@ -26,9 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dapr/components-contrib/bindings"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
@@ -88,8 +86,8 @@ func NewRedis() (*Redis, error) {
 }
 
 // Init performs metadata parsing and connection creation.
-func (r *Redis) Init() (err error) {
-	r.BaseOperations.Init()
+func (r *Redis) Init(metadata Properties) (err error) {
+	r.BaseOperations.Init(metadata)
 
 	if viper.IsSet("KB_SERVICE_USER") {
 		redisUser = viper.GetString("KB_SERVICE_USER")
@@ -99,7 +97,6 @@ func (r *Redis) Init() (err error) {
 		redisPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
-	r.Metadata = component.GetProperties("redis")
 	r.Logger.Info("Initializing Redis binding")
 	r.DBType = "redis"
 	r.InitIfNeed = r.initIfNeed
@@ -630,7 +627,7 @@ func (r *Redis) UnlockInstance(ctx context.Context) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func defaultRedisEntryParser(req *bindings.InvokeRequest, object *RedisEntry) error {
+func defaultRedisEntryParser(req *ProbeRequest, object *RedisEntry) error {
 	if req == nil || req.Metadata == nil {
 		return fmt.Errorf("no metadata provided")
 	}

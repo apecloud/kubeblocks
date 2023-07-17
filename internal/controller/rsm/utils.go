@@ -555,15 +555,15 @@ func getSvcSelector(leader *workloads.ReplicaRole) (string, string) {
 }
 
 func setOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
-	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		return copyOwnership(owner, obj, scheme, finalizer)
-	}
+	// if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+	//	return CopyOwnership(owner, obj, scheme, finalizer)
+	// }
 	return intctrlutil.SetOwnership(owner, obj, scheme, finalizer)
 }
 
-// copyOwnership copies owner ref fields of 'owner' to 'obj'
+// CopyOwnership copies owner ref fields of 'owner' to 'obj'
 // and calls controllerutil.AddFinalizer if not exists.
-func copyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
 	// Returns true if a and b point to the same object.
 	referSameObject := func(a, b metav1.OwnerReference) bool {
 		aGV, err := schema.ParseGroupVersion(a.APIVersion)

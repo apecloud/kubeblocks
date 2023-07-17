@@ -274,8 +274,8 @@ func genReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatu
 func setConsensusSetStatusRoles(newConsensusSetStatus *appsv1alpha1.ConsensusSetStatus, rsmObj *workloads.ReplicatedStateMachine) {
 	for _, memberStatus := range rsmObj.Status.MembersStatus {
 		status := appsv1alpha1.ConsensusMemberStatus{
-			Name: memberStatus.Name,
-			Pod: memberStatus.PodName,
+			Name:       memberStatus.Name,
+			Pod:        memberStatus.PodName,
 			AccessMode: appsv1alpha1.AccessMode(memberStatus.AccessMode),
 		}
 		switch {

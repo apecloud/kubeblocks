@@ -115,8 +115,8 @@ func (m *MockServer) Start() {
 
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		oidcConfig := OIDCWellKnownEndpoints{
-			AuthorizationEndpoint: "http://localhost:" + m.Port + "/authorize",
-			TokenEndpoint:         "http://localhost:" + m.Port + "/oauth/token",
+			AuthorizationEndpoint: "http://127.0.0.1:" + m.Port + "/authorize",
+			TokenEndpoint:         "http://127.0.0.1:" + m.Port + "/oauth/token",
 		}
 
 		jsonData, err := json.Marshal(oidcConfig)
@@ -188,7 +188,7 @@ var _ = Describe("PKCE_Authenticator", func() {
 	Context("test Authorization", func() {
 		It("test get token", func() {
 			authorizationResponse := &AuthorizationResponse{
-				CallbackURL: "http://localhost:5000?code=test_code&state=test_state",
+				CallbackURL: "http://127.0.0.1:5000?code=test_code&state=test_state",
 				Code:        "test_code",
 			}
 			ExpectWithOffset(1, func() error {
@@ -206,7 +206,7 @@ var _ = Describe("PKCE_Authenticator", func() {
 
 		It("test get RefreshToken", func() {
 			authorizationResponse := &AuthorizationResponse{
-				CallbackURL: "http://localhost:5000?code=test_code&state=test_state",
+				CallbackURL: "http://127.0.0.1:5000?code=test_code&state=test_state",
 				Code:        "test_code",
 			}
 			ExpectWithOffset(1, func() error {

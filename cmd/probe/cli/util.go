@@ -26,5 +26,5 @@ import (
 )
 
 func Printf(format string, args ...any) {
-	fmt.Fprintf(os.Stdout, "["+time.Now().String()+"] "+format, args...)
+	fmt.Fprintf(os.Stdout, "["+time.Now().Format("2006-01-02T15:04:05 -07:00:00")+"] "+format, args...)
 }

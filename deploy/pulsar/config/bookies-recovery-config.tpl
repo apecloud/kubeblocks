@@ -13,6 +13,9 @@ httpServerEnabled: "true"
 httpServerPort: "8000"
 prometheusStatsHttpPort: "8000"
 useHostNameAsBookieID: "true"
+# how long to wait, in seconds, before starting autorecovery of a lost bookie.
+# TODO: set to 0 after opsRequest for rollingUpdate supports hooks
+lostBookieRecoveryDelay: "300"
 PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+DoEscapeAnalysis -XX:ParallelGCThreads=4 -XX:ConcGCThreads=4 -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB -XX:+ExitOnOutOfMemoryError -XX:+PerfDisableSharedMem -Xlog:gc* -Xlog:gc::utctime -Xlog:safepoint -Xlog:gc+heap=trace -verbosegc
 {{- $MaxDirectMemorySize := "" }}
 {{- $phy_memory := getContainerMemory ( index $.podSpec.containers 0 ) }}

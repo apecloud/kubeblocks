@@ -1,9 +1,15 @@
 PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+DoEscapeAnalysis -XX:ParallelGCThreads=4 -XX:ConcGCThreads=4 -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB -XX:+ExitOnOutOfMemoryError -XX:+PerfDisableSharedMem -XshowSettings:vm -Ddepth=64
 PULSAR_PREFIX_journalDirectories: /pulsar/data/bookkeeper/journal
-dbStorage_readAheadCacheMaxSizeMb: "32"
-dbStorage_rocksDB_blockCacheSize: "8388608"
-dbStorage_rocksDB_writeBufferSizeMB: "8"
-dbStorage_writeCacheMaxSizeMb: "32"
+PULSAR_PREFIX_autoRecoveryDaemonEnabled: "true"
+PULSAR_PREFIX_compactionRateByBytes: "52428800"
+PULSAR_PREFIX_useTransactionalCompaction: "true"
+#dbStorage_readAheadCacheMaxSizeMb: "32"
+#dbStorage_rocksDB_blockCacheSize: "8388608"
+#dbStorage_rocksDB_writeBufferSizeMB: "8"
+#dbStorage_writeCacheMaxSizeMb: "32"
+# how long to wait, in seconds, before starting autorecovery of a lost bookie.
+# TODO: set to 0 after opsRequest for rollingUpdate supports hooks
+lostBookieRecoveryDelay: "300"
 httpServerEnabled: "true"
 httpServerPort: "8000"
 journalDirectories: /pulsar/data/bookkeeper/journal

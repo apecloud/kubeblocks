@@ -52,6 +52,7 @@ spec:
           memory: {{ .requests.memory | quote }}
       {{- end }}
       {{- end }}
+    {{- if .Values.bookiesRecovery.enable }}
     - name: bookies-recovery
       componentDefRef: bookies-recovery
       monitor: {{ .Values.monitor.enabled | default false }}
@@ -69,6 +70,7 @@ spec:
           memory: {{ .requests.memory | quote }}
       {{- end }}
       {{- end }}
+    {{- end }}
     - name: bookies
       componentDefRef: bookies
       monitor: {{ .Values.monitor.enabled | default false }}

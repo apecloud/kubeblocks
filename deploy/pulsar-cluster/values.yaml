@@ -64,7 +64,9 @@ bookies:
 ## Bookies-recovery configuration
 bookiesRecovery:
   ## @param bookies.replicaCount Number of Bookies replicas
-  replicaCount: 1
+  ## at least 3 nodes if autoRecoveryDaemonEnabled is false in bookies.conf
+  enable: false
+  replicaCount: 3
 
   resources:
     # We usually recommend not to specify default resources and to leave this as a conscious

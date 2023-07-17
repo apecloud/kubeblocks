@@ -532,6 +532,17 @@ spec:
                 description: 'mode specifies the mode of this cluster, the value of
                   this can be one of the following: Standalone, Replication, RaftGroup.'
                 type: string
+              monitor:
+                description: monitor specifies the configuration of monitor
+                properties:
+                  monitoringInterval:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: monitoringInterval specifies interval of monitoring,
+                      no monitor if set to 0
+                    x-kubernetes-int-or-string: true
+                type: object
               parameters:
                 additionalProperties:
                   type: string

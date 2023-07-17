@@ -102,6 +102,10 @@ type ClusterSpec struct {
 	// customized parameters that is used in different clusterdefinition
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
+
+	// monitor specifies the configuration of monitor
+	// +optional
+	Monitor ClusterMonitor `json:"monitor,omitempty"`
 }
 
 type ClusterResources struct {
@@ -532,6 +536,14 @@ type ClassDefRef struct {
 	// Class refers to the name of the class that is defined in the ComponentClassDefinition.
 	// +kubebuilder:validation:Required
 	Class string `json:"class"`
+}
+
+type ClusterMonitor struct {
+
+	// monitoringInterval specifies interval of monitoring, no monitor if set to 0
+	// +kubebuilder:validation:XIntOrString
+	// +optional
+	MonitoringInterval *intstr.IntOrString `json:"monitoringInterval,omitempty"`
 }
 
 // +genclient

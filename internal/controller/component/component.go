@@ -113,6 +113,14 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 				},
 			}
 		}
+		if cluster.Spec.Monitor.MonitoringInterval != nil {
+			if len(cluster.Spec.Monitor.MonitoringInterval.StrVal) == 0 && cluster.Spec.Monitor.MonitoringInterval.IntVal == 0 {
+				clusterCompSpec.Monitor = false
+			} else {
+				clusterCompSpec.Monitor = true
+				// TODO: should also set interval
+			}
+		}
 	}
 
 	affinityTopoKey := func(policyType appsv1alpha1.AvailabilityPolicyType) string {

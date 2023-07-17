@@ -199,6 +199,10 @@ func (o *createSubCmdsOptions) run() error {
 			}
 		}
 
+		if len(objs) > 1 {
+			fmt.Fprintf(o.Out, "---\n")
+		}
+
 		p, err := o.ToPrinter(nil, false)
 		if err != nil {
 			return err

@@ -216,6 +216,32 @@ spec:
 			Expect(component.ComponentDef).Should(Equal("proxy"))
 		})
 
+		It("build affinity correctly", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			By("fill affinity")
+			cluster.Spec.AvailabilityPolicy = appsv1alpha1.AvailabilityPolicyZone
+			cluster.Spec.Tenancy = appsv1alpha1.DedicatedNode
+			By("clear cluster's component spec")
+			cluster.Spec.ComponentSpecs = nil
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.PodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal("topology.kubernetes.io/zone"))
+			Expect(component.PodSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal("kubernetes.io/hostname"))
+		})
+
 		It("Test replace secretRef env placeholder token", func() {
 			By("mock connect credential and do replace placeholder token")
 			credentialMap := GetEnvReplacementMapForConnCredential(cluster.Name)

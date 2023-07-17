@@ -64,6 +64,16 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// tenancy describes how pods are distributed across node.
+	// SharedNode means multiple pods may share the same node.
+	// DedicatedNode means each pod runs on their own dedicated node.
+	// +optional
+	Tenancy TenancyType `json:"tenancy,omitempty"`
+
+	// availabilityPolicy describes the availability policy, including zone, node, and none.
+	// +optional
+	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
+
 	// affinity is a group of affinity scheduling rules.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`

@@ -73,6 +73,10 @@ func main() {
 	}
 
 	http.HandleFunc("/", probe.SetMiddleware(probe.GetRouter()))
+	go func() {
+		addr := fmt.Sprintf("localhost:%d", port)
+		http.ListenAndServe(addr, nil)
+	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
 	// ha := highavailability.NewHa(logHa)

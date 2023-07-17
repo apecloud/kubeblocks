@@ -12,12 +12,32 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-scale-config-template
+  name: vtgate-config-template
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
-  wesql-scale.cnf: |-
-    {{- .Files.Get "config/mysql-scale-config.tpl" | nindent 4 }}
+  vtgate.cnf: |-
+    {{- .Files.Get "config/mysql-scale-vtgate-config.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vtconsensus-config-template
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  vtconsensus.cnf: |-
+    {{- .Files.Get "config/mysql-scale-vtconsensus-config.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vttablet-config-template
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  vttablet.cnf: |-
+    {{- .Files.Get "config/mysql-scale-vttablet-config.tpl" | nindent 4 }}
 ---
 apiVersion: v1
 kind: ConfigMap

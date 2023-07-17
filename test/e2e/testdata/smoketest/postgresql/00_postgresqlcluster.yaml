@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kb-pg-cluster
-  namespace: default
+  namespace: pulsar-kb
   labels:
     helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
@@ -79,14 +79,14 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: kb-pg-cluster
-    namespace: default
+    namespace: pulsar-kb
 ---
 # Source: postgresql-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: pg-cluster
-  namespace: default
+  namespace: pulsar-kb
   labels: 
     helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"

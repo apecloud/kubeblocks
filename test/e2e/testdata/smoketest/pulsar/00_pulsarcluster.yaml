@@ -1,94 +1,75 @@
-# Source: apecloud-mysql-cluster/templates/cluster.yaml
+---
+# Source: pulsar-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: pulsar-test
+  name: pulsar-cluster
+  namespace: pulsar-kb
+  labels: 
+    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    app.kubernetes.io/version: "2.11.1"
+    app.kubernetes.io/instance: pulsar-cluster
 spec:
-    clusterDefinitionRef: pulsar
-    clusterVersionRef: pulsar-2.11.0
-    componentSpecs:
-    - componentDefRef: pulsar-proxy
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-2.11.1
+  terminationPolicy: WipeOut
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: broker
+      componentDefRef: pulsar-broker
       monitor: false
-      name: proxy
-      noCreatePDB: false
       replicas: 1
       resources:
         limits:
-          cpu: 200m
-          memory: 512Mi
+          cpu: 
+          memory: "512Mi"
         requests:
-          cpu: 200m
-          memory: 512Mi
-    - componentDefRef: pulsar-broker
+          cpu: "200m"
+          memory: "512Mi"
+    - name: bookies
+      componentDefRef: bookies
       monitor: false
-      name: broker
-      noCreatePDB: false
-      replicas: 1
-      resources:
-        limits:
-          cpu: 200m
-          memory: 512Mi
-        requests:
-          cpu: 200m
-          memory: 512Mi
-    - componentDefRef: bookies-recovery
-      monitor: false
-      name: bookies-recovery
-      noCreatePDB: false
-      replicas: 1
-      resources:
-        limits:
-          cpu: 200m
-          memory: 512Mi
-        requests:
-          cpu: 200m
-          memory: 512Mi
-    - componentDefRef: bookies
-      monitor: false
-      name: bookies
-      noCreatePDB: false
       replicas: 3
       resources:
         limits:
-          cpu: 200m
-          memory: 512Mi
+          cpu: 
+          memory: "512Mi"
         requests:
-          cpu: 200m
-          memory: 512Mi
-      serviceAccountName: kb-pulsar-pulsar-cluster
+          cpu: "200m"
+          memory: "512Mi"
       volumeClaimTemplates:
-      - name: ledgers
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
-      - name: journal
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
-    - componentDefRef: zookeeper
+        - name: ledgers
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi
+        - name: journal
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi
+    - name: zookeeper
+      componentDefRef: zookeeper
       monitor: false
-      name: zookeeper
-      noCreatePDB: false
-      replicas: 1
+      replicas: 3
       resources:
         limits:
-          cpu: 200m
-          memory: 512Mi
+          cpu: 
+          memory: "512Mi"
         requests:
-          cpu: 100m
-          memory: 512Mi
+          cpu: "100m"
+          memory: "512Mi"
       volumeClaimTemplates:
-      - name: data
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
-    terminationPolicy: WipeOut
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi

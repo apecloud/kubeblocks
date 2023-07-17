@@ -152,8 +152,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 1 and 100:
     12:18
 mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
     9:44
-    12:18
-`))
+    12:18`))
 
 			By("normal update.")
 			{

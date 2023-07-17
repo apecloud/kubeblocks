@@ -24,6 +24,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -84,10 +86,12 @@ var _ = Describe("component module", func() {
 			}
 			component, err := BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -97,10 +101,12 @@ var _ = Describe("component module", func() {
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
 			component, err = BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -108,24 +114,106 @@ var _ = Describe("component module", func() {
 			By("new container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 
 			By("new init container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
+		})
+
+		It("should auto fill first component if it's empty", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			clusterTplStr := `
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name:
+spec:
+  componentSpecs:
+    - name: mysql # user-defined
+      componentDefRef: mysql # ref clusterdefinition componentDefs.name
+      monitor: false
+      replicas: 1
+      serviceAccountName: kb-release-name-apecloud-mysql-cluster
+      enabledLogs:     ["slow","error"]
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+    - name: etcd
+      componentDefRef: etcd # ref clusterdefinition componentDefs.name
+      replicas: 1
+    - name: vtctld
+      componentDefRef: vtctld # ref clusterdefinition componentDefs.name
+      replicas: 1
+    - name: vtconsensus
+      componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
+      replicas: 1
+    - name: vtgate
+      componentDefRef: proxy # ref clusterdefinition componentDefs.name
+      replicas: 1
+`
+			clusterTpl := appsv1alpha1.ClusterTemplate{}
+			Expect(yaml.Unmarshal([]byte(clusterTplStr), &clusterTpl)).Should(Succeed())
+			By("fill simplified fields")
+			r := int32(3)
+			cluster.Spec.Replicas = &r
+			cluster.Spec.Resources.CPU = resource.MustParse("1000m")
+			cluster.Spec.Resources.Memory = resource.MustParse("2Gi")
+			cluster.Spec.Storage.Size = resource.MustParse("20Gi")
+			By("clear cluster's component spec")
+			cluster.Spec.ComponentSpecs = nil
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				&clusterTpl,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.Replicas).Should(Equal(*cluster.Spec.Replicas))
+			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
+			component, err = buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				&clusterTpl,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[1],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component.Name).Should(Equal("vtgate"))
+			Expect(component.ComponentDef).Should(Equal("proxy"))
 		})
 
 		It("Test replace secretRef env placeholder token", func() {

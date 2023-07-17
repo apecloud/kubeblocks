@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -50,8 +50,8 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handling the horizontal scaling request.
-func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewHorizontalScalingCondition(opsRequest)
+func (hs horizontalScalingOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewHorizontalScalingCondition(opsRes.OpsRequest), nil
 }
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
@@ -143,7 +143,7 @@ func (hs horizontalScalingOpsHandler) getExpectReplicas(opsRequest *appsv1alpha1
 func getCompPodNamesBeforeScaleDownReplicas(reqCtx intctrlutil.RequestCtx,
 	cli client.Client, cluster appsv1alpha1.Cluster, compName string) ([]string, error) {
 	podNames := make([]string, 0)
-	podList, err := util.GetComponentPodList(reqCtx.Ctx, cli, cluster, compName)
+	podList, err := components.GetComponentPodList(reqCtx.Ctx, cli, cluster, compName)
 	if err != nil {
 		return podNames, err
 	}

@@ -3,10 +3,10 @@ kind: OpsRequest
 metadata:
   name: ops-vexpand
 spec:
-  clusterRef: mycluster
+  clusterRef: mongodb-cluster
   type: VolumeExpansion
   volumeExpansion:
     - componentName: mongodb
       volumeClaimTemplates:
         - name: data
-          storage: "2Gi"
+          storage: "20Gi"

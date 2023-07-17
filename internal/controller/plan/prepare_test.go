@@ -28,9 +28,11 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -56,6 +58,9 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) ([]client.Object, error) {
 	resources := make([]client.Object, 0)
+	if cluster.UID == "" {
+		cluster.UID = types.UID("test-uid")
+	}
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
 		envConfig, err := builder.BuildEnvConfig(cluster, component)
 		if err != nil {
@@ -117,46 +122,8 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		configs, err := RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			resources = append(resources, configs...)
-		}
-		// end render config
-
-		//// tls certs secret volume and volumeMount
-		// if err := updateTLSVolumeAndVolumeMount(podSpec, cluster.Name, *component); err != nil {
-		//	return err
-		// }
-		return nil
+		return RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
 	}
-
-	// pre-condition check
-	// if component.WorkloadType == appsv1alpha1.Replication {
-	//	// get the number of existing pods under the current component
-	//	var existPodList = &corev1.PodList{}
-	//	if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *cluster, existPodList, component.Name); err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
-	//	// TODO: (xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-	//	if len(existPodList.Items) > 0 {
-	//		primaryIndexChanged, _, err := replication.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, cluster,
-	//			component.Name, component.GetPrimaryIndex())
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		if primaryIndexChanged {
-	//			if err := replication.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, cluster,
-	//				componentutil.GetClusterComponentSpecByName(*cluster, component.Name)); err != nil {
-	//				return nil, err
-	//			}
-	//		}
-	//	}
-	// }
 
 	// TODO: may add a PDB transform to Create/Update/Delete.
 	// if no these handle, the cluster controller will occur an error during reconciling.
@@ -193,7 +160,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, cluster, component)
+				return builder.BuildDeploy(reqCtx, cluster, component, "")
 			}); err != nil {
 			return nil, err
 		}
@@ -253,7 +220,12 @@ var _ = Describe("Cluster Controller", func() {
 		clusterDef     *appsv1alpha1.ClusterDefinition
 		clusterVersion *appsv1alpha1.ClusterVersion
 		cluster        *appsv1alpha1.Cluster
+		configSpecName string
 	)
+
+	isStatefulSet := func(v string) bool {
+		return v == "StatefulSet"
+	}
 
 	Context("with Deployment workload", func() {
 		BeforeEach(func() {
@@ -277,10 +249,12 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -325,10 +299,12 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0],
 			)
 			Expect(err).Should(Succeed())
@@ -346,7 +322,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
-				if v == "StatefulSet" {
+				if isStatefulSet(v) {
 					container := clusterDef.Spec.ComponentDefs[0].PodSpec.Containers[0]
 					sts := resources[i].(*appsv1.StatefulSet)
 					Expect(len(sts.Spec.Template.Spec.Volumes)).Should(Equal(len(container.VolumeMounts)))
@@ -363,9 +339,10 @@ var _ = Describe("Cluster Controller", func() {
 			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
+			configSpecName = cm.Name
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
+				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config", testapps.DefaultMySQLContainerName, "not-exist").
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponentVersion(mysqlCompDefName).
@@ -386,10 +363,12 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -401,12 +380,15 @@ var _ = Describe("Cluster Controller", func() {
 				"Service",
 				"ConfigMap",
 				"Service",
-				"ConfigMap",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
+				if isStatefulSet(v) {
+					sts := resources[i].(*appsv1.StatefulSet)
+					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName))).Should(BeTrue())
+				}
 			}
 		})
 	})
@@ -443,10 +425,12 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -458,16 +442,15 @@ var _ = Describe("Cluster Controller", func() {
 				"Service",
 				"ConfigMap",
 				"Service",
-				"ConfigMap",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
-				if v == "StatefulSet" {
+				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
 					podSpec := sts.Spec.Template.Spec
-					Expect(len(podSpec.Containers)).Should(Equal(2))
+					Expect(len(podSpec.Containers)).Should(Equal(3))
 				}
 			}
 			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec
@@ -509,10 +492,12 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
@@ -554,7 +539,6 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(redisCompName, redisCompDefName).
 				SetReplicas(2).
-				SetPrimaryIndex(0).
 				GetObject()
 		})
 
@@ -565,10 +549,12 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			component, err := component.BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -612,7 +598,6 @@ var _ = Describe("Cluster Controller", func() {
 	// 			clusterDef.Name, clusterVersion.Name).
 	// 			AddComponentVersion(redisCompName, redisCompDefName).
 	// 			SetReplicas(2).
-	// 			SetPrimaryIndex(0).
 	// 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 	// 			GetObject()
 	// 	})

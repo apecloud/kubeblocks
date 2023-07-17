@@ -12,6 +12,7 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_mysql)"
+  clusterFamilyRef: apecloud-mysql-cluster-family
   componentDefs:
     - name: mysql
       characterType: mysql
@@ -24,7 +25,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9104
+          scrapePort: {{ .Values.metrics.service.port }}
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -35,6 +36,16 @@ spec:
           templateRef: mysql8.0-config-template
           constraintRef: mysql8.0-config-constraints
           volumeName: mysql-config
+          namespace: {{ .Release.Namespace }}
+        - name: agamotto-configuration
+          templateRef: apecloud-mysql8-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
+          defaultMode: 0777
+        - name: vttablet-config
+          templateRef: vttablet-config-template
+          constraintRef: mysql-scale-vttablet-config-constraints
+          volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: apecloud-mysql-scripts
@@ -59,8 +70,29 @@ spec:
             port: 3306
             targetPort: mysql
       horizontalScalePolicy:
-        type: Snapshot
+        type: CloneVolume
         backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale
+      switchoverSpec:
+        withCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - mysql
+            args:
+              - -h$(KB_CONSENSUS_LEADER_POD_FQDN)
+              - -u$(MYSQL_ROOT_USER)
+              - -p$(MYSQL_ROOT_PASSWORD)
+              - -e
+              - "call dbms_consensus.change_leader('$(KB_SWITCHOVER_CANDIDATE_FQDN):13306');"
+          scriptSpecSelectors:
+            - name: apecloud-mysql-scripts
+        withoutCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /scripts/switchover-without-candidate.sh
+          scriptSpecSelectors:
+            - name: apecloud-mysql-scripts
       volumeTypes:
         - name: data
           type: data
@@ -153,9 +185,13 @@ spec:
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
+              runAsNonRoot: false
+              runAsUser: 0
             env:
+              - name: DB_TYPE
+                value: MySQL
+              - name: ENDPOINT
+                value: {{ printf "localhost:3306" }}
               - name: MYSQL_USER
                 valueFrom:
                   secretKeyRef:
@@ -168,33 +204,70 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-              - name: DATA_SOURCE_NAME
-                value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
-            command:
-              - "/bin/mysqld_exporter"
-              - "--collect.info_schema.wesql_consensus"
+            command: ["/scripts/agamotto.sh"]
             ports:
               - name: http-metrics
-                containerPort: 9104
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
+              - name: data
+                mountPath: /data/mysql
+              - name: log-data
+                mountPath: /var/log/kubeblocks
+                readOnly: false
+              - name: scripts
+                mountPath: /scripts
+          - name: vttablet
+            image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
+            ports:
+              - containerPort: 15100
+                name: vttabletport
+              - containerPort: 16100
+                name: vttabletgrpc
+              - containerPort: 40000
+                name: delvedebug
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+              - name: VTTABLET_PORT
+                value: "15100"
+              - name: VTTABLET_GRPC_PORT
+                value: "16100"
+              - name: VTCTLD_HOST
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: VTCTLD_WEB_PORT
+                value: "15000"
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+            command: ["/scripts/vttablet.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: mysql-scale-config
+                mountPath: /conf
         volumes:
+          - name: log-data
+            hostPath:
+              path: /var/log/kubeblocks
+              type: DirectoryOrCreate
           - name: annotations
             downwardAPI:
               items:
@@ -264,3 +337,225 @@ spec:
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+    - name: vtcontroller
+      characterType: vtcontroller
+      workloadType: Stateful
+      volumeTypes:
+        - name: data
+          type: data
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      configSpecs:
+        - name: vtconsensus-config
+          templateRef: vtconsensus-config-template
+          constraintRef: mysql-scale-vtconsensus-config-constraints
+          volumeName: mysql-scale-config
+          namespace: {{ .Release.Namespace }}
+      logConfigs:
+        {{- range $name,$pattern := .Values.etcdLogConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      service:
+        ports:
+          - name: etcd-port
+            port: 2379
+            targetPort: etcd-client
+          - name: vtctld-webport
+            port: 15000
+            targetPort: vtctld-webport
+          - name: vtctld-grpcport
+            port: 15999
+            targetPort: vtctld-grpcport
+      podSpec:
+        containers:
+          - name: etcd
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
+            ports:
+              - containerPort: 2379
+                name: etcd-client
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: ETCDCTL_API
+                value: "2"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command: ["/scripts/etcd.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: data
+                mountPath: /vtdataroot/etcd
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/scripts/etcd-post-start.sh"]
+          - name: vtctld
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
+            ports:
+              - containerPort: 15000
+                name: vtctld-webport
+              - containerPort: 15999
+                name: vtctld-grpcport
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: VTCTLD_SERVER
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: VTCTLD_WEB_PORT
+                value: "15000"
+              - name: VTCTLD_GRPC_PORT
+                value: "15999"
+              - name: ETCD_SERVER
+                value: "localhost"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command: ["/scripts/vtctld.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+          - name: vtconsensus
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
+            ports:
+              - containerPort: 16000
+                name: port
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: VTCONSENSUS_PORT
+                value: "16000"
+              - name: ETCD_SERVER
+                value: "localhost"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command: ["/scripts/vtconsensus.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: mysql-scale-config
+                mountPath: /conf
+    - name: vtgate
+      characterType: mysql
+      workloadType: Stateless
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      logConfigs:
+        {{- range $name,$pattern := .Values.vtgateLogConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configSpecs:
+        - name: vtgate-config
+          templateRef: vtgate-config-template
+          constraintRef: mysql-scale-vtgate-config-constraints
+          volumeName: mysql-scale-config
+          namespace: {{ .Release.Namespace }}
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 15001
+      service:
+        ports:
+          - name: webport
+            port: 15001
+            targetPort: webport
+          - name: grpcport
+            port: 15991
+            targetPort: grpcport
+          - name: serverport
+            port: 15306
+            targetPort: serverport
+          - name: delvedebug
+            port: 40000
+            targetPort: delvedebug
+      podSpec:
+        initContainers:
+          - name: wait-vtctld-ready
+            imagePullPolicy: IfNotPresent
+            image: busybox:1.35
+            env:
+              - name: VTCTLD_HOST
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: VTCTLD_GRPC_PORT
+                value: "15999"
+            command: ["/scripts/wait-for-service.sh", "vtctld", "$(VTCTLD_HOST)", "$(VTCTLD_GRPC_PORT)"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+        containers:
+          - name: vtgate
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 15001
+                name: webport
+              - containerPort: 15991
+                name: grpcport
+              - containerPort: 15306
+                name: serverport
+              - containerPort: 40000
+                name: delvedebug
+            env:
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: VTGATE_MYSQL_PORT
+                value: "15306"
+              - name: VTGATE_WEB_PORT
+                value: "15001"
+              - name: VTGATE_GRPC_PORT
+                value: "15991"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+              - name: MYSQL_UNIX_PORT
+                value: "/tmp/mysql.sock"
+            command: ["/scripts/vtgate.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: mysql-scale-config
+                mountPath: /conf

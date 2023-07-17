@@ -108,6 +108,7 @@ var _ = Describe("PITR Functions", func() {
 			synthesizedComponent *component.SynthesizedComponent
 			pvc                  *corev1.PersistentVolumeClaim
 			backup               *dpv1alpha1.Backup
+			backupTool           *dpv1alpha1.BackupTool
 		)
 
 		BeforeEach(func() {
@@ -144,6 +145,7 @@ var _ = Describe("PITR Functions", func() {
 				AddAppComponentLabel(mysqlCompName).
 				AddAppManangedByLabel().
 				AddVolume(volume).
+				AddLabels(constant.ConsensusSetAccessModeLabelKey, string(appsv1alpha1.ReadWrite)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				AddNodeName("fake-node-name").
 				Create(&testCtx).GetObject()
@@ -154,7 +156,7 @@ var _ = Describe("PITR Functions", func() {
 				constant.BackupToolTypeLabelKey: "pitr",
 				constant.ClusterDefLabelKey:     clusterDefName,
 			})
-			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
+			backupTool = testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
 				backupSelfDefineObj, testapps.RandomizedObjName())
 			backupToolName = backupTool.Name
 
@@ -194,9 +196,10 @@ var _ = Describe("PITR Functions", func() {
 
 			By("By creating base backup: ")
 			backupLabels := map[string]string{
-				constant.AppInstanceLabelKey:    sourceCluster,
-				constant.KBAppComponentLabelKey: mysqlCompName,
-				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeDataFile),
+				constant.AppInstanceLabelKey:              sourceCluster,
+				constant.KBAppComponentLabelKey:           mysqlCompName,
+				constant.BackupTypeLabelKeyKey:            string(dpv1alpha1.BackupTypeDataFile),
+				constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
 			}
 			backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
@@ -210,6 +213,7 @@ var _ = Describe("PITR Functions", func() {
 				StartTimestamp:            baseStartTime,
 				CompletionTimestamp:       baseStopTime,
 				BackupToolName:            backupToolName,
+				SourceCluster:             clusterName,
 				PersistentVolumeClaimName: remotePVC.Name,
 				Manifests: &dpv1alpha1.ManifestsStatus{
 					BackupLog: &dpv1alpha1.BackupLogStatus{
@@ -221,15 +225,16 @@ var _ = Describe("PITR Functions", func() {
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backup))
 
 			By("By creating incremental backup: ")
-			incrBackupLabels := map[string]string{
-				constant.AppInstanceLabelKey:    sourceCluster,
-				constant.KBAppComponentLabelKey: mysqlCompName,
-				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeLogFile),
+			logfileBackupLabels := map[string]string{
+				constant.AppInstanceLabelKey:              sourceCluster,
+				constant.KBAppComponentLabelKey:           mysqlCompName,
+				constant.BackupTypeLabelKeyKey:            string(dpv1alpha1.BackupTypeLogFile),
+				constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
 			}
 			incrStartTime := &startTime
 			incrStopTime := &stopTime
-			backupIncr := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				WithRandomName().SetLabels(incrBackupLabels).
+			logfileBackup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				WithRandomName().SetLabels(logfileBackupLabels).
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeLogFile).
 				Create(&testCtx).GetObject()
@@ -237,6 +242,7 @@ var _ = Describe("PITR Functions", func() {
 				Phase:                     dpv1alpha1.BackupCompleted,
 				StartTimestamp:            incrStartTime,
 				CompletionTimestamp:       incrStopTime,
+				SourceCluster:             clusterName,
 				PersistentVolumeClaimName: remotePVC.Name,
 				BackupToolName:            backupToolName,
 				Manifests: &dpv1alpha1.ManifestsStatus{
@@ -246,7 +252,7 @@ var _ = Describe("PITR Functions", func() {
 					},
 				},
 			}
-			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupIncr))
+			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(logfileBackup))
 		})
 
 		It("Test restore", func() {
@@ -273,8 +279,19 @@ var _ = Describe("PITR Functions", func() {
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("when base backup restore job completed")
-			baseBackupJobName := fmt.Sprintf("base-%s-%s-0", clusterName, mysqlCompName)
+			baseBackupJobName := fmt.Sprintf("base-%s", fmt.Sprintf("%s-%s-%s-%d", "data", clusterName, synthesizedComponent.Name, 0))
 			baseBackupJobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: baseBackupJobName}
+			Eventually(testapps.CheckObj(&testCtx, baseBackupJobKey, func(g Gomega, fetched *batchv1.Job) {
+				envs := fetched.Spec.Template.Spec.Containers[0].Env
+				var existsTargetENV bool
+				for _, env := range envs {
+					if env.Name == constant.KBEnvPodName {
+						existsTargetENV = true
+						break
+					}
+				}
+				g.Expect(existsTargetENV).Should(BeTrue())
+			})).Should(Succeed())
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, baseBackupJobKey, func(fetched *batchv1.Job) {
 				fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}
 			})).Should(Succeed())
@@ -297,8 +314,15 @@ var _ = Describe("PITR Functions", func() {
 			err = DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
+			By("mock the podScope is ReadWrite for logic restore")
+			Expect(testapps.ChangeObj(&testCtx, backupTool, func(tool *dpv1alpha1.BackupTool) {
+				tool.Spec.Logical.PodScope = dpv1alpha1.PodRestoreScopeReadWrite
+			})).Should(Succeed())
+			err = DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+
 			By("when logic PITR jobs are completed")
-			logicJobName := fmt.Sprintf("restore-logic-data-%s-%s-0", clusterName, mysqlCompName)
+			logicJobName := fmt.Sprintf("restore-logic-%s-%s-0", clusterName, mysqlCompName)
 			logicJobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: logicJobName}
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, logicJobKey, func(fetched *batchv1.Job) {
 				fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}

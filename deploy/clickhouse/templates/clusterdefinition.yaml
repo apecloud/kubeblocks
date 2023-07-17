@@ -34,7 +34,7 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      componentConfigSpec:
+      configSpecs:
         - name: clickhouse-tpl
           templateRef: clickhouse-tpl
           volumeName: config
@@ -44,27 +44,21 @@ spec:
           - name: http
             targetPort: http
             port: 8123
-            nodePort: null
           - name: tcp
             targetPort: tcp
             port: 9000
-            nodePort: null
           - name: tcp-mysql
             targetPort: tcp-mysql
             port: 9004
-            nodePort: null
           - name: tcp-postgresql
             targetPort: tcp-postgresql
             port: 9005
-            nodePort: null
           - name: http-intersrv
             targetPort: http-intersrv
             port: 9009
-            nodePort: null
           - name: http-metrics
             targetPort: http-metrics
             port: 8001
-            nodePort: null
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -161,7 +155,7 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      componentConfigSpec:
+      configSpecs:
         - name: clickhouse-keeper-tpl
           templateRef: clickhouse-keeper-tpl
           volumeName: config
@@ -262,18 +256,16 @@ spec:
         - name: zookeeper-scripts-tpl
           templateRef: zookeeper-scripts-tpl
           namespace: {{ .Release.Namespace }}
-          volumeName: script
+          volumeName: scripts
           defaultMode: 0755
       service:
         ports:
           - name: tcp-client
             port: 2181
             targetPort: client
-            nodePort: null
           - name: metrics
             port: 9141
             targetPort: metrics
-            nodePort: null
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -327,7 +319,7 @@ spec:
                 value: "40000"
               # HACK: hack for single ZK node only
               - name: ZOO_SERVERS
-                value: "$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc:2888:3888::1"
+                value: "$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:2888:3888::1"
                 # value: myck-zookeeper-0.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::1 myck-zookeeper-1.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::2 myck-zookeeper-2.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::3 
               - name: ZOO_ENABLE_AUTH
                 value: "no"
@@ -347,6 +339,7 @@ spec:
                 value: "$(KB_POD_NAME)"
               - name: POD_NAMESPACE
                 value: "$(KB_NAMESPACE)"
+              # TODO: using componentDefRef to inject zookeeper or keeper env
             ports:
               - name: client
                 containerPort: 2181

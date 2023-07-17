@@ -53,6 +53,12 @@ spec:
               datafile:
                 description: the policy for datafile backup.
                 properties:
+                  backupRepoName:
+                    description: refer to BackupRepo and the backup data will be stored
+                      in the corresponding repo.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
                   backupStatusUpdates:
                     description: define how to update metadata for backup status.
                     items:
@@ -79,11 +85,20 @@ spec:
                           - pre
                           - post
                           type: string
+                        useTargetPodServiceAccount:
+                          description: useTargetPodServiceAccount defines whether
+                            this job requires the service account of the backup target
+                            pod. if true, will use the service account of the backup
+                            target pod. otherwise, will use the system service account.
+                          type: boolean
+                      required:
+                      - updateStage
                       type: object
                     type: array
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
+                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -122,23 +137,29 @@ spec:
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                       name:
-                        description: the name of the PersistentVolumeClaim.
+                        description: the name of PersistentVolumeClaim to store backup
+                          data.
+                        maxLength: 63
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
                           which contains a persistentVolume template. key must be
                           "persistentVolume" and value is the "PersistentVolume" struct.
                           support the following built-in Objects: - $(GENERATE_NAME):
-                          generate a specific format "pvcName-pvcNamespace". if the
-                          PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent",
-                          the controller will create it by this template. this is
-                          a mutually exclusive setting with "storageClassName".'
+                          generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
+                          if the PersistentVolumeClaim not exists and CreatePolicy
+                          is "IfNotPresent", the controller will create it by this
+                          template. this is a mutually exclusive setting with "storageClassName".'
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name
@@ -147,9 +168,9 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
-                    required:
-                    - name
                     type: object
                   target:
                     description: target database cluster for backup.
@@ -210,6 +231,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -229,12 +251,17 @@ spec:
                     - labelsSelector
                     type: object
                 required:
-                - persistentVolumeClaim
                 - target
                 type: object
               logfile:
                 description: the policy for logfile backup.
                 properties:
+                  backupRepoName:
+                    description: refer to BackupRepo and the backup data will be stored
+                      in the corresponding repo.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
                   backupStatusUpdates:
                     description: define how to update metadata for backup status.
                     items:
@@ -261,11 +288,20 @@ spec:
                           - pre
                           - post
                           type: string
+                        useTargetPodServiceAccount:
+                          description: useTargetPodServiceAccount defines whether
+                            this job requires the service account of the backup target
+                            pod. if true, will use the service account of the backup
+                            target pod. otherwise, will use the system service account.
+                          type: boolean
+                      required:
+                      - updateStage
                       type: object
                     type: array
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
+                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -304,23 +340,29 @@ spec:
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                       name:
-                        description: the name of the PersistentVolumeClaim.
+                        description: the name of PersistentVolumeClaim to store backup
+                          data.
+                        maxLength: 63
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
                           which contains a persistentVolume template. key must be
                           "persistentVolume" and value is the "PersistentVolume" struct.
                           support the following built-in Objects: - $(GENERATE_NAME):
-                          generate a specific format "pvcName-pvcNamespace". if the
-                          PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent",
-                          the controller will create it by this template. this is
-                          a mutually exclusive setting with "storageClassName".'
+                          generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
+                          if the PersistentVolumeClaim not exists and CreatePolicy
+                          is "IfNotPresent", the controller will create it by this
+                          template. this is a mutually exclusive setting with "storageClassName".'
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name
@@ -329,9 +371,9 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
-                    required:
-                    - name
                     type: object
                   target:
                     description: target database cluster for backup.
@@ -392,6 +434,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -411,7 +454,6 @@ spec:
                     - labelsSelector
                     type: object
                 required:
-                - persistentVolumeClaim
                 - target
                 type: object
               retention:
@@ -470,6 +512,14 @@ spec:
                     - cronExpression
                     - enable
                     type: object
+                  startWindowMinutes:
+                    description: startWindowMinutes defines the time window for starting
+                      the job if it misses scheduled time for any reason. the unit
+                      of time is minute.
+                    format: int64
+                    maximum: 1440
+                    minimum: 0
+                    type: integer
                 type: object
               snapshot:
                 description: the policy for snapshot backup.
@@ -500,6 +550,14 @@ spec:
                           - pre
                           - post
                           type: string
+                        useTargetPodServiceAccount:
+                          description: useTargetPodServiceAccount defines whether
+                            this job requires the service account of the backup target
+                            pod. if true, will use the service account of the backup
+                            target pod. otherwise, will use the system service account.
+                          type: boolean
+                      required:
+                      - updateStage
                       type: object
                     type: array
                   backupsHistoryLimit:
@@ -592,6 +650,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:

@@ -5,7 +5,7 @@ title: kbcli dashboard open
 Open one dashboard.
 
 ```
-kbcli dashboard open [flags]
+kbcli dashboard open NAME [DASHBOARD-TYPE] [--port PORT] [flags]
 ```
 
 ### Examples
@@ -16,6 +16,10 @@ kbcli dashboard open [flags]
   
   # Open a dashboard with a specific local port
   kbcli dashboard open kubeblocks-grafana --port 8080
+  
+  # for dashboard kubeblocks-grafana, support to direct the specified dashboard type
+  # now we support mysql,mongodb,postgresql,redis,weaviate,kafka,cadvisor,jmx and node
+  kbcli dashboard open kubeblocks-grafana mysql
 ```
 
 ### Options

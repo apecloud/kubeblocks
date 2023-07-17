@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -86,12 +84,10 @@ var _ = Describe("kubeblocks install", func() {
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version:         version.DefaultKubeBlocksVersion,
-			Monitor:         true,
 			CreateNamespace: true,
 		}
 		Expect(o.Install()).Should(HaveOccurred())
-		Expect(o.ValueOpts.Values).Should(HaveLen(1))
-		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
+		Expect(o.ValueOpts.Values).Should(HaveLen(0))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
 	})
@@ -115,5 +111,23 @@ var _ = Describe("kubeblocks install", func() {
 		By("kubernetes is not provided by cloud provider")
 		v.Kubernetes = "v1.25.0"
 		Expect(o.checkVersion(v)).Should(Succeed())
+	})
+
+	It("CompleteInstallOptions test", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.NewFakeConfig(namespace),
+				Client:    testing.FakeClientSet(),
+				Dynamic:   testing.FakeDynamicClient(),
+			},
+			Version:         version.DefaultKubeBlocksVersion,
+			CreateNamespace: true,
+		}
+		Expect(o.TolerationsRaw).Should(BeNil())
+		Expect(o.ValueOpts.JSONValues).Should(BeNil())
+		Expect(o.CompleteInstallOptions()).ShouldNot(HaveOccurred())
+		Expect(o.TolerationsRaw).Should(Equal([]string{defaultTolerationsForInstallation}))
+		Expect(o.ValueOpts.JSONValues).ShouldNot(BeNil())
 	})
 })

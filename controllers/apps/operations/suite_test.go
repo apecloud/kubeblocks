@@ -40,8 +40,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -67,6 +68,7 @@ const (
 
 func init() {
 	viper.AutomaticEnv()
+	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 }
 
 func TestAPIs(t *testing.T) {
@@ -172,7 +174,7 @@ func initOperationsResources(clusterDefinitionName,
 func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
 	testapps.MockConsensusComponentPods(&testCtx, nil, clusterName, consensusComp)
-	podList, err := util.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
+	podList, err := components.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.

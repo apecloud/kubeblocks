@@ -26,12 +26,12 @@ import (
 	"strings"
 	"time"
 
+	gv "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -104,6 +104,7 @@ type initOptions struct {
 	cloudProvider  string
 	region         string
 	autoApprove    bool
+	dockerVersion  *gv.Version
 
 	baseOptions
 }
@@ -119,6 +120,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Long:    initLong,
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete())
 			util.CheckErr(o.validate())
 			util.CheckErr(o.run())
 		},
@@ -140,6 +142,16 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
+func (o *initOptions) complete() error {
+	var err error
+
+	if o.cloudProvider != cp.Local {
+		return nil
+	}
+	o.dockerVersion, err = util.GetDockerVersion()
+	return err
+}
+
 func (o *initOptions) validate() error {
 	if !slices.Contains(supportedCloudProviders, o.cloudProvider) {
 		return fmt.Errorf("cloud provider %s is not supported, only support %v", o.cloudProvider, supportedCloudProviders)
@@ -151,6 +163,10 @@ func (o *initOptions) validate() error {
 
 	if o.clusterDef == "" {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
+	}
+
+	if o.cloudProvider == cp.Local && o.dockerVersion.LessThan(version.MinimumDockerVersion) {
+		return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker", o.dockerVersion, version.MinimumDockerVersion)
 	}
 
 	if err := o.baseOptions.validate(); err != nil {
@@ -212,7 +228,7 @@ func (o *initOptions) local() error {
 
 // bootstraps a playground in the remote cloud
 func (o *initOptions) cloud() error {
-	cpPath, err := cloudProviderRepoDir()
+	cpPath, err := cloudProviderRepoDir("")
 	if err != nil {
 		return err
 	}
@@ -374,14 +390,6 @@ func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
 func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	var err error
 
-	// when the kubernetes cluster is not ready, the runtime will output the error
-	// message like "couldn't get resource list for", we ignore it
-	runtime.ErrorHandlers[0] = func(err error) {
-		if klog.V(1).Enabled() {
-			klog.ErrorDepth(2, err)
-		}
-	}
-
 	// write kubeconfig content to a temporary file and use it
 	if err = writeAndUseKubeConfig(info.KubeConfig, o.kubeConfigPath, o.Out); err != nil {
 		return err
@@ -441,25 +449,23 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			Timeout:   o.Timeout,
 		},
 		Version: o.kbVersion,
-		Monitor: true,
 		Quiet:   true,
 		Check:   true,
 	}
+
+	// enable monitor components by default
+	insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
+		"prometheus.enabled=true",
+		"grafana.enabled=true",
+		"agamotto.enabled=true",
+	)
 
 	if o.cloudProvider == cp.Local {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
 			// use hostpath csi driver to support snapshot
 			"snapshot-controller.enabled=true",
 			"csi-hostpath-driver.enabled=true",
-
-			// disable the persistent volume of prometheus, if not, the prometheus
-			// will depend on the hostpath csi driver to create persistent
-			// volume, but the order of addon installation is not guaranteed which
-			// will cause the prometheus PVC pending forever.
-			"prometheus.server.persistentVolume.enabled=false",
-			"prometheus.server.statefulSet.enabled=false",
-			"prometheus.alertmanager.persistentVolume.enabled=false",
-			"prometheus.alertmanager.statefulSet.enabled=false")
+		)
 	} else if o.cloudProvider == cp.AWS {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
 			// enable aws-load-balancer-controller addon automatically on playground
@@ -475,6 +481,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			fmt.Fprintf(o.Out, strings.Split(errMsg, ",")[0]+"\n")
 			return nil
 		}
+		return err
+	}
+	if err = insOpts.CompleteInstallOptions(); err != nil {
 		return err
 	}
 	return insOpts.Install()

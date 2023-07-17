@@ -82,7 +82,7 @@ func NewDescribeOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Short:             "Show details of a specific OpsRequest.",
 		Aliases:           []string{"desc-ops"},
 		Example:           describeOpsExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.OpsGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(args))
 			util.CheckErr(o.run())
@@ -272,8 +272,12 @@ func (o *describeOpsOptions) getVerticalScalingCommand(spec appsv1alpha1.OpsRequ
 	for i := range componentNameSlice {
 		commands[i] = fmt.Sprintf("kbcli cluster vscale %s --components=%s",
 			spec.ClusterRef, strings.Join(componentNameSlice[i], ","))
-		class := spec.VerticalScalingList[i].Class
-		if class != "" {
+		clsRef := spec.VerticalScalingList[i].ClassDefRef
+		if clsRef != nil {
+			class := clsRef.Class
+			if clsRef.Name != "" {
+				class = fmt.Sprintf("%s:%s", clsRef.Name, class)
+			}
 			commands[i] += fmt.Sprintf("--class=%s", class)
 		} else {
 			resource := resourceSlice[i].(corev1.ResourceRequirements)

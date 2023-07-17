@@ -41,7 +41,7 @@ import (
 
 // log is for logging in this package.
 var (
-	opsrequestlog           = logf.Log.WithName("opsrequest-resource")
+	opsRequestLog           = logf.Log.WithName("opsrequest-resource")
 	opsRequestAnnotationKey = "kubeblocks.io/ops-request"
 	// OpsRequestBehaviourMapper records the opsRequest behaviour according to the OpsType.
 	OpsRequestBehaviourMapper = map[OpsType]OpsRequestBehaviour{}
@@ -60,13 +60,13 @@ var _ webhook.Validator = &OpsRequest{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateCreate() error {
-	opsrequestlog.Info("validate create", "name", r.Name)
+	opsRequestLog.Info("validate create", "name", r.Name)
 	return r.validateEntry(true)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
-	opsrequestlog.Info("validate update", "name", r.Name)
+	opsRequestLog.Info("validate update", "name", r.Name)
 	lastOpsRequest := old.(*OpsRequest).DeepCopy()
 	// if no spec updated, we should skip validation.
 	// if not, we can not delete the OpsRequest when cluster has been deleted.
@@ -81,7 +81,7 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 
 	// Keep the cancel consistent between the two opsRequest for comparing the diff.
 	lastOpsRequest.Spec.Cancel = r.Spec.Cancel
-	if !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+	if !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) && r.Status.Phase != "" {
 		return fmt.Errorf("update OpsRequest: %s is forbidden except for cancel when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 	return r.validateEntry(false)
@@ -89,7 +89,7 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateDelete() error {
-	opsrequestlog.Info("validate delete", "name", r.Name)
+	opsRequestLog.Info("validate delete", "name", r.Name)
 	return nil
 }
 
@@ -117,15 +117,17 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; ok {
 		// opsRequest annotation value in cluster to map
 		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
-			return nil
+			return err
 		}
 	}
+
 	opsNamesInQueue := make([]string, len(opsRecorder))
 	for i, v := range opsRecorder {
 		// judge whether the opsRequest meets the following conditions:
 		// 1. the opsRequest is Reentrant.
 		// 2. the opsRequest supports concurrent execution of the same kind.
-		if v.Name != r.Name {
+		// 3. reconfiguring is a special case, it can be executed concurrently with other opsRequests.
+		if v.Name != r.Name && v.Type != ReconfiguringType {
 			return fmt.Errorf("existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name)
 		}
 		opsNamesInQueue[i] = v.Name
@@ -133,7 +135,10 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
 	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
 		!slices.Contains(opsNamesInQueue, r.Name) {
-		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+		// if TTLSecondsBeforeAbort is not set or 0, return error
+		if r.Spec.TTLSecondsBeforeAbort == nil || *r.Spec.TTLSecondsBeforeAbort == 0 {
+			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+		}
 	}
 	return nil
 }
@@ -196,6 +201,10 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		return r.validateRestart(cluster)
 	case ReconfiguringType:
 		return r.validateReconfigure(cluster)
+	case SwitchoverType:
+		return r.validateSwitchover(ctx, k8sClient, cluster)
+	case DataScriptType:
+		return r.validateDataScript(ctx, k8sClient, cluster)
 	}
 	return nil
 }
@@ -322,6 +331,30 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		return fmt.Errorf("existing other VolumeExpansion OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
 	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
+}
+
+// validateSwitchover validates switchover api when spec.type is Switchover.
+func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, cluster *Cluster) error {
+	switchoverList := r.Spec.SwitchoverList
+	if len(switchoverList) == 0 {
+		return notEmptyError("spec.switchover")
+	}
+	componentNames := make([]string, len(switchoverList))
+	for i, v := range switchoverList {
+		componentNames[i] = v.ComponentName
+
+	}
+	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
+		return err
+	}
+	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(SwitchoverType))
+	if err != nil {
+		return err
+	}
+	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
+		return fmt.Errorf("existing other Switchover OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
+	}
+	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
 }
 
 // checkComponentExistence checks whether components to be operated exist in cluster spec.
@@ -477,6 +510,48 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	return pvc.Spec.StorageClassName, nil
 }
 
+// validateDataScript validates the data script.
+func (r *OpsRequest) validateDataScript(ctx context.Context, cli client.Client, cluster *Cluster) error {
+	validateScript := func(spec *ScriptSpec) error {
+		rawScripts := spec.Script
+		scriptsFrom := spec.ScriptFrom
+		if len(rawScripts) == 0 && (scriptsFrom == nil) {
+			return fmt.Errorf("spec.scriptSpec.script and spec.scriptSpec.scriptFrom can not be empty at the same time")
+		}
+		if scriptsFrom != nil {
+			if scriptsFrom.ConfigMapRef == nil && scriptsFrom.SecretRef == nil {
+				return fmt.Errorf("spec.scriptSpec.scriptFrom.configMapRefs and spec.scriptSpec.scriptFrom.secretRefs can not be empty at the same time")
+			}
+			for _, configMapRef := range scriptsFrom.ConfigMapRef {
+				if err := cli.Get(ctx, types.NamespacedName{Name: configMapRef.Name, Namespace: r.Namespace}, &corev1.ConfigMap{}); err != nil {
+					return err
+				}
+			}
+			for _, secret := range scriptsFrom.SecretRef {
+				if err := cli.Get(ctx, types.NamespacedName{Name: secret.Name, Namespace: r.Namespace}, &corev1.Secret{}); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	scriptSpec := r.Spec.ScriptSpec
+	if scriptSpec == nil {
+		return notEmptyError("spec.scriptSpec")
+	}
+
+	if err := r.checkComponentExistence(cluster, []string{scriptSpec.ComponentName}); err != nil {
+		return err
+	}
+
+	if err := validateScript(scriptSpec); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // validateVerticalResourceList checks if k8s resourceList is legal
 func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) (string, error) {
 	for k := range resourceList {
@@ -517,4 +592,55 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 		}
 	}
 	return runningOpsList, nil
+}
+
+// validateSwitchoverResourceList checks if switchover resourceList is legal.
+func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *Cluster, switchoverList []Switchover) error {
+	for _, switchover := range switchoverList {
+		if switchover.InstanceName == "" {
+			return notEmptyError("switchover.instanceName")
+		}
+
+		// check clusterComponentDefinition whether support switchover
+		compDefObj, err := GetComponentDefByCluster(ctx, cli, *cluster, cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
+		if err != nil {
+			return err
+		}
+		if compDefObj == nil {
+			return fmt.Errorf("this cluster component %s is invalid", switchover.ComponentName)
+		}
+		if compDefObj.SwitchoverSpec == nil {
+			return fmt.Errorf("this cluster component %s does not support switchover", switchover.ComponentName)
+		}
+		switch switchover.InstanceName {
+		case constant.KBSwitchoverCandidateInstanceForAnyPod:
+			if compDefObj.SwitchoverSpec.WithoutCandidate == nil {
+				return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", switchover.ComponentName)
+			}
+		default:
+			if compDefObj.SwitchoverSpec.WithCandidate == nil {
+				return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", switchover.ComponentName)
+			}
+		}
+
+		// check switchover.InstanceName whether exist and role label is correct
+		if switchover.InstanceName == constant.KBSwitchoverCandidateInstanceForAnyPod {
+			return nil
+		}
+		pod := &corev1.Pod{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: switchover.InstanceName}, pod); err != nil {
+			return fmt.Errorf("get instanceName %s failed, err: %s, and check the validity of the instanceName using \"kbcli cluster list-instances\"", switchover.InstanceName, err.Error())
+		}
+		v, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || v == "" {
+			return fmt.Errorf("instanceName %s cannot be promoted because it had a invalid role label", switchover.InstanceName)
+		}
+		if v == constant.Primary || v == constant.Leader {
+			return fmt.Errorf("instanceName %s cannot be promoted because it is already the primary or leader instance", switchover.InstanceName)
+		}
+		if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
+			return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
+		}
+	}
+	return nil
 }

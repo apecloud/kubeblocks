@@ -25,6 +25,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -59,6 +61,15 @@ type RestoreManager struct {
 	sourceCluster string
 }
 
+func NewRestoreManager(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, scheme *k8sruntime.Scheme) *RestoreManager {
+	return &RestoreManager{
+		Cluster: cluster,
+		Client:  cli,
+		Ctx:     ctx,
+		Scheme:  scheme,
+	}
+}
+
 const (
 	backupVolumePATH = "/backupdata"
 )
@@ -70,12 +81,7 @@ func DoRestore(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Clu
 		return nil
 	}
 
-	mgr := RestoreManager{
-		Cluster: cluster,
-		Client:  cli,
-		Ctx:     ctx,
-		Scheme:  schema,
-	}
+	mgr := NewRestoreManager(ctx, cli, cluster, schema)
 
 	// check restore from backup
 	backupObj, err := mgr.getBackupObjectFromAnnotation(component)
@@ -91,7 +97,7 @@ func DoRestore(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Clu
 	}
 	jobs := make([]client.Object, 0)
 	if backupObj.Spec.BackupType == dpv1alpha1.BackupTypeDataFile {
-		dataFileJobs, err := mgr.buildDatafileRestoreJob(component, backupObj)
+		dataFileJobs, err := mgr.BuildDatafileRestoreJob(component, backupObj)
 		if err != nil {
 			return err
 		}
@@ -125,33 +131,26 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 	if cluster.Status.ObservedGeneration > 1 {
 		return nil
 	}
-
-	pitrMgr := RestoreManager{
-		Cluster: cluster,
-		Client:  cli,
-		Ctx:     ctx,
-		Scheme:  schema,
-	}
-
+	pitrMgr := NewRestoreManager(ctx, cli, cluster, schema)
 	if need, err := pitrMgr.checkPITRAndInit(); err != nil {
 		return err
 	} else if !need {
 		return nil
 	}
 
-	// get the latest backup  from point in time
-	backupObj, err := pitrMgr.getLatestBaseBackup(component.Name)
+	// get the latest base backup from point in time
+	baseBackup, err := pitrMgr.getLatestBaseBackup(component.Name)
 	if err != nil {
 		return err
 	}
 
-	if err = pitrMgr.createDataPVCs(component, backupObj); err != nil {
+	if err = pitrMgr.createDataPVCs(component, baseBackup); err != nil {
 		return err
 	}
 
 	jobs := make([]client.Object, 0)
-	if backupObj.Spec.BackupType == dpv1alpha1.BackupTypeDataFile {
-		dataFilejobs, err := pitrMgr.buildDatafileRestoreJob(component, backupObj)
+	if baseBackup.Spec.BackupType == dpv1alpha1.BackupTypeDataFile {
+		dataFilejobs, err := pitrMgr.BuildDatafileRestoreJob(component, baseBackup)
 		if err != nil {
 			return err
 		}
@@ -161,21 +160,31 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		}
 		jobs = append(jobs, dataFilejobs...)
 	}
-
-	pitrJobs, err := pitrMgr.buildPITRRestoreJob(component)
+	sourceClusterUID := baseBackup.Labels[constant.DataProtectionLabelClusterUIDKey]
+	logfileBackup, err := pitrMgr.getLogfileBackup(component.Name, sourceClusterUID)
 	if err != nil {
 		return err
 	}
 
-	logfileBackup, err := pitrMgr.getLogfileBackup(component.Name)
+	recoveryInfo, err := pitrMgr.getRecoveryInfo(baseBackup, logfileBackup)
 	if err != nil {
 		return err
 	}
-	logicJobs, err := pitrMgr.buildLogicRestoreJob(component, logfileBackup)
-	if err != nil {
-		return err
+	pitrJobs := make([]client.Object, 0)
+	if len(recoveryInfo.Physical.RestoreCommands) != 0 {
+		pitrJobs, err = pitrMgr.buildPITRPhysicalRestoreJob(component, recoveryInfo, logfileBackup)
+		if err != nil {
+			return err
+		}
 	}
-	pitrJobs = append(pitrJobs, logicJobs...)
+
+	if len(recoveryInfo.Logical.RestoreCommands) != 0 {
+		logicJobs, err := pitrMgr.buildLogicRestoreJob(component, logfileBackup, recoveryInfo.Env...)
+		if err != nil {
+			return err
+		}
+		pitrJobs = append(pitrJobs, logicJobs...)
+	}
 
 	// do create PITR job and check completed
 	if err = pitrMgr.createJobsAndWaiting(pitrJobs); err != nil {
@@ -214,12 +223,8 @@ func (p *RestoreManager) listCompletedBackups(componentName string) (backupItems
 	return backupItems, nil
 }
 
-// getSortedBackups sorts by StopTime
-func (p *RestoreManager) getSortedBackups(componentName string, reverse bool) ([]dpv1alpha1.Backup, error) {
-	backups, err := p.listCompletedBackups(componentName)
-	if err != nil {
-		return backups, err
-	}
+// sortBackups sorts by StopTime
+func (p *RestoreManager) sortBackups(backups []dpv1alpha1.Backup, reverse bool) []dpv1alpha1.Backup {
 	sort.Slice(backups, func(i, j int) bool {
 		if reverse {
 			i, j = j, i
@@ -235,16 +240,17 @@ func (p *RestoreManager) getSortedBackups(componentName string, reverse bool) ([
 		}
 		return backups[i].Status.Manifests.BackupLog.StopTime.Before(backups[j].Status.Manifests.BackupLog.StopTime)
 	})
-	return backups, nil
+	return backups
 }
 
 // getLatestBaseBackup gets the latest baseBackup
 func (p *RestoreManager) getLatestBaseBackup(componentName string) (*dpv1alpha1.Backup, error) {
 	// 1. sorts reverse backups
-	backups, err := p.getSortedBackups(componentName, true)
+	backups, err := p.listCompletedBackups(componentName)
 	if err != nil {
 		return nil, err
 	}
+	backups = p.sortBackups(backups, true)
 
 	// 2. gets the latest backup object
 	var latestBackup *dpv1alpha1.Backup
@@ -297,7 +303,7 @@ func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) string {
 	dataVolumeMount := "/data"
 	// TODO: hack it because the mount path is not explicitly specified in cluster definition
 	for _, env := range spec.Env {
-		if env.Name == "VOLUME_DATA_DIR" {
+		if env.Name == constant.DPVolumeDataDIR {
 			dataVolumeMount = env.Value
 			break
 		}
@@ -305,52 +311,67 @@ func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) string {
 	return dataVolumeMount
 }
 
-func (p *RestoreManager) getRecoveryInfo(componentName string) (*dpv1alpha1.BackupToolSpec, error) {
+// getRecoveryInfo gets the pitr recovery info from baseBackup and logfileBackup
+func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.Backup) (*dpv1alpha1.BackupToolSpec, error) {
 	// gets scripts from backup template
-	toolList := dpv1alpha1.BackupToolList{}
-	// TODO: The reference PITR backup tool needs a stronger reference relationship, for now use label references
-	if err := p.Client.List(p.Ctx, &toolList,
-		client.MatchingLabels{
-			constant.ClusterDefLabelKey:     p.Cluster.Spec.ClusterDefRef,
-			constant.BackupToolTypeLabelKey: "pitr",
-		}); err != nil {
-
+	backupTool := dpv1alpha1.BackupTool{}
+	if err := p.Client.Get(p.Ctx, types.NamespacedName{
+		Name: logfileBackup.Status.BackupToolName,
+	}, &backupTool); err != nil {
 		return nil, err
 	}
-	if len(toolList.Items) == 0 {
-		return nil, errors.New("not support recovery because of non-existed pitr backupTool")
-	}
-	logfileBackup, err := p.getLogfileBackup(componentName)
-	if err != nil {
-		return nil, err
-	}
-	spec := &toolList.Items[0].Spec
-	timeFormat := time.RFC3339
-	envTimeEnvIdx := -1
-	for i, env := range spec.Env {
-		if env.Value == "$KB_RECOVERY_TIME" {
-			envTimeEnvIdx = i
-		} else if env.Name == "TIME_FORMAT" {
-			timeFormat = env.Value
-		}
-	}
-	if envTimeEnvIdx != -1 {
-		spec.Env[envTimeEnvIdx].Value = p.restoreTime.Time.UTC().Format(timeFormat)
-	}
+	// build recovery env
 	backupDIR := logfileBackup.Name
 	if logfileBackup.Status.Manifests != nil && logfileBackup.Status.Manifests.BackupTool != nil {
 		backupDIR = logfileBackup.Status.Manifests.BackupTool.FilePath
 	}
 	headEnv := []corev1.EnvVar{
-		{Name: "BACKUP_DIR", Value: backupVolumePATH + "/" + backupDIR},
-		{Name: "BACKUP_NAME", Value: logfileBackup.Name}}
+		{Name: constant.DPBackupDIR, Value: backupVolumePATH + backupDIR},
+		{Name: constant.DPBackupName, Value: logfileBackup.Name},
+	}
+	// build env of recovery time
+	spec := &backupTool.Spec
+	timeFormat := time.RFC3339
+	envTimeEnvIdx := -1
+	for i, env := range spec.Env {
+		if env.Value == "$KB_RECOVERY_TIME" {
+			envTimeEnvIdx = i
+		} else if env.Name == constant.DPTimeFormat {
+			timeFormat = env.Value
+		}
+	}
+	if envTimeEnvIdx != -1 {
+		spec.Env[envTimeEnvIdx].Value = p.restoreTime.UTC().Format(timeFormat)
+	} else {
+		headEnv = append(headEnv, corev1.EnvVar{Name: constant.DPKBRecoveryTime, Value: p.restoreTime.UTC().Format(timeFormat)})
+	}
+	headEnv = append(headEnv, corev1.EnvVar{Name: constant.DPKBRecoveryTimestamp, Value: strconv.FormatInt(p.restoreTime.Unix(), 10)})
+	// build env of backup startTime and user contexts
+	if baseBackup.Status.Manifests != nil {
+		// inject env for backup startTime
+		backupLog := baseBackup.Status.Manifests.BackupLog
+		startTime := baseBackup.Status.StartTimestamp
+		if backupLog != nil && backupLog.StartTime != nil {
+			startTime = backupLog.StartTime
+		}
+		if startTime != nil {
+			startTimeEnv := corev1.EnvVar{Name: constant.DPBackupStartTime, Value: startTime.UTC().Format(timeFormat)}
+			startTimeTimestampEnv := corev1.EnvVar{Name: constant.DPBackupStartTimestamp, Value: strconv.FormatInt(startTime.Unix(), 10)}
+			headEnv = append(headEnv, startTimeEnv, startTimeTimestampEnv)
+		}
+		// inject env for user contexts
+		backupUserContext := baseBackup.Status.Manifests.UserContext
+		for k, v := range backupUserContext {
+			headEnv = append(headEnv, corev1.EnvVar{Name: strings.ToUpper(k), Value: v})
+		}
+	}
 	spec.Env = append(headEnv, spec.Env...)
 	return spec, nil
 }
 
-func (p *RestoreManager) getLogfileBackup(componentName string) (*dpv1alpha1.Backup, error) {
-	incrementalBackupList := dpv1alpha1.BackupList{}
-	if err := p.Client.List(p.Ctx, &incrementalBackupList,
+func (p *RestoreManager) getLogfileBackup(componentName string, sourceClusterUID string) (*dpv1alpha1.Backup, error) {
+	logfileBackupList := dpv1alpha1.BackupList{}
+	if err := p.Client.List(p.Ctx, &logfileBackupList,
 		client.MatchingLabels{
 			constant.AppInstanceLabelKey:    p.sourceCluster,
 			constant.KBAppComponentLabelKey: componentName,
@@ -358,17 +379,21 @@ func (p *RestoreManager) getLogfileBackup(componentName string) (*dpv1alpha1.Bac
 		}); err != nil {
 		return nil, err
 	}
-	if len(incrementalBackupList.Items) == 0 {
+	if len(logfileBackupList.Items) == 0 {
 		return nil, errors.New("not found logfile backups")
 	}
-	return &incrementalBackupList.Items[0], nil
+	backups := p.sortBackups(logfileBackupList.Items, true)
+	for _, v := range backups {
+		// filter backups with cluster uid for excluding same cluster name
+		if v.Labels[constant.DataProtectionLabelClusterUIDKey] == sourceClusterUID {
+			return &v, nil
+		}
+	}
+	// TODO: return an error if logfile backup is not found after v0.7.0, return the first logfile for compatibility with version v0.5.0.
+	return &logfileBackupList.Items[0], nil
 }
 
-func (p *RestoreManager) getLogfilePVC(componentName string) (*corev1.PersistentVolumeClaim, error) {
-	logfileBackup, err := p.getLogfileBackup(componentName)
-	if err != nil {
-		return nil, err
-	}
+func (p *RestoreManager) getLogfilePVC(logfileBackup *dpv1alpha1.Backup) (*corev1.PersistentVolumeClaim, error) {
 	pvcKey := types.NamespacedName{
 		Name:      logfileBackup.Status.PersistentVolumeClaimName,
 		Namespace: logfileBackup.Namespace,
@@ -399,7 +424,7 @@ func (p *RestoreManager) getDataPVCs(componentName string) ([]corev1.PersistentV
 // this is a little different from the getDataPVCs function,
 // we need to get the node name of the pvc according to the pod,
 // and the job must be the same as the node name of the pvc
-func (p *RestoreManager) getDataPVCsFromPods(componentName string) ([]corev1.PersistentVolumeClaim, error) {
+func (p *RestoreManager) getDataPVCsAndPods(componentName string, podRestoreScope dpv1alpha1.PodRestoreScope) (map[string]corev1.Pod, error) {
 	podList := corev1.PodList{}
 	podLabels := map[string]string{
 		constant.AppInstanceLabelKey:    p.Cluster.Name,
@@ -410,7 +435,7 @@ func (p *RestoreManager) getDataPVCsFromPods(componentName string) ([]corev1.Per
 		client.MatchingLabels(podLabels)); err != nil {
 		return nil, err
 	}
-	dataPVCs := []corev1.PersistentVolumeClaim{}
+	dataPVCsAndPodsMap := map[string]corev1.Pod{}
 	for _, targetPod := range podList.Items {
 		for _, volume := range targetPod.Spec.Volumes {
 			if volume.PersistentVolumeClaim == nil {
@@ -424,29 +449,42 @@ func (p *RestoreManager) getDataPVCsFromPods(componentName string) ([]corev1.Per
 			if dataPVC.Labels[constant.VolumeTypeLabelKey] != string(appsv1alpha1.VolumeTypeData) {
 				continue
 			}
-			if dataPVC.Annotations == nil {
-				dataPVC.Annotations = map[string]string{}
+			if podRestoreScope == dpv1alpha1.PodRestoreScopeAll {
+				dataPVCsAndPodsMap[dataPVC.Name] = targetPod
+				continue
 			}
-			dataPVC.Annotations["pod-name"] = targetPod.Name
-			dataPVC.Annotations["node-name"] = targetPod.Spec.NodeName
-			dataPVCs = append(dataPVCs, dataPVC)
+			if podRestoreScope == dpv1alpha1.PodRestoreScopeReadWrite {
+				if targetPod.Labels[constant.ConsensusSetAccessModeLabelKey] == string(appsv1alpha1.ReadWrite) ||
+					targetPod.Labels[constant.RoleLabelKey] == constant.Primary {
+					dataPVCsAndPodsMap[dataPVC.Name] = targetPod
+					break
+				}
+			}
 		}
 	}
-	return dataPVCs, nil
+	return dataPVCsAndPodsMap, nil
 }
 
-func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup) error {
-	// determines the data volume type
+func (p *RestoreManager) getDataVCT(synthesizedComponent *component.SynthesizedComponent) corev1.PersistentVolumeClaimTemplate {
 	vctMap := map[string]corev1.PersistentVolumeClaimTemplate{}
 	for _, vct := range synthesizedComponent.VolumeClaimTemplates {
 		vctMap[vct.Name] = vct
 	}
-	var vct corev1.PersistentVolumeClaimTemplate
 	for _, vt := range synthesizedComponent.VolumeTypes {
 		if vt.Type == appsv1alpha1.VolumeTypeData {
-			vct = vctMap[vt.Name]
+			return vctMap[vt.Name]
+
 		}
 	}
+	if len(synthesizedComponent.VolumeClaimTemplates) != 0 {
+		return synthesizedComponent.VolumeClaimTemplates[0]
+	}
+	return corev1.PersistentVolumeClaimTemplate{}
+}
+
+func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup) error {
+	// determines the data volume type
+	vct := p.getDataVCT(synthesizedComponent)
 	if vct.Name == "" {
 		return intctrlutil.NewNotFound("can not found any PersistentVolumeClaim of data type")
 	}
@@ -498,7 +536,16 @@ func (p *RestoreManager) getBackupObjectFromAnnotation(synthesizedComponent *com
 	return backup, nil
 }
 
-func (p *RestoreManager) buildDatafileRestoreJob(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup) (objs []client.Object, err error) {
+func (p *RestoreManager) BuildDatafileRestoreJob(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup) (objs []client.Object, err error) {
+	pvcNames := make([]string, 0)
+	vct := p.getDataVCT(synthesizedComponent)
+	for i := int32(0); i < synthesizedComponent.Replicas; i++ {
+		pvcNames = append(pvcNames, fmt.Sprintf("%s-%s-%s-%d", vct.Name, p.Cluster.Name, synthesizedComponent.Name, i))
+	}
+	return p.BuildDatafileRestoreJobByPVCS(synthesizedComponent, backup, pvcNames, p.BuildCommonLabels(synthesizedComponent))
+}
+
+func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup, pvcNames []string, labels map[string]string) (objs []client.Object, err error) {
 	backupToolKey := client.ObjectKey{Name: backup.Status.BackupToolName}
 	backupTool := dpv1alpha1.BackupTool{}
 	if err = p.Client.Get(p.Ctx, backupToolKey, &backupTool); err != nil {
@@ -545,15 +592,13 @@ func (p *RestoreManager) buildDatafileRestoreJob(synthesizedComponent *component
 	// merges env from backup tool.
 	env = append(env, backupTool.Spec.Env...)
 	objs = make([]client.Object, 0)
-	jobNamePrefix := fmt.Sprintf("base-%s-%s", p.Cluster.Name, synthesizedComponent.Name)
-	for i := int32(0); i < synthesizedComponent.Replicas; i++ {
-		// merge volume and volumeMounts
-		vct := synthesizedComponent.VolumeClaimTemplates[0]
+	vct := p.getDataVCT(synthesizedComponent)
+	for _, pvcName := range pvcNames {
 		dataVolume := corev1.Volume{
 			Name: vct.Name,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: fmt.Sprintf("%s-%s-%s-%d", vct.Name, p.Cluster.Name, synthesizedComponent.Name, i),
+					ClaimName: pvcName,
 				},
 			},
 		}
@@ -562,29 +607,31 @@ func (p *RestoreManager) buildDatafileRestoreJob(synthesizedComponent *component
 		volumes = append(volumes, synthesizedComponent.PodSpec.Volumes...)
 		volumeMounts := make([]corev1.VolumeMount, 0)
 		for _, volume := range volumes {
-			volumeMounts = append(volumeMounts, volumeMountMap[volume.Name])
-		}
+			if vmount, ok := volumeMountMap[volume.Name]; ok {
+				volumeMounts = append(volumeMounts, vmount)
+			}
 
-		jobName := fmt.Sprintf("%s-%d", jobNamePrefix, i)
-		job, err := builder.BuildRestoreJob(jobName, p.Cluster.Namespace, backupTool.Spec.Image, []string{"sh", "-c"},
+		}
+		jobName := p.GetDatafileRestoreJobName(pvcName)
+		job, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
 			backupTool.Spec.Physical.RestoreCommands, volumes, volumeMounts, env, backupTool.Spec.Resources)
 		if err != nil {
 			return nil, err
 		}
-		if err = controllerutil.SetControllerReference(p.Cluster, job, p.Scheme); err != nil {
-			return nil, err
+		if p.Scheme != nil {
+			if err = controllerutil.SetControllerReference(p.Cluster, job, p.Scheme); err != nil {
+				return nil, err
+			}
 		}
+		job.SetLabels(labels)
 		objs = append(objs, job)
 	}
 	return objs, nil
 }
 
-func (p *RestoreManager) buildPITRRestoreJob(synthesizedComponent *component.SynthesizedComponent) (objs []client.Object, err error) {
-	commonLabels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    p.Cluster.Name,
-		constant.KBAppComponentLabelKey: synthesizedComponent.Name,
-	}
+func (p *RestoreManager) buildPITRPhysicalRestoreJob(synthesizedComponent *component.SynthesizedComponent,
+	recoveryInfo *dpv1alpha1.BackupToolSpec,
+	logfileBackup *dpv1alpha1.Backup) (objs []client.Object, err error) {
 	// gets data dir pvc name
 	dataPVCs, err := p.getDataPVCs(synthesizedComponent.Name)
 	if err != nil {
@@ -593,16 +640,12 @@ func (p *RestoreManager) buildPITRRestoreJob(synthesizedComponent *component.Syn
 	if len(dataPVCs) == 0 {
 		return objs, errors.New("not found data pvc")
 	}
-	recoveryInfo, err := p.getRecoveryInfo(synthesizedComponent.Name)
-	if err != nil {
-		return objs, err
-	}
 	// renders the pitrJob cue template
 	image := recoveryInfo.Image
 	if image == "" {
 		image = synthesizedComponent.PodSpec.Containers[0].Image
 	}
-	logfilePVC, err := p.getLogfilePVC(synthesizedComponent.Name)
+	logfilePVC, err := p.getLogfilePVC(logfileBackup)
 	if err != nil {
 		return objs, err
 	}
@@ -619,16 +662,18 @@ func (p *RestoreManager) buildPITRRestoreJob(synthesizedComponent *component.Syn
 			{Name: "log", VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: logfilePVC.GetName()}}},
 		}
-		pitrJobName := fmt.Sprintf("pitr-phy-%s", dataPVC.GetName())
-		pitrJob, err := builder.BuildRestoreJob(pitrJobName, p.namespace, image, []string{"sh", "-c"},
+		pitrJobName := p.buildRestoreJobName(fmt.Sprintf("pitr-phy-%s", dataPVC.GetName()))
+		pitrJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, pitrJobName, image,
 			recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
 		if err != nil {
 			return objs, err
 		}
-		if err = controllerutil.SetControllerReference(p.Cluster, pitrJob, p.Scheme); err != nil {
-			return nil, err
+		if p.Scheme != nil {
+			if err = controllerutil.SetControllerReference(p.Cluster, pitrJob, p.Scheme); err != nil {
+				return nil, err
+			}
 		}
-		pitrJob.SetLabels(commonLabels)
+		pitrJob.SetLabels(p.BuildCommonLabels(synthesizedComponent))
 		// collect pvcs and jobs for later deletion
 		objs = append(objs, pitrJob)
 	}
@@ -636,7 +681,7 @@ func (p *RestoreManager) buildPITRRestoreJob(synthesizedComponent *component.Syn
 	return objs, nil
 }
 
-func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup) (objs []client.Object, err error) {
+func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup, envs ...corev1.EnvVar) (objs []client.Object, err error) {
 	// creates logic restore job, usually imported after the cluster service is started
 	if p.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 		return nil, nil
@@ -646,48 +691,48 @@ func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.Sy
 	if err = p.Client.Get(p.Ctx, backupToolKey, &backupTool); err != nil {
 		return nil, err
 	}
-	if len(backupTool.Spec.Logical.RestoreCommands) == 0 {
+	if backupTool.Spec.Logical == nil || len(backupTool.Spec.Logical.RestoreCommands) == 0 {
 		return nil, nil
 	}
-
 	image := backupTool.Spec.Image
 	if image == "" {
 		image = synthesizedComponent.PodSpec.Containers[0].Image
 	}
-	commonLabels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    p.Cluster.Name,
-		constant.KBAppComponentLabelKey: synthesizedComponent.Name,
-	}
-
 	dataVolumeMount := getVolumeMount(&backupTool.Spec)
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "data", MountPath: dataVolumeMount},
 		{Name: "backup-data", MountPath: backupVolumePATH},
 	}
-	dataPVCsFromPods, err := p.getDataPVCsFromPods(synthesizedComponent.Name)
+	pvcsAndPodsMap, err := p.getDataPVCsAndPods(synthesizedComponent.Name, backupTool.Spec.Logical.PodScope)
 	if err != nil {
 		return objs, err
 	}
-	for _, dataPVC := range dataPVCsFromPods {
+	jobEnv := backupTool.Spec.Env
+	jobEnv = append(jobEnv, envs...)
+	for pvcName, pod := range pvcsAndPodsMap {
+		podENV := pod.Spec.Containers[0].Env
+		podENV = append(podENV, corev1.EnvVar{Name: constant.DPDBHost, Value: intctrlutil.BuildPodHostDNS(&pod)})
+		podENV = append(podENV, jobEnv...)
 		volumes := []corev1.Volume{
 			{Name: "data", VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.GetName()}}},
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName}}},
 			{Name: "backup-data", VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: backup.Status.PersistentVolumeClaimName}}},
 		}
-		logicJobName := fmt.Sprintf("restore-logic-%s", dataPVC.GetName())
-		logicJob, err := builder.BuildRestoreJob(logicJobName, p.namespace, image, []string{"sh", "-c"},
-			backupTool.Spec.Logical.RestoreCommands, volumes, volumeMounts, backupTool.Spec.Env, backupTool.Spec.Resources)
+		logicJobName := p.buildRestoreJobName(fmt.Sprintf("restore-logic-%s", pod.Name))
+		logicJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, logicJobName, image,
+			backupTool.Spec.Logical.RestoreCommands, volumes, volumeMounts, podENV, backupTool.Spec.Resources)
 		if err != nil {
 			return objs, err
 		}
-		if err = controllerutil.SetControllerReference(p.Cluster, logicJob, p.Scheme); err != nil {
-			return nil, err
+		if p.Scheme != nil {
+			if err = controllerutil.SetControllerReference(p.Cluster, logicJob, p.Scheme); err != nil {
+				return nil, err
+			}
 		}
-		logicJob.SetLabels(commonLabels)
+		logicJob.SetLabels(p.BuildCommonLabels(synthesizedComponent))
 		// DO NOT use "volume.kubernetes.io/selected-node" annotation key in PVC, because it is unreliable.
-		logicJob.Spec.Template.Spec.NodeName = dataPVC.Annotations["node-name"]
+		logicJob.Spec.Template.Spec.NodeName = pod.Spec.NodeName
 		objs = append(objs, logicJob)
 	}
 
@@ -759,4 +804,25 @@ func (p *RestoreManager) cleanupClusterAnnotations() error {
 		return p.Client.Patch(p.Ctx, cluster, patch)
 	}
 	return nil
+}
+
+// buildRestoreJobName builds the restore job name.
+func (p *RestoreManager) buildRestoreJobName(jobName string) string {
+	l := len(jobName)
+	if l > 63 {
+		return fmt.Sprintf("%s-%s", jobName[:57], jobName[l-5:l])
+	}
+	return jobName
+}
+
+func (p *RestoreManager) GetDatafileRestoreJobName(pvcName string) string {
+	return p.buildRestoreJobName(fmt.Sprintf("base-%s", pvcName))
+}
+
+func (p *RestoreManager) BuildCommonLabels(synthesizedComponent *component.SynthesizedComponent) map[string]string {
+	return map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    p.Cluster.Name,
+		constant.KBAppComponentLabelKey: synthesizedComponent.Name,
+	}
 }

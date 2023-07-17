@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-reconfigure
+spec:
+  clusterRef: mongodb-cluster
+  reconfigure:
+    componentName: mongodb
+    configurations:
+      - keys:
+          - key: mongodb.conf
+            parameters:
+              - key: systemLog.verbosity
+                value: "1"
+        name: mongodb-config
+  type: Reconfiguring

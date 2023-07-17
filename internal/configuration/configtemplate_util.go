@@ -20,10 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
@@ -115,20 +111,6 @@ func MergeConfigTemplates(cvConfigSpecs []appsv1alpha1.ComponentConfigSpec,
 	}
 
 	return mergedCfgTpl
-}
-
-func GetClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, cli client.Client, ctx context.Context) error {
-	if cvName == "" {
-		return nil
-	}
-	clusterVersionKey := client.ObjectKey{
-		Namespace: "",
-		Name:      cvName,
-	}
-	if err := cli.Get(ctx, clusterVersionKey, cv); err != nil {
-		return WrapError(err, "failed to get clusterversion[%s]", cvName)
-	}
-	return nil
 }
 
 func IsSupportConfigFileReconfigure(configTemplateSpec appsv1alpha1.ComponentConfigSpec, configFileKey string) bool {

@@ -23,18 +23,16 @@ import (
 	"context"
 	"time"
 
-	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -106,6 +104,12 @@ import (
 // componentresourceconstraint get list
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
 
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/status,verbs=get
+
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get
+
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
@@ -170,9 +174,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ValidateAndLoadRefResourcesTransformer{},
 			// validate config
 			&ValidateEnableLogsTransformer{},
-			// fix spec
-			// fill class related info
-			&FillClassTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
 			// handle restore
@@ -181,12 +182,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ComponentTransformer{Client: r.Client},
 			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
 			&BackupPolicyTPLTransformer{},
+			// handle rbac for pod
+			&RBACTransformer{},
 			// add our finalizer to all objects
 			&OwnershipTransformer{},
 			// make all workload objects depending on credential secret
 			&SecretTransformer{},
-			// make config configmap immutable
-			&ConfigTransformer{},
 			// update cluster status
 			&ClusterStatusTransformer{},
 			// always safe to put your transformer below
@@ -207,7 +208,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	requeueDuration = time.Duration(viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS))
+	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
+	if retryDurationMS != 0 {
+		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
+	}
 	// TODO: add filter predicate for core API objects
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
@@ -221,18 +225,20 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
 		Owns(&dataprotectionv1alpha1.Backup{}).
 		Owns(&batchv1.Job{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
-	if viper.GetBool("VOLUMESNAPSHOT") {
-		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.Predicates{})
-		} else {
-			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.Predicates{})
-		}
+		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
+
+	if viper.GetBool(constant.EnableRBACManager) {
+		b.Owns(&rbacv1.RoleBinding{}).
+			Owns(&corev1.ServiceAccount{})
+	} else {
+		b.Watches(&source.Kind{Type: &rbacv1.RoleBinding{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
+			Watches(&source.Kind{Type: &corev1.ServiceAccount{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 	}
+
 	return b.Complete(r)
 }
 
-func (r *ClusterReconciler) filterClusterPods(obj client.Object) []reconcile.Request {
+func (r *ClusterReconciler) filterClusterResources(obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}

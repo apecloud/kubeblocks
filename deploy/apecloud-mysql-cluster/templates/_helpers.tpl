@@ -1,62 +1,58 @@
 {{/*
-Expand the name of the chart.
+Define the cluster componnets with proxy.
+The proxy cpu cores is 1/6 of the cluster total cpu cores and is multiple of 0.5.
+The minimum proxy cpu cores is 0.5 and the maximum cpu cores is 64.
 */}}
-{{- define "apecloud-mysql-cluster.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- define "apecloud-mysql-cluster.proxyComponents" }}
+{{- $replicas := (include "apecloud-mysql-cluster.replicas" .) }}
+{{- $proxyCPU := divf (mulf $replicas .Values.cpu) 6.0 }}
+{{- $proxyCPU = divf $proxyCPU 0.5 | ceil | mulf 0.5 }}
+{{- if lt $proxyCPU 0.5 }}
+{{- $proxyCPU = 0.5 }}
+{{- else if gt $proxyCPU 64.0 }}
+{{- $proxyCPU = 64 }}
+{{- end }}
+- name: vtcontroller
+  componentDefRef: vtcontroller # ref clusterdefinition componentDefs.name
+  enabledLogs:
+    - log
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+- name: vtgate
+  componentDefRef: vtgate # ref clusterdefinition componentDefs.name
+  replicas: 1
+  enabledLogs:
+    - error
+    - warning
+    - info
+    - queryLog
+  resources:
+    requests:
+      cpu: {{ $proxyCPU }}
+    limits:
+      cpu: {{ $proxyCPU }}
 {{- end }}
 
 {{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
+Define replicas.
+standalone mode: 1
+raftGroup mode: max(replicas, 3)
 */}}
-{{- define "apecloud-mysql-cluster.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- define "apecloud-mysql-cluster.replicas" }}
+{{- if eq .Values.mode "standalone" }}
+{{- 1 }}
+{{- else if eq .Values.mode "raftGroup" }}
+{{- max .Values.replicas 3 }}
 {{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create chart name and version as used by the chart label.
-*/}}
-{{- define "apecloud-mysql-cluster.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels
-*/}}
-{{- define "apecloud-mysql-cluster.labels" -}}
-helm.sh/chart: {{ include "apecloud-mysql-cluster.chart" . }}
-{{ include "apecloud-mysql-cluster.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "apecloud-mysql-cluster.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "apecloud-mysql-cluster.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{- define "clustername" -}}
-{{ include "apecloud-mysql-cluster.fullname" .}}
-{{- end}}
-
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "apecloud-mysql-cluster.serviceAccountName" -}}
-{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
-{{- end }}
+{{- end -}}

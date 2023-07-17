@@ -5,7 +5,7 @@ metadata:
 data:
   init.sh: |
     #!/bin/sh
-    set -ex
+    set -e
     PRIMARY_ROLE=primary
     KB_ROLE_NAME=`cat /etc/conf/role/labels`
     if [ "$KB_ROLE_NAME" = "$PRIMARY_ROLE" ]; then
@@ -15,7 +15,7 @@ data:
     fi
   setup.sh: |
     #!/bin/sh
-    set -ex
+    set -e
     SECONDARY_ROLE=secondary
     KB_ROLE_NAME=`cat /etc/conf/role/labels`
     if [ "$KB_ROLE_NAME" = "$SECONDARY_ROLE" ]; then

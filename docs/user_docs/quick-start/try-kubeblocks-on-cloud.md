@@ -36,8 +36,8 @@ Fill in an access key and run the command below to authenticate the requests.
 
 ```bash
 aws configure
-AWS Access Key ID [None]: AKIAIOSFODNN7EXAMPLE
-AWS Secret Access Key [None]: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS Access Key ID [None]: YOUR_ACCESS_KEY_ID
+AWS Secret Access Key [None]: YOUR_SECRET_ACCESS_KEY
 ```
 
 You can refer to [Quick configuration with aws configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html#cli-configure-quickstart-config) for detailed information.
@@ -45,8 +45,8 @@ You can refer to [Quick configuration with aws configure](https://docs.aws.amazo
 **Option 2.** Use environment variables.
 
 ```bash
-export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
-export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+export AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="YOUR_SECRET_ACCESS_KEY"
 ```
 
 ### Initialize Playground
@@ -113,7 +113,7 @@ Make sure you have all the followings prepared.
    gcloud auth application-default login
    ```
 
-4. Configure GOOGLE_PROJECT environment variables，```kbcli playground``` creates GKE cluster in the project.
+4. Configure GOOGLE_PROJECT environment variables, ```kbcli playground``` creates GKE cluster in the project.
 
    ```bash
    export GOOGLE_PROJECT=<project-name>
@@ -217,6 +217,12 @@ Make sure you have all the followings prepared.
 
 1. Log in to Alibaba Cloud.
 2. Follow the instructions in [Quick start for first-time users](https://www.alibabacloud.com/help/en/container-service-for-kubernetes/latest/quick-start-for-first-time-users) to check whether you have activated Alibaba Cloud Container Service for Kubernetes (ACK) and assigned roles.
+
+   :::note
+
+   For users who deploy Alibaba Cloud in China Mainland, refer to [the corresponding guide](https://help.aliyun.com/document_detail/161387.htm?spm=a2c4g.85903.0.0.478d2246FdHMGt#task-2470091).
+
+   :::
 3. Click [AliyunOOSLifecycleHook4CSRole](https://ram.console.aliyun.com/role/authorize?spm=5176.2020520152.0.0.5b4716ddI6QevL&request=%7B%22ReturnUrl%22%3A%22https%3A%2F%2Fram.console.aliyun.com%22%2C%22Services%22%3A%5B%7B%22Roles%22%3A%5B%7B%22RoleName%22%3A%22AliyunOOSLifecycleHook4CSRole%22%2C%22TemplateId%22%3A%22AliyunOOSLifecycleHook4CSRole%22%7D%5D%2C%22Service%22%3A%22OOS%22%7D%5D%7D) and click **Agree to Authorization** to create an AliyunOOSLifecycleHook4CSRole role.
 
    This operation grant permissions to access Operation Orchestration Service (OOS) and to access the resources in other cloud products since creating and managing a node pool is required for creating an ACK cluster.
@@ -225,12 +231,13 @@ Make sure you have all the followings prepared.
 4. Create an AccessKey ID and the corresponding AccessKey secret.
 
    1. Go to [Alibaba Cloud Management Console](https://homenew.console.aliyun.com/home/dashboard/ProductAndService). Hover the pointer over your account console and click **AccessKey Management**.
+       ![AccessKey Management](./../../img/quick-start-alibaba-cloud-ak-management.png)
    2. Click **Create AccessKey** to create the AccessKey ID and the corresponding AccessKey secret.
    3. Add the AccessKey ID and AccessKey secret to the environment variable to configure identity authorization information.
 
        ```bash
-       export ALICLOUD_ACCESS_KEY="************"
-       export ALICLOUD_SECRET_KEY="************"
+       export ALICLOUD_ACCESS_KEY="YOUR_ACCESS_KEY"
+       export ALICLOUD_SECRET_KEY="YOUR_SECRET_KEY"
        ```
 
    :::note
@@ -319,7 +326,7 @@ kbcli cluster connect mycluster
 3. Open another terminal tab to connect the database cluster.
 
    ```bash
-   mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
+   mysql -h 127.0.0.1 -P 3306 -u root -p"******"
    >
    ...
    Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.

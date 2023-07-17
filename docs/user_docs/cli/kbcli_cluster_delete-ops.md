@@ -8,6 +8,16 @@ Delete an OpsRequest.
 kbcli cluster delete-ops [flags]
 ```
 
+### Examples
+
+```
+  # delete all ops belong the specified cluster
+  kbcli cluster delete-ops mycluster
+  
+  # delete the specified ops belong the specify cluster
+  kbcli cluster delete-ops --name=mysql-restart-82zxv
+```
+
 ### Options
 
 ```

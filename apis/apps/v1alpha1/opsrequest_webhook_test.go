@@ -28,11 +28,11 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
+	// testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("OpsRequest webhook", func() {
@@ -48,6 +48,11 @@ var _ = Describe("OpsRequest webhook", func() {
 		clusterName                  = "opswebhook-mysql-" + randomStr
 		opsRequestName               = "opswebhook-mysql-ops-" + randomStr
 	)
+
+	int32Ptr := func(i int32) *int32 {
+		return &i
+	}
+
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
@@ -397,6 +402,93 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 
+	testSwitchover := func(clusterDef *ClusterDefinition, cluster *Cluster) {
+		switchoverList := []Switchover{
+			{
+				ComponentOps: ComponentOps{ComponentName: "switchover-component-not-exist"},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "switchover-instance-name-not-exist",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: fmt.Sprintf("%s-%s-0", cluster.Name, componentName),
+			},
+		}
+
+		By("By testing horizontalScaling - delete component proxy from cluster definition which is exist in cluster")
+		patch := client.MergeFrom(clusterDef.DeepCopy())
+		// delete component proxy from cluster definition
+		if clusterDef.Spec.ComponentDefs[0].Name == proxyComponentName {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[1:]
+		} else {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[:1]
+		}
+		Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
+		tmp := &ClusterDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
+		Expect(len(tmp.Spec.ComponentDefs)).Should(Equal(1))
+
+		By("By testing switchover - target component not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("switchover-component-not-exist")))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("switchover.instanceName"))
+
+		By("By testing switchover - clusterDefinition has no switchoverSpec and do not support switchover")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("does not support switchover"))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		patch = client.MergeFrom(clusterDef.DeepCopy())
+		commandExecutorEnvItem := CommandExecutorEnvItem{
+			Image: "",
+		}
+		commandExecutorItem := CommandExecutorItem{
+			Command: []string{"echo", "hello"},
+			Args:    []string{},
+		}
+		switchoverSpec := &SwitchoverSpec{
+			WithCandidate: &SwitchoverAction{
+				CmdExecutorConfig: &CmdExecutorConfig{
+					CommandExecutorEnvItem: commandExecutorEnvItem,
+					CommandExecutorItem:    commandExecutorItem,
+				},
+			},
+			WithoutCandidate: &SwitchoverAction{
+				CmdExecutorConfig: &CmdExecutorConfig{
+					CommandExecutorEnvItem: commandExecutorEnvItem,
+					CommandExecutorItem:    commandExecutorItem,
+				},
+			},
+		}
+		clusterDef.Spec.ComponentDefs[0].SwitchoverSpec = switchoverSpec
+		Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
+		tmp = &ClusterDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
+		Expect(len(tmp.Spec.ComponentDefs)).Should(Equal(1))
+
+		By("By testing switchover - switchover.InstanceName is * and should succeed ")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+	}
+
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
 		By("delete cluster")
 		newCluster := &Cluster{}
@@ -453,29 +545,96 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			testHorizontalScaling(clusterDef, cluster)
 
+			testSwitchover(clusterDef, cluster)
+
 			opsRequest = testRestart(cluster)
 
 			testWhenClusterDeleted(cluster, opsRequest)
+		})
+
+		It("check datascript opts", func() {
+			OpsRequestBehaviourMapper[DataScriptType] = OpsRequestBehaviour{
+				FromClusterPhases: []ClusterPhase{RunningClusterPhase},
+			}
+
+			By("By create a clusterDefinition")
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+			By("By creating a clusterVersion")
+			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+
+			opsRequest := createTestOpsRequest(clusterName, opsRequestName, DataScriptType)
+			opsRequest.Spec.ScriptSpec = &ScriptSpec{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+			}
+
+			// create Cluster
+			By("By testing spec.clusterDef is legal")
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+			By("By create a new cluster ")
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+
+			By("By testing dataScript without script, should fail")
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+
+			By("By testing dataScript, with script, no wait, should fail")
+			opsRequest.Spec.ScriptSpec.Script = []string{"create database test;"}
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).To(ContainSubstring("DataScript is forbidden"))
+
+			By("By testing dataScript, with illegal configmap, should fail")
+			opsRequest.Spec.ScriptSpec.ScriptFrom = &ScriptFrom{
+				ConfigMapRef: []corev1.ConfigMapKeySelector{
+					{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-cm",
+						},
+						Key: "createdb",
+					},
+				},
+			}
+
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+
+			By("By testing dataScript, with illegal scriptFrom, should fail")
+			opsRequest.Spec.ScriptSpec.ScriptFrom.SecretRef = nil
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+
+			// patch cluster to running
+			By("By patching cluster to running")
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+			clusterPatch := client.MergeFrom(cluster.DeepCopy())
+			cluster.Status.Phase = RunningClusterPhase
+			Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)
+				return cluster.Status.Phase == RunningClusterPhase
+			}).Should(BeTrue())
+
+			opsRequest.Spec.ScriptSpec.Script = []string{"create database test;"}
+			opsRequest.Spec.ScriptSpec.ScriptFrom = nil
+			opsRequest.Spec.TTLSecondsBeforeAbort = int32Ptr(0)
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 		})
 	})
 })
 
 func createTestOpsRequest(clusterName, opsRequestName string, opsType OpsType) *OpsRequest {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
-	opsRequestYaml := fmt.Sprintf(`
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: %s
-  namespace: default
-  labels:
-     app.kubernetes.io/instance: %s
-     ops.kubeblocks.io/ops-type: %s
-spec:
-  clusterRef: %s
-  type: %s
-`, opsRequestName+randomStr, clusterName, opsType, clusterName, opsType)
-	opsRequest := &OpsRequest{}
-	_ = yaml.Unmarshal([]byte(opsRequestYaml), opsRequest)
-	return opsRequest
+	return &OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsRequestName + randomStr,
+			Namespace: "default",
+			Labels: map[string]string{
+				"app.kubernetes.io/instance": clusterName,
+				"ops.kubeblocks.io/ops-type": string(opsType),
+			},
+		},
+		Spec: OpsRequestSpec{
+			ClusterRef: clusterName,
+			Type:       opsType,
+		},
+	}
 }

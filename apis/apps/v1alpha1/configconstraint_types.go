@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,6 +29,23 @@ type ConfigConstraintSpec struct {
 	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
+
+	// toolConfig used to config init container.
+	// +optional
+	ToolsImageSpec *ToolsImageSpec `json:"toolsImageSpec,omitempty"`
+	// ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
+
+	// downwardAPIOptions is used to watch pod fields.
+	// +optional
+	DownwardAPIOptions []DownwardAPIOption `json:"downwardAPIOptions,omitempty"`
+
+	// scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image
+	// +optional
+	// +patchMergeKey=scriptConfigMapRef
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=scriptConfigMapRef
+	ScriptConfigs []ScriptConfig `json:"scriptConfigs,omitempty"`
 
 	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
@@ -122,15 +140,65 @@ type UnixSignalTrigger struct {
 
 	// processName is process name, sends unix signal to proc.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ProcessName string `json:"processName"`
 }
 
-type ShellTrigger struct {
-	// exec used to execute for reload.
+type ToolsImageSpec struct {
+	// auto generate
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
-	Exec string `json:"exec"`
+	// +kubebuilder:validation:MaxLength=32
+	// VolumeName string `json:"volumeName"`
 
+	// mountPoint is the mount point of the scripts file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	MountPoint string `json:"mountPoint"`
+
+	// toolConfig used to config init container.
+	// +optional
+	ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
+}
+
+type ToolConfig struct {
+	// Specify the name of initContainer. Must be a DNS_LABEL name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	Name string `json:"name,omitempty"`
+
+	// tools Container image name.
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// exec used to execute for init containers.
+	// +kubebuilder:validation:Required
+	Command []string `json:"command"`
+}
+
+type DownwardAPIOption struct {
+	// Specify the name of the field.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// mountPoint is the mount point of the scripts file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	MountPoint string `json:"mountPoint"`
+
+	// Items is a list of downward API volume file
+	// +kubebuilder:validation:Required
+	Items []corev1.DownwardAPIVolumeFile `json:"items"`
+
+	// command used to execute for downwrad api.
+	// +optional
+	Command []string `json:"command,omitempty"`
+}
+
+type ScriptConfig struct {
 	// scriptConfigMapRef used to execute for reload.
 	// +kubebuilder:validation:Required
 	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
@@ -139,21 +207,19 @@ type ShellTrigger struct {
 	// An empty namespace is equivalent to the "default" namespace.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:default="default"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
 
-type TPLScriptTrigger struct {
-	// scriptConfigMapRef used to execute for reload.
+type ShellTrigger struct {
+	// command used to execute for reload.
 	// +kubebuilder:validation:Required
-	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
+	Command []string `json:"command"`
+}
 
-	// Specify the namespace of the referenced the tpl script ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:default="default"
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
+type TPLScriptTrigger struct {
+	ScriptConfig `json:",inline"`
 
 	// Specify synchronize updates parameters to the config manager.
 	// +optional

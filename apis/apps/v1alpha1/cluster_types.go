@@ -17,23 +17,32 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // ClusterSpec defines the desired state of Cluster.
 type ClusterSpec struct {
 	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referencing ClusterVersion name.
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
@@ -63,6 +72,44 @@ type ClusterSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// replicas specifies the replicas of the first componentSpec, if the replicas of the first componentSpec is specified, this value will be ignored.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// resources specifies the resources of the first componentSpec, if the resources of the first componentSpec is specified, this value will be ignored.
+	// +optional
+	Resources ClusterResources `json:"resources,omitempty"`
+
+	// storage specifies the storage of the first componentSpec, if the storage of the first componentSpec is specified, this value will be ignored.
+	// +optional
+	Storage ClusterStorage `json:"storage,omitempty"`
+
+	// mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.
+	// +optional
+	Mode ClusterMode `json:"mode,omitempty"`
+
+	// customized parameters that is used in different clusterdefinition
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+type ClusterResources struct {
+
+	// cpu resource needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	CPU resource.Quantity `json:"cpu,omitempty"`
+
+	// memory resource needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Memory resource.Quantity `json:"memory,omitempty"`
+}
+
+type ClusterStorage struct {
+
+	// storage size needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Size resource.Quantity `json:"size,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster.
@@ -100,17 +147,20 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// ClusterComponentSpec defines the cluster component spec.
 type ClusterComponentSpec struct {
-	// name defines cluster's component name.
+	// name defines cluster's component name, this name is also part of Service DNS name, so this name will
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=15
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// componentDefRef references the componentDef defined in ClusterDefinition spec.
+	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
@@ -162,11 +212,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
-	// primaryIndex determines which index is primary when workloadType is Replication. Index number starts from zero.
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
-
 	// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
@@ -184,7 +229,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// noCreatePDB defines the PodDistruptionBudget creation behavior and is set to true if creation of PodDistruptionBudget
+	// noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget
 	// for this component is not needed. It defaults to false.
 	// +kubebuilder:default=false
 	// +optional
@@ -296,9 +341,12 @@ type ReplicationMemberStatus struct {
 type ClusterSwitchPolicy struct {
 	// TODO other attribute extensions
 
-	// clusterSwitchPolicy type defined by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+	// clusterSwitchPolicy defines type of the switchPolicy when workloadType is Replication.
+	// MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. It will be available in future versions.
+	// MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. It will be available in future versions.
+	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=MaximumAvailability
+	// +kubebuilder:default=Noop
 	// +optional
 	Type SwitchPolicyType `json:"type"`
 }
@@ -346,19 +394,23 @@ type PersistentVolumeClaimSpec struct {
 }
 
 // ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
-func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
+func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes:      r.AccessModes,
 		Resources:        r.Resources,
-		StorageClassName: r.StorageClassName,
+		StorageClassName: r.GetStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
 	}
 }
 
 // GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
 // it returns preferSC argument.
-func (r PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
+func (r *PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
+	}
+
+	if preferSC == "" {
+		return nil
 	}
 	return &preferSC
 }
@@ -462,6 +514,8 @@ type ClusterComponentService struct {
 
 type ClassDefRef struct {
 	// Name refers to the name of the ComponentClassDefinition.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -682,24 +736,6 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 	return ts
 }
 
-// GetPrimaryIndex provides safe operation get ClusterComponentSpec.PrimaryIndex, if value is nil, it's treated as 0.
-func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
-	if r == nil || r.PrimaryIndex == nil {
-		return 0
-	}
-	return *r.PrimaryIndex
-}
-
-// GetClusterTerminalPhases returns Cluster terminal phases.
-func GetClusterTerminalPhases() []ClusterPhase {
-	return []ClusterPhase{
-		RunningClusterPhase,
-		StoppedClusterPhase,
-		FailedClusterPhase,
-		AbnormalClusterPhase,
-	}
-}
-
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.
 func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
@@ -709,11 +745,13 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	}
 }
 
-// GetClusterFailedPhases return Cluster failed or partially failed phases.
-func GetClusterFailedPhases() []ClusterPhase {
+// GetReconfiguringRunningPhases return Cluster running or partially running phases.
+func GetReconfiguringRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
-		FailedClusterPhase,
+		RunningClusterPhase,
+		SpecReconcilingClusterPhase, // enable partial running for reconfiguring
 		AbnormalClusterPhase,
+		FailedClusterPhase,
 	}
 }
 
@@ -739,4 +777,19 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 // ComponentPodsAreReady checks if the pods of component are ready.
 func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
+}
+
+// GetComponentDefByCluster gets component from ClusterDefinition with compDefName
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster Cluster,
+	compDefName string) (*ClusterComponentDefinition, error) {
+	clusterDef := &ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+	for _, component := range clusterDef.Spec.ComponentDefs {
+		if component.Name == compDefName {
+			return &component, nil
+		}
+	}
+	return nil, ErrNotMatchingCompDef
 }

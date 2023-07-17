@@ -2,9 +2,9 @@ apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup
 metadata:
   labels:
-    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/instance: mysql-cluster
     dataprotection.kubeblocks.io/backup-type: snapshot
-  name: backup-sbapshot-mycluster
+  name: backup-snapshot-mycluster
 spec:
-  backupPolicyName: mycluster-mysql-backup-policy
+  backupPolicyName: mysql-cluster-backup-policy
   backupType: snapshot

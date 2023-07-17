@@ -1,15 +1,18 @@
+annotations:
+  category: Database
 apiVersion: v2
 name: mongodb-cluster
-description: A MongoDB cluster Helm chart for KubeBlocks
-
 type: application
-
-version: 0.5.1-beta.0
+version: 0.6.0-alpha.36
+description: A MongoDB cluster Helm chart for KubeBlocks
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
 
 appVersion: "5.0.14"
 
-home: https://www.mongodb.com
-icon: https://bitnami.com/assets/stacks/mongodb/img/mongodb-stack-220x234.png
 keywords:
   - mongodb
   - database
@@ -18,6 +21,13 @@ keywords:
   - replicaset
   - replication
 
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/mongodb-cluster
+icon: https://kubeblocks.io/img/logo.png
+
 maintainers:
-  - name: xuriwuyun
-    url: https://github.com/apecloud/kubeblocks/deploy
+  - name: ApeCloud
+    url: https://kubeblocks.io/
+
+sources:
+  - https://github.com/apecloud/kubeblocks/
+  - https://github.com/apecloud/kubeblocks/tree/main/deploy/mongodb

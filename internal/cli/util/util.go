@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	mrand "math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -45,6 +46,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -61,6 +63,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -546,6 +549,9 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 		if err != nil {
 			return false, err
 		}
+		if schema.Schema == nil {
+			return true, nil
+		}
 	}
 
 	schemaSpec := schema.Schema.Properties["spec"]
@@ -557,7 +563,7 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 	return true, nil
 }
 
-func getIPLocation() (string, error) {
+func GetIPLocation() (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", "https://ifconfig.io/country_code", nil)
 	if err != nil {
@@ -583,12 +589,22 @@ func GetHelmChartRepoURL() string {
 		return testing.KubeBlocksChartURL
 	}
 
-	location, _ := getIPLocation()
-	// if location is CN, or we can not get location, use GitLab helm chart repo
-	if location == "CN" || location == "" {
-		return types.GitLabHelmChartRepo
+	// if helm repo url is specified by config or environment, use it
+	url := viper.GetString(types.CfgKeyHelmRepoURL)
+	if url != "" {
+		klog.V(1).Infof("Using helm repo url set by config or environment: %s", url)
+		return url
 	}
-	return types.KubeBlocksChartURL
+
+	// if helm repo url is not specified, choose one from GitHub and GitLab based on the IP location
+	// if location is CN, or we can not get location, use GitLab helm chart repo
+	repo := types.KubeBlocksChartURL
+	location, _ := GetIPLocation()
+	if location == "CN" || location == "" {
+		repo = types.GitLabHelmChartRepo
+	}
+	klog.V(1).Infof("Using helm repo url: %s", repo)
+	return repo
 }
 
 // GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
@@ -771,13 +787,16 @@ func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
 }
 
-func GetUnifiedDiffString(original, edited string) (string, error) {
+func GetUnifiedDiffString(original, edited string, from, to string, contextLine int) (string, error) {
+	if contextLine <= 0 {
+		contextLine = 3
+	}
 	diff := difflib.UnifiedDiff{
 		A:        difflib.SplitLines(original),
 		B:        difflib.SplitLines(edited),
-		FromFile: "Original",
-		ToFile:   "Current",
-		Context:  3,
+		FromFile: from,
+		ToFile:   to,
+		Context:  contextLine,
 	}
 	return difflib.GetUnifiedDiffString(diff)
 }
@@ -899,4 +918,47 @@ func AddDirToPath(dir string) error {
 		p = dir + ":" + p
 	}
 	return os.Setenv("PATH", p)
+}
+
+func ListResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrs []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
+	unstructuredList := make([]*unstructured.UnstructuredList, 0)
+	for _, gvr := range gvrs {
+		for _, labelSelector := range selector {
+			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvr=%v, selector=%v", namespace, gvr, labelSelector)
+			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
+			if err != nil {
+				AppendErrIgnoreNotFound(allErrs, err)
+				continue
+			}
+			unstructuredList = append(unstructuredList, resource)
+		}
+	}
+	return unstructuredList
+}
+
+func AppendErrIgnoreNotFound(allErrs *[]error, err error) {
+	if err == nil || apierrors.IsNotFound(err) {
+		return
+	}
+	*allErrs = append(*allErrs, err)
+}
+
+func WritePogStreamingLog(ctx context.Context, client kubernetes.Interface, pod *corev1.Pod, logOptions corev1.PodLogOptions, writer io.Writer) error {
+	request := client.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &logOptions)
+	if data, err := request.DoRaw(ctx); err != nil {
+		return err
+	} else {
+		_, err := writer.Write(data)
+		return err
+	}
+}
+
+// RandRFC1123String generate a random string with length n, which fulfills RFC1123
+func RandRFC1123String(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[mrand.Intn(len(letters))]
+	}
+	return string(b)
 }

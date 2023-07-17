@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: chaos-mesh
+  name: fault-chaos-mesh
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     "kubeblocks.io/provider": community
@@ -15,7 +15,18 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/chaos-mesh-2.5.2.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/chaos-mesh
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/chaos-mesh-2.5.2/chaos-mesh-2.5.2.tgz
+    {{- else }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/chaos-mesh-2.5.2.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 2.5.2
+      {{- end }}
 
     installValues:
       setValues:

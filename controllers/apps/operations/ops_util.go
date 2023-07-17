@@ -32,10 +32,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+var _ error = &WaitForClusterPhaseErr{}
+
+type WaitForClusterPhaseErr struct {
+	clusterName   string
+	currentPhase  appsv1alpha1.ClusterPhase
+	expectedPhase []appsv1alpha1.ClusterPhase
+}
+
+func (e *WaitForClusterPhaseErr) Error() string {
+	return fmt.Sprintf("wait for cluster %s to reach phase %v, current status is :%s", e.clusterName, e.expectedPhase, e.currentPhase)
+}
 
 type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -85,7 +97,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
 			continue
 		}
-		if util.IsFailedOrAbnormal(v.Phase) {
+		if components.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
 		}
 		var compStatus appsv1alpha1.OpsRequestComponentStatus
@@ -213,6 +225,12 @@ func patchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes 
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
+// patchFastFailErrorCondition patches a new failed condition to the OpsRequest.status.conditions.
+func patchFastFailErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, err error) error {
+	condition := appsv1alpha1.NewFailedCondition(opsRes.OpsRequest, err)
+	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
+}
+
 // GetOpsRecorderFromSlice gets OpsRequest recorder from slice by target cluster phase
 func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 	opsRequestName string) (int, appsv1alpha1.OpsRecorder) {
@@ -226,15 +244,18 @@ func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 }
 
 // patchOpsRequestToCreating patches OpsRequest.status.phase to Running
-func patchOpsRequestToCreating(ctx context.Context,
+func patchOpsRequestToCreating(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	opsDeepCoy *appsv1alpha1.OpsRequest,
 	opsHandler OpsHandler) error {
 	var condition *metav1.Condition
 	validatePassCondition := appsv1alpha1.NewValidatePassedCondition(opsRes.OpsRequest.Name)
-	condition = opsHandler.ActionStartedCondition(opsRes.OpsRequest)
-	return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
+	condition, err := opsHandler.ActionStartedCondition(reqCtx, cli, opsRes)
+	if err != nil {
+		return err
+	}
+	return PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
 }
 
 // patchClusterStatusAndRecordEvent records the ops event in the cluster and
@@ -404,4 +425,29 @@ func cancelComponentOps(ctx context.Context,
 		lastCompInfos[comp.Name] = lastConfig
 	}
 	return cli.Update(ctx, opsRes.Cluster)
+}
+
+// validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
+// only requests with `Pending` phase will be validated.
+func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
+	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase {
+		return nil
+	}
+	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
+	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
+		// check if entry-condition is met
+		// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
+		// if len(opsRecorder) == 0 && !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
+		// TTLSecondsBeforeAbort is 0 means that the we do not need to wait for the cluster to reach the expected phase.
+		if ops.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.TTLSecondsBeforeAbort) * time.Second))) {
+			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", ops.Spec.Type, cluster.Status.Phase)
+		}
+
+		return &WaitForClusterPhaseErr{
+			clusterName:   cluster.Name,
+			currentPhase:  cluster.Status.Phase,
+			expectedPhase: opsBehaviour.FromClusterPhases,
+		}
+	}
+	return nil
 }

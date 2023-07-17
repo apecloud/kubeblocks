@@ -26,11 +26,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/redis/go-redis/v9"
-	"golang.org/x/exp/slices"
-
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	// import this json-iterator package to replace the default
 	// to avoid the error: 'json: unsupported type: map[interface {}]interface {}'
@@ -50,6 +50,11 @@ var (
 		"kbprobe",
 		"kbreplicator",
 	}
+)
+
+var (
+	redisUser   = "default"
+	redisPasswd = ""
 )
 
 // Redis is a redis output binding.
@@ -75,10 +80,20 @@ func NewRedis(logger logger.Logger) bindings.OutputBinding {
 func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.BaseOperations.Init(meta)
 
+	if viper.IsSet("KB_SERVICE_USER") {
+		redisUser = viper.GetString("KB_SERVICE_USER")
+	}
+
+	if viper.IsSet("KB_SERVICE_PASSWORD") {
+		redisPasswd = viper.GetString("KB_SERVICE_PASSWORD")
+	}
+
 	r.Logger.Debug("Initializing Redis binding")
 	r.DBType = "redis"
 	r.InitIfNeed = r.initIfNeed
 	r.BaseOperations.GetRole = r.GetRole
+	r.BaseOperations.LockInstance = r.LockInstance
+	r.BaseOperations.UnlockInstance = r.UnlockInstance
 
 	// register redis operations
 	r.RegisterOperation(bindings.CreateOperation, r.createOps)
@@ -133,7 +148,11 @@ func (r *Redis) initDelay() error {
 		return nil
 	}
 	var err error
-	r.client, r.clientSettings, err = rediscomponent.ParseClientFromProperties(r.Metadata.Properties, nil)
+	defaultSettings := &rediscomponent.Settings{
+		Password: redisPasswd,
+		Username: redisUser,
+	}
+	r.client, r.clientSettings, err = rediscomponent.ParseClientFromProperties(r.Metadata.Properties, defaultSettings)
 	if err != nil {
 		return err
 	}
@@ -587,6 +606,16 @@ func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, re
 		return SECONDARY, nil
 	}
 	return role, nil
+}
+
+func (r *Redis) LockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
+
+func (r *Redis) UnlockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
 }
 
 func defaultRedisEntryParser(req *bindings.InvokeRequest, object *RedisEntry) error {

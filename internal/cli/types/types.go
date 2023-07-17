@@ -26,11 +26,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -133,6 +131,7 @@ const (
 	ResourceBackupTools    = "backuptools"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
+	ResourceBackupRepos    = "backuprepos"
 )
 
 // Extensions API group
@@ -140,6 +139,13 @@ const (
 	ExtensionsAPIGroup   = "extensions.kubeblocks.io"
 	ExtensionsAPIVersion = "v1alpha1"
 	ResourceAddons       = "addons"
+)
+
+// Storage API group
+const (
+	StorageAPIGroup          = "storage.kubeblocks.io"
+	StorageAPIVersion        = "v1alpha1"
+	ResourceStorageProviders = "storageproviders"
 )
 
 // Migration API group
@@ -157,6 +163,14 @@ const (
 	ResourceCustomResourceDefinition   = "customresourcedefinitions"
 )
 
+// Kubebench API group
+const (
+	KubebenchAPIGroup   = "benchmark.apecloud.io"
+	KubebenchAPIVersion = "v1alpha1"
+	ResourcePgBench     = "pgbenches"
+	ResourceSysBench    = "sysbenches"
+)
+
 const (
 	None = "<none>"
 
@@ -165,9 +179,6 @@ const (
 )
 
 var (
-	// KubeBlocksName is the name of KubeBlocks project
-	KubeBlocksName = "kubeblocks"
-
 	// KubeBlocksRepoName helm repo name for kubeblocks
 	KubeBlocksRepoName = "kubeblocks"
 
@@ -182,12 +193,6 @@ var (
 
 	// GitLabHelmChartRepo the helm chart repo in GitLab
 	GitLabHelmChartRepo = "https://jihulab.com/api/v4/projects/85949/packages/helm/stable"
-
-	// InstanceLabelSelector app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
-	InstanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, KubeBlocksChartName)
-
-	// ReleaseLabelSelector release=kubeblocks, for prometheus-alertmanager and prometheus-server
-	ReleaseLabelSelector = fmt.Sprintf("release=%s", KubeBlocksChartName)
 
 	// KubeBlocksHelmLabel name=kubeblocks,owner-helm, for helm secret
 	KubeBlocksHelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
@@ -237,12 +242,20 @@ func BackupToolGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTools}
 }
 
+func BackupRepoGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupRepos}
+}
+
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestoreJobs}
 }
 
 func AddonGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
+}
+
+func StorageProviderGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: StorageAPIGroup, Version: StorageAPIVersion, Resource: ResourceStorageProviders}
 }
 
 func ComponentResourceConstraintGVR() schema.GroupVersionResource {
@@ -377,4 +390,12 @@ func JobGVR() schema.GroupVersionResource {
 }
 func CronJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: K8SBatchAPIGroup, Version: K8sBatchAPIVersion, Resource: ResourceCronJobs}
+}
+
+func PgBenchGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourcePgBench}
+}
+
+func SysbenchGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourceSysBench}
 }

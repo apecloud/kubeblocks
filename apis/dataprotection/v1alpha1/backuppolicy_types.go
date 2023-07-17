@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,13 @@ type RetentionSpec struct {
 }
 
 type Schedule struct {
+	// startWindowMinutes defines the time window for starting the job if it misses scheduled
+	// time for any reason. the unit of time is minute.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1440
+	StartWindowMinutes *int64 `json:"startWindowMinutes,omitempty"`
+
 	// schedule policy for snapshot backup.
 	// +optional
 	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`
@@ -92,20 +100,31 @@ type CommonBackupPolicy struct {
 	BasePolicy `json:",inline"`
 
 	// refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.
-	// +kubebuilder:validation:Required
-	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim"`
+	// +optional
+	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
+
+	// refer to BackupRepo and the backup data will be stored in the corresponding repo.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	BackupRepoName *string `json:"backupRepoName,omitempty"`
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupToolName string `json:"backupToolName,omitempty"`
 }
 
 type PersistentVolumeClaim struct {
-	// the name of the PersistentVolumeClaim.
-	Name string `json:"name"`
+	// the name of PersistentVolumeClaim to store backup data.
+	// +kubebuilder:validation:MaxLength=63
+	// +optional
+	Name *string `json:"name,omitempty"`
 
 	// storageClassName is the name of the StorageClass required by the claim.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
@@ -119,12 +138,12 @@ type PersistentVolumeClaim struct {
 	// - IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains 'ReadWriteMany'.
 	// +kubebuilder:default=IfNotPresent
 	// +optional
-	CreatePolicy CreatePVCPolicy `json:"createPolicy"`
+	CreatePolicy CreatePVCPolicy `json:"createPolicy,omitempty"`
 
 	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
 	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
 	// support the following built-in Objects:
-	// - $(GENERATE_NAME): generate a specific format "pvcName-pvcNamespace".
+	// - $(GENERATE_NAME): generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
 	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
 	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
 	// +optional
@@ -134,12 +153,17 @@ type PersistentVolumeClaim struct {
 type PersistentVolumeConfigMap struct {
 	// the name of the persistentVolume ConfigMap.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// the namespace of the persistentVolume ConfigMap.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	Namespace string `json:"namespace"`
 }
+
 type BasePolicy struct {
 	// target database cluster for backup.
 	// +kubebuilder:validation:Required
@@ -180,6 +204,7 @@ type TargetCluster struct {
 type BackupPolicySecret struct {
 	// the secret name
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
@@ -239,9 +264,14 @@ type BackupStatusUpdate struct {
 	// +optional
 	Script string `json:"script,omitempty"`
 
-	// when to update the backup status, pre: before backup, post: after backup
+	// useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.
+	// if true, will use the service account of the backup target pod. otherwise, will use the system service account.
 	// +optional
-	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
+	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
+
+	// when to update the backup status, pre: before backup, post: after backup
+	// +kubebuilder:validation:Required
+	UpdateStage BackupStatusUpdateStage `json:"updateStage"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy
@@ -335,4 +365,18 @@ func ToDuration(ttl *string) time.Duration {
 	}
 	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
 	return time.Hour * time.Duration(hours)
+}
+
+// AddTTL adds tll with hours
+func AddTTL(ttl *string, hours int) string {
+	if ttl == nil {
+		return ""
+	}
+	ttlLower := strings.ToLower(*ttl)
+	if strings.HasSuffix(ttlLower, "d") {
+		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
+		return fmt.Sprintf("%dh", days*24+hours)
+	}
+	ttlHours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
+	return fmt.Sprintf("%dh", ttlHours+hours)
 }

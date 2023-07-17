@@ -61,7 +61,7 @@ kbcli fault network partition [flags]
       --node stringArray               Inject faults into pods in the specified node.
       --node-label stringToString      label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux. (default [])
       --ns-fault stringArray           Specifies the namespace into which you want to inject faults. (default [default])
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --phase stringArray              Specify the pod that injects the fault by the state of the pod.
       --target-label stringToString    label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
       --target-mode string             You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.

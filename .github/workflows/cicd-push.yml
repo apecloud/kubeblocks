@@ -10,8 +10,8 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
+  GO_VERSION: "1.20"
 
 jobs:
   trigger-mode:
@@ -19,6 +19,13 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
+      - name: Cancel Previous Runs
+        if: github.ref_name != 'main'
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -28,7 +35,7 @@ jobs:
           TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
               --branch-name "${{ github.ref_name }}" \
               --base-branch "${{ env.BASE_BRANCH }}"`
-          
+
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
@@ -85,9 +92,9 @@ jobs:
             libdevmapper-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.20"
+          go-version: "${{ env.GO_VERSION }}"
 
       - name: Check cli doc
         id: check-cli-doc
@@ -147,7 +154,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score" 
+              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score"
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3
@@ -175,51 +182,53 @@ jobs:
       - name: remove runner
         run: |
           bash .github/utils/utils.sh --type 9 \
-            --github-token ${{ env.GITHUB_TOKEN }} \
+            --github-token "${{ env.GITHUB_TOKEN }}" \
             --runner-name ${{ needs.make-test.outputs.runner-name }}
 
   check-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
     with:
       MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
-      VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
 
   check-tools-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
     with:
-      MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "build-tools-image"
+      MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
-      VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      DOCKERFILE_PATH: "./docker/Dockerfile-tools"
+    secrets: inherit
+
+  check-datascript-image:
+    needs: trigger-mode
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
+    with:
+      IMG: "apecloud/kubeblocks-datascript"
+      BUILDX_PLATFORMS: "linux/amd64"
+      DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
     secrets: inherit
 
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.8
     with:
       MAKE_OPS: "bump-chart-ver"
-      VERSION: "v0.4.0-check"
+      VERSION: "v0.6.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      PUSH_ENABLE: false
-      DEP_REPO: "helm dep update deploy/delphic"
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.8"
     secrets: inherit
 
   deploy-kubeblocks-io:
@@ -239,7 +248,7 @@ jobs:
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') }}
     strategy:
       matrix:
-        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
+        os: [linux-amd64, darwin-arm64]
     steps:
       - uses: actions/checkout@v3
       - name: install lib
@@ -247,12 +256,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libbtrfs-dev \
-            libdevmapper-dev
+            libdevmapper-dev \
+            libgpgme-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.20"
+          go-version: "${{ env.GO_VERSION }}"
 
       - name: make generate
         run: make generate

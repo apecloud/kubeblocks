@@ -1,0 +1,88 @@
+name: CodeQL
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  push:
+    branches: [ "main", release-*, releasing-* ]
+
+env:
+  BASE_BRANCH: origin/main
+  GO_VERSION: "1.20"
+
+jobs:
+  trigger-mode:
+    runs-on: ubuntu-latest
+    outputs:
+      trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
+    steps:
+      - name: Cancel Previous Runs
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Get trigger mode
+        id: get_trigger_mode
+        run: |
+          TRIGGER_MODE="[go]"
+          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+              TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
+                  --branch-name "${{ github.event.pull_request.head.ref }}" \
+                  --base-commit "${{ github.event.pull_request.base.sha }}"`
+          elif [[ "${{ github.event_name }}" == 'push' ]]; then
+              TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
+                  --branch-name "${{ github.ref_name }}" \
+                  --base-branch "${{ env.BASE_BRANCH }}"`
+          fi
+          echo $TRIGGER_MODE
+          echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
+
+  analyze:
+    name: Analyze
+    needs: trigger-mode
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[go]')
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'go' ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: install lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: make generate
+        run: |
+          make generate test-go-generate
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{matrix.language}}"

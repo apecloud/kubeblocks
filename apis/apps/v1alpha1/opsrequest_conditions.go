@@ -35,27 +35,31 @@ const (
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
 	ConditionTypeVolumeExpanding   = "VolumeExpanding"
 	ConditionTypeReconfigure       = "Reconfigure"
+	ConditionTypeSwitchover        = "Switchover"
 	ConditionTypeStop              = "Stopping"
 	ConditionTypeStart             = "Starting"
 	ConditionTypeVersionUpgrading  = "VersionUpgrading"
 	ConditionTypeExpose            = "Exposing"
+	ConditionTypeDataScript        = "ExecuteDataScript"
 
 	// condition and event reasons
 
-	ReasonReconfigureMerging   = "ReconfigureMerging"
-	ReasonReconfigureMerged    = "ReconfigureMerged"
-	ReasonReconfigureFailed    = "ReconfigureFailed"
-	ReasonReconfigureNoChanged = "ReconfigureNoChanged"
-	ReasonReconfigureSucceed   = "ReconfigureSucceed"
-	ReasonReconfigureRunning   = "ReconfigureRunning"
-	ReasonClusterPhaseMismatch = "ClusterPhaseMismatch"
-	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
-	ReasonValidateFailed       = "ValidateFailed"
-	ReasonClusterNotFound      = "ClusterNotFound"
-	ReasonOpsRequestFailed     = "OpsRequestFailed"
-	ReasonOpsCanceling         = "Canceling"
-	ReasonOpsCancelFailed      = "CancelFailed"
-	ReasonOpsCancelSucceed     = "CancelSucceed"
+	ReasonReconfigureMerging       = "ReconfigureMerging"
+	ReasonReconfigureMerged        = "ReconfigureMerged"
+	ReasonReconfigureFailed        = "ReconfigureFailed"
+	ReasonReconfigureRestartFailed = "ReconfigureRestartFailed"
+	ReasonReconfigureRestart       = "ReconfigureRestarted"
+	ReasonReconfigureNoChanged     = "ReconfigureNoChanged"
+	ReasonReconfigureSucceed       = "ReconfigureSucceed"
+	ReasonReconfigureRunning       = "ReconfigureRunning"
+	ReasonClusterPhaseMismatch     = "ClusterPhaseMismatch"
+	ReasonOpsTypeNotSupported      = "OpsTypeNotSupported"
+	ReasonValidateFailed           = "ValidateFailed"
+	ReasonClusterNotFound          = "ClusterNotFound"
+	ReasonOpsRequestFailed         = "OpsRequestFailed"
+	ReasonOpsCanceling             = "Canceling"
+	ReasonOpsCancelFailed          = "CancelFailed"
+	ReasonOpsCancelSucceed         = "CancelSucceed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -172,6 +176,18 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
+// NewSwitchoveringCondition creates a condition that the operation starts to switchover components
+func NewSwitchoveringCondition(generation int64, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeSwitchover,
+		Status:             metav1.ConditionTrue,
+		Reason:             "SwitchoverStarted",
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
+		ObservedGeneration: generation,
+	}
+}
+
 // NewVerticalScalingCondition creates a condition that the OpsRequest starts to vertical scale cluster
 func NewVerticalScalingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
@@ -258,6 +274,20 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		Message: fmt.Sprintf("Start to reconfigure in Cluster: %s, Component: %s",
 			ops.Spec.ClusterRef,
 			ops.Spec.Reconfigure.ComponentName),
+	}
+}
+
+func NewDataScriptCondition(ops *OpsRequest) *metav1.Condition {
+	return newOpsCondition(ops, ConditionTypeDataScript, "DataScriptStarted", fmt.Sprintf("Start to execute data script in Cluster: %s", ops.Spec.ClusterRef))
+}
+
+func newOpsCondition(ops *OpsRequest, condType, reason, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               condType,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
 	}
 }
 

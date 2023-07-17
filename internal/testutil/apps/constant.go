@@ -39,21 +39,19 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
-	ReplicationPodRoleVolume       = "pod-role"
-	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
-	DefaultReplicationPrimaryIndex = 0
-	DefaultReplicationReplicas     = 2
+	ReplicationPodRoleVolume         = "pod-role"
+	ReplicationRoleLabelFieldPath    = "metadata.labels['kubeblocks.io/role']"
+	DefaultReplicationCandidateIndex = 0
+	DefaultReplicationReplicas       = 2
 
-	MySQLType                 = "state.mysql"
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
 
 	NginxImage                = "nginx"
 	DefaultNginxContainerName = "nginx"
 
-	RedisType                     = "state.redis"
 	DefaultRedisCompDefName       = "redis"
-	DefaultRedisCompName          = "redis-rsts"
+	DefaultRedisCompSpecName      = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
@@ -64,13 +62,28 @@ const (
 )
 
 var (
+	zeroResRequirements = corev1.ResourceRequirements{
+		Limits: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    resource.MustParse("0"),
+			corev1.ResourceMemory: resource.MustParse("0"),
+		},
+	}
+
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateless,
 		CharacterType: "stateless",
+		Probes: &appsv1alpha1.ClusterDefinitionProbes{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
+				FailureThreshold: 3,
+				PeriodSeconds:    1,
+				TimeoutSeconds:   5,
+			},
+		},
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
-				Name:  DefaultNginxContainerName,
-				Image: NginxImage,
+				Name:      DefaultNginxContainerName,
+				Image:     NginxImage,
+				Resources: zeroResRequirements,
 			}},
 		},
 		Service: &appsv1alpha1.ServiceSpec{
@@ -121,6 +134,7 @@ var (
 		Name:            DefaultMySQLContainerName,
 		Image:           ApeCloudMySQLImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
+		Resources:       zeroResRequirements,
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "mysql",
@@ -164,7 +178,14 @@ var (
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateful,
 		CharacterType: "mysql",
-		Service:       &defaultMySQLService,
+		Probes: &appsv1alpha1.ClusterDefinitionProbes{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
+				FailureThreshold: 3,
+				PeriodSeconds:    1,
+				TimeoutSeconds:   5,
+			},
+		},
+		Service: &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},
@@ -248,6 +269,7 @@ var (
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    defaultReplicationRedisVolumeMounts,
 		Command:         []string{"/scripts/init.sh"},
+		Resources:       zeroResRequirements,
 	}
 
 	defaultRedisContainer = corev1.Container{
@@ -270,12 +292,20 @@ var (
 				},
 			},
 		},
+		Resources: zeroResRequirements,
 	}
 
 	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Replication,
 		CharacterType: "redis",
-		Service:       &defaultRedisService,
+		Probes: &appsv1alpha1.ClusterDefinitionProbes{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
+				FailureThreshold: 3,
+				PeriodSeconds:    1,
+				TimeoutSeconds:   5,
+			},
+		},
+		Service: &defaultRedisService,
 		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
 			Name: DataVolumeName,
 			Type: appsv1alpha1.VolumeTypeData,

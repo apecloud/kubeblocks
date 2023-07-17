@@ -14,6 +14,7 @@ on:
       - published
 
 env:
+  GH_TOKEN: ${{ github.token }}
   RELEASE_VERSION: ${{ github.ref_name }}
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
@@ -39,43 +40,74 @@ jobs:
 
   release-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
     with:
       MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "push-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
 
   release-tools-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
     with:
-      MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "push-tools-image"
+      MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile-tools"
+    secrets: inherit
+
+  release-datascript-image:
+    needs: image-tag
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
+    with:
+      IMG: "apecloud/kubeblocks-datascript"
+      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
     secrets: inherit
 
   send-message:
     runs-on: ubuntu-latest
-    needs: [ release-image, release-tools-image ]
+    needs: [ release-image, release-tools-image, release-datascript-image]
     if: ${{ always() && github.event.action == 'published' }}
     steps:
       - uses: actions/checkout@v3
       - name: send message
+        id: send_message
         run: |
+          release_result="${{ env.RELEASE_VERSION }}-image"
+          touch ${release_result}
+          echo 'release-result='${release_result} >> $GITHUB_OUTPUT
+
           CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0error"
-          if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success" ]]; then
+          if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success"  && "${{ needs.release-datascript-image.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0success"
+              echo "success" > ${release_result}
+          else
+              echo "error" > ${release_result}
           fi
-          
+
           bash .github/utils/utils.sh --type 12 \
             --tag-name ${{ env.RELEASE_VERSION }} \
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: delete cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.send_message.outputs.release-result }}"
+
+      - name: Save Artifact
+        id: cache-artifact-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ${{ steps.send_message.outputs.release-result }}
+          key: ${{ steps.send_message.outputs.release-result }}

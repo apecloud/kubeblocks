@@ -24,10 +24,13 @@ options: {
 	typeLower:              string
 	ttlSecondsAfterSucceed: int
 	clusterVersionRef:      string
+	component:              string
+	instance:               string
 	componentNames: [...string]
-	cpu:      string
-	memory:   string
-	class:    string
+	cpu:    string
+	memory: string
+	class:  string
+	classDefRef: {...}
 	replicas: int
 	storage:  string
 	vctNames: [...string]
@@ -93,7 +96,7 @@ content: {
 			verticalScaling: [ for _, cName in options.componentNames {
 				componentName: cName
 				if options.class != "" {
-					class: options.class
+					classDefRef: options.classDefRef
 				}
 				requests: {
 					if options.memory != "" {
@@ -136,6 +139,22 @@ content: {
 					serviceType: svc.serviceType
 					annotations: svc.annotations
 				}]
+			}]
+		}
+		if options.type == "Switchover" {
+			switchover: [{
+				if options.component == "" {
+					componentName: options.componentNames[0]
+				}
+				if options.component != "" {
+					componentName: options.component
+				}
+				if options.instance == "" {
+					instanceName: "*"
+				}
+				if options.instance != "" {
+					instanceName: options.instance
+				}
 			}]
 		}
 	}

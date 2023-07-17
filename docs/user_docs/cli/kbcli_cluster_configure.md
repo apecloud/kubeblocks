@@ -29,7 +29,7 @@ kbcli cluster configure NAME --set key=value[,key=value] [--component=component-
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
   -h, --help                           help for configure
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --set strings                    Specify parameters list to be updated. For more details, refer to 'kbcli cluster describe-config'.
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```

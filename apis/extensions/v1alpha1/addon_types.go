@@ -281,6 +281,8 @@ type ResourceReqLimItem struct {
 type DataObjectKeySelector struct {
 	// Object name of the referent.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"` // need corev1.LocalObjectReference
 
 	// The key to select.
@@ -423,7 +425,7 @@ func (r *Addon) GetExtraNames() []string {
 	}
 	switch r.Spec.Type {
 	case HelmType:
-		if r.Spec.Helm == nil {
+		if r.Spec.Helm == nil || len(r.Spec.Helm.ValuesMapping.ExtraItems) == 0 {
 			return nil
 		}
 		// r.Spec.DefaultInstallValues has minItem=1 constraint

@@ -17,7 +17,7 @@
 
 cluster: {
 	metadata: {
-		name:      string
+		name: string
 	}
 }
 component: {
@@ -40,10 +40,10 @@ backupJob: {
 			"dataprotection.kubeblocks.io/backup-type":         backupType
 			"apps.kubeblocks.io/managed-by":                    "cluster"
 			"backuppolicies.dataprotection.kubeblocks.io/name": backupPolicyName
-			"app.kubernetes.io/name":            "\(component.clusterDefName)"
-			"app.kubernetes.io/instance":        cluster.metadata.name
-			"app.kubernetes.io/managed-by":      "kubeblocks"
-			"apps.kubeblocks.io/component-name": "\(component.name)"
+			"app.kubernetes.io/name":                           "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":                       cluster.metadata.name
+			"app.kubernetes.io/managed-by":                     "kubeblocks"
+			"apps.kubeblocks.io/component-name":                "\(component.name)"
 		}
 	}
 	spec: {

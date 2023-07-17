@@ -38,6 +38,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -227,26 +229,7 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger)
 		return
 	}
 
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Errorf("get k8s client config failed: %v", err)
-		return
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Infof("k8s client create failed: %v", err)
-		return
-	}
-	namespace := os.Getenv("KB_NAMESPACE")
-	for i := 0; i < 30; i++ {
-		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
-		if err == nil {
-			break
-		}
-		log.Errorf("send event failed: %v", err)
-		time.Sleep(10 * time.Second)
-	}
+	_ = sendEvent(ctx, log, event)
 }
 
 func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
@@ -269,10 +252,10 @@ source:
 `
 
 	// get pod object
-	podName := os.Getenv("KB_POD_NAME")
-	podUID := os.Getenv("KB_POD_UID")
-	nodeName := os.Getenv("KB_NODENAME")
-	namespace := os.Getenv("KB_NAMESPACE")
+	podName := os.Getenv(constant.KBEnvPodName)
+	podUID := os.Getenv(constant.KBEnvPodUID)
+	nodeName := os.Getenv(constant.KBEnvNodeName)
+	namespace := os.Getenv(constant.KBEnvNamespace)
 	msg, _ := json.Marshal(opsResult)
 	seq := rand.String(16)
 	roleValue := map[string]string{
@@ -303,4 +286,39 @@ source:
 	event.LastTimestamp = metav1.Now()
 
 	return event, nil
+}
+
+func sendEvent(ctx context.Context, log logger.Logger, event *corev1.Event) error {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Errorf("get k8s client config failed: %v", err)
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Infof("k8s client create failed: %v", err)
+		return err
+	}
+	namespace := os.Getenv(constant.KBEnvNamespace)
+	for i := 0; i < 30; i++ {
+		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
+		if err == nil {
+			break
+		}
+		log.Errorf("send event failed: %v", err)
+		time.Sleep(10 * time.Second)
+	}
+	return err
+}
+
+func StartupCheckWraper(manager component.DBManager, operation LegacyOperation) LegacyOperation {
+	return func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
+		if !manager.IsDBStartupReady() {
+			opsRes := OpsResult{"event": OperationFailed, "message": "db not ready"}
+			return opsRes, nil
+		}
+
+		return operation(ctx, request, response)
+	}
 }

@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-reconfigure
 spec:
-  clusterRef: mycluster
+  clusterRef: mysql-cluster
   reconfigure:
     componentName: mysql
     configurations:

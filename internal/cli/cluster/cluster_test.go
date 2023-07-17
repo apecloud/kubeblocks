@@ -26,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("cluster util", func() {
@@ -37,9 +39,24 @@ var _ = Describe("cluster util", func() {
 		testing.FakePVCs(),
 	}
 
+	baseObjsWithBackupPods := func() []runtime.Object {
+		podsWithBackup := testing.FakePods(4, testing.Namespace, testing.ClusterName)
+		labels := podsWithBackup.Items[0].GetLabels()
+		labels[constant.DataProtectionLabelBackupNameKey] = string(dpv1alpha1.BackupTypeLogFile)
+		podsWithBackup.Items[0].SetLabels(labels)
+		return []runtime.Object{
+			podsWithBackup,
+			testing.FakeSecrets(testing.Namespace, testing.ClusterName),
+			testing.FakeServices(),
+			testing.FakePVCs(),
+		}
+	}
+	cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 	dynamic := testing.FakeDynamicClient(
-		testing.FakeCluster(testing.ClusterName, testing.Namespace),
+		cluster,
 		testing.FakeClusterDef(),
+		testing.FakeBackupPolicy("backupPolicy-test", testing.ClusterName),
+		testing.FakeBackupWithCluster(cluster, "backup-test"),
 		testing.FakeClusterVersion())
 
 	getOptions := GetOptions{
@@ -50,6 +67,7 @@ var _ = Describe("cluster util", func() {
 		WithSecret:         true,
 		WithPVC:            true,
 		WithPod:            true,
+		WithDataProtection: true,
 	}
 
 	It("get cluster objects", func() {
@@ -89,5 +107,8 @@ var _ = Describe("cluster util", func() {
 		baseObjs = append(baseObjs, testing.FakeNode())
 		testFn(testing.FakeClientSet(baseObjs...))
 		Expect(len(objs.Nodes)).Should(Equal(1))
+
+		By("when pod is back-up created")
+		testFn(testing.FakeClientSet(baseObjsWithBackupPods()...))
 	})
 })

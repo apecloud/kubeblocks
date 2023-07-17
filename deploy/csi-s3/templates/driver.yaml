@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: ru.yandex.s3.csi
+spec:
+  attachRequired: false
+  podInfoOnMount: true
+  fsGroupPolicy: File # added in Kubernetes 1.19, this field is GA as of Kubernetes 1.23
+  volumeLifecycleModes: # added in Kubernetes 1.16, this field is beta
+    - Persistent

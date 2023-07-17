@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: loki
+  name: {{ include "addon.loki.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     "kubeblocks.io/provider": community
@@ -14,8 +14,20 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: "https://github.com/grafana/helm-charts/releases/download/helm-loki-5.5.8/loki-5.5.8.tgz"
-    # chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/...
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/loki
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/loki-5.8.9/loki-5.8.9.tgz
+    {{- else }}
+    # chartLocationURL: "https://github.com/grafana/helm-charts/releases/download/helm-loki-5.5.8/loki-5.5.8.tgz"
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/loki-5.8.9.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 5.8.9
+      {{- end }}
+
     installValues:
       configMapRefs:
         - name: {{ include "addon.loki.name" . }}-chart-kubeblocks-values
@@ -28,7 +40,7 @@ spec:
         persistentVolumeEnabled: singleBinary.persistence.enabled
 
       jsonMap:
-        tolerations: singleBinary.tolerations
+        tolerations: global.tolerations
 
       resources:
         storage: singleBinary.persistence.size

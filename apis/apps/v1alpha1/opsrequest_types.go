@@ -51,6 +51,8 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
+	// Deprecate: replace by update cluster command
+
 	// horizontalScaling defines what component need to horizontal scale the specified replicas.
 	// +optional
 	// +patchMergeKey=componentName
@@ -60,16 +62,18 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
 	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Deprecate: replace by update cluster command.
+	// Note: Quantity struct can not do immutable check by CEL.
+
 	// volumeExpansion defines what component and volumeClaimTemplate need to expand the specified storage.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.volumeExpansion"
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// restart the specified component.
+	// restart the specified components.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -78,13 +82,24 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
 	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// switchover the specified components.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
+	SwitchoverList []Switchover `json:"switchover,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// Deprecate: replace by update cluster command.
+	// Note: Quantity struct can not do immutable check by CEL.
+
 	// verticalScaling defines what component need to vertical scale the specified compute resources.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.verticalScaling"
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// reconfigure defines the variables that need to input when updating configuration.
@@ -105,6 +120,16 @@ type OpsRequestSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreFrom"
 	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
+
+	// ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.
+	// If not specified, the default value is 0, which means that the start-conditions must be met immediately.
+	// +kubebuilder:default=0
+	// +optional
+	TTLSecondsBeforeAbort *int32 `json:"ttlSecondsBeforeAbort,omitempty"`
+
+	// scriptSpec defines the script to be executed.
+	// +optional
+	ScriptSpec *ScriptSpec `json:"scriptSpec,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -112,6 +137,21 @@ type ComponentOps struct {
 	// componentName cluster component name.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
+}
+
+type Switchover struct {
+	ComponentOps `json:",inline"`
+
+	// instanceName is used to specify the candidate primary or leader instanceName for switchover.
+	// If instanceName is set to "*", it means that no specific primary or leader is specified for the switchover,
+	// and the switchoverAction defined in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate will be executed,
+	// It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate is not empty.
+	// If instanceName is set to a valid instanceName other than "*", it means that a specific candidate primary or leader is specified for the switchover.
+	// the value of instanceName can be obtained using `kbcli cluster list-instances`, any other value is invalid.
+	// In this case, the `switchoverAction` defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
+	// and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not empty.
+	// +kubebuilder:validation:Required
+	InstanceName string `json:"instanceName"`
 }
 
 // Upgrade defines the variables of upgrade operation.
@@ -129,9 +169,9 @@ type VerticalScaling struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
 
-	// class specifies the class name of the component
+	// classDefRef reference class defined in ComponentClassDefinition.
 	// +optional
-	Class string `json:"class,omitempty"`
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 }
 
 // VolumeExpansion defines the variables of volume expansion operation.
@@ -279,6 +319,57 @@ type PointInTimeRefSpec struct {
 	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
+// ScriptSpec defines the script to be executed. It is not a general purpose script executor.
+// It is designed to execute the script to perform some specific operations, such as create database, create user, etc.
+// It is applicable for engines, such as MySQL, PostgreSQL, Redis, MongoDB, etc.
+type ScriptSpec struct {
+	ComponentOps `json:",inline"`
+	// exec command with image, by default use the image of kubeblocks-datascript.
+	// +optional
+	Image string `json:"image,omitempty"`
+	// secret defines the secret to be used to execute the script.
+	// If not specified, the default cluster root credential secret will be used.
+	// +optional
+	Secret *ScriptSecret `json:"secret,omitempty"`
+	// script defines the script to be executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script"
+	Script []string `json:"script,omitempty"`
+	// scriptFrom defines the script to be executed from configMap or secret.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
+	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
+}
+
+// ScriptSecret defines the secret to be used to execute the script.
+type ScriptSecret struct {
+	// name is the name of the secret.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+	// usernameKey field is used to specify the username of the secret.
+	// +kubebuilder:default:="username"
+	// +optional
+	UsernameKey string `json:"usernameKey,omitempty"`
+	// passwordKey field is used to specify the password of the secret.
+	// +kubebuilder:default:="password"
+	// +optional
+	PasswordKey string `json:"passwordKey,omitempty"`
+}
+
+// ScriptFrom defines the script to be executed from configMap or secret.
+type ScriptFrom struct {
+	// configMapRef defines the configMap to be executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.configMapRef"
+	ConfigMapRef []corev1.ConfigMapKeySelector `json:"configMapRef,omitempty"`
+	// secretRef defines the secret to be executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.secretRef"
+	SecretRef []corev1.SecretKeySelector `json:"secretRef,omitempty"`
+}
+
 // OpsRequestStatus defines the observed state of OpsRequest
 type OpsRequestStatus struct {
 
@@ -363,9 +454,9 @@ type LastComponentConfiguration struct {
 	// +optional
 	corev1.ResourceRequirements `json:",inline,omitempty"`
 
-	// the last class name of the component.
+	// classDefRef reference class defined in ComponentClassDefinition.
 	// +optional
-	Class string `json:"class,omitempty"`
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional
@@ -403,6 +494,16 @@ type OpsRequestComponentStatus struct {
 	// workloadType references workload type of component in ClusterDefinition.
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
+
+	// reason describes the reason for the component phase.
+	// +kubebuilder:validation:MaxLength=1024
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+
+	// message is a human-readable message indicating details about this operation.
+	// +kubebuilder:validation:MaxLength=32768
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 type ReconfiguringStatus struct {
@@ -510,6 +611,15 @@ func (r OpsRequestSpec) GetRestartComponentNameSet() ComponentNameSet {
 	return set
 }
 
+// GetSwitchoverComponentNameSet gets the component name map with switchover operation.
+func (r OpsRequestSpec) GetSwitchoverComponentNameSet() ComponentNameSet {
+	set := make(ComponentNameSet)
+	for _, v := range r.SwitchoverList {
+		set[v.ComponentName] = struct{}{}
+	}
+	return set
+}
+
 // GetVerticalScalingComponentNameSet gets the component name map with vertical scaling operation.
 func (r OpsRequestSpec) GetVerticalScalingComponentNameSet() ComponentNameSet {
 	set := make(ComponentNameSet)
@@ -552,6 +662,13 @@ func (r OpsRequestSpec) GetVolumeExpansionComponentNameSet() ComponentNameSet {
 	for _, v := range r.VolumeExpansionList {
 		set[v.ComponentName] = struct{}{}
 	}
+	return set
+}
+
+// GetDataScriptComponentNameSet gets the component name map with switchover operation.
+func (r OpsRequestSpec) GetDataScriptComponentNameSet() ComponentNameSet {
+	set := make(ComponentNameSet)
+	set[r.ScriptSpec.ComponentName] = struct{}{}
 	return set
 }
 
@@ -620,6 +737,10 @@ func (r *OpsRequest) GetComponentNameSet() ComponentNameSet {
 		return r.Spec.GetReconfiguringComponentNameSet()
 	case ExposeType:
 		return r.Spec.GetExposeComponentNameSet()
+	case SwitchoverType:
+		return r.Spec.GetSwitchoverComponentNameSet()
+	case DataScriptType:
+		return r.Spec.GetDataScriptComponentNameSet()
 	default:
 		return nil
 	}

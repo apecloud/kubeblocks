@@ -1,0 +1,51 @@
+# Default values for tdengine.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  registry: docker.io
+  repository: tdengine/tdengine
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "3.0.5.0"
+
+imagePullSecrets: []
+
+## Common override values:
+##
+## @param clusterVersionOverride
+## @param nameOverride
+## @param fullnameOverride
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+defaultAuth:
+  username: root
+  password: taosdata
+
+timeZone: Asia/Shanghai
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+metrics:
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/taoskeeper
+    tag: 0.0.5
+    pullPolicy: IfNotPresent
+  service:
+    port: 6043
+
+

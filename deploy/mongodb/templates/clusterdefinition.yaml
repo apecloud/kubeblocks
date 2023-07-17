@@ -33,8 +33,8 @@ spec:
           keys:
             - mongodb.conf
           defaultMode: 256
-        - name: mongodb-metrics-config
-          templateRef: mongodb-metrics-config
+        - name: mongodb-metrics-config-new
+          templateRef: mongodb-metrics-config-new
           namespace: {{ .Release.Namespace }}
           volumeName: mongodb-metrics-config
           defaultMode: 0777
@@ -63,6 +63,21 @@ spec:
           failureThreshold: {{ .Values.roleProbe.failureThreshold }}
           periodSeconds: {{ .Values.roleProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      switchoverSpec:
+        withCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /scripts/switchover-with-candidate.sh
+          scriptSpecSelectors:
+            - name: mongodb-scripts
+        withoutCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /scripts/switchover-without-candidate.sh
+          scriptSpecSelectors:
+            - name: mongodb-scripts
       service:
         ports:
           - name: mongodb
@@ -109,13 +124,9 @@ spec:
                 name: mongodb-config
                 subPath: keyfile
               - name: scripts
-                mountPath: /scripts/replicaset-setup.sh
-                subPath: replicaset-setup.sh
-              - name: scripts
-                mountPath: /scripts/replicaset-post-start.sh
-                subPath: replicaset-post-start.sh
+                mountPath: /scripts
           - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true

@@ -29,8 +29,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](filePath string, signature func(T, L)) (PT, error) {
+type MatchResourceFunc func(object client.Object) bool
+
+func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](filePath string, signature func(T, L)) (PT, error) {
 	objList, err := CustomizedObjectListFromYaml[T, PT, L](filePath, signature)
 	if err != nil {
 		return nil, err
@@ -41,8 +42,7 @@ func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T],
 	return objList[0], nil
 }
 
-func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](yamlfile string, signature func(T, L)) ([]PT, error) {
+func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](yamlfile string, signature func(T, L)) ([]PT, error) {
 	objBytes, err := os.ReadFile(yamlfile)
 	if err != nil {
 		return nil, err
@@ -57,8 +57,7 @@ func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T],
 	return objList, nil
 }
 
-func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](yamlBytes []byte, _ func(T, L)) PT {
+func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](yamlBytes []byte, _ func(T, L)) PT {
 	var obj PT
 	if err := yaml.Unmarshal(yamlBytes, &obj); err != nil {
 		return nil
@@ -66,12 +65,28 @@ func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T],
 	return obj
 }
 
-func GetTypedResourceObjectBySignature[T generics.Object, PT generics.PObject[T],
-	L generics.ObjList[T]](objects []client.Object, _ func(T, L)) PT {
+func GetTypedResourceObjectBySignature[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](objects []client.Object, _ func(T, L), matchers ...MatchResourceFunc) PT {
 	for _, object := range objects {
-		if cd, ok := object.(PT); ok {
-			return cd
+		obj, ok := object.(PT)
+		if !ok {
+			continue
+		}
+		found := true
+		for _, matcher := range matchers {
+			if !matcher(obj) {
+				found = false
+				break
+			}
+		}
+		if found {
+			return obj
 		}
 	}
 	return nil
+}
+
+func WithResourceName(name string) MatchResourceFunc {
+	return func(object client.Object) bool {
+		return name == "" || object.GetName() == name
+	}
 }

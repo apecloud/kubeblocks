@@ -68,6 +68,11 @@ func (r *ClusterDefinition) Default() {
 				probes.RoleProbeTimeoutAfterPodsReady = 0
 			}
 		}
+		// set to CloneVolume if deprecated value used
+		if r.Spec.ComponentDefs[i].HorizontalScalePolicy != nil &&
+			r.Spec.ComponentDefs[i].HorizontalScalePolicy.Type == HScaleDataClonePolicyFromSnapshot {
+			r.Spec.ComponentDefs[i].HorizontalScalePolicy.Type = HScaleDataClonePolicyCloneVolume
+		}
 	}
 }
 
@@ -145,7 +150,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	validateSystemAccount := func(component *ClusterComponentDefinition) {
 		sysAccountSpec := component.SystemAccounts
 		if sysAccountSpec != nil {
-			sysAccountSpec.validateSysAccounts(allErrs)
+			sysAccountSpec.validate(allErrs)
 		}
 	}
 
@@ -185,6 +190,10 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	}
 
 	for _, component := range r.Spec.ComponentDefs {
+		for _, compRef := range component.ComponentDefRef {
+			compRef.validate(allErrs)
+		}
+
 		if err := r.validateConfigSpec(component); err != nil {
 			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
 			continue
@@ -211,8 +220,8 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	}
 }
 
-// validateSysAccounts validate spec.components[].systemAccounts
-func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
+// validate validates spec.components[].systemAccounts
+func (r *SystemAccountSpec) validate(allErrs *field.ErrorList) {
 	accountName := make(map[AccountName]bool)
 	for _, sysAccount := range r.Accounts {
 		// validate provision policy
@@ -281,4 +290,33 @@ func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
 		volumeSet[tpl.VolumeName] = struct{}{}
 	}
 	return nil
+}
+
+func (r ComponentDefRef) validate(allErrs *field.ErrorList) {
+	if len(r.ComponentDefName) == 0 {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentDefName"), r.ComponentDefName, "componentDefName cannot be empty"))
+	}
+
+	for _, env := range r.ComponentRefEnvs {
+		if len(env.Value) > 0 && env.ValueFrom != nil {
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].value"), env.Value, "value and valueFrom cannot be set at the same time"))
+		}
+		if len(env.Value) == 0 && env.ValueFrom == nil {
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].value"), env.Value, "value and valueFrom cannot be empty at the same time"))
+		}
+		if env.ValueFrom == nil {
+			continue
+		}
+		valueFrom := env.ValueFrom
+		switch valueFrom.Type {
+		case FromFieldRef:
+			if len(valueFrom.FieldPath) == 0 {
+				*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].valueFrom"), valueFrom.FieldPath, "fieldRef cannot be empty"))
+			}
+		case FromHeadlessServiceRef:
+			if len(valueFrom.FieldPath) > 0 {
+				*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].valueFrom"), valueFrom, "headlessServiceRef cannot set fieldPath"))
+			}
+		}
+	}
 }

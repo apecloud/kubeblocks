@@ -62,6 +62,14 @@ func TestGetUpdateParameterList(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, util.EqSet(expected,
 		set.NewLinkedHashSetString(params...)), "param: %v, expected: %v", params, expected.AsSlice())
+
+	// for trim
+	expected = set.NewLinkedHashSetString("msld.cakl", "msld.dg", "cd")
+	params, err = getUpdateParameterList(newCfgDiffMeta(testData, nil, nil), "g")
+	require.Nil(t, err)
+	require.True(t, util.EqSet(expected,
+		set.NewLinkedHashSetString(params...)), "param: %v, expected: %v", params, expected.AsSlice())
+
 }
 
 func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *ConfigPatchInfo {
@@ -233,6 +241,83 @@ func TestIsSchedulableConfigResource(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IsSchedulableConfigResource(tt.object); got != tt.want {
 				t.Errorf("IsSchedulableConfigResource() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSetParametersUpdateSource(t *testing.T) {
+	mockConfigMap := func() *corev1.ConfigMap {
+		return &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Labels:    make(map[string]string),
+			},
+			Data: make(map[string]string),
+		}
+	}
+
+	cm := mockConfigMap()
+	require.False(t, IsParametersUpdateFromManager(cm))
+	require.False(t, IsNotUserReconfigureOperation(cm))
+	SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+	require.True(t, IsParametersUpdateFromManager(cm))
+	require.False(t, IsNotUserReconfigureOperation(cm))
+
+	// check user reconfigure
+	cm.Annotations[constant.CMInsEnableRerenderTemplateKey] = "true"
+	require.True(t, IsNotUserReconfigureOperation(cm))
+
+	SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
+	require.False(t, IsNotUserReconfigureOperation(cm))
+}
+
+func TestValidateConfigPatch(t *testing.T) {
+	type args struct {
+		patch     *ConfigPatchInfo
+		formatCfg *appsv1alpha1.FormatterConfig
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{{
+		name: "test",
+		args: args{
+			patch:     &ConfigPatchInfo{},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+		},
+		wantErr: false,
+	}, {
+		name: "test",
+		args: args{
+			patch: &ConfigPatchInfo{
+				IsModify: true,
+				UpdateConfig: map[string][]byte{
+					"file1": []byte(`{"a":"b"}`),
+				},
+			},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+		},
+		wantErr: false,
+	}, {
+		name: "test-failed",
+		args: args{
+			patch: &ConfigPatchInfo{
+				IsModify: true,
+				UpdateConfig: map[string][]byte{
+					"file1": []byte(`{"a":null}`),
+				},
+			},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+		},
+		wantErr: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateConfigPatch(tt.args.patch, tt.args.formatCfg); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

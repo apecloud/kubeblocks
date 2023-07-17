@@ -3,10 +3,10 @@ kind: OpsRequest
 metadata:
   name: ops-vexpand
 spec:
-  clusterRef: mycluster-redis-cluster
+  clusterRef: redis-cluster
   type: VolumeExpansion
   volumeExpansion:
-    - componentName: postgresql
+    - componentName: redis
       volumeClaimTemplates:
         - name: data
           storage: "11Gi"

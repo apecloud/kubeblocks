@@ -25,54 +25,115 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	clusterDef appsv1alpha1.ClusterDefinition,
-	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
-	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) (*SynthesizedComponent, error) {
-	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
-	if err != nil {
-		return nil, err
-	}
-	/*
-		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
-			return nil, err
-		}
-	*/
-	return synthesizedComp, nil
-}
-
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
-	cluster appsv1alpha1.Cluster,
-	clusterDef appsv1alpha1.ClusterDefinition,
-	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clsMgr *class.Manager,
+	cluster *appsv1alpha1.Cluster,
+	clusterTpl *appsv1alpha1.ClusterTemplate,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, clsMgr, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func buildComponent(reqCtx intctrlutil.RequestCtx,
-	cluster appsv1alpha1.Cluster,
-	clusterDef appsv1alpha1.ClusterDefinition,
-	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clsMgr *class.Manager,
+	cluster *appsv1alpha1.Cluster,
+	clusterTpl *appsv1alpha1.ClusterTemplate,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
+
+	fillClusterTemplate := func() {
+		if clusterTpl == nil || len(clusterTpl.Spec.ComponentSpecs) == 0 {
+			return
+		}
+		for _, compSpecTpl := range clusterTpl.Spec.ComponentSpecs {
+			if compSpecTpl.ComponentDefRef == clusterCompDef.Name {
+				clusterCompSpec = compSpecTpl.DeepCopy()
+			}
+		}
+	}
+
+	fillSimplifiedAPI := func() {
+		// fill simplified api only to first defined component
+		if len(clusterDef.Spec.ComponentDefs) == 0 ||
+			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
+			return
+		}
+		if clusterCompSpec == nil {
+			clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
+			clusterCompSpec.Name = clusterCompDef.Name
+		}
+		if cluster.Spec.Replicas != nil {
+			clusterCompSpec.Replicas = *cluster.Spec.Replicas
+		}
+		dataVolumeName := "data"
+		for _, v := range clusterCompDef.VolumeTypes {
+			if v.Type == appsv1alpha1.VolumeTypeData {
+				dataVolumeName = v.Name
+			}
+		}
+		if !cluster.Spec.Resources.CPU.IsZero() || !cluster.Spec.Resources.Memory.IsZero() {
+			clusterCompSpec.Resources.Limits = corev1.ResourceList{}
+		}
+		if !cluster.Spec.Resources.CPU.IsZero() {
+			clusterCompSpec.Resources.Limits["cpu"] = cluster.Spec.Resources.CPU
+		}
+		if !cluster.Spec.Resources.Memory.IsZero() {
+			clusterCompSpec.Resources.Limits["memory"] = cluster.Spec.Resources.Memory
+		}
+		if !cluster.Spec.Storage.Size.IsZero() {
+			clusterCompSpec.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+				{
+					Name: dataVolumeName,
+					Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								"storage": cluster.Spec.Storage.Size,
+							},
+						},
+					},
+				},
+			}
+		}
+	}
+
+	buildAffinity := func() *appsv1alpha1.Affinity {
+		affinity := cluster.Spec.Affinity
+		if clusterCompSpec.Affinity != nil {
+			affinity = clusterCompSpec.Affinity
+		}
+		return affinity
+	}
+
+	// priority: cluster.spec.componentSpecs > simplified api (e.g. cluster.spec.storage etc.) > cluster template
+	if clusterCompSpec == nil {
+		fillClusterTemplate()
+		fillSimplifiedAPI()
+	}
+	if clusterCompSpec == nil {
+		return nil, nil
+	}
+
 	var err error
+	// make a copy of clusterCompDef
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
@@ -93,7 +154,9 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ConfigTemplates:       clusterCompDefObj.ConfigSpecs,
 		ScriptTemplates:       clusterCompDefObj.ScriptSpecs,
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		VolumeProtection:      clusterCompDefObj.VolumeProtectionSpec,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		SwitchoverSpec:        clusterCompDefObj.SwitchoverSpec,
 		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
 		MinAvailable:          clusterCompSpec.GetMinAvailable(clusterCompDefObj.GetMinAvailable()),
 		Replicas:              clusterCompSpec.Replicas,
@@ -115,20 +178,19 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		for _, c := range clusterCompVer.VersionsCtx.Containers {
 			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
+		// override component.SwitchoverSpec
+		overrideSwitchoverSpecAttr(component.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
 	}
 
 	// handle component.PodSpec extra settings
 	// set affinity and tolerations
-	affinity := cluster.Spec.Affinity
-	if clusterCompSpec.Affinity != nil {
-		affinity = clusterCompSpec.Affinity
-	}
-	if component.PodSpec.Affinity, err = buildPodAffinity(&cluster, affinity, component); err != nil {
+	affinity := buildAffinity()
+	if component.PodSpec.Affinity, err = buildPodAffinity(cluster, affinity, component); err != nil {
 		reqCtx.Log.Error(err, "build pod affinity failed.")
 		return nil, err
 	}
-	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
-	if component.PodSpec.Tolerations, err = BuildTolerations(&cluster, &clusterCompSpec); err != nil {
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
+	if component.PodSpec.Tolerations, err = BuildTolerations(cluster, clusterCompSpec); err != nil {
 		reqCtx.Log.Error(err, "build pod tolerations failed.")
 		return nil, err
 	}
@@ -136,9 +198,15 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
 	}
+
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
+	if err = updateResources(cluster, component, *clusterCompSpec, clsMgr); err != nil {
+		reqCtx.Log.Error(err, "update class resources failed")
+		return nil, err
+	}
+
 	if clusterCompDefObj.Service != nil {
 		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
@@ -155,26 +223,29 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			component.Services = append(component.Services, service)
 		}
 	}
-	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
+
+	// probe container requires a service account with adequate privileges.
+	// If probes are required and the serviceAccountName is not set,
+	// a default serviceAccountName will be assigned.
+	if component.ServiceAccountName == "" && component.Probes != nil {
+		component.ServiceAccountName = "kb-" + component.ClusterName
+	}
+
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 
-	// TODO: (zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
-	// At present, it is not possible to distinguish between ConfigMap volume and normal volume,
-	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
-	//
-	// if component.VolumeClaimTemplates == nil {
-	//	 for i := range component.PodSpec.Containers {
-	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
-	//	 }
-	// }
-
-	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
+	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
 	if err = buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
+
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+
+	if err = buildComponentRef(clusterDef, cluster, clusterCompDefObj, clusterCompSpec, component); err != nil {
+		reqCtx.Log.Error(err, "failed to merge componentRef")
+		return nil, err
+	}
 	return component, nil
 }
 
@@ -313,22 +384,63 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 	return newEnvs
 }
 
-func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
-	cluster appsv1alpha1.Cluster,
-	compName string) *appsv1alpha1.ClusterComponentDefinition {
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if comp.Name != compName {
-			continue
-		}
-		for _, compDef := range clusterDef.Spec.ComponentDefs {
-			if compDef.Name == comp.ComponentDefRef {
-				return &compDef
-			}
-		}
-	}
-	return nil
-}
-
 func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
+}
+
+// overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
+func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
+	if cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
+		return
+	}
+	applyCmdExecutorConfig := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
+		if cmdExecutorConfig == nil {
+			return
+		}
+		if len(cvSwitchoverSpec.CmdExecutorConfig.Image) > 0 {
+			cmdExecutorConfig.Image = cvSwitchoverSpec.CmdExecutorConfig.Image
+		}
+		if len(cvSwitchoverSpec.CmdExecutorConfig.Env) > 0 {
+			cmdExecutorConfig.Env = cvSwitchoverSpec.CmdExecutorConfig.Env
+		}
+	}
+	if switchoverSpec.WithCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithCandidate.CmdExecutorConfig)
+	}
+	if switchoverSpec.WithoutCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithoutCandidate.CmdExecutorConfig)
+	}
+}
+
+func GenerateComponentEnvName(clusterName, componentName string) string {
+	return fmt.Sprintf("%s-%s-env", clusterName, componentName)
+}
+
+func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec, clsMgr *class.Manager) error {
+	if ignoreResourceConstraint(cluster) {
+		return nil
+	}
+
+	if clsMgr == nil {
+		return nil
+	}
+
+	expectResources, err := clsMgr.GetResources(&clusterCompSpec)
+	if err != nil {
+		return err
+	}
+
+	actualResources := component.PodSpec.Containers[0].Resources
+	if actualResources.Requests == nil {
+		actualResources.Requests = corev1.ResourceList{}
+	}
+	if actualResources.Limits == nil {
+		actualResources.Limits = corev1.ResourceList{}
+	}
+	for k, v := range expectResources {
+		actualResources.Requests[k] = v
+		actualResources.Limits[k] = v
+	}
+	component.PodSpec.Containers[0].Resources = actualResources
+	return nil
 }

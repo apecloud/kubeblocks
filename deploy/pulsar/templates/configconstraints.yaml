@@ -64,7 +64,7 @@ spec:
           - cp
           - /bin/pulsar-admin
           - /kb/tools/pulsar-admin
-        image: "{{ template "pulsar.imageFullName" (dict "image" .Values.images.pulsarTools"root" .) }}"
+        image: "{{ template "pulsar.imageFullName" (dict "image" .Values.images.pulsarTools "root" .) }}"
         # imagePullPolicy: "{{ template "pulsar.imagePullPolicy" (dict "image" .Values.images.pulsarTools "root" .) }}"
       - name: init-pulsar-client-config
         command:

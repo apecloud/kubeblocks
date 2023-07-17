@@ -17,7 +17,7 @@ data:
     #!/bin/bash
     function set_config_variables(){
       echo "set config variables [$1]"
-      config_file="/conf/wesql-scale.cnf"
+      config_file="/conf/$1.cnf"
       config_content=$(sed -n '/\['$1'\]/,/\[/ { /\['$1'\]/d; /\[/q; p; }' $config_file)
       while read line
       do
@@ -242,6 +242,7 @@ data:
     --service_map 'grpc-queryservice,grpc-tabletmanager,grpc-updatestream' \
     --pid_file $VTDATAROOT/vttablet.pid \
     --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
+    --table-acl-config-mode=$table_acl_config_mode \
     --disable_active_reparents
     EOF
   etcd.sh: |-
@@ -255,7 +256,7 @@ data:
 
     etcd --enable-v2=true --data-dir "${VTDATAROOT}/etcd/"  \
       --listen-client-urls "http://0.0.0.0:${etcd_port}" \
-      --advertise-client-urls "http://0.0.0.0:${etcd_port}"
+      --advertise-client-urls "http://0.0.0.0:${etcd_port}" 2>&1 | tee "${VTDATAROOT}/etcd.log"
   etcd-post-start.sh: |-
     #!/bin/bash
     etcd_port=${ETCD_PORT:-'2379'}

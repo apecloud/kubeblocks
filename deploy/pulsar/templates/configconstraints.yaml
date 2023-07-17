@@ -1,0 +1,71 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: pulsar-env-constraints
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+spec:
+  configurationSchema:
+    cue: ""
+
+  # mysql configuration file format
+  formatterConfig:
+    format: yaml
+---
+
+{{- $cc := .Files.Get "config/broker-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: brokers-config-constraints
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+spec:
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/broker-config-constraint.cue" | nindent 6 }}
+
+  # mysql configuration file format
+  formatterConfig:
+    format: props-plus
+
+  ## define static parameter list
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+      ## define dynamic parameter list
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+  reloadOptions:
+    shellTrigger:
+      command:
+        - "update-dynamic-config.sh"
+
+  scriptConfigs:
+    - scriptConfigMapRef: pulsar-tools-script
+      namespace: {{ .Release.Namespace }}
+
+  toolsImageSpec:
+    mountPoint: /kb/tools
+    toolConfigs:
+      - name: init-pulsar-tools
+        command:
+          - cp
+          - /bin/pulsar-admin
+          - /kb/tools/pulsar-admin
+        image: "{{ template "pulsar.imageFullName" (dict "image" .Values.images.pulsarTools "root" .) }}"
+        # imagePullPolicy: "{{ template "pulsar.imagePullPolicy" (dict "image" .Values.images.pulsarTools "root" .) }}"
+      - name: init-pulsar-client-config
+        command:
+          - "/opt/kb-tools/reload/broker-config/install-pulsar-client-config.sh"

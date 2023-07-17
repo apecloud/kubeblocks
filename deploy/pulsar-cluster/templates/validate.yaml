@@ -1,0 +1,10 @@
+{{- if .Values.zookeeper.replicaCount }}
+  {{- if ne (mod (int .Values.zookeeper.replicaCount) 2) 1 }}
+    {{ fail "Zookeeper cluster does not support running with even number replicas." }}
+  {{- end }}
+{{- end }}
+{{- if .Values.bookies.replicaCount }}
+  {{- if lt (int .Values.bookies.replicaCount) 3 }}
+    {{ fail "Pulsar bookies replicas cannot be less than 3." }}
+  {{- end }}
+{{- end }}

@@ -86,12 +86,6 @@ define BUILDX_ERROR
 buildx not enabled, refusing to run this recipe
 endef
 
-ifeq ($(TAG_LATEST), true)
-	IMAGE_TAGS ?= $(IMG):$(VERSION) $(IMG):latest
-else
-	IMAGE_TAGS ?= $(IMG):$(VERSION)
-endif
-
 DOCKER_BUILD_ARGS =
 DOCKER_NO_BUILD_CACHE ?= false
 

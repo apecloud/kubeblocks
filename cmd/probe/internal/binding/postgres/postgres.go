@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
@@ -109,8 +109,8 @@ func NewPostgres() (*PostgresOperations, error) {
 }
 
 // Init initializes the PostgreSql binding.
-func (pgOps *PostgresOperations) Init() error {
-	pgOps.BaseOperations.Init()
+func (pgOps *PostgresOperations) Init(metadata Properties) error {
+	pgOps.BaseOperations.Init(metadata)
 	if viper.IsSet("KB_SERVICE_USER") {
 		dbUser = viper.GetString("KB_SERVICE_USER")
 	}
@@ -120,7 +120,6 @@ func (pgOps *PostgresOperations) Init() error {
 	}
 
 	pgOps.Logger.Info("Initializing Postgres binding")
-	pgOps.Metadata = component.GetProperties("postgres")
 	pgOps.DBType = "postgres"
 	pgOps.InitIfNeed = pgOps.initIfNeed
 	pgOps.BaseOperations.GetRole = pgOps.GetRole

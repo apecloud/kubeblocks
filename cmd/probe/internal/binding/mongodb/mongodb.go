@@ -23,6 +23,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
+
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
 	"github.com/go-logr/zapr"
@@ -88,10 +90,9 @@ func NewMongoDB() (*MongoDBOperations, error) {
 }
 
 // Init initializes the MongoDB Binding.
-func (mongoOps *MongoDBOperations) Init() error {
+func (mongoOps *MongoDBOperations) Init(properties component.Properties) error {
 	mongoOps.Logger.Info("Initializing MongoDB binding")
-	mongoOps.BaseOperations.Init()
-	mongoOps.Metadata = component.GetProperties("mongo")
+	mongoOps.BaseOperations.Init(properties)
 	config, _ := mongodb.NewConfig(mongoOps.Metadata)
 	manager, _ := mongodb.NewManager(mongoOps.Logger)
 
@@ -170,4 +171,23 @@ func (mongoOps *MongoDBOperations) UnlockInstance(ctx context.Context) error {
 func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *ProbeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed
 	return nil, nil
+}
+
+func (mongoOps *MongoDBOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
+	// TODO: impl
+	return nil, nil
+}
+
+func (mongoOps *MongoDBOperations) InternalExec(ctx context.Context, sql string) (int64, error) {
+	// TODO: impl
+	return 0, nil
+}
+
+func (mongoOps *MongoDBOperations) GetLogger() logr.Logger {
+	return mongoOps.Logger
+}
+
+func (mongoOps *MongoDBOperations) GetRunningPort() int {
+	// TODO: impl
+	return mongoOps.DBPort
 }

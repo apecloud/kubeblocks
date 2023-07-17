@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/go-logr/logr"
+
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 
 	"github.com/go-logr/zapr"
@@ -66,11 +68,10 @@ func NewKafka() (*KafkaOperations, error) {
 	}, nil
 }
 
-func (kafkaOps *KafkaOperations) Init() error {
-	kafkaOps.Metadata = component.GetProperties("kafka")
-	kafkaOps.kafka.Init(context.Background(), kafkaOps.Metadata)
-	kafkaOps.BaseOperations.Init()
+func (kafkaOps *KafkaOperations) Init(metadata component.Properties) error {
 	kafkaOps.Logger.Info("Initializing kafka binding")
+	kafkaOps.BaseOperations.Init(metadata)
+	kafkaOps.kafka.Init(context.Background(), kafkaOps.Metadata)
 	kafkaOps.DBType = "kafka"
 	kafkaOps.InitIfNeed = kafkaOps.initIfNeed
 	// kafkaOps.BaseOperations.GetRole = kafkaOps.GetRole
@@ -153,4 +154,23 @@ func (kafkaOps *KafkaOperations) LockInstance(ctx context.Context) error {
 func (kafkaOps *KafkaOperations) UnlockInstance(ctx context.Context) error {
 	// TODO: impl
 	return fmt.Errorf("NotSupported")
+}
+
+func (kafkaOps *KafkaOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
+	// TODO: impl
+	return nil, nil
+}
+
+func (kafkaOps *KafkaOperations) InternalExec(ctx context.Context, sql string) (int64, error) {
+	// TODO: impl
+	return 0, nil
+}
+
+func (kafkaOps *KafkaOperations) GetLogger() logr.Logger {
+	return kafkaOps.Logger
+}
+
+func (kafkaOps *KafkaOperations) GetRunningPort() int {
+	// TODO: impl
+	return kafkaOps.DBPort
 }

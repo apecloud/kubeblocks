@@ -44,7 +44,7 @@ type OpsResult map[string]interface{}
 
 type Operation interface {
 	Kind() OperationKind
-	Init(metadata Metadata) error
+	Init(metadata component.Properties) error
 	Invoke(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) error
 }
 
@@ -57,6 +57,7 @@ type BaseInternalOps interface {
 	InternalExec(ctx context.Context, sql string) (int64, error)
 	GetLogger() logr.Logger
 	GetRunningPort() int
+	Dispatch(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error)
 }
 
 type BaseOperations struct {
@@ -92,7 +93,7 @@ func init() {
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
-func (ops *BaseOperations) Init() {
+func (ops *BaseOperations) Init(properties component.Properties) {
 	ops.FailedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
 	if ops.FailedEventReportFrequency < 300 {
 		ops.FailedEventReportFrequency = 300
@@ -114,6 +115,7 @@ func (ops *BaseOperations) Init() {
 		}
 	}
 
+	ops.Metadata = properties
 	ops.LegacyOperations = map[OperationKind]LegacyOperation{
 		CheckRunningOperation: ops.CheckRunningOps,
 		CheckRoleOperation:    ops.CheckRoleOps,
@@ -128,7 +130,7 @@ func (ops *BaseOperations) Init() {
 	ops.DBAddress = ops.getAddress()
 
 	for kind, op := range ops.Ops {
-		if err := op.Init(metadata); err != nil {
+		if err := op.Init(properties); err != nil {
 			ops.Logger.Error(err, fmt.Sprintf("init operation %s error", kind))
 			// panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
 		}

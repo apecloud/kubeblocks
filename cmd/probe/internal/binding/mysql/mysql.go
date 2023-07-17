@@ -29,7 +29,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dapr/components-contrib/bindings"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
@@ -98,10 +99,10 @@ func NewMysql() (*MysqlOperations, error) {
 }
 
 // Init initializes the MySQL binding.
-func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
+func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	mysqlOps.Logger.Info("Initializing MySQL binding")
 	mysqlOps.BaseOperations.Init(metadata)
-	config, err := mysql.NewConfig(metadata.Properties)
+	config, err := mysql.NewConfig(metadata)
 	if err != nil {
 		mysqlOps.Logger.Error(err, "MySQL config initialize failed")
 		return err

@@ -293,7 +293,7 @@ func checkErrorResponse(res *http.Response) (bool, error) {
 	errorRes := &ErrorResponse{}
 	err := json.NewDecoder(res.Body).Decode(errorRes)
 	if err != nil {
-		return false, errors.Wrap(err, "error decoding error response")
+		return false, errors.Wrap(err, "error decoding response")
 	}
 
 	// Authentication is not yet complete or requests need to be slowed down.

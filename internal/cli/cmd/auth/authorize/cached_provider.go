@@ -21,22 +21,20 @@ package authorize
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/99designs/keyring"
-	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
-	defaultConfigPath = "~/.config/kueblocks"
-	userInfoFile      = "user_info.json"
-	tokenFile         = "token.json"
+	userInfoFile = "user_info.json"
+	tokenFile    = "token.json"
 
 	keyringKey     = "token"
 	keyringService = "kueblocks"
@@ -76,9 +74,8 @@ func (k *KeyringCached) remove() error {
 }
 
 type FileCached struct {
-	tokenFilename     string
-	userInfoFilename  string
-	defaultConfigPath string
+	tokenFilename    string
+	userInfoFilename string
 }
 
 type KeyringCachedTokenProvider struct {
@@ -88,9 +85,8 @@ type KeyringCachedTokenProvider struct {
 
 func NewKeyringCachedTokenProvider(keyringCached *KeyringProvider) *KeyringCachedTokenProvider {
 	fileCached := FileCached{
-		tokenFilename:     tokenFile,
-		userInfoFilename:  userInfoFile,
-		defaultConfigPath: defaultConfigPath,
+		tokenFilename:    tokenFile,
+		userInfoFilename: userInfoFile,
 	}
 
 	if keyringCached == nil {
@@ -218,12 +214,7 @@ func (k *KeyringCachedTokenProvider) getUserInfo() (*authenticator.UserInfoRespo
 }
 
 func (f *FileCached) getConfigDir() (string, error) {
-	dir, err := homedir.Expand(f.defaultConfigPath)
-	if err != nil {
-		return "", fmt.Errorf("can't expand path %q: %s", defaultConfigPath, err)
-	}
-
-	return dir, nil
+	return util.GetCliHomeDir()
 }
 
 func (f *FileCached) getTokenPath() (string, error) {

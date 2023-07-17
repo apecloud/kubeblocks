@@ -27,7 +27,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 )
 
@@ -87,15 +86,4 @@ func NewRequest(ctx context.Context, url string, payload url.Values) (*http.Requ
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	return req, nil
-}
-
-// BoldRed returns a string formatted with red and bold.
-func BoldRed(msg interface{}) string {
-	return color.New(color.FgRed).Add(color.Bold).Sprint(msg)
-}
-
-// Bold returns a string formatted with bold.
-func Bold(msg interface{}) string {
-	// the 'color' package already handles IsTTY gracefully
-	return color.New(color.Bold).Sprint(msg)
 }

@@ -88,22 +88,31 @@ func newPKCEAuthenticator(client *http.Client, clientID string, authURL string) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get OIDC well known endpoints")
 	}
-	p.Challenge = defaultChallengeGenerator()
+	p.Challenge, err = defaultChallengeGenerator()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate PKCE challenge")
+	}
+
 	return p, nil
 }
 
 func (p *PKCEAuthenticator) GetAuthorization(ctx context.Context, openURLFunc func(URL string), states ...string) (interface{}, error) {
-	callback := newCallbackService("8000")
+	callbackService := newCallbackService("8000")
 	codeReceiverCh := make(chan CallbackResponse)
 	defer close(codeReceiverCh)
 
 	var state string
+	var err error
 	if states == nil {
-		state = defaultStateGenerator()
+		state, err = defaultStateGenerator()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate state")
+		}
 	} else {
 		state = states[0]
 	}
-	go callback.awaitResponse(codeReceiverCh, state)
+
+	go callbackService.awaitResponse(codeReceiverCh, state)
 
 	params := url.Values{
 		"audience":              []string{p.AuthAudience},
@@ -112,7 +121,7 @@ func (p *PKCEAuthenticator) GetAuthorization(ctx context.Context, openURLFunc fu
 		"code_challenge_method": []string{p.Challenge.Method},
 		"response_type":         []string{"code"},
 		"state":                 []string{state},
-		"redirect_uri":          []string{callback.getCallbackURL()},
+		"redirect_uri":          []string{callbackService.getCallbackURL()},
 		"scope": []string{strings.Join([]string{
 			"read_databases", "write_databases", "read_user", "read_organization", "offline_access", "openid", "profile", "email",
 		}, " ")},
@@ -124,15 +133,18 @@ func (p *PKCEAuthenticator) GetAuthorization(ctx context.Context, openURLFunc fu
 	)
 	openURLFunc(URL)
 
-	callbackResult := <-codeReceiverCh
-
+	callbackResult, ok := <-codeReceiverCh
+	if !ok {
+		return nil, errors.New("codeReceiverCh closed")
+	}
 	if callbackResult.Error != nil {
 		return nil, callbackResult.Error
 	}
-	callback.close()
+	callbackService.close()
+
 	return &AuthorizationResponse{
 		Code:        callbackResult.Code,
-		CallbackURL: callback.getCallbackURL(),
+		CallbackURL: callbackService.getCallbackURL(),
 	}, nil
 }
 
@@ -288,33 +300,37 @@ func getOIDCWellKnownEndpoints(authURL string) (*OIDCWellKnownEndpoints, error) 
 
 // generateRandomString returns a URL-safe, base64 encoded
 // securely generated random string.
-func generateRandomString(n int) string {
+func generateRandomString(n int) (string, error) {
 	b := make([]byte, n)
 	_, err := rand.Read(b)
 	// Note that err == nil only if we read len(b) bytes.
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
-	return base64.RawURLEncoding.EncodeToString(b)
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-func generateChallenge(length int) Challenge {
+func generateChallenge(length int) (Challenge, error) {
 	c := Challenge{}
 
-	c.Verifier = generateRandomString(length)
+	var err error
+	c.Verifier, err = generateRandomString(length)
+	if err != nil {
+		return c, err
+	}
 
 	sum := sha256.Sum256([]byte(c.Verifier))
 	c.Code = base64.RawURLEncoding.EncodeToString(sum[:])
 	c.Method = "S256"
 
-	return c
+	return c, nil
 }
 
-func defaultChallengeGenerator() Challenge {
+func defaultChallengeGenerator() (Challenge, error) {
 	return generateChallenge(32)
 }
 
-func defaultStateGenerator() string {
+func defaultStateGenerator() (string, error) {
 	return generateRandomString(32)
 }

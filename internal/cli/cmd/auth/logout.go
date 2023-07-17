@@ -42,7 +42,7 @@ func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &LogOutOptions{Options: authorize.Options{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Short: "Log out of the Kubeblocks Cloud",
+		Short: "Log out of the KubeBlocks Cloud",
 		Run: func(cmd *cobra.Command, args []string) {
 			cobra.CheckErr(o.complete())
 			cobra.CheckErr(o.validate())
@@ -50,8 +50,8 @@ func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks CLI application.")
-	cmd.Flags().StringVar(&o.AuthURL, "api-url", DefaultBaseURL, "The Kubeblocks Auth API base URL.")
+	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the KubeBlocks Cloud.")
+	cmd.Flags().StringVar(&o.AuthURL, "api-url", DefaultBaseURL, "The KubeBlocks Auth Base URL.")
 	return cmd
 }
 
@@ -76,7 +76,7 @@ func (o *LogOutOptions) validate() error {
 
 func (o *LogOutOptions) run(cmd *cobra.Command) error {
 	if utils.IsTTY() {
-		fmt.Fprintln(o.Out, "Press Enter to log out of the Kubeblocks API.")
+		fmt.Fprintln(o.Out, "Press Enter to log out of the KubeBlocks Cloud.")
 		_ = waitForEnter(cmd.InOrStdin())
 	}
 

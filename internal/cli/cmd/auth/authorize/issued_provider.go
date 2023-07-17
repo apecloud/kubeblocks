@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
 	"time"
 
@@ -35,6 +34,8 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 type Options struct {
@@ -133,16 +134,13 @@ func (c *CloudIssuedTokenProvider) printProgress(message string) func() {
 
 func (c *CloudIssuedTokenProvider) openURLFunc(url string) {
 	if !c.NoBrowser {
-		openCmd := utils.OpenBrowser(runtime.GOOS, url)
-		err := openCmd.Run()
+		err := util.OpenBrowser(url)
 		if err != nil {
-			msg := fmt.Sprintf("failed to open a browser: %s", utils.BoldRed(err.Error()))
+			msg := fmt.Sprintf("failed to open a browser: %s", printer.BoldRed(err.Error()))
 			fmt.Fprint(c.Out, msg)
 		}
-		msg := fmt.Sprintf("\nIf something goes wrong, copy and paste this URL into your browser: %s\n\n", utils.Bold(url))
-		fmt.Fprint(c.Out, msg)
 	} else {
-		msg := fmt.Sprintf("\nPlease paste this URL into your browser: %s\n\n", utils.Bold(url))
+		msg := fmt.Sprintf("\nPlease paste this URL into your browser: %s\n\n", printer.BoldGreen(url))
 		fmt.Fprint(c.Out, msg)
 	}
 }

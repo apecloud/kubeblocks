@@ -48,7 +48,7 @@ func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &LoginOptions{Options: authorize.Options{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Authenticate with the Kubeblocks Cloud",
+		Short: "Authenticate with the KubeBlocks Cloud",
 		Run: func(cmd *cobra.Command, args []string) {
 			cobra.CheckErr(o.complete())
 			cobra.CheckErr(o.validate())
@@ -56,8 +56,8 @@ func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks cloud application.")
-	cmd.Flags().StringVar(&o.AuthURL, "site", DefaultBaseURL, "The Kubeblocks Auth API Base URL.")
+	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the KubeBlocks cloud application.")
+	cmd.Flags().StringVar(&o.AuthURL, "site", DefaultBaseURL, "The KubeBlocks Auth API Base URL.")
 	cmd.Flags().BoolVar(&o.NoBrowser, "no-browser", false, "Do not open the browser for authentication.")
 	return cmd
 }

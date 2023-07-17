@@ -16,7 +16,7 @@ version: 0.6.0-alpha.36
 appVersion: 3.3.2
 
 home: https://kubeblocks.io/
-icon: https://bitnami.com/assets/stacks/kafka/img/kafka-stack-220x234.png
+icon: https://kubeblocks.io/img/logo.png
 keywords:
   - kafka
   - kraft

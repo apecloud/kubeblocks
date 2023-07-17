@@ -82,7 +82,22 @@ func BuildFlagsBySchema(cmd *cobra.Command, f cmdutil.Factory, schema *spec.Sche
 			return err
 		}
 	}
+
+	for _, name := range schema.Required {
+		flagName := strcase.KebabCase(name)
+		if err := cmd.MarkFlagRequired(flagName); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+// castOrZero is a helper function to cast a value to a specific type.
+// If the cast fails, the zero value will be returned.
+func castOrZero[T any](v any) T {
+	cv, _ := v.(T)
+	return cv
 }
 
 func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema) error {
@@ -94,13 +109,13 @@ func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schem
 
 	switch tpe {
 	case "string":
-		cmd.Flags().String(name, s.Default.(string), buildFlagDescription(s))
+		cmd.Flags().String(name, castOrZero[string](s.Default), buildFlagDescription(s))
 	case "integer":
-		cmd.Flags().Int(name, int(s.Default.(float64)), buildFlagDescription(s))
+		cmd.Flags().Int(name, int(castOrZero[float64](s.Default)), buildFlagDescription(s))
 	case "number":
-		cmd.Flags().Float64(name, s.Default.(float64), buildFlagDescription(s))
+		cmd.Flags().Float64(name, castOrZero[float64](s.Default), buildFlagDescription(s))
 	case "boolean":
-		cmd.Flags().Bool(name, s.Default.(bool), buildFlagDescription(s))
+		cmd.Flags().Bool(name, castOrZero[bool](s.Default), buildFlagDescription(s))
 	default:
 		return fmt.Errorf("unsupported json schema type %s", s.Type)
 	}
@@ -115,10 +130,21 @@ func buildFlagDescription(s *spec.Schema) string {
 
 	var legalVals []string
 	for _, e := range s.Enum {
-		legalVals = append(legalVals, fmt.Sprintf("%s", e))
+		legalVals = append(legalVals, fmt.Sprintf("%v", e))
 	}
 	if len(legalVals) > 0 {
 		desc.WriteString(fmt.Sprintf(" Legal values [%s].", strings.Join(legalVals, ", ")))
+	}
+
+	var valueRange []string
+	if s.Minimum != nil {
+		valueRange = append(valueRange, fmt.Sprintf("%v", *s.Minimum))
+	}
+	if s.Maximum != nil {
+		valueRange = append(valueRange, fmt.Sprintf("%v", *s.Maximum))
+	}
+	if len(valueRange) > 0 {
+		desc.WriteString(fmt.Sprintf(" Value range [%s].", strings.Join(valueRange, ", ")))
 	}
 	return desc.String()
 }

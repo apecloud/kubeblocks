@@ -5,8 +5,8 @@ KafkaClient {
 };
 KafkaServer {
    org.apache.kafka.common.security.plain.PlainLoginModule required
-   username="user"
+   username="admin"
    password="kubeblocks"
-   user_user="kubeblocks"
+   user_admin="kubeblocks"
    user_client="kubeblocks";
 };

@@ -30,6 +30,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -179,7 +180,7 @@ var _ = Describe("Consensus Component", func() {
 			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
-			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, *cluster, consensusCompDefRef)
+			componentDef, _ := appsv1alpha1.GetComponentDefByCluster(ctx, k8sClient, *cluster, consensusCompDefRef)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")
@@ -324,6 +325,24 @@ var _ = Describe("Consensus Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 		})
+
+		It("test GetComponentInfoByPod with no cluster componentSpec", func() {
+			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
+			By("set componentSpec to nil")
+			cluster.Spec.ComponentSpecs = nil
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						constant.KBAppComponentLabelKey: consensusCompName,
+					},
+				},
+			}
+			componentName, componentDef, err := GetComponentInfoByPod(ctx, k8sClient, *cluster, &pod)
+			Expect(err).Should(Succeed())
+			Expect(componentName).Should(Equal(consensusCompName))
+			Expect(componentDef).ShouldNot(BeNil())
+		})
 	})
 })
 
@@ -368,7 +387,28 @@ var _ = Describe("Component utils test", func() {
 				AddRoleLabel(role).
 				AddConsensusSetAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
-				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+				AddContainer(corev1.Container{
+					Name:  testapps.DefaultMySQLContainerName,
+					Image: testapps.ApeCloudMySQLImage,
+					LivenessProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Path: "/hello",
+								Port: intstr.FromInt(1024),
+							},
+						},
+						TimeoutSeconds:   1,
+						PeriodSeconds:    1,
+						FailureThreshold: 1,
+					},
+					StartupProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							TCPSocket: &corev1.TCPSocketAction{
+								Port: intstr.FromInt(1024),
+							},
+						},
+					},
+				}).
 				GetObject()
 			resolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
 			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())

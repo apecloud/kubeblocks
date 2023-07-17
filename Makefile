@@ -283,17 +283,22 @@ create-kbcli-embed-charts-dir:
 build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
 build-single-kbcli-embed-chart.%:
 	$(HELM) dependency update deploy/$(chart) --skip-refresh
+ifeq ($(VERSION), latest)
+	$(HELM) package deploy/$(chart)
+else
 	$(HELM) package deploy/$(chart) --version $(VERSION)
+endif
 	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart
 build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
-	build-single-kbcli-embed-chart.redis-cluster
+	build-single-kbcli-embed-chart.redis-cluster \
+	build-single-kbcli-embed-chart.postgresql-cluster \
+	build-single-kbcli-embed-chart.kafka-cluster \
+	build-single-kbcli-embed-chart.mongodb-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
-#	build-single-kbcli-embed-chart.kafka-cluster \
-#	build-single-kbcli-embed-chart.mongodb-cluster \
 #	build-single-kbcli-embed-chart.milvus-cluster \
 #	build-single-kbcli-embed-chart.qdrant-cluster \
 #	build-single-kbcli-embed-chart.weaviate-cluster
@@ -308,6 +313,10 @@ clean-kbcli: ## Clean bin/kbcli*.
 .PHONY: kbcli-doc
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
+
+.PHONY: sqlctl-doc
+sqlctl-doc: generate test-go-generate ## generate CLI command reference manual.
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/sqlctl/main.go ./docs/user_docs/sqlctl
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
@@ -582,15 +591,19 @@ KUBECTL=$(shell which kubectl)
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) dependency build deploy/apecloud-mysql-cluster --skip-refresh
-	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	$(HELM) dependency build deploy/redis-cluster --skip-refresh
+	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
+	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
+	$(HELM) template mysql-cluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	$(HELM) template pg-cluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template redis-cluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

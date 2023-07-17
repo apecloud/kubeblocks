@@ -275,7 +275,10 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 
 	resolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
 
+	delayUpdatePodSpecSystemFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
+
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
+		updatePodSpecSystemFields(&deployObjCopy.Spec.Template.Spec)
 		c.WorkloadVertex.Obj = deployObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")

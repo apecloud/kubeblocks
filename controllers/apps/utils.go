@@ -21,9 +21,12 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	celgo "github.com/google/cel-go/cel"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,4 +82,72 @@ func getFinalEventMessageForRecorder(event *corev1.Event) string {
 		return fmt.Sprintf("Pod %s: %s", event.InvolvedObject.Name, event.Message)
 	}
 	return event.Message
+}
+
+func mergeClusterTemplates(cts []appsv1alpha1.ClusterTemplate) *appsv1alpha1.ClusterTemplate {
+	var finalClusterTpl appsv1alpha1.ClusterTemplate
+	for i, ct := range cts {
+		if i == 0 {
+			finalClusterTpl = ct
+			continue
+		}
+		for _, comp := range ct.Spec.ComponentSpecs {
+			compSpec := finalClusterTpl.Spec.GetComponentByName(comp.Name)
+			if compSpec == nil {
+				finalClusterTpl.Spec.ComponentSpecs = append(finalClusterTpl.Spec.ComponentSpecs, comp)
+			}
+		}
+	}
+	return &finalClusterTpl
+}
+
+func getTemplateNamesFromCF(ctx context.Context, cf *appsv1alpha1.ClusterFamily, cluster *appsv1alpha1.Cluster) ([]string, error) {
+	var tplNames []string
+	for _, ref := range cf.Spec.ClusterTemplateRefs {
+		exp := ref.Key
+		if len(ref.Expression) > 0 {
+			exp = ref.Expression
+		}
+		if len(exp) == 0 {
+			tplNames = append(tplNames, ref.TemplateRef)
+			continue
+		}
+		res, err := evalCEL(ctx, exp, cluster)
+		if err != nil {
+			// ignore errors if key not exists
+			if strings.Contains(res, "no such key") {
+				continue
+			}
+			return nil, err
+		}
+		if res == ref.Value {
+			tplNames = append(tplNames, ref.TemplateRef)
+		}
+	}
+	return tplNames, nil
+}
+
+func evalCEL(ctx context.Context, exp string, cluster *appsv1alpha1.Cluster) (string, error) {
+	env, err := celgo.NewEnv(celgo.Variable("cluster", celgo.AnyType))
+	if err != nil {
+		return "", err
+	}
+	ast, iss := env.Compile(exp)
+	if iss.Err() != nil {
+		return "", iss.Err()
+	}
+	prg, err := env.Program(ast, celgo.EvalOptions(celgo.OptOptimize|celgo.OptTrackState), celgo.InterruptCheckFrequency(100))
+	if err != nil {
+		return "", err
+	}
+	clusterByte, err := json.Marshal(cluster)
+	if err != nil {
+		return "", err
+	}
+	clusterMap := map[string]any{}
+	if err := json.Unmarshal(clusterByte, &clusterMap); err != nil {
+		return "", err
+	}
+	out, _, err := prg.ContextEval(ctx, map[string]any{"cluster": clusterMap})
+	return fmt.Sprintf("%v", out.Value()), err
 }

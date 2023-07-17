@@ -17,6 +17,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/kubebench
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/kubebench-0.0.1/kubebench-0.0.1.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/kubebench-0.0.1.tgz
     {{- end }}

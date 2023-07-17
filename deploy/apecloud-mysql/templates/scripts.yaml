@@ -17,11 +17,11 @@ data:
     #!/bin/bash
     function set_config_variables(){
       echo "set config variables [$1]"
-      config_file="/conf/wesql-scale.cnf"
+      config_file="/conf/$1.cnf"
       config_content=$(sed -n '/\['$1'\]/,/\[/ { /\['$1'\]/d; /\[/q; p; }' $config_file)
       while read line
       do
-        if [[ $line =~ ^[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9_]*$ ]]; then
+        if [[ $line =~ ^[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9_.]*$ ]]; then
           echo $line
           eval "export $line"
         elif ! [[ $line =~ ^[[:space:]]*# ]]; then 
@@ -31,6 +31,7 @@ data:
     }
   setup.sh: |
     #!/bin/bash
+    rmdir /docker-entrypoint-initdb.d && mkdir -p /data/mysql/docker-entrypoint-initdb.d && ln -s /data/mysql/docker-entrypoint-initdb.d /docker-entrypoint-initdb.d;
     exec docker-entrypoint.sh
   pre-stop.sh: |
     #!/bin/bash
@@ -172,6 +173,13 @@ data:
         break
       fi
     done
+  agamotto.sh: |-
+    #!/bin/sh
+    if [ "$KB_PROXY_ENABLED" != "on" ]; then
+      /bin/agamotto --config=/opt/agamotto/agamotto-config.yaml
+    else
+      /bin/agamotto --config=/opt/agamotto/agamotto-config-with-proxy.yaml
+    fi 
   vttablet.sh: |-
     #!/bin/bash
     while [ "$KB_PROXY_ENABLED" != "on" ]
@@ -198,6 +206,8 @@ data:
 
     tablet_type=replica
     topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+    /scripts/wait-for-service.sh vtctld $vtctld_host $vtctld_web_port
 
     echo "starting vttablet for $alias..."
 
@@ -232,6 +242,7 @@ data:
     --service_map 'grpc-queryservice,grpc-tabletmanager,grpc-updatestream' \
     --pid_file $VTDATAROOT/vttablet.pid \
     --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
+    --table-acl-config-mode=$table_acl_config_mode \
     --disable_active_reparents
     EOF
   etcd.sh: |-
@@ -245,7 +256,7 @@ data:
 
     etcd --enable-v2=true --data-dir "${VTDATAROOT}/etcd/"  \
       --listen-client-urls "http://0.0.0.0:${etcd_port}" \
-      --advertise-client-urls "http://0.0.0.0:${etcd_port}"
+      --advertise-client-urls "http://0.0.0.0:${etcd_port}" 2>&1 | tee "${VTDATAROOT}/etcd.log"
   etcd-post-start.sh: |-
     #!/bin/bash
     etcd_port=${ETCD_PORT:-'2379'}
@@ -253,6 +264,11 @@ data:
 
     cell=${CELL:-'zone1'}
     export ETCDCTL_API=2
+
+    etcdctl --endpoints "http://127.0.0.1:${etcd_port}" get "/vitess/global" >/dev/null 2>&1
+    if [[ $? -eq 1 ]]; then
+      exit 0
+    fi
 
     echo "add /vitess/global"
     etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/global
@@ -345,5 +361,24 @@ data:
       --tablet_refresh_interval $tablet_refresh_interval \
       --service_map 'grpc-vtgateservice' \
       --pid_file $VTDATAROOT/vtgate.pid \
-      --mysql_auth_server_impl none
+      --mysql_auth_server_impl none \
+      --read_write_splitting_policy $read_write_splitting_policy  \
+      --read_after_write_consistency $read_after_write_consistency \
+      --read_after_write_timeout $read_after_write_timeout \
+      --enable_buffer=$enable_buffer \
+      --buffer_size $buffer_size \
+      --buffer_window $buffer_window \
+      --buffer_max_failover_duration $buffer_max_failover_duration \
+      --buffer_min_time_between_failovers $buffer_min_time_between_failovers
     EOF
+  binlog-collector.sh: |-
+    #!/bin/bash
+    set -e;
+    LOG_DIR=/data/mysql/data;
+    cd $LOG_DIR;
+    LOG_START_TIME=$(mysqlbinlog $(ls -Ftr $LOG_DIR/|grep -e '^mysql-bin.*[[:digit:]]$'|head -n 1) |grep 'Xid =' |head -n 1|awk -F ' server id ' '{print $1}'|tr -d '#')
+    for i in $(ls -Ft $LOG_DIR/|grep -e '^mysql-bin.*[[:digit:]]$'); do LOG_STOP_TIME=$(mysqlbinlog $i |grep 'Xid =' |tail -n 1|awk -F ' server id ' '{print $1}'|tr -d '#'); [[ "$LOG_STOP_TIME" != "" ]] && break;  done
+    if [ "${LOG_START_TIME}" == "" ]; then LOG_START_TIME=${LOG_STOP_TIME}; fi
+    LOG_START_TIME=$(date -d "$LOG_START_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
+    LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
+    printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"

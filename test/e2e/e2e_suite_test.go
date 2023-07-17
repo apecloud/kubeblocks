@@ -53,6 +53,7 @@ var region string
 var secretID string
 var secretKey string
 var initEnv bool
+var testType string
 
 func init() {
 	viper.AutomaticEnv()
@@ -62,6 +63,7 @@ func init() {
 	flag.StringVar(&secretID, "SECRET_ID", "", "cloud-provider SECRET_ID")
 	flag.StringVar(&secretKey, "SECRET_KEY", "", "cloud-provider SECRET_KEY")
 	flag.BoolVar(&initEnv, "INIT_ENV", false, "cloud-provider INIT_ENV")
+	flag.StringVar(&testType, "TEST_TYPE", "", "test type")
 }
 
 func TestE2e(t *testing.T) {
@@ -102,6 +104,7 @@ var _ = BeforeSuite(func() {
 	log.Println("kb version:" + version)
 	Version = version
 	InitEnv = initEnv
+	TestType = testType
 	if len(provider) > 0 && len(region) > 0 && len(secretID) > 0 && len(secretKey) > 0 {
 		Provider = provider
 		Region = region
@@ -113,34 +116,6 @@ var _ = BeforeSuite(func() {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
 		}))
 	}
-
-	Ctx, Cancel = context.WithCancel(context.TODO())
-	Logger = logf.FromContext(Ctx).WithValues()
-	Logger.Info("logger start")
-
-	K8sClient = TC.Kubebuilder
-	CheckNoKubeBlocksCRDs()
-
-	By("bootstrapping e2e-test environment")
-	var flag = true
-	testEnv = &envtest.Environment{
-		CRDInstallOptions: envtest.CRDInstallOptions{
-			CleanUpAfterUse: true,
-		},
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases"),
-			// use dependent external CRDs.
-			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.2.0", "config", "crd")},
-		ErrorIfCRDPathMissing: true,
-		UseExistingCluster:    &flag,
-	}
-
-	var err error
-	// cfg is defined in this file globally.
-	cfg, err = testEnv.Start()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
 })
 
 var _ = AfterSuite(func() {
@@ -158,6 +133,33 @@ var _ = Describe("e2e test", func() {
 
 	log.Println(initEnv)
 	if initEnv {
+		Ctx, Cancel = context.WithCancel(context.TODO())
+		Logger = logf.FromContext(Ctx).WithValues()
+		Logger.Info("logger start")
+
+		K8sClient = TC.Kubebuilder
+		CheckNoKubeBlocksCRDs()
+
+		By("bootstrapping e2e-test environment")
+		var flag = true
+		testEnv = &envtest.Environment{
+			CRDInstallOptions: envtest.CRDInstallOptions{
+				CleanUpAfterUse: true,
+			},
+			CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases"),
+				// use dependent external CRDs.
+				// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
+				filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
+					"client/v6@v6.2.0", "config", "crd")},
+			ErrorIfCRDPathMissing: true,
+			UseExistingCluster:    &flag,
+		}
+
+		var err error
+		// cfg is defined in this file globally.
+		cfg, err = testEnv.Start()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg).NotTo(BeNil())
 		var _ = Describe("KubeBlocks playground init", PlaygroundInit)
 
 		var _ = Describe("KubeBlocks uninstall", UninstallKubeblocks)

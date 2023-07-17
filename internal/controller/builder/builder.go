@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -144,12 +146,12 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		name      string
 		fieldPath string
 	}{
-		{name: "KB_POD_NAME", fieldPath: "metadata.name"},
-		{name: "KB_POD_UID", fieldPath: "metadata.uid"},
-		{name: "KB_NAMESPACE", fieldPath: "metadata.namespace"},
+		{name: constant.KBEnvPodName, fieldPath: "metadata.name"},
+		{name: constant.KBEnvPodUID, fieldPath: "metadata.uid"},
+		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
 		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
-		{name: "KB_NODENAME", fieldPath: "spec.nodeName"},
-		{name: "KB_HOST_IP", fieldPath: "status.hostIP"},
+		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
+		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
 		{name: "KB_POD_IP", fieldPath: "status.podIP"},
 		{name: "KB_POD_IPS", fieldPath: "status.podIPs"},
 		// TODO: need to deprecate following
@@ -200,13 +202,18 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
 			return err
 		}
-		for k, v := range udeMap {
-			if k == "" || v == "" {
+		keys := make([]string, 0)
+		for k := range udeMap {
+			if k == "" || udeMap[k] == "" {
 				continue
 			}
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
 			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
 				Name:  k,
-				Value: v,
+				Value: udeMap[k],
 			})
 		}
 	}
@@ -753,4 +760,29 @@ func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSna
 		return nil, err
 	}
 	return vsc, nil
+}
+
+func BuildServiceAccount(cluster *appsv1alpha1.Cluster) (*corev1.ServiceAccount, error) {
+	const tplFile = "rbac_template.cue"
+
+	sa := &corev1.ServiceAccount{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "serviceaccount", sa); err != nil {
+		return nil, err
+	}
+	return sa, nil
+}
+
+func BuildRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.RoleBinding, error) {
+	const tplFile = "rbac_template.cue"
+
+	rb := &rbacv1.RoleBinding{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "rolebinding", rb); err != nil {
+		return nil, err
+	}
+
+	return rb, nil
 }

@@ -66,19 +66,19 @@ import (
 var (
 	listBackupPolicyExample = templates.Examples(`
 		# list all backup policies
-		kbcli cluster list-backup-policy 
-        
-		# using short cmd to list backup policy of the specified cluster 
+		kbcli cluster list-backup-policy
+
+		# using short cmd to list backup policy of the specified cluster
         kbcli cluster list-bp mycluster
 	`)
 	editExample = templates.Examples(`
 		# edit backup policy
 		kbcli cluster edit-backup-policy <backup-policy-name>
 
-        # enable pitr 
+        # enable pitr
 		kbcli cluster edit-backup-policy <backup-policy-name> --set schedule.logfile.enable=true
 
-	    # using short cmd to edit backup policy 
+	    # using short cmd to edit backup policy
         kbcli cluster edit-bp <backup-policy-name>
 	`)
 	createBackupExample = templates.Examples(`
@@ -522,6 +522,10 @@ func (o *CreateRestoreOptions) runPITR() error {
 			constant.RestoreFromTimeAnnotationKey:       o.RestoreTime.Format(time.RFC3339),
 			constant.RestoreFromSrcClusterAnnotationKey: o.SourceCluster,
 		},
+	}
+	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
+	if clusterObj.Spec.ClusterDefRef == "apecloud-mysql" {
+		clusterObj.Spec.ComponentSpecs[0].Replicas = 1
 	}
 	return o.createCluster(clusterObj)
 }

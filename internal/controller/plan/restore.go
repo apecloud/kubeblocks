@@ -607,7 +607,10 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 		volumes = append(volumes, synthesizedComponent.PodSpec.Volumes...)
 		volumeMounts := make([]corev1.VolumeMount, 0)
 		for _, volume := range volumes {
-			volumeMounts = append(volumeMounts, volumeMountMap[volume.Name])
+			if vmount, ok := volumeMountMap[volume.Name]; ok {
+				volumeMounts = append(volumeMounts, vmount)
+			}
+
 		}
 		jobName := p.GetDatafileRestoreJobName(pvcName)
 		job, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,

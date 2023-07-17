@@ -1,0 +1,12 @@
+03_restart_zookeeper:
+  yaml:
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-restart-broker
+spec:
+  clusterRef: pulsar-test
+  ttlSecondsAfterSucceed: 3600
+  type: Start
+  restart:
+    - componentName: broker

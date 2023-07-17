@@ -51,6 +51,9 @@ spec:
           spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
+              clusterFamilyRef:
+                description: reference name of clusterfamily
+                type: string
               componentDefs:
                 description: componentDefs provides cluster components definitions.
                 items:
@@ -170,6 +173,13 @@ spec:
                         user's own configuration file according to the user's cluster.
                       items:
                         properties:
+                          asEnvFrom:
+                            description: 'asEnvFrom is optional: the list of containers
+                              will be injected into EnvFrom.'
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: set
                           constraintRef:
                             description: Specify the name of the referenced the configuration
                               constraints object.
@@ -9165,6 +9175,39 @@ spec:
                       - accounts
                       - cmdExecutorConfig
                       - passwordConfig
+                      type: object
+                    volumeProtectionSpec:
+                      properties:
+                        highWatermark:
+                          default: 90
+                          description: The high watermark threshold for volume space
+                            usage. If there is any specified volumes who's space usage
+                            is over the threshold, the pre-defined "LOCK" action will
+                            be triggered to degrade the service to protect volume
+                            from space exhaustion, such as to set the instance as
+                            read-only. And after that, if all volumes' space usage
+                            drops under the threshold later, the pre-defined "UNLOCK"
+                            action will be performed to recover the service normally.
+                          maximum: 100
+                          minimum: 0
+                          type: integer
+                        volumes:
+                          description: Volumes to protect.
+                          items:
+                            properties:
+                              highWatermark:
+                                description: Volume specified high watermark threshold,
+                                  it will override the component level threshold.
+                                  If the value is invalid, it will be ignored and
+                                  the component level threshold will be used.
+                                maximum: 100
+                                minimum: 0
+                                type: integer
+                              name:
+                                description: Name of volume to protect.
+                                type: string
+                            type: object
+                          type: array
                       type: object
                     volumeTypes:
                       description: "volumeTypes is used to describe the purpose of

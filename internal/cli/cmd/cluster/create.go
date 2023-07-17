@@ -98,10 +98,6 @@ var clusterCreateExample = templates.Examples(`
 	# the default storage class will be used
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
 
-	# Create a cluster and set the class to general-1c1g
-	# run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
-
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
 
@@ -142,6 +138,7 @@ var clusterCreateExample = templates.Examples(`
 const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
+	apeCloudMysql   = "apecloud-mysql"
 )
 
 type setKey string
@@ -192,6 +189,7 @@ type CreateOptions struct {
 	Annotations       map[string]string        `json:"annotations,omitempty"`
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
+	RBACEnabled       bool                     `json:"-"`
 
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
@@ -220,10 +218,11 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
 	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
-	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
+	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
+	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
 	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
@@ -254,7 +253,8 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
-	o.CreateOptions.CreateDependencies = o.CreateDependencies
+	// o.CreateOptions.CreateDependencies = o.CreateDependencies
+	o.CreateOptions.CleanUpFn = o.CleanUp
 	return o
 }
 
@@ -333,6 +333,12 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 	if err != nil {
 		return err
 	}
+	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
+	if backupCluster.Spec.ClusterDefRef == apeCloudMysql && o.RestoreTime != "" {
+		for _, c := range backupCluster.Spec.ComponentSpecs {
+			c.Replicas = 1
+		}
+	}
 	curCluster := *cls
 	if curCluster == nil {
 		curCluster = backupCluster
@@ -375,10 +381,20 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	return nil
 }
 
-func setRestoreTime(o *CreateOptions) error {
+func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error {
 	if o.RestoreTime == "" || o.SourceCluster == "" {
 		return nil
 	}
+
+	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
+	if o.ClusterDefRef == apeCloudMysql {
+		for _, c := range components {
+			if c["replicas"].(int64) > 1 {
+				return fmt.Errorf("apecloud-mysql only support one replica for point-in-time recovery")
+			}
+		}
+	}
+
 	if o.Annotations == nil {
 		o.Annotations = map[string]string{}
 	}
@@ -482,7 +498,7 @@ func (o *CreateOptions) Complete() error {
 	if err = setBackup(o, components); err != nil {
 		return err
 	}
-	if err = setRestoreTime(o); err != nil {
+	if err = setRestoreTime(o, components); err != nil {
 		return err
 	}
 	o.ComponentSpecs = components
@@ -516,28 +532,61 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		compSpecs []*appsv1alpha1.ClusterComponentSpec
 	)
 
-	compClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, o.ClusterDefRef)
-	if err != nil {
-		return nil, err
-	}
-
 	cd, err = cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return nil, err
 	}
+	clsMgr, err := class.GetManager(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return nil, err
+	}
+
+	compSets, err := buildCompSetsMap(o.Values, cd)
+	if err != nil {
+		return nil, err
+	}
+	overrideComponentBySets := func(comp, setComp *appsv1alpha1.ClusterComponentSpec, setValues map[setKey]string) {
+		for k := range setValues {
+			switch k {
+			case keyReplicas:
+				comp.Replicas = setComp.Replicas
+			case keyCPU:
+				comp.Resources.Requests[corev1.ResourceCPU] = setComp.Resources.Requests[corev1.ResourceCPU]
+				comp.Resources.Limits[corev1.ResourceCPU] = setComp.Resources.Limits[corev1.ResourceCPU]
+			case keyClass:
+				comp.ClassDefRef = setComp.ClassDefRef
+			case keyMemory:
+				comp.Resources.Requests[corev1.ResourceMemory] = setComp.Resources.Requests[corev1.ResourceMemory]
+				comp.Resources.Limits[corev1.ResourceMemory] = setComp.Resources.Limits[corev1.ResourceMemory]
+			case keyStorage:
+				if len(comp.VolumeClaimTemplates) > 0 && len(setComp.VolumeClaimTemplates) > 0 {
+					comp.VolumeClaimTemplates[0].Spec.Resources.Requests = setComp.VolumeClaimTemplates[0].Spec.Resources.Requests
+				}
+			case keyStorageClass:
+				if len(comp.VolumeClaimTemplates) > 0 && len(setComp.VolumeClaimTemplates) > 0 {
+					comp.VolumeClaimTemplates[0].Spec.StorageClassName = setComp.VolumeClaimTemplates[0].Spec.StorageClassName
+				}
+			case keySwitchPolicy:
+				comp.SwitchPolicy = setComp.SwitchPolicy
+			}
+		}
+	}
 
 	if clusterCompSpecs != nil {
-		for _, comp := range clusterCompSpecs {
-			compSpecs = append(compSpecs, &comp)
-		}
-	} else {
-		// build components from set values or environment variables
-		compSets, err := buildCompSetsMap(o.Values, cd)
+		setsCompSpecs, err := buildClusterComp(cd, compSets, clsMgr)
 		if err != nil {
 			return nil, err
 		}
-
-		compSpecs, err = buildClusterComp(cd, compSets, compClasses)
+		setsCompSpecsMap := map[string]*appsv1alpha1.ClusterComponentSpec{}
+		for _, setComp := range setsCompSpecs {
+			setsCompSpecsMap[setComp.Name] = setComp
+		}
+		for _, comp := range clusterCompSpecs {
+			overrideComponentBySets(&comp, setsCompSpecsMap[comp.Name], compSets[comp.Name])
+			compSpecs = append(compSpecs, &comp)
+		}
+	} else {
+		compSpecs, err = buildClusterComp(cd, compSets, clsMgr)
 		if err != nil {
 			return nil, err
 		}
@@ -546,7 +595,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	var comps []map[string]interface{}
 	for _, compSpec := range compSpecs {
 		// validate component classes
-		if _, err = class.ValidateComponentClass(compSpec, compClasses); err != nil {
+		if err = clsMgr.ValidateResources(compSpec); err != nil {
 			return nil, err
 		}
 
@@ -565,16 +614,15 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 }
 
 const (
-	saNamePrefix          = "kb-sa-"
-	roleNamePrefix        = "kb-role-"
-	roleBindingNamePrefix = "kb-rolebinding-"
+	saNamePrefix          = "kb-"
+	roleNamePrefix        = "kb-"
+	roleBindingNamePrefix = "kb-"
 )
 
 // buildDependenciesFn creates dependencies function for components, e.g. postgresql depends on
 // a service account, a role and a rolebinding
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
 	return nil
@@ -586,6 +634,10 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
+
+	if !o.RBACEnabled {
+		return nil
+	}
 
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account
@@ -802,8 +854,7 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string,
-	componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string, clsMgr *class.Manager) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
@@ -873,7 +924,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
 		// does not specify any set, so we only build the first component.
 		// TODO(ldm): remove this hack and use helm chart to render the cluster.
-		if i > 0 && len(sets) == 0 && cd.Name == "apecloud-mysql" {
+		if i > 0 && len(sets) == 0 && cd.Name == apeCloudMysql {
 			continue
 		}
 
@@ -898,15 +949,21 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 
 		// class has higher priority than other resource related parameters
 		resourceList := make(corev1.ResourceList)
-		if _, ok := componentClasses[c.Name]; ok {
+		if clsMgr.HasClass(compObj.ComponentDefRef, class.Any) {
 			if className := getVal(&c, keyClass, sets); className != "" {
-				compObj.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: className}
-			} else {
-				if cpu, ok := sets[keyCPU]; ok {
-					resourceList[corev1.ResourceCPU] = resource.MustParse(cpu)
+				clsDefRef := appsv1alpha1.ClassDefRef{}
+				parts := strings.SplitN(className, ":", 2)
+				if len(parts) == 1 {
+					clsDefRef.Class = parts[0]
+				} else {
+					clsDefRef.Name = parts[0]
+					clsDefRef.Class = parts[1]
 				}
-				if mem, ok := sets[keyMemory]; ok {
-					resourceList[corev1.ResourceMemory] = resource.MustParse(mem)
+				compObj.ClassDefRef = &clsDefRef
+			} else {
+				resourceList = corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse(getVal(&c, keyCPU, sets)),
+					corev1.ResourceMemory: resource.MustParse(getVal(&c, keyMemory, sets)),
 				}
 			}
 		} else {

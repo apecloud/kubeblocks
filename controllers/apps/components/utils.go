@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -205,21 +206,6 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster,
-	compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return nil, err
-	}
-	for _, component := range clusterDef.Spec.ComponentDefs {
-		if component.Name == compDefName {
-			return &component, nil
-		}
-	}
-	return nil, nil
-}
-
 // getClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
 func getClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
@@ -331,7 +317,11 @@ func GetComponentInfoByPod(ctx context.Context,
 		return "", nil, errors.New("pod component name label is nil")
 	}
 	compDefName := cluster.Spec.GetComponentDefRefName(componentName)
-	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	// if no componentSpec found, then componentName is componentDefName
+	if len(compDefName) == 0 && len(cluster.Spec.ComponentSpecs) == 0 {
+		compDefName = componentName
+	}
+	componentDef, err = appsv1alpha1.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return componentName, componentDef, err
 	}
@@ -591,21 +581,25 @@ func getRunningPods(ctx context.Context, cli client.Client, obj client.Object) (
 // resolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
 func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
-		if vv.DownwardAPI == nil || v.DownwardAPI == nil {
-			return
-		}
-		for i := range vv.DownwardAPI.Items {
-			vf := v.DownwardAPI.Items[i]
-			if vf.FieldRef == nil {
-				continue
+		if vv.DownwardAPI != nil && v.DownwardAPI != nil {
+			for i := range vv.DownwardAPI.Items {
+				vf := v.DownwardAPI.Items[i]
+				if vf.FieldRef == nil {
+					continue
+				}
+				vvf := &vv.DownwardAPI.Items[i]
+				if vvf.FieldRef != nil && len(vvf.FieldRef.APIVersion) == 0 {
+					vvf.FieldRef.APIVersion = vf.FieldRef.APIVersion
+				}
 			}
-			vvf := &vv.DownwardAPI.Items[i]
-			if vvf.FieldRef != nil && len(vvf.FieldRef.APIVersion) == 0 {
-				vvf.FieldRef.APIVersion = vf.FieldRef.APIVersion
+			if vv.DownwardAPI.DefaultMode == nil {
+				vv.DownwardAPI.DefaultMode = v.DownwardAPI.DefaultMode
 			}
 		}
-		if vv.DownwardAPI.DefaultMode == nil {
-			vv.DownwardAPI.DefaultMode = v.DownwardAPI.DefaultMode
+		if vv.ConfigMap != nil && v.ConfigMap != nil {
+			if vv.ConfigMap.DefaultMode == nil {
+				vv.ConfigMap.DefaultMode = v.ConfigMap.DefaultMode
+			}
 		}
 	}
 	resolveContainer := func(c corev1.Container, cc *corev1.Container) {
@@ -617,6 +611,33 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 		}
 		if len(cc.ImagePullPolicy) == 0 {
 			cc.ImagePullPolicy = c.ImagePullPolicy
+		}
+
+		resolveContainerProbe := func(p corev1.Probe, pp *corev1.Probe) {
+			if pp.TimeoutSeconds == 0 {
+				pp.TimeoutSeconds = p.TimeoutSeconds
+			}
+			if pp.PeriodSeconds == 0 {
+				pp.PeriodSeconds = p.PeriodSeconds
+			}
+			if pp.SuccessThreshold == 0 {
+				pp.SuccessThreshold = p.SuccessThreshold
+			}
+			if pp.FailureThreshold == 0 {
+				pp.FailureThreshold = p.FailureThreshold
+			}
+			if pp.HTTPGet != nil && len(pp.HTTPGet.Scheme) == 0 {
+				pp.HTTPGet.Scheme = p.HTTPGet.Scheme
+			}
+		}
+		if cc.LivenessProbe != nil && c.LivenessProbe != nil {
+			resolveContainerProbe(*c.LivenessProbe, cc.LivenessProbe)
+		}
+		if cc.ReadinessProbe != nil && c.ReadinessProbe != nil {
+			resolveContainerProbe(*c.ReadinessProbe, cc.ReadinessProbe)
+		}
+		if cc.StartupProbe != nil && c.StartupProbe != nil {
+			resolveContainerProbe(*c.StartupProbe, cc.StartupProbe)
 		}
 	}
 	min := func(a, b int) int {
@@ -664,4 +685,46 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	if pobj.PreemptionPolicy == nil {
 		pobj.PreemptionPolicy = obj.PreemptionPolicy
 	}
+}
+
+// delayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
+func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+	for i := range pobj.Containers {
+		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
+	}
+}
+
+// updatePodSpecSystemFields to update system fields in pod spec.
+func updatePodSpecSystemFields(pobj *corev1.PodSpec) {
+	for i := range pobj.Containers {
+		updateKubeBlocksToolsImage(&pobj.Containers[i])
+	}
+}
+
+func delayUpdateKubeBlocksToolsImage(containers []corev1.Container, pc *corev1.Container) {
+	if pc.Image != viper.GetString(constant.KBToolsImage) {
+		return
+	}
+	for _, c := range containers {
+		if c.Name == pc.Name {
+			if getImageName(c.Image) == getImageName(pc.Image) {
+				pc.Image = c.Image
+			}
+			break
+		}
+	}
+}
+
+func updateKubeBlocksToolsImage(pc *corev1.Container) {
+	if getImageName(pc.Image) == getImageName(viper.GetString(constant.KBToolsImage)) {
+		pc.Image = viper.GetString(constant.KBToolsImage)
+	}
+}
+
+func getImageName(image string) string {
+	subs := strings.Split(image, ":")
+	if len(subs) != 2 {
+		return ""
+	}
+	return subs[0]
 }

@@ -101,9 +101,11 @@ func init() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
+	viper.SetDefault(constant.EnableRBACManager, true)
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
+	viper.SetDefault(constant.KBChartsImage, "apecloud/kubeblocks-charts:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
@@ -111,6 +113,7 @@ func init() {
 	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
+	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 }
 
 type flagName string

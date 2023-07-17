@@ -289,6 +289,105 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restoreFrom
                   rule: self == oldSelf
+              scriptSpec:
+                description: scriptSpec defines the script to be executed.
+                properties:
+                  componentName:
+                    description: componentName cluster component name.
+                    type: string
+                  image:
+                    description: exec command with image, by default use the image
+                      of kubeblocks-datascript.
+                    type: string
+                  script:
+                    description: script defines the script to be executed.
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-validations:
+                    - message: forbidden to update spec.scriptSpec.script
+                      rule: self == oldSelf
+                  scriptFrom:
+                    description: scriptFrom defines the script to be executed from
+                      configMap or secret.
+                    properties:
+                      configMapRef:
+                        description: configMapRef defines the configMap to be executed.
+                        items:
+                          description: Selects a key from a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                        type: array
+                        x-kubernetes-validations:
+                        - message: forbidden to update spec.scriptSpec.scriptFrom.configMapRef
+                          rule: self == oldSelf
+                      secretRef:
+                        description: secretRef defines the secret to be executed.
+                        items:
+                          description: SecretKeySelector selects a key of a Secret.
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                        type: array
+                        x-kubernetes-validations:
+                        - message: forbidden to update spec.scriptSpec.scriptFrom.secretRef
+                          rule: self == oldSelf
+                    type: object
+                    x-kubernetes-validations:
+                    - message: forbidden to update spec.scriptSpec.scriptFrom
+                      rule: self == oldSelf
+                  secret:
+                    description: secret defines the secret to be used to execute the
+                      script. If not specified, the default cluster root credential
+                      secret will be used.
+                    properties:
+                      name:
+                        description: name is the name of the secret.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        type: string
+                      passwordKey:
+                        default: password
+                        description: passwordKey field is used to specify the password
+                          of the secret.
+                        type: string
+                      usernameKey:
+                        default: username
+                        description: usernameKey field is used to specify the username
+                          of the secret.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - componentName
+                type: object
               switchover:
                 description: switchover the specified components.
                 items:
@@ -328,6 +427,13 @@ spec:
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
                 format: int32
                 type: integer
+              ttlSecondsBeforeAbort:
+                default: 0
+                description: ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort
+                  seconds for start-conditions to be met. If not specified, the default
+                  value is 0, which means that the start-conditions must be met immediately.
+                format: int32
+                type: integer
               type:
                 description: type defines the operation type.
                 enum:
@@ -341,6 +447,7 @@ spec:
                 - Stop
                 - Expose
                 - Switchover
+                - DataScript
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type
@@ -384,9 +491,21 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    class:
-                      description: class specifies the class name of the component
-                      type: string
+                    classDefRef:
+                      description: classDefRef reference class defined in ComponentClassDefinition.
+                      properties:
+                        class:
+                          description: Class refers to the name of the class that
+                            is defined in the ComponentClassDefinition.
+                          type: string
+                        name:
+                          description: Name refers to the name of the ComponentClassDefinition.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - class
+                      type: object
                     componentName:
                       description: componentName cluster component name.
                       type: string
@@ -666,9 +785,21 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                        class:
-                          description: the last class name of the component.
-                          type: string
+                        classDefRef:
+                          description: classDefRef reference class defined in ComponentClassDefinition.
+                          properties:
+                            class:
+                              description: Class refers to the name of the class that
+                                is defined in the ComponentClassDefinition.
+                              type: string
+                            name:
+                              description: Name refers to the name of the ComponentClassDefinition.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - class
+                          type: object
                         limits:
                           additionalProperties:
                             anyOf:

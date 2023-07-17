@@ -4,15 +4,45 @@ title: kbcli bench pgbench
 
 Run pgbench against a PostgreSQL cluster
 
+```
+kbcli bench pgbench [flags]
+```
+
+### Examples
+
+```
+  # pgbench run on a cluster
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with different threads and different client
+  kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
+  
+  # pgbench run on a cluster with specified transactions
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --transactions 1000
+  
+  # pgbench run on a cluster with specified seconds
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
+  
+  # pgbench run on a cluster with select only
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
+```
+
 ### Options
 
 ```
-      --database string   database name
-  -h, --help              help for pgbench
-      --host string       the host of database
-      --password string   the password of database
-      --port int          the port of database
-      --user string       the user of database
+      --clients ints       The number of clients to use for pgbench (default [1])
+      --cluster string     the cluster of database
+      --database string    database name
+      --duration int       The seconds to run pgbench for (default 60)
+  -h, --help               help for pgbench
+      --host string        the host of database
+      --password string    the password of database
+      --port int           the port of database
+      --scale int          The scale factor to use for pgbench (default 1)
+      --select             Run pgbench with select only
+      --threads int        The number of threads to use for pgbench (default 1)
+      --transactions int   The number of transactions to run for pgbench
+      --user string        the user of database
 ```
 
 ### Options inherited from parent commands
@@ -25,7 +55,6 @@ Run pgbench against a PostgreSQL cluster
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -41,9 +70,6 @@ Run pgbench against a PostgreSQL cluster
 ### SEE ALSO
 
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
-* [kbcli bench pgbench cleanup](kbcli_bench_pgbench_cleanup.md)	 - Cleanup pgbench test data for a PostgreSQL cluster
-* [kbcli bench pgbench prepare](kbcli_bench_pgbench_prepare.md)	 - Prepare pgbench test data for a PostgreSQL cluster
-* [kbcli bench pgbench run](kbcli_bench_pgbench_run.md)	 - Run pgbench against a PostgreSQL cluster
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

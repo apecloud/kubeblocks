@@ -72,6 +72,13 @@ var (
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateless,
 		CharacterType: "stateless",
+		Probes: &appsv1alpha1.ClusterDefinitionProbes{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
+				FailureThreshold: 3,
+				PeriodSeconds:    1,
+				TimeoutSeconds:   5,
+			},
+		},
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      DefaultNginxContainerName,
@@ -171,7 +178,14 @@ var (
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateful,
 		CharacterType: "mysql",
-		Service:       &defaultMySQLService,
+		Probes: &appsv1alpha1.ClusterDefinitionProbes{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
+				FailureThreshold: 3,
+				PeriodSeconds:    1,
+				TimeoutSeconds:   5,
+			},
+		},
+		Service: &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},
@@ -284,7 +298,14 @@ var (
 	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Replication,
 		CharacterType: "redis",
-		Service:       &defaultRedisService,
+		Probes: &appsv1alpha1.ClusterDefinitionProbes{
+			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
+				FailureThreshold: 3,
+				PeriodSeconds:    1,
+				TimeoutSeconds:   5,
+			},
+		},
+		Service: &defaultRedisService,
 		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
 			Name: DataVolumeName,
 			Type: appsv1alpha1.VolumeTypeData,

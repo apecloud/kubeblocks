@@ -168,10 +168,12 @@ var _ = Describe("builder", func() {
 		By("assign every available fields")
 		component, err := component.BuildComponent(
 			reqCtx,
-			*cluster,
-			*clusterDef,
-			clusterDef.Spec.ComponentDefs[0],
-			cluster.Spec.ComponentSpecs[0],
+			nil,
+			cluster,
+			nil,
+			clusterDef,
+			&clusterDef.Spec.ComponentDefs[0],
+			&cluster.Spec.ComponentSpecs[0],
 			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(err).Should(Succeed())
 		Expect(component).ShouldNot(BeNil())
@@ -513,6 +515,24 @@ var _ = Describe("builder", func() {
 			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers)
 			Expect(err).Should(BeNil())
 			Expect(obj).ShouldNot(BeEmpty())
+		})
+
+		It("builds serviceaccount correctly", func() {
+			_, cluster, _ := newClusterObjs(nil)
+			expectName := fmt.Sprintf("kb-%s", cluster.Name)
+			serviceAccount, err := BuildServiceAccount(cluster)
+			Expect(err).Should(BeNil())
+			Expect(serviceAccount).ShouldNot(BeNil())
+			Expect(serviceAccount.Name).Should(Equal(expectName))
+		})
+
+		It("builds rolebinding correctly", func() {
+			_, cluster, _ := newClusterObjs(nil)
+			expectName := fmt.Sprintf("kb-%s", cluster.Name)
+			rb, err := BuildServiceAccount(cluster)
+			Expect(err).Should(BeNil())
+			Expect(rb).ShouldNot(BeNil())
+			Expect(rb.Name).Should(Equal(expectName))
 		})
 	})
 

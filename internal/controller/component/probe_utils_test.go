@@ -40,14 +40,14 @@ var _ = Describe("probe_utils", func() {
 	Context("build probe containers", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
-		var probeServiceHTTPPort, probeServiceGrpcPort int
+		var probeServiceHTTPPort int
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			var err error
 			container, err = buildProbeContainer()
 			Expect(err).NotTo(HaveOccurred())
-			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
+			probeServiceHTTPPort = 3501
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
@@ -106,7 +106,7 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build role service container", func() {
-			buildProbeServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
+			buildProbeServiceContainer(component, container)
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 

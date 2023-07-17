@@ -400,7 +400,7 @@ spec:
                 mountPath: /opt/agamotto
     - name: bookies
       workloadType: Stateful
-      characterType: bookies
+      characterType: bookkeeper
       statefulSpec:
         updateStrategy: BestEffortParallel
       monitor:

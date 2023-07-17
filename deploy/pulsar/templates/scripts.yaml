@@ -67,13 +67,7 @@ data:
     idx=${KB_POD_NAME##*-}
     if [ $idx -ge $current_component_replicas ]; then
        bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
-    else
-       # disable auto recovery if rollingUpdate bookies
-       bin/bookkeeper shell autorecovery -disable
     fi
-  poststart-bookies.sh: |-
-    #!/bin/bash
-    bin/bookkeeper shell autorecovery -enable
   start-bookies.sh: |-
     #!/bin/bash
     set -e

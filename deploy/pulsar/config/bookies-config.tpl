@@ -9,7 +9,9 @@ httpServerPort: "8000"
 journalDirectories: /pulsar/data/bookkeeper/journal
 journalMaxBackups: "0"
 ledgerDirectories: /pulsar/data/bookkeeper/ledgers
+# statsProviderClass ref: https://bookkeeper.apache.org/docs/admin/metrics#stats-providers
 statsProviderClass: org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
+enableStatistics: "true"
 useHostNameAsBookieID: "true"
 zkLedgersRootPath: /ledgers
 {{- $clusterName := $.cluster.metadata.name }}

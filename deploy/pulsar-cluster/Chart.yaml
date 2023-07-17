@@ -6,7 +6,7 @@ type: application
 
 version: 0.6.0-alpha.28
 
-appVersion: 2.11.0
+appVersion: 2.11.1
 
 dependencies:
   - name: kblib

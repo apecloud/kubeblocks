@@ -51,7 +51,7 @@ images:
   pulsarTools:
     repository: apecloud/pulsartools
     pullPolicy: ""
-    tag: 2.11
+    tag: "2.11"
 
   metrics:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/agamotto

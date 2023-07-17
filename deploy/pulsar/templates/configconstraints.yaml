@@ -64,7 +64,8 @@ spec:
           - cp
           - /bin/pulsar-admin
           - /kb/tools/pulsar-admin
-        image: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar/pulsar-tools:latest
+        image: "{{ template "pulsar.imageFullName" (dict "image" .Values.images.pulsarTools"root" .) }}"
+        # imagePullPolicy: "{{ template "pulsar.imagePullPolicy" (dict "image" .Values.images.pulsarTools "root" .) }}"
       - name: init-pulsar-client-config
         command:
           - "/opt/kb-tools/reload/broker-config/install-pulsar-client-config.sh"

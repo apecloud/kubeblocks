@@ -425,10 +425,15 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 }
 
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	return true, nil
+	return mgr.IsDBStartupReady(), nil
 }
 
 func (mgr *Manager) Premote() error {
+	if isLeader, err := mgr.IsLeader(context.TODO(), nil); err == nil && isLeader {
+		mgr.Logger.Infof("i am already a leader, don't need to promote")
+		return nil
+	}
+
 	err := mgr.prePromote()
 	if err != nil {
 		return err
@@ -487,6 +492,12 @@ func (mgr *Manager) Stop() error {
 
 func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 	ctx := context.TODO()
+
+	if cluster.Leader == nil || cluster.Leader.Name == "" {
+		mgr.Logger.Warnf("no action coz cluster has no leader")
+		return mgr.Start()
+	}
+
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("handle rewind failed, err:%v", err)
@@ -538,7 +549,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		return false
 	}
 
-	primaryTimeLine, err := mgr.getPrimaryTimeLine()
+	primaryTimeLine, err := mgr.getPrimaryTimeLine(cluster.GetMemberAddr(*cluster.GetLeaderMember()))
 	if err != nil {
 		mgr.Logger.Errorf("get primary timeLine failed, err:%v", err)
 		return false
@@ -573,9 +584,9 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 	return needRewind
 }
 
-func (mgr *Manager) getPrimaryTimeLine() (int64, error) {
+func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("psql", "replication=database", "-c", "IDENTIFY_SYSTEM")
+	cmd := exec.Command("psql", "-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -760,7 +771,35 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	return mgr.Stop()
+	return mgr.Start()
+}
+
+func (mgr *Manager) Start() error {
+	standbySignal, err := os.Create("/postgresql/data/standby.signal")
+	if err != nil {
+		mgr.Logger.Errorf("touch standby signal failed, err:%v", err)
+		return err
+	}
+	defer standbySignal.Close()
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("docker-entrypoint.sh", "--config-file=/kubeblocks/conf/postgresql.conf", "--hba_file=/kubeblocks/conf/pg_hba.conf", "&")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+
+	if err != nil || stderr.String() != "" {
+		mgr.Logger.Errorf("start postgresql failed, err:%v, stderr:%s", err, stderr.String())
+		return err
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config.pool)
+	if err != nil {
+		return errors.Errorf("unable to ping the DB: %v", err)
+	}
+	mgr.Pool = pool
+
+	return nil
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {

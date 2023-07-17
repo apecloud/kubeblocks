@@ -267,5 +267,5 @@ jobs:
           CLI_OS_ARCH=`bash .github/utils/utils.sh \
             --tag-name ${{ matrix.os }} \
             --type 2`
-
+          echo $CLI_OS_ARCH
           make bin/kbcli.$CLI_OS_ARCH

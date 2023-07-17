@@ -391,7 +391,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	if err != nil {
 		return err
 	}
-	defer client.Disconnect(context.TODO())
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)

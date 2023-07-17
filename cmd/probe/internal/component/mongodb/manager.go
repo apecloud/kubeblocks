@@ -273,6 +273,7 @@ func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return nil
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
@@ -280,7 +281,6 @@ func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 		return nil
 	}
 
-	_ = client.Disconnect(context.TODO())
 	return mgr.GetMemberAddrsFromRSConfig(rsConfig)
 }
 
@@ -341,6 +341,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return true
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
@@ -355,7 +356,6 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 		}
 	}
 
-	_ = client.Disconnect(context.TODO())
 	return false
 }
 
@@ -391,6 +391,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	if err != nil {
 		return err
 	}
+	defer client.Disconnect(context.TODO())
 
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
@@ -413,7 +414,6 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	rsConfig.Members = append(rsConfig.Members, configMember)
 
 	rsConfig.Version++
-	_ = client.Disconnect(context.TODO())
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
@@ -422,6 +422,7 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 	if err != nil {
 		return err
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
@@ -439,7 +440,6 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 
 	rsConfig.Members = configMembers
 	rsConfig.Version++
-	_ = client.Disconnect(context.TODO())
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
@@ -449,16 +449,14 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		mgr.Logger.Debugf("Get leader client failed: %v", err)
 		return false
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
+
 	status, err := mgr.GetReplSetStatusWithClient(ctx, client)
 	if err != nil {
 		return false
 	}
 	mgr.Logger.Debugf("cluster status: %v", status)
-	if status.OK != 0 {
-		return true
-	}
-	_ = client.Disconnect(ctx)
-	return false
+	return status.OK != 0
 }
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
@@ -467,13 +465,14 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	if err != nil {
 		return true, err
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
 	rsConfig, err := mgr.GetReplSetConfigWithClient(ctx, client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return false, err
 	}
-	_ = client.Disconnect(ctx)
+
 	return rsConfig.ID != "", nil
 }
 
@@ -485,7 +484,12 @@ func (mgr *Manager) Premote() error {
 	}
 
 	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
-	client, _ := mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
+	client, err := mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
+
 	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
 			rsConfig.Members[i].Priority = 2
@@ -495,7 +499,6 @@ func (mgr *Manager) Premote() error {
 	}
 
 	rsConfig.Version++
-	_ = client.Disconnect(context.TODO())
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 

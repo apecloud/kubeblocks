@@ -42,6 +42,12 @@ func (b *replicationComponentWorkloadBuilder) BuildService() componentWorkloadBu
 		if err != nil {
 			return nil, err
 		}
+		clusterSvcList, err := builder.BuildClusterSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		if err != nil {
+			return nil, err
+		}
+		svcList = append(svcList, clusterSvcList...)
+
 		objs := make([]client.Object, 0, len(svcList))
 		for _, svc := range svcList {
 			svc.Spec.Selector[constant.RoleLabelKey] = constant.Primary

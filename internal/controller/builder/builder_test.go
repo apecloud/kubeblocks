@@ -124,6 +124,7 @@ var _ = Describe("builder", func() {
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddAnnotationsInMap(newExtraEnvs()).
+			AddAnnotations(constant.HeadComponentAnnotationKey, mysqlCompName).
 			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
@@ -250,8 +251,8 @@ var _ = Describe("builder", func() {
 				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
 			}
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
-			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", cluster.Name, synthesizedComponent.Name, cluster.Namespace)
-			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, synthesizedComponent.Name, cluster.Namespace)
+			svcFQDN := fmt.Sprintf("%s.%s.svc", cluster.Name, cluster.Namespace)
+			headlessSvcFQDN := fmt.Sprintf("%s-headless.%s.svc", cluster.Name, cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
 			for _, s := range synthesizedComponent.Services[0].Spec.Ports {

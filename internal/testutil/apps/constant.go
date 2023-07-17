@@ -90,6 +90,7 @@ var (
 			Ports: []appsv1alpha1.ServicePort{{
 				Protocol: corev1.ProtocolTCP,
 				Port:     80,
+				Name:     "nginx",
 			}},
 		},
 	}
@@ -213,6 +214,7 @@ var (
 		Ports: []appsv1alpha1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     3306,
+			Name:     "mysql",
 		}},
 	}
 
@@ -241,6 +243,7 @@ var (
 		Ports: []appsv1alpha1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     6379,
+			Name:     "redis",
 		}},
 	}
 

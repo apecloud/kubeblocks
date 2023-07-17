@@ -74,6 +74,10 @@ type ClusterSpec struct {
 	// +optional
 	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
 
+	// Services expose endpoints that can be accessed by clients.
+	// +optional
+	Services []ClusterComponentService `json:"services,omitempty"`
+
 	// affinity is a group of affinity scheduling rules.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`

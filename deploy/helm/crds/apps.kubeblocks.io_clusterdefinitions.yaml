@@ -9283,16 +9283,80 @@ spec:
                   random UUID v4 BASE64 encoded string. - `$(UUID_STR_B64)` - generate
                   a random UUID v4 string then BASE64 encoded. - `$(UUID_HEX)` - generate
                   a random UUID v4 HEX representation. - `$(HEADLESS_SVC_FQDN)` -
-                  headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
-                  where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute; - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern
-                  - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME
-                  is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute; - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value
-                  with specified port name, i.e, a servicePort JSON struct: `{\"name\":
-                  \"mysql\", \"targetPort\": \"mysqlContainerPort\", \"port\": 3306}`,
-                  and \"$(SVC_PORT_mysql)\" in the connection credential value is
-                  3306."
+                  headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(FRONTEND_COMP_NAME)-headless.$(NAMESPACE).svc,
+                  where FRONTEND_COMP_NAME is the frontend component that provide
+                  `ClusterDefinition.spec.componentDefs[].service` attribute; - `$(SVC_FQDN)`
+                  - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(FRONTEND_COMP_NAME).$(NAMESPACE).svc,
+                  where FRONTEND_COMP_NAME is the frontend component that provide
+                  `ClusterDefinition.spec.componentDefs[].service` attribute; - `$(SVC_PORT_{PORT-NAME})`
+                  - a ServicePort's port value with specified port name, i.e, a servicePort
+                  JSON struct: `{\"name\": \"mysql\", \"targetPort\": \"mysqlContainerPort\",
+                  \"port\": 3306}`, and \"$(SVC_PORT_mysql)\" in the connection credential
+                  value is 3306."
+                type: object
+              service:
+                description: service defines the cluster service spec.
+                properties:
+                  frontendComponents:
+                    description: frontendComponents defines the frontend components
+                      that can provide service for cluster, ordered by priority.
+                    items:
+                      type: string
+                    type: array
+                  ports:
+                    description: 'The list of ports that are exposed by this service.
+                      More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies'
+                    items:
+                      properties:
+                        appProtocol:
+                          description: The application protocol for this port. This
+                            field follows standard Kubernetes label syntax. Un-prefixed
+                            names are reserved for IANA standard service names (as
+                            per RFC-6335 and https://www.iana.org/assignments/service-names).
+                            Non-standard protocols should use prefixed names such
+                            as mycompany.com/my-custom-protocol.
+                          type: string
+                        name:
+                          description: The name of this port within the service. This
+                            must be a DNS_LABEL. All ports within a ServiceSpec must
+                            have unique names. When considering the endpoints for
+                            a Service, this must match the 'name' field in the EndpointPort.
+                          type: string
+                        port:
+                          description: The port that will be exposed by this service.
+                          format: int32
+                          type: integer
+                        protocol:
+                          default: TCP
+                          description: The IP protocol for this port. Supports "TCP",
+                            "UDP", and "SCTP". Default is TCP.
+                          enum:
+                          - TCP
+                          - UDP
+                          - SCTP
+                          type: string
+                        targetPort:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: 'Number or name of the port to access on the
+                            pods targeted by the service. Number must be in the range
+                            1 to 65535. Name must be an IANA_SVC_NAME. If this is
+                            a string, it will be looked up as a named port in the
+                            target Pod''s container ports. If this is not specified,
+                            the value of the ''port'' field is used (an identity map).
+                            This field is ignored for services with clusterIP=None,
+                            and should be omitted or set equal to the ''port'' field.
+                            More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service'
+                          x-kubernetes-int-or-string: true
+                      required:
+                      - port
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - port
+                    - protocol
+                    x-kubernetes-list-type: map
                 type: object
               type:
                 description: Cluster definition type defines well known application

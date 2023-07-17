@@ -145,6 +145,7 @@ const (
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
+	HeadComponentAnnotationKey                  = "cluster.kubeblocks.io/head-component"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

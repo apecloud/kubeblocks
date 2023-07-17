@@ -293,6 +293,26 @@ func BuildSvcList(cluster *appsv1alpha1.Cluster, component *component.Synthesize
 	return result, nil
 }
 
+func BuildClusterSvcList(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) ([]*corev1.Service, error) {
+	const tplFile = "cluster_service_template.cue"
+	var result = make([]*corev1.Service, 0)
+	for _, item := range component.ClusterServices {
+		if len(item.Spec.Ports) == 0 {
+			continue
+		}
+		svc := corev1.Service{}
+		if err := buildFromCUE(tplFile, map[string]any{
+			"cluster":   cluster,
+			"service":   item,
+			"component": component,
+		}, "svc", &svc); err != nil {
+			return nil, err
+		}
+		result = append(result, &svc)
+	}
+	return result, nil
+}
+
 func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.Service, error) {
 	const tplFile = "headless_service_template.cue"
 	service := corev1.Service{}
@@ -401,12 +421,12 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_B64)":             uuidB64,
 		"$(UUID_STR_B64)":         uuidStrB64,
 		"$(UUID_HEX)":             uuidHex,
-		"$(SVC_FQDN)":             fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(SVC_FQDN)":             fmt.Sprintf("%s.%s.svc", cluster.Name, cluster.Namespace),
 		"$(KB_CLUSTER_COMP_NAME)": cluster.Name + "-" + component.Name,
-		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-headless.%s.svc", cluster.Name, cluster.Namespace),
 	}
-	if len(component.Services) > 0 {
-		for _, p := range component.Services[0].Spec.Ports {
+	if len(component.ClusterServices) > 0 {
+		for _, p := range component.ClusterServices[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}

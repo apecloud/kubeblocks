@@ -303,6 +303,25 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			component.Services = append(component.Services, service)
 		}
 	}
+	if cluster.GetAnnotations()[constant.HeadComponentAnnotationKey] == component.Name &&
+		clusterDef.Spec.Service != nil && len(clusterDef.Spec.Service.Ports) > 0 {
+
+		service := corev1.Service{Spec: clusterDef.Spec.Service.ToSVCSpec()}
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+		component.ClusterServices = append(component.ClusterServices, service)
+
+		for _, item := range cluster.Spec.Services {
+			service = corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        item.Name,
+					Annotations: item.Annotations,
+				},
+				Spec: service.Spec,
+			}
+			service.Spec.Type = item.ServiceType
+			component.ClusterServices = append(component.ClusterServices, service)
+		}
+	}
 
 	// probe container requires a service account with adequate privileges.
 	// If probes are required and the serviceAccountName is not set,

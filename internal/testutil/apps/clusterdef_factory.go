@@ -44,6 +44,9 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 		&appsv1alpha1.ClusterDefinition{
 			Spec: appsv1alpha1.ClusterDefinitionSpec{
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
+				Service: &appsv1alpha1.ClusterService{
+					ServiceSpec: appsv1alpha1.ServiceSpec{},
+				},
 			},
 		}, f)
 	f.SetConnectionCredential(defaultConnectionCredential, nil)
@@ -52,6 +55,7 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 
 func NewClusterDefFactoryWithConnCredential(name string) *MockClusterDefFactory {
 	f := NewClusterDefFactory(name)
+	f.AddClusterServicePort("mysql", 3306)
 	f.AddComponentDef(StatefulMySQLComponent, "conn-cred")
 	f.SetConnectionCredential(defaultConnectionCredential, &defaultSvcSpec)
 	return f
@@ -72,6 +76,15 @@ func (factory *MockClusterDefFactory) AddComponentDef(tplType ComponentDefTplTyp
 	factory.get().Spec.ComponentDefs = append(factory.get().Spec.ComponentDefs, *component)
 	comp := factory.getLastCompDef()
 	comp.Name = compDefName
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddClusterServicePort(name string, port int32) *MockClusterDefFactory {
+	factory.get().Spec.Service.Ports = append(factory.get().Spec.Service.Ports, appsv1alpha1.ServicePort{
+		Protocol: corev1.ProtocolTCP,
+		Port:     port,
+		Name:     name,
+	})
 	return factory
 }
 

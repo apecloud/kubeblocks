@@ -42,6 +42,11 @@ func (b *consensusComponentWorkloadBuilder) BuildService() componentWorkloadBuil
 		if err != nil {
 			return nil, err
 		}
+		clusterSvcList, err := builder.BuildClusterSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		if err != nil {
+			return nil, err
+		}
+		svcList = append(svcList, clusterSvcList...)
 		objs := make([]client.Object, 0, len(svcList))
 		leader := b.Comp.GetConsensusSpec().Leader
 		for _, svc := range svcList {

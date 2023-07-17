@@ -49,6 +49,7 @@ type SynthesizedComponent struct {
 	ReplicationSpec       *v1alpha1.ReplicationSetSpec           `json:"replicationSpec,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
+	ClusterServices       []corev1.Service                       `json:"clusterServices,omitempty"`
 	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`
 	VolumeClaimTemplates  []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor               *MonitorConfig                         `json:"monitor,omitempty"`

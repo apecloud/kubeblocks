@@ -23,6 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -47,9 +49,23 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 
+	var frontendComponents []appsv1alpha1.ClusterComponentDefinition
+	if transCtx.ClusterDef.Spec.Service != nil {
+		for _, name := range transCtx.ClusterDef.Spec.Service.FrontendComponents {
+			compDef := transCtx.ClusterDef.GetComponentDefByName(name)
+			if compDef != nil {
+				continue
+			}
+			frontendComponents = append(frontendComponents, *compDef)
+		}
+	}
+	if len(frontendComponents) == 0 {
+		frontendComponents = transCtx.ClusterDef.Spec.ComponentDefs
+	}
+
 	var synthesizedComponent *component.SynthesizedComponent
 	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
-	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
+	for _, compDef := range frontendComponents {
 		if compDef.Service == nil {
 			continue
 		}
@@ -69,8 +85,8 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 			}
 		}
 		if synthesizedComponent != nil {
-			synthesizedComponent.Services = []corev1.Service{
-				{Spec: compDef.Service.ToSVCSpec()},
+			synthesizedComponent.ClusterServices = []corev1.Service{
+				{Spec: transCtx.ClusterDef.Spec.Service.ToSVCSpec()},
 			}
 			break
 		}
@@ -83,6 +99,14 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		if secret != nil {
 			ictrltypes.LifecycleObjectCreate(dag, secret, root)
 		}
+
+		annotations := cluster.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[constant.HeadComponentAnnotationKey] = synthesizedComponent.Name
+		cluster.SetAnnotations(annotations)
 	}
+
 	return nil
 }

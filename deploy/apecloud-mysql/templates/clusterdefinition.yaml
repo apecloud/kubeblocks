@@ -12,6 +12,14 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_mysql)"
+  service:
+    ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+    frontendComponents:
+    - vtgate
+    - mysql
   clusterFamilyRef: apecloud-mysql-cluster-family
   componentDefs:
     - name: mysql
@@ -69,6 +77,9 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
+          - name: http
+            port: 80
+            targetPort: rest
       horizontalScalePolicy:
         type: CloneVolume
         backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale
@@ -524,6 +535,8 @@ spec:
                 name: serverport
               - containerPort: 40000
                 name: delvedebug
+              - containerPort: 3306
+                name: mysql
             env:
               - name: MYSQL_ROOT_USER
                 valueFrom:
@@ -540,7 +553,7 @@ spec:
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: VTGATE_MYSQL_PORT
-                value: "15306"
+                value: "3306"
               - name: VTGATE_WEB_PORT
                 value: "15001"
               - name: VTGATE_GRPC_PORT

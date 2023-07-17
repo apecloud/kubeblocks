@@ -52,18 +52,31 @@ type ClusterDefinitionSpec struct {
 	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
 	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
 	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
-	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
-	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
-	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
+	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(FRONTEND_COMP_NAME)-headless.$(NAMESPACE).svc,
+	//    where FRONTEND_COMP_NAME is the frontend component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
+	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(FRONTEND_COMP_NAME).$(NAMESPACE).svc,
+	//    where FRONTEND_COMP_NAME is the frontend component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
 	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 
+	// service defines the cluster service spec.
+	// +optional
+	Service *ClusterService `json:"service,omitempty"`
+
 	// reference name of clusterfamily
 	ClusterFamilyRef string `json:"clusterFamilyRef,omitempty"`
+}
+
+type ClusterService struct {
+	// +optional
+	ServiceSpec `json:",inline"`
+
+	// frontendComponents defines the frontend components that can provide service for cluster, ordered by priority.
+	// +optional
+	FrontendComponents []string `json:"frontendComponents,omitempty" json:"FrontendComponents,omitempty"`
 }
 
 // SystemAccountSpec specifies information to create system accounts.

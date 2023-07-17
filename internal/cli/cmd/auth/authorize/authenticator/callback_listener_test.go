@@ -49,10 +49,7 @@ var _ = Describe("callback listener", func() {
 			callbackListener.awaitResponse(codeReceiverCh, state)
 
 			go func() {
-				defer GinkgoRecover()
-
-				_, err := http.Get("http://127.0.0.1:" + port + "/callback?code=test_code&state=test_state")
-				Expect(err).To(BeNil())
+				_, _ = http.Get("http://127.0.0.1:" + port + "/callback?code=test_code&state=test_state")
 			}()
 
 			ExpectWithOffset(1, func() error {

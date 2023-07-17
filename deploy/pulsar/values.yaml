@@ -1,0 +1,66 @@
+# Default values for Pulsar.
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+commonAnnotations: {}
+
+## @param debugEnabled 
+#
+debugEnabled: false
+
+## Default Pulsar image
+##
+defaultPulsarImage:
+  repository: docker.io/apecloud/pulsar
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 2.11.1
+
+## Images
+##
+## Control what images to use for each component
+images:
+  bookie:
+    repository: ""
+    pullPolicy: ""
+    tag: ""
+
+  zookeeper:
+    # Zookeeper component is used for metadata, shouldn't need update following tag value for common 
+    # upgrade scenario
+    repository: docker.io/apecloud/pulsar
+    pullPolicy: IfNotPresent
+    tag: 2.11.1
+
+  broker:
+    repository: ""
+    pullPolicy: ""
+    tag: ""
+
+  proxy:
+    repository: ""
+    pullPolicy: ""
+    tag: ""
+
+  pulsarTools:
+    repository: docker.io/apecloud/pulsartools
+    pullPolicy: ""
+    tag: "2.11"
+
+  metrics:
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/agamotto
+    pullPolicy: IfNotPresent
+    tag: 0.1.2-beta.2
+
+metrics:
+  service:
+    port: 1234
+
+
+clusterDomain: ".cluster.local"

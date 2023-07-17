@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pulsar.name" . }}-recovery-conf-tpl
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  conf: |-
+    {{- .Files.Get "config/bookies-recovery-config.tpl" | nindent 4 }}

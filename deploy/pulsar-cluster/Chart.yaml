@@ -1,0 +1,32 @@
+apiVersion: v2
+name: pulsar-cluster
+description: A Pulsar Cluster Helm chart for KubeBlocks.
+
+type: application
+
+version: 0.6.0-alpha.28
+
+appVersion: 2.11.1
+
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
+home: https://pulsar.apache.org/
+icon: https://pulsar.apache.org/img/logo-black.svg
+keywords:
+  - pulsar
+  - kafka
+  - kop
+  - streaming
+  - messaging
+  - cloud-native
+  - message queue
+  - producer
+  - consumer
+
+maintainers:
+  - name: ApeCloud
+    url: https://github.com/apecloud/kubeblocks/deploy

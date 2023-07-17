@@ -180,7 +180,8 @@ spec:
                       reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
                       properties: a file extension mainly used in Java, reference
                       wiki: https://en.wikipedia.org/wiki/.properties toml: reference
-                      wiki: https://en.wikipedia.org/wiki/TOML"
+                      wiki: https://en.wikipedia.org/wiki/TOML props-plus: a file
+                      extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)"
                     enum:
                     - xml
                     - ini
@@ -191,6 +192,7 @@ spec:
                     - toml
                     - properties
                     - redis
+                    - props-plus
                     type: string
                   iniConfig:
                     description: iniConfig represents the ini options.
@@ -224,6 +226,10 @@ spec:
                         items:
                           type: string
                         type: array
+                      sync:
+                        description: Specify synchronize updates parameters to the
+                          config manager.
+                        type: boolean
                     required:
                     - command
                     type: object

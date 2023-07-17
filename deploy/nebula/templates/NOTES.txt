@@ -10,6 +10,6 @@ connect to graphd using nebula-console
  ./nebula-console --addr 127.0.0.1 --port 9669 -u root -p nebula
 
 3. and add storaged hosts
-ADD HOSTS "nebula-cluster-nebula-storaged-0.nebula-cluster-nebula-storaged-headless.default.svc.cluster.local":9779
-ADD HOSTS "nebula-cluster-nebula-storaged-1.nebula-cluster-nebula-storaged-headless.default.svc.cluster.local":9779
-ADD HOSTS "nebula-cluster-nebula-storaged-2.nebula-cluster-nebula-storaged-headless.default.svc.cluster.local":9779
+ADD HOSTS "nebula-cluster-nebula-storaged-0.nebula-cluster-nebula-storaged-headless.default.svc{{ .Values.clusterDomain }}":9779
+ADD HOSTS "nebula-cluster-nebula-storaged-1.nebula-cluster-nebula-storaged-headless.default.svc{{ .Values.clusterDomain }}":9779
+ADD HOSTS "nebula-cluster-nebula-storaged-2.nebula-cluster-nebula-storaged-headless.default.svc{{ .Values.clusterDomain }}":9779

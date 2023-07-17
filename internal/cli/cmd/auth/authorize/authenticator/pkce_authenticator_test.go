@@ -175,7 +175,7 @@ var _ = Describe("PKCE_Authenticator", func() {
 		mockServer = NewMockServer()
 		go mockServer.Start()
 
-		authURL := fmt.Sprintf("http://localhost:%s", mockServer.Port)
+		authURL := fmt.Sprintf("http://127.0.0.1:%s", mockServer.Port)
 		ExpectWithOffset(1, func() error {
 			a, err = newPKCEAuthenticator(nil, clientID, authURL)
 			return err

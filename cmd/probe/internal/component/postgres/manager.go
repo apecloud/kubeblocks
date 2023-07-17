@@ -197,7 +197,6 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 	var rows pgx.Rows
 	var err error
 	if pool != nil {
-		mgr.Logger.Infof("pool config host is: %s", pool.Config().ConnConfig.Host)
 		rows, err = pool.Query(ctx, sql)
 		defer pool.Close()
 	} else {
@@ -830,7 +829,6 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 			mgr.Logger.Errorf("unable to ping the DB: %v, host:%s", err, host)
 			continue
 		}
-		mgr.Logger.Infof("pool config host:%s", resp[i].Config().ConnConfig.Host)
 	}
 
 	return resp, nil

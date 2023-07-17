@@ -22,7 +22,7 @@ data:
             echo "${property} = '${value}'" >>"$conf_file"
         fi
     }
-    #####################
+    ############
     replace_in_file() {
         local filename="${1:?filename is required}"
         local match_regex="${2:?match regex is required}"
@@ -42,7 +42,7 @@ data:
         fi
         echo "$result" > "$filename"
     }
-    #########################
+    ############
     am_i_root() {
         if [[ "$(id -u)" = "0" ]]; then
             true
@@ -51,17 +51,17 @@ data:
         fi
         echo "am_i_root finish"
     }
-    ########################
+    ############
     user_exists() {
         local user="${1:?user is missing}"
         id "$user" >/dev/null 2>&1
     }
-    ########################
+    ############
     group_exists() {
         local group="${1:?group is missing}"
         getent group "$group" >/dev/null 2>&1
     }
-    ########################
+    ############
     ensure_group_exists() {
         local group="${1:?group is missing}"
         local gid=""
@@ -100,7 +100,7 @@ data:
         fi
         echo "group exist done"
     }
-    ########################
+    ############
     ensure_user_exists() {
         local user="${1:?user is missing}"
         local uid=""
@@ -177,7 +177,7 @@ data:
         fi
         echo "user exist finish"
     }
-    ########################
+    ############
     configure_permissions_ownership() {
         local -r paths="${1:?paths is missing}"
         local dir_mode=""
@@ -235,7 +235,7 @@ data:
             fi
         done
     }
-    ########################
+    ############
     postgresql_slave_init_db() {
         local -r check_args=("-U" "$POSTGRESQL_REPLICATION_USER" "-h" "$POSTGRESQL_MASTER_HOST" "-p" "$POSTGRESQL_MASTER_PORT_NUMBER" "-d" "postgres")
         local check_cmd=()
@@ -270,7 +270,7 @@ data:
             fi
         done
     }
-    ##############
+    ############
     export POSTGRESQL_INIT_MAX_TIMEOUT="${POSTGRESQL_INIT_MAX_TIMEOUT:-60}"
     export POSTGRESQL_DAEMON_USER="postgres"
     export POSTGRESQL_DAEMON_GROUP="postgres"
@@ -282,30 +282,30 @@ data:
       cp -r postgresql/conf/ kubeblocks/
     fi
 
-    KB_0_POD_NAME_PREFIX="${KB_0_HOSTNAME%%\.*}"
-    if [ "$KB_0_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
-      export POSTGRES_REPLICATION_MODE=slave
-      export POSTGRESQL_REPLICATION_USER=$POSTGRES_USER
-      export POSTGRESQL_REPLICATION_PASSWORD=$POSTGRES_PASSWORD
-      export POSTGRESQL_CLUSTER_APP_NAME=my-application
-      export POSTGRESQL_MASTER_HOST=$KB_0_HOSTNAME
-      export POSTGRESQL_MASTER_PORT_NUMBER="5432"
+    if [ ! -d ${PGDATA} ]; then
+      KB_0_POD_NAME_PREFIX="${KB_0_HOSTNAME%%\.*}"
+      if [ "$KB_0_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
+        export POSTGRES_REPLICATION_MODE=slave
+        export POSTGRESQL_REPLICATION_USER=$POSTGRES_USER
+        export POSTGRESQL_REPLICATION_PASSWORD=$POSTGRES_PASSWORD
+        export POSTGRESQL_CLUSTER_APP_NAME=my-application
+        export POSTGRESQL_MASTER_HOST=$KB_0_HOSTNAME
+        export POSTGRESQL_MASTER_PORT_NUMBER="5432"
 
-      export primary_conninfo="host=$KB_0_HOSTNAME port=$POSTGRESQL_PORT_NUMBER user=$PGUSER password=$PGPASSWORD application_name=$POSTGRESQL_CLUSTER_APP_NAME"
-      # add permission to daemon user
-      chmod a+w "$POSTGRESQL_VOLUME_DIR"
-      # Ensure 'daemon' user exists when running as 'root'
-      am_i_root && ensure_user_exists "$POSTGRESQL_DAEMON_USER" --group "$POSTGRESQL_DAEMON_GROUP"
-      if [ ! -d ${PGDATA} ]; then
-         # pg_basebackup
-         postgresql_slave_init_db
-         postgresql_set_property "primary_conninfo" "$primary_conninfo" "$POSTGRESQL_CONF_FILE"
+        export primary_conninfo="host=$KB_0_HOSTNAME port=$POSTGRESQL_PORT_NUMBER user=$PGUSER password=$PGPASSWORD application_name=$POSTGRESQL_CLUSTER_APP_NAME"
+        # add permission to daemon user
+        chmod a+w "$POSTGRESQL_VOLUME_DIR"
+        # Ensure 'daemon' user exists when running as 'root'
+        am_i_root && ensure_user_exists "$POSTGRESQL_DAEMON_USER" --group "$POSTGRESQL_DAEMON_GROUP"
+        postgresql_slave_init_db
+        postgresql_set_property "primary_conninfo" "$primary_conninfo" "$POSTGRESQL_CONF_FILE"
+        touch "$POSTGRESQL_DATA_DIR"/standby.signal
       fi
-      touch "$POSTGRESQL_DATA_DIR"/standby.signal
+
+      docker-entrypoint.sh --config-file=/kubeblocks/conf/postgresql.conf --hba_file=/kubeblocks/conf/pg_hba.conf
     else
-      if [ -d ${PGDATA} ]; then
-         touch "$POSTGRESQL_DATA_DIR"/standby.signal
-      fi
+      while true
+      do
+        sleep 60
+      done
     fi
-
-    docker-entrypoint.sh --config-file=/kubeblocks/conf/postgresql.conf --hba_file=/kubeblocks/conf/pg_hba.conf

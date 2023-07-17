@@ -64,6 +64,13 @@ const (
 	cliName = "kbcli"
 )
 
+// TODO: add more commands
+var whiteList = map[string]bool{
+	"logout":  true,
+	"cluster": true,
+	"addon":   true,
+}
+
 func init() {
 	if _, err := util.GetCliHomeDir(); err != nil {
 		fmt.Println("Failed to create kbcli home dir:", err)
@@ -146,7 +153,7 @@ A Command Line Interface for KubeBlocks`,
 			if cmd.Name() == cobra.ShellCompRequestCmd {
 				kcplugin.SetupPluginCompletion(cmd, args)
 			}
-			if cmd.Name() != "login" && !auth.IsLoggedIn() {
+			if whiteList[cmd.Name()] && !auth.IsLoggedIn() {
 				return fmt.Errorf("not logged in, please run 'kbcli login'")
 			}
 			return nil

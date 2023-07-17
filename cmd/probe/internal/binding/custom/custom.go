@@ -29,6 +29,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
@@ -59,7 +61,7 @@ func NewHTTPCustom() (*HTTPCustom, error) {
 }
 
 // Init performs metadata parsing.
-func (h *HTTPCustom) Init() error {
+func (h *HTTPCustom) Init(metadata component.Properties) error {
 	actionSvcList := viper.GetString("KB_CONSENSUS_SET_ACTION_SVC_LIST")
 	if len(actionSvcList) > 0 {
 		err := json.Unmarshal([]byte(actionSvcList), h.actionSvcPorts)
@@ -82,7 +84,7 @@ func (h *HTTPCustom) Init() error {
 		Transport: netTransport,
 	}
 
-	h.BaseOperations.Init()
+	h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
 	h.BaseOperations.LockInstance = h.LockInstance
 	h.BaseOperations.UnlockInstance = h.UnlockInstance

@@ -216,6 +216,10 @@ type ShellTrigger struct {
 	// command used to execute for reload.
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
+
+	// Specify synchronize updates parameters to the config manager.
+	// +optional
+	Sync *bool `json:"sync,omitempty"`
 }
 
 type TPLScriptTrigger struct {

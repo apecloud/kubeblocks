@@ -226,6 +226,10 @@ spec:
                         items:
                           type: string
                         type: array
+                      sync:
+                        description: Specify synchronize updates parameters to the
+                          config manager.
+                        type: boolean
                     required:
                     - command
                     type: object

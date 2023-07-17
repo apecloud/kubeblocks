@@ -3,8 +3,8 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-sa-redis-cluster
-  namespace: default
+  name: kb-redis-cluster
+  namespace: pulsar-kb
   labels:
     helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
@@ -14,8 +14,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-role-redis-cluster
-  namespace: default
+  name: kb-redis-cluster
+  namespace: pulsar-kb
   labels:
     helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
@@ -32,7 +32,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-rolebinding-redis-cluster
+  name: kb-redis-cluster
   labels:
     helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
@@ -40,18 +40,18 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-role-redis-cluster
+  name: kb-redis-cluster
 subjects:
   - kind: ServiceAccount
-    name: kb-sa-redis-cluster
-    namespace: default
+    name: kb-redis-cluster
+    namespace: pulsar-kb
 ---
 # Source: redis-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: redis-cluster
-  namespace: default
+  namespace: pulsar-kb
   labels: 
     helm.sh/chart: redis-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "7.0.6"
@@ -72,13 +72,22 @@ spec:
       replicas: 1
       enabledLogs:
         - running
-      serviceAccountName: kb-sa-redis-cluster
+      serviceAccountName: kb-redis-cluster
       switchPolicy:
         type: Noop      
       resources:
         limits:
           cpu: "0.5"
-          memory: "1Gi"
+          memory: "0.5Gi"
         requests:
           cpu: "0.5"
-          memory: "1Gi"
+          memory: "0.5Gi"      
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi      
+      services:

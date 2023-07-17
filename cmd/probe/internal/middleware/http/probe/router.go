@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -84,7 +85,7 @@ func RegisterBuiltin() error {
 		}
 	}
 
-	// custom 感觉不一定需要init
+	// todo custom init
 	customOp, _ = custom.NewHTTPCustom()
 
 	return nil
@@ -92,36 +93,35 @@ func RegisterBuiltin() error {
 
 func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		// get type
+		// get the character type
 		character := getCharacter(request.URL.Path)
 		if character == "" {
 			Logger.Error(nil, "character type missing in path")
 			return
 		}
-		// read body
+
 		body := request.Body
 		defer body.Close()
 		buf := make([]byte, 500)
 		n, err := body.Read(buf)
-		if err != nil {
+		if err != nil && err != io.EOF { // if the error is eof, ignore it
 			Logger.Error(err, "request body read failed")
 			return
 		}
 		buf = buf[:n]
-		request.Context()
-		// parse
+
 		meta := &RequestMeta{Metadata: map[string]string{}}
 		err = json.Unmarshal(buf, meta)
 		if err != nil {
 			Logger.Error(err, "request body unmarshal failed")
 			return
 		}
-		// 赋值
 		probeRequest := &ProbeRequest{Metadata: meta.Metadata}
 		probeRequest.Operation = util.OperationKind(meta.Operation)
-		// 派发
+
+		// route the request to engine
 		probeResp, err := route(character, request.Context(), probeRequest)
-		// 响应
+
 		if err != nil {
 			Logger.Error(err, "exec ops failed")
 			msg := fmt.Sprintf("exec ops failed: %v", err)
@@ -158,7 +158,7 @@ func getCharacter(url string) string {
 
 func route(character string, ctx context.Context, request *ProbeRequest) (*ProbeResponse, error) {
 	ops, ok := builtinMap[character]
-	// 如果不是builtin那就用custom
+	// if there is no builtin type, use the custom
 	if !ok {
 		// TODO: impl the custom
 		return nil, nil

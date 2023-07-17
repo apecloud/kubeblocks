@@ -1,6 +1,5 @@
 name: postgres
 spec:
-  type: bindings.postgres
   version: v1
   metadata:
   - name: url # Required

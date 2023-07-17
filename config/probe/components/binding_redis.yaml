@@ -1,6 +1,5 @@
 name: redis
 spec:
-  type: bindings.redis
   version: v1
   metadata:
   - name: redisHost

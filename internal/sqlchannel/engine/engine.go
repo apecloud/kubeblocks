@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -35,16 +37,34 @@ const (
 	statePulsarProxy  = "pulsar-proxy"
 )
 
+const (
+	host     = "host"
+	port     = "port"
+	user     = "user"
+	password = "password"
+	command  = "command"
+)
+
+var (
+	envVarMap = map[string]string{
+		host:     "KB_HOST",
+		port:     "KB_PORT",
+		user:     "KB_USER",
+		password: "KB_PASSWD",
+	}
+)
+
 // AuthInfo is the authentication information for the database
 type AuthInfo struct {
 	UserName   string
 	UserPasswd string
 }
 
-type Interface interface {
+type ClusterCommands interface {
 	ConnectCommand(info *AuthInfo) []string
 	Container() string
 	ConnectExample(info *ConnectionInfo, client string) string
+	ExecuteCommand([]string) ([]string, []corev1.EnvVar, error)
 }
 
 type EngineInfo struct {
@@ -55,7 +75,7 @@ type EngineInfo struct {
 	Database    string
 }
 
-func New(typeName string) (Interface, error) {
+func New(typeName string) (ClusterCommands, error) {
 	switch typeName {
 	case stateMysql:
 		return newMySQL(), nil

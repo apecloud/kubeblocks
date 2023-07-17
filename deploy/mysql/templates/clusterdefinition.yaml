@@ -1,0 +1,68 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: mysql
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  type: mysql
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mysql)"
+  componentDefs:
+    - name: mysql
+      characterType: mysql
+      probes:
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      workloadType: Replication
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+      configSpecs:
+        - name: mysql-replication-config
+          templateRef: mysql8.0.33-config-template
+          constraintRef: mysql8.0.33-config-constraints
+          volumeName: mysql-config
+          namespace: {{ .Release.Namespace }}
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: mysql
+            imagePullPolicy: IfNotPresent
+            command:
+              - bash 
+              - -c
+              - "docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1))"
+            volumeMounts:
+              - mountPath: /var/lib/mysql
+                name: data
+              - mountPath: /etc/mysql/conf.d
+                name: mysql-config
+            ports:
+              - containerPort: 3306
+                name: mysql
+            env:
+              - name: MYSQL_ROOT_HOST
+                value: {{ .Values.auth.rootHost | default "%" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false

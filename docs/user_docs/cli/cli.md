@@ -25,6 +25,13 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
+## [backuprepo](kbcli_backuprepo.md)
+
+BackupRepo command.
+
+* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
+
+
 ## [bench](kbcli_bench.md)
 
 Run a benchmark.

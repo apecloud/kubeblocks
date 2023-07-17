@@ -60,6 +60,7 @@ type SynthesizedComponent struct {
 	TLS                   bool                                   `json:"tls"`
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
 	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"volumeTypes,omitempty"`
+	VolumeProtection      *v1alpha1.VolumeProtectionSpec         `json:"volumeProtection,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	SwitchoverSpec        *v1alpha1.SwitchoverSpec               `json:"switchoverSpec,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`

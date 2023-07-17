@@ -33,6 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
@@ -67,6 +68,10 @@ var _ = Describe("object rbac transformer test.", func() {
 			clusterDefName, clusterVersionName).WithRandomName().
 			AddComponent(compName, compDefName).
 			SetServiceAccountName(serviceAccountName).GetObject()
+		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(testapps.StatefulMySQLComponent, "sts").
+			GetObject()
+		clusterDefObj.Spec.ComponentDefs[0].Probes = &appsv1alpha1.ClusterDefinitionProbes{}
 		saKey = types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
 			Name:      serviceAccountName,
@@ -78,16 +83,17 @@ var _ = Describe("object rbac transformer test.", func() {
 			EventRecorder: nil,
 			Logger:        logger,
 			Cluster:       cluster,
+			ClusterDef:    clusterDefObj,
 		}
 
 		dag = mockDAG(cluster)
 		transformer = &RBACTransformer{}
 		allSettings = viper.AllSettings()
-		viper.SetDefault("ENABLE_RBAC_MANAGER", true)
+		viper.SetDefault(constant.EnableRBACManager, true)
 	})
 
 	AfterEach(func() {
-		viper.SetDefault("ENABLE_RBAC_MANAGER", false)
+		viper.SetDefault(constant.EnableRBACManager, false)
 		if allSettings != nil {
 			Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
 			allSettings = nil

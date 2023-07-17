@@ -21,13 +21,13 @@
 	db_connect_timeout_ms: int & >=0
 
 	// Interval between health checks. (default 20s)
-	health_check_interval: =~ "[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
+	health_check_interval: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
 	// Time to wait for a remote operation. (default 15s)
-	remote_operation_timeout: =~ "[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
+	remote_operation_timeout: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
 	// Delay between retries of updates to keep the tablet and its shard record in sync. (default 30s)
-	shard_sync_retry_delay: =~ "[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
+	shard_sync_retry_delay: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
 	...
 }

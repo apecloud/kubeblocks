@@ -33,3 +33,4 @@ var Region string
 var SecretID string
 var SecretKey string
 var InitEnv bool
+var TestType string

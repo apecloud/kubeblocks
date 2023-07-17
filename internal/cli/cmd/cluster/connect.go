@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel/engine"
 )
@@ -71,7 +72,7 @@ type ConnectOptions struct {
 
 	clientType  string
 	showExample bool
-	engine      engine.Interface
+	engine      engine.ClusterCommands
 
 	privateEndPoint bool
 	svc             *corev1.Service
@@ -106,7 +107,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	cmd.Flags().StringVar(&o.componentName, "component", "", "The component to connect. If not specified, pick up the first one.")
+	flags.AddComponentsFlag(f, cmd, false, &o.componentName, "The component to connect. If not specified, pick up the first one.")
 	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster/instance from different clients.")
 	cmd.Flags().StringVar(&o.clientType, "client", "", "Which client connection example should be output, only valid if --show-example is true.")
 

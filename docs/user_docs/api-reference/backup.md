@@ -280,7 +280,7 @@ BackupPolicyStatus
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo
 </h3>
 <div>
-<p>BackupRepo is the Schema for the backuprepoes API</p><br />
+<p>BackupRepo is the Schema for the backuprepos API</p><br />
 </div>
 <table>
 <thead>
@@ -2397,7 +2397,7 @@ PersistentVolumeConfigMap
 </td>
 <td>
 <em>(Optional)</em>
-<p>persistentVolumeConfigMap references the configmap which contains a persistentVolume template.<br />key must be &ldquo;persistentVolume&rdquo; and value is the &ldquo;PersistentVolume&rdquo; struct.<br />support the following built-in Objects:<br />- $(GENERATE_NAME): generate a specific format &ldquo;<PVC NAME>-<PVC NAMESPACE>&rdquo;.<br />if the PersistentVolumeClaim not exists and CreatePolicy is &ldquo;IfNotPresent&rdquo;, the controller<br />will create it by this template. this is a mutually exclusive setting with &ldquo;storageClassName&rdquo;.</p><br />
+<p>persistentVolumeConfigMap references the configmap which contains a persistentVolume template.<br />key must be &ldquo;persistentVolume&rdquo; and value is the &ldquo;PersistentVolume&rdquo; struct.<br />support the following built-in Objects:<br />- $(GENERATE_NAME): generate a specific format &ldquo;<code>PVC NAME</code>-<code>PVC NAMESPACE</code>&rdquo;.<br />if the PersistentVolumeClaim not exists and CreatePolicy is &ldquo;IfNotPresent&rdquo;, the controller<br />will create it by this template. this is a mutually exclusive setting with &ldquo;storageClassName&rdquo;.</p><br />
 </td>
 </tr>
 </tbody>

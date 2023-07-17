@@ -52,6 +52,7 @@ type SchemaPropName string
 // the common schema property name
 const (
 	VersionSchemaProp SchemaPropName = "version"
+	RBACEnabledProp   SchemaPropName = "rbacEnabled"
 )
 
 type ChartInfo struct {

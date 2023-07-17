@@ -324,7 +324,7 @@ func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.Request
 	if err != nil {
 		return nil, nil, err
 	}
-	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, w.clusterVersionObj, cluster, compName, graph.NewDAG())
+	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, w.clusterVersionObj, cluster, nil, compName, graph.NewDAG())
 	if err != nil {
 		return nil, nil, err
 	}

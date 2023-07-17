@@ -127,6 +127,11 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		reqCtx.Log.Info("pod current role label equals to new role, ignore it", "new role", newRole)
 		return nil
 	}
+	// in case of adding new node
+	// if newRole != "" {
+	// 	return updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole)
+	// }
+
 	// if switchPolicy is not Noop, return
 	clusterCompSpec := getClusterComponentSpecByName(*cluster, compName)
 	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {

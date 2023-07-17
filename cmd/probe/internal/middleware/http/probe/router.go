@@ -93,7 +93,7 @@ func RegisterBuiltin() error {
 func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		// get type
-		character := GetCharacter(request.URL.Path)
+		character := getCharacter(request.URL.Path)
 		if character == "" {
 			Logger.Error(nil, "character type missing in path")
 			return
@@ -112,11 +112,15 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 		// parse
 		meta := &RequestMeta{Metadata: map[string]string{}}
 		err = json.Unmarshal(buf, meta)
+		if err != nil {
+			Logger.Error(err, "request body unmarshal failed")
+			return
+		}
 		// 赋值
 		probeRequest := &ProbeRequest{Metadata: meta.Metadata}
 		probeRequest.Operation = util.OperationKind(meta.Operation)
 		// 派发
-		probeResp, err := Route(character, request.Context(), probeRequest)
+		probeResp, err := route(character, request.Context(), probeRequest)
 		// 响应
 		if err != nil {
 			Logger.Error(err, "exec ops failed")
@@ -141,19 +145,19 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func GetCharacter(url string) string {
+func getCharacter(url string) string {
 	//bindingPath  = "/v1.0/bindings/${char}"
 	if !strings.HasPrefix(url, bindingPath) {
 		return ""
 	}
 	splits := strings.Split(url, "/")
-	if len(splits) != 3 {
+	if len(splits) != 4 {
 		return ""
 	}
-	return splits[2]
+	return splits[3]
 }
 
-func Route(character string, ctx context.Context, request *ProbeRequest) (*ProbeResponse, error) {
+func route(character string, ctx context.Context, request *ProbeRequest) (*ProbeResponse, error) {
 	ops, ok := builtinMap[character]
 	// 如果不是builtin那就用custom
 	if !ok {

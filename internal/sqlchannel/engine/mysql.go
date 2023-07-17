@@ -21,15 +21,18 @@ package engine
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
+
+var _ ClusterCommands = &mysql{}
 
 type mysql struct {
 	info     EngineInfo
 	examples map[ClientType]buildConnectExample
 }
-
-var _ Interface = &mysql{}
 
 func newMySQL() *mysql {
 	return &mysql{
@@ -276,4 +279,21 @@ func (m *mysql) ConnectExample(info *ConnectionInfo, client string) string {
 		info.Database = m.info.Database
 	}
 	return buildExample(info, client, m.examples)
+}
+
+func (m *mysql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
+	cmd := []string{}
+	cmd = append(cmd, "/bin/sh", "-c", "-ex")
+	cmd = append(cmd, fmt.Sprintf("%s -u%s -p%s -e %s", m.info.Client,
+		fmt.Sprintf("$%s", envVarMap[user]),
+		fmt.Sprintf("$%s", envVarMap[password]),
+		strconv.Quote(strings.Join(scripts, " "))))
+
+	envs := []corev1.EnvVar{
+		{
+			Name:  "MYSQL_HOST",
+			Value: fmt.Sprintf("$(%s)", envVarMap[host]),
+		},
+	}
+	return cmd, envs, nil
 }

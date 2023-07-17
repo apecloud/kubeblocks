@@ -42,7 +42,7 @@ var configDir string
 
 const (
 	DefaultPort       = 7373
-	DefaultConfigPath = "config-path"
+	DefaultConfigPath = "config/probe"
 )
 
 func init() {

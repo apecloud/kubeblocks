@@ -138,8 +138,8 @@ spec:
                 value: "true"
               - name: KUBERNETES_USE_CONFIGMAPS
                 value: "true"
-              - name: POSTGRES_PASSWORD
-                value: "postgres"
+{{/*              - name: POSTGRES_PASSWORD*/}}
+{{/*                value: "postgres"*/}}
               - name: SCOPE
                 value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
               - name: KUBERNETES_SCOPE_LABEL
@@ -206,7 +206,7 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
                     optional: false
-              - name: PGPASSWORD
+              - name: POSTGRES_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)

@@ -86,14 +86,14 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Below is the command 
 * `spec.clusterDefinitionRef` is the name of the cluster definition CRD that define the cluster components.
 * `spec.clusterVersionRef` is the name of the cluster version CRD that define the cluster version.
 * `spec.componentSpecs` is the list of components that define the cluster components. 
-* `spec.componnetSpecs.componentDefRef` is the name of the component definition that defined in the cluster definition.
+* `spec.componnetSpecs.componentDefRef` is the name of the component definition that defined in the cluster definition, you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`
 * `spec.componentSpecs.name` is the name of the component.
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
 * `spec.componentSpecs.volumeClaimTemplates` is the list of volume claim templates that define the volume claim templates for the component.
-* `spec.terminationPolicy` gives the policy of the cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block delete operation. `Halt` will delete workload resources such as statefulset, deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+* `spec.terminationPolicy` is the policy of the cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block delete operation. `Halt` will delete workload resources such as statefulset, deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 
-KubeBlocks operator watches for the `Cluster` CRD, creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all -l clustername=<clustername> --namespace <name>`.
+KubeBlocks operator watches for the `Cluster` CRD, creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mysql-cluster -n demo`.
 
 ```bash
 

@@ -23,8 +23,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -54,13 +55,11 @@ func TestGetRole(t *testing.T) {
 		"username":     "username",
 		"password":     "password",
 	}
-	bm := bindings.Metadata{
-		Base: metadata.Base{Properties: properties},
-	}
+	development, _ := zap.NewDevelopment()
 	m := &MongoDBOperations{
-		BaseOperations: BaseOperations{Logger: },
+		BaseOperations: BaseOperations{Logger: zapr.NewLogger(development)},
 	}
-	err := m.Init(bm)
+	err := m.Init(properties)
 	assert.Nil(t, err)
 	m.manager.Client = mt.Client
 	role, err := m.GetRole(context.Background(), &ProbeRequest{}, &ProbeResponse{})

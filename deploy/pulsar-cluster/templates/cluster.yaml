@@ -16,6 +16,7 @@ spec:
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
   componentSpecs:
+    {{- if .Values.proxy.enable }}
     - name: proxy
       componentDefRef: pulsar-proxy
       monitor: {{ .Values.monitor.enabled | default false }}
@@ -33,6 +34,7 @@ spec:
           memory: {{ .requests.memory | quote }}
       {{- end }}
       {{- end }}
+    {{- end }}
     - name: broker
       componentDefRef: pulsar-broker
       monitor: {{ .Values.monitor.enabled | default false }}

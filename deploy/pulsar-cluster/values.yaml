@@ -130,6 +130,7 @@ broker:
 proxy:
   ## @param proxy.replicaCount Number of Proxy replicas
   replicaCount: 1
+  enable: false
 
   resources:
     # We usually recommend not to specify default resources and to leave this as a conscious

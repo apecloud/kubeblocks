@@ -30,8 +30,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +41,7 @@ import (
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -68,7 +69,7 @@ type volumeExt struct {
 }
 
 type operationVolumeProtection struct {
-	Logger        logger.Logger
+	Logger        logr.Logger
 	Requester     volumeStatsRequester
 	Pod           string
 	HighWatermark int
@@ -80,7 +81,7 @@ type operationVolumeProtection struct {
 	BaseOperation *BaseOperations
 }
 
-func newVolumeProtectionOperation(logger logger.Logger, ops *BaseOperations) *operationVolumeProtection {
+func newVolumeProtectionOperation(logger logr.Logger, ops *BaseOperations) *operationVolumeProtection {
 	return &operationVolumeProtection{
 		Logger: logger,
 		Requester: &httpsVolumeStatsRequester{
@@ -95,17 +96,17 @@ func (o *operationVolumeProtection) Kind() OperationKind {
 	return util.VolumeProtection
 }
 
-func (o *operationVolumeProtection) Init(metadata bindings.Metadata) error {
+func (o *operationVolumeProtection) Init(metadata Properties) error {
 	if err := o.Requester.init(context.Background()); err != nil {
 		return err
 	}
 
 	o.Pod = os.Getenv(constant.KBEnvPodName)
 	if err := o.initVolumes(); err != nil {
-		o.Logger.Warnf("init volumes to monitor error: %s", err.Error())
+		o.Logger.Error(err, "init volumes to monitor error")
 		return err
 	}
-	o.Logger.Infof("succeed to init %s operation, pod: %s, spec: %s", o.Kind(), o.Pod, o.buildVolumesMsg())
+	o.Logger.Info(fmt.Sprintf("succeed to init %s operation, pod: %s, spec: %s", o.Kind(), o.Pod, o.buildVolumesMsg()))
 	return nil
 }
 
@@ -113,7 +114,7 @@ func (o *operationVolumeProtection) initVolumes() error {
 	spec := &appsv1alpha1.VolumeProtectionSpec{}
 	raw := os.Getenv(constant.KBEnvVolumeProtectionSpec)
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
-		o.Logger.Warnf("unmarshal volume protection spec error: %s, raw spec: %s", err.Error(), raw)
+		o.Logger.Error(err, "unmarshal volume protection spec error", "raw spec", raw)
 		return err
 	}
 
@@ -134,15 +135,15 @@ func (o *operationVolumeProtection) initVolumes() error {
 	return nil
 }
 
-func (o *operationVolumeProtection) Invoke(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) error {
+func (o *operationVolumeProtection) Invoke(ctx context.Context, req *ProbeRequest, rsp *ProbeResponse) error {
 	if o.disabled() {
-		o.Logger.Infof("The operation %s is disabled", o.Kind())
+		o.Logger.Info(fmt.Sprintf("The operation %s is disabled", o.Kind()))
 		return nil
 	}
 
 	summary, err := o.Requester.request(ctx)
 	if err != nil {
-		o.Logger.Warnf("request stats summary from kubelet error: %s", err.Error())
+		o.Logger.Error(err, "request stats summary from kubelet error")
 		return err
 	}
 
@@ -174,7 +175,7 @@ func (o *operationVolumeProtection) disabled() bool {
 func (o *operationVolumeProtection) updateVolumeStats(payload []byte) error {
 	summary := &statsv1alpha1.Summary{}
 	if err := json.Unmarshal(payload, summary); err != nil {
-		o.Logger.Warnf("stats summary obtained from kubelet error: %s", err.Error())
+		o.Logger.Error(err, "stats summary obtained from kubelet error")
 		return err
 	}
 	for _, pod := range summary.Pods {
@@ -245,15 +246,15 @@ func (o *operationVolumeProtection) highWatermark(ctx context.Context, msg strin
 		return nil
 	}
 	if err := o.lockInstance(ctx); err != nil {
-		o.Logger.Warnf("set instance to read-only error: %s, volumes: %s", err.Error(), msg)
+		o.Logger.Error(err, "set instance to read-only error", "volumes", msg)
 		return err
 	}
 
-	o.Logger.Infof("set instance to read-only OK: %s", msg)
+	o.Logger.Info("set instance to read-only OK", "msg", msg)
 	o.Readonly = true
 
 	if err := o.sendEvent(ctx, reasonLock, msg); err != nil {
-		o.Logger.Warnf("send volume protection (lock) event error: %s, volumes: %s", err.Error(), msg)
+		o.Logger.Error(err, "send volume protection (lock) event error", "volumes", msg)
 		return err
 	}
 	return nil
@@ -264,15 +265,15 @@ func (o *operationVolumeProtection) lowWatermark(ctx context.Context, msg string
 		return nil
 	}
 	if err := o.unlockInstance(ctx); err != nil {
-		o.Logger.Warnf("reset instance to read-write error: %s, volumes: %s", err.Error(), msg)
+		o.Logger.Error(err, "reset instance to read-write error", "volumes", msg)
 		return err
 	}
 
-	o.Logger.Infof("reset instance to read-write OK: %s", msg)
+	o.Logger.Info("reset instance to read-write OK", "msg", msg)
 	o.Readonly = false
 
 	if err := o.sendEvent(ctx, reasonUnlock, msg); err != nil {
-		o.Logger.Warnf("send volume protection (unlock) event error: %s, volumes: %s", err.Error(), msg)
+		o.Logger.Error(err, "send volume protection (unlock) event error", "volumes", msg)
 		return err
 	}
 	return nil
@@ -342,7 +343,7 @@ func (o *operationVolumeProtection) createEvent(reason, msg string) *corev1.Even
 }
 
 type httpsVolumeStatsRequester struct {
-	logger logger.Logger
+	logger logr.Logger
 	cli    *http.Client
 	req    *http.Request
 }
@@ -352,11 +353,11 @@ var _ volumeStatsRequester = &httpsVolumeStatsRequester{}
 func (r *httpsVolumeStatsRequester) init(ctx context.Context) error {
 	var err error
 	if r.cli, err = httpClient(); err != nil {
-		r.logger.Warnf("build HTTP client error at setup: %s", err.Error())
+		r.logger.Error(err, "build HTTP client error at setup")
 		return err
 	}
 	if r.req, err = httpRequest(ctx); err != nil {
-		r.logger.Warnf("build HTTP request error at setup, will try it later: %s", err.Error())
+		r.logger.Error(err, "build HTTP request error at setup, will try it later")
 	}
 	return nil
 }
@@ -370,7 +371,7 @@ func (r *httpsVolumeStatsRequester) request(ctx context.Context) ([]byte, error)
 		var err error
 		r.req, err = httpRequest(ctx)
 		if err != nil {
-			r.logger.Warnf("build HTTP request to query kubelet error: %s", err.Error())
+			r.logger.Error(err, "build HTTP request to query kubelet error")
 			return nil, err
 		}
 	}
@@ -378,11 +379,11 @@ func (r *httpsVolumeStatsRequester) request(ctx context.Context) ([]byte, error)
 	req := r.req.WithContext(ctx)
 	rsp, err := r.cli.Do(req)
 	if err != nil {
-		r.logger.Warnf("issue request to kubelet error: %s", err.Error())
+		r.logger.Error(err, "issue request to kubelet error")
 		return nil, err
 	}
 	if rsp.StatusCode != 200 {
-		r.logger.Warnf("HTTP response from kubelet error: %s", rsp.Status)
+		r.logger.Error(nil, fmt.Sprintf("HTTP response from kubelet error: %s", rsp.Status))
 		return nil, fmt.Errorf(rsp.Status)
 	}
 

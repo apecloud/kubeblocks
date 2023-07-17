@@ -466,7 +466,6 @@ func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *binding.
 	sqlTplRend := func(user UserInfo) string {
 		return listUserTpl
 	}
-	//return OpsResult{},nil
 	return QueryObject(ctx, mysqlOps, req, ListUsersOp, sqlTplRend, nil, UserInfo{})
 }
 

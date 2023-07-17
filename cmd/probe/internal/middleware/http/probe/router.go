@@ -146,7 +146,6 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 }
 
 func getCharacter(url string) string {
-	//bindingPath  = "/v1.0/bindings/${char}"
 	if !strings.HasPrefix(url, bindingPath) {
 		return ""
 	}

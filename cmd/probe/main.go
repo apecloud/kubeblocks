@@ -75,7 +75,10 @@ func main() {
 	http.HandleFunc("/", probe.SetMiddleware(probe.GetRouter()))
 	go func() {
 		addr := fmt.Sprintf("localhost:%d", port)
-		http.ListenAndServe(addr, nil)
+		err := http.ListenAndServe(addr, nil)
+		if err != nil {
+			panic(fmt.Errorf("fatal error listen on port %d", port))
+		}
 	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run

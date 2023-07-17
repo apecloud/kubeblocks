@@ -29,14 +29,13 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
 	"github.com/spf13/viper"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -104,7 +103,6 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 	)
 
 	for _, port := range *h.actionSvcPorts {
-		// todo url是写死的
 		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
 		lastOutput, err = h.callAction(ctx, u)
 		if err != nil {
@@ -136,7 +134,6 @@ func (h *HTTPCustom) UnlockInstance(ctx context.Context) error {
 }
 
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort
-// 现在感人的是, 不一定是Get了,也可能是Post, 一种方案是全部用Post算了
 func (h *HTTPCustom) callAction(ctx context.Context, url string) (string, error) {
 	// compose http request
 	request, err := http.NewRequestWithContext(ctx, "POST", url, nil)

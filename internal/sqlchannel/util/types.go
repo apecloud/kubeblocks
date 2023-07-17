@@ -50,8 +50,7 @@ const (
 	VolumeProtection      OperationKind = "volumeProtection"
 
 	// actions for cluster accounts management
-	ListUsersOp OperationKind = "listUsers"
-	//ListUsersOp          OperationKind = "listUsers"
+	ListUsersOp          OperationKind = "listUsers"
 	CreateUserOp         OperationKind = "createUser"
 	DeleteUserOp         OperationKind = "deleteUser"
 	DescribeUserOp       OperationKind = "describeUser"

@@ -48,9 +48,9 @@ func TestInit(t *testing.T) {
 	index := strings.LastIndex(addr, ":")
 	portStr := addr[index+1:]
 	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", "["+portStr+"]")
-	hs, err := NewHTTPCustom()
+	hs, _ := NewHTTPCustom()
 	metadata := make(component.Properties)
-	err = hs.Init(metadata)
+	err := hs.Init(metadata)
 	require.NoError(t, err)
 
 	tests := map[string]struct {

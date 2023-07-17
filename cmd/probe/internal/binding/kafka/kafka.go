@@ -71,7 +71,10 @@ func NewKafka() (*KafkaOperations, error) {
 func (kafkaOps *KafkaOperations) Init(metadata component.Properties) error {
 	kafkaOps.Logger.Info("Initializing kafka binding")
 	kafkaOps.BaseOperations.Init(metadata)
-	kafkaOps.kafka.Init(context.Background(), kafkaOps.Metadata)
+	err := kafkaOps.kafka.Init(context.Background(), kafkaOps.Metadata)
+	if err != nil {
+		return err
+	}
 	kafkaOps.DBType = "kafka"
 	kafkaOps.InitIfNeed = kafkaOps.initIfNeed
 	// kafkaOps.BaseOperations.GetRole = kafkaOps.GetRole
@@ -90,7 +93,9 @@ func (kafkaOps *KafkaOperations) initIfNeed() bool {
 	if kafkaOps.kafka.Producer == nil {
 		go func() {
 			err := kafkaOps.InitDelay()
-			kafkaOps.Logger.Error(err, "Kafka connection init failed")
+			if err != nil {
+				kafkaOps.Logger.Error(err, "Kafka connection init failed")
+			}
 		}()
 		return true
 	}

@@ -22,7 +22,6 @@ package accounts
 import (
 	"strings"
 
-	"github.com/dapr/components-contrib/bindings"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -37,7 +36,7 @@ type GrantOptions struct {
 	info channelutil.UserInfo
 }
 
-func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op bindings.OperationKind) *GrantOptions {
+func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op channelutil.OperationKind) *GrantOptions {
 	if (op != channelutil.GrantUserRoleOp) && (op != channelutil.RevokeUserRoleOp) {
 		klog.V(1).Infof("invalid operation kind: %s", op)
 		return nil

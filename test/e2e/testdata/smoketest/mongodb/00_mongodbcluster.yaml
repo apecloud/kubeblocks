@@ -3,8 +3,8 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-sa-mongodb-cluster
-  namespace: default
+  name: kb-mongodb-cluster
+  namespace: pulsar-kb
   labels:
     helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
@@ -14,8 +14,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-role-mongodb-cluster
-  namespace: default
+  name: kb-mongodb-cluster
+  namespace: pulsar-kb
   labels:
     helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
@@ -32,7 +32,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-rolebinding-mongodb-cluster
+  name: kb-mongodb-cluster
   labels:
     helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
@@ -40,18 +40,18 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-role-mongodb-cluster
+  name: kb-mongodb-cluster
 subjects:
   - kind: ServiceAccount
-    name: kb-sa-mongodb-cluster
-    namespace: default
+    name: kb-mongodb-cluster
+    namespace: pulsar-kb
 ---
 # Source: mongodb-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mongodb-cluster
-  namespace: default
+  namespace: pulsar-kb
   labels: 
     helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
@@ -70,11 +70,20 @@ spec:
       componentDefRef: mongodb      
       monitor: false      
       replicas: 1
-      serviceAccountName: kb-sa-mongodb-cluster      
+      serviceAccountName: kb-mongodb-cluster      
       resources:
         limits:
           cpu: "0.5"
-          memory: "1Gi"
+          memory: "0.5Gi"
         requests:
           cpu: "0.5"
-          memory: "1Gi"
+          memory: "0.5Gi"      
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi      
+      services:

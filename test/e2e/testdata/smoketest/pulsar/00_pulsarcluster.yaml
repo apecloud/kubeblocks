@@ -1,0 +1,75 @@
+---
+# Source: pulsar-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: pulsar-cluster
+  namespace: pulsar-kb
+  labels: 
+    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    app.kubernetes.io/version: "2.11.1"
+    app.kubernetes.io/instance: pulsar-cluster
+spec:
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-2.11.1
+  terminationPolicy: WipeOut
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: broker
+      componentDefRef: pulsar-broker
+      monitor: false
+      replicas: 1
+      resources:
+        limits:
+          cpu: 
+          memory: "512Mi"
+        requests:
+          cpu: "200m"
+          memory: "512Mi"
+    - name: bookies
+      componentDefRef: bookies
+      monitor: false
+      replicas: 3
+      resources:
+        limits:
+          cpu: 
+          memory: "512Mi"
+        requests:
+          cpu: "200m"
+          memory: "512Mi"
+      volumeClaimTemplates:
+        - name: ledgers
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi
+        - name: journal
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi
+    - name: zookeeper
+      componentDefRef: zookeeper
+      monitor: false
+      replicas: 3
+      resources:
+        limits:
+          cpu: 
+          memory: "512Mi"
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi

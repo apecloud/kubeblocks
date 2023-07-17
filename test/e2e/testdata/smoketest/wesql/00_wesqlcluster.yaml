@@ -3,8 +3,8 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-sa-mysql-cluster
-  namespace: default
+  name: kb-mysql-cluster
+  namespace: pulsar-kb
   labels:
     helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "8.0.30"
@@ -14,8 +14,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-role-mysql-cluster
-  namespace: default
+  name: kb-mysql-cluster
+  namespace: pulsar-kb
   labels:
     helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "8.0.30"
@@ -32,7 +32,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-rolebinding-mysql-cluster
+  name: kb-mysql-cluster
   labels:
     helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "8.0.30"
@@ -40,18 +40,18 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-role-mysql-cluster
+  name: kb-mysql-cluster
 subjects:
   - kind: ServiceAccount
-    name: kb-sa-mysql-cluster
-    namespace: default
+    name: kb-mysql-cluster
+    namespace: pulsar-kb
 ---
 # Source: apecloud-mysql-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mysql-cluster
-  namespace: default
+  namespace: pulsar-kb
   labels: 
     helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "8.0.30"
@@ -68,19 +68,19 @@ spec:
   componentSpecs:
     - name: mysql
       componentDefRef: mysql # ref clusterdefinition componentDefs.name      
-      monitor: false      
+      monitor: false
       replicas: 1
       enabledLogs:
         - slow
         - error
-      serviceAccountName: kb-sa-mysql-cluster      
+      serviceAccountName: kb-mysql-cluster      
       resources:
         limits:
           cpu: "0.5"
-          memory: "1Gi"
+          memory: "0.5Gi"
         requests:
           cpu: "0.5"
-          memory: "1Gi"      
+          memory: "0.5Gi"      
       volumeClaimTemplates:
         - name: data # ref clusterDefinition components.containers.volumeMounts.name
           spec:

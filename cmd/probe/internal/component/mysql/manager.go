@@ -113,7 +113,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	// test if db is ready to connect or not
 	err := mgr.DB.PingContext(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "DB is not ready: %v")
+		mgr.Logger.Error(err, "DB is not ready")
 		return false
 	}
 

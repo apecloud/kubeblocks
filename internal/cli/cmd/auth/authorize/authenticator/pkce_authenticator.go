@@ -84,10 +84,6 @@ func newPKCEAuthenticator(client *http.Client, clientID string, authURL string) 
 		AuthAudience: authURL + "/api/v2/",
 	}
 	var err error
-	p.WellKnownEndpoints, err = getOIDCWellKnownEndpoints(authURL)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get OIDC well known endpoints")
-	}
 	p.Challenge, err = defaultChallengeGenerator()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate PKCE challenge")
@@ -114,6 +110,13 @@ func (p *PKCEAuthenticator) GetAuthorization(ctx context.Context, openURLFunc fu
 
 	go callbackService.awaitResponse(codeReceiverCh, state)
 
+	var endpoint string
+	if err = p.getOIDCWellKnownEndpoints(p.AuthURL); err != nil {
+		endpoint = strings.Join([]string{p.AuthURL, "authorization"}, "/")
+	} else {
+		endpoint = p.WellKnownEndpoints.AuthorizationEndpoint
+	}
+
 	params := url.Values{
 		"audience":              []string{p.AuthAudience},
 		"client_id":             []string{p.ClientID},
@@ -128,7 +131,7 @@ func (p *PKCEAuthenticator) GetAuthorization(ctx context.Context, openURLFunc fu
 	}
 
 	URL := fmt.Sprintf("%s?%s",
-		p.WellKnownEndpoints.AuthorizationEndpoint,
+		endpoint,
 		params.Encode(),
 	)
 	openURLFunc(URL)
@@ -154,7 +157,14 @@ func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorization interfac
 		return nil, errors.New("invalid authorization response")
 	}
 
-	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
+	var endpoint string
+	if err := p.getOIDCWellKnownEndpoints(p.AuthURL); err != nil {
+		endpoint = strings.Join([]string{p.AuthURL, "oauth/token"}, "/")
+	} else {
+		endpoint = p.WellKnownEndpoints.TokenEndpoint
+	}
+
+	req, err := utils.NewRequest(ctx, endpoint, url.Values{
 		"grant_type":    []string{"authorization_code"},
 		"code_verifier": []string{p.Challenge.Verifier},
 		"client_id":     []string{p.ClientID},
@@ -213,7 +223,14 @@ func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*Use
 }
 
 func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
-	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
+	var endpoint string
+	if err := p.getOIDCWellKnownEndpoints(p.AuthURL); err != nil {
+		endpoint = strings.Join([]string{p.AuthURL, "oauth/token"}, "/")
+	} else {
+		endpoint = p.WellKnownEndpoints.TokenEndpoint
+	}
+
+	req, err := utils.NewRequest(ctx, endpoint, url.Values{
 		"grant_type":    []string{"refresh_token"},
 		"client_id":     []string{p.ClientID},
 		"refresh_token": []string{refreshToken},
@@ -273,29 +290,30 @@ func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFun
 }
 
 // Get authorize endpoint and token endpoint
-func getOIDCWellKnownEndpoints(authURL string) (*OIDCWellKnownEndpoints, error) {
+func (p *PKCEAuthenticator) getOIDCWellKnownEndpoints(authURL string) error {
 	u, err := url.Parse(authURL)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not parse issuer url to build well known endpoints")
+		return errors.Wrap(err, "could not parse issuer url to build well known endpoints")
 	}
 	u.Path = path.Join(u.Path, ".well-known/openid-configuration")
 
 	r, err := http.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not get well known endpoints from url %s", u.String())
+		return errors.Wrapf(err, "could not get well known endpoints from url %s", u.String())
 	}
 
 	if _, err = checkErrorResponse(r); err != nil {
-		return nil, err
+		return err
 	}
 
 	var wkEndpoints OIDCWellKnownEndpoints
 	err = json.NewDecoder(r.Body).Decode(&wkEndpoints)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode json body when getting well known endpoints")
+		return errors.Wrap(err, "could not decode json body when getting well known endpoints")
 	}
 
-	return &wkEndpoints, nil
+	p.WellKnownEndpoints = &wkEndpoints
+	return nil
 }
 
 // generateRandomString returns a URL-safe, base64 encoded

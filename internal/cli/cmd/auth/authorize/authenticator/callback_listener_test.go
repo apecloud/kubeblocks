@@ -20,43 +20,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package authenticator
 
 import (
-	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"net/http"
+	"net/http/httptest"
 )
 
-var _ = Describe("callback listener", func() {
+var _ = Describe("CallbackService", func() {
 	var (
-		callbackListener *CallbackService
-		state            string
-		codeReceiverCh   chan CallbackResponse
-		port             = "8001"
+		server  *httptest.Server
+		service *CallbackService
 	)
 
 	BeforeEach(func() {
-		callbackListener = newCallbackService(port)
-		state = "test_state"
-		codeReceiverCh = make(chan CallbackResponse)
+		server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("callback response"))
+		}))
 
+		service = newCallbackService(server.URL)
 	})
 
 	AfterEach(func() {
+		server.Close()
 	})
 
-	Context("test callback listener", func() {
-		It("test callback listener", func() {
-			callbackListener.awaitResponse(codeReceiverCh, state)
+	It("should await response and receive callback", func() {
+		responseCh := make(chan CallbackResponse)
+		state := "test_state"
 
-			go func() {
-				_, _ = http.Get("http://127.0.0.1:" + port + "/callback?code=test_code&state=test_state")
-			}()
+		go service.awaitResponse(responseCh, state)
 
-			ExpectWithOffset(1, func() error {
-				callbackResult := <-codeReceiverCh
-				Expect(callbackResult.Code).To(Equal("test_code"))
-				return callbackResult.Error
-			}()).To(BeNil())
-		})
+		resp, err := http.Get(server.URL + "/callback?state=" + state)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+		response := <-responseCh
+
+		Expect(response.Error).NotTo(HaveOccurred())
+		Expect(response.Code).To(Equal("callback response"))
 	})
 })

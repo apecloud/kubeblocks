@@ -31,9 +31,28 @@ import (
 	"net/http/httptest"
 )
 
-func mockServer() *httptest.Server {
+func mockDeviceServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/oauth/device/code":
+			deviceCodeResponse := DeviceCodeResponse{
+				DeviceCode:              "test_device_code",
+				UserCode:                "test_user_code",
+				PollingInterval:         5,
+				ExpiresIn:               1800,
+				VerificationURI:         "https://example.com/device",
+				VerificationCompleteURI: "https://example.com/device?user_code=test_user_code",
+			}
+
+			jsonData, err := json.Marshal(deviceCodeResponse)
+			if err != nil {
+				log.Fatalf("failed to marshal JSON: %v", err)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(jsonData)
+
 		case "/oauth/token":
 			tokenResp := TokenResponse{
 				AccessToken:  "test_access_token",
@@ -76,15 +95,15 @@ func mockServer() *httptest.Server {
 var _ = Describe("PKCE_Authenticator", func() {
 	var (
 		clientID = "test_clientID"
-		a        *PKCEAuthenticator
+		a        *DeviceAuthenticator
 		err      error
 		server   *httptest.Server
 	)
 
 	BeforeEach(func() {
-		server = mockServer()
+		server = mockDeviceServer()
 		ExpectWithOffset(1, func() error {
-			a, err = newPKCEAuthenticator(nil, clientID, server.URL)
+			a, err = newDeviceAuthenticator(nil, clientID, server.URL)
 			return err
 		}()).To(BeNil())
 	})
@@ -94,6 +113,16 @@ var _ = Describe("PKCE_Authenticator", func() {
 	})
 
 	Context("test Authorization", func() {
+		It("test get Authorization", func() {
+			ExpectWithOffset(1, func() error {
+				openFunc := func(URL string) {
+					fmt.Println(URL)
+				}
+				_, err := a.GetAuthorization(context.TODO(), openFunc)
+				return err
+			}()).To(BeNil())
+		})
+
 		It("test get userInfo", func() {
 			ExpectWithOffset(1, func() error {
 				_, err := a.GetUserInfo(context.TODO(), "test_token")
@@ -102,9 +131,12 @@ var _ = Describe("PKCE_Authenticator", func() {
 		})
 
 		It("test get token", func() {
-			authorizationResponse := &AuthorizationResponse{
-				CallbackURL: server.URL + "?code=test_code&state=test_state",
-				Code:        "test_code",
+			authorizationResponse := &DeviceVerification{
+				DeviceCode:              "test_device_code",
+				UserCode:                "test_user_code",
+				Interval:                5,
+				VerificationURL:         "https://example.com/device",
+				VerificationCompleteURL: "https://example.com/device?user_code=test_user_code",
 			}
 			ExpectWithOffset(1, func() error {
 				_, err := a.GetToken(context.TODO(), authorizationResponse)

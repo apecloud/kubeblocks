@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package probe
 
 import (
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	bindingPath = "/v1.0/bindings"
+	bindingPath  = "/v1.0/bindings"
+	operationKey = "operation"
 
 	// the key is used to bypass the dapr framework and set http status code.
 	// "status-code" is the key defined by probe, but this will be changed
@@ -42,6 +43,11 @@ const (
 	statusCodeHeader = "Metadata.status-Code"
 	bodyFmt          = `{"operation": "%s", "metadata": {"sql" : ""}}`
 )
+
+type RequestMeta struct {
+	Operation string            `json:"operation"`
+	Metadata  map[string]string `json:"metadata"`
+}
 
 // NewProbeMiddleware returns a new probe middleware.
 func NewProbeMiddleware(log logger.Logger) middleware.Middleware {
@@ -76,19 +82,13 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 			uri := ctx.Request.URI()
 			method := string(ctx.Request.Header.Method())
 			if method == http.MethodGet && strings.HasPrefix(string(uri.Path()), bindingPath) {
-				var body string
 				ctx.Request.Header.SetMethod(http.MethodPost)
 
-				switch operation := uri.QueryArgs().Peek("operation"); bindings.OperationKind(operation) {
-				case CheckStatusOperation:
-					body = fmt.Sprintf(bodyFmt, CheckStatusOperation)
-					ctx.Request.SetBody([]byte(body))
-				case CheckRunningOperation:
-					body = fmt.Sprintf(bodyFmt, CheckRunningOperation)
-					ctx.Request.SetBody([]byte(body))
-				case CheckRoleOperation:
-					body = fmt.Sprintf(bodyFmt, CheckRoleOperation)
-					ctx.Request.SetBody([]byte(body))
+				args := uri.QueryArgs()
+				switch operation := args.Peek(operationKey); bindings.OperationKind(operation) {
+				case CheckStatusOperation, CheckRunningOperation, CheckRoleOperation, VolumeProtection:
+					body := GetRequestBody(string(operation), args)
+					ctx.Request.SetBody(body)
 				default:
 					m.logger.Infof("unknown probe operation: %v", string(operation))
 				}
@@ -108,4 +108,23 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 			}
 		}
 	}, nil
+}
+
+func GetRequestBody(operation string, args *fasthttp.Args) []byte {
+	metadata := make(map[string]string)
+	walkFunc := func(key, value []byte) {
+		if string(key) == operationKey {
+			return
+		}
+		metadata[string(key)] = string(value)
+	}
+	args.VisitAll(walkFunc)
+
+	requestMeta := RequestMeta{
+		Operation: operation,
+		Metadata:  metadata,
+	}
+
+	body, _ := json.Marshal(requestMeta)
+	return body
 }

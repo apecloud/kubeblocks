@@ -3,7 +3,7 @@ annotations:
 apiVersion: v2
 name: mongodb-cluster
 type: application
-version: 0.6.0-alpha.33
+version: 0.6.0-alpha.36
 description: A MongoDB cluster Helm chart for KubeBlocks
 dependencies:
   - name: kblib

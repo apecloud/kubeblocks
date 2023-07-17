@@ -314,6 +314,10 @@ clean-kbcli: ## Clean bin/kbcli*.
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
+.PHONY: sqlctl-doc
+sqlctl-doc: generate test-go-generate ## generate CLI command reference manual.
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/sqlctl/main.go ./docs/user_docs/sqlctl
+
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
 	@./hack/docgen/api/generate.sh
@@ -599,7 +603,7 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

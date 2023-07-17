@@ -38,9 +38,11 @@ const (
 	CheckRoleOperation    bindings.OperationKind = "checkRole"
 	GetRoleOperation      bindings.OperationKind = "getRole"
 	GetLagOperation       bindings.OperationKind = "getLag"
+	SwitchoverOperation   bindings.OperationKind = "switchover"
 	ExecOperation         bindings.OperationKind = "exec"
 	QueryOperation        bindings.OperationKind = "query"
 	CloseOperation        bindings.OperationKind = "close"
+	VolumeProtection      bindings.OperationKind = "volumeProtection"
 
 	// actions for cluster accounts management
 	ListUsersOp          bindings.OperationKind = "listUsers"

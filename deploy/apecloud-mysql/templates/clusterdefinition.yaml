@@ -12,6 +12,7 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_mysql)"
+  clusterFamilyRef: apecloud-mysql-cluster-family
   componentDefs:
     - name: mysql
       characterType: mysql
@@ -203,9 +204,7 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-            command:
-              - "/bin/agamotto"
-              - "--config=/opt/agamotto/agamotto-config.yaml"
+            command: ["/scripts/agamotto.sh"]
             ports:
               - name: http-metrics
                 containerPort: {{ .Values.metrics.service.port }}
@@ -217,6 +216,8 @@ spec:
               - name: log-data
                 mountPath: /var/log/kubeblocks
                 readOnly: false
+              - name: scripts
+                mountPath: /scripts
           - name: vttablet
             image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
@@ -418,7 +419,7 @@ spec:
             command: ["/scripts/vtctld.sh"]
             volumeMounts:
               - name: scripts
-                mountPath: /scripts 
+                mountPath: /scripts
           - name: vtconsensus
             imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
@@ -454,7 +455,7 @@ spec:
               - name: mysql-scale-config
                 mountPath: /conf
     - name: vtgate
-      characterType: vtgate
+      characterType: mysql
       workloadType: Stateless
       scriptSpecs:
         - name: apecloud-mysql-scripts
@@ -468,6 +469,11 @@ spec:
           constraintRef: mysql-scale-vtgate-config-constraints
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 15001
       service:
         ports:
           - name: webport
@@ -489,7 +495,7 @@ spec:
             image: busybox:1.35
             env:
               - name: VTCTLD_HOST
-                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless" 
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
               - name: VTCTLD_GRPC_PORT
                 value: "15999"
             command: ["/scripts/wait-for-service.sh", "vtctld", "$(VTCTLD_HOST)", "$(VTCTLD_GRPC_PORT)"]
@@ -535,6 +541,8 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+              - name: MYSQL_UNIX_PORT
+                value: "/tmp/mysql.sock"
             command: ["/scripts/vtgate.sh"]
             volumeMounts:
               - name: scripts

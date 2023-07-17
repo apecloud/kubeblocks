@@ -1,0 +1,37 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: kafka
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'Apache Kafka is a distributed streaming platform designed to build real-time pipelines and can be used as a message
+  broker or as a replacement for a log aggregation solution for big data applications.'
+
+  type: Helm
+
+  helm:
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/redis
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/kafka-{{ default .Chart.Version .Values.versionOverride }}/kafka-{{ default .Chart.Version .Values.versionOverride }}.tgz
+
+    {{- else }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/kafka-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+     {{- end }}
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

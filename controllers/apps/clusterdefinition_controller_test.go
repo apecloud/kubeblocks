@@ -57,8 +57,8 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 		// resources should be released in following order
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterVersionSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterDefinitionSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterVersionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterDefinitionSignature, true, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 
 		// namespaced

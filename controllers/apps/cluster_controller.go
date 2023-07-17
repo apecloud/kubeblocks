@@ -227,7 +227,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 
-	if viper.GetBool("ENABLE_RBAC_MANAGER") {
+	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.RoleBinding{}).
 			Owns(&corev1.ServiceAccount{})
 	} else {

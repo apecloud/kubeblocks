@@ -551,6 +551,14 @@ const (
 	VolumeTypeLog  VolumeType = "log"
 )
 
+type ClusterMode string
+
+const (
+	ClusterModeRaftGroup   ClusterMode = "raftGroup"
+	ClusterModeReplication ClusterMode = "replication"
+	ClusterModeStandAlone  ClusterMode = "standalone"
+)
+
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.
 // +enum
 // +kubebuilder:validation:Enum={full,snapshot}

@@ -184,7 +184,7 @@ var _ = Describe("Cluster Controller", func() {
 	// ClusterComponentDefinition.PodSpec, it's a subset of the real ports as some containers can be dynamically
 	// injected into the pod by the lifecycle controller, such as the probe container.
 	getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
-		comp, err := components.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
+		comp, err := appsv1alpha1.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		var headlessSvcPorts []corev1.ServicePort
 		for _, container := range comp.PodSpec.Containers {
@@ -1141,6 +1141,7 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(3).
 			SetServiceAccountName("test-service-account").
+			WithRandomName().
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1669,6 +1670,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
+			cleanEnv()
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)
 		})
@@ -1804,7 +1806,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
 				factory.AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetReplicas(initialReplicas)
-			})
+			}, false)
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, statefulCompName, consensusCompName, replicationCompName)
@@ -1945,6 +1947,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
+		})
+		AfterEach(func() {
+			cleanEnv()
 		})
 
 		for compName, compDefName := range compNameNDef {
@@ -2308,6 +2313,46 @@ var _ = Describe("Cluster Controller", func() {
 					g.Expect(condition).ShouldNot(BeNil())
 					g.Expect(condition.Reason).Should(Equal(ReasonApplyResourcesFailed))
 				})).Should(Succeed())
+		})
+	})
+
+	Context("cluster deletion", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+		It("should deleted after all the sub-resources", func() {
+			createClusterObj(consensusCompName, consensusCompDefName)
+
+			By("Waiting for the cluster enter running phase")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+			stsKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      clusterKey.Name + "-" + consensusCompName,
+			}
+			By("checking sts exists")
+			Eventually(testapps.CheckObjExists(&testCtx, stsKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+
+			finalizerName := "test/finalizer"
+			By("set finalizer for sts to prevent it from deletion")
+			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+				sts.ObjectMeta.Finalizers = append(sts.ObjectMeta.Finalizers, finalizerName)
+			})()).ShouldNot(HaveOccurred())
+
+			By("Delete the cluster")
+			testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+			By("checking cluster keep existing")
+			Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+			By("remove finalizer of sts to get it deleted")
+			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+				sts.ObjectMeta.Finalizers = nil
+			})()).ShouldNot(HaveOccurred())
+
+			By("Wait for the cluster to terminate")
+			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 		})
 	})
 })

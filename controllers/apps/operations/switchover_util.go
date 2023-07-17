@@ -529,7 +529,7 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 		err     error
 		podList *corev1.PodList
 	)
-	compDef, err := components.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	compDef, err := appsv1alpha1.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return nil, err
 	}

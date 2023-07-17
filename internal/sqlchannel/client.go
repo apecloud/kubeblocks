@@ -118,24 +118,24 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 		Operation: string(ListSystemAccountsOp),
 	}
 
-	if resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req); err != nil {
+	var resp *dapr.BindingEvent
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	if err != nil {
 		return nil, err
-	} else {
-		sqlResponse := SQLChannelResponse{}
-		if err = json.Unmarshal(resp.Data, &sqlResponse); err != nil {
-			return nil, err
-		}
-		if sqlResponse.Event == RespEveFail {
-			return nil, fmt.Errorf("get system accounts error: %s", sqlResponse.Message)
-		} else {
-			result := []string{}
-			if err = json.Unmarshal(([]byte)(sqlResponse.Message), &result); err != nil {
-				return nil, err
-			} else {
-				return result, err
-			}
-		}
 	}
+
+	sqlResponse := SQLChannelResponse{}
+	if err = json.Unmarshal(resp.Data, &sqlResponse); err != nil {
+		return nil, err
+	}
+	if sqlResponse.Event == RespEveFail {
+		return nil, fmt.Errorf("get system accounts error: %s", sqlResponse.Message)
+	}
+	result := []string{}
+	if err = json.Unmarshal(([]byte)(sqlResponse.Message), &result); err != nil {
+		return nil, err
+	}
+	return result, err
 }
 
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {

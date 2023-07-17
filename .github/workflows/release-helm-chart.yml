@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       chart-version: ${{ steps.get_version.outputs.chart_version }}
+      chart-version-bump: ${{ steps.get_version.outputs.chart_version_bump }}
     steps:
       - name: Get Chart Version
         id: get_version
@@ -31,6 +32,8 @@ jobs:
               VERSION=${{ env.RELEASE_VERSION }}
           fi
           echo chart_version=$VERSION >> $GITHUB_OUTPUT
+          VERSION_BUMP="${VERSION/v/}"
+          echo chart_version_bump=$VERSION_BUMP >> $GITHUB_OUTPUT
 
   release-chart:
     needs: chart-version
@@ -48,7 +51,7 @@ jobs:
     needs: [ chart-version, release-chart ]
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
     with:
-      MAKE_OPS_PRE: "helm-package VERSION=${{ needs.chart-version.outputs.chart-version }}"
+      MAKE_OPS_PRE: "helm-package VERSION=${{ needs.chart-version.outputs.chart-version-bump }}"
       IMG: "apecloud/kubeblocks-charts"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
       GO_VERSION: "1.20"

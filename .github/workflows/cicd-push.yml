@@ -252,6 +252,7 @@ jobs:
             libbtrfs-dev \
             libdevmapper-dev \
             libgpgme-dev
+          sudo apt install clang -y
 
       - name: Setup Go
         uses: actions/setup-go@v4

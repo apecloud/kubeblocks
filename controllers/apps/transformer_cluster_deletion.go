@@ -152,7 +152,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		root.Action = ictrltypes.ActionDeletePtr()
 	} else {
 		root.Action = ictrltypes.ActionNoopPtr()
-		// requeue in case deletion event get lost
+		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")
 	}
 

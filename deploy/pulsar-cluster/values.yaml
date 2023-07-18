@@ -40,7 +40,8 @@ affinity: {}
 bookies:
   ## @param bookies.replicaCount Number of Bookies replicas
   replicaCount: 3
-  # supported values: selfVerifying,generic
+  # supported values: selfVerifying, generic
+  # refer to https://bookkeeper.apache.org/docs/admin/bookies
   mode: generic
   resources:
     # We usually recommend not to specify default resources and to leave this as a conscious

@@ -28,12 +28,14 @@ import (
 )
 
 const (
-	stateMysql      = "mysql"
-	statePostgreSQL = "postgresql"
-	stateRedis      = "redis"
-	stateMongoDB    = "mongodb"
-	stateNebula     = "nebula"
-	stateFoxLake    = "foxlake"
+	stateMysql        = "mysql"
+	statePostgreSQL   = "postgresql"
+	stateRedis        = "redis"
+	stateMongoDB      = "mongodb"
+	stateNebula       = "nebula"
+	statePulsarBroker = "pulsar-broker"
+	statePulsarProxy  = "pulsar-proxy"
+	stateFoxLake      = "foxlake"
 )
 
 const (
@@ -84,6 +86,12 @@ func New(typeName string) (ClusterCommands, error) {
 		return newRedis(), nil
 	case stateMongoDB:
 		return newMongoDB(), nil
+	case stateNebula:
+		return newNebula(), nil
+	case statePulsarBroker:
+		return newPulsar("broker"), nil
+	case statePulsarProxy:
+		return newPulsar("proxy"), nil
 	case stateFoxLake:
 		return newFoxLake(), nil
 	default:

@@ -64,11 +64,10 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	probeContainers := []corev1.Container{}
 	componentProbes := component.Probes
-	reqCtx.Log.V(1).Info("probe", "settings", componentProbes)
 	if componentProbes == nil {
 		return nil
 	}
-
+	reqCtx.Log.V(3).Info("probe", "settings", componentProbes)
 	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
 	probeSvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
 	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, probeSvcGRPCPort})

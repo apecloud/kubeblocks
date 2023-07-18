@@ -2,6 +2,10 @@
 ##
 terminationPolicy: WipeOut
 
+## Annotation configurations
+commonAnnotations:
+  resource.kubeblocks.io/ignore-constraint: "true"
+
 ## Monitoring configurations
 monitor:
   ## @param monitor.enabled if `true`, enable Cluster monitor capabilities
@@ -56,10 +60,10 @@ bookies:
     enabled: true
     data:
       storageClassName:
-      size: 2Gi
+      size: 20Gi
     log:
       storageClassName:
-      size: 2Gi
+      size: 20Gi
 
 ## Bookies-recovery configuration
 bookiesRecovery:
@@ -103,10 +107,10 @@ zookeeper:
     enabled: true
     data:
       storageClassName:
-      size: 2Gi
+      size: 20Gi
     log:
       storageClassName:
-      size: 2Gi
+      size: 20Gi
 
   ## @param keeper.tolerations Tolerations for *Keeper pods assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/

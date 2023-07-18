@@ -24,11 +24,9 @@ spec:
           - name: foxlake
             targetPort: foxlake
             port: 11288
-            nodePort: null
           - name: foxlake-coordinator
             targetPort: mpp
             port: 10030
-            nodePort: null
       podSpec:
         securityContext:
           fsGroup: 1001

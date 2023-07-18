@@ -1,15 +1,16 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
-  labels: {{ include "foxlake-cluster.labels" . | nindent 4 }}
+  name: {{ include "kblib.clusterName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
   {{- if .Values.defaultStorage.create }}
   annotations:
     kubeblocks.io/extra-env: '{
       "createDefaultStorage":"true",
       "defaultStorageEndpoint":{{ .Values.defaultStorage.endpoint | quote }},
       "defaultStorageAccessKeyID":{{ .Values.defaultStorage.accessKey | quote }},
-      "defaultStorageSecretAccessKey":{{ .Values.defaultStorage.secretKey | quote }}}
+      "defaultStorageSecretAccessKey":{{ .Values.defaultStorage.secretKey | quote }}
     }'
   {{- end }}
 spec:
@@ -26,16 +27,9 @@ spec:
   componentSpecs:
     - name: foxlake-server # user-defined
       componentDefRef: foxlake-server # ref clusterdefinition componentDefs.name
-      serviceAccountName: {{ include "foxlake-cluster.serviceAccountName" . }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
       replicas: 1
     - name: foxlake-metadb
       componentDefRef: foxlake-metadb
       replicas: 1
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+      {{- include "kblib.componentStorages" . | indent 6 }}

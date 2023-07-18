@@ -34,15 +34,15 @@ defaultStorage:
   ## @param defaultStorage.accessKey Access key for the object storage service.
   ## For AWS S3 storage, this is the same as AWS_ACCESS_KEY_ID
   ##
-  accessKey: "admin"
+  accessKey: ""
   ## @param defaultStorage.secretKey Secret key for the object storage service.
   ## For AWS S3 storage, this is the same as AWS_SECRET_ACCESS_KEY
   ##
-  secretKey: "F0E2ZnIPz4"
+  secretKey: ""
   ## @param defaultStorage.endpoint Endpoint for the object storage service.
   ## For AWS S3 storage, set it to "s3://<your bucket>.s3.<region>.amazonaws.com/default".
   ## If the AWS region is in China, set it to "s3://<your bucket>.s3.<region>.amazonaws.com.cn/default", for example:
   ## "s3://<your bucket>.s3.cn-northwest-1.amazonaws.com.cn/default".
   ## For MinIO storage, set it to "minio://<your minio endpoint>/<your bucket>/default".
   ##
-  endpoint: "minio://minio:9000/foxlake/default"
+  endpoint: ""

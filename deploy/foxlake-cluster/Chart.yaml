@@ -1,6 +1,11 @@
 apiVersion: v2
 name: foxlake-cluster
 description: An ApeCloud FoxLake Cluster Helm chart for KubeBlocks.
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
 
 annotations:
   category: Database

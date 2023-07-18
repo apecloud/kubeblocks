@@ -3,11 +3,10 @@ kind: ClusterRoleBinding
 metadata:
   name: kb-clusterrolebinding-{{ .Release.Namespace }}-{{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{ include "foxlake-cluster.labels" . | nindent 4 }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
 subjects:
 - kind: ServiceAccount
-  name: kb-sa-{{ .Release.Name }}
+  name: {{ include "kblib.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole

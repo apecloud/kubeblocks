@@ -375,6 +375,14 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			Eventually(func(g Gomega) {
+				l := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				expects(g, &l.Items[0], nil)
+			}).Should(Succeed())
+			return
+		}
+
 		isStsWorkload := true
 		switch compDefName {
 		case statelessCompDefName:

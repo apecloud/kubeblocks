@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package mongodb
 
 import (
@@ -24,7 +43,7 @@ const (
 )
 
 type Config struct {
-	host             string
+	hosts            []string
 	username         string
 	password         string
 	replSetName      string
@@ -43,14 +62,14 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	}
 
 	if val, ok := properties[host]; ok && val != "" {
-		config.host = val
+		config.hosts = []string{val}
 	}
 
 	if viper.IsSet("KB_SERVICE_PORT") {
-		config.host = "localhost:" + viper.GetString("KB_SERVICE_PORT")
+		config.hosts = []string{"localhost:" + viper.GetString("KB_SERVICE_PORT")}
 	}
 
-	if len(config.host) == 0 {
+	if len(config.hosts) == 0 {
 		return nil, errors.New("must set 'host' in metadata or KB_SERVICE_PORT environment variable")
 	}
 
@@ -91,7 +110,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 }
 
 func (config *Config) GetDBPort() int {
-	_, portStr, err := net.SplitHostPort(config.host)
+	_, portStr, err := net.SplitHostPort(config.hosts[0])
 	if err != nil {
 		return defaultDBPort
 	}
@@ -102,6 +121,13 @@ func (config *Config) GetDBPort() int {
 	}
 
 	return port
+}
+
+func (config *Config) DeepCopy() *Config {
+	newConf := *config
+	newConf.hosts = make([]string, len(config.hosts))
+	copy(config.hosts, newConf.hosts)
+	return &newConf
 }
 
 func GetConfig() *Config {

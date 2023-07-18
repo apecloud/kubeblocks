@@ -66,10 +66,8 @@ const (
 )
 
 // TODO: add more commands
-var whiteList = map[string]bool{
-	"logout":  true,
-	"cluster": true,
-	"addon":   true,
+var cloudCmds = map[string]bool{
+	"logout": true,
 }
 
 func init() {
@@ -154,7 +152,7 @@ A Command Line Interface for KubeBlocks`,
 			if cmd.Name() == cobra.ShellCompRequestCmd {
 				kcplugin.SetupPluginCompletion(cmd, args)
 			}
-			if whiteList[cmd.Name()] && !auth.IsLoggedIn() {
+			if cloudCmds[cmd.Name()] && !auth.IsLoggedIn() {
 				return fmt.Errorf("use 'kbcli login' to login first")
 			}
 			return nil

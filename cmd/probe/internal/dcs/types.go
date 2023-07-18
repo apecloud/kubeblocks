@@ -91,7 +91,7 @@ type HaConfig struct {
 	maxLagOnSwitchover int64
 }
 
-func (c *HaConfig) GetTtl() int {
+func (c *HaConfig) GetTTL() int {
 	return c.ttl
 }
 
@@ -104,7 +104,7 @@ type Leader struct {
 	Name        string
 	AcquireTime int64
 	RenewTime   int64
-	Ttl         int
+	TTL         int
 	Resource    interface{}
 }
 
@@ -121,13 +121,13 @@ func (m *Member) GetName() string {
 	return m.Name
 }
 
-func newMember(index string, name string, role string, url string) *Member {
-	return &Member{
-		Index: index,
-		Name:  name,
-		Role:  role,
-	}
-}
+// func newMember(index string, name string, role string, url string) *Member {
+// 	return &Member{
+// 		Index: index,
+// 		Name:  name,
+// 		Role:  role,
+// 	}
+// }
 
 type Switchover struct {
 	Index       string

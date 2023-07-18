@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,6 +41,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -289,13 +291,15 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 				},
 			},
 			SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{
-				WithCandidate: &appsv1alpha1.CmdExecutorConfig{
-					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
-						Image: "",
-					},
-					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
-						Command: []string{"mysql"},
-						Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+				WithCandidate: &appsv1alpha1.SwitchoverAction{
+					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+						CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+							Image: "",
+						},
+						CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+							Command: []string{"mysql"},
+							Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+						},
 					},
 				},
 			},
@@ -310,7 +314,7 @@ func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef st
 		GetObject()
 
 	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
-		AddClasses(constraint.Name, []string{testapps.Class1c1gName, testapps.Class2c4gName}).
+		AddClasses(constraint.Name, []appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
 		GetObject()
 
 	return componentClassDefinition
@@ -365,7 +369,7 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 					BackupsHistoryLimit: 1,
 				},
 				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: "test1",
+					Name: pointer.String("test1"),
 				},
 			},
 			Logfile: &dpv1alpha1.CommonBackupPolicy{
@@ -373,7 +377,7 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 					BackupsHistoryLimit: 1,
 				},
 				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: "test1",
+					Name: pointer.String("test1"),
 				},
 			},
 			Schedule: dpv1alpha1.Schedule{
@@ -930,4 +934,77 @@ func FakeEventForObject(name string, namespace string, object string) *corev1.Ev
 			Name: object,
 		},
 	}
+}
+
+func FakeStorageProvider(name string) *storagev1alpha1.StorageProvider {
+	storageProvider := &storagev1alpha1.StorageProvider{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.StorageAPIGroup, types.StorageAPIVersion),
+			Kind:       "StorageProvider",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: storagev1alpha1.StorageProviderSpec{
+			CSIDriverName: "fake-csi-s3",
+			CSIDriverSecretTemplate: `
+accessKeyId: {{ index .Parameters "accessKeyId" }}
+secretAccessKey: {{ index .Parameters "secretAccessKey" }}
+`,
+			StorageClassTemplate: `
+bucket: {{ index .Parameters "bucket" }}
+region: {{ index .Parameters "region" }}
+endpoint: {{ index .Parameters "endpoint" }}
+mountOptions: {{ index .Parameters "mountOptions" | default "" }}
+`,
+			ParametersSchema: &storagev1alpha1.ParametersSchema{
+				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"accessKeyId":     {Type: "string"},
+						"secretAccessKey": {Type: "string"},
+						"bucket":          {Type: "string"},
+						"region": {
+							Type: "string",
+							Enum: []apiextensionsv1.JSON{{Raw: []byte(`""`)}, {Raw: []byte(`"us-east-1"`)}, {Raw: []byte(`"us-west-1"`)}},
+						},
+						"endpoint":     {Type: "string"},
+						"mountOptions": {Type: "string"},
+					},
+					Required: []string{
+						"accessKeyId",
+						"secretAccessKey",
+					},
+				},
+				CredentialFields: []string{
+					"accessKeyId",
+					"secretAccessKey",
+				},
+			},
+		},
+	}
+	storageProvider.SetCreationTimestamp(metav1.Now())
+	return storageProvider
+}
+
+func FakeBackupRepo(name string, isDefault bool) *dpv1alpha1.BackupRepo {
+	backupRepo := &dpv1alpha1.BackupRepo{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       "BackupRepo",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: dpv1alpha1.BackupRepoSpec{
+			StorageProviderRef: "fake-storage-provider",
+			PVReclaimPolicy:    "Retain",
+		},
+	}
+	if isDefault {
+		backupRepo.Annotations = map[string]string{
+			constant.DefaultBackupRepoAnnotationKey: "true",
+		}
+	}
+	return backupRepo
 }

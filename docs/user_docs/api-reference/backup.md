@@ -21,6 +21,8 @@ Resource Types:
 </li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy</a>
 </li><li>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo</a>
+</li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTool">BackupTool</a>
 </li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreJob">RestoreJob</a>
@@ -275,6 +277,142 @@ BackupPolicyStatus
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo
+</h3>
+<div>
+<p>BackupRepo is the Schema for the backuprepos API</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>dataprotection.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>BackupRepo</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepoSpec">
+BackupRepoSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>storageProviderRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The storage provider used by this backup repo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeCapacity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#quantity-resource-core">
+Kubernetes resource.Quantity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The requested capacity for the PVC created by this backup repo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>pvReclaimPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumereclaimpolicy-v1-core">
+Kubernetes core/v1.PersistentVolumeReclaimPolicy
+</a>
+</em>
+</td>
+<td>
+<p>The reclaim policy for the PV created by this backup repo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>config</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Non-secret configurations for the storage provider.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A secret that contains the credentials needed by the storage provider.</p><br />
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepoStatus">
+BackupRepoStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupTool">BackupTool
 </h3>
 <div>
@@ -345,11 +483,13 @@ string
 <td>
 <code>deployKind</code><br/>
 <em>
-string
+<a href="#dataprotection.kubeblocks.io/v1alpha1.DeployKind">
+DeployKind
+</a>
 </em>
 </td>
 <td>
-<p>which kind for run a backup tool.</p><br />
+<p>which kind for run a backup tool, supported values: job, statefulSet.</p><br />
 </td>
 </tr>
 <tr>
@@ -445,8 +585,8 @@ BackupToolRestoreCommand
 <td>
 <code>logical</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
-BackupToolRestoreCommand
+<a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">
+LogicalConfig
 </a>
 </em>
 </td>
@@ -668,11 +808,15 @@ Kubernetes meta/v1.Time
 </thead>
 <tbody><tr><td><p>&#34;Completed&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;Deleting&#34;</p></td>
+<td></td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;InProgress&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;New&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>
@@ -986,6 +1130,209 @@ Kubernetes meta/v1.Time
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepoPhase">BackupRepoPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepoStatus">BackupRepoStatus</a>)
+</p>
+<div>
+<p>BackupRepoPhase defines phases for BackupRepo CR.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Deleting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;PreChecking&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Ready&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepoSpec">BackupRepoSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo</a>)
+</p>
+<div>
+<p>BackupRepoSpec defines the desired state of BackupRepo</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>storageProviderRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The storage provider used by this backup repo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeCapacity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#quantity-resource-core">
+Kubernetes resource.Quantity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The requested capacity for the PVC created by this backup repo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>pvReclaimPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumereclaimpolicy-v1-core">
+Kubernetes core/v1.PersistentVolumeReclaimPolicy
+</a>
+</em>
+</td>
+<td>
+<p>The reclaim policy for the PV created by this backup repo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>config</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Non-secret configurations for the storage provider.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A secret that contains the credentials needed by the storage provider.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRepoStatus">BackupRepoStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepo">BackupRepo</a>)
+</p>
+<div>
+<p>BackupRepoStatus defines the observed state of BackupRepo</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupRepoPhase">
+BackupRepoPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Storage provider reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the current state of the repo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ObservedGeneration is the latest generation observed by the controller.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>generatedCSIDriverSecret</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>GeneratedCSIDriverSecret references the generated secret used by the CSI driver.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>generatedStorageClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>GeneratedStorageClassName indicates the generated storage class name.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>backupPVCName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BackupPVCName is the name of the PVC used to store backup data.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupSnapshotStatus">BackupSnapshotStatus
 </h3>
 <p>
@@ -1228,6 +1575,29 @@ string
 </tr>
 <tr>
 <td>
+<code>sourceCluster</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>sourceCluster records the source cluster information for this backup.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>availableReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>availableReplicas available replicas for statefulSet which created by backup.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>manifests</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.ManifestsStatus">
@@ -1295,6 +1665,18 @@ string
 </tr>
 <tr>
 <td>
+<code>useTargetPodServiceAccount</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.<br />if true, will use the service account of the backup target pod. otherwise, will use the system service account.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>updateStage</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusUpdateStage">
@@ -1303,7 +1685,6 @@ BackupStatusUpdateStage
 </em>
 </td>
 <td>
-<em>(Optional)</em>
 <p>when to update the backup status, pre: before backup, post: after backup</p><br />
 </td>
 </tr>
@@ -1359,6 +1740,18 @@ string
 </tr>
 <tr>
 <td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeName records volume name of backup data pvc.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>uploadTotalSize</code><br/>
 <em>
 string
@@ -1398,7 +1791,7 @@ string
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">BackupToolRestoreCommand
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">LogicalConfig</a>)
 </p>
 <div>
 <p>BackupToolRestoreCommand defines the restore commands of BackupTool</p><br />
@@ -1468,11 +1861,13 @@ string
 <td>
 <code>deployKind</code><br/>
 <em>
-string
+<a href="#dataprotection.kubeblocks.io/v1alpha1.DeployKind">
+DeployKind
+</a>
 </em>
 </td>
 <td>
-<p>which kind for run a backup tool.</p><br />
+<p>which kind for run a backup tool, supported values: job, statefulSet.</p><br />
 </td>
 </tr>
 <tr>
@@ -1568,8 +1963,8 @@ BackupToolRestoreCommand
 <td>
 <code>logical</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
-BackupToolRestoreCommand
+<a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">
+LogicalConfig
 </a>
 </em>
 </td>
@@ -1724,7 +2119,20 @@ PersistentVolumeClaim
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>backupRepoName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>refer to BackupRepo and the backup data will be stored in the corresponding repo.</p><br />
 </td>
 </tr>
 <tr>
@@ -1760,6 +2168,73 @@ string
 </tr><tr><td><p>&#34;Never&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.DeployKind">DeployKind
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>)
+</p>
+<div>
+<p>DeployKind which kind for run a backup tool.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;job&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;statefulSet&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">LogicalConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>BackupToolRestoreCommand</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
+BackupToolRestoreCommand
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>BackupToolRestoreCommand</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podScope</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PodRestoreScope">
+PodRestoreScope
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>podScope defines the pod scope for restore from backup, supported values:<br />- &lsquo;All&rsquo; will exec the restore command on all pods.<br />- &lsquo;ReadWrite&rsquo; will pick a ReadWrite pod to exec the restore command.</p><br />
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ManifestsStatus">ManifestsStatus
 </h3>
@@ -1867,7 +2342,8 @@ string
 </em>
 </td>
 <td>
-<p>the name of the PersistentVolumeClaim.</p><br />
+<em>(Optional)</em>
+<p>the name of PersistentVolumeClaim to store backup data.</p><br />
 </td>
 </tr>
 <tr>
@@ -1921,7 +2397,7 @@ PersistentVolumeConfigMap
 </td>
 <td>
 <em>(Optional)</em>
-<p>persistentVolumeConfigMap references the configmap which contains a persistentVolume template.<br />key must be &ldquo;persistentVolume&rdquo; and value is the &ldquo;PersistentVolume&rdquo; struct.<br />support the following built-in Objects:<br />- $(GENERATE_NAME): generate a specific format &ldquo;pvcName-pvcNamespace&rdquo;.<br />if the PersistentVolumeClaim not exists and CreatePolicy is &ldquo;IfNotPresent&rdquo;, the controller<br />will create it by this template. this is a mutually exclusive setting with &ldquo;storageClassName&rdquo;.</p><br />
+<p>persistentVolumeConfigMap references the configmap which contains a persistentVolume template.<br />key must be &ldquo;persistentVolume&rdquo; and value is the &ldquo;PersistentVolume&rdquo; struct.<br />support the following built-in Objects:<br />- $(GENERATE_NAME): generate a specific format &ldquo;<code>PVC NAME</code>-<code>PVC NAMESPACE</code>&rdquo;.<br />if the PersistentVolumeClaim not exists and CreatePolicy is &ldquo;IfNotPresent&rdquo;, the controller<br />will create it by this template. this is a mutually exclusive setting with &ldquo;storageClassName&rdquo;.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1965,6 +2441,14 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.PodRestoreScope">PodRestoreScope
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">LogicalConfig</a>)
+</p>
+<div>
+<p>PodRestoreScope defines the scope pod for restore from backup.</p><br />
+</div>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RestoreJobPhase">RestoreJobPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -2201,6 +2685,18 @@ string
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>startWindowMinutes</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>startWindowMinutes defines the time window for starting the job if it misses scheduled<br />time for any reason. the unit of time is minute.</p><br />
+</td>
+</tr>
 <tr>
 <td>
 <code>snapshot</code><br/>

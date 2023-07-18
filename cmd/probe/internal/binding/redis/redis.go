@@ -92,6 +92,8 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.DBType = "redis"
 	r.InitIfNeed = r.initIfNeed
 	r.BaseOperations.GetRole = r.GetRole
+	r.BaseOperations.LockInstance = r.LockInstance
+	r.BaseOperations.UnlockInstance = r.UnlockInstance
 
 	// register redis operations
 	r.RegisterOperation(bindings.CreateOperation, r.createOps)
@@ -604,6 +606,16 @@ func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, re
 		return SECONDARY, nil
 	}
 	return role, nil
+}
+
+func (r *Redis) LockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
+}
+
+func (r *Redis) UnlockInstance(ctx context.Context) error {
+	// TODO: impl
+	return fmt.Errorf("NotSupported")
 }
 
 func defaultRedisEntryParser(req *bindings.InvokeRequest, object *RedisEntry) error {

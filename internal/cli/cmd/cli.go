@@ -36,8 +36,11 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	infras "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure"
+
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/backuprepo"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/class"
@@ -183,6 +186,8 @@ A Command Line Interface for KubeBlocks`,
 		fault.NewFaultCmd(f, ioStreams),
 		builder.NewBuilderCmd(f, ioStreams),
 		report.NewReportCmd(f, ioStreams),
+		infras.NewInfraCmd(ioStreams),
+		backuprepo.NewBackupRepoCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

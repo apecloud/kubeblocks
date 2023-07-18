@@ -35,10 +35,14 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var deleteExample = templates.Examples(`
+var (
+	deleteExample = templates.Examples(`
 		# delete a cluster named mycluster
 		kbcli cluster delete mycluster
 `)
+
+	rbacEnabled = false
+)
 
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
@@ -55,6 +59,7 @@ func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 	o.AddFlags(cmd)
+	cmd.Flags().BoolVar(&rbacEnabled, "rbac-enabled", false, "Specify whether rbac resources will be deleted by kbcli")
 	return cmd
 }
 
@@ -79,6 +84,71 @@ func clusterPreDeleteHook(o *delete.DeleteOptions, object runtime.Object) error 
 		return fmt.Errorf("cluster %s is protected by termination policy %s, skip deleting", cluster.Name, appsv1alpha1.DoNotTerminate)
 	}
 	return nil
+}
+
+func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	if object == nil {
+		return nil
+	}
+
+	c, err := getClusterFromObject(object)
+	if err != nil {
+		return err
+	}
+
+	client, err := o.Factory.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	if err = deleteDependencies(client, c.Namespace, c.Name); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteDependencies(client kubernetes.Interface, ns string, name string) error {
+	if !rbacEnabled {
+		return nil
+	}
+
+	klog.V(1).Infof("delete dependencies for cluster %s", name)
+	var (
+		saName          = saNamePrefix + name
+		roleName        = roleNamePrefix + name
+		roleBindingName = roleBindingNamePrefix + name
+		allErr          []error
+	)
+
+	// now, delete the dependencies, for postgresql, we delete sa, role and rolebinding
+	ctx := context.TODO()
+	gracePeriod := int64(0)
+	deleteOptions := metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
+	checkErr := func(err error) bool {
+		if err != nil && !apierrors.IsNotFound(err) {
+			return true
+		}
+		return false
+	}
+
+	// delete rolebinding
+	klog.V(1).Infof("delete rolebinding %s", roleBindingName)
+	if err := client.RbacV1().RoleBindings(ns).Delete(ctx, roleBindingName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete service account
+	klog.V(1).Infof("delete service account %s", saName)
+	if err := client.CoreV1().ServiceAccounts(ns).Delete(ctx, saName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete role
+	klog.V(1).Infof("delete role %s", roleName)
+	if err := client.RbacV1().Roles(ns).Delete(ctx, roleName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+	return errors.NewAggregate(allErr)
 }
 
 func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) {

@@ -95,6 +95,7 @@ var _ = Describe("Addon controller", func() {
 			cleanEnv()
 			const distro = "kubeblocks"
 			testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
+			viper.Set(constant.KBChartsImage, "apecloud/kubeblocks-charts:latest")
 			Expect(client.IgnoreAlreadyExists(testCtx.CreateNamespace())).To(Not(HaveOccurred()))
 		})
 
@@ -103,6 +104,7 @@ var _ = Describe("Addon controller", func() {
 			viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
 			viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
 			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
+			viper.Set(constant.KBChartsImage, "")
 		})
 
 		doReconcile := func() (ctrl.Result, error) {
@@ -341,6 +343,19 @@ var _ = Describe("Addon controller", func() {
 
 			By("By enabled addon with fake completed install job status")
 			fakeInstallationCompletedJob(2)
+
+			By("By checking init container")
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getInstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				fakeActiveJob(g, jobKey)
+			}).Should(Succeed())
+			Eventually(func(g Gomega) {
+				job := getJob(g, jobKey)
+				g.Expect(job.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
+			}).Should(Succeed())
 
 			By("By disabling enabled addon")
 			// create fake helm release

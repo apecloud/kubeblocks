@@ -24,13 +24,13 @@ func GetClientSet(logger logger.Logger) (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-// GetClientForKubeBlocks returns a kubernetes restclient for KubeBlocks types.
+// GetRESTClient returns a kubernetes restclient for KubeBlocks types.
 func GetRESTClient(logger logger.Logger) (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
 		logger.Errorf("kubeconfig not found: %v", err)
 	}
-	appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
+	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
 	restConfig.GroupVersion = &appsv1alpha1.GroupVersion
 	restConfig.APIPath = "/apis"
 	restConfig.NegotiatedSerializer = clientsetscheme.Codecs.WithoutConversion()

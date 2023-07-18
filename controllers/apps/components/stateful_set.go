@@ -137,7 +137,7 @@ func (r *stateful) HandleUpdateWithStrategy(ctx context.Context, obj client.Obje
 	compDefName := r.Cluster.Spec.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
 	// get componentDef from ClusterDefinition by compDefName
-	componentDef, err := GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)
+	componentDef, err := appsv1alpha1.GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)
 	if err != nil {
 		return nil, err
 	}

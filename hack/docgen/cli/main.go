@@ -105,6 +105,22 @@ func main() {
 		cacheDirFlag.DefValue = "$HOME/.kube/cache"
 	}
 
+	// get infra command, replace the default value of output-kubeconfig flag
+	for _, c := range cli.Commands() {
+		if c.Name() != "infra" {
+			continue
+		}
+		for _, sub := range c.Commands() {
+			if sub.Name() != "create" {
+				continue
+			}
+			if outputKubeconfigFlag := sub.Flag("output-kubeconfig"); outputKubeconfigFlag != nil {
+				outputKubeconfigFlag.DefValue = "$HOME/.kube/config"
+			}
+			break
+		}
+	}
+
 	err := doc.GenMarkdownTree(cli, rootPath)
 	if err != nil {
 		log.Fatal(err)

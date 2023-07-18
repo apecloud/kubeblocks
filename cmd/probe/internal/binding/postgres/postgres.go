@@ -122,20 +122,23 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.manager = manager
 	pgOps.DBPort = config.GetDBPort()
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
-	pgOps.OperationMap[GetRoleOperation] = StartupCheckWraper(manager, pgOps.GetRoleOps)
+	pgOps.BaseOperations.LockInstance = pgOps.LockInstance
+	pgOps.BaseOperations.UnlockInstance = pgOps.UnlockInstance
+	pgOps.DBPort = pgOps.GetRunningPort()
+	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
 	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
-	pgOps.OperationMap[CheckStatusOperation] = StartupCheckWraper(manager, pgOps.CheckStatusOps)
-	pgOps.OperationMap[ExecOperation] = StartupCheckWraper(manager, pgOps.ExecOps)
-	pgOps.OperationMap[QueryOperation] = StartupCheckWraper(manager, pgOps.QueryOps)
+	pgOps.RegisterOperationOnDBReady(CheckStatusOperation, pgOps.CheckStatusOps, manager)
+	pgOps.RegisterOperationOnDBReady(ExecOperation, pgOps.ExecOps, manager)
+	pgOps.RegisterOperationOnDBReady(QueryOperation, pgOps.QueryOps, manager)
 
 	// following are ops for account management
-	pgOps.OperationMap[ListUsersOp] = StartupCheckWraper(manager, pgOps.listUsersOps)
-	pgOps.OperationMap[CreateUserOp] = StartupCheckWraper(manager, pgOps.createUserOps)
-	pgOps.OperationMap[DeleteUserOp] = StartupCheckWraper(manager, pgOps.deleteUserOps)
-	pgOps.OperationMap[DescribeUserOp] = StartupCheckWraper(manager, pgOps.describeUserOps)
-	pgOps.OperationMap[GrantUserRoleOp] = StartupCheckWraper(manager, pgOps.grantUserRoleOps)
-	pgOps.OperationMap[RevokeUserRoleOp] = StartupCheckWraper(manager, pgOps.revokeUserRoleOps)
-	pgOps.OperationMap[ListSystemAccountsOp] = StartupCheckWraper(manager, pgOps.listSystemAccountsOps)
+	pgOps.RegisterOperationOnDBReady(ListUsersOp, pgOps.listUsersOps, manager)
+	pgOps.RegisterOperationOnDBReady(CreateUserOp, pgOps.createUserOps, manager)
+	pgOps.RegisterOperationOnDBReady(DeleteUserOp, pgOps.deleteUserOps, manager)
+	pgOps.RegisterOperationOnDBReady(DescribeUserOp, pgOps.describeUserOps, manager)
+	pgOps.RegisterOperationOnDBReady(GrantUserRoleOp, pgOps.grantUserRoleOps, manager)
+	pgOps.RegisterOperationOnDBReady(RevokeUserRoleOp, pgOps.revokeUserRoleOps, manager)
+	pgOps.RegisterOperationOnDBReady(ListSystemAccountsOp, pgOps.listSystemAccountsOps, manager)
 	return nil
 }
 
@@ -158,6 +161,20 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	return pgOps.manager.GetMemberStateWithPool(ctx, nil)
+}
+
+func (pgOps *PostgresOperations) LockInstance(ctx context.Context) error {
+	// sql := "alter system set default_transaction_read_only=on; select pg_reload_conf();"
+	// _, err := pgOps.exec(ctx, sql)
+	// return err
+	return fmt.Errorf("NotSupported")
+}
+
+func (pgOps *PostgresOperations) UnlockInstance(ctx context.Context) error {
+	// sql := "alter system set default_transaction_read_only=off; select pg_reload_conf();"
+	// _, err := pgOps.exec(ctx, sql)
+	// return err
+	return fmt.Errorf("NotSupported")
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

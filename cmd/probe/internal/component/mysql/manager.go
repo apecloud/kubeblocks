@@ -74,7 +74,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 func getIndex(memberName string) (int, error) {
 	i := strings.LastIndex(memberName, "-")
 	if i < 0 {
-		return 0, fmt.Errorf("The format of Member name is wrong: %s", memberName)
+		return 0, fmt.Errorf("the format of member name is wrong: %s", memberName)
 	}
 	return strconv.Atoi(memberName[i+1:])
 }
@@ -157,30 +157,34 @@ func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, e
 		return false, err
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		if cluster.Leader.Name == mgr.CurrentMemberName {
-			return true, nil
-		} else {
-			return false, nil
-		}
-	}
+	// if cluster.Leader != nil && cluster.Leader.Name != "" {
+	// 	if cluster.Leader.Name == mgr.CurrentMemberName {
+	// 		return true, nil
+	// 	} else {
+	// 		return false, nil
+	// 	}
+	// }
 
-	// During the initialization of cluster, there would be more than one leader,
-	// in this case, the first member is chosen as the leader
-	if mgr.CurrentMemberName == cluster.Members[0].Name {
-		return true, nil
-	}
-	isFirstMemberLeader, err := mgr.IsLeaderMember(ctx, cluster, &cluster.Members[0])
-	if err == nil && isFirstMemberLeader {
-		return false, nil
-	}
+	// // During the initialization of cluster, there would be more than one leader,
+	// // in this case, the first member is chosen as the leader
+	// if mgr.CurrentMemberName == cluster.Members[0].Name {
+	// 	return true, nil
+	// }
+	// isFirstMemberLeader, err := mgr.IsLeaderMember(ctx, cluster, &cluster.Members[0])
+	// if err == nil && isFirstMemberLeader {
+	// 	return false, nil
+	// }
 
 	return true, err
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	readonly, err := mgr.IsReadonly(ctx, cluster, member)
-	return !readonly, err
+	if err != nil || readonly {
+		return false, err
+	}
+
+	return true, err
 }
 
 func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {
@@ -206,7 +210,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	mgr.EnsureServerID(context.TODO())
+	_, _ = mgr.EnsureServerID(context.TODO())
 	return mgr.IsMemberHealthy(nil, nil)
 }
 
@@ -357,13 +361,14 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 		return true
 	}
 
-	masterHost := rowMap.GetString("Master_Host")
-
-	if strings.HasPrefix(masterHost, leader) {
-		return false
+	ioError := rowMap.GetString("Last_IO_Error")
+	sqlError := rowMap.GetString("Last_SQL_Error")
+	if ioError != "" || sqlError != "" {
+		return true
 	}
 
-	return true
+	masterHost := rowMap.GetString("Master_Host")
+	return strings.HasPrefix(masterHost, leader)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
@@ -391,7 +396,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-// Are there any healthy members other than the leader?
+// HasOtherHealthyMembers checks if there are any healthy members, excluding the leader
 func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 	for _, member := range cluster.Members {

@@ -1,4 +1,4 @@
-# permissions for end users to view backuprepoes.
+# permissions for end users to view backuprepos.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -14,7 +14,7 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuprepoes
+  - backuprepos
   verbs:
   - get
   - list
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuprepoes/status
+  - backuprepos/status
   verbs:
   - get

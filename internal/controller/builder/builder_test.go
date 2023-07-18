@@ -31,7 +31,6 @@ import (
 	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -169,10 +168,12 @@ var _ = Describe("builder", func() {
 		By("assign every available fields")
 		component, err := component.BuildComponent(
 			reqCtx,
-			*cluster,
-			*clusterDef,
-			clusterDef.Spec.ComponentDefs[0],
-			cluster.Spec.ComponentSpecs[0],
+			nil,
+			cluster,
+			nil,
+			clusterDef,
+			&clusterDef.Spec.ComponentDefs[0],
+			&cluster.Spec.ComponentSpecs[0],
 			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(err).Should(Succeed())
 		Expect(component).ShouldNot(BeNil())
@@ -310,7 +311,7 @@ var _ = Describe("builder", func() {
 		It("builds Deploy correctly", func() {
 			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent)
+			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent, "")
 			Expect(err).Should(BeNil())
 			Expect(deploy).ShouldNot(BeNil())
 		})
@@ -445,87 +446,6 @@ var _ = Describe("builder", func() {
 			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
 		})
 
-		It("should build restore job correctly", func() {
-			restoreJobKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-restore-job",
-			}
-			component := component.SynthesizedComponent{
-				Name: "component",
-				PodSpec: &corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									"cpu": resource.MustParse("1"),
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "data1",
-									MountPath: "/data/mysql",
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{},
-				},
-				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-					{
-						Name: "data1",
-						Type: "data",
-					},
-				},
-				VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "data1",
-						},
-						Spec: corev1.PersistentVolumeClaimSpec{},
-					},
-				},
-			}
-			backup := dataprotectionv1alpha1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "backup",
-					Namespace: "default",
-					Labels: map[string]string{
-						constant.ClusterDefLabelKey: "test-cluster-def",
-					},
-				},
-				Status: dataprotectionv1alpha1.BackupStatus{
-					PersistentVolumeClaimName: "data-pvc",
-					Manifests: &dataprotectionv1alpha1.ManifestsStatus{
-						BackupTool: &dataprotectionv1alpha1.BackupToolManifestsStatus{
-							FilePath: "/default/mysql-182dee90-4e6b-4b74-97e8-9031ec63db52/mysql/backup-default-mysql-20230523115255",
-						},
-					},
-				},
-			}
-			backupTool := dataprotectionv1alpha1.BackupTool{
-				Spec: dataprotectionv1alpha1.BackupToolSpec{
-					Image: "xtrabackup",
-					Env: []corev1.EnvVar{
-						{
-							Name:  "test-name",
-							Value: "test-value",
-						},
-					},
-					Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
-						RestoreCommands: []string{
-							"echo \"hello world\"",
-							"echo \"hello world\"",
-							"echo \"hello world\"",
-						},
-					},
-				},
-			}
-			podName := "mysql-mysql-0"
-			job, err := BuildRestoreJobForFullBackup(restoreJobKey.Name, &component, &backup, &backupTool, podName)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(job).ShouldNot(BeNil())
-		})
-
 		It("builds backup manifests job correctly", func() {
 			backup := &dataprotectionv1alpha1.Backup{}
 			podSpec := &corev1.PodSpec{
@@ -547,7 +467,13 @@ var _ = Describe("builder", func() {
 			volumes := []corev1.Volume{}
 			volumeMounts := []corev1.VolumeMount{}
 			env := []corev1.EnvVar{}
-			job, err := BuildRestoreJob(key.Name, key.Namespace, "", []string{"sh"}, volumes, volumeMounts, env, nil)
+			component := &component.SynthesizedComponent{
+				Name: mysqlCompName,
+			}
+			cluster := &appsv1alpha1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace},
+			}
+			job, err := BuildRestoreJob(cluster, component, key.Name, "", []string{"sh"}, volumes, volumeMounts, env, nil)
 			Expect(err).Should(BeNil())
 			Expect(job).ShouldNot(BeNil())
 			Expect(job.Name).Should(Equal(key.Name))

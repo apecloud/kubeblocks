@@ -17,7 +17,8 @@
 {{- range $i, $e := until $replicas }}
         <server>
           <id>{{ $i | int | add1 }}</id>
-          <hostname>{{ $clusterName }}-{{ $.component.name }}-{{ $i }}.{{ $clusterName }}-{{ $.component.name }}-headless.{{ $namespace }}.svc</hostname>
+           # TODO: clusterDomain 'cluster.local' requires configurable
+          <hostname>{{ $clusterName }}-{{ $.component.name }}-{{ $i }}.{{ $clusterName }}-{{ $.component.name }}-headless.{{ $namespace }}.svc.cluster.local</hostname>
           <port from_env="CLICKHOUSE_KEEPER_RAFT_PORT"></port>
         </server>
 {{- end }}

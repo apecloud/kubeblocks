@@ -58,6 +58,13 @@ type RetentionSpec struct {
 }
 
 type Schedule struct {
+	// startWindowMinutes defines the time window for starting the job if it misses scheduled
+	// time for any reason. the unit of time is minute.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1440
+	StartWindowMinutes *int64 `json:"startWindowMinutes,omitempty"`
+
 	// schedule policy for snapshot backup.
 	// +optional
 	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`
@@ -93,8 +100,14 @@ type CommonBackupPolicy struct {
 	BasePolicy `json:",inline"`
 
 	// refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.
-	// +kubebuilder:validation:Required
-	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim"`
+	// +optional
+	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
+
+	// refer to BackupRepo and the backup data will be stored in the corresponding repo.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	BackupRepoName *string `json:"backupRepoName,omitempty"`
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
@@ -105,10 +118,9 @@ type CommonBackupPolicy struct {
 
 type PersistentVolumeClaim struct {
 	// the name of PersistentVolumeClaim to store backup data.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:default=kb-backup-data
-	Name string `json:"name"`
+	// +optional
+	Name *string `json:"name,omitempty"`
 
 	// storageClassName is the name of the StorageClass required by the claim.
 	// +kubebuilder:validation:MaxLength=63
@@ -131,7 +143,7 @@ type PersistentVolumeClaim struct {
 	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
 	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
 	// support the following built-in Objects:
-	// - $(GENERATE_NAME): generate a specific format "<PVC NAME>-<PVC NAMESPACE>".
+	// - $(GENERATE_NAME): generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
 	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
 	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
 	// +optional

@@ -114,6 +114,9 @@ type Commands struct {
 	AppErr             error
 	AppStarted         chan bool
 	Options            *Options
+	SigCh              chan os.Signal
+	// if it's false, sqlctl will not restart db service
+	restartDB bool
 }
 
 func getSQLChannelCommand(options *Options) (*exec.Cmd, error) {
@@ -157,7 +160,7 @@ func newCommands(ctx context.Context, options *Options) (*Commands, error) {
 
 	//nolint
 	var appCMD *exec.Cmd = getAppCommand(options)
-	return &Commands{
+	cmd := &Commands{
 		ctx:                ctx,
 		SQLChannelCMD:      sqlChannelCMD,
 		SQLChannelErr:      nil,
@@ -168,7 +171,21 @@ func newCommands(ctx context.Context, options *Options) (*Commands, error) {
 		AppErr:             nil,
 		AppStarted:         make(chan bool, 1),
 		Options:            options,
-	}, nil
+		SigCh:              make(chan os.Signal, 1),
+		restartDB:          true,
+	}
+	go func() {
+		for {
+			sig := <-cmd.SigCh
+			switch sig {
+			case syscall.SIGUSR1:
+				cmd.restartDB = false
+			case syscall.SIGUSR2:
+				cmd.restartDB = true
+			}
+		}
+	}()
+	return cmd, nil
 }
 
 func (commands *Commands) StartSQLChannel() {
@@ -195,15 +212,26 @@ func (commands *Commands) RestartDBServiceIfExited() {
 		return
 	}
 	commands.WaitGroup.Add(1)
-	for true {
+	for {
 		select {
 		case <-commands.ctx.Done():
 			commands.WaitGroup.Done()
 			return
 		default:
 		}
-		if commands.AppCMD.ProcessState != nil && commands.AppCMD.ProcessState.Exited() {
-			commands.RestartDBService()
+
+		if commands.AppCMD.ProcessState != nil {
+			Printf("DB service exits: %v\n", commands.AppCMD.ProcessState)
+			if !commands.restartDB {
+				Printf("restart DB service: %v\n", commands.restartDB)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			status, ok := commands.AppCMD.ProcessState.Sys().(syscall.WaitStatus)
+			if commands.AppCMD.ProcessState.Exited() || (ok && status.Signaled()) {
+				commands.RestartDBService()
+			}
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -213,6 +241,7 @@ func (commands *Commands) RestartDBService() {
 	if commands.AppCMD == nil {
 		return
 	}
+	Printf("DB service restart: %v\n", commands.AppCMD)
 	// commands.StopDBService()
 	commands.AppCMD = getAppCommand(commands.Options)
 	commands.AppErr = nil
@@ -245,7 +274,7 @@ func (commands *Commands) StartDBService() {
 	outScanner := bufio.NewScanner(stdOutPipe)
 	go func() {
 		for errScanner.Scan() {
-			fmt.Printf("== DB Service == %s\n", errScanner.Text())
+			fmt.Printf("== DB Service err == %s\n", errScanner.Text())
 		}
 	}()
 
@@ -279,8 +308,8 @@ func (commands *Commands) StopSQLChannel() bool {
 			fmt.Fprintln(os.Stdout, "Send SIGTERM to SQLChannel")
 		}
 	}
-	//state, err = commands.SQLChannelCMD.Process.Wait()
-	//fmt.Printf("state: %v, err: %v\n", state, err)
+	// state, err = commands.SQLChannelCMD.Process.Wait()
+	// fmt.Printf("state: %v, err: %v\n", state, err)
 	commands.WaitSQLChannel()
 	return exitWithError
 }

@@ -20,15 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"time"
+
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // RBACTransformer puts the rbac at the beginning of the DAG
@@ -44,18 +49,36 @@ const (
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if !viper.GetBool("ENABLE_RBAC_MANAGER") {
-		transCtx.Logger.V(1).Info("rbac manager is not enabled")
-		return nil
-	}
-
+	clusterDef := transCtx.ClusterDef
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
 
+	var hasProbes bool
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		if compDef.Probes != nil {
+			hasProbes = true
+		}
+	}
+
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
+		if serviceAccountName == "" {
+			if !hasProbes {
+				return nil
+			}
+			serviceAccountName = "kb-" + cluster.Name
+		}
+
+		if !viper.GetBool(constant.EnableRBACManager) {
+			transCtx.Logger.V(1).Info("rbac manager is not enabled")
+			if !isServiceAccountExist(transCtx, serviceAccountName, true) {
+				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")
+			}
+			return nil
+		}
+
 		if isRoleBindingExist(transCtx, serviceAccountName) {
 			continue
 		}
@@ -89,6 +112,30 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	return nil
 }
 
+func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName string, sendEvent bool) bool {
+	cluster := transCtx.Cluster
+	namespaceName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      serviceAccountName,
+	}
+	sa := &corev1.ServiceAccount{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa); err != nil {
+		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
+		// the rolebinding is not already present.
+		if errors.IsNotFound(err) {
+			transCtx.Logger.V(1).Info("ServiceAccount not exists", "namespaceName", namespaceName)
+			if sendEvent {
+				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
+					string(ictrlutil.ErrorTypeNotFound), serviceAccountName+" ServiceAccount is not exist")
+			}
+			return false
+		}
+		transCtx.Logger.Error(err, "get ServiceAccount failed")
+		return false
+	}
+	return true
+}
+
 func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
@@ -103,12 +150,10 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
 			return false
 		}
-		transCtx.Logger.V(0).Error(err, "get service account failed")
+		transCtx.Logger.Error(err, "get role binding failed")
 		return false
 	}
-	if rb == nil {
-		return false
-	}
+
 	if rb.RoleRef.Name != RBACRoleName {
 		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
 			RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
@@ -118,6 +163,7 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 	for _, sub := range rb.Subjects {
 		if sub.Kind == ServiceAccountKind && sub.Name == serviceAccountName {
 			isServiceAccountMatch = true
+			break
 		}
 	}
 

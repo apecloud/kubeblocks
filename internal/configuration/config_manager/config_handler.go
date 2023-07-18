@@ -270,7 +270,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 	if len(command) == 0 {
 		return nil, cfgcore.MakeError("invalid command: %s", command)
 	}
-	filter, err := createFileRegex(fromConfigSpecMeta(configMeta))
+	filter, err := createFileRegex(fromConfigSpecInfo(configMeta))
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 	return shellTrigger, nil
 }
 
-func fromConfigSpecMeta(meta *ConfigSpecInfo) string {
+func fromConfigSpecInfo(meta *ConfigSpecInfo) string {
 	if meta == nil || len(meta.ConfigSpec.Keys) == 0 {
 		return ""
 	}

@@ -9,38 +9,11 @@ spec:
   constraints:
   - cpu:
       min: "0.5"
-      max: 2
+      max: 64
       step: "0.5"
     memory:
-      sizePerCPU: 1Gi
-  - cpu:
-      min: "0.5"
-      max: 2
-    memory:
-      sizePerCPU: 2Gi
-  - cpu:
-      slots: [2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
-    memory:
-      sizePerCPU: 4Gi
-
----
-
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ComponentResourceConstraint
-metadata:
-  name: kb-resource-constraint-memory-optimized
-  labels:
-    resourceconstraint.kubeblocks.io/provider: kubeblocks
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-spec:
-  constraints:
-  - cpu:
-      slots: [2, 4, 8, 12, 24, 48]
-    memory:
-      sizePerCPU: 8Gi
-  - cpu:
-      min: 2
-      max: 128
-      step: 2
-    memory:
-      sizePerCPU: 16Gi
+      minPerCPU: 1Gi
+      maxPerCPU: 32Gi
+    storage:
+      min: 20Gi
+      max: 10Ti

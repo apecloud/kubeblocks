@@ -39,6 +39,11 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - /bin/true
+        - name: datascript
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/true
       containers:
         - name: manager
           args:
@@ -77,6 +82,10 @@ spec:
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_CHARTS_IMAGE
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.charts.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
@@ -92,7 +101,7 @@ spec:
               value: "true"
             {{- end }}
             - name: ENABLE_RBAC_MANAGER
-              value: {{ .Values.rbac.enabled }}
+              value: {{ .Values.rbac.enabled | quote}}
             {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "true" }}
             - name: ADDON_JOB_TTL
               value: {{ .jobTTL | quote }}
@@ -261,6 +270,8 @@ spec:
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_CHARTS_IMAGE
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.charts.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}

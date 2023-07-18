@@ -17,6 +17,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/weaviate
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/weaviate-{{ default .Chart.Version .Values.versionOverride }}/weaviate-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/weaviate-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- end }}

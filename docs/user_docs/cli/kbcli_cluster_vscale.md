@@ -29,7 +29,7 @@ kbcli cluster vscale NAME [flags]
   -h, --help                           help for vscale
       --memory string                  Request and limit size of component memory
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 

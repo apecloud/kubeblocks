@@ -42,6 +42,9 @@ const (
 	// data plane config key
 	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
 	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
+
+	// storage config keys
+	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 )
 
 const (
@@ -59,8 +62,10 @@ const (
 )
 
 const (
-	KBToolsImage      = "KUBEBLOCKS_TOOLS_IMAGE"
-	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
+	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
+	KBChartsImage            = "KUBEBLOCKS_CHARTS_IMAGE"
+	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
 
 const (
@@ -80,6 +85,7 @@ const (
 	BackupToolTypeLabelKey                 = "kubeblocks.io/backup-tool-type"
 	AddonProviderLabelKey                  = "kubeblocks.io/provider" // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                           = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
+	ModeKey                                = "kubeblocks.io/mode"     // ModeKey is in enum of standalone/replication/raftGroup
 	VolumeTypeLabelKey                     = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
 	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"
@@ -104,6 +110,7 @@ const (
 	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
+	OpsRequestNameLabelKey                 = "ops.kubeblocks.io/ops-name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -153,8 +160,8 @@ const (
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
-	// ClassAnnotationKey is used to specify the class of components
-	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
+	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
+	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
 )
 
 const (
@@ -201,12 +208,13 @@ const (
 
 const (
 	// Container port name
-	ProbeHTTPPortName         = "probe-http-port"
-	ProbeGRPCPortName         = "probe-grpc-port"
-	ProbeInitContainerName    = "kb-initprobe"
-	RoleProbeContainerName    = "kb-checkrole"
-	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-checkrunning"
+	ProbeHTTPPortName                  = "probe-http-port"
+	ProbeGRPCPortName                  = "probe-grpc-port"
+	ProbeInitContainerName             = "kb-initprobe"
+	RoleProbeContainerName             = "kb-checkrole"
+	StatusProbeContainerName           = "kb-checkstatus"
+	RunningProbeContainerName          = "kb-checkrunning"
+	VolumeProtectionProbeContainerName = "kb-volume-protection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"

@@ -39,3 +39,6 @@ data:
     # data plane affinity
     DATA_PLANE_AFFINITY: {{ toJson .affinity | squote }}
     {{- end }}
+
+    # the default storage class name.
+    DEFAULT_STORAGE_CLASS: {{ include "kubeblocks.defaultStorageClass" . | quote }}

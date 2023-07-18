@@ -1,30 +1,24 @@
 ---
-# Source: pgcluster/templates/serviceaccount.yaml
+# Source: postgresql-cluster/templates/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-mycluster-pgcluster
+  name: kb-pg-cluster
+  namespace: default
   labels:
-    
-    helm.sh/chart: pgcluster-0.6.0-alpha.21
-    app.kubernetes.io/name: pgcluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: pg-cluster
 ---
-# Source: pgcluster/templates/role.yaml
+# Source: postgresql-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-mycluster-pgcluster
-  namespace: default
+  name: kb-pg-cluster
   labels:
-    
-    helm.sh/chart: pgcluster-0.6.0-alpha.21
-    app.kubernetes.io/name: pgcluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: pg-cluster
 rules:
   - apiGroups:
       - ""
@@ -69,60 +63,66 @@ rules:
     verbs:
       - create
 ---
-# Source: pgcluster/templates/rolebinding.yaml
+# Source: postgresql-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-mycluster-pgcluster
+  name: kb-pg-cluster
   labels:
-    
-    helm.sh/chart: pgcluster-0.6.0-alpha.21
-    app.kubernetes.io/name: pgcluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: pg-cluster
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-mycluster-pgcluster
+  name: kb-pg-cluster
 subjects:
   - kind: ServiceAccount
-    name: kb-mycluster-pgcluster
+    name: kb-pg-cluster
     namespace: default
 ---
-# Source: pgcluster/templates/cluster.yaml
+# Source: postgresql-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-pgcluster
+  name: pg-cluster
+  namespace: default
   labels: 
-    helm.sh/chart: pgcluster-0.6.0-alpha.21
-    app.kubernetes.io/name: pgcluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
     app.kubernetes.io/version: "14.8.0"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: pg-cluster
 spec:
-  clusterDefinitionRef: postgresql # ref clusterdefinition.name
-  clusterVersionRef: postgresql-14.8.0 # ref clusterversion.name
-  terminationPolicy: Delete
+  clusterVersionRef: postgresql-14.8.0
+  terminationPolicy: Delete  
   affinity:
-    topologyKeys: 
+    podAntiAffinity: Preferred
+    topologyKeys:
       - kubernetes.io/hostname
+    tenancy: SharedNode
+  clusterDefinitionRef: postgresql
   componentSpecs:
-    - name: postgresql # user-defined
-      componentDefRef: postgresql # ref clusterdefinition components.name
-      monitor: false
-      replicas: 2
-      serviceAccountName: kb-mycluster-pgcluster
+    - name: postgresql
+      componentDefRef: postgresql      
+      monitor: false      
+      replicas: 1
+      enabledLogs:
+        - running
+      serviceAccountName: kb-pg-cluster
       switchPolicy:
-        type: Noop
-      enabledLogs:     ["running"]
+        type: Noop      
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"      
       volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 4Gi
+                storage: 20Gi      
+      services:

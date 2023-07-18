@@ -48,7 +48,7 @@ SQL Channel client`,
 		if versionFlag {
 			printVersion()
 		} else {
-			cmd.Help()
+			_ = cmd.Help()
 		}
 	},
 }
@@ -62,7 +62,6 @@ var (
 	cliVersion            string
 	versionFlag           bool
 	sqlChannelVer         sqlChannelVersion
-	logAsJSON             bool
 	sqlChannelRuntimePath string
 )
 

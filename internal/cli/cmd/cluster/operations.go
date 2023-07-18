@@ -70,9 +70,10 @@ type OperationsOptions struct {
 	ClusterVersionRef string `json:"clusterVersionRef"`
 
 	// VerticalScaling options
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
-	Class  string `json:"class"`
+	CPU         string                   `json:"cpu"`
+	Memory      string                   `json:"memory"`
+	Class       string                   `json:"class"`
+	ClassDefRef appsv1alpha1.ClassDefRef `json:"classDefRef,omitempty"`
 
 	// HorizontalScaling options
 	Replicas int `json:"replicas"`
@@ -129,7 +130,8 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 // addCommonFlags adds common flags for operations command
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	// add print flags
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	printer.AddOutputFlagForCreate(cmd, &o.Format, false)
+
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
@@ -234,14 +236,23 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 	if o.Class == "" && o.CPU == "" && o.Memory == "" {
 		return fmt.Errorf("class or cpu/memory must be specified")
 	}
-	componentClasses, err := class.ListClassesByClusterDefinition(o.Dynamic, cluster.Spec.ClusterDefRef)
+
+	clsMgr, err := class.GetManager(o.Dynamic, cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return err
 	}
 
 	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) error {
 		if o.Class != "" {
-			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: o.Class}
+			clsDefRef := appsv1alpha1.ClassDefRef{}
+			parts := strings.SplitN(o.Class, ":", 2)
+			if len(parts) == 1 {
+				clsDefRef.Class = parts[0]
+			} else {
+				clsDefRef.Name = parts[0]
+				clsDefRef.Class = parts[1]
+			}
+			comp.ClassDefRef = &clsDefRef
 			comp.Resources = corev1.ResourceRequirements{}
 		} else {
 			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{}
@@ -274,11 +285,12 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 			if err = fillClassParams(&comp); err != nil {
 				return err
 			}
-			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
+			if err = clsMgr.ValidateResources(&comp); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -432,10 +444,6 @@ func (o *OperationsOptions) fillExpose() error {
 	}
 	if provider == util.UnknownProvider {
 		return fmt.Errorf("unknown k8s provider")
-	}
-
-	if err = o.CompleteComponentsFlag(); err != nil {
-		return err
 	}
 
 	// default expose to internet
@@ -672,6 +680,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			o.Args = args
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.fillExpose())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())

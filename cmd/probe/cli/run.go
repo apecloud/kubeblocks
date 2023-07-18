@@ -40,10 +40,6 @@ var (
 	enableAppHealth  bool
 )
 
-const (
-	runtimeWaitTimeoutInSeconds = 60
-)
-
 var RunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run sqlchannel and db service.",
@@ -68,12 +64,13 @@ sqlctl run  -- mysqld
 			InternalGRPCPort: internalGRPCPort,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, err.Error())
+			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(1)
 		}
 
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+		signal.Notify(commands.SigCh, syscall.SIGUSR1, syscall.SIGUSR2)
 
 		go commands.StartSQLChannel()
 		<-commands.SQLChannelStarted

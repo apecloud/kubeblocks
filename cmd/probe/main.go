@@ -63,7 +63,7 @@ import (
 var (
 	log        = logger.NewLogger("dapr.runtime")
 	logContrib = logger.NewLogger("dapr.contrib")
-	logHa      = logger.NewLogger("sqlchannel.highavailability")
+	logHA      = logger.NewLogger("dapr.HA")
 )
 
 func init() {
@@ -130,7 +130,7 @@ func main() {
 	}
 
 	// ha dependent on dbmanager which is initialized by rt.Run
-	ha := highavailability.NewHa(logHa)
+	ha := highavailability.NewHa(logHA)
 	if ha != nil {
 		defer ha.ShutdownWithWait()
 		go ha.Start()

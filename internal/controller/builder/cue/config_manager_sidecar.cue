@@ -30,9 +30,12 @@ template: {
 	env: [
 		{
 			name: "CONFIG_MANAGER_POD_IP"
-			valueFrom:
-				fieldRef:
-					fieldPath: "status.podIP"
+			valueFrom: {
+				fieldRef: {
+					apiVersion: "v1"
+					fieldPath:  "status.podIP"
+				}
+			}
 		},
 		if parameter.characterType != "" {
 			{

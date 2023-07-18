@@ -228,7 +228,7 @@ func (o *initOptions) local() error {
 
 // bootstraps a playground in the remote cloud
 func (o *initOptions) cloud() error {
-	cpPath, err := cloudProviderRepoDir()
+	cpPath, err := cloudProviderRepoDir("")
 	if err != nil {
 		return err
 	}
@@ -481,6 +481,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			fmt.Fprintf(o.Out, strings.Split(errMsg, ",")[0]+"\n")
 			return nil
 		}
+		return err
+	}
+	if err = insOpts.CompleteInstallOptions(); err != nil {
 		return err
 	}
 	return insOpts.Install()

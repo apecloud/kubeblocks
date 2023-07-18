@@ -89,7 +89,7 @@ var (
 )
 
 // ValidateResources validates if the resources of the component is invalid
-func (r *Manager) ValidateResources(comp *v1alpha1.ClusterComponentSpec) error {
+func (r *Manager) ValidateResources(clusterDefRef string, comp *v1alpha1.ClusterComponentSpec) error {
 	if comp.ClassDefRef != nil && comp.ClassDefRef.Class != "" {
 		if r.HasClass(comp.ComponentDefRef, *comp.ClassDefRef) {
 			return nil
@@ -102,12 +102,7 @@ func (r *Manager) ValidateResources(comp *v1alpha1.ClusterComponentSpec) error {
 	}
 
 	for _, constraint := range r.constraints {
-		resources := corev1.ResourceList{}
-		for k, v := range comp.Resources.Requests {
-			resources[k] = v
-		}
-		// validate cpu and memory
-		result := constraint.FindMatchingConstraints(resources)
+		result := constraint.FindMatchingConstraints(clusterDefRef, comp)
 		if len(result) == 0 {
 			continue
 		}
@@ -130,7 +125,7 @@ func (r *Manager) ValidateResources(comp *v1alpha1.ClusterComponentSpec) error {
 	return ErrInvalidResource
 }
 
-func (r *Manager) GetResources(comp *v1alpha1.ClusterComponentSpec) (corev1.ResourceList, error) {
+func (r *Manager) GetResources(clusterDefRef string, comp *v1alpha1.ClusterComponentSpec) (corev1.ResourceList, error) {
 	result := corev1.ResourceList{}
 
 	if comp.ClassDefRef != nil && comp.ClassDefRef.Class != "" {
@@ -141,36 +136,37 @@ func (r *Manager) GetResources(comp *v1alpha1.ClusterComponentSpec) (corev1.Reso
 		return corev1.ResourceList{corev1.ResourceCPU: cls.CPU, corev1.ResourceMemory: cls.Memory}, nil
 	}
 
+	var constraints []v1alpha1.ResourceConstraint
+	for _, constraint := range r.constraints {
+		constraints = append(constraints, constraint.FindConstraint(clusterDefRef, comp)...)
+	}
 	if len(r.constraints) == 0 {
 		return nil, nil
 	}
 
 	var resourcesList []corev1.ResourceList
-	for _, constraint := range r.constraints {
+	for _, constraint := range constraints {
 		resources := corev1.ResourceList{}
 		for k, v := range comp.Resources.Requests {
 			resources[k] = v
 		}
-		rules := constraint.FindMatchingConstraints(resources)
-		if len(rules) == 0 {
+		if !constraint.ValidateResources(resources) {
 			continue
 		}
-		for _, rule := range rules {
-			match := true
-			for _, volume := range comp.VolumeClaimTemplates {
-				if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
-					match = false
-					break
-				}
+		match := true
+		for _, volume := range comp.VolumeClaimTemplates {
+			if !constraint.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
+				match = false
+				break
 			}
-			if !match {
-				continue
-			}
-			if resources.Cpu().IsZero() && resources.Memory().IsZero() {
-				resourcesList = append(resourcesList, rule.GetMinimalResources())
-			} else {
-				resourcesList = append(resourcesList, rule.CompleteResources(resources))
-			}
+		}
+		if !match {
+			continue
+		}
+		if resources.Cpu().IsZero() && resources.Memory().IsZero() {
+			resourcesList = append(resourcesList, constraint.GetMinimalResources())
+		} else {
+			resourcesList = append(resourcesList, constraint.CompleteResources(resources))
 		}
 	}
 	if len(resourcesList) == 0 {

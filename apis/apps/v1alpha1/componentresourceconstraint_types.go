@@ -309,13 +309,13 @@ func (m *ResourceConstraint) GetMinimalResources() corev1.ResourceList {
 }
 
 // FindMatchingConstraints find all constraints that resource satisfies.
-func (c *ComponentResourceConstraint) FindMatchingConstraints(r corev1.ResourceList) []ResourceConstraint {
+func (c *ComponentResourceConstraint) FindMatchingConstraints(clusterDefRef string, componentSpec *ClusterComponentSpec) []ResourceConstraint {
 	if c == nil {
 		return nil
 	}
-	var constraints []ResourceConstraint
-	for _, constraint := range c.Spec.Constraints {
-		if constraint.ValidateResources(r) {
+	constraints := c.FindConstraint(clusterDefRef, componentSpec)
+	for _, constraint := range constraints {
+		if constraint.ValidateResources(componentSpec.Resources.Requests) {
 			constraints = append(constraints, constraint)
 		}
 	}
@@ -330,4 +330,25 @@ func (c *ComponentResourceConstraint) MatchClass(class *ComponentClassInstance) 
 	}
 	constraints := c.FindMatchingConstraints(request)
 	return len(constraints) > 0
+}
+
+func (c *ComponentResourceConstraint) FindConstraint(clusterDefRef string, componentSpec *ClusterComponentSpec) []ResourceConstraint {
+	constraints := make(map[string]bool)
+	for _, selector := range c.Spec.Selectors {
+		if selector.ClusterDefRef != clusterDefRef || selector.ClusterComponentDefRef != componentSpec.ComponentDefRef {
+			continue
+		}
+		for _, name := range selector.Constraints {
+			constraints[name] = true
+		}
+	}
+
+	var result []ResourceConstraint
+	for _, constraint := range c.Spec.Constraints {
+		if _, ok := constraints[constraint.Name]; !ok {
+			continue
+		}
+		result = append(result, constraint)
+	}
+	return result
 }

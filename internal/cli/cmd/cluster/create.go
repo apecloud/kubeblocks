@@ -595,7 +595,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	var comps []map[string]interface{}
 	for _, compSpec := range compSpecs {
 		// validate component classes
-		if err = clsMgr.ValidateResources(compSpec); err != nil {
+		if err = clsMgr.ValidateResources(o.ClusterDefRef, compSpec); err != nil {
 			return nil, err
 		}
 

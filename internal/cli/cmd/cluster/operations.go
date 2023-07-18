@@ -285,7 +285,7 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 			if err = fillClassParams(&comp); err != nil {
 				return err
 			}
-			if err = clsMgr.ValidateResources(&comp); err != nil {
+			if err = clsMgr.ValidateResources(o.Name, &comp); err != nil {
 				return err
 			}
 		}

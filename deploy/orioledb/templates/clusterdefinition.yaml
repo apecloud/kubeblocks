@@ -31,11 +31,11 @@ spec:
           failureThreshold: 2
           periodSeconds: 1
           timeoutSeconds: 1
-{{/*      monitor:*/}}
-{{/*        builtIn: false*/}}
-{{/*        exporterConfig:*/}}
-{{/*          scrapePath: /metrics*/}}
-{{/*          scrapePort: {{ .Values.metrics.service.port }}*/}}
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: {{ .Values.metrics.service.port }}
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -57,11 +57,16 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: pgbouncer-config
           defaultMode: 0777
-{{/*        - name: orioledb-custom-metrics*/}}
-{{/*          templateRef: orioledb-custom-metrics*/}}
-{{/*          namespace: {{ .Release.Namespace }}*/}}
-{{/*          volumeName: postgresql-custom-metrics*/}}
-{{/*          defaultMode: 0777*/}}
+        - name: orioledb-custom-metrics
+          templateRef: orioledb-custom-metrics
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-custom-metrics
+          defaultMode: 0777
+        - name: agamotto-configuration
+          templateRef: postgresql-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
+          defaultMode: 0777
       scriptSpecs:
         - name: orioledb-scripts
           templateRef: orioledb-scripts
@@ -84,23 +89,15 @@ spec:
           runAsUser: 0
           fsGroup: 103
           runAsGroup: 103
-        initContainers:
-          - name: orioledb-init-container
-            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-            command:
-              - /kb-scripts/init_container.sh
-            volumeMounts:
-              - name: data
-                mountPath: /home/postgres/pgdata
-              - name: postgresql-config
-                mountPath: /home/postgres/conf
-              - name: scripts
-                mountPath: /kb-scripts
-              - name: pod-info
-                mountPath: /kb-podinfo
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            command:
+              - bin/bash
+              - -c
+              - /kb-scripts/setup.sh
+{{/*              - sleep*/}}
+{{/*              - "10000"*/}}
             securityContext:
               runAsUser: 0
             readinessProbe:
@@ -138,8 +135,6 @@ spec:
                 value: "true"
               - name: KUBERNETES_USE_CONFIGMAPS
                 value: "true"
-{{/*              - name: POSTGRES_PASSWORD*/}}
-{{/*                value: "postgres"*/}}
               - name: SCOPE
                 value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
               - name: KUBERNETES_SCOPE_LABEL
@@ -162,6 +157,10 @@ spec:
                 value: "true"
               - name: PGROOT
                 value: /home/postgres/pgdata/pgroot
+              - name: PGCONF
+                value: /home/postgres/conf
+              - name: PGDATA
+                value: /home/postgres/pgdata
               - name: POD_IP
                 valueFrom:
                   fieldRef:
@@ -268,56 +267,56 @@ spec:
                 value: "6432"
               - name: PGBOUNCER_BIND_ADDRESS
                 value: "0.0.0.0"
-{{/*          - name: metrics*/}}
-{{/*            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}*/}}
-{{/*            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}*/}}
-{{/*            securityContext:*/}}
-{{/*              runAsUser: 0*/}}
-{{/*            env:*/}}
-{{/*              - name: ENDPOINT*/}}
-{{/*                value: {{ printf "127.0.0.1:5432" }}*/}}
-{{/*              - name: DATA_SOURCE_PASS*/}}
-{{/*                valueFrom:*/}}
-{{/*                  secretKeyRef:*/}}
-{{/*                    name: $(CONN_CREDENTIAL_SECRET_NAME)*/}}
-{{/*                    key: password*/}}
-{{/*                    optional: false*/}}
-{{/*              - name: DATA_SOURCE_USER*/}}
-{{/*                valueFrom:*/}}
-{{/*                  secretKeyRef:*/}}
-{{/*                    name: $(CONN_CREDENTIAL_SECRET_NAME)*/}}
-{{/*                    key: username*/}}
-{{/*                    optional: false*/}}
-{{/*            command:*/}}
-{{/*              - "/bin/agamotto"*/}}
-{{/*              - "--config=/opt/agamotto/agamotto-config.yaml"*/}}
-{{/*            ports:*/}}
-{{/*              - name: http-metrics*/}}
-{{/*                containerPort: {{ .Values.metrics.service.port }}*/}}
-{{/*            volumeMounts:*/}}
-{{/*              - name: postgresql-custom-metrics*/}}
-{{/*                mountPath: /opt/conf*/}}
-{{/*              - name: agamotto-configuration*/}}
-{{/*                mountPath: /opt/agamotto*/}}
-{{/*        volumes:*/}}
-{{/*          - name: dshm*/}}
-{{/*            emptyDir:*/}}
-{{/*              medium: Memory*/}}
-{{/*              {{- with .Values.shmVolume.sizeLimit }}*/}}
-{{/*              sizeLimit: {{ . }}*/}}
-{{/*              {{- end }}*/}}
-{{/*          - name: pod-info*/}}
-{{/*            downwardAPI:*/}}
-{{/*              items:*/}}
-{{/*                - path: "pod-role"*/}}
-{{/*                  fieldRef:*/}}
-{{/*                    fieldPath: metadata.labels['kubeblocks.io/role']*/}}
-{{/*                - path: "primary-pod"*/}}
-{{/*                  fieldRef:*/}}
-{{/*                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']*/}}
-{{/*                - path: "component-replicas"*/}}
-{{/*                  fieldRef:*/}}
-{{/*                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']*/}}
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsUser: 0
+            env:
+              - name: ENDPOINT
+                value: {{ printf "127.0.0.1:5432" }}
+              - name: DATA_SOURCE_PASS
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: DATA_SOURCE_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: postgresql-custom-metrics
+                mountPath: /opt/conf
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+              {{- with .Values.shmVolume.sizeLimit }}
+              sizeLimit: {{ . }}
+              {{- end }}
+          - name: pod-info
+            downwardAPI:
+              items:
+                - path: "pod-role"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']
+                - path: "primary-pod"
+                  fieldRef:
+                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
@@ -353,21 +352,21 @@ spec:
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
                 update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
-{{/*          - name: kbdataprotection*/}}
-{{/*            provisionPolicy: *kbAdminAcctRef*/}}
-{{/*          - name: kbprobe*/}}
-{{/*            provisionPolicy: &kbReadonlyAcctRef*/}}
-{{/*              type: CreateByStmt*/}}
-{{/*              scope: AnyPods*/}}
-{{/*              statements:*/}}
-{{/*                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);*/}}
-{{/*                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';*/}}
-{{/*          - name: kbmonitoring*/}}
-{{/*            provisionPolicy: *kbReadonlyAcctRef*/}}
-{{/*          - name: kbreplicator*/}}
-{{/*            provisionPolicy:*/}}
-{{/*              type: CreateByStmt*/}}
-{{/*              scope: AnyPods*/}}
-{{/*              statements:*/}}
-{{/*                creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';*/}}
-{{/*                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';*/}}
+          - name: kbdataprotection
+            provisionPolicy: *kbAdminAcctRef
+          - name: kbprobe
+            provisionPolicy: &kbReadonlyAcctRef
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
+          - name: kbmonitoring
+            provisionPolicy: *kbReadonlyAcctRef
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';

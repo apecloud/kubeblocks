@@ -187,7 +187,7 @@ password_encryption = 'md5'
 pg_stat_statements.max = '5000'
 pg_stat_statements.save = 'False'
 pg_stat_statements.track = 'top'
-# pg_stat_statements.track_planning = 'False'
+pg_stat_statements.track_planning = 'False'
 pg_stat_statements.track_utility = 'False'
 # extension: pgaudit
 pgaudit.log_catalog = 'True'
@@ -211,7 +211,7 @@ session_replication_role = 'origin'
 # extension: sql_firewall
 sql_firewall.firewall = 'disable'
 shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
-# shared_preload_libraries = 'pg_stat_statements,auto_explain,bg_mon,pgextwlist,pg_auth_mon,set_user,pg_cron,pg_stat_kcache'
+shared_preload_libraries = 'orioledb,pg_stat_statements,auto_explain'
 {{- if $.component.tls }}
 {{- $ca_file := getCAFile }}
 {{- $cert_file := getCertFile }}

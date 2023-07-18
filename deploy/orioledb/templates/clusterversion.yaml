@@ -10,9 +10,9 @@ spec:
   componentVersions:
     - componentDefRef: orioledb
       versionsContext:
-        initContainers:
-          - name: orioledb-init-container
-            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+{{/*        initContainers:*/}}
+{{/*          - name: orioledb-init-container*/}}
+{{/*            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}*/}}
         containers:
           - name: postgresql
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

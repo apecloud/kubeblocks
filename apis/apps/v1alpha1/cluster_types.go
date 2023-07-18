@@ -106,6 +106,10 @@ type ClusterSpec struct {
 	// monitor specifies the configuration of monitor
 	// +optional
 	Monitor ClusterMonitor `json:"monitor,omitempty"`
+
+	// network specifies the configuration of network
+	// +optional
+	Network *ClusterNetwork `json:"network,omitempty"`
 }
 
 type ClusterResources struct {
@@ -544,6 +548,19 @@ type ClusterMonitor struct {
 	// +kubebuilder:validation:XIntOrString
 	// +optional
 	MonitoringInterval *intstr.IntOrString `json:"monitoringInterval,omitempty"`
+}
+
+type ClusterNetwork struct {
+
+	// hostNetworkAccessible specifies whether host network is accessible. It defaults to false
+	// +kubebuilder:default=false
+	// +optional
+	HostNetworkAccessible bool `json:"hostNetworkAccessible,omitempty"`
+
+	// publiclyAccessible specifies whether it is publicly accessible. It defaults to false
+	// +kubebuilder:default=false
+	// +optional
+	PubliclyAccessible bool `json:"publiclyAccessible,omitempty"`
 }
 
 // +genclient

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -119,6 +120,57 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			} else {
 				clusterCompSpec.Monitor = true
 				// TODO: should also set interval
+			}
+		}
+		if cluster.Spec.Network != nil {
+			clusterCompSpec.Services = []appsv1alpha1.ClusterComponentService{}
+			if cluster.Spec.Network.HostNetworkAccessible {
+				svc := appsv1alpha1.ClusterComponentService{
+					Name:        "vpc",
+					ServiceType: "LoadBalancer",
+				}
+				switch getCloudProvider() {
+				case CloudProviderAWS:
+					svc.Annotations = map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+						"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
+					}
+				case CloudProviderGCP:
+					svc.Annotations = map[string]string{
+						"networking.gke.io/load-balancer-type": "Internal",
+					}
+				case CloudProviderAliyun:
+					svc.Annotations = map[string]string{
+						"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "intranet",
+					}
+				case CloudProviderAzure:
+					svc.Annotations = map[string]string{
+						"service.beta.kubernetes.io/azure-load-balancer-internal": "true",
+					}
+				}
+				clusterCompSpec.Services = append(clusterCompSpec.Services, svc)
+			}
+			if cluster.Spec.Network.PubliclyAccessible {
+				svc := appsv1alpha1.ClusterComponentService{
+					Name:        "public",
+					ServiceType: "LoadBalancer",
+				}
+				switch getCloudProvider() {
+				case CloudProviderAWS:
+					svc.Annotations = map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+						"service.beta.kubernetes.io/aws-load-balancer-internal": "false",
+					}
+				case CloudProviderAliyun:
+					svc.Annotations = map[string]string{
+						"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
+					}
+				case CloudProviderAzure:
+					svc.Annotations = map[string]string{
+						"service.beta.kubernetes.io/azure-load-balancer-internal": "false",
+					}
+				}
+				clusterCompSpec.Services = append(clusterCompSpec.Services, svc)
 			}
 		}
 	}
@@ -471,4 +523,21 @@ func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedCompon
 	}
 	component.PodSpec.Containers[0].Resources = actualResources
 	return nil
+}
+
+func getCloudProvider() CloudProvider {
+	k8sVersion := viper.GetString(constant.CfgKeyServerInfo)
+	if strings.Contains(k8sVersion, "eks") {
+		return CloudProviderAWS
+	}
+	if strings.Contains(k8sVersion, "gke") {
+		return CloudProviderGCP
+	}
+	if strings.Contains(k8sVersion, "aliyun") {
+		return CloudProviderAliyun
+	}
+	if strings.Contains(k8sVersion, "tke") {
+		return CloudProviderTencent
+	}
+	return CloudProviderUnknown
 }

@@ -543,6 +543,20 @@ spec:
                       no monitor if set to 0
                     x-kubernetes-int-or-string: true
                 type: object
+              network:
+                description: network specifies the configuration of network
+                properties:
+                  hostNetworkAccessible:
+                    default: false
+                    description: hostNetworkAccessible specifies whether host network
+                      is accessible. It defaults to false
+                    type: boolean
+                  publiclyAccessible:
+                    default: false
+                    description: publiclyAccessible specifies whether it is publicly
+                      accessible. It defaults to false
+                    type: boolean
+                type: object
               parameters:
                 additionalProperties:
                   type: string

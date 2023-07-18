@@ -179,19 +179,7 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 	scheme := *model.GetScheme()
 	ctx := context.Background()
 	ref, err := e.getOwnerUpTo(ctx, object, e.UpToLevel, scheme)
-	if err != nil {
-		log.Info("cloud not find ancestor object",
-			"source object gvk", object.GetObjectKind().GroupVersionKind(),
-			"name", object.GetName(),
-			"up to level", e.UpToLevel,
-			"error", err.Error())
-		return
-	}
-	if ref == nil {
-		log.Info("cloud not find ancestor object",
-			"source object gvk", object.GetObjectKind().GroupVersionKind(),
-			"name", object.GetName(),
-			"up to level", e.UpToLevel)
+	if err != nil || ref == nil {
 		return
 	}
 

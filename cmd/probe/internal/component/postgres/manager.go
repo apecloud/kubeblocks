@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode"
 
 	"github.com/dapr/kit/logger"
@@ -465,23 +466,30 @@ func (mgr *Manager) postPromote() error {
 
 func (mgr *Manager) Demote() error {
 	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
-	standbySignal, err := os.Create("/postgresql/data/standby.signal")
-	if err != nil {
-		mgr.Logger.Errorf("touch standby signal failed, err:%v", err)
-		return err
-	}
-	defer standbySignal.Close()
 
 	return mgr.Stop()
 }
 
 func (mgr *Manager) Stop() error {
+	mgr.Logger.Infof("wait for send signal 1 to deactivate sql channel")
+	sqlChannelProc, err := component.GetSqlChannelProc()
+	if err != nil {
+		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		return errors.Errorf("can't find sql channel process, err:%v", err)
+	}
+
+	// deactivate sql channel restart db
+	err = sqlChannelProc.Signal(syscall.SIGUSR1)
+	if err != nil {
+		return errors.Errorf("send signal1 to sql channel failed, err:%v", err)
+	}
+
 	var stdout, stderr bytes.Buffer
 	stopCmd := exec.Command("su", "-c", "pg_ctl stop -m fast", "postgres")
 	stopCmd.Stdout = &stdout
 	stopCmd.Stderr = &stderr
 
-	err := stopCmd.Run()
+	err = stopCmd.Run()
 	if err != nil || stderr.String() != "" {
 		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
 		return err
@@ -775,30 +783,18 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) Start() error {
-	standbySignal, err := os.Create("/postgresql/data/standby.signal")
+	mgr.Logger.Infof("wait for send signal 2 to activate sql channel")
+	sqlChannelProc, err := component.GetSqlChannelProc()
 	if err != nil {
-		mgr.Logger.Errorf("touch standby signal failed, err:%v", err)
-		return err
-	}
-	defer standbySignal.Close()
-
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("docker-entrypoint.sh", "--config-file=/kubeblocks/conf/postgresql.conf", "--hba_file=/kubeblocks/conf/pg_hba.conf", "&")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("start postgresql failed, err:%v, stderr:%s", err, stderr.String())
-		return err
+		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		return errors.Errorf("can't find sql channel process, err:%v", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), config.pool)
+	// activate sql channel restart db
+	err = sqlChannelProc.Signal(syscall.SIGUSR2)
 	if err != nil {
-		return errors.Errorf("unable to ping the DB: %v", err)
+		return errors.Errorf("send signal2 to sql channel failed, err:%v", err)
 	}
-	mgr.Pool = pool
-
 	return nil
 }
 
@@ -874,5 +870,11 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	return cluster.GetLeaderMember().Name == member.Name, nil
+	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
+	if err != nil || pools[0] == nil {
+		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
+		return false, err
+	}
+
+	return mgr.IsLeaderWithPool(ctx, pools[0])
 }

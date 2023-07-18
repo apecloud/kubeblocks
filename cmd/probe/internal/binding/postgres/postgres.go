@@ -26,10 +26,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 

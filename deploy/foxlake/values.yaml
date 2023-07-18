@@ -21,16 +21,3 @@ images:
     repository: mysql
     pullPolicy: IfNotPresent
     tag: "8.0.30"
-  minio:
-    repository: docker.io/minio/minio
-    tag: RELEASE.2022-03-17T06-34-49Z
-
-## @param storage configuration
-##
-s3:
-  accessKey: ""
-  secretKey: ""
-  defaultRegion: ""
-minio:
-  accessKey: "rootuser"
-  secretKey: "rootpass123"

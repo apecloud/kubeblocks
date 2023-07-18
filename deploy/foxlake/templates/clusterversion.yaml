@@ -23,9 +23,3 @@ spec:
           - name: mysql
             image: {{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.mysql.pullPolicy }}
-    - componentDefRef: foxlake-minio
-      versionsContext:
-        containers:
-          - name: minio
-            image: {{ .Values.images.minio.repository }}:{{ .Values.images.minio.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.minio.pullPolicy }}

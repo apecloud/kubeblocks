@@ -71,10 +71,6 @@ func NewKafka() (*KafkaOperations, error) {
 func (kafkaOps *KafkaOperations) Init(metadata component.Properties) error {
 	kafkaOps.Logger.Info("Initializing kafka binding")
 	kafkaOps.BaseOperations.Init(metadata)
-	err := kafkaOps.kafka.Init(context.Background(), kafkaOps.Metadata)
-	if err != nil {
-		return err
-	}
 	kafkaOps.DBType = "kafka"
 	kafkaOps.InitIfNeed = kafkaOps.initIfNeed
 	// kafkaOps.BaseOperations.GetRole = kafkaOps.GetRole

@@ -129,4 +129,4 @@ spec:
               - name: CLUSTER_HOSTNAME
                 value: "$(KB_POD_NAME)"
               - name: CLUSTER_JOIN
-                value: "$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc.cluster.local"
+                value: "$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc"

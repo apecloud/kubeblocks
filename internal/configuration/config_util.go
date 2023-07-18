@@ -162,3 +162,17 @@ func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []apps
 	}
 	return nil, nil, nil
 }
+
+func IsWatchModuleForShellTrigger(trigger *appsv1alpha1.ShellTrigger) bool {
+	if trigger == nil || trigger.Sync == nil {
+		return true
+	}
+	return !*trigger.Sync
+}
+
+func IsWatchModuleForTplTrigger(trigger *appsv1alpha1.TPLScriptTrigger) bool {
+	if trigger == nil || trigger.Sync == nil {
+		return true
+	}
+	return !*trigger.Sync
+}

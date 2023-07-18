@@ -1,0 +1,134 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "kblib.clusterName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ $.Values.terminationPolicy }}
+  affinity:
+    {{- with $.Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    {{- if .Values.proxy.enable }}
+    - name: proxy
+      componentDefRef: pulsar-proxy
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.proxy.replicaCount | default 3 }}
+      {{- with  .Values.proxy.resources }}
+      resources:
+      {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+      {{- end }}
+      {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- end }}
+    {{- end }}
+    - name: broker
+      componentDefRef: pulsar-broker
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.broker.replicaCount | default 3 }}
+      {{- with  .Values.broker.resources }}
+      resources:
+      {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+      {{- end }}
+      {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- end }}
+    {{- if .Values.bookiesRecovery.enable }}
+    - name: bookies-recovery
+      componentDefRef: bookies-recovery
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.bookiesRecovery.replicaCount | default 3 }}
+      {{- with  .Values.bookiesRecovery.resources }}
+      resources:
+      {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+      {{- end }}
+      {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- end }}
+    {{- end }}
+    - name: bookies
+      componentDefRef: bookies
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.bookies.replicaCount | default 3 }}
+      {{- with  .Values.bookies.resources }}
+      resources:
+        {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        {{- end }}
+        {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.bookies.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: ledgers
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.bookies.persistence.data.size }}
+        - name: journal
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.bookies.persistence.log.size }}
+      {{- end }}
+    - name: zookeeper
+      componentDefRef: zookeeper
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.zookeeper.replicaCount | default 3 }}
+      {{- with  .Values.zookeeper.resources }}
+      resources:
+        {{- if .limits }}
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        {{- end }}
+        {{- if .requests }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.zookeeper.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.zookeeper.persistence.data.size }}
+      {{- end }}

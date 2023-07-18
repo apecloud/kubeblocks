@@ -18,6 +18,7 @@ type DBManager interface {
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
 	IsLeader(context.Context, *dcs.Cluster) (bool, error)
 	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
+	IsFirstMember() bool
 	IsDBStartupReady() bool
 	Recover()
 	AddCurrentMemberToCluster(*dcs.Cluster) error
@@ -55,6 +56,10 @@ func (mgr *DBManagerBase) GetLogger() logger.Logger {
 
 func (mgr *DBManagerBase) GetCurrentMemberName() string {
 	return mgr.CurrentMemberName
+}
+
+func (mgr *DBManagerBase) IsFirstMember() bool {
+	return strings.HasSuffix(mgr.CurrentMemberName, "-0")
 }
 
 func RegisterManager(characterType string, manager DBManager) {

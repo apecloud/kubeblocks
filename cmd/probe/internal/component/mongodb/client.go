@@ -49,7 +49,7 @@ func NewMongodbClient(ctx context.Context, config *Config) (*mongo.Client, error
 	if err != nil {
 		return nil, errors.Wrap(err, "connect to mongodb")
 	}
-	return client, err
+	return client, nil
 }
 
 func NewReplSetClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
@@ -60,7 +60,7 @@ func NewReplSetClient(ctx context.Context, hosts []string) (*mongo.Client, error
 
 }
 
-func MongosClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
+func NewMongosClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
 	config := GetConfig().DeepCopy()
 	config.hosts = hosts
 	config.direct = false
@@ -69,11 +69,30 @@ func MongosClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
 	return NewMongodbClient(ctx, config)
 }
 
-func StandaloneClient(ctx context.Context, host string) (*mongo.Client, error) {
+func NewStandaloneClient(ctx context.Context, host string) (*mongo.Client, error) {
 	config := GetConfig().DeepCopy()
 	config.hosts = []string{host}
 	config.direct = true
 	config.replSetName = ""
 
 	return NewMongodbClient(ctx, config)
+}
+
+func NewLocalUnauthClient(ctx context.Context) (*mongo.Client, error) {
+	config := GetConfig().DeepCopy()
+	config.direct = true
+	config.replSetName = ""
+
+	opts := options.Client().
+		SetHosts(config.hosts).
+		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.J(true))).
+		SetReadPreference(readpref.Primary()).
+		SetDirect(config.direct)
+
+	client, err := mongo.Connect(ctx, opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "connect to mongodb")
+	}
+
+	return client, nil
 }

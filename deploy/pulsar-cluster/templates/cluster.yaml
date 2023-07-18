@@ -4,6 +4,9 @@ metadata:
   name: {{ include "kblib.clusterName" . }}
   namespace: {{ .Release.Namespace }}
   labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
 spec:
   clusterDefinitionRef: pulsar
   clusterVersionRef: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}

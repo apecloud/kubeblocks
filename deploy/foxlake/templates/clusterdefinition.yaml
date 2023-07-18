@@ -4,9 +4,6 @@ metadata:
   name: foxlake
   labels:
     {{- include "foxlake.labels" . | nindent 4 }}
-  annotations:
-    k8s.foxlake.io/mpp-worker-image: {{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
-    k8s.foxlake.io/mpp-worker-tolerations: spot=true:NoSchedule
 spec:
   connectionCredential:
     username: "foxlake_root"

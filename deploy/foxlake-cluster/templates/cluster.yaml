@@ -4,15 +4,16 @@ metadata:
   name: {{ include "kblib.clusterName" . }}
   namespace: {{ .Release.Namespace }}
   labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
-  {{- if .Values.defaultStorage.create }}
   annotations:
     kubeblocks.io/extra-env: '{
+    {{- if .Values.defaultStorage.create }}
       "createDefaultStorage":"true",
       "defaultStorageEndpoint":{{ .Values.defaultStorage.endpoint | quote }},
       "defaultStorageAccessKeyID":{{ .Values.defaultStorage.accessKey | quote }},
-      "defaultStorageSecretAccessKey":{{ .Values.defaultStorage.secretKey | quote }}
+      "defaultStorageSecretAccessKey":{{ .Values.defaultStorage.secretKey | quote }},
+    {{- end }}
+      "MPP_WORKER_TOLERATIONS":{{ .Values.mppWorkerTolerations | quote }}
     }'
-  {{- end }}
 spec:
   clusterDefinitionRef: foxlake  # ref clusterdefinition.name
   clusterVersionRef: foxlake-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name

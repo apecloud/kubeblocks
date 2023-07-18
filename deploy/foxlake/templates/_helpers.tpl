@@ -116,13 +116,7 @@ FoxLake Configration Environment Variables
 - name: MY_POD_IP
   value: $(KB_POD_IP)
 - name: MY_POD_RPC_SERVICE_NAME
-  value: "$(KB_CLUSTER_NAME)-foxlake.$(KB_NAMESPACE).svc"
+  value: "$(KB_CLUSTER_NAME)-foxlake-server"
 - name: MPP_WORKER_CONTAINER_IMAGE
-  valueFrom:
-    fieldRef:
-      fieldPath: metadata.annotations['k8s.foxlake.io/mpp-worker-image']
-- name: MPP_WORKER_TOLERATIONS
-  valueFrom:
-    fieldRef:
-      fieldPath: metadata.annotations['k8s.foxlake.io/mpp-worker-tolerations']
+  value: {{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
 {{- end}}

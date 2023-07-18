@@ -46,3 +46,5 @@ defaultStorage:
   ## For MinIO storage, set it to "minio://<your minio endpoint>/<your bucket>/default".
   ##
   endpoint: ""
+
+mppWorkerTolerations: ""

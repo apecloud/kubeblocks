@@ -20,12 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -161,16 +167,4 @@ func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) 
 		return nil, err
 	}
 	return cluster, nil
-}
-
-func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
-	if object == nil {
-		return nil
-	}
-
-	_, err := getClusterFromObject(object)
-	if err != nil {
-		return err
-	}
-	return nil
 }

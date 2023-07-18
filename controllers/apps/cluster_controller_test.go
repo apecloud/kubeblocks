@@ -437,6 +437,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+		clusterDefName := cluster.Spec.ClusterDefRef
 		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
@@ -448,6 +449,7 @@ var _ = Describe("Cluster Controller", func() {
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
 						constant.AppManagedByLabelKey:         constant.AppName,
+						constant.AppNameLabelKey:              clusterDefName,
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
@@ -1397,7 +1399,7 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(consensusStatus.Followers).Should(HaveLen(2))
 			g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
 			g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
-		}).WithTimeout(1000 * time.Second).Should(Succeed())
+		}).Should(Succeed())
 
 		By("Waiting the component be running")
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).

@@ -310,12 +310,12 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppNameLabelKey:        component.ClusterDefName,
-		constant.AppComponentLabelKey:   component.CompDefName,
 		constant.AppInstanceLabelKey:    cluster.Name,
 		constant.KBAppComponentLabelKey: component.Name,
 	}
 	podBuilder := NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
@@ -326,6 +326,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 	stsBuilder := NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
 		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddMatchLabelsInMap(commonLabels).
 		SetServiceName(cluster.Name + "-" + component.Name + "-headless").
 		SetReplicas(component.Replicas).
@@ -370,12 +371,12 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppNameLabelKey:        component.ClusterDefName,
-		constant.AppComponentLabelKey:   component.CompDefName,
 		constant.AppInstanceLabelKey:    cluster.Name,
 		constant.KBAppComponentLabelKey: component.Name,
 	}
 	podBuilder := NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
@@ -387,6 +388,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	rsmName := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
 	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
 		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddMatchLabelsInMap(commonLabels).
 		SetServiceName(rsmName + "-headless").
 		SetReplicas(component.Replicas).

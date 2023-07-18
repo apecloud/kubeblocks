@@ -46,6 +46,13 @@ type RSM struct {
 
 var _ internal.ComponentSet = &RSM{}
 
+func (r *RSM) getName() string {
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Name
+	}
+	return r.ComponentSpec.Name
+}
+
 func (r *RSM) getReplicas() int32 {
 	if r.SynthesizedComponent != nil {
 		return r.SynthesizedComponent.Replicas
@@ -137,10 +144,9 @@ func (r *RSM) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.
 		return nil, nil
 	}
 
-	rsmObj, _ := obj.(*workloads.ReplicatedStateMachine)
 	// update cluster.status.component.consensusSetStatus based on the existences for all pods
-	componentName := rsmObj.Name
-
+	componentName := r.getName()
+	rsmObj, _ := obj.(*workloads.ReplicatedStateMachine)
 	switch r.SynthesizedComponent.WorkloadType {
 	case appsv1alpha1.Consensus:
 		// first, get the old status

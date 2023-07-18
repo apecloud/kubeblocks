@@ -58,6 +58,7 @@ var config *Config
 func NewConfig(properties map[string]string) (*Config, error) {
 	config = &Config{
 		direct:           true,
+		username:         "root",
 		operationTimeout: defaultTimeout,
 	}
 
@@ -87,6 +88,10 @@ func NewConfig(properties map[string]string) (*Config, error) {
 
 	if viper.IsSet("KB_SERVICE_PASSWORD") {
 		config.password = viper.GetString("KB_SERVICE_PASSWORD")
+	}
+
+	if viper.IsSet("KB_CLUSTER_COMP_NAME") {
+		config.replSetName = viper.GetString("KB_CLUSTER_COMP_NAME")
 	}
 
 	config.databaseName = adminDatabase
@@ -126,7 +131,7 @@ func (config *Config) GetDBPort() int {
 func (config *Config) DeepCopy() *Config {
 	newConf := *config
 	newConf.hosts = make([]string, len(config.hosts))
-	copy(config.hosts, newConf.hosts)
+	copy(newConf.hosts, config.hosts)
 	return &newConf
 }
 

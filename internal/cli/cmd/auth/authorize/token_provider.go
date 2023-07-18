@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
-
 	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 )
 
 type TokenProvider struct {

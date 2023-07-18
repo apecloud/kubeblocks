@@ -24,6 +24,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/99designs/keyring"
 	"github.com/pkg/errors"
@@ -33,6 +34,7 @@ import (
 )
 
 const (
+	authDir      = "auth"
 	userInfoFile = "user_info.json"
 	tokenFile    = "token.json"
 
@@ -90,7 +92,7 @@ func NewKeyringCachedTokenProvider(keyringCached *KeyringProvider) *KeyringCache
 	}
 
 	if keyringCached == nil {
-		defaultKeyring, isValid := defaultKeyring()
+		defaultKeyring, isValid := getDefaultKeyring()
 		return &KeyringCachedTokenProvider{
 			keyringCached: &KeyringCached{
 				key:     keyringKey,
@@ -107,7 +109,7 @@ func NewKeyringCachedTokenProvider(keyringCached *KeyringProvider) *KeyringCache
 	}
 }
 
-func defaultKeyring() (keyring.Keyring, bool) {
+func getDefaultKeyring() (keyring.Keyring, bool) {
 	k, err := keyring.Open(keyring.Config{
 		AllowedBackends: []keyring.BackendType{
 			keyring.SecretServiceBackend,
@@ -214,7 +216,11 @@ func (k *KeyringCachedTokenProvider) getUserInfo() (*authenticator.UserInfoRespo
 }
 
 func (f *FileCached) getConfigDir() (string, error) {
-	return util.GetCliHomeDir()
+	cliHomeDir, err := util.GetCliHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return strings.Join([]string{cliHomeDir, authDir}, "/"), nil
 }
 
 func (f *FileCached) getTokenPath() (string, error) {

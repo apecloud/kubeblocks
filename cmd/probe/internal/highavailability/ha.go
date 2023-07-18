@@ -23,6 +23,7 @@ type Ha struct {
 }
 
 func NewHa(logger logr.Logger) *Ha {
+
 	dcs, _ := dcs.NewKubernetesStore(logger)
 	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
 	if characterType == "" {
@@ -48,7 +49,7 @@ func NewHa(logger logr.Logger) *Ha {
 func (ha *Ha) RunCycle() {
 	cluster, err := ha.dcs.GetCluster()
 	if err != nil {
-		ha.logger.Error(err, "Get Cluster err: ")
+		ha.logger.Error(err, "Get Cluster err")
 		return
 	}
 
@@ -64,7 +65,7 @@ func (ha *Ha) RunCycle() {
 
 	case !ha.dbManager.IsCurrentMemberInCluster(cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(cluster)):
 		ha.logger.Info("Current member is not in cluster, add it to cluster")
-		ha.dbManager.AddCurrentMemberToCluster(cluster)
+		_ = ha.dbManager.AddCurrentMemberToCluster(cluster)
 
 	case !ha.dbManager.IsCurrentMemberHealthy():
 		ha.logger.Info("DB Service is not healthy,  do some recover")
@@ -80,7 +81,7 @@ func (ha *Ha) RunCycle() {
 				err := ha.dbManager.Premote()
 				if err != nil {
 					ha.logger.Error(err, "Take the leader failed")
-					ha.dcs.ReleaseLock()
+					_ = ha.dcs.ReleaseLock()
 				} else {
 					ha.logger.Info("Take the leader success!")
 				}
@@ -102,14 +103,14 @@ func (ha *Ha) RunCycle() {
 
 		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Info("Refresh leader ttl")
-			ha.dcs.UpdateLock()
+			_ = ha.dcs.UpdateLock()
 			if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(cluster)) {
 				ha.DecreaseClusterReplicas(cluster)
 			}
 
 		} else if ha.dbManager.HasOtherHealthyLeader(cluster) != nil {
 			ha.logger.Info("Release leader")
-			ha.dcs.ReleaseLock()
+			_ = ha.dcs.ReleaseLock()
 		} else {
 			_ = ha.dbManager.Premote()
 			_ = ha.dcs.UpdateLock()
@@ -140,7 +141,7 @@ func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
 	cluster, err := ha.dcs.GetCluster()
 	if cluster == nil {
-		ha.logger.Error(err, fmt.Sprintf("Get Cluster %s error, so HA exists.", ha.dcs.GetClusterName()))
+		ha.logger.Error(err, "Get Cluster error, so HA exists.", "cluster-name", ha.dcs.GetClusterName())
 		return
 	}
 
@@ -177,7 +178,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 	hosts := ha.dbManager.GetMemberAddrs(cluster)
 	sort.Strings(hosts)
 	deleteHost := hosts[len(hosts)-1]
-	ha.logger.Info("Delete member", "member", deleteHost)
+	ha.logger.Info("Delete member", "name", deleteHost)
 	// The pods in the cluster are managed by a StatefulSet. If the replica count is decreased,
 	// then the last pod will be removed first.
 	//
@@ -201,7 +202,7 @@ func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
 		}
 
 		if candidate != "" && ha.dbManager.IsMemberHealthy(cluster, cluster.GetMemberWithName(candidate)) {
-			ha.logger.Info("manual switchover to new leader", "name", candidate)
+			ha.logger.Info("manual switchover to new leader", "new leader", candidate)
 			return false
 		}
 
@@ -213,7 +214,7 @@ func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
 	}
 
 	if member := ha.dbManager.HasOtherHealthyLeader(cluster); member != nil {
-		ha.logger.Info("there is a healthy leader exists", "name", member.Name)
+		ha.logger.Info("there is a healthy leader exists", "leader", member.Name)
 		return false
 	}
 

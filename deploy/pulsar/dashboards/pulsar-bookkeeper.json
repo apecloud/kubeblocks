@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 12,
+  "id": 16,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -35,7 +35,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -77,7 +77,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "irate(bookkeeper_server_ADD_ENTRY_REQUEST_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\"}[30s])",
@@ -130,7 +130,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -172,7 +172,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "irate(bookkeeper_server_READ_ENTRY_REQUEST_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\"}[30s])",
@@ -225,7 +225,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -267,7 +267,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(bookie_WRITE_BYTES{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}[30s])",
@@ -320,7 +320,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -362,7 +362,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "irate(bookie_READ_BYTES{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}[30s])",
           "format": "time_series",
@@ -411,7 +411,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -453,7 +453,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookkeeper_server_ADD_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.5\"}",
           "format": "time_series",
@@ -502,7 +502,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -544,7 +544,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookkeeper_server_READ_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.5\"}",
           "format": "time_series",
@@ -593,7 +593,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -635,7 +635,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "bookkeeper_server_ADD_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.99\"}",
@@ -688,7 +688,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -730,7 +730,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookkeeper_server_READ_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.99\"}",
           "format": "time_series",
@@ -779,7 +779,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -821,7 +821,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "bookie_storage_ledgers_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
@@ -874,7 +874,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -916,7 +916,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookie_storage_entries_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
           "format": "time_series",
@@ -967,7 +967,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -1009,7 +1009,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookie_journal_JOURNAL_QUEUE_SIZE{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
           "format": "time_series",
@@ -1058,7 +1058,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -1100,7 +1100,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookie_journal_JOURNAL_QUEUE_LATENCY{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"1\"}",
           "format": "time_series",
@@ -1149,7 +1149,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -1191,7 +1191,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "irate(bookie_journal_JOURNAL_SYNC_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\"}[30s])",
           "format": "time_series",
@@ -1242,7 +1242,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -1284,7 +1284,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookie_journal_JOURNAL_SYNC{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.99\"}",
           "format": "time_series",
@@ -1333,7 +1333,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -1375,7 +1375,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "expr": "bookie_journal_JOURNAL_SYNC{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"1\"}",
           "format": "time_series",
@@ -1424,7 +1424,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -1466,7 +1466,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "bookie_storage_write_cache_size{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
@@ -1519,7 +1519,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "I75Y-1jVz"
+        "uid": "${datasource}"
       },
       "decimals": 1,
       "fill": 0,
@@ -1561,13 +1561,15 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "I75Y-1jVz"
+            "uid": "${datasource}"
           },
+          "editorMode": "code",
           "expr": "bookie_storage_read_cache_size{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
+          "range": true,
           "refId": "A",
           "step": 2
         }
@@ -1617,15 +1619,34 @@
     "list": [
       {
         "current": {
-          "selected": false,
+          "selected": true,
+          "text": "default",
+          "value": "default"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "data source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
           "text": "pulsar-cluster",
           "value": "pulsar-cluster"
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "I75Y-1jVz"
+          "uid": "${datasource}"
         },
-        "definition": "",
+        "definition": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{job=\"bookie\"}, app_kubernetes_io_instance)",
         "hide": 0,
         "includeAll": false,
         "label": "Cluster",
@@ -1633,13 +1654,13 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "{app_kubernetes_io_instance=~\".+\"}",
-          "refId": "Prometheus-cluster-Variable-Query"
+          "query": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{job=\"bookie\"}, app_kubernetes_io_instance)",
+          "refId": "StandardVariableQuery"
         },
-        "refresh": 2,
-        "regex": "/.*[^_]app_kubernetes_io_instance=\\\"([^\\\"]+)\\\".*/",
+        "refresh": 1,
+        "regex": "",
         "skipUrlSync": false,
-        "sort": 1,
+        "sort": 5,
         "tagValuesQuery": "",
         "tagsQuery": "",
         "type": "query",
@@ -1658,9 +1679,9 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "I75Y-1jVz"
+          "uid": "${datasource}"
         },
-        "definition": "bookkeeper_server_ADD_ENTRY_BLOCKED{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\".+\"}",
+        "definition": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{app_kubernetes_io_instance=~\"$cluster\", job=\"bookie\"}, kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "label": "Bookie",
@@ -1668,13 +1689,13 @@
         "name": "bookie",
         "options": [],
         "query": {
-          "query": "bookkeeper_server_ADD_ENTRY_BLOCKED{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\".+\"}",
+          "query": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{app_kubernetes_io_instance=~\"$cluster\", job=\"bookie\"}, kubernetes_pod_name)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
-        "regex": "/.*[^_]kubernetes_pod_name=\\\"([^\\\"]+)\\\".*/",
+        "regex": "",
         "skipUrlSync": false,
-        "sort": 1,
+        "sort": 5,
         "tagValuesQuery": "",
         "tagsQuery": "",
         "type": "query",
@@ -1711,7 +1732,7 @@
       "30d"
     ]
   },
-  "timezone": "browser",
+  "timezone": "",
   "title": "Pulsar / BookKeeper",
   "uid": "pulsar-bookkeeper",
   "version": 1,

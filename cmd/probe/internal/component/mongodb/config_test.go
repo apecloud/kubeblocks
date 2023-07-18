@@ -33,7 +33,7 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 		metadata, err := NewConfig(properties)
 		assert.Nil(t, err)
-		assert.Equal(t, properties[host], metadata.hosts)
+		assert.Equal(t, properties[host], metadata.hosts[0])
 		assert.Equal(t, adminDatabase, metadata.databaseName)
 	})
 
@@ -47,7 +47,7 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 		metadata, err := NewConfig(properties)
 		assert.Nil(t, err)
-		assert.Equal(t, properties[host], metadata.hosts)
+		assert.Equal(t, properties[host], metadata.hosts[0])
 		assert.Equal(t, properties[databaseName], metadata.databaseName)
 		assert.Equal(t, properties[username], metadata.username)
 		assert.Equal(t, properties[password], metadata.password)

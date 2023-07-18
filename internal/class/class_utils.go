@@ -52,7 +52,7 @@ type Manager struct {
 }
 
 func NewManager(classDefinitionList v1alpha1.ComponentClassDefinitionList, constraintList v1alpha1.ComponentResourceConstraintList) (*Manager, error) {
-	classes, err := GetClasses(classDefinitionList)
+	classes, err := getClasses(classDefinitionList)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func GetCustomClassObjectName(cdName string, componentName string) string {
 	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
 }
 
-func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string][]*ComponentClassWithRef, error) {
+func getClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string][]*ComponentClassWithRef, error) {
 	var (
 		compTypeLabel    = "apps.kubeblocks.io/component-def-ref"
 		componentClasses = make(map[string][]*ComponentClassWithRef)

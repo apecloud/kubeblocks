@@ -29,10 +29,37 @@ import (
 // ComponentResourceConstraintSpec defines the desired state of ComponentResourceConstraint
 type ComponentResourceConstraintSpec struct {
 	// Component resource constraints
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +kbubebuilder:validation:Required
 	Constraints []ResourceConstraint `json:"constraints,omitempty"`
+
+	// selector is used to bind the component resource constraint to a component.
+	// +optional
+	Selectors []ComponentResourceConstraintSelector `json:"selector,omitempty"`
+}
+
+type ComponentResourceConstraintSelector struct {
+	// clusterDefRef is the name of the cluster definition.
+	// +kubebuilder:validation:Required
+	ClusterDefRef string `json:"clusterDefRef"`
+
+	// clusterComponentDefRef is the name of the component definition in the cluster definition.
+	// +kubebuilder:validation:Required
+	ClusterComponentDefRef string `json:"clusterComponentDefRef"`
+
+	// constraints are the constraints that will be applied to the component.
+	// +kubebuilder:validation:Required
+	Constraints []string `json:"constraints"`
 }
 
 type ResourceConstraint struct {
+	// The name of the constraint.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
 	// The constraint for vcpu cores.
 	// +kubebuilder:validation:Required
 	CPU CPUConstraint `json:"cpu"`

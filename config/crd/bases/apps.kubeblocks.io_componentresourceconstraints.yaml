@@ -134,6 +134,8 @@ spec:
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                       type: object
+                    name:
+                      type: string
                     storage:
                       description: The constraint for storage size.
                       properties:
@@ -157,6 +159,34 @@ spec:
                   required:
                   - cpu
                   - memory
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              selector:
+                description: selector is used to bind the component resource constraint
+                  to a component.
+                items:
+                  properties:
+                    clusterComponentDefRef:
+                      description: clusterComponentDefRef is the name of the component
+                        definition in the cluster definition.
+                      type: string
+                    clusterDefRef:
+                      description: clusterDefRef is the name of the cluster definition.
+                      type: string
+                    constraints:
+                      description: constraints are the constraints that will be applied
+                        to the component.
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - clusterComponentDefRef
+                  - clusterDefRef
+                  - constraints
                   type: object
                 type: array
             type: object

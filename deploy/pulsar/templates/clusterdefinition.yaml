@@ -64,8 +64,14 @@ spec:
         - name: http
           port: 80
           targetPort: http
+        - name: http-alt
+          port: 8080
+          targetPort: http
         - name: kafka-client
           port: 9092
+          targetPort: kafka-client
+        - name: kafka-client
+          port: 9093
           targetPort: kafka-client
       podSpec:
         securityContext:

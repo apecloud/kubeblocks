@@ -75,7 +75,7 @@ spec:
       componentDefRef: bookies
       monitor: {{ .Values.monitor.enabled | default false }}
       {{- $bookiesReplicas := .Values.bookies.replicaCount }}
-      {{- if and ( eq .Values.bookies.replicaCount $bookiesReplicas ) ( eq .Values.bookies.mode "generic" ) }}
+      {{- if and ( eq (int $bookiesReplicas) 3 ) ( eq .Values.bookies.mode "generic" ) }}
         {{- $bookiesReplicas = 4 }}
       {{- end }}
       replicas: {{ $bookiesReplicas | default 3 }}

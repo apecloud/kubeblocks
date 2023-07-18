@@ -11,7 +11,7 @@ images:
 
 storageClass:
   # Specifies whether the storage class should be created
-  create: false
+  create: true
   # storage class name
   name: "csi-s3"
   # Use a single bucket for all dynamically provisioned persistent volumes
@@ -41,7 +41,7 @@ storageClass:
 
 secret:
   # Specifies whether the secret should be created
-  create: false
+  create: true
   # S3 Access Key
   accessKey: ""
   # S3 Secret Key

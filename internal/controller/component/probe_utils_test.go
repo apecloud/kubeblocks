@@ -40,14 +40,14 @@ var _ = Describe("probe_utils", func() {
 	Context("build probe containers", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
-		var probeServiceHTTPPort int
+		var probeServiceHTTPPort, probeServiceGrpcPort int
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			var err error
 			container, err = buildProbeContainer()
 			Expect(err).NotTo(HaveOccurred())
-			probeServiceHTTPPort = 3501
+			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
@@ -101,12 +101,12 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build role changed probe container", func() {
-			buildRoleProbeContainer(component, container, clusterDefProbe, probeServiceHTTPPort)
+			buildRoleProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 
 		It("should build role service container", func() {
-			buildProbeServiceContainer(component, container)
+			buildProbeServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 

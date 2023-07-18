@@ -248,13 +248,17 @@ func (c *componentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 		}); pos < 0 {
 			node.Action = ictrltypes.ActionCreatePtr()
 		} else {
+			svcObj := svcObjList[pos]
 			// remove original monitor annotations
-			if len(svcObjList[pos].Annotations) > 0 {
-				maps.DeleteFunc(svcObjList[pos].Annotations, func(k, v string) bool {
+			if len(svcObj.Annotations) > 0 {
+				maps.DeleteFunc(svcObj.Annotations, func(k, v string) bool {
 					return strings.HasPrefix(k, "monitor.kubeblocks.io")
 				})
 			}
-			mergeAnnotations(svcObjList[pos].Annotations, &svcProto.Annotations)
+			mergeAnnotations(svcObj.Annotations, &svcProto.Annotations)
+			svcObj.Annotations = svcProto.Annotations
+			svcObj.Spec = svcProto.Spec
+			node.Obj = svcObj
 			node.Action = ictrltypes.ActionUpdatePtr()
 		}
 	}

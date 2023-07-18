@@ -84,6 +84,8 @@ func New(typeName string) (ClusterCommands, error) {
 		return newRedis(), nil
 	case stateMongoDB:
 		return newMongoDB(), nil
+	case stateFoxLake:
+		return newFoxLake(), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}

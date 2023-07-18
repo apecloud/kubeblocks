@@ -22,7 +22,11 @@ package engine
 import (
 	"fmt"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
+
+var _ ClusterCommands = &foxlake{}
 
 type foxlake struct {
 	info     EngineInfo
@@ -67,4 +71,8 @@ func (r *foxlake) Container() string {
 
 func (r *foxlake) ConnectExample(info *ConnectionInfo, client string) string {
 	return buildExample(info, client, r.examples)
+}
+
+func (r *foxlake) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
 }

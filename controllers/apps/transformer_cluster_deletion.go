@@ -162,8 +162,6 @@ func kindsForHalt() []client.ObjectList {
 	kindsPlus := []client.ObjectList{
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
-		&corev1.ServiceList{},
-		&policyv1.PodDisruptionBudgetList{},
 	}
 	kindsPlus = append(kindsPlus, kinds...)
 	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {

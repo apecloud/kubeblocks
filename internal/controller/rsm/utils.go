@@ -331,7 +331,7 @@ func getPodOrdinal(podName string) (int, error) {
 
 // ordinal is the ordinal of pod which this action apply to
 func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
-	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer()); err != nil {
+	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer(action)); err != nil {
 		return err
 	}
 	cli.Create(dag, action)
@@ -511,7 +511,10 @@ func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message s
 	transCtx.EventRecorder.Event(transCtx.rsm, eventType, strings.ToUpper(reason), message)
 }
 
-func getFinalizer() string {
+func getFinalizer(obj client.Object) string {
+	if _, ok := obj.(*workloads.ReplicatedStateMachine); ok {
+		return rsmFinalizerName
+	}
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		return constant.DBClusterFinalizerName
 	}

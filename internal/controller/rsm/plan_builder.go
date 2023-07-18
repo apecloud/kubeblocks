@@ -133,7 +133,7 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.DELETE:
-		finalizer := getFinalizer()
+		finalizer := getFinalizer(vertex.Obj)
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 			err := b.cli.Update(b.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {

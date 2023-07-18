@@ -68,7 +68,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	for _, object := range objects {
-		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer()); err != nil {
+		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer(object)); err != nil {
 			return err
 		}
 	}

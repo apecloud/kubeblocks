@@ -2086,7 +2086,7 @@ var _ = Describe("Cluster Controller", func() {
 			createBackupPolicyTpl(clusterDefObj)
 		})
 
-		FIt("Should success with one leader pod and two follower pods", func() {
+		It("Should success with one leader pod and two follower pods", func() {
 			testThreeReplicas(compName, compDefName)
 		})
 

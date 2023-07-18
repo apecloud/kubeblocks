@@ -46,10 +46,4 @@ spec:
     {{- end }}
 
   installable:
-    autoInstall: {{ index .Values "llm" "enabled" }}
-    selectors:
-    - key: KubeGitVersion
-      operator: Contains
-      values:
-      - eks
-
+    autoInstall: false

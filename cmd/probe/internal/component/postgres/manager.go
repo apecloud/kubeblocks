@@ -63,7 +63,7 @@ func (mgr *Manager) readPidFile() (*PidFile, error) {
 		return nil, err
 	}
 	defer func() {
-		err := f.Close()
+		err = f.Close()
 		if err != nil {
 			mgr.Logger.Error(err)
 		}
@@ -315,17 +315,17 @@ func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
 	})
 	switch mode {
 	case "off":
-		return "asynchronous", nil
+		return asynchronous, nil
 	case "local":
-		return "asynchronous", nil
+		return asynchronous, nil
 	case "remote_write":
-		return "asynchronous", nil
+		return asynchronous, nil
 	case "on":
-		return "synchronous", nil
+		return synchronous, nil
 	case "remote_apply":
-		return "synchronous", nil
+		return synchronous, nil
 	default: // default "on"
-		return "synchronous", nil
+		return synchronous, nil
 	}
 }
 
@@ -563,22 +563,24 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		return false
 	}
 
-	if localTimeLine > primaryTimeLine {
+	switch {
+	case localTimeLine > primaryTimeLine:
 		needRewind = true
-	} else if localTimeLine == primaryTimeLine {
+	case localTimeLine == primaryTimeLine:
 		needRewind = false
-	} else if primaryTimeLine > 1 {
+	case primaryTimeLine > 1:
 		historys = mgr.getHistory()
 	}
 
 	if historys != nil {
 		for _, h := range historys {
 			if h.parentTimeline == localTimeLine {
-				if isRecovery {
+				switch {
+				case isRecovery:
 					needRewind = localLsn > h.switchPoint
-				} else if localLsn >= h.switchPoint {
+				case localLsn >= h.switchPoint:
 					needRewind = true
-				} else {
+				default:
 					// TODO:get checkpoint end
 				}
 				break

@@ -11,12 +11,33 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const (
+	asynchronous = "asynchronous"
+	synchronous  = "synchronous"
+)
+
 type PidFile struct {
 	pid     int32
 	dataDir string
 	startTs int64
 	port    int
 }
+
+const (
+	first            = "first"
+	star             = "star"
+	ident            = "ident"
+	doubleQuote      = "double_quote"
+	space            = "space"
+	anyA             = "any"
+	num              = "num"
+	comma            = "comma"
+	parenthesisStart = "parenthesis_start"
+	parenthesisEnd   = "parenthesis_end"
+	quorum           = "quorum"
+	priority         = "priority"
+	off              = "off"
+)
 
 type PGStandby struct {
 	Types   string
@@ -51,7 +72,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		`(?P<JUNK> .) `,
 	}
 	result := &PGStandby{
-		Types:   "off",
+		Types:   off,
 		Members: mapset.NewSet(),
 	}
 
@@ -77,7 +98,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	start := 0
 	for match != nil {
 		num := getMatchLastGroupNumber(rs, standbyRow, match.String(), start)
-		if groupNames[num+2] != "space" {
+		if groupNames[num+2] != space {
 			matches = append(matches, []string{groupNames[num+2], match.String(), strconv.FormatInt(int64(start), 10)})
 		}
 		start = match.Index + match.Length
@@ -93,24 +114,24 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		return result, nil
 	}
 	var syncList [][]string
-	if matches[0][0] == "any" && matches[1][0] == "num" && matches[2][0] == "parenthesis_start" && matches[length-1][0] == "parenthesis_end" {
-		result.Types = "quorum"
+	if matches[0][0] == anyA && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd {
+		result.Types = quorum
 		amount, err := strconv.Atoi(matches[1][1])
 		if err != nil {
 			amount = 0
 		}
 		result.Amount = amount
 		syncList = matches[3 : length-1]
-	} else if matches[0][0] == "first" && matches[1][0] == "num" && matches[2][0] == "parenthesis_start" && matches[length-1][0] == "parenthesis_end" {
-		result.Types = "priority"
+	} else if matches[0][0] == first && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd {
+		result.Types = priority
 		amount, err := strconv.Atoi(matches[1][1])
 		if err != nil {
 			amount = 0
 		}
 		result.Amount = amount
 		syncList = matches[3 : length-1]
-	} else if matches[0][0] == "num" && matches[1][0] == "parenthesis_start" && matches[length-1][0] == "parenthesis_end" {
-		result.Types = "priority"
+	} else if matches[0][0] == num && matches[1][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd {
+		result.Types = priority
 		amount, err := strconv.Atoi(matches[0][1])
 		if err != nil {
 			amount = 0
@@ -118,27 +139,27 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		result.Amount = amount
 		syncList = matches[2 : length-1]
 	} else {
-		result.Types = "priority"
+		result.Types = priority
 		result.Amount = 1
 		syncList = matches
 	}
 
 	for i, sync := range syncList {
-		if i%2 == 1 { // odd elements are supposed to be commas
+		switch {
+		case i%2 == 1: // odd elements are supposed to be commas
 			if len(syncList) == i+1 {
 				return nil, errors.Errorf("Unparseable synchronous_standby_names value: Unexpected token %s %s at %s", sync[0], sync[1], sync[2])
-			} else if sync[0] != "comma" {
+			} else if sync[0] != comma {
 				return nil, errors.Errorf("Unparseable synchronous_standby_names value: Got token %s %s while expecting comma at %s", sync[0], sync[1], sync[2])
 			}
-		} else if slices.Contains([]string{"ident", "first", "any"}, sync[0]) {
+		case slices.Contains([]string{ident, first, anyA}, sync[0]):
 			result.Members.Add(sync[1])
-		} else if sync[0] == "star" {
+		case sync[0] == star:
 			result.Members.Add(sync[1])
 			result.HasStar = true
-		} else if sync[0] == "double_quote" {
-			//TODO:check
+		case sync[0] == doubleQuote:
 			result.Members.Add(strings.Replace(sync[1][1:len(sync)-1], `""`, `"`, -1))
-		} else {
+		default:
 			return nil, errors.Errorf("Unparseable synchronous_standby_names value: Unexpected token %s %s at %s", sync[0], sync[1], sync[2])
 		}
 	}

@@ -1,12 +1,12 @@
 ---
-title: Delete a MySQL Cluster
-description: How to delete a MySQL Cluster
-keywords: [mysql, delete a cluster]
+title: Delete a Redis Cluster
+description: How to delete a Redis Cluster
+keywords: [Redis, delete a cluster]
 sidebar_position: 6
 sidebar_label: Delete protection
 ---
 
-# Delete a MySQL Cluster
+# Delete a Redis Cluster
 
 ## Termination policy
 
@@ -26,9 +26,9 @@ The termination policy determines how you delete a cluster.
 To check the termination policy, execute the following command.
 
 ```bash
-$ kubectl -n demo get cluster mysql-cluster
-NAME            CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mysql-cluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   67m
+$ kubectl -n demo get cluster redis
+NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
+redis   redis                redis-7.0.6   Delete               Running   10m
 ```
 
 ## Step
@@ -36,6 +36,6 @@ mysql-cluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Runn
 If you want to delete cluster and all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
 ```bash
-$ kubectl patch -n demo cluster mysql-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
-$ kubectl delete -n demo cluster mysql-cluster
+$ kubectl patch -n demo cluster redis -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+$ kubectl delete -n demo cluster redis
 ```

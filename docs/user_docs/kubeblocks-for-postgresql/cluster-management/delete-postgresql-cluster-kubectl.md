@@ -1,12 +1,12 @@
 ---
-title: Delete a MySQL Cluster
-description: How to delete a MySQL Cluster
-keywords: [mysql, delete a cluster]
+title: Delete a PostgreSQL Cluster
+description: How to delete a PostgreSQL Cluster
+keywords: [PostgreSQL, delete a cluster]
 sidebar_position: 6
 sidebar_label: Delete protection
 ---
 
-# Delete a MySQL Cluster
+# Delete a PostgreSQL Clusterr
 
 ## Termination policy
 
@@ -26,9 +26,9 @@ The termination policy determines how you delete a cluster.
 To check the termination policy, execute the following command.
 
 ```bash
-$ kubectl -n demo get cluster mysql-cluster
-NAME            CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mysql-cluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   67m
+$ kubectl -n demo get cluster pg-cluster 
+NAME         CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
+pg-cluster   postgresql           postgresql-14.8.0   Delete               Running   29m
 ```
 
 ## Step
@@ -36,6 +36,6 @@ mysql-cluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Runn
 If you want to delete cluster and all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
 ```bash
-$ kubectl patch -n demo cluster mysql-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
-$ kubectl delete -n demo cluster mysql-cluster
+$ kubectl patch -n demo cluster pg-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+$ kubectl delete -n demo cluster pg-cluster
 ```

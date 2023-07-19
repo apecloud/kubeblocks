@@ -15,10 +15,10 @@ This document shows how to create and connect to a MySQL cluster.
 ### Before you start
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the ApeCloud MySQL addon is installed with `kubectl get addon apecloud-mysql`.
+* Make sure the ApeCloud MySQL addon is installed with `kubectl get addons.extensions.kubeblocks.io apecloud-mysql`.
   
   ```bash
-  $ kubectl get addon apecloud-mysql
+  $ kubectl get addons.extensions.kubeblocks.io apecloud-mysql
   NAME             TYPE   STATUS    AGE
   apecloud-mysql   Helm   Enabled   61s
   ```
@@ -101,7 +101,7 @@ KubeBlocks operator watches for the `Cluster` CRD, creates the cluster and all d
 
 Run the following command to see the modified MySQL cluster object:
 ```bash
-$ kubectl get cluster mysql-cluster -o yaml
+$ kubectl get cluster mysql-cluster -n demo -o yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -206,7 +206,7 @@ $ kubectl get secrets -n demo mysql-cluster-conn-credential -o jsonpath='{.data.
 Now, we can exec into the pod `mysql-cluster-mysql-0` and connect to the database using username and password.
 
 ```bash
-$ kubectl exec -ti mysql-cluster-mysql-0 -- bash
+$ kubectl exec -ti -n demo mysql-cluster-mysql-0 -- bash
 
 [root@mysql-cluster-mysql-0 /]# mysql -uroot -p2gvztbvz
 mysql: [Warning] Using a password on the command line interface can be insecure.

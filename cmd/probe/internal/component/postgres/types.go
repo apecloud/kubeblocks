@@ -115,7 +115,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	}
 	var syncList [][]string
 	switch {
-	case matches[0][0] == anyA && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
+	case length >= 3 && matches[0][0] == anyA && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = quorum
 		amount, err := strconv.Atoi(matches[1][1])
 		if err != nil {
@@ -123,7 +123,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		}
 		result.Amount = amount
 		syncList = matches[3 : length-1]
-	case matches[0][0] == first && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
+	case length >= 3 && matches[0][0] == first && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
 		amount, err := strconv.Atoi(matches[1][1])
 		if err != nil {
@@ -131,7 +131,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		}
 		result.Amount = amount
 		syncList = matches[3 : length-1]
-	case matches[0][0] == num && matches[1][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
+	case length >= 2 && matches[0][0] == num && matches[1][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
 		amount, err := strconv.Atoi(matches[0][1])
 		if err != nil {
@@ -189,6 +189,10 @@ type history struct {
 
 func parsePgLsn(str string) int64 {
 	list := strings.Split(str, "/")
+	if len(list) < 2 {
+		return 0
+	}
+
 	prefix, _ := strconv.ParseInt(list[0], 16, 64)
 	suffix, _ := strconv.ParseInt(list[1], 16, 64)
 	return prefix*0x100000000 + suffix

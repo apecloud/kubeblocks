@@ -333,10 +333,10 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("with Stateful workload and with config template", func() {
 		BeforeEach(func() {
-			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
+			cm := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-config.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
+			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			configSpecName = cm.Name
@@ -387,7 +387,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
-					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName))).Should(BeTrue())
+					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], generateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName), "env-config"))).Should(BeTrue())
 				}
 			}
 		})

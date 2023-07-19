@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package template
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 
@@ -48,9 +49,14 @@ func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T], L g
 		return nil, err
 	}
 	objList := make([]PT, 0)
-	for _, doc := range bytes.Split(objBytes, []byte("---")) {
-		if len(bytes.TrimSpace(doc)) == 0 {
-			continue
+	reader := bufio.NewReader(bytes.NewReader(objBytes))
+	for {
+		doc, err := yaml.NewYAMLReader(reader).Read()
+		if len(doc) == 0 {
+			break
+		}
+		if err != nil {
+			return nil, err
 		}
 		objList = append(objList, CreateTypedObjectFromYamlByte[T, PT, L](doc, signature))
 	}

@@ -86,16 +86,19 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, m
 func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecMeta) []corev1.VolumeMount {
 	enableWatchVolume := func(volume corev1.VolumeMount) bool {
 		for _, param := range buildParams {
-			if param.ReloadType != appsv1alpha1.TPLScriptType || param.ConfigSpec.VolumeName != volume.Name {
+			if param.ConfigSpec.VolumeName != volume.Name {
 				continue
 			}
-			triggerOptions := param.ReloadOptions.TPLScriptTrigger
-			if triggerOptions == nil || triggerOptions.Sync == nil {
+			switch param.ReloadType {
+			case appsv1alpha1.TPLScriptType:
+				return cfgcore.IsWatchModuleForTplTrigger(param.ReloadOptions.TPLScriptTrigger)
+			case appsv1alpha1.ShellType:
+				return cfgcore.IsWatchModuleForShellTrigger(param.ReloadOptions.ShellTrigger)
+			default:
 				return true
 			}
-			return !*triggerOptions.Sync
 		}
-		return true
+		return false
 	}
 
 	allVolumeMounts := make([]corev1.VolumeMount, 0, len(volumeDirs))

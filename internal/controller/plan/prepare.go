@@ -86,45 +86,10 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 		return cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
-	injectTemplateEnvFrom(cluster, component, podSpec)
-	// TODO config resource objects are updated by the operator
+	if err := injectTemplateEnvFrom(cluster, component, podSpec, cli, ctx, renderWrapper.renderedObjs); err != nil {
+		return err
+	}
 	return createConfigObjects(cli, ctx, renderWrapper.renderedObjs)
-}
-
-func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec) {
-	for _, template := range component.ConfigTemplates {
-		if len(template.AsEnvFrom) != 0 {
-			cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, template.Name)
-			injectEnvFrom(podSpec.Containers, template.AsEnvFrom, cmName)
-			injectEnvFrom(podSpec.InitContainers, template.AsEnvFrom, cmName)
-		}
-	}
-}
-
-func checkEnvFrom(container *corev1.Container, cmName string) bool {
-	for i := range container.EnvFrom {
-		source := &container.EnvFrom[i]
-		if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
-			return true
-		}
-	}
-	return false
-}
-
-func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName string) {
-	sets := cfgutil.NewSet(asEnvFrom...)
-	for i := range containers {
-		container := &containers[i]
-		if sets.InArray(container.Name) && !checkEnvFrom(container, cmName) {
-			container.EnvFrom = append(container.EnvFrom,
-				corev1.EnvFromSource{
-					ConfigMapRef: &corev1.ConfigMapEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: cmName,
-						}},
-				})
-		}
-	}
 }
 
 func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object) error {

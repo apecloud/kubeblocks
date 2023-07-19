@@ -24,7 +24,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/99designs/keyring"
 	"github.com/pkg/errors"
@@ -220,7 +219,7 @@ func (f *FileCached) getConfigDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.Join([]string{cliHomeDir, authDir}, "/"), nil
+	return filepath.Join(cliHomeDir, authDir), nil
 }
 
 func (f *FileCached) getTokenPath() (string, error) {

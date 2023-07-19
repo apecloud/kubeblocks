@@ -84,12 +84,12 @@ metadata:
     "helm.sh/hook": test
 spec:
   containers:
-    - name: wget
+    - name: omb-k2k
       image: docker.io/apecloud/omb:0.1
       command: ['bin/benchmark']
       args: 
         - --drivers 
-        - driver-kop/pulsar_to_kafka.yaml
+        - driver-kop/kafka_to_kafka.yaml
         - workloads/1-topic-16-partitions-1kb.yaml
       env:
         - name: BOOTSTRAP_SERVERS

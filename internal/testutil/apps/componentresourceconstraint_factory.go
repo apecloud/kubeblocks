@@ -34,33 +34,39 @@ const (
 	ProductionResourceConstraint      ResourceConstraintTplType = "production"
 
 	generalResourceConstraintTemplate = `
-- cpu:
+- name: c1
+  cpu:
     min: 0.5
     max: 2
     step: 0.5
   memory:
     sizePerCPU: 1Gi
-- cpu:
+- name: c2
+  cpu:
     min: 2
     max: 2
   memory:
     sizePerCPU: 2Gi
-- cpu:
+- name: c3
+  cpu:
     slots: [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
   memory:
     sizePerCPU: 4Gi
-- cpu:
+- name: c4
+  cpu:
     slots: [100, 500]
   memory:
     sizePerCPU: 2Gi
 `
 
 	memoryResourceConstraintTemplate = `
-- cpu:
+- name: c1
+  cpu:
     slots: [2, 4, 8, 12, 24, 48]
   memory:
     sizePerCPU: 8Gi
-- cpu:
+- name: c2
+  cpu:
     min: 2
     max: 128
     step: 2
@@ -69,7 +75,8 @@ const (
 `
 
 	productionResourceConstraintTemplate = `
-- cpu:
+- name: c1
+  cpu:
     min: "0.5"
     max: 64
     step: "0.5"
@@ -118,5 +125,10 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 	}
 	constraints = append(constraints, newConstraints...)
 	factory.get().Spec.Constraints = constraints
+	return factory
+}
+
+func (factory *MockComponentResourceConstraintFactory) AddSelector(selector appsv1alpha1.ComponentResourceConstraintSelector) *MockComponentResourceConstraintFactory {
+	factory.get().Spec.Selector = append(factory.get().Spec.Selector, selector)
 	return factory
 }

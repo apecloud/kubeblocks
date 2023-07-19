@@ -96,6 +96,11 @@ var _ = Describe("Cluster", func() {
 			clusterDef := testing.FakeClusterDef()
 			resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 				AddConstraints(testapps.ProductionResourceConstraint).
+				AddSelector(appsv1alpha1.ComponentResourceConstraintSelector{
+					ClusterDefRef:   clusterDef.Name,
+					ComponentDefRef: testing.ComponentDefName,
+					Constraints:     []string{"c1"},
+				}).
 				GetObject()
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
@@ -204,10 +209,10 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("should fail if component with storage not meets the constraint", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,storage=500Mi", testing.ExtraComponentDefName)}
+			o.Values = []string{fmt.Sprintf("type=%s,storage=500Mi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 
-			o.Values = []string{fmt.Sprintf("type=%s,storage=1Pi", testing.ExtraComponentDefName)}
+			o.Values = []string{fmt.Sprintf("type=%s,storage=1Pi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 

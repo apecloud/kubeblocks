@@ -38,7 +38,7 @@ type ComponentResourceConstraintSpec struct {
 
 	// selector is used to bind the component resource constraint to a component.
 	// +optional
-	Selectors []ComponentResourceConstraintSelector `json:"selector,omitempty"`
+	Selector []ComponentResourceConstraintSelector `json:"selector,omitempty"`
 }
 
 type ComponentResourceConstraintSelector struct {
@@ -46,9 +46,9 @@ type ComponentResourceConstraintSelector struct {
 	// +kubebuilder:validation:Required
 	ClusterDefRef string `json:"clusterDefRef"`
 
-	// clusterComponentDefRef is the name of the component definition in the cluster definition.
+	// componentDefRef is the name of the component definition in the cluster definition.
 	// +kubebuilder:validation:Required
-	ClusterComponentDefRef string `json:"clusterComponentDefRef"`
+	ComponentDefRef string `json:"componentDefRef"`
 
 	// constraints are the constraints that will be applied to the component.
 	// +kubebuilder:validation:Required
@@ -309,33 +309,35 @@ func (m *ResourceConstraint) GetMinimalResources() corev1.ResourceList {
 }
 
 // FindMatchingConstraints find all constraints that resource satisfies.
-func (c *ComponentResourceConstraint) FindMatchingConstraints(clusterDefRef string, componentSpec *ClusterComponentSpec) []ResourceConstraint {
-	if c == nil {
-		return nil
-	}
-	constraints := c.FindConstraint(clusterDefRef, componentSpec)
+func (c *ComponentResourceConstraint) FindMatchingConstraints(
+	clusterDefRef string,
+	componentDefRef string,
+	resources corev1.ResourceList) []ResourceConstraint {
+
+	constraints := c.FindConstraints(clusterDefRef, componentDefRef)
+	var result []ResourceConstraint
 	for _, constraint := range constraints {
-		if constraint.ValidateResources(componentSpec.Resources.Requests) {
-			constraints = append(constraints, constraint)
+		if constraint.ValidateResources(resources) {
+			result = append(result, constraint)
 		}
 	}
-	return constraints
+	return result
 }
 
 // MatchClass checks if the class meets the constraints
-func (c *ComponentResourceConstraint) MatchClass(class *ComponentClassInstance) bool {
+func (c *ComponentResourceConstraint) MatchClass(clusterDefRef, componentDefRef string, class *ComponentClass) bool {
 	request := corev1.ResourceList{
 		corev1.ResourceCPU:    class.CPU,
 		corev1.ResourceMemory: class.Memory,
 	}
-	constraints := c.FindMatchingConstraints(request)
+	constraints := c.FindMatchingConstraints(clusterDefRef, componentDefRef, request)
 	return len(constraints) > 0
 }
 
-func (c *ComponentResourceConstraint) FindConstraint(clusterDefRef string, componentSpec *ClusterComponentSpec) []ResourceConstraint {
+func (c *ComponentResourceConstraint) FindConstraints(clusterDefRef, componentDefRef string) []ResourceConstraint {
 	constraints := make(map[string]bool)
-	for _, selector := range c.Spec.Selectors {
-		if selector.ClusterDefRef != clusterDefRef || selector.ClusterComponentDefRef != componentSpec.ComponentDefRef {
+	for _, selector := range c.Spec.Selector {
+		if selector.ClusterDefRef != clusterDefRef || selector.ComponentDefRef != componentDefRef {
 			continue
 		}
 		for _, name := range selector.Constraints {

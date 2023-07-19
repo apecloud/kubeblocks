@@ -33,7 +33,8 @@ metadata:
   name: kb-resource-constraint-general
 spec:
   constraints:
-  - cpu:
+  - name: c1
+    cpu:
       min: 0.5
       max: 128
       step: 0.5
@@ -41,7 +42,8 @@ spec:
       sizePerCPU: 4Gi
     storage:
       min: 20Gi
-  - cpu:
+  - name: c2
+    cpu:
       slots: [0.1, 0.2, 0.4, 0.6, 0.8, 1]
     memory:
       minPerCPU: 200Mi
@@ -49,7 +51,8 @@ spec:
     storage:
       min: 20Gi
       max: 100Ti
-  - cpu:
+  - name: c3
+    cpu:
       min: 0.1
       max: 64
       step: 0.1
@@ -58,7 +61,18 @@ spec:
       maxPerCPU: 8Gi
     storage:
       max: 100Ti
+  selector:
+  - clusterDefRef: apecloud-mysql
+    componentDefRef: mysql
+    constraints:
+    - "c1"
+    - "c2"
+    - "c3"
 `
+const (
+	clusterDefRef   = "apecloud-mysql"
+	componentDefRef = "mysql"
+)
 
 var (
 	cf ComponentResourceConstraint
@@ -188,18 +202,16 @@ func TestResourceConstraints(t *testing.T) {
 			requests[corev1.ResourceStorage] = resource.MustParse(item.storage)
 		}
 
-		constraints := cf.FindMatchingConstraints(requests)
+		constraints := cf.FindMatchingConstraints(clusterDefRef, componentDefRef, requests)
 		assert.Equal(t, item.expect, len(constraints) > 0)
 
 		// if storage is empty, we should also validate function MatchClass which only consider cpu and memory
 		if item.storage == "" {
-			class := &ComponentClassInstance{
-				ComponentClass: ComponentClass{
-					CPU:    *requests.Cpu(),
-					Memory: *requests.Memory(),
-				},
+			class := &ComponentClass{
+				CPU:    *requests.Cpu(),
+				Memory: *requests.Memory(),
 			}
-			assert.Equal(t, item.expect, cf.MatchClass(class))
+			assert.Equal(t, item.expect, cf.MatchClass(clusterDefRef, componentDefRef, class))
 		}
 	}
 }

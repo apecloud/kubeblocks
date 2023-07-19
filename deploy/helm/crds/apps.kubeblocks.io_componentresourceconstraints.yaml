@@ -135,6 +135,7 @@ spec:
                           x-kubernetes-int-or-string: true
                       type: object
                     name:
+                      description: The name of the constraint.
                       type: string
                     storage:
                       description: The constraint for storage size.
@@ -170,12 +171,12 @@ spec:
                   to a component.
                 items:
                   properties:
-                    clusterComponentDefRef:
-                      description: clusterComponentDefRef is the name of the component
-                        definition in the cluster definition.
-                      type: string
                     clusterDefRef:
                       description: clusterDefRef is the name of the cluster definition.
+                      type: string
+                    componentDefRef:
+                      description: componentDefRef is the name of the component definition
+                        in the cluster definition.
                       type: string
                     constraints:
                       description: constraints are the constraints that will be applied
@@ -184,8 +185,8 @@ spec:
                         type: string
                       type: array
                   required:
-                  - clusterComponentDefRef
                   - clusterDefRef
+                  - componentDefRef
                   - constraints
                   type: object
                 type: array

@@ -51,12 +51,12 @@ var _ = Describe("", func() {
 	AfterEach(cleanEnv)
 
 	It("Class should exist in status", func() {
-		constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+		testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 			AddConstraints(testapps.GeneralResourceConstraint).
 			Create(&testCtx).GetObject()
 
 		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", "mysql").
-			AddClasses(constraint.Name, []v1alpha1.ComponentClass{testapps.Class1c1g}).
+			AddClasses([]v1alpha1.ComponentClass{testapps.Class1c1g}).
 			Create(&testCtx).GetObject()
 
 		key := client.ObjectKeyFromObject(componentClassDefinition)

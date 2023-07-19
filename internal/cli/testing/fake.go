@@ -309,12 +309,12 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 }
 
 func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef string) *appsv1alpha1.ComponentClassDefinition {
-	constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+	testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 		AddConstraints(testapps.GeneralResourceConstraint).
 		GetObject()
 
 	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
-		AddClasses(constraint.Name, []appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
+		AddClasses([]appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
 		GetObject()
 
 	return componentClassDefinition

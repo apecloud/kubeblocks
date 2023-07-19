@@ -6,13 +6,22 @@ metadata:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
 spec:
   constraints:
-  - cpu:
+  - name: c1
+    cpu:
       slots: [2, 4, 8, 12, 24, 48]
     memory:
       sizePerCPU: 8Gi
-  - cpu:
+  - name: c2
+    cpu:
       min: 2
       max: 128
       step: 2
     memory:
       sizePerCPU: 16Gi
+  selector:
+  - clusterDefRef: apecloud-mysql
+    components:
+    - componentDefRef: mysql
+      constraints:
+      - "c1"
+      - "c2"

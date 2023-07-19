@@ -60,11 +60,9 @@ spec:
 
 var buildClass = func(cpu string, memory string) *ComponentClassWithRef {
 	return &ComponentClassWithRef{
-		ComponentClassInstance: appsv1alpha1.ComponentClassInstance{
-			ComponentClass: appsv1alpha1.ComponentClass{
-				CPU:    resource.MustParse(cpu),
-				Memory: resource.MustParse(memory),
-			},
+		ComponentClass: appsv1alpha1.ComponentClass{
+			CPU:    resource.MustParse(cpu),
+			Memory: resource.MustParse(memory),
 		},
 	}
 }

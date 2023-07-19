@@ -121,14 +121,14 @@ var _ = Describe("util", func() {
 	})
 
 	It("GetPodStatus", func() {
-		newPod := func(phase corev1.PodPhase) *corev1.Pod {
-			return &corev1.Pod{
+		newPod := func(phase corev1.PodPhase) corev1.Pod {
+			return corev1.Pod{
 				Status: corev1.PodStatus{
 					Phase: phase,
 				}}
 		}
 
-		var pods []*corev1.Pod
+		var pods []corev1.Pod
 		for _, p := range []corev1.PodPhase{corev1.PodRunning, corev1.PodPending, corev1.PodSucceeded, corev1.PodFailed} {
 			pods = append(pods, newPod(p))
 		}

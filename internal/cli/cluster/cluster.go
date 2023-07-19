@@ -297,10 +297,10 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 	var comps []*ComponentInfo
 	for _, c := range o.Cluster.Spec.ComponentSpecs {
 		// get all pods belonging to current component
-		var pods []*corev1.Pod
+		var pods []corev1.Pod
 		for _, p := range o.Pods.Items {
 			if n, ok := p.Labels[constant.KBAppComponentLabelKey]; ok && n == c.Name {
-				pods = append(pods, &p)
+				pods = append(pods, p)
 			}
 		}
 

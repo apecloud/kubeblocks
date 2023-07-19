@@ -274,7 +274,7 @@ func ResourceIsEmpty(res *resource.Quantity) bool {
 	return false
 }
 
-func GetPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) {
+func GetPodStatus(pods []corev1.Pod) (running, waiting, succeeded, failed int) {
 	for _, pod := range pods {
 		switch pod.Status.Phase {
 		case corev1.PodRunning:

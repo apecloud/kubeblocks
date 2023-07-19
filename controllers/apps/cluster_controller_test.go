@@ -1840,7 +1840,7 @@ var _ = Describe("Cluster Controller", func() {
 			horizontalScale(int(updatedReplicas), policyType, consensusCompDefName, replicationCompDefName)
 		}
 
-		FIt("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
+		It("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
 			compNameNDef := map[string]string{
 				statelessCompName:   statelessCompDefName,
 				consensusCompName:   consensusCompDefName,
@@ -1916,14 +1916,16 @@ var _ = Describe("Cluster Controller", func() {
 						checkObject(&pvc)
 					}
 					By("check secret resources preserved")
-					Expect(cmList.Items).ShouldNot(BeEmpty())
+					Expect(secretList.Items).ShouldNot(BeEmpty())
 					for _, secret := range secretList.Items {
 						checkObject(&secret)
 					}
-					By("check configmap resources preserved")
-					Expect(secretList.Items).ShouldNot(BeEmpty())
-					for _, cm := range cmList.Items {
-						checkObject(&cm)
+					if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+						By("check configmap resources preserved")
+						Expect(cmList.Items).ShouldNot(BeEmpty())
+						for _, cm := range cmList.Items {
+							checkObject(&cm)
+						}
 					}
 				}
 				return pvcList, secretList, cmList
@@ -1946,9 +1948,11 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(outOfOrderEqualFunc(initSecretList.Items, lastSecretList.Items, func(i corev1.Secret, j corev1.Secret) bool {
 				return i.UID == j.UID
 			})).Should(BeTrue())
-			Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, j corev1.ConfigMap) bool {
-				return i.UID == j.UID
-			})).Should(BeTrue())
+			if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, j corev1.ConfigMap) bool {
+					return i.UID == j.UID
+				})).Should(BeTrue())
+			}
 
 			By("delete the cluster and should preserved PVC,Secret,CM resources but result updated the new last applied cluster UID")
 			deleteCluster(appsv1alpha1.Halt)

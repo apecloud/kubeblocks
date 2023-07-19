@@ -575,7 +575,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		historys = mgr.getHistory()
 	}
 
-	if historys != nil {
+	if len(historys) != 0 {
 		for _, h := range historys {
 			if h.parentTimeline == localTimeLine {
 				switch {

@@ -23,10 +23,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"golang.org/x/exp/slices"
-	"strconv"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"

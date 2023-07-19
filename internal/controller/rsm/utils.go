@@ -233,7 +233,7 @@ func ownedKinds() []client.ObjectList {
 
 func deletionKinds() []client.ObjectList {
 	kinds := ownedKinds()
-	kinds = append(kinds, &corev1.PersistentVolumeClaimList{}, &batchv1.JobList{})
+	kinds = append(kinds, &batchv1.JobList{})
 	return kinds
 }
 
@@ -536,11 +536,12 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 				labels[key] = value
 			}
 		}
+		labels[workloadsManagedByLabelKey] = kindReplicatedStateMachine
 		return labels
 	}
 	return map[string]string{
 		constant.AppInstanceLabelKey: rsm.Name,
-		constant.KBManagedByKey:      kindReplicatedStateMachine,
+		workloadsManagedByLabelKey:   kindReplicatedStateMachine,
 	}
 }
 

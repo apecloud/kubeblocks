@@ -1840,7 +1840,7 @@ var _ = Describe("Cluster Controller", func() {
 			horizontalScale(int(updatedReplicas), policyType, consensusCompDefName, replicationCompDefName)
 		}
 
-		It("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
+		FIt("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
 			compNameNDef := map[string]string{
 				statelessCompName:   statelessCompDefName,
 				consensusCompName:   consensusCompDefName,

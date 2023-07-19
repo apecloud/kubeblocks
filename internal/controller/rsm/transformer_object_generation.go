@@ -140,6 +140,7 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 		return nil
 	}
 	labels := getLabels(&rsm)
+	// TODO(free6om): selector in compatibility mode
 	svcBuilder := builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
 		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).

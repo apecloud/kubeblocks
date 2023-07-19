@@ -545,14 +545,38 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 	}
 }
 
-func getSvcSelector(leader *workloads.ReplicaRole) (string, string) {
-	if leader == nil {
-		return "", ""
+func getSvcSelector(rsm *workloads.ReplicatedStateMachine) map[string]string {
+	var leader *workloads.ReplicaRole
+	for _, role := range rsm.Spec.Roles {
+		if role.IsLeader && len(role.Name) > 0 {
+			leader = &role
+			break
+		}
 	}
+	selectors := make(map[string]string, 0)
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		return constant.RoleLabelKey, leader.Name
+		keys := []string{
+			constant.AppManagedByLabelKey,
+			constant.AppInstanceLabelKey,
+			constant.KBAppComponentLabelKey,
+		}
+		for _, key := range keys {
+			if value, ok := rsm.Labels[key]; ok {
+				selectors[key] = value
+			}
+		}
+		if leader != nil {
+			selectors[constant.RoleLabelKey] = leader.Name
+		}
+		return selectors
 	}
-	return rsmAccessModeLabelKey, string(leader.AccessMode)
+
+	selectors[constant.AppInstanceLabelKey] = rsm.Name
+	selectors[workloadsManagedByLabelKey] = kindReplicatedStateMachine
+	if leader != nil {
+		selectors[rsmAccessModeLabelKey] = string(leader.AccessMode)
+	}
+	return selectors
 }
 
 func setOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {

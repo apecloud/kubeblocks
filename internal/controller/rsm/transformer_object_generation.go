@@ -140,20 +140,13 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 		return nil
 	}
 	labels := getLabels(&rsm)
-	// TODO(free6om): selector in compatibility mode
-	svcBuilder := builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
+	selectors := getSvcSelector(&rsm)
+	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
-		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
-		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddSelectorsInMap(selectors).
 		AddPorts(rsm.Spec.Service.Ports...).
-		SetType(rsm.Spec.Service.Type)
-	for _, role := range rsm.Spec.Roles {
-		if role.IsLeader && len(role.Name) > 0 {
-			k, v := getSvcSelector(&role)
-			svcBuilder.AddSelectors(k, v)
-		}
-	}
-	return svcBuilder.GetObject()
+		SetType(rsm.Spec.Service.Type).
+		GetObject()
 }
 
 func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service {

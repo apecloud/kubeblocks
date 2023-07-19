@@ -149,12 +149,12 @@ var _ = Describe("OpsRequest Controller", func() {
 		const opsName = "mysql-verticalscaling"
 
 		By("Create class related objects")
-		constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+		testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 			AddConstraints(testapps.GeneralResourceConstraint).
 			Create(&testCtx).GetObject()
 
 		testapps.NewComponentClassDefinitionFactory("custom", clusterDefObj.Name, mysqlCompDefName).
-			AddClasses(constraint.Name, []appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
+			AddClasses([]appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
 			Create(&testCtx)
 
 		By("Create a cluster obj")

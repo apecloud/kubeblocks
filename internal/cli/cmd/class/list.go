@@ -76,32 +76,14 @@ func (o *ListOptions) run() error {
 	if err != nil {
 		return err
 	}
-	constraintClassMap := make(map[string]map[string][]*class.ComponentClassWithRef)
-	for compName, items := range clsMgr.GetClasses() {
-		for _, item := range items {
-			if _, ok := constraintClassMap[item.ResourceConstraintRef]; !ok {
-				constraintClassMap[item.ResourceConstraintRef] = make(map[string][]*class.ComponentClassWithRef)
-			}
-			constraintClassMap[item.ResourceConstraintRef][compName] = append(constraintClassMap[item.ResourceConstraintRef][compName], item)
-		}
-	}
-	var constraintNames []string
-	for name := range constraintClassMap {
-		constraintNames = append(constraintNames, name)
-	}
-	sort.Strings(constraintNames)
-	for _, constraintName := range constraintNames {
-		for compName, classes := range constraintClassMap[constraintName] {
-			o.printClass(constraintName, compName, classes)
-		}
-		_, _ = fmt.Fprint(o.Out, "\n")
+	for compName, classes := range clsMgr.GetClasses() {
+		o.printClass(compName, classes)
 	}
 	return nil
 }
 
-func (o *ListOptions) printClass(constraintName string, compName string, classes []*class.ComponentClassWithRef) {
+func (o *ListOptions) printClass(compName string, classes []*class.ComponentClassWithRef) {
 	tbl := printer.NewTablePrinter(o.Out)
-	_, _ = fmt.Fprintf(o.Out, "\nConstraint %s:\n", constraintName)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY")
 	sort.Sort(class.ByClassResource(classes))
 	for _, cls := range classes {

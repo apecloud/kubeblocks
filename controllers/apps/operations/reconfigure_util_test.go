@@ -61,7 +61,7 @@ var _ = Describe("Reconfigure util test", func() {
 		k8sMockClient.Finish()
 	})
 
-	Context("updateCfgParams test", func() {
+	Context("updateConfigConfigmapResource test", func() {
 		It("Should success without error", func() {
 			tpl := appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -118,19 +118,19 @@ var _ = Describe("Reconfigure util test", func() {
 
 			By("CM object failed.")
 			// mock failed
-			r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
+			r := updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 			Expect(r.err).ShouldNot(Succeed())
 			Expect(r.err.Error()).Should(ContainSubstring("failed to get cm object"))
 
 			By("TPL object failed.")
 			// mock failed
-			r = updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
+			r = updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 			Expect(r.err).ShouldNot(Succeed())
 			Expect(r.err.Error()).Should(ContainSubstring("failed to get tpl object"))
 
 			By("update validate failed.")
 			// check diff
-			r = updateCfgParams(appsv1alpha1.Configuration{
+			r = updateConfigConfigmapResource(appsv1alpha1.Configuration{
 				Keys: []appsv1alpha1.ParameterConfig{{
 					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
@@ -157,7 +157,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 			By("normal update.")
 			{
 				oldConfig := cmObj.Data
-				r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
+				r := updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 				Expect(r.err).Should(Succeed())
 				diff, err := cfgcore.CreateMergePatch(
 					cfgcore.FromConfigData(oldConfig, nil),

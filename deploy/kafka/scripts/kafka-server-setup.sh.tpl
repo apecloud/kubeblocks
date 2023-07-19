@@ -111,6 +111,16 @@ if [[ -n "$KB_KAFKA_BROKER_HEAP" ]]; then
 fi
 
 # cfg setting
+if [[ "broker,controller" = "$KAFKA_CFG_PROCESS_ROLES" ]] || [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
+    # deleting this information can reacquire the controller members when the broker restarts,
+    # and avoid the mismatch between the controller in the quorum-state and the actual controller in the case of a controller scale,
+    # which will cause the broker to fail to start
+    if [ -f "$KAFKA_CFG_METADATA_LOG_DIR/__cluster_metadata-0/quorum-state" ]; then
+      echo "[action]Removing quorum-state file when restart."
+      rm -f "$KAFKA_CFG_METADATA_LOG_DIR/__cluster_metadata-0/quorum-state"
+    fi
+fi
+
 if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
     # override node.id setting
     # increments based on a specified base to avoid conflicts with controller settings
@@ -135,14 +145,6 @@ if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
     {{- end }}
     export KAFKA_CFG_CONTROLLER_QUORUM_VOTERS={{ $voters }}
     echo "[cfg]export KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=$KAFKA_CFG_CONTROLLER_QUORUM_VOTERS,for kafka-broker."
-
-    # deleting this information can reacquire the controller members when the broker restarts,
-    # and avoid the mismatch between the controller in the quorum-state and the actual controller in the case of a controller scale,
-    # which will cause the broker to fail to start
-    if [ -f "$KAFKA_CFG_METADATA_LOG_DIR/__cluster_metadata-0/quorum-state" ]; then
-      echo "[action]Removing quorum-state file when restart."
-      rm -f "$KAFKA_CFG_METADATA_LOG_DIR/__cluster_metadata-0/quorum-state"
-    fi
 else
     if [[ "controller" = "$KAFKA_CFG_PROCESS_ROLES" ]] && [[ -n "$KB_KAFKA_CONTROLLER_HEAP" ]]; then
       export KAFKA_HEAP_OPTS=${KB_KAFKA_CONTROLLER_HEAP}

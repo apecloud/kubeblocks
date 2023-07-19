@@ -470,7 +470,7 @@ func GenerateConnCredential(clusterName string) string {
 
 // overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
 func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
-	if cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
+	if switchoverSpec == nil || cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
 		return
 	}
 	applyCmdExecutorConfig := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
@@ -505,8 +505,8 @@ func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedCompon
 		return nil
 	}
 
-	expectResources, err := clsMgr.GetResources(&clusterCompSpec)
-	if err != nil {
+	expectResources, err := clsMgr.GetResources(cluster.Spec.ClusterDefRef, &clusterCompSpec)
+	if err != nil || expectResources == nil {
 		return err
 	}
 

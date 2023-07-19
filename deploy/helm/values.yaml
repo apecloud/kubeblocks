@@ -312,12 +312,35 @@ admissionWebhooks:
 dataProtection:
   enabled: true
   enableVolumeSnapshot: false
-  backupPVCName: kb-backup-data
+  backupPVCName: ""
   backupPVCInitCapacity: ""
   backupPVCStorageClassName: ""
   backupPVCCreatePolicy: ""
   backupPVConfigMapName: ""
   backupPVConfigMapNamespace: ""
+
+## BackupRepo settings
+##
+## @param backupRepo.create - creates a backup repo during installation
+## @param backupRepo.default - set the created repo as the default
+## @param backupRepo.storageProvider - the storage provider used by the repo, options: [s3, oss, minio]
+## @param backupRepo.pvReclaimPolicy - the PV reclaim policy, options: [Retain, Delete]
+## @param backupRepo.volumeCapacity - the capacity for creating PVC
+## @param backupRepo.config - a key-value map containing the settings required by the storage provider
+## @param backupRepo.secrets - a key-value map containing the secret values required by the storage provider
+backupRepo:
+  create: false
+  default: true
+  storageProvider: ""
+  pvReclaimPolicy: "Retain"
+  volumeCapacity: ""
+  config:
+    bucket: ""
+    endpoint: ""
+    region: ""
+  secrets:
+    accessKeyId: ""
+    secretAccessKey: ""
 
 ## Addon controller settings, this will require cluster-admin clusterrole.
 ##
@@ -637,7 +660,7 @@ cloudProvider:
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
 ##
 csi-s3:
-  ## @param backupRepo.enabled -- Enable csi-s3 chart.
+  ## @param csi-s3.enabled -- Enable csi-s3 chart.
   ##
   enabled: false
 

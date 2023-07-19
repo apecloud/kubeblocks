@@ -42,8 +42,8 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
           defaultMode: 0777
-        - name: mysql-scale-config
-          templateRef: mysql-scale-config-template
+        - name: vttablet-config
+          templateRef: vttablet-config-template
           constraintRef: mysql-scale-vttablet-config-constraints
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
@@ -350,11 +350,16 @@ spec:
           volumeName: scripts
           defaultMode: 493
       configSpecs:
-        - name: mysql-scale-config
-          templateRef: mysql-scale-config-template
+        - name: vtconsensus-config
+          templateRef: vtconsensus-config-template
           constraintRef: mysql-scale-vtconsensus-config-constraints
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
+      logConfigs:
+        {{- range $name,$pattern := .Values.etcdLogConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       service:
         ports:
           - name: etcd-port
@@ -463,9 +468,14 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
+      logConfigs:
+        {{- range $name,$pattern := .Values.vtgateLogConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       configSpecs:
-        - name: mysql-scale-config
-          templateRef: mysql-scale-config-template
+        - name: vtgate-config
+          templateRef: vtgate-config-template
           constraintRef: mysql-scale-vtgate-config-constraints
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}

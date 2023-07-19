@@ -196,6 +196,9 @@ var (
 
 	// KubeBlocksHelmLabel name=kubeblocks,owner-helm, for helm secret
 	KubeBlocksHelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
+
+	// KubeBlocksManagerConfigMapName the kubeblocks manager configMap name
+	KubeBlocksManagerConfigMapName = fmt.Sprintf("%s-manager-config", KubeBlocksChartName)
 )
 
 // Playground

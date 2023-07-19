@@ -92,7 +92,7 @@ data:
     echo "DownwardAPI get primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
     echo "KB_POD_NAME=$KB_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
     if [ -z "$primary" ]; then
-      echo "Error: Primary pod information not available. Exiting..."
+      echo "Primary pod information not available. Exiting..."
       exit 1
     fi
 

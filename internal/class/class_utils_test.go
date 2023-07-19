@@ -64,7 +64,7 @@ var _ = Describe("utils", func() {
 		BeforeEach(func() {
 			var err error
 			kbClassFactory := testapps.NewComponentClassDefinitionFactory(kbClassDefinitionObjName, clusterDefinitionName, compType1)
-			kbClassFactory.AddClasses(testapps.DefaultResourceConstraintName, []v1alpha1.ComponentClass{
+			kbClassFactory.AddClasses([]v1alpha1.ComponentClass{
 				buildClass("general-1c1g", "1", "1Gi"),
 				buildClass("general-1c4g", "1", "4Gi"),
 				buildClass("general-2c4g", "2", "4Gi"),
@@ -73,7 +73,7 @@ var _ = Describe("utils", func() {
 			})
 
 			customClassFactory := testapps.NewComponentClassDefinitionFactory(customClassDefinitionObjName, clusterDefinitionName, compType1)
-			customClassFactory.AddClasses(testapps.DefaultResourceConstraintName, []v1alpha1.ComponentClass{
+			customClassFactory.AddClasses([]v1alpha1.ComponentClass{
 				buildClass("large", "100", "200Gi"),
 			})
 
@@ -105,7 +105,7 @@ var _ = Describe("utils", func() {
 				Expect(cls.CPU.Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
 				Expect(cls.Memory.Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
 				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minial class with partial classDefRef", func() {
@@ -120,7 +120,7 @@ var _ = Describe("utils", func() {
 				Expect(cls.CPU.String()).Should(Equal("100"))
 				Expect(cls.Memory.String()).Should(Equal("200Gi"))
 				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with invalid classDefRef", func() {
@@ -144,7 +144,7 @@ var _ = Describe("utils", func() {
 				Expect(cls.CPU.Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
 				Expect(cls.Memory.Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
 				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with invalid cpu resource", func() {
@@ -178,7 +178,7 @@ var _ = Describe("utils", func() {
 				Expect(cls.CPU.String()).Should(Equal("1"))
 				Expect(cls.Memory.String()).Should(Equal("1Gi"))
 				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minial memory if with only cpu", func() {
@@ -193,7 +193,7 @@ var _ = Describe("utils", func() {
 				Expect(cls.CPU.String()).Should(Equal("2"))
 				Expect(cls.Memory.String()).Should(Equal("4Gi"))
 				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minial cpu if with only memory", func() {
@@ -208,7 +208,7 @@ var _ = Describe("utils", func() {
 				Expect(cls.CPU.String()).Should(Equal("1"))
 				Expect(cls.Memory.String()).Should(Equal("4Gi"))
 				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 		})
 
@@ -220,7 +220,7 @@ var _ = Describe("utils", func() {
 				cls, err := clsMgr.ChooseClass(comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls).Should(BeNil())
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with classDefRef", func() {
@@ -230,7 +230,7 @@ var _ = Describe("utils", func() {
 				}
 				_, err := clsMgr.ChooseClass(comp)
 				Expect(err).Should(HaveOccurred())
-				Expect(clsMgr.ValidateResources(comp)).Should(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).Should(HaveOccurred())
 			})
 
 			It("should succeed without classDefRef", func() {
@@ -243,7 +243,7 @@ var _ = Describe("utils", func() {
 				cls, err := clsMgr.ChooseClass(comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls).Should(BeNil())
-				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 		})
 	})
@@ -259,20 +259,17 @@ var _ = Describe("utils", func() {
 		)
 
 		classDef := testapps.NewComponentClassDefinitionFactory(classDefinitionObjName, "apecloud-mysql", compType).
-			AddClasses(testapps.DefaultResourceConstraintName, []v1alpha1.ComponentClass{testapps.Class1c1g}).
+			AddClasses([]v1alpha1.ComponentClass{testapps.Class1c1g}).
 			GetObject()
 
 		By("class definition status is out of date")
 		classDef.SetGeneration(1)
 		classDef.Status.ObservedGeneration = 0
-		classDef.Status.Classes = []v1alpha1.ComponentClassInstance{
+		classDef.Status.Classes = []v1alpha1.ComponentClass{
 			{
-				ComponentClass: v1alpha1.ComponentClass{
-					Name:   statusClassDefRef.Class,
-					CPU:    resource.MustParse("100"),
-					Memory: resource.MustParse("100Gi"),
-				},
-				ResourceConstraintRef: "",
+				Name:   statusClassDefRef.Class,
+				CPU:    resource.MustParse("100"),
+				Memory: resource.MustParse("100Gi"),
 			},
 		}
 		clsMgr, err = NewManager(v1alpha1.ComponentClassDefinitionList{

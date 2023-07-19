@@ -199,9 +199,8 @@ func (o *createSubCmdsOptions) run() error {
 			}
 		}
 
-		// for dry-run, only output cluster resource
-		if !isCluster {
-			continue
+		if len(objs) > 1 {
+			fmt.Fprintf(o.Out, "---\n")
 		}
 
 		p, err := o.ToPrinter(nil, false)

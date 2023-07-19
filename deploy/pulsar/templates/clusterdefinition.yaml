@@ -64,6 +64,9 @@ spec:
         - name: http
           port: 80
           targetPort: http
+        - name: http-alt
+          port: 8080
+          targetPort: http
         - name: kafka-client
           port: 9092
           targetPort: kafka-client
@@ -148,6 +151,15 @@ spec:
             - name: PULSAR_PREFIX_advertisedListeners
               value: cluster:pulsar://$(POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:6650
             - name: PULSAR_PREFIX_bindAddresses
+
+            # KoP configs
+            - name: PULSAR_PREFIX_allowAutoTopicCreationType
+              value: partitioned 
+            - name: PULSAR_PREFIX_kafkaListeners
+              value: PLAINTEXT://0.0.0.0:9092
+            - name: PULSAR_PREFIX_kafkaAdvertisedListeners
+              value: PLAINTEXT://$(POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:9092
+
             - name: brokerServiceUrl
               value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:6650
             - name: clusterName

@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,16 +41,16 @@ type reconfiguringResult struct {
 	err                error
 }
 
-// updateCfgParams merges parameters of the config into the configmap, and verifies final configuration file.
-func updateCfgParams(config appsv1alpha1.Configuration,
-	tpl appsv1alpha1.ComponentConfigSpec,
+// updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
+func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
+	configSpec appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
 	ctx context.Context,
 	cli client.Client,
 	opsCrName string) reconfiguringResult {
 	var (
-		cm     = &corev1.ConfigMap{}
-		cfgTpl = &appsv1alpha1.ConfigConstraint{}
+		cm = &corev1.ConfigMap{}
+		cc = &appsv1alpha1.ConfigConstraint{}
 
 		err    error
 		newCfg map[string]string
@@ -59,9 +60,9 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 		return makeReconfiguringResult(err)
 	}
 	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: tpl.Namespace,
-		Name:      tpl.ConfigConstraintRef,
-	}, cfgTpl); err != nil {
+		Namespace: configSpec.Namespace,
+		Name:      configSpec.ConfigConstraintRef,
+	}, cc); err != nil {
 		return makeReconfiguringResult(err)
 	}
 
@@ -73,23 +74,23 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 		}
 	}
 
-	fc := cfgTpl.Spec.FormatterConfig
-	newCfg, err = cfgcore.MergeAndValidateConfigs(cfgTpl.Spec, cm.Data, tpl.Keys, params)
+	fc := cc.Spec.FormatterConfig
+	newCfg, err = cfgcore.MergeAndValidateConfigs(cc.Spec, cm.Data, configSpec.Keys, params)
 	if err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
 
-	configPatch, _, err := cfgcore.CreateConfigPatch(cm.Data, newCfg, fc.Format, tpl.Keys, false)
+	configPatch, _, err := cfgcore.CreateConfigPatch(cm.Data, newCfg, fc.Format, configSpec.Keys, false)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}
 	if !configPatch.IsModify {
 		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
 	}
-	return makeReconfiguringResult(persistCfgCM(cm, newCfg, cli, ctx, opsCrName), withReturned(newCfg, configPatch))
+	return makeReconfiguringResult(syncConfigmap(cm, newCfg, cli, ctx, opsCrName, configSpec, &cc.Spec), withReturned(newCfg, configPatch))
 }
 
-func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string) error {
+func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec) error {
 	patch := client.MergeFrom(cmObj.DeepCopy())
 	cmObj.Data = newCfg
 	if cmObj.Annotations == nil {
@@ -97,6 +98,9 @@ func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
 	cfgcore.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
+	if err := plan.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
+		return err
+	}
 	return cli.Patch(ctx, cmObj, patch)
 }
 

@@ -66,6 +66,12 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 		return err
 	}
 	origCluster := transCtx.OrigCluster
+
+	// if backup is disabled, skip the backup policy template transformation.
+	if origCluster.Spec.Backup == nil || !origCluster.Spec.Backup.Enabled {
+		return nil
+	}
+
 	backupPolicyNames := map[string]struct{}{}
 	for _, tpl := range backupPolicyTPLs.Items {
 		r.isDefaultTemplate = tpl.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey]
@@ -80,6 +86,10 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 			if backupPolicy == nil {
 				continue
 			}
+
+			// merge cluster backup configuration to the backup policy.
+			r.mergeClusterBackup(origCluster, backupPolicy)
+
 			// if exist multiple backup policy templates and duplicate spec.identifier,
 			// the backupPolicy that may be generated may have duplicate names, and it is necessary to check if it already exists.
 			if _, ok := backupPolicyNames[backupPolicy.Name]; ok {
@@ -223,6 +233,47 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 	bpSpec.Snapshot = r.convertSnapshotPolicy(policyTPL.Snapshot, cluster.Name, *component, workloadType)
 	backupPolicy.Spec = bpSpec
 	return backupPolicy
+}
+
+// mergeClusterBackup merges the cluster backup configuration into the backup policy.
+func (r *BackupPolicyTPLTransformer) mergeClusterBackup(cluster *appsv1alpha1.Cluster,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
+	if cluster.Spec.Backup == nil || backupPolicy == nil {
+		return
+	}
+
+	backup := cluster.Spec.Backup
+	spec := &backupPolicy.Spec
+	if backup.RetentionPeriod != nil {
+		spec.Retention = &dataprotectionv1alpha1.RetentionSpec{
+			TTL: backup.RetentionPeriod,
+		}
+	}
+
+	if backup.StartWindowMinutes != nil {
+		spec.Schedule.StartWindowMinutes = backup.StartWindowMinutes
+	}
+
+	var schedulePolicy *dataprotectionv1alpha1.SchedulePolicy
+	switch backup.Method {
+	case dataprotectionv1alpha1.BackupMethodSnapshot:
+		schedulePolicy = spec.Schedule.Snapshot
+	case dataprotectionv1alpha1.BackupMethodBackupTool:
+		schedulePolicy = spec.Schedule.Datafile
+	}
+
+	if schedulePolicy == nil {
+		return
+	}
+
+	// enable specified backup method and set its cron expression
+	schedulePolicy.Enable = true
+	schedulePolicy.CronExpression = backup.CronExpression
+
+	// always enable PITR if it is supported
+	if backupPolicy.Spec.Schedule.Logfile != nil {
+		backupPolicy.Spec.Schedule.Logfile.Enable = true
+	}
 }
 
 // getFirstComponent returns the first component name of the componentDefRef.

@@ -325,7 +325,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 	}
 
-	testDoNotTermintate := func(compName, compDefName string) {
+	testDoNotTerminate := func(compName, compDefName string) {
 		createClusterObj(compName, compDefName)
 
 		// REVIEW: this test flow
@@ -1958,7 +1958,7 @@ var _ = Describe("Cluster Controller", func() {
 			})
 
 			It(fmt.Sprintf("[comp: %s] should not terminate immediately if deleting cluster with terminationPolicy=DoNotTerminate", compName), func() {
-				testDoNotTermintate(compName, compDefName)
+				testDoNotTerminate(compName, compDefName)
 			})
 
 			It(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {

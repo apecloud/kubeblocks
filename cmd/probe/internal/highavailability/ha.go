@@ -104,6 +104,7 @@ func (ha *Ha) RunCycle() {
 			ha.logger.Infof("Refresh leader ttl")
 			_ = ha.dcs.UpdateLock()
 			if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(cluster)) {
+				ha.DecreaseClusterReplicas(cluster)
 			}
 
 		} else if ha.dbManager.HasOtherHealthyLeader(cluster) != nil {

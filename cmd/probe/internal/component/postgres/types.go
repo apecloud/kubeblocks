@@ -19,7 +19,7 @@ const (
 type PidFile struct {
 	pid     int32
 	dataDir string
-	startTs int64
+	startTS int64
 	port    int
 }
 
@@ -180,11 +180,6 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 	}
 
 	return -1
-}
-
-type DataBaseStatus struct {
-	isLeader    bool
-	WalPosition int64
 }
 
 type history struct {

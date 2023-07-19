@@ -82,7 +82,7 @@ func (mgr *Manager) readPidFile() (*PidFile, error) {
 	file.pid = int32(pid)
 	file.dataDir = text[1]
 	startTS, _ := strconv.ParseInt(text[2], 10, 64)
-	file.startTs = startTS
+	file.startTS = startTS
 	port, _ := strconv.ParseInt(text[3], 10, 64)
 	file.port = int(port)
 
@@ -475,7 +475,7 @@ func (mgr *Manager) Demote() error {
 
 func (mgr *Manager) Stop() error {
 	mgr.Logger.Infof("wait for send signal 1 to deactivate sql channel")
-	sqlChannelProc, err := component.GetSqlChannelProc()
+	sqlChannelProc, err := component.GetSQLChannelProc()
 	if err != nil {
 		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
 		return errors.Errorf("can't find sql channel process, err:%v", err)
@@ -733,7 +733,7 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) map[string]string {
 	return primaryInfo
 }
 
-// TODO
+// TODO: Parse history file
 func (mgr *Manager) getHistory() []*history {
 	return nil
 }
@@ -789,7 +789,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 
 func (mgr *Manager) Start() error {
 	mgr.Logger.Infof("wait for send signal 2 to activate sql channel")
-	sqlChannelProc, err := component.GetSqlChannelProc()
+	sqlChannelProc, err := component.GetSQLChannelProc()
 	if err != nil {
 		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
 		return errors.Errorf("can't find sql channel process, err:%v", err)
@@ -857,9 +857,9 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 		return nil, errors.New("Get other pool without hosts")
 	}
 
-	resp := make([]*pgxpool.Pool, len(hosts), len(hosts))
+	resp := make([]*pgxpool.Pool, len(hosts))
 	for i, host := range hosts {
-		tempConfig, err := pgxpool.ParseConfig(config.GetConnectUrlWithHost(host))
+		tempConfig, err := pgxpool.ParseConfig(config.GetConnectURLWithHost(host))
 		if err != nil {
 			return nil, errors.Wrap(err, "new temp config")
 		}

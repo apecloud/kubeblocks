@@ -23,14 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"sync"
-
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
+	"strconv"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
@@ -78,15 +74,8 @@ const (
 	listSystemAccountsTpl = "SELECT rolname FROM pg_catalog.pg_roles WHERE pg_roles.rolname LIKE 'kb%'"
 )
 
-var (
-	defaultDBPort = 3306
-	dbUser        = ""
-	dbPasswd      = ""
-)
-
 // PostgresOperations represents PostgreSQL output binding.
 type PostgresOperations struct {
-	mu      sync.Mutex
 	manager *postgres.Manager
 	BaseOperations
 }
@@ -102,12 +91,6 @@ func NewPostgres(logger logger.Logger) bindings.OutputBinding {
 func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.Logger.Debug("Initializing Postgres binding")
 	pgOps.BaseOperations.Init(metadata)
-	if viper.IsSet("KB_SERVICE_USER") {
-		dbUser = viper.GetString("KB_SERVICE_USER")
-	}
-	if viper.IsSet("KB_SERVICE_PASSWORD") {
-		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
-	}
 	config, err := postgres.NewConfig(metadata.Properties)
 	if err != nil {
 		pgOps.Logger.Errorf("new postgresql config failed, err:%v", err)
@@ -123,7 +106,6 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
 	pgOps.BaseOperations.LockInstance = pgOps.LockInstance
 	pgOps.BaseOperations.UnlockInstance = pgOps.UnlockInstance
-	pgOps.DBPort = pgOps.GetRunningPort()
 	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
 	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
 	pgOps.RegisterOperationOnDBReady(CheckStatusOperation, pgOps.CheckStatusOps, manager)
@@ -142,20 +124,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 }
 
 func (pgOps *PostgresOperations) GetRunningPort() int {
-	p := pgOps.Metadata.Properties
-	url, ok := p[connectionURLKey]
-	if !ok || url == "" {
-		return defaultDBPort
-	}
-
-	poolConfig, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return defaultDBPort
-	}
-	if poolConfig.ConnConfig.Port == 0 {
-		return defaultDBPort
-	}
-	return int(poolConfig.ConnConfig.Port)
+	return 0
 }
 
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {

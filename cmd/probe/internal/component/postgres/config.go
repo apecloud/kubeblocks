@@ -60,7 +60,7 @@ func (config *Config) GetDBPort() int {
 	return config.port
 }
 
-func (config *Config) GetConnectUrlWithHost(host string) string {
+func (config *Config) GetConnectURLWithHost(host string) string {
 	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s pool_min_conns=%d pool_max_conns=%d",
 		config.username, config.password, host, config.port, config.database, config.minConns, config.maxConns)
 }

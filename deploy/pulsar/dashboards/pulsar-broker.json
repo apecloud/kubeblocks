@@ -2,10 +2,11 @@
   "annotations": {
     "list": [
       {
+        "$$hashKey": "object:2894",
         "builtIn": 1,
         "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
+          "type": "datasource",
+          "uid": "grafana"
         },
         "enable": true,
         "hide": true,
@@ -24,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 16,
+  "id": 20,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -35,9 +36,15 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -77,22 +84,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "editorMode": "code",
-          "expr": "irate(bookkeeper_server_ADD_ENTRY_REQUEST_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\"}[30s])",
-          "format": "time_series",
+          "expr": "sum(pulsar_rate_in{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "range": true,
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Add entry rate",
+      "title": "Publish rate (msg/s)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -106,14 +108,12 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:790",
           "format": "short",
           "logBase": 1,
           "min": "0",
           "show": true
         },
         {
-          "$$hashKey": "object:791",
           "format": "short",
           "logBase": 1,
           "show": true
@@ -130,9 +130,16 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -142,7 +149,7 @@
         "y": 0
       },
       "hiddenSeries": false,
-      "id": 2,
+      "id": 32,
       "legend": {
         "avg": false,
         "current": false,
@@ -172,22 +179,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "editorMode": "code",
-          "expr": "irate(bookkeeper_server_READ_ENTRY_REQUEST_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\"}[30s])",
-          "format": "time_series",
+          "expr": "sum(pulsar_rate_out{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "range": true,
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Read entry rate",
+      "title": "Dispatch rate (msg / s)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -201,14 +203,12 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:715",
-          "format": "short",
+          "format": "Bps",
           "logBase": 1,
           "min": "0",
           "show": true
         },
         {
-          "$$hashKey": "object:716",
           "format": "short",
           "logBase": 1,
           "show": true
@@ -225,9 +225,15 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -267,22 +273,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "editorMode": "code",
-          "expr": "rate(bookie_WRITE_BYTES{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}[30s])",
-          "format": "time_series",
+          "expr": "sum(pulsar_throughput_in{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "range": true,
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Write throughput (MBytes / s)",
+      "title": "Publish throughput (MB/s)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -296,14 +297,12 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:117",
           "format": "Bps",
           "logBase": 1,
           "min": "0",
           "show": true
         },
         {
-          "$$hashKey": "object:118",
           "format": "short",
           "logBase": 1,
           "show": true
@@ -320,9 +319,15 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -362,20 +367,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "expr": "irate(bookie_READ_BYTES{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}[30s])",
-          "format": "time_series",
+          "expr": "sum(pulsar_throughput_out{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Read throughput (MBytes / s)",
+      "title": "Dispatch throughput (MB/s)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -411,19 +413,25 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
-        "w": 12,
+        "h": 6,
+        "w": 8,
         "x": 0,
         "y": 14
       },
       "hiddenSeries": false,
-      "id": 3,
+      "id": 21,
       "legend": {
         "avg": false,
         "current": false,
@@ -453,20 +461,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "expr": "bookkeeper_server_ADD_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.5\"}",
-          "format": "time_series",
+          "expr": "sum(pulsar_topics_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Add entry latency (50pct)",
+      "title": "Topics count",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -480,13 +485,14 @@
       },
       "yaxes": [
         {
-          "format": "ms",
+          "format": "short",
           "logBase": 1,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
+          "label": "",
           "logBase": 1,
           "show": true
         }
@@ -502,107 +508,22 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
+        "h": 6,
+        "w": 8,
+        "x": 8,
         "y": 14
-      },
-      "hiddenSeries": false,
-      "id": 4,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "9.2.4",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "bookkeeper_server_READ_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.5\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 2
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Read entry latency (50pct)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "ms",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "decimals": 1,
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 21
       },
       "hiddenSeries": false,
       "id": 5,
@@ -635,22 +556,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "editorMode": "code",
-          "expr": "bookkeeper_server_ADD_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.99\"}",
-          "format": "time_series",
+          "expr": "sum(pulsar_producers_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)  ",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "range": true,
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Add entry latency (99pct)",
+      "title": "Producers count",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -664,15 +580,14 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:640",
-          "format": "ms",
+          "format": "none",
           "logBase": 1,
           "min": "0",
           "show": true
         },
         {
-          "$$hashKey": "object:641",
           "format": "short",
+          "label": "",
           "logBase": 1,
           "show": true
         }
@@ -688,16 +603,117 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 14
+      },
+      "hiddenSeries": false,
+      "id": 20,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_consumers_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)  ",
+          "interval": "",
+          "legendFormat": "{{kubernetes_pod_name}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Consumers count",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "none",
+          "logBase": 1,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
         "h": 7,
         "w": 12,
-        "x": 12,
-        "y": 21
+        "x": 0,
+        "y": 20
       },
       "hiddenSeries": false,
       "id": 6,
@@ -730,20 +746,312 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "expr": "bookkeeper_server_READ_ENTRY_REQUEST{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.99\"}",
-          "format": "time_series",
+          "expr": "sum(pulsar_msg_backlog{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Read entry latency (99pct)",
+      "title": "Messages Backlog",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "logBase": 1,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {
+        "0 - 0.5 ms": "#2F575E",
+        "0.5 - 1 ms": "#3F6833",
+        "1 - 5 ms": "#629E51",
+        "10 - 20 ms": "#E5A8E2",
+        "100 - 200 ms": "#EF843C",
+        "20 - 50 ms": "#65C5DB",
+        "200 ms - 1 s": "#EA6460",
+        "5 - 10 ms": "#1F78C1",
+        "50 - 100 ms": "#E5AC0E",
+        "< +Inf ms": "#BF1B00",
+        "< 0.5 ms": "#508642",
+        "> 1 s": "#BF1B00"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 5,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "hiddenSeries": false,
+      "id": 3,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "< 100 ms",
+          "yaxis": 1
+        }
+      ],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_0_5{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "0 - 0.5 ms",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_1{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "0.5 - 1 ms",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_5{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "1 - 5 ms",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_10{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "5 - 10 ms",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_20{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "10 - 20 ms",
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_50{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "20 - 50 ms",
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_100{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "50 - 100 ms",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_200{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "100 - 200 ms",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_le_1000{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "200 ms - 1 s",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_storage_write_latency_overflow{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
+          "interval": "",
+          "legendFormat": "> 1 s",
+          "refId": "J"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Storage Write Latency",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": "msg / s",
+          "logBase": 1,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "decimals": 1,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 27
+      },
+      "hiddenSeries": false,
+      "id": 22,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_broker_publish_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", quantile=\"0.5\"}) by (kubernetes_pod_name)",
+          "interval": "",
+          "legendFormat": "{{kubernetes_pod_name}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Publish Latency - 50pct",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -779,19 +1087,26 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
         "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 28
+        "w": 6,
+        "x": 6,
+        "y": 27
       },
       "hiddenSeries": false,
-      "id": 8,
+      "id": 23,
       "legend": {
         "avg": false,
         "current": false,
@@ -821,299 +1136,114 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
+          },
+          "expr": "sum(pulsar_broker_publish_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", quantile=\"0.99\"}) by (kubernetes_pod_name)",
+          "interval": "",
+          "legendFormat": "{{kubernetes_pod_name}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Publish Latency - 99pct",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "ms",
+          "logBase": 1,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "decimals": 1,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 12,
+        "y": 27
+      },
+      "hiddenSeries": false,
+      "id": 25,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
           },
           "editorMode": "code",
-          "expr": "bookie_storage_ledgers_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
-          "format": "time_series",
+          "expr": "sum(pulsar_broker_publish_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", quantile=\"0.999\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
           "range": true,
-          "refId": "A",
-          "step": 2
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Ledgers count",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:490",
-          "format": "short",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:491",
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "decimals": 1,
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 28
-      },
-      "hiddenSeries": false,
-      "id": 9,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "9.2.4",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "bookie_storage_entries_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 2
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Entries count",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:565",
-          "format": "short",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:566",
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "decimals": 1,
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 35
-      },
-      "hiddenSeries": false,
-      "id": 11,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "9.2.4",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "bookie_journal_JOURNAL_QUEUE_SIZE{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 2
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Journal Queue length",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "decimals": 1,
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 35
-      },
-      "hiddenSeries": false,
-      "id": 10,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "9.2.4",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "bookie_journal_JOURNAL_QUEUE_LATENCY{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"1\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 2
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Journal Queue latency (Max)",
+      "title": "Publish Latency - 99.9pct",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1149,19 +1279,26 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
       "decimals": 1,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
         "h": 7,
-        "w": 8,
-        "x": 0,
-        "y": 42
+        "w": 6,
+        "x": 18,
+        "y": 27
       },
       "hiddenSeries": false,
-      "id": 14,
+      "id": 24,
       "legend": {
         "avg": false,
         "current": false,
@@ -1191,20 +1328,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "expr": "irate(bookie_journal_JOURNAL_SYNC_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\"}[30s])",
-          "format": "time_series",
+          "expr": "sum(pulsar_broker_publish_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", quantile=\"1.0\"}) by (kubernetes_pod_name)",
           "interval": "",
-          "intervalFactor": 2,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 4
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Journal Sync Rate",
+      "title": "Publish Latency - Max",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1218,14 +1352,133 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:415",
+          "format": "ms",
+          "logBase": 1,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 31,
+      "panels": [],
+      "repeat": "cache",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Broker Cache - $cache",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 0,
+        "y": 35
+      },
+      "hiddenSeries": false,
+      "id": 27,
+      "interval": "",
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "caffeine_cache_estimated_size{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", cache=~\"$cache\"}",
+          "interval": "",
+          "legendFormat": "{{ kubernetes_pod_name }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Cache size",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
           "format": "short",
           "logBase": 1,
           "min": "0",
           "show": true
         },
         {
-          "$$hashKey": "object:416",
           "format": "short",
           "logBase": 1,
           "show": true
@@ -1242,19 +1495,120 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
-      "decimals": 1,
-      "fill": 0,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
-        "w": 8,
+        "h": 8,
+        "w": 4,
+        "x": 4,
+        "y": 35
+      },
+      "hiddenSeries": false,
+      "id": 55,
+      "interval": "",
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "irate(caffeine_cache_eviction_total{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", cache=~\"$cache\"}[1m])",
+          "interval": "",
+          "legendFormat": "{{ kubernetes_pod_name }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Evictions rate",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "logBase": 1,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 4,
         "x": 8,
-        "y": 42
+        "y": 35
       },
       "hiddenSeries": false,
-      "id": 15,
+      "id": 53,
+      "interval": "",
       "legend": {
         "avg": false,
         "current": false,
@@ -1266,16 +1620,16 @@
       },
       "lines": true,
       "linewidth": 1,
-      "links": [],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
       },
       "percentage": false,
       "pluginVersion": "9.2.4",
-      "pointradius": 5,
+      "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "repeatDirection": "h",
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
@@ -1284,20 +1638,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "expr": "bookie_journal_JOURNAL_SYNC{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"0.99\"}",
-          "format": "time_series",
+          "expr": "irate(caffeine_cache_hit_total{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", cache=~\"$cache\"}[1m])",
           "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 4
+          "legendFormat": "{{ kubernetes_pod_name }}",
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Journal Sync Latency (99pct)",
+      "title": "Hits / s",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1311,7 +1662,7 @@
       },
       "yaxes": [
         {
-          "format": "ms",
+          "format": "short",
           "logBase": 1,
           "min": "0",
           "show": true
@@ -1333,205 +1684,26 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${prometheus}"
       },
-      "decimals": 1,
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 16,
-        "y": 42
-      },
-      "hiddenSeries": false,
-      "id": 16,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "9.2.4",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "bookie_journal_JOURNAL_SYNC{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\", success=\"true\", quantile=\"1\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A",
-          "step": 4
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Journal Sync Latency (Max)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "ms",
-          "logBase": 1,
-          "min": "0",
-          "show": true
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
         },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
+        "overrides": []
       },
-      "decimals": 1,
-      "fill": 0,
+      "fill": 1,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 49
-      },
-      "hiddenSeries": false,
-      "id": 18,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "9.2.4",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "expr": "bookie_storage_write_cache_size{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "range": true,
-          "refId": "A",
-          "step": 2
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Write Cache Size",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:265",
-          "format": "decbytes",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:266",
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "decimals": 1,
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 12,
+        "h": 8,
+        "w": 4,
         "x": 12,
-        "y": 49
+        "y": 35
       },
       "hiddenSeries": false,
-      "id": 19,
+      "id": 56,
+      "interval": "",
       "legend": {
         "avg": false,
         "current": false,
@@ -1543,16 +1715,16 @@
       },
       "lines": true,
       "linewidth": 1,
-      "links": [],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
       },
       "percentage": false,
       "pluginVersion": "9.2.4",
-      "pointradius": 5,
+      "pointradius": 2,
       "points": false,
       "renderer": "flot",
+      "repeatDirection": "h",
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
@@ -1561,22 +1733,17 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "${prometheus}"
           },
-          "editorMode": "code",
-          "expr": "bookie_storage_read_cache_size{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$bookie\"}",
-          "format": "time_series",
+          "expr": "irate(caffeine_cache_miss_total{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", cache=~\"$cache\"}[1m])",
           "interval": "",
-          "intervalFactor": 2,
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "range": true,
-          "refId": "A",
-          "step": 2
+          "legendFormat": "{{ kubernetes_pod_name }}",
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Read Cache Size",
+      "title": "Misses / s",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1590,14 +1757,202 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:340",
-          "format": "decbytes",
+          "format": "short",
           "logBase": 1,
           "min": "0",
           "show": true
         },
         {
-          "$$hashKey": "object:341",
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 16,
+        "y": 35
+      },
+      "hiddenSeries": false,
+      "id": 54,
+      "interval": "",
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "irate(caffeine_cache_loads_total{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", cache=~\"$cache\"}[1m])",
+          "interval": "",
+          "legendFormat": "{{ kubernetes_pod_name }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Loads / s",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "logBase": 1,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 35
+      },
+      "hiddenSeries": false,
+      "id": 57,
+      "interval": "",
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.2.4",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${prometheus}"
+          },
+          "expr": "idelta(caffeine_cache_load_duration_seconds_sum{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", cache=~\"$cache\"}[1m])/idelta(caffeine_cache_load_duration_seconds_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", cache=~\"$cache\"}[1m])\n",
+          "interval": "",
+          "legendFormat": "{{ kubernetes_pod_name }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Avg load latency",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "s",
+          "logBase": 1,
+          "min": "0",
+          "show": true
+        },
+        {
           "format": "short",
           "logBase": 1,
           "show": true
@@ -1612,14 +1967,14 @@
   "schemaVersion": 37,
   "style": "dark",
   "tags": [
-    "bookkeeper",
-    "pulsar"
+    "pulsar",
+    "broker"
   ],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "default",
           "value": "default"
         },
@@ -1627,7 +1982,7 @@
         "includeAll": false,
         "label": "data source",
         "multi": false,
-        "name": "datasource",
+        "name": "prometheus",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
@@ -1638,15 +1993,15 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "pulsar-cluster",
           "value": "pulsar-cluster"
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "${prometheus}"
         },
-        "definition": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{job=\"bookie\"}, app_kubernetes_io_instance)",
+        "definition": "label_values(pulsar_broker_lookup_count{job=\"broker\"}, app_kubernetes_io_instance)",
         "hide": 0,
         "includeAll": false,
         "label": "Cluster",
@@ -1654,10 +2009,10 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{job=\"bookie\"}, app_kubernetes_io_instance)",
+          "query": "label_values(pulsar_broker_lookup_count{job=\"broker\"}, app_kubernetes_io_instance)",
           "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 5,
@@ -1679,17 +2034,52 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "${prometheus}"
         },
-        "definition": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{app_kubernetes_io_instance=~\"$cluster\", job=\"bookie\"}, kubernetes_pod_name)",
+        "definition": "label_values(pulsar_rate_in{app_kubernetes_io_instance=~\"$cluster\", job=\"broker\"}, kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
-        "label": "Bookie",
+        "label": "Broker",
         "multi": true,
-        "name": "bookie",
+        "name": "broker",
         "options": [],
         "query": {
-          "query": "label_values(bookkeeper_server_ADD_ENTRY_BLOCKED{app_kubernetes_io_instance=~\"$cluster\", job=\"bookie\"}, kubernetes_pod_name)",
+          "query": "label_values(pulsar_rate_in{app_kubernetes_io_instance=~\"$cluster\", job=\"broker\"}, kubernetes_pod_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 5,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${prometheus}"
+        },
+        "definition": "label_values(caffeine_cache_hit_total{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}, cache)",
+        "hide": 1,
+        "includeAll": true,
+        "label": "Cache Name",
+        "multi": true,
+        "name": "cache",
+        "options": [],
+        "query": {
+          "query": "label_values(caffeine_cache_hit_total{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}, cache)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -1733,8 +2123,8 @@
     ]
   },
   "timezone": "",
-  "title": "Pulsar / BookKeeper",
-  "uid": "pulsar-bookkeeper",
+  "title": "Pulsar / Broker Metrics",
+  "uid": "pulsar-broker",
   "version": 1,
   "weekStart": ""
 }

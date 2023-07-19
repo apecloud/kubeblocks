@@ -1189,14 +1189,11 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 		}
 	}
 	// for cloud k8s we will check the kubeblocks-manager-config
-	if !existedDefault {
-		// todo: how to clarify the cloud situation
-		existedDefault, err = validateDefaultSCInConfig(dynamic)
-		if err != nil {
-			return allStorageClasses, existedDefault, err
-		}
+	defaultInConfig, err := validateDefaultSCInConfig(dynamic)
+	if err != nil {
+		return allStorageClasses, existedDefault, err
 	}
-	return allStorageClasses, existedDefault, nil
+	return allStorageClasses, existedDefault || defaultInConfig, nil
 }
 
 // validateClusterVersion checks the existence of declared cluster version,

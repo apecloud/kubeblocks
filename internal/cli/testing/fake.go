@@ -210,8 +210,9 @@ func FakeSecret(namespace string, cluster string) *corev1.Secret {
 	secret.Namespace = namespace
 	secret.Type = corev1.SecretTypeServiceAccountToken
 	secret.Labels = map[string]string{
-		"name":  types.KubeBlocksChartName,
-		"owner": "helm",
+		constant.AppInstanceLabelKey: cluster,
+		"name":                       types.KubeBlocksChartName,
+		"owner":                      "helm",
 	}
 
 	secret.Data = map[string][]byte{

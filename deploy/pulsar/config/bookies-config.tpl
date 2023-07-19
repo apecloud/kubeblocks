@@ -1,6 +1,5 @@
 PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+DoEscapeAnalysis -XX:ParallelGCThreads=4 -XX:ConcGCThreads=4 -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB -XX:+ExitOnOutOfMemoryError -XX:+PerfDisableSharedMem -XshowSettings:vm -Ddepth=64
 PULSAR_PREFIX_journalDirectories: /pulsar/data/bookkeeper/journal
-PULSAR_PREFIX_autoRecoveryDaemonEnabled: "true"
 PULSAR_PREFIX_compactionRateByBytes: "52428800"
 PULSAR_PREFIX_useTransactionalCompaction: "true"
 #dbStorage_readAheadCacheMaxSizeMb: "32"
@@ -37,3 +36,11 @@ zkServers: {{ $zk_server }}:2181
   {{- $MaxDirectMemorySize = printf "-XX:MaxDirectMemorySize=%dm" (div $phy_memory ( mul 1024 1024 2 )) }}
 {{- end }}
 PULSAR_MEM: -XX:MinRAMPercentage=25 -XX:MaxRAMPercentage=50 {{ $MaxDirectMemorySize }}
+
+{{- $autoRecoveryDaemonEnabled := "true" }}
+{{- range $i, $e := $.cluster.spec.componentSpecs }}
+  {{- if eq $e.componentDefRef "bookies-recovery" }}
+    {{- $autoRecoveryDaemonEnabled = "false" }}
+  {{- end }}
+{{- end }}
+PULSAR_PREFIX_autoRecoveryDaemonEnabled: {{ $autoRecoveryDaemonEnabled }}

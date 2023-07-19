@@ -31,7 +31,11 @@ import (
 
 var _ = Describe("", func() {
 
-	var componentClassDefinition *v1alpha1.ComponentClassDefinition
+	var (
+		clusterDefRef            = "apecloud-mysql"
+		componentDefRef          = "mysql"
+		componentClassDefinition *v1alpha1.ComponentClassDefinition
+	)
 
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -53,9 +57,14 @@ var _ = Describe("", func() {
 	It("Class should exist in status", func() {
 		testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 			AddConstraints(testapps.GeneralResourceConstraint).
+			AddSelector(v1alpha1.ComponentResourceConstraintSelector{
+				ClusterDefRef:   clusterDefRef,
+				ComponentDefRef: componentDefRef,
+				Constraints:     []string{"c1", "c2", "c3", "c4"},
+			}).
 			Create(&testCtx).GetObject()
 
-		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", "apecloud-mysql", "mysql").
+		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", clusterDefRef, componentDefRef).
 			AddClasses([]v1alpha1.ComponentClass{testapps.Class1c1g}).
 			Create(&testCtx).GetObject()
 

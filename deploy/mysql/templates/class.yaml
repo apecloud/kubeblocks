@@ -8,8 +8,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: mysql
 spec:
   groups:
-  - resourceConstraintRef: kb-resource-constraint-general
-    template: |
+  - template: |
       cpu: {{ printf "{{ .cpu }}" }}
       memory: {{ printf "{{ .memory }}Gi" }}
     vars: [ cpu, memory]
@@ -28,8 +27,7 @@ spec:
       - args: [ "64", "256"]
       - args: [ "128", "512"]
 
-  - resourceConstraintRef: kb-resource-constraint-memory-optimized
-    template: |
+  - template: |
       cpu: {{ printf "{{ .cpu }}" }}
       memory: {{ printf "{{ .memory }}Gi" }}
     vars: [ cpu, memory]

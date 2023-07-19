@@ -18,9 +18,3 @@ spec:
     storage:
       min: 20Gi
       max: 10Ti
-  selector:
-  - clusterDefRef: apecloud-mysql
-    components:
-    - componentDefRef: mysql
-      constraints:
-      - "general"

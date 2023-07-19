@@ -70,8 +70,18 @@ data:
     fi
   start-bookies.sh: |-
     #!/bin/bash
-    set -e
-
+    set -x
+    mkdir -p ${journalDirectories}/current && mkdir -p ${ledgerDirectories}/current
+    journalRes=`ls -A ${journalDirectories}/current`
+    ledgerRes=`ls -A ${ledgerDirectories}/current`
+    if [[ -z $journalRes && -z $ledgerRes ]]; then
+       host_ip_port="${KB_POD_FQDN}${cluster_domain}:3181"
+       # if current dir are empty but bookieId exists in zookeeper, delete it
+       if bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zkServers} get ${zkLedgersRootPath}/cookies/${host_ip_port}; then
+         echo "Warning: exist redundant bookieID ${zkLedgersRootPath}/cookies/${host_ip_port}"
+         bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zkServers} delete ${zkLedgersRootPath}/cookies/${host_ip_port};
+       fi
+    fi
     bin/apply-config-from-env.py conf/bookkeeper.conf;
     OPTS="${OPTS} -Dlog4j2.formatMsgNoLookups=true" exec bin/pulsar bookie;
   start-zookeeper.sh: |-

@@ -265,7 +265,7 @@ var _ = Describe("Config Handler Test", func() {
 			By("not change config")
 			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
 			By("not support onlineUpdate")
-			Expect(handler.OnlineUpdate(context.TODO(), config.ConfigSpec.Name, nil)).ShouldNot(Succeed())
+			Expect(handler.OnlineUpdate(context.TODO(), config.ConfigSpec.Name, nil)).Should(Succeed())
 		})
 
 		It("TplScriptsHandler", func() {

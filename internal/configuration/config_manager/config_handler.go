@@ -171,7 +171,14 @@ type shellCommandHandler struct {
 	filter     regexFilter
 }
 
-func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
+func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
+	logger.V(1).Info(fmt.Sprintf("online update[%v]", updatedParams))
+	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
+	args := make([]string, len(s.arg))
+	return s.execHandler(ctx, updatedParams, args)
+}
+
+func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args []string) error {
 	commonHandle := func(args []string) error {
 		command := exec.CommandContext(ctx, s.command, args...)
 		stdout, err := cfgutil.ExecShellCommand(command)
@@ -183,6 +190,21 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 		copy(args, baseCMD)
 		args = append(args, paramName, paramValue)
 		return commonHandle(args)
+	}
+	for key, value := range updatedParams {
+		if err := volumeHandle(args, key, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
+	commonHandle := func(args []string) error {
+		command := exec.CommandContext(ctx, s.command, args...)
+		stdout, err := cfgutil.ExecShellCommand(command)
+		logger.Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+		return err
 	}
 
 	if mountPoint, ok := s.downwardAPIVolume(event); ok {
@@ -207,12 +229,9 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 	}
 
 	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
-	for key, value := range updatedParams {
-		if err := volumeHandle(args, key, value); err != nil {
-			return err
-		}
+	if err := s.execHandler(ctx, updatedParams, args); err != nil {
+		return err
 	}
-
 	if len(files) != 0 {
 		return backupLastConfigFiles(files, s.backupPath)
 	}

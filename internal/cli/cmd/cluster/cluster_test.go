@@ -362,6 +362,15 @@ var _ = Describe("Cluster", func() {
 		})
 
 		Context("validate storageClass", func() {
+			fakeConfigData := map[string]string{
+				"config.yaml": `# the default storage class name.
+    DEFAULT_STORAGE_CLASS: ""`,
+			}
+			fakeConfigDataWithDefaultSC := map[string]string{
+				"config.yaml": `# the default storage class name.
+    DEFAULT_STORAGE_CLASS: kb-default-sc`,
+			}
+
 			It("can get all StorageClasses in K8S and check out if the cluster have a default StorageClasses by GetStorageClasses()", func() {
 				storageClasses, existedDefault, err := getStorageClasses(o.Dynamic)
 				Expect(err).Should(Succeed())
@@ -369,7 +378,7 @@ var _ = Describe("Cluster", func() {
 				Expect(existedDefault).Should(BeTrue())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsNotDefault)
 				cd := testing.FakeClusterDef()
-				tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData))
 				storageClasses, existedDefault, err = getStorageClasses(tf.FakeDynamicClient)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
@@ -380,7 +389,7 @@ var _ = Describe("Cluster", func() {
 				Expect(validateStorageClass(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
 				cd := testing.FakeClusterDef()
-				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData))
 				Expect(validateStorageClass(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
 			})
 
@@ -389,10 +398,22 @@ var _ = Describe("Cluster", func() {
 				spec := vct[0].(map[string]interface{})["spec"]
 				delete(spec.(map[string]interface{}), "storageClassName")
 				Expect(validateStorageClass(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
-				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
-				cd := testing.FakeClusterDef()
-				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault), testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData))
 				Expect(validateStorageClass(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
+				// It can validate 'DEFAULT_STORAGE_CLASS' in ConfigMap for cloud K8S
+				FakeDynamicClientWithConfigDefaultSC := testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault), testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigDataWithDefaultSC))
+				Expect(validateStorageClass(FakeDynamicClientWithConfigDefaultSC, o.ComponentSpecs)).Should(Succeed())
+			})
+
+			It("validateCloudConfigMap test", func() {
+				_, err := validateCloudConfigMap(o.Dynamic)
+				Expect(err).Should(HaveOccurred())
+				have, err := validateCloudConfigMap(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeFalse())
+				have, err = validateCloudConfigMap(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigDataWithDefaultSC)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeTrue())
 			})
 		})
 

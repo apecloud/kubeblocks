@@ -596,7 +596,7 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	return addon
 }
 
-func FakeConfigMap(cmName string) *corev1.ConfigMap {
+func FakeConfigMap(cmName string, namespace string, data map[string]string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -606,9 +606,10 @@ func FakeConfigMap(cmName string) *corev1.ConfigMap {
 			Name:      cmName,
 			Namespace: Namespace,
 		},
-		Data: map[string]string{
-			"fake": "fake",
-		},
+		Data: data,
+	}
+	if namespace != "" {
+		cm.Namespace = namespace
 	}
 	return cm
 }

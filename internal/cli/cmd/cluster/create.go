@@ -1188,6 +1188,14 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 			existedDefault = true
 		}
 	}
+	// for cloud k8s we will check the kubeblocks-manager-config
+	if !existedDefault {
+		// todo: how to clarify the cloud situation
+		existedDefault, err = validateCloudConfigMap(dynamic)
+		if err != nil {
+			return allStorageClasses, existedDefault, err
+		}
+	}
 	return allStorageClasses, existedDefault, nil
 }
 
@@ -1299,4 +1307,20 @@ func setKeys() []string {
 		string(keyStorageClass),
 		string(keySwitchPolicy),
 	}
+}
+
+// validateCloudConfigMap will verify if the ConfigMap of Kubeblocks is configured with the DEFAULT_STORAGE_CLASS
+func validateCloudConfigMap(dynamic dynamic.Interface) (bool, error) {
+	// todo:  types.KubeBlocksManagerConfigMapName almost is hard code, add a unique label for kubeblocks-manager-config
+	cfg, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(types.DefaultNamespace).Get(context.Background(), types.KubeBlocksManagerConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	var config map[string]interface{}
+	data := cfg.Object["data"].(map[string]interface{})
+	err = yaml.Unmarshal([]byte(data["config.yaml"].(string)), &config)
+	if err != nil {
+		return false, err
+	}
+	return len(config["DEFAULT_STORAGE_CLASS"].(string)) != 0, nil
 }

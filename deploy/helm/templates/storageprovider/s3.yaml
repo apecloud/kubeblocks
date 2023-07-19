@@ -25,7 +25,7 @@ spec:
     parameters:
       mounter: geesefs
       # you can set mount options here, for example limit memory cache size (recommended)
-      options: {{ `{{ printf "%s --region %s" (index .Parameters "mountOptions") (index .Parameters "region") }}` }}
+      options: {{ `{{ printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 %s --region %s" (index .Parameters "mountOptions") (index .Parameters "region") }}` }}
       bucket: {{ `{{ index .Parameters "bucket" }}` }}
       csi.storage.k8s.io/provisioner-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
       csi.storage.k8s.io/provisioner-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
@@ -52,7 +52,6 @@ spec:
         mountOptions:
           type: string
           description: "mount options for geesefs"
-          default: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
         accessKeyId:
           type: string
           description: "AWS access key"

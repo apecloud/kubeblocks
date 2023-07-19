@@ -617,7 +617,7 @@ func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
 	return "", errors.New("failed to get KubeBlocks installation namespace")
 }
 
-// GetKubeBlocksNamespaceBy gets namespace of KubeBlocks installation, infer namespace from helm secrets
+// GetKubeBlocksNamespaceByDynamic gets namespace of KubeBlocks installation, infer namespace from helm secrets
 func GetKubeBlocksNamespaceByDynamic(dynamic dynamic.Interface) (string, error) {
 	list, err := dynamic.Resource(types.SecretGVR()).List(context.TODO(), metav1.ListOptions{LabelSelector: types.KubeBlocksHelmLabel})
 	if err == nil && len(list.Items) >= 1 {

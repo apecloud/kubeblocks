@@ -27,10 +27,9 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -1934,6 +1933,70 @@ var _ = Describe("Cluster Controller", func() {
 			viper.Set("VOLUMESNAPSHOT", false)
 			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+		})
+	})
+
+	When("creating cluster with backup configuration", func() {
+		const (
+			compName    = statefulCompName
+			compDefName = statefulCompDefName
+			compDefType = testapps.StatefulMySQLComponent
+		)
+		BeforeEach(func() {
+			cleanEnv()
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
+		})
+
+		createClusterWithBackup := func(backup *appsv1alpha1.ClusterBackup) {
+			By("Creating a cluster")
+			clusterFactory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDefObj.Name, clusterVersionObj.Name).
+				AddComponent(compName, compDefName).WithRandomName().SetBackup(backup)
+
+			clusterObj = clusterFactory.Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey)
+		}
+
+		It("Creating cluster without backup", func() {
+			createClusterWithBackup(nil)
+			Eventually(testapps.List(&testCtx, generics.BackupPolicySignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
+		})
+
+		It("Creating cluster with backup", func() {
+			backup := &appsv1alpha1.ClusterBackup{
+				Enabled: true,
+				RetentionPeriod: func() *string {
+					retention := "1d"
+					return &retention
+				}(),
+				Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
+				CronExpression: "*/1 * * * *",
+				StartWindowMinutes: func() *int64 {
+					startWindow := int64(10)
+					return &startWindow
+				}(),
+			}
+
+			createClusterWithBackup(backup)
+			By("Checking backup policy created from backup policy template")
+			for _, compDef := range clusterDefObj.Spec.ComponentDefs {
+				policyName := DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
+					func(g Gomega, policy *dataprotectionv1alpha1.BackupPolicy) {
+						schedule := policy.Spec.Schedule
+						g.Expect(schedule.Snapshot).ShouldNot(BeNil())
+						g.Expect(schedule.Snapshot.Enable).Should(BeEquivalentTo(backup.Enabled))
+						g.Expect(schedule.Snapshot.CronExpression).Should(Equal(backup.CronExpression))
+						g.Expect(schedule.StartWindowMinutes).Should(Equal(backup.StartWindowMinutes))
+					})).Should(Succeed())
+			}
 		})
 	})
 

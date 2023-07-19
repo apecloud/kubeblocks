@@ -66,12 +66,6 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 		return err
 	}
 	origCluster := transCtx.OrigCluster
-
-	// if backup is disabled, skip the backup policy template transformation.
-	if origCluster.Spec.Backup == nil || !origCluster.Spec.Backup.Enabled {
-		return nil
-	}
-
 	backupPolicyNames := map[string]struct{}{}
 	for _, tpl := range backupPolicyTPLs.Items {
 		r.isDefaultTemplate = tpl.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey]
@@ -238,12 +232,27 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 // mergeClusterBackup merges the cluster backup configuration into the backup policy.
 func (r *BackupPolicyTPLTransformer) mergeClusterBackup(cluster *appsv1alpha1.Cluster,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
-	if cluster.Spec.Backup == nil || backupPolicy == nil {
+	if backupPolicy == nil {
 		return
 	}
 
 	backup := cluster.Spec.Backup
 	spec := &backupPolicy.Spec
+	setSchedulePolicy := func(schedulePolicy *dataprotectionv1alpha1.SchedulePolicy, enable bool) {
+		if schedulePolicy == nil {
+			return
+		}
+		schedulePolicy.Enable = enable
+	}
+
+	// disable backup if it is not enabled
+	if backup == nil || !backup.Enabled {
+		setSchedulePolicy(spec.Schedule.Snapshot, false)
+		setSchedulePolicy(spec.Schedule.Datafile, false)
+		setSchedulePolicy(spec.Schedule.Logfile, false)
+		return
+	}
+
 	if backup.RetentionPeriod != nil {
 		spec.Retention = &dataprotectionv1alpha1.RetentionSpec{
 			TTL: backup.RetentionPeriod,
@@ -268,7 +277,9 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(cluster *appsv1alpha1.Cl
 
 	// enable specified backup method and set its cron expression
 	schedulePolicy.Enable = true
-	schedulePolicy.CronExpression = backup.CronExpression
+	if backup.CronExpression != "" {
+		schedulePolicy.CronExpression = backup.CronExpression
+	}
 
 	// always enable PITR if it is supported
 	if backupPolicy.Spec.Schedule.Logfile != nil {

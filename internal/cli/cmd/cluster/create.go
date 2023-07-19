@@ -517,7 +517,11 @@ func (o *CreateOptions) Complete() error {
 }
 
 func (o *CreateOptions) CleanUp() error {
-	return nil
+	if o.Client == nil {
+		return nil
+	}
+
+	return deleteDependencies(o.Client, o.Namespace, o.Name)
 }
 
 // buildComponents builds components from file or set values
@@ -595,8 +599,11 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 			return nil, err
 		}
 
-		// set component service account name
-		compSpec.ServiceAccountName = saNamePrefix + o.Name
+		// create component dependencies
+		if err = o.buildDependenciesFn(cd, compSpec); err != nil {
+			return nil, err
+		}
+
 		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compSpec)
 		if err != nil {
 			return nil, err

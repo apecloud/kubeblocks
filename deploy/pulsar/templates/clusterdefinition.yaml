@@ -70,7 +70,6 @@ spec:
         - name: kafka-client
           port: 9092
           targetPort: kafka-client
-          targetPort: kafka-client
       podSpec:
         securityContext:
           runAsNonRoot: true

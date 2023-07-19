@@ -23,7 +23,7 @@ data:
   
     # Kafka configs
     kafkaConfig: |
-      bootstrap.servers={{ include "pulsar-cluster.brokerFQDN" . }}:9093
+      bootstrap.servers={{ include "pulsar-cluster.brokerFQDN" . }}:9092
       linger.ms=1
       batch.size=1048576
 
@@ -51,7 +51,7 @@ data:
     
     # Kafka configs
     kafkaConfig: |
-      bootstrap.servers={{ include "pulsar-cluster.brokerFQDN" . }}:9093
+      bootstrap.servers={{ include "pulsar-cluster.brokerFQDN" . }}:9092
       linger.ms=1
       batch.size=1048576
   
@@ -70,7 +70,7 @@ data:
     
     # Kafka configs
     kafkaConfig: |
-      bootstrap.servers={{ include "pulsar-cluster.brokerFQDN" . }}:9093
+      bootstrap.servers={{ include "pulsar-cluster.brokerFQDN" . }}:9092
       linger.ms=1
       batch.size=1048576
 
@@ -86,19 +86,14 @@ spec:
   containers:
     - name: wget
       image: docker.io/apecloud/omb:0.1
-      command:
-        - sleep
-        - "1000000"
-    #   command: ['bin/benchmark']
-    #   args: 
-    #     - --drivers 
-    #     - driver-kop/pulsar_to_kafka.yaml
-    #     - workloads/1-topic-16-partitions-1kb.yaml
-    #     - --output
-    #     - /out/omb_results.txt
+      command: ['bin/benchmark']
+      args: 
+        - --drivers 
+        - driver-kop/pulsar_to_kafka.yaml
+        - workloads/1-topic-16-partitions-1kb.yaml
       env:
         - name: BOOTSTRAP_SERVERS
-          value: "{{ include "pulsar-cluster.brokerFQDN" . }}:9093" 
+          value: "{{ include "pulsar-cluster.brokerFQDN" . }}:9092" 
       volumeMounts:
         - name: out
           mountPath: /out

@@ -77,5 +77,13 @@ var _ = Describe("kb_storage_class_test", func() {
 				g.Expect(res.Message).Should(Equal(message))
 			}).Should(Succeed())
 		})
+		It("AnalyzeResult with message test, and expected that fail is true", func() {
+			Eventually(func(g Gomega) {
+				message := "test"
+				res := newWarnResultWithMessage("test", message)
+				g.Expect(res.IsWarn).Should(BeTrue())
+				g.Expect(res.Message).Should(Equal(message))
+			}).Should(Succeed())
+		})
 	})
 })

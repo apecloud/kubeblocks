@@ -37,9 +37,10 @@ import (
 )
 
 const (
-	NodesPath   = "cluster-resources/nodes.json"
-	Tolerations = "tolerations"
-	KubeBlocks  = "kubeblocks"
+	NodesPath      = "cluster-resources/nodes.json"
+	NodesErrorPath = "cluster-resources/nodes-error.json"
+	Tolerations    = "tolerations"
+	KubeBlocks     = "kubeblocks"
 )
 
 type AnalyzeTaintClassByKb struct {
@@ -71,12 +72,19 @@ func (a *AnalyzeTaintClassByKb) Analyze(getFile GetCollectedFileContents, findFi
 func (a *AnalyzeTaintClassByKb) analyzeTaint(getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
 	nodesData, err := getFile(NodesPath)
 	if err != nil {
-		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get nodes from jsonfile failed, err:%v", err)), err
 	}
+
+	nodesErrorData, err := getFile(NodesErrorPath)
+	if err != nil && nodesErrorData != nil && len(nodesErrorData) > 0 && len(nodesData) == 0 {
+		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get nodes list from k8s failed, err:%v", err)), err
+	}
+
 	var nodes v1.NodeList
 	if err = json.Unmarshal(nodesData, &nodes); err != nil {
-		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("unmarshal nodes jsonfile failed, err:%v", err)), err
 	}
+
 	err = a.generateTolerations()
 	if err != nil {
 		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get tolerations failed, err:%v", err)), err

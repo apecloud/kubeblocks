@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 20,
+  "id": 17,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -859,9 +859,11 @@
             "type": "prometheus",
             "uid": "${prometheus}"
           },
+          "editorMode": "code",
           "expr": "sum(pulsar_storage_write_latency_le_0_5{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\"}) / 60.0",
           "interval": "",
           "legendFormat": "0 - 0.5 ms",
+          "range": true,
           "refId": "A"
         },
         {
@@ -1330,9 +1332,11 @@
             "type": "prometheus",
             "uid": "${prometheus}"
           },
-          "expr": "sum(pulsar_broker_publish_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", quantile=\"1.0\"}) by (kubernetes_pod_name)",
+          "editorMode": "code",
+          "expr": "sum(pulsar_broker_publish_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$broker\", quantile=\"1\"}) by (kubernetes_pod_name)",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
+          "range": true,
           "refId": "A"
         }
       ],

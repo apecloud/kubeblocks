@@ -63,11 +63,12 @@ spec:
       max: 100Ti
   selector:
   - clusterDefRef: apecloud-mysql
-    componentDefRef: mysql
-    constraints:
-    - "c1"
-    - "c2"
-    - "c3"
+    components:
+    - componentDefRef: mysql
+      constraints:
+      - "c1"
+      - "c2"
+      - "c3"
 `
 const (
 	clusterDefRef   = "apecloud-mysql"

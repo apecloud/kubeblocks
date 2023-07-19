@@ -96,10 +96,14 @@ var _ = Describe("Cluster", func() {
 			clusterDef := testing.FakeClusterDef()
 			resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 				AddConstraints(testapps.ProductionResourceConstraint).
-				AddSelector(appsv1alpha1.ComponentResourceConstraintSelector{
-					ClusterDefRef:   clusterDef.Name,
-					ComponentDefRef: testing.ComponentDefName,
-					Constraints:     []string{"c1"},
+				AddSelector(appsv1alpha1.ClusterResourceConstraintSelector{
+					ClusterDefRef: clusterDef.Name,
+					Components: []appsv1alpha1.ComponentResourceConstraintSelector{
+						{
+							ComponentDefRef: testing.ComponentDefName,
+							Constraints:     []string{"c1"},
+						},
+					},
 				}).
 				GetObject()
 			tf.FakeDynamicClient = testing.FakeDynamicClient(

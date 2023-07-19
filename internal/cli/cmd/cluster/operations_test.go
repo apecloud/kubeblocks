@@ -66,10 +66,14 @@ var _ = Describe("operations", func() {
 			GetObject()
 		resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 			AddConstraints(testapps.ProductionResourceConstraint).
-			AddSelector(appsv1alpha1.ComponentResourceConstraintSelector{
-				ClusterDefRef:   testing.ClusterDefName,
-				ComponentDefRef: testing.ComponentDefName,
-				Constraints:     []string{"c1"},
+			AddSelector(appsv1alpha1.ClusterResourceConstraintSelector{
+				ClusterDefRef: testing.ClusterDefName,
+				Components: []appsv1alpha1.ComponentResourceConstraintSelector{
+					{
+						ComponentDefRef: testing.ComponentDefName,
+						Constraints:     []string{"c1"},
+					},
+				},
 			}).
 			GetObject()
 		pods := testing.FakePods(2, clusterWithOneComp.Namespace, clusterName1)

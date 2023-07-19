@@ -128,7 +128,7 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 	return factory
 }
 
-func (factory *MockComponentResourceConstraintFactory) AddSelector(selector appsv1alpha1.ComponentResourceConstraintSelector) *MockComponentResourceConstraintFactory {
+func (factory *MockComponentResourceConstraintFactory) AddSelector(selector appsv1alpha1.ClusterResourceConstraintSelector) *MockComponentResourceConstraintFactory {
 	factory.get().Spec.Selector = append(factory.get().Spec.Selector, selector)
 	return factory
 }

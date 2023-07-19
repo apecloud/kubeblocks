@@ -20,6 +20,7 @@ spec:
       max: 10Ti
   selector:
   - clusterDefRef: apecloud-mysql
-    componentDefRef: mysql
-    constraints:
-    - "general"
+    components:
+    - componentDefRef: mysql
+      constraints:
+      - "general"

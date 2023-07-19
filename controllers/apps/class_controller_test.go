@@ -57,10 +57,14 @@ var _ = Describe("", func() {
 	It("Class should exist in status", func() {
 		testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 			AddConstraints(testapps.GeneralResourceConstraint).
-			AddSelector(v1alpha1.ComponentResourceConstraintSelector{
-				ClusterDefRef:   clusterDefRef,
-				ComponentDefRef: componentDefRef,
-				Constraints:     []string{"c1", "c2", "c3", "c4"},
+			AddSelector(v1alpha1.ClusterResourceConstraintSelector{
+				ClusterDefRef: clusterDefRef,
+				Components: []v1alpha1.ComponentResourceConstraintSelector{
+					{
+						ComponentDefRef: componentDefRef,
+						Constraints:     []string{"c1", "c2", "c3", "c4"},
+					},
+				},
 			}).
 			Create(&testCtx).GetObject()
 

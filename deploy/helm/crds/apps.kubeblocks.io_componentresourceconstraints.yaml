@@ -167,29 +167,46 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               selector:
-                description: selector is used to bind the component resource constraint
-                  to a component.
+                description: selector is used to bind the resource constraint to cluster
+                  definitions.
                 items:
                   properties:
                     clusterDefRef:
                       description: clusterDefRef is the name of the cluster definition.
                       type: string
-                    componentDefRef:
-                      description: componentDefRef is the name of the component definition
-                        in the cluster definition.
-                      type: string
-                    constraints:
-                      description: constraints are the constraints that will be applied
-                        to the component.
+                    components:
+                      description: selector is used to bind the resource constraint
+                        to components.
                       items:
-                        type: string
+                        properties:
+                          componentDefRef:
+                            description: componentDefRef is the name of the component
+                              definition in the cluster definition.
+                            type: string
+                          constraints:
+                            description: constraints are the constraints that will
+                              be applied to the component.
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - componentDefRef
+                        - constraints
+                        type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - componentDefRef
+                      x-kubernetes-list-type: map
                   required:
                   - clusterDefRef
-                  - componentDefRef
-                  - constraints
+                  - components
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - clusterDefRef
+                x-kubernetes-list-type: map
+            required:
+            - constraints
             type: object
         type: object
     served: true

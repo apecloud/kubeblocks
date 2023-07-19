@@ -33,19 +33,29 @@ type ComponentResourceConstraintSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	// +kbubebuilder:validation:Required
-	Constraints []ResourceConstraint `json:"constraints,omitempty"`
+	// +kubebuilder:validation:Required
+	Constraints []ResourceConstraint `json:"constraints"`
 
-	// selector is used to bind the component resource constraint to a component.
+	// selector is used to bind the resource constraint to cluster definitions.
+	// +listType=map
+	// +listMapKey=clusterDefRef
 	// +optional
-	Selector []ComponentResourceConstraintSelector `json:"selector,omitempty"`
+	Selector []ClusterResourceConstraintSelector `json:"selector,omitempty"`
 }
 
-type ComponentResourceConstraintSelector struct {
+type ClusterResourceConstraintSelector struct {
 	// clusterDefRef is the name of the cluster definition.
 	// +kubebuilder:validation:Required
 	ClusterDefRef string `json:"clusterDefRef"`
 
+	// selector is used to bind the resource constraint to components.
+	// +listType=map
+	// +listMapKey=componentDefRef
+	// +kubebuilder:validation:Required
+	Components []ComponentResourceConstraintSelector `json:"components"`
+}
+
+type ComponentResourceConstraintSelector struct {
 	// componentDefRef is the name of the component definition in the cluster definition.
 	// +kubebuilder:validation:Required
 	ComponentDefRef string `json:"componentDefRef"`
@@ -337,11 +347,16 @@ func (c *ComponentResourceConstraint) MatchClass(clusterDefRef, componentDefRef 
 func (c *ComponentResourceConstraint) FindConstraints(clusterDefRef, componentDefRef string) []ResourceConstraint {
 	constraints := make(map[string]bool)
 	for _, selector := range c.Spec.Selector {
-		if selector.ClusterDefRef != clusterDefRef || selector.ComponentDefRef != componentDefRef {
+		if selector.ClusterDefRef != clusterDefRef {
 			continue
 		}
-		for _, name := range selector.Constraints {
-			constraints[name] = true
+		for _, item := range selector.Components {
+			if item.ComponentDefRef != componentDefRef {
+				continue
+			}
+			for _, name := range item.Constraints {
+				constraints[name] = true
+			}
 		}
 	}
 

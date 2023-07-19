@@ -20,7 +20,8 @@ spec:
       sizePerCPU: 16Gi
   selector:
   - clusterDefRef: apecloud-mysql
-    componentDefRef: mysql
-    constraints:
-    - "c1"
-    - "c2"
+    components:
+    - componentDefRef: mysql
+      constraints:
+      - "c1"
+      - "c2"

@@ -425,8 +425,8 @@ func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedCompon
 		return nil
 	}
 
-	expectResources, err := clsMgr.GetResources(&clusterCompSpec)
-	if err != nil {
+	expectResources, err := clsMgr.GetResources(cluster.Spec.ClusterDefRef, &clusterCompSpec)
+	if err != nil || expectResources == nil {
 		return err
 	}
 

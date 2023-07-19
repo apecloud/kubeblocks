@@ -112,7 +112,7 @@ func (b ByClassResource) Swap(i, j int) {
 }
 
 type ComponentClassWithRef struct {
-	appsv1alpha1.ComponentClassInstance
+	appsv1alpha1.ComponentClass
 
 	ClassDefRef appsv1alpha1.ClassDefRef
 }

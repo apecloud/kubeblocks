@@ -22,6 +22,7 @@ package probe
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -44,6 +45,7 @@ const (
 	// by dapr framework and http framework in the end.
 	statusCodeHeader = "Metadata.status-Code"
 	bodyFmt          = `{"operation": "%s", "metadata": {"sql" : ""}}`
+	tokenKeyInHeader = "token"
 )
 
 type RequestMeta struct {
@@ -94,6 +96,23 @@ func GetRequestBody(operation string, args map[string][]string) []byte {
 
 func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
+		// get token
+		token := request.Header.Get(tokenKeyInHeader)
+		if token == "" {
+			handleTokenError(writer, "token missing... request refused!")
+			return
+		}
+
+		// check token
+		tokenInCluster, err := getToken(request.Context(), Logger)
+		if err != nil {
+			handleTokenError(writer, "fetch token from cluster failed... request refused!")
+			return
+		}
+		if tokenInCluster != "" && tokenInCluster != token {
+			handleTokenError(writer, fmt.Sprintf("token mismatch: %s is invalid.", token))
+		}
+
 		uri := request.URL
 		method := request.Method
 		if method == http.MethodGet && strings.HasPrefix(uri.Path, bindingPath) {
@@ -120,5 +139,14 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			// header has no statusCodeHeader
 			Logger.Info("response has no statusCodeHeader")
 		}
+	}
+}
+
+func handleTokenError(writer http.ResponseWriter, msg string) {
+	Logger.Info(msg)
+	writer.WriteHeader(http.StatusUnauthorized)
+	_, err := writer.Write([]byte(msg))
+	if err != nil {
+		Logger.Error(err, "error on write response body")
 	}
 }

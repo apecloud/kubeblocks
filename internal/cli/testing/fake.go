@@ -203,6 +203,27 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 	return pods
 }
 
+// FakeSecret for test cluster create
+func FakeSecret(namespace string, cluster string) *corev1.Secret {
+	secret := corev1.Secret{}
+	secret.Name = SecretName
+	secret.Namespace = namespace
+	secret.Type = corev1.SecretTypeServiceAccountToken
+	secret.Labels = map[string]string{
+		constant.AppInstanceLabelKey: cluster,
+		"name":                       types.KubeBlocksChartName,
+		"owner":                      "helm",
+	}
+
+	secret.Data = map[string][]byte{
+		corev1.ServiceAccountTokenKey: []byte("fake-secret-token"),
+		"fake-secret-key":             []byte("fake-secret-value"),
+		"username":                    []byte("test-user"),
+		"password":                    []byte("test-password"),
+	}
+	return &secret
+}
+
 func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret := corev1.Secret{}
 	secret.Name = SecretName
@@ -596,7 +617,7 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	return addon
 }
 
-func FakeConfigMap(cmName string) *corev1.ConfigMap {
+func FakeConfigMap(cmName string, namespace string, data map[string]string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -606,9 +627,10 @@ func FakeConfigMap(cmName string) *corev1.ConfigMap {
 			Name:      cmName,
 			Namespace: Namespace,
 		},
-		Data: map[string]string{
-			"fake": "fake",
-		},
+		Data: data,
+	}
+	if namespace != "" {
+		cm.Namespace = namespace
 	}
 	return cm
 }

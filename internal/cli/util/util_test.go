@@ -281,7 +281,7 @@ var _ = Describe("util", func() {
 	})
 
 	It("convert obj to unstructured ", func() {
-		unstructuredObj, err := ConvertObjToUnstructured(testing.FakeConfigMap("cm-test"))
+		unstructuredObj, err := ConvertObjToUnstructured(testing.FakeConfigMap("cm-test", testing.Namespace, map[string]string{"fake": "fake"}))
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(unstructuredObj.Object).Should(HaveLen(4))
 

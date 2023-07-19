@@ -62,6 +62,9 @@ const (
 	PreflightPattern     = "data/%s_preflight.yaml"
 	HostPreflightPattern = "data/%s_hostpreflight.yaml"
 	PreflightMessage     = "Kubernetes cluster preflight"
+
+	BasePreflightPattern     = "data/kubeblocks_base_preflight.yaml"
+	BaseHostPreflightPattern = "data/kubeblocks_base_hostpreflight.yaml"
 )
 
 var (
@@ -127,9 +130,17 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	var yamlDataList [][]byte
 	if data, err := defaultVendorYamlData.ReadFile(newPreflightPath(vendorName)); err == nil {
 		yamlDataList = append(yamlDataList, data)
+	} else {
+		if data, err := defaultVendorYamlData.ReadFile(BasePreflightPattern); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
 	}
 	if data, err := defaultVendorYamlData.ReadFile(newHostPreflightPath(vendorName)); err == nil {
 		yamlDataList = append(yamlDataList, data)
+	} else {
+		if data, err := defaultVendorYamlData.ReadFile(BaseHostPreflightPattern); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
 	}
 	if len(yamlDataList) == 0 {
 		return yamlDataList, errors.New("unsupported k8s provider")

@@ -87,3 +87,7 @@ func newPassAnalyzeResult(title string, outcome *troubleshoot.Outcome) *analyze.
 func newFailedResultWithMessage(title, message string) *analyze.AnalyzeResult {
 	return newFailAnalyzeResult(title, &troubleshoot.Outcome{Fail: &troubleshoot.SingleOutcome{Message: message}})
 }
+
+func newWarnResultWithMessage(title, message string) *analyze.AnalyzeResult {
+	return newWarnAnalyzeResult(title, &troubleshoot.Outcome{Warn: &troubleshoot.SingleOutcome{Message: message}})
+}

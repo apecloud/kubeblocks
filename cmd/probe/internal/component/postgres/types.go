@@ -114,7 +114,8 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		return result, nil
 	}
 	var syncList [][]string
-	if matches[0][0] == anyA && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd {
+	switch {
+	case matches[0][0] == anyA && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = quorum
 		amount, err := strconv.Atoi(matches[1][1])
 		if err != nil {
@@ -122,7 +123,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		}
 		result.Amount = amount
 		syncList = matches[3 : length-1]
-	} else if matches[0][0] == first && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd {
+	case matches[0][0] == first && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
 		amount, err := strconv.Atoi(matches[1][1])
 		if err != nil {
@@ -130,7 +131,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		}
 		result.Amount = amount
 		syncList = matches[3 : length-1]
-	} else if matches[0][0] == num && matches[1][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd {
+	case matches[0][0] == num && matches[1][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
 		amount, err := strconv.Atoi(matches[0][1])
 		if err != nil {
@@ -138,7 +139,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		}
 		result.Amount = amount
 		syncList = matches[2 : length-1]
-	} else {
+	default:
 		result.Types = priority
 		result.Amount = 1
 		syncList = matches
@@ -158,7 +159,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 			result.Members.Add(sync[1])
 			result.HasStar = true
 		case sync[0] == doubleQuote:
-			result.Members.Add(strings.Replace(sync[1][1:len(sync)-1], `""`, `"`, -1))
+			result.Members.Add(strings.ReplaceAll(sync[1][1:len(sync)-1], `""`, `"`))
 		default:
 			return nil, errors.Errorf("Unparseable synchronous_standby_names value: Unexpected token %s %s at %s", sync[0], sync[1], sync[2])
 		}

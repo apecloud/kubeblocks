@@ -453,6 +453,9 @@ func (mgr *Manager) Premote() error {
 	mgr.Logger.Infof("promote success, response:%s", stdout.String())
 
 	err = mgr.postPromote()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

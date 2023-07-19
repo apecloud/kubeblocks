@@ -85,7 +85,7 @@ func (r *Manager) HasClass(compType string, classDefRef v1alpha1.ClassDefRef) bo
 
 var (
 	ErrClassNotFound   = fmt.Errorf("class not found")
-	ErrInvalidResource = fmt.Errorf("invalid resource")
+	ErrInvalidResource = fmt.Errorf("resource is not conform to the constraints, please check the ComponentResourceConstraint API")
 )
 
 // ValidateResources validates if the resources of the component is invalid

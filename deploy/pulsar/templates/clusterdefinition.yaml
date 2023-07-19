@@ -466,6 +466,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: cluster_domain
+              value: {{ .Values.clusterDomain }}
             lifecycle:
               preStop:
                 exec:

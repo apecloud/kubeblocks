@@ -125,13 +125,11 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 
 		body := request.Body
 		defer body.Close()
-		buf := make([]byte, 500)
-		n, err := body.Read(buf)
-		if err != nil && err != io.EOF { // if the error is eof, ignore it
+		buf, err := io.ReadAll(request.Body)
+		if err != nil {
 			Logger.Error(err, "request body read failed")
 			return
 		}
-		buf = buf[:n]
 
 		meta := &RequestMeta{Metadata: map[string]string{}}
 		err = json.Unmarshal(buf, meta)

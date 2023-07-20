@@ -16,12 +16,12 @@ spec:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/llm
     {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/llm-1.4.8.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/llm-0.1.0.tgz
     {{- end }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 1.4.8
+      version: 0.1.0
       {{- end }}
 
     valuesMapping:

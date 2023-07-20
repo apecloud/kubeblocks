@@ -429,6 +429,13 @@ var _ = Describe("Cluster", func() {
 				have, err = validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeNilConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName)))
 				Expect(err).Should(Succeed())
 				Expect(have).Should(BeFalse())
+				have, err = validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, nil), testing.FakeSecret(types.DefaultNamespace, clusterName)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeFalse())
+				have, err = validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, map[string]string{"not-config-yaml": "error situation"}), testing.FakeSecret(types.DefaultNamespace, clusterName)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeFalse())
+
 			})
 		})
 

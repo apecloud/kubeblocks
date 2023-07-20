@@ -1318,7 +1318,13 @@ func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
 		return false, err
 	}
 	var config map[string]interface{}
+	if cfg.Object["data"] == nil {
+		return false, nil
+	}
 	data := cfg.Object["data"].(map[string]interface{})
+	if data["config.yaml"] == nil {
+		return false, nil
+	}
 	err = yaml.Unmarshal([]byte(data["config.yaml"].(string)), &config)
 	if err != nil {
 		return false, err

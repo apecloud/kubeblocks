@@ -219,7 +219,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			TTL: policyTPL.Retention.TTL,
 		}
 	}
-	bpSpec.Schedule.StartWindowMinutes = policyTPL.Schedule.StartWindowMinutes
+	bpSpec.Schedule.RetryWindowMinutes = policyTPL.Schedule.RetryWindowMinutes
 	bpSpec.Schedule.Snapshot = r.convertSchedulePolicy(policyTPL.Schedule.Snapshot)
 	bpSpec.Schedule.Datafile = r.convertSchedulePolicy(policyTPL.Schedule.Datafile)
 	bpSpec.Schedule.Logfile = r.convertSchedulePolicy(policyTPL.Schedule.Logfile)
@@ -241,6 +241,7 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 	if backupPolicy == nil {
 		// backup policy is nil, can not enable cluster backup, so log and return.
 		if backupEnabled() {
+			// TODO: should we return an error here?
 			transCtx.Logger.Info("backup policy is nil, can not enable cluster backup",
 				"namespace", cluster.Namespace, "cluster", cluster.Name)
 		}
@@ -256,7 +257,7 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		schedulePolicy.Enable = enable
 	}
 
-	// disable backup, set all backup schedule to false
+	// disable automated backup, set all backup schedule to false
 	if !backupEnabled() {
 		setSchedulePolicy(spec.Schedule.Snapshot, false)
 		setSchedulePolicy(spec.Schedule.Datafile, false)
@@ -270,8 +271,8 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		}
 	}
 
-	if backup.StartWindowMinutes != nil {
-		spec.Schedule.StartWindowMinutes = backup.StartWindowMinutes
+	if backup.RetryWindowMinutes != nil {
+		spec.Schedule.RetryWindowMinutes = backup.RetryWindowMinutes
 	}
 
 	var schedulePolicy *dataprotectionv1alpha1.SchedulePolicy
@@ -283,6 +284,10 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 	}
 
 	if schedulePolicy == nil {
+		// failed to find the schedule policy for backup method, so log and return.
+		// TODO: should we return an error here?
+		transCtx.Logger.Info(fmt.Sprintf("failed to find the schedule policy for backup method %s", backup.Method),
+			"namespace", cluster.Namespace, "cluster", cluster.Name)
 		return
 	}
 
@@ -292,9 +297,16 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		schedulePolicy.CronExpression = backup.CronExpression
 	}
 
-	// always enable PITR if it is supported
 	if backupPolicy.Spec.Schedule.Logfile != nil {
-		backupPolicy.Spec.Schedule.Logfile.Enable = true
+		backupPolicy.Spec.Schedule.Logfile.Enable = backup.PITREnabled
+	} else if backup.PITREnabled {
+		// TODO: if backupPolicy.Spec.Schedule.Logfile is nil, and backup.PITREnabled is true,
+		// should we create a new SchedulePolicy for logfile?
+		// Now, hscale also maintains a backupPolicy, we can not distinguish the backupPolicy for backup
+		// or hscale, so we can not create a new SchedulePolicy for logfile.
+		// Need a method to distinguish the backupPolicy for backup or hscale in the future.
+		transCtx.Logger.Info("failed to find the schedule policy for PITR",
+			"namespace", cluster.Namespace, "cluster", cluster.Name)
 	}
 }
 

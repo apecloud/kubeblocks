@@ -1984,7 +1984,7 @@ var _ = Describe("Cluster Controller", func() {
 						}(),
 						Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
 						CronExpression: "*/1 * * * *",
-						StartWindowMinutes: func() *int64 {
+						RetryWindowMinutes: func() *int64 {
 							startWindow := int64(10)
 							return &startWindow
 						}(),
@@ -2000,7 +2000,7 @@ var _ = Describe("Cluster Controller", func() {
 						}(),
 						Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
 						CronExpression: "*/1 * * * *",
-						StartWindowMinutes: func() *int64 {
+						RetryWindowMinutes: func() *int64 {
 							startWindow := int64(10)
 							return &startWindow
 						}(),
@@ -2016,7 +2016,7 @@ var _ = Describe("Cluster Controller", func() {
 						}(),
 						Method:         dataprotectionv1alpha1.BackupMethodBackupTool,
 						CronExpression: "*/1 * * * *",
-						StartWindowMinutes: func() *int64 {
+						RetryWindowMinutes: func() *int64 {
 							startWindow := int64(10)
 							return &startWindow
 						}(),
@@ -2041,7 +2041,7 @@ var _ = Describe("Cluster Controller", func() {
 					case dataprotectionv1alpha1.BackupMethodBackupTool:
 						checkSchedulePolicy(g, schedule.Datafile)
 					}
-					g.Expect(schedule.StartWindowMinutes).Should(Equal(backup.StartWindowMinutes))
+					g.Expect(schedule.RetryWindowMinutes).Should(Equal(backup.RetryWindowMinutes))
 				}
 				checkPolicyDisabled := func(g Gomega, p *dataprotectionv1alpha1.BackupPolicy) {
 					schedule := p.Spec.Schedule

@@ -117,8 +117,17 @@ spec:
                     - enum:
                       - snapshot
                       - backupTool
-                    default: backupTool
+                    default: snapshot
                     description: 'backup method, support: snapshot, backupTool.'
+                    type: string
+                  pitrEnabled:
+                    default: true
+                    description: pitrEnabled defines whether to enable point-in-time
+                      recovery.
+                    type: boolean
+                  repoName:
+                    description: repoName is the name of the backupRepo, if not set,
+                      will use the default backupRepo.
                     type: string
                   retentionPeriod:
                     default: 1d
@@ -127,8 +136,8 @@ spec:
                       be retained. if not set, will be retained forever.
                     pattern: ^\d+[d|D|h|H]$
                     type: string
-                  startWindowMinutes:
-                    description: startWindowMinutes defines the time window for starting
+                  retryWindowMinutes:
+                    description: retryWindowMinutes defines the time window for retrying
                       the job if it misses scheduled time for any reason. the unit
                       of time is minute.
                     format: int64

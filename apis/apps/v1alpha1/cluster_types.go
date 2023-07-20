@@ -115,19 +115,28 @@ type ClusterBackup struct {
 	// backup method, support: snapshot, backupTool.
 	// +kubebuilder:validation:Enum=snapshot;backupTool
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=backupTool
+	// +kubebuilder:default=snapshot
 	Method dataprotectionv1alpha1.BackupMethod `json:"method"`
 
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +optional
 	CronExpression string `json:"cronExpression,omitempty"`
 
-	// startWindowMinutes defines the time window for starting the job if it misses scheduled
+	// retryWindowMinutes defines the time window for retrying the job if it misses scheduled
 	// time for any reason. the unit of time is minute.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1440
-	StartWindowMinutes *int64 `json:"startWindowMinutes,omitempty"`
+	RetryWindowMinutes *int64 `json:"retryWindowMinutes,omitempty"`
+
+	// repoName is the name of the backupRepo, if not set, will use the default backupRepo.
+	// +optional
+	RepoName string `json:"repoName,omitempty"`
+
+	// pitrEnabled defines whether to enable point-in-time recovery.
+	// +kubebuilder:default=true
+	// +optional
+	PITREnabled bool `json:"pitrEnabled,omitempty"`
 }
 
 type ClusterResources struct {

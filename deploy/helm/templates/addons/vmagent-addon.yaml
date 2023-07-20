@@ -1,0 +1,52 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: victoria-metrics-agent
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'vmagent is a tiny agent which helps you collect metrics from various sources, relabel and filter the collected metrics and store them in VictoriaMetrics or any other storage systems via Prometheus remote_write protocol.'
+  type: Helm
+
+  helm:
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/victoria-metrics-agent
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/victoria-metrics-agent-0.8.41/victoria-metrics-agent-0.8.41.tgz
+    {{- else }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/victoria-metrics-agent-0.8.41.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 0.8.41
+      {{- end }}
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+  
+  defaultInstallValues:
+  - replicas: 1
+    {{- with .Values.tolerations }}
+    tolerations: {{ toJson . | quote }}
+    {{- end }}
+
+  installable:
+    autoInstall: false 

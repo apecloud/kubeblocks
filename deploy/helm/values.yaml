@@ -601,6 +601,7 @@ prometheus:
       log.level: info
       storage.tsdb.min-block-duration: 30m
       enable-feature: memory-snapshot-on-shutdown
+      storage.tsdb.retention.size: 10GB
 
     ## https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write
     ##

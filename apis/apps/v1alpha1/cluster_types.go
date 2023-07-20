@@ -94,7 +94,7 @@ type ClusterSpec struct {
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
-	// cluster backup configuration
+	// cluster backup configuration.
 	// +optional
 	Backup *ClusterBackup `json:"backup,omitempty"`
 }
@@ -112,7 +112,7 @@ type ClusterBackup struct {
 	// +optional
 	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
 
-	// backup method, support: snapshot, backupTool
+	// backup method, support: snapshot, backupTool.
 	// +kubebuilder:validation:Enum=snapshot;backupTool
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=backupTool

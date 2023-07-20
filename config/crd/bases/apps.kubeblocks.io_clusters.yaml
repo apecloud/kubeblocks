@@ -99,7 +99,7 @@ spec:
                     x-kubernetes-list-type: set
                 type: object
               backup:
-                description: cluster backup configuration
+                description: cluster backup configuration.
                 properties:
                   cronExpression:
                     description: the cron expression for schedule, the timezone is
@@ -118,7 +118,7 @@ spec:
                       - snapshot
                       - backupTool
                     default: backupTool
-                    description: 'backup method, support: snapshot, backupTool'
+                    description: 'backup method, support: snapshot, backupTool.'
                     type: string
                   retentionPeriod:
                     default: 1d

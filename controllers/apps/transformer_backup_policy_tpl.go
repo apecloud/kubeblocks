@@ -78,7 +78,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 			// build the backup policy from the template.
 			backupPolicy, action := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, &tpl)
 
-			// merge cluster backup configuration to the backup policy.
+			// merge cluster backup configuration into the backup policy.
 			r.mergeClusterBackup(transCtx, origCluster, backupPolicy)
 
 			if backupPolicy == nil {

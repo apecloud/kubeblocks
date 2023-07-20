@@ -34,7 +34,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-        - name: broker-env
+        - name: pulsar-env
           templateRef: {{ include "pulsar.name" . }}-broker-env-tpl
           namespace: {{ .Release.Namespace }}
           constraintRef: pulsar-env-constraints
@@ -45,7 +45,7 @@ spec:
             - broker
             - init-pulsar-client-config
           volumeName: broker-env
-        - name: broker-config
+        - name: pulsar-config
           templateRef: {{ include "pulsar.name" . }}-broker-config-tpl
           namespace: {{ .Release.Namespace }}
           constraintRef: brokers-config-constraints
@@ -272,7 +272,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-        - name: proxy-env
+        - name: pulsar-env
           templateRef: {{ include "pulsar.name" . }}-proxy-env-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: proxy-env
@@ -281,7 +281,7 @@ spec:
             - conf
           asEnvFrom:
             - proxy
-        - name: proxy-config
+        - name: pulsar-config
           templateRef: {{ include "pulsar.name" . }}-proxy-config-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: pulsar-proxy-config
@@ -437,7 +437,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-        - name: bookies-env
+        - name: pulsar-env
           templateRef: {{ include "pulsar.name" . }}-bookies-env-tpl
           namespace: {{ .Release.Namespace }}
           constraintRef: pulsar-env-constraints
@@ -447,7 +447,7 @@ spec:
           asEnvFrom:
             - init-bookies
             - bookies
-        - name: bookies-config
+        - name: pulsar-config
           templateRef: {{ include "pulsar.name" . }}-bookies-config-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: pulsar-bookies-config
@@ -593,7 +593,7 @@ spec:
         templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
         namespace: {{ .Release.Namespace }}
         volumeName: agamotto-configuration
-      - name: bookies-recovery-env
+      - name: pulsar-env
         templateRef: {{ include "pulsar.name" . }}-recovery-env-tpl
         namespace: {{ .Release.Namespace }}
         constraintRef: pulsar-env-constraints
@@ -718,7 +718,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-        - name: zookeeper-env
+        - name: pulsar-env
           templateRef: {{ include "pulsar.name" . }}-zookeeper-env-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: zookeeper-config-env

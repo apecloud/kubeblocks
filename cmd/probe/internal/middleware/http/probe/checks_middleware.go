@@ -28,12 +28,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/viper"
+
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 
 	"go.uber.org/zap"
-
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (
@@ -96,33 +96,37 @@ func GetRequestBody(operation string, args map[string][]string) []byte {
 
 func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		// get token
-		token := request.Header.Get(tokenKeyInHeader)
-		if token == "" {
-			handleTokenError(writer, "token missing... request refused!")
-			return
-		}
-
-		// check token
-		tokenInCluster, err := getToken(request.Context(), Logger)
-		if err != nil {
-			handleTokenError(writer, "fetch token from cluster failed... request refused!")
-			return
-		}
-		if tokenInCluster != "" && tokenInCluster != token {
-			handleTokenError(writer, fmt.Sprintf("token mismatch: %s is invalid.", token))
-		}
-
 		uri := request.URL
 		method := request.Method
+
+		if method != http.MethodGet {
+			token := request.Header.Get(tokenKeyInHeader)
+			if token == "" {
+				handleTokenError(writer, "token missing... request refused!")
+				return
+			}
+			tokenInCluster := viper.GetString("KB_PROBE_TOKEN")
+			if tokenInCluster != "" && tokenInCluster != token {
+				handleTokenError(writer, fmt.Sprintf("token mismatch: %s is invalid.", token))
+			}
+		}
+
 		if method == http.MethodGet && strings.HasPrefix(uri.Path, bindingPath) {
 			request.Method = http.MethodPost
 
-			switch operation := uri.Query().Get(operationKey); OperationKind(operation) {
-			case CheckStatusOperation, CheckRunningOperation, CheckRoleOperation, VolumeProtection:
+			//switch operation := uri.Query().Get(operationKey); OperationKind(operation) {
+			//case CheckStatusOperation, CheckRunningOperation, CheckRoleOperation, VolumeProtection, ListSystemAccountsOp:
+			//	body := GetRequestBody(operation, uri.Query())
+			//	request.Body = io.NopCloser(bytes.NewReader(body))
+			//default:
+			//	Logger.Info("unknown probe operation", "operation", operation)
+			//}
+
+			operation := uri.Query().Get(operationKey)
+			if strings.HasPrefix(operation, "get") || strings.HasPrefix(operation, "check") || strings.HasPrefix(operation, "list") {
 				body := GetRequestBody(operation, uri.Query())
 				request.Body = io.NopCloser(bytes.NewReader(body))
-			default:
+			} else {
 				Logger.Info("unknown probe operation", "operation", operation)
 			}
 		}

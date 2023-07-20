@@ -6,4 +6,3 @@ PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:
   {{- $MaxDirectMemorySize = printf "-XX:MaxDirectMemorySize=%dm" (mul (div $phy_memory ( mul 1024 1024 10)) 6) }}
 {{- end }}
 PULSAR_MEM: -XX:MinRAMPercentage=30 -XX:MaxRAMPercentage=30 {{ $MaxDirectMemorySize }}
-statusFilePath: /pulsar/status

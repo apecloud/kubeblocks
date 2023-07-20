@@ -20,7 +20,7 @@
 {{- $replicas := $component.replicas | int }}
 {{- $servers := "" }}
 {{- range $i, $e := until $replicas }}
-  {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.cluster.local" $clusterName $component.name $i $clusterName $component.name $namespace }}
+  {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.%s" $clusterName $component.name $i $clusterName $component.name $namespace $.clusterDomain }}
   {{- $server := printf "--kafka.server=%s:9092 \\\n" $podFQDN }}
   {{- $servers = printf "%s\t%s" $servers $server }}
 {{- end }}

@@ -1323,5 +1323,8 @@ func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if config["DEFAULT_STORAGE_CLASS"] == nil {
+		return false, nil
+	}
 	return len(config["DEFAULT_STORAGE_CLASS"].(string)) != 0, nil
 }

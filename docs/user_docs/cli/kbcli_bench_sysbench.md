@@ -30,7 +30,7 @@ kbcli bench sysbench [ClusterName] [flags]
 ### Options
 
 ```
-      --cluster string      the name of the cluster to run sysbench test
+      --cluster string      the cluster of database
       --database string     database name
       --duration int        the seconds of running sysbench (default 60)
   -h, --help                help for sysbench

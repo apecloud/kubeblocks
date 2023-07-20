@@ -22,6 +22,7 @@ package apps
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -146,7 +147,14 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
-	root.Action = ictrltypes.ActionDeletePtr()
+	// set cluster action to noop until all the sub-resources deleted
+	if len(objs) == 0 {
+		root.Action = ictrltypes.ActionDeletePtr()
+	} else {
+		root.Action = ictrltypes.ActionNoopPtr()
+		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
+		return newRequeueError(time.Second*1, "not all sub-resources deleted")
+	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop

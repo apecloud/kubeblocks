@@ -41,10 +41,14 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var deleteExample = templates.Examples(`
+var (
+	deleteExample = templates.Examples(`
 		# delete a cluster named mycluster
 		kbcli cluster delete mycluster
 `)
+
+	rbacEnabled = false
+)
 
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
@@ -61,6 +65,7 @@ func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 	o.AddFlags(cmd)
+	cmd.Flags().BoolVar(&rbacEnabled, "rbac-enabled", false, "Specify whether rbac resources will be deleted by kbcli")
 	return cmd
 }
 
@@ -102,7 +107,6 @@ func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error
 		return err
 	}
 
-	// HACK: for a postgresql cluster, we need to delete the sa, role and rolebinding
 	if err = deleteDependencies(client, c.Namespace, c.Name); err != nil {
 		return err
 	}
@@ -110,6 +114,10 @@ func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error
 }
 
 func deleteDependencies(client kubernetes.Interface, ns string, name string) error {
+	if !rbacEnabled {
+		return nil
+	}
+
 	klog.V(1).Infof("delete dependencies for cluster %s", name)
 	var (
 		saName          = saNamePrefix + name

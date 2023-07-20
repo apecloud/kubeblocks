@@ -20,9 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package k8score
 
 import (
+	"encoding/json"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // IsOvertimeEvent checks whether the duration of warning event reaches the threshold.
@@ -32,4 +35,16 @@ func IsOvertimeEvent(event *corev1.Event, timeout time.Duration) bool {
 	}
 	// Note: LastTimestamp/FirstTimestamp/Count/Source of event are deprecated in k8s v1.25
 	return event.LastTimestamp.After(event.FirstTimestamp.Add(timeout))
+}
+
+// ParseProbeEventMessage parses probe event message.
+func ParseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *ProbeMessage {
+	message := &ProbeMessage{}
+	err := json.Unmarshal([]byte(event.Message), message)
+	if err != nil {
+		// not role related message, ignore it
+		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
+		return nil
+	}
+	return message
 }

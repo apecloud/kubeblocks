@@ -25,11 +25,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
@@ -154,6 +156,15 @@ func (w *templateRenderWorkflow) dumpRenderedTemplates(outputDir string, objects
 		templates = append(templates, component.ScriptTemplates...)
 		return templates
 	}
+	foundConfigSpec := func(component *component.SynthesizedComponent, name string) *appsv1alpha1.ComponentConfigSpec {
+		for i := range component.ConfigTemplates {
+			template := &component.ConfigTemplates[i]
+			if template.Name == name {
+				return template
+			}
+		}
+		return nil
+	}
 
 	for _, template := range fromTemplate(synthesizedComponent) {
 		if name != "" && name != template.Name {
@@ -161,7 +172,7 @@ func (w *templateRenderWorkflow) dumpRenderedTemplates(outputDir string, objects
 		}
 		comName, _ := w.getComponentName(componentDef.Name, cluster)
 		cfgName := cfgcore.GetComponentCfgName(cluster.Name, comName, template.Name)
-		if err := dumpTemplate(template, outputDir, objects, componentDef.Name, cfgName); err != nil {
+		if err := dumpTemplate(template, outputDir, objects, componentDef.Name, cfgName, foundConfigSpec(synthesizedComponent, template.Name)); err != nil {
 			return err
 		}
 	}
@@ -240,10 +251,10 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions, clu
 	}, nil
 }
 
-func dumpTemplate(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, objects []client.Object, componentDefName string, cfgName string) error {
+func dumpTemplate(template appsv1alpha1.ComponentTemplateSpec, outputDir string, objects []client.Object, componentDefName string, cfgName string, configSpec *appsv1alpha1.ComponentConfigSpec) error {
 	output := filepath.Join(outputDir, cfgName)
 	fmt.Printf("dump rendering template spec: %s, output directory: %s\n",
-		printer.BoldYellow(fmt.Sprintf("%s.%s", componentDefName, configSpec.Name)), output)
+		printer.BoldYellow(fmt.Sprintf("%s.%s", componentDefName, template.Name)), output)
 
 	if err := os.MkdirAll(output, 0755); err != nil {
 		return err
@@ -252,17 +263,43 @@ func dumpTemplate(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir strin
 	var ok bool
 	var cm *corev1.ConfigMap
 	for _, obj := range objects {
-		if cm, ok = obj.(*corev1.ConfigMap); !ok || cm.Name != cfgName {
+		if cm, ok = obj.(*corev1.ConfigMap); !ok || !isTemplateOwner(cm, configSpec, cfgName) {
 			continue
 		}
-		for file, val := range cm.Data {
-			if err := os.WriteFile(filepath.Join(output, file), []byte(val), 0755); err != nil {
+		if isTemplateObject(cm, cfgName) {
+			for file, val := range cm.Data {
+				if err := os.WriteFile(filepath.Join(output, file), []byte(val), 0755); err != nil {
+					return err
+				}
+			}
+		}
+		if isTemplateEnvFromObject(cm, configSpec, cfgName) {
+			val, err := yaml.Marshal(cm)
+			if err != nil {
+				return err
+			}
+			yamlFile := fmt.Sprintf("%s.yaml", cm.Name[len(cfgName)+1:])
+			if err := os.WriteFile(filepath.Join(output, yamlFile), val, 0755); err != nil {
 				return err
 			}
 		}
-		break
 	}
 	return nil
+}
+
+func isTemplateObject(cm *corev1.ConfigMap, cfgName string) bool {
+	return cm.Name == cfgName
+}
+
+func isTemplateEnvFromObject(cm *corev1.ConfigMap, configSpec *appsv1alpha1.ComponentConfigSpec, cfgName string) bool {
+	if configSpec == nil || len(configSpec.AsEnvFrom) == 0 || configSpec.ConfigConstraintRef == "" || len(cm.Labels) == 0 {
+		return false
+	}
+	return cm.Labels[constant.CMTemplateNameLabelKey] == configSpec.Name && strings.HasPrefix(cm.Name, cfgName)
+}
+
+func isTemplateOwner(cm *corev1.ConfigMap, configSpec *appsv1alpha1.ComponentConfigSpec, cfgName string) bool {
+	return isTemplateObject(cm, cfgName) || isTemplateEnvFromObject(cm, configSpec, cfgName)
 }
 
 func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx, cli *mockClient,
@@ -287,7 +324,7 @@ func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.Request
 	if err != nil {
 		return nil, nil, err
 	}
-	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, w.clusterVersionObj, cluster, compName, graph.NewDAG())
+	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, w.clusterVersionObj, cluster, nil, compName, graph.NewDAG())
 	if err != nil {
 		return nil, nil, err
 	}

@@ -98,10 +98,6 @@ var clusterCreateExample = templates.Examples(`
 	# the default storage class will be used
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
 
-	# Create a cluster and set the class to general-1c1g
-	# run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
-
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
 
@@ -193,6 +189,7 @@ type CreateOptions struct {
 	Annotations       map[string]string        `json:"annotations,omitempty"`
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
+	RBACEnabled       bool                     `json:"-"`
 
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
@@ -221,10 +218,11 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
 	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
-	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
+	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
+	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
 	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
@@ -256,6 +254,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
 	// o.CreateOptions.CreateDependencies = o.CreateDependencies
+	o.CreateOptions.CleanUpFn = o.CleanUp
 	return o
 }
 
@@ -596,7 +595,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	var comps []map[string]interface{}
 	for _, compSpec := range compSpecs {
 		// validate component classes
-		if err = clsMgr.ValidateResources(compSpec); err != nil {
+		if err = clsMgr.ValidateResources(o.ClusterDefRef, compSpec); err != nil {
 			return nil, err
 		}
 
@@ -624,7 +623,6 @@ const (
 // a service account, a role and a rolebinding
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
 	return nil
@@ -636,6 +634,10 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
+
+	if !o.RBACEnabled {
+		return nil
+	}
 
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account
@@ -1186,7 +1188,12 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 			existedDefault = true
 		}
 	}
-	return allStorageClasses, existedDefault, nil
+	// for cloud k8s we will check the kubeblocks-manager-config
+	defaultInConfig, err := validateDefaultSCInConfig(dynamic)
+	if err != nil {
+		return allStorageClasses, existedDefault, err
+	}
+	return allStorageClasses, existedDefault || defaultInConfig, nil
 }
 
 // validateClusterVersion checks the existence of declared cluster version,
@@ -1297,4 +1304,24 @@ func setKeys() []string {
 		string(keyStorageClass),
 		string(keySwitchPolicy),
 	}
+}
+
+// validateDefaultSCInConfig will verify if the ConfigMap of Kubeblocks is configured with the DEFAULT_STORAGE_CLASS
+func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
+	// todo:  types.KubeBlocksManagerConfigMapName almost is hard code, add a unique label for kubeblocks-manager-config
+	namespace, err := util.GetKubeBlocksNamespaceByDynamic(dynamic)
+	if err != nil {
+		return false, err
+	}
+	cfg, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(namespace).Get(context.Background(), types.KubeBlocksManagerConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	var config map[string]interface{}
+	data := cfg.Object["data"].(map[string]interface{})
+	err = yaml.Unmarshal([]byte(data["config.yaml"].(string)), &config)
+	if err != nil {
+		return false, err
+	}
+	return len(config["DEFAULT_STORAGE_CLASS"].(string)) != 0, nil
 }

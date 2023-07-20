@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,6 +41,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -201,6 +203,27 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 	return pods
 }
 
+// FakeSecret for test cluster create
+func FakeSecret(namespace string, cluster string) *corev1.Secret {
+	secret := corev1.Secret{}
+	secret.Name = SecretName
+	secret.Namespace = namespace
+	secret.Type = corev1.SecretTypeServiceAccountToken
+	secret.Labels = map[string]string{
+		constant.AppInstanceLabelKey: cluster,
+		"name":                       types.KubeBlocksChartName,
+		"owner":                      "helm",
+	}
+
+	secret.Data = map[string][]byte{
+		corev1.ServiceAccountTokenKey: []byte("fake-secret-token"),
+		"fake-secret-key":             []byte("fake-secret-value"),
+		"username":                    []byte("test-user"),
+		"password":                    []byte("test-password"),
+	}
+	return &secret
+}
+
 func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret := corev1.Secret{}
 	secret.Name = SecretName
@@ -307,12 +330,12 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 }
 
 func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef string) *appsv1alpha1.ComponentClassDefinition {
-	constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+	testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 		AddConstraints(testapps.GeneralResourceConstraint).
 		GetObject()
 
 	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
-		AddClasses(constraint.Name, []appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
+		AddClasses([]appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
 		GetObject()
 
 	return componentClassDefinition
@@ -594,7 +617,7 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	return addon
 }
 
-func FakeConfigMap(cmName string) *corev1.ConfigMap {
+func FakeConfigMap(cmName string, namespace string, data map[string]string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -604,9 +627,10 @@ func FakeConfigMap(cmName string) *corev1.ConfigMap {
 			Name:      cmName,
 			Namespace: Namespace,
 		},
-		Data: map[string]string{
-			"fake": "fake",
-		},
+		Data: data,
+	}
+	if namespace != "" {
+		cm.Namespace = namespace
 	}
 	return cm
 }
@@ -932,4 +956,77 @@ func FakeEventForObject(name string, namespace string, object string) *corev1.Ev
 			Name: object,
 		},
 	}
+}
+
+func FakeStorageProvider(name string) *storagev1alpha1.StorageProvider {
+	storageProvider := &storagev1alpha1.StorageProvider{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.StorageAPIGroup, types.StorageAPIVersion),
+			Kind:       "StorageProvider",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: storagev1alpha1.StorageProviderSpec{
+			CSIDriverName: "fake-csi-s3",
+			CSIDriverSecretTemplate: `
+accessKeyId: {{ index .Parameters "accessKeyId" }}
+secretAccessKey: {{ index .Parameters "secretAccessKey" }}
+`,
+			StorageClassTemplate: `
+bucket: {{ index .Parameters "bucket" }}
+region: {{ index .Parameters "region" }}
+endpoint: {{ index .Parameters "endpoint" }}
+mountOptions: {{ index .Parameters "mountOptions" | default "" }}
+`,
+			ParametersSchema: &storagev1alpha1.ParametersSchema{
+				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"accessKeyId":     {Type: "string"},
+						"secretAccessKey": {Type: "string"},
+						"bucket":          {Type: "string"},
+						"region": {
+							Type: "string",
+							Enum: []apiextensionsv1.JSON{{Raw: []byte(`""`)}, {Raw: []byte(`"us-east-1"`)}, {Raw: []byte(`"us-west-1"`)}},
+						},
+						"endpoint":     {Type: "string"},
+						"mountOptions": {Type: "string"},
+					},
+					Required: []string{
+						"accessKeyId",
+						"secretAccessKey",
+					},
+				},
+				CredentialFields: []string{
+					"accessKeyId",
+					"secretAccessKey",
+				},
+			},
+		},
+	}
+	storageProvider.SetCreationTimestamp(metav1.Now())
+	return storageProvider
+}
+
+func FakeBackupRepo(name string, isDefault bool) *dpv1alpha1.BackupRepo {
+	backupRepo := &dpv1alpha1.BackupRepo{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       "BackupRepo",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: dpv1alpha1.BackupRepoSpec{
+			StorageProviderRef: "fake-storage-provider",
+			PVReclaimPolicy:    "Retain",
+		},
+	}
+	if isDefault {
+		backupRepo.Annotations = map[string]string{
+			constant.DefaultBackupRepoAnnotationKey: "true",
+		}
+	}
+	return backupRepo
 }

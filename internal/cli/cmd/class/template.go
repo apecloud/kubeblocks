@@ -30,8 +30,7 @@ import (
 )
 
 const ComponentClassTemplate = `
-- resourceConstraintRef: kb-resource-constraint-general
-  # class template, you can declare variables and set default values here
+- # class template, you can declare variables and set default values here
   template: |
     cpu: "{{ or .cpu 1 }}"
     memory: "{{ or .memory 4 }}Gi"

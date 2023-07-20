@@ -131,6 +131,7 @@ const (
 	ResourceBackupTools    = "backuptools"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
+	ResourceBackupRepos    = "backuprepos"
 )
 
 // Extensions API group
@@ -138,6 +139,13 @@ const (
 	ExtensionsAPIGroup   = "extensions.kubeblocks.io"
 	ExtensionsAPIVersion = "v1alpha1"
 	ResourceAddons       = "addons"
+)
+
+// Storage API group
+const (
+	StorageAPIGroup          = "storage.kubeblocks.io"
+	StorageAPIVersion        = "v1alpha1"
+	ResourceStorageProviders = "storageproviders"
 )
 
 // Migration API group
@@ -157,7 +165,7 @@ const (
 
 // Kubebench API group
 const (
-	KubebenchAPIGroup   = "benchmark.kubebench.io"
+	KubebenchAPIGroup   = "benchmark.apecloud.io"
 	KubebenchAPIVersion = "v1alpha1"
 	ResourcePgBench     = "pgbenches"
 	ResourceSysBench    = "sysbenches"
@@ -188,6 +196,9 @@ var (
 
 	// KubeBlocksHelmLabel name=kubeblocks,owner-helm, for helm secret
 	KubeBlocksHelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
+
+	// KubeBlocksManagerConfigMapName the kubeblocks manager configMap name
+	KubeBlocksManagerConfigMapName = fmt.Sprintf("%s-manager-config", KubeBlocksChartName)
 )
 
 // Playground
@@ -234,12 +245,20 @@ func BackupToolGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTools}
 }
 
+func BackupRepoGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupRepos}
+}
+
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestoreJobs}
 }
 
 func AddonGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
+}
+
+func StorageProviderGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: StorageAPIGroup, Version: StorageAPIVersion, Resource: ResourceStorageProviders}
 }
 
 func ComponentResourceConstraintGVR() schema.GroupVersionResource {

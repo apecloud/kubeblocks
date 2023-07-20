@@ -26,3 +26,5 @@ nebula:
       repository: docker.io/vesoft/nebula-console
       tag: v3.5.0
       pullPolicy: IfNotPresent
+
+clusterDomain: ".cluster.local"

@@ -193,5 +193,6 @@ func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[st
 			newValues[k] = v
 		}
 	}
+
 	return newValues
 }

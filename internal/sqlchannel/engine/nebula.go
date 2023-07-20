@@ -22,14 +22,16 @@ package engine
 import (
 	"fmt"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
+
+var _ ClusterCommands = &nebula{}
 
 type nebula struct {
 	info     EngineInfo
 	examples map[ClientType]buildConnectExample
 }
-
-var _ Interface = &nebula{}
 
 func newNebula() *nebula {
 	return &nebula{
@@ -47,7 +49,7 @@ nebula --addr %s --port %s --user %s -port%s
 	}
 }
 
-func (m *nebula) ConnectCommand(connectInfo *AuthInfo) []string {
+func (r *nebula) ConnectCommand(connectInfo *AuthInfo) []string {
 	userName := "root"
 	userPass := "nebula"
 
@@ -56,15 +58,19 @@ func (m *nebula) ConnectCommand(connectInfo *AuthInfo) []string {
 		userPass = connectInfo.UserPasswd
 	}
 
-	nebulaCmd := []string{fmt.Sprintf("%s --addr $GRAPHD_SVC_NAME --port $GRAPHD_SVC_PORT --user %s --password %s", m.info.Client, userName, userPass)}
+	nebulaCmd := []string{fmt.Sprintf("%s --addr $GRAPHD_SVC_NAME --port $GRAPHD_SVC_PORT --user %s --password %s", r.info.Client, userName, userPass)}
 
 	return []string{"sh", "-c", strings.Join(nebulaCmd, " ")}
 }
 
-func (m *nebula) Container() string {
-	return m.info.Container
+func (r *nebula) Container() string {
+	return r.info.Container
 }
 
-func (m *nebula) ConnectExample(info *ConnectionInfo, client string) string {
-	return buildExample(info, client, m.examples)
+func (r *nebula) ConnectExample(info *ConnectionInfo, client string) string {
+	return buildExample(info, client, r.examples)
+}
+
+func (r *nebula) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
 }

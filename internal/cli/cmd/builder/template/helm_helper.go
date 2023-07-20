@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package template
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -93,9 +94,14 @@ func CreateObjectsFromDirectory(rootPath string) ([]client.Object, error) {
 
 func createObjectsFromYaml(yamlBytes []byte) ([]client.Object, error) {
 	objects := make([]client.Object, 0)
-	for _, doc := range bytes.Split(yamlBytes, []byte("---")) {
-		if len(bytes.TrimSpace(doc)) == 0 {
-			continue
+	reader := bufio.NewReader(bytes.NewReader(yamlBytes))
+	for {
+		doc, err := yaml.NewYAMLReader(reader).Read()
+		if len(doc) == 0 {
+			break
+		}
+		if err != nil {
+			return nil, err
 		}
 		meta, err := getResourceMeta(doc)
 		if err != nil {

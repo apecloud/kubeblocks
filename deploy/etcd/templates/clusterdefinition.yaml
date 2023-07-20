@@ -46,7 +46,7 @@ spec:
                 echo "start etcd..."
                 PEERS=""
                 # TODO: clusterDomain 'cluster.local' requires configurable
-                DOMAIN=$KB_NAMESPACE".svc.cluster.local"
+                DOMAIN=$KB_NAMESPACE".svc{{ .Values.clusterDomain }}"
                 i=0
                 while [ $i -lt $KB_REPLICA_COUNT ]; do
                 	if [ $i -ne 0 ]; then
@@ -59,7 +59,7 @@ spec:
                     i=$(( i + 1))
                 done
                 # TODO: clusterDomain 'cluster.local' requires configurable
-                MY_PEER=$KB_POD_FQDN.cluster.local
+                MY_PEER=$KB_POD_FQDN{{ .Values.clusterDomain }}
                 exec etcd --name ${HOSTNAME} \
                 --listen-peer-urls http://0.0.0.0:2380 \
                 --listen-client-urls http://0.0.0.0:2379 \

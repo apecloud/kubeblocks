@@ -30,6 +30,7 @@ kbcli cluster create mysql NAME [flags]
       --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
       --proxy-enabled                Enable proxy or not.
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
+      --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
       --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3. Value range [1, 5]. (default 1)
       --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")

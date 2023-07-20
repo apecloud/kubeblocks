@@ -37,6 +37,14 @@ rules:
   - update
   - delete
 - apiGroups:
+  - ""
+  resources:
+  - nodes
+  - nodes/stats
+  verbs:
+  - get
+  - list
+- apiGroups:
   - apps.kubeblocks.io
   resources:
   - clusters

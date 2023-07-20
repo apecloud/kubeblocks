@@ -17,7 +17,7 @@ spec:
     matchLabels:
       "apps.kubeblocks.postgres.patroni/role": "master"
 
-  # top level mysql configuration type
+  # top level pg configuration type
   cfgSchemaTopLevelName: PGParameter
 
   # ConfigurationSchema that impose restrictions on engine parameter's rule

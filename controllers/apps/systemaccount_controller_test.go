@@ -91,7 +91,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// namespaced resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)

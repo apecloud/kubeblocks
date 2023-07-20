@@ -1,8 +1,11 @@
 package operations
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -130,6 +134,16 @@ var _ = Describe("DataScriptOps", func() {
 			}
 		})
 
+		AfterEach(func() {
+			By("clean resources")
+			inNS := client.InNamespace(testCtx.DefaultNamespace)
+			testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			testapps.ClearResources(&testCtx, generics.ServiceSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			testapps.ClearResources(&testCtx, generics.ServiceSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			testapps.ClearResources(&testCtx, generics.JobSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+		})
+
 		It("create a datascript ops with ttlSecondsBeforeAbort-0, abort immediately", func() {
 			By("patch cluster to creating")
 			patchClusterStatus(appsv1alpha1.CreatingClusterPhase)
@@ -188,7 +202,7 @@ var _ = Describe("DataScriptOps", func() {
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
 
-		It("reconcile a datascript ops on running cluster", func() {
+		It("reconcile a datascript ops on running cluster, patch job to complete", func() {
 			By("patch cluster to running")
 			patchClusterStatus(appsv1alpha1.RunningClusterPhase)
 
@@ -201,37 +215,56 @@ var _ = Describe("DataScriptOps", func() {
 			opsResource.OpsRequest = ops
 
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
-			By("mock a job")
+			By("mock a job, missing service, should fail")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
+			_, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			Expect(err).Should(HaveOccurred())
+
+			By("mock a service, should pass")
+			serviceName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: clusterObj.Namespace},
+				Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 3306}}},
+			}
+			err = k8sClient.Create(testCtx.Ctx, service)
+			Expect(err).Should(Succeed())
+
+			By("mock a job one more time, fail with missing secret")
+			_, err = buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("conn-credential"))
+
+			By("patch a secret name to ops, fail with missing secret")
+			secretName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)
+			patch := client.MergeFrom(ops.DeepCopy())
+			ops.Spec.ScriptSpec.Secret = &appsv1alpha1.ScriptSecret{
+				Name:        secretName,
+				PasswordKey: "password",
+				UsernameKey: "username",
+			}
+			Expect(k8sClient.Patch(testCtx.Ctx, ops, patch)).Should(Succeed())
+
+			_, err = buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(secretName))
+
+			By("mock a secret, should pass")
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: clusterObj.Namespace},
+				Type:       corev1.SecretTypeOpaque,
+				Data: map[string][]byte{
+					"password": []byte("123456"),
+					"username": []byte("hellocoffee"),
+				},
+			}
+			err = k8sClient.Create(testCtx.Ctx, secret)
+			Expect(err).Should(Succeed())
+
+			By("create job, should pass")
+			viper.Set(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-clients:latest")
+			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
-
-			By("reconcile the opsRequest phase")
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
-			Expect(err).Should(Succeed())
-			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))
-		})
-
-		It("reconcile a datascript ops on running cluster, patch job to succeed", func() {
-			By("patch cluster to running")
-			patchClusterStatus(appsv1alpha1.RunningClusterPhase)
-
-			By("create a datascript ops with ttlSecondsBeforeAbort=0")
-			ops := createClusterDatascriptOps(consensusComp, 0)
-			opsResource.OpsRequest = ops
-			opsKey := client.ObjectKeyFromObject(ops)
-			patchOpsPhase(opsKey, appsv1alpha1.OpsRunningPhase)
-			Expect(k8sClient.Get(testCtx.Ctx, opsKey, ops)).Should(Succeed())
-			opsResource.OpsRequest = ops
-
-			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
-			By("mock a job")
-			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
-			Expect(err).Should(Succeed())
-			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
-			// patch job to running
 
 			By("reconcile the opsRequest phase")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
@@ -253,6 +286,10 @@ var _ = Describe("DataScriptOps", func() {
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(err).Should(Succeed())
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+
+			Expect(k8sClient.Delete(testCtx.Ctx, service)).Should(Succeed())
+			Expect(k8sClient.Delete(testCtx.Ctx, job)).Should(Succeed())
+			Expect(k8sClient.Delete(testCtx.Ctx, secret)).Should(Succeed())
 		})
 
 		It("reconcile a datascript ops on running cluster, patch job to failed", func() {
@@ -268,22 +305,53 @@ var _ = Describe("DataScriptOps", func() {
 			opsResource.OpsRequest = ops
 
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
-			By("mock a job")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
+			By("mock a service, should pass")
+			serviceName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: clusterObj.Namespace},
+				Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 3306}}},
+			}
+			err := k8sClient.Create(testCtx.Ctx, service)
+			Expect(err).Should(Succeed())
+
+			By("patch a secret name to ops")
+			secretName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: clusterObj.Namespace},
+				Type:       corev1.SecretTypeOpaque,
+				Data: map[string][]byte{
+					"password": []byte("123456"),
+					"username": []byte("hellocoffee"),
+				},
+			}
+			patch := client.MergeFrom(ops.DeepCopy())
+			ops.Spec.ScriptSpec.Secret = &appsv1alpha1.ScriptSecret{
+				Name:        secretName,
+				PasswordKey: "password",
+				UsernameKey: "username",
+			}
+			Expect(k8sClient.Patch(testCtx.Ctx, ops, patch)).Should(Succeed())
+
+			By("mock a secret, should pass")
+			err = k8sClient.Create(testCtx.Ctx, secret)
+			Expect(err).Should(Succeed())
+
+			By("create job, should pass")
+			viper.Set(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-clients:latest")
+			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
-			// patch job to running
 
 			By("reconcile the opsRequest phase")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(err).Should(Succeed())
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
-			By("patch job to succeed")
+			By("patch job to failed")
 			Eventually(func(g Gomega) {
 				g.Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
-					job.Status.Failed = 1
+					job.Status.Succeeded = 1
 					job.Status.Conditions = append(job.Status.Conditions,
 						batchv1.JobCondition{
 							Type:   batchv1.JobFailed,
@@ -295,9 +363,13 @@ var _ = Describe("DataScriptOps", func() {
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(err).Should(Succeed())
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+
+			Expect(k8sClient.Delete(testCtx.Ctx, service)).Should(Succeed())
+			Expect(k8sClient.Delete(testCtx.Ctx, job)).Should(Succeed())
+			Expect(k8sClient.Delete(testCtx.Ctx, secret)).Should(Succeed())
 		})
 
-		It("parse script from psec", func() {
+		It("parse script from spec", func() {
 			cmName := "test-configmap"
 			secretName := "test-secret"
 

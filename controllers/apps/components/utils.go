@@ -206,21 +206,6 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster,
-	compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return nil, err
-	}
-	for _, component := range clusterDef.Spec.ComponentDefs {
-		if component.Name == compDefName {
-			return &component, nil
-		}
-	}
-	return nil, nil
-}
-
 // getClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
 func getClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
@@ -332,7 +317,11 @@ func GetComponentInfoByPod(ctx context.Context,
 		return "", nil, errors.New("pod component name label is nil")
 	}
 	compDefName := cluster.Spec.GetComponentDefRefName(componentName)
-	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	// if no componentSpec found, then componentName is componentDefName
+	if len(compDefName) == 0 && len(cluster.Spec.ComponentSpecs) == 0 {
+		compDefName = componentName
+	}
+	componentDef, err = appsv1alpha1.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return componentName, componentDef, err
 	}

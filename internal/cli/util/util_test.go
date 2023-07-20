@@ -121,14 +121,14 @@ var _ = Describe("util", func() {
 	})
 
 	It("GetPodStatus", func() {
-		newPod := func(phase corev1.PodPhase) *corev1.Pod {
-			return &corev1.Pod{
+		newPod := func(phase corev1.PodPhase) corev1.Pod {
+			return corev1.Pod{
 				Status: corev1.PodStatus{
 					Phase: phase,
 				}}
 		}
 
-		var pods []*corev1.Pod
+		var pods []corev1.Pod
 		for _, p := range []corev1.PodPhase{corev1.PodRunning, corev1.PodPending, corev1.PodSucceeded, corev1.PodFailed} {
 			pods = append(pods, newPod(p))
 		}
@@ -207,12 +207,15 @@ var _ = Describe("util", func() {
 					}
 				}
 			})
+		badcaseCCObject := configConstraintObj.DeepCopy()
+		badcaseCCObject.Spec.CfgSchemaTopLevelName = "badcase"
+		badcaseCCObject.SetName("badcase")
 
 		tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 		defer tf.Cleanup()
 
 		Expect(appsv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
-		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
+		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj, badcaseCCObject)
 		configSpec := appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        "for_test",
@@ -244,6 +247,20 @@ var _ = Describe("util", func() {
 				updatedParams: testapps.WithMap("not_exist_field", "1"),
 			},
 			expected: false,
+		}, {
+			name: "badcase test",
+			args: args{
+				configSpec: appsv1alpha1.ComponentConfigSpec{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "for_test",
+						TemplateRef: ccName,
+						VolumeName:  "config",
+					},
+					ConfigConstraintRef: "badcase",
+				},
+				updatedParams: testapps.WithMap("automatic_sp_privileges", "1"),
+			},
+			expected: true,
 		}}
 
 		for _, tt := range tests {
@@ -264,7 +281,7 @@ var _ = Describe("util", func() {
 	})
 
 	It("convert obj to unstructured ", func() {
-		unstructuredObj, err := ConvertObjToUnstructured(testing.FakeConfigMap("cm-test"))
+		unstructuredObj, err := ConvertObjToUnstructured(testing.FakeConfigMap("cm-test", testing.Namespace, map[string]string{"fake": "fake"}))
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(unstructuredObj.Object).Should(HaveLen(4))
 

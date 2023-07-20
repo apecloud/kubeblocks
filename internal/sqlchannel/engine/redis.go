@@ -19,7 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package engine
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+)
+
+var _ ClusterCommands = &redis{}
 
 type redis struct {
 	info     EngineInfo
@@ -57,4 +64,6 @@ func (r redis) ConnectExample(info *ConnectionInfo, client string) string {
 	panic("implement me")
 }
 
-var _ Interface = &redis{}
+func (r redis) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
+}

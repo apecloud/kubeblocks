@@ -427,19 +427,20 @@ type webhookManager struct {
 
 // CfgFileFormat defines formatter of configuration files.
 // +enum
-// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis}
+// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis,props-plus}
 type CfgFileFormat string
 
 const (
-	Ini        CfgFileFormat = "ini"
-	YAML       CfgFileFormat = "yaml"
-	JSON       CfgFileFormat = "json"
-	XML        CfgFileFormat = "xml"
-	HCL        CfgFileFormat = "hcl"
-	Dotenv     CfgFileFormat = "dotenv"
-	TOML       CfgFileFormat = "toml"
-	Properties CfgFileFormat = "properties"
-	RedisCfg   CfgFileFormat = "redis"
+	Ini            CfgFileFormat = "ini"
+	YAML           CfgFileFormat = "yaml"
+	JSON           CfgFileFormat = "json"
+	XML            CfgFileFormat = "xml"
+	HCL            CfgFileFormat = "hcl"
+	Dotenv         CfgFileFormat = "dotenv"
+	TOML           CfgFileFormat = "toml"
+	Properties     CfgFileFormat = "properties"
+	RedisCfg       CfgFileFormat = "redis"
+	PropertiesPlus CfgFileFormat = "props-plus"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.
@@ -549,6 +550,14 @@ type VolumeType string
 const (
 	VolumeTypeData VolumeType = "data"
 	VolumeTypeLog  VolumeType = "log"
+)
+
+type ClusterMode string
+
+const (
+	ClusterModeRaftGroup   ClusterMode = "raftGroup"
+	ClusterModeReplication ClusterMode = "replication"
+	ClusterModeStandAlone  ClusterMode = "standalone"
 )
 
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.

@@ -1,0 +1,80 @@
+# Default values for mysql.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  registry: 
+  repository: mysql
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  #tag: 8.0.33
+  tag: 5.7
+
+## MySQL Cluster parameters
+cluster:
+  ## CLUSTER_ID
+  clusterId: "1"
+  ## CLUSTER_START_INDEX
+  clusterStartIndex: "1"
+  ## @param cluster.replicaSetCount
+  replicaSetCount: 3
+  ## MYSQL_TEMPLATE_CONFIG
+  templateConfig:
+  ## MYSQL_CUSTOM_CONFIG
+  customConfig:
+  ## MYSQL_DYNAMIC_CONFIG
+  dynamicConfig:
+  ## KB_EMBEDDED_WESQL
+  kbWeSQLImage: "1"
+
+## MySQL Authentication parameters
+auth:
+  ## MYSQL_ROOT_HOST
+  rootHost: "%"
+  ## @param auth.createDatabase Whether to create the .Values.auth.database or not
+  ##
+  createDatabase: true
+  ## @param auth.database Name for a custom database to create
+  ## MYSQL_DATABASE
+  database: "mydb"
+  ## @param auth.username Name for a custom user to create
+  ## MYSQL_USER
+  username: "u1"
+  ## MYSQL_PASSWORD
+  password: "u1"
+  ## @param auth.replicationUser MySQL replication user
+  ##
+  replicationUser: "replicator"
+  ## @param auth.replicationPassword MySQL replication user password. Ignored if existing secret is provided
+  ##
+  replicationPassword: ""
+
+
+configTemplate:
+  ## @param config template name
+  ## name: mysql-3node-tpl-8.0
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+clusterVersionOverride: ""
+
+logConfigs:
+  error: /data/mysql/log/mysqld-error.log
+  slow: /data/mysql/log/mysqld-slowquery.log
+  general: /data/mysql/log/mysqld.log
+
+roleProbe:
+  failureThreshold: 2
+  periodSeconds: 1
+  timeoutSeconds: 1
+
+metrics:
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/agamotto
+    tag: 0.1.0-beta.5
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 9104

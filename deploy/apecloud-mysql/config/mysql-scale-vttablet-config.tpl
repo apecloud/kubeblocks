@@ -1,0 +1,6 @@
+[vttablet]
+health_check_interval=1s
+shard_sync_retry_delay=1s
+remote_operation_timeout=1s
+db_connect_timeout_ms=500
+table_acl_config_mode=simple

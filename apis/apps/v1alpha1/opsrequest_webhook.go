@@ -594,21 +594,6 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 	return runningOpsList, nil
 }
 
-// getComponentDefByCluster gets component from ClusterDefinition with compDefName
-func getComponentDefByCluster(ctx context.Context, cli client.Client, cluster Cluster,
-	compDefName string) (*ClusterComponentDefinition, error) {
-	clusterDef := &ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return nil, err
-	}
-	for _, component := range clusterDef.Spec.ComponentDefs {
-		if component.Name == compDefName {
-			return &component, nil
-		}
-	}
-	return nil, nil
-}
-
 // validateSwitchoverResourceList checks if switchover resourceList is legal.
 func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *Cluster, switchoverList []Switchover) error {
 	for _, switchover := range switchoverList {
@@ -617,7 +602,7 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 		}
 
 		// check clusterComponentDefinition whether support switchover
-		compDefObj, err := getComponentDefByCluster(ctx, cli, *cluster, cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
+		compDefObj, err := GetComponentDefByCluster(ctx, cli, *cluster, cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
 		if err != nil {
 			return err
 		}

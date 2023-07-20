@@ -26,3 +26,7 @@ hostNetworkAccessible: false
 ## @param publiclyAccessible if true, expose the internet service
 ##
 publiclyAccessible: false
+
+## @param rbacEnabled if true, rbac resources will be created
+##
+rbacEnabled: true

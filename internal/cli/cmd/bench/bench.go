@@ -60,12 +60,13 @@ var benchGVRList = []schema.GroupVersionResource{
 }
 
 type BenchBaseOptions struct {
-	Driver   string `json:"driver"`
-	Database string `json:"database"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
+	Driver      string
+	Database    string
+	Host        string
+	Port        int
+	User        string
+	Password    string
+	ClusterName string
 }
 
 func (o *BenchBaseOptions) BaseValidate() error {
@@ -89,6 +90,10 @@ func (o *BenchBaseOptions) BaseValidate() error {
 		return fmt.Errorf("user is required")
 	}
 
+	if o.ClusterName == "" {
+		return fmt.Errorf("cluster is required")
+	}
+
 	return nil
 }
 
@@ -98,6 +103,7 @@ func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&o.User, "user", "", "the user of database")
 	cmd.PersistentFlags().StringVar(&o.Password, "password", "", "the password of database")
 	cmd.PersistentFlags().IntVar(&o.Port, "port", 0, "the port of database")
+	cmd.PersistentFlags().StringVar(&o.ClusterName, "cluster", "", "the cluster of database")
 }
 
 // NewBenchCmd creates the bench command

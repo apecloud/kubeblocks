@@ -33,7 +33,7 @@ template: {
 			valueFrom: {
 				fieldRef: {
 					apiVersion: "v1"
-					fieldPath: "status.podIP"
+					fieldPath:  "status.podIP"
 				}
 			}
 		},

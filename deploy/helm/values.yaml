@@ -22,6 +22,9 @@ image:
     repository: apecloud/kubeblocks-tools
   charts:
     repository: apecloud/kubeblocks-charts
+  datascript:
+    repository: apecloud/kubeblocks-datascript
+
 
 ## @param separatedDeployment separated the KubeBlocks deployment into two deployments.
 ## This switch is used to isolate the apps controller and dataprotection controller
@@ -42,11 +45,11 @@ fullnameOverride: ""
 
 
 ## KubeBlocks RBAC access priority setting
-## 
-## @param rbac.enabled is used to enable or disable KubeBlocks RBAC access priority. 
-## By enabling this feature, KubeBlocks can ensure resource accessibility for the 
+##
+## @param rbac.enabled is used to enable or disable KubeBlocks RBAC access priority.
+## By enabling this feature, KubeBlocks can ensure resource accessibility for the
 ## cluster's pods, which are required to efficiently manage the cluster. By default,
-## it is set to true. When RBAC access priority is enabled, KubeBlocks will have 
+## it is set to true. When RBAC access priority is enabled, KubeBlocks will have
 ## the following permissions:
 ##   groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 ##   groups=core,resources=serviceaccounts/status,verbs=get;update;patch
@@ -56,8 +59,8 @@ fullnameOverride: ""
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get;update;patch
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update
 ##
-## If it is set to false, then you will need to create the service account 
-## named `cluster.ComponentSpec.ServiceAccountName` and the corresponding role binding 
+## If it is set to false, then you will need to create the service account
+## named `cluster.ComponentSpec.ServiceAccountName` and the corresponding role binding
 ## manually or through the cluster's Helm template, as shown in the example:
 ##   helm install mysql apecloud-mysql-cluster
 rbac:
@@ -309,12 +312,35 @@ admissionWebhooks:
 dataProtection:
   enabled: true
   enableVolumeSnapshot: false
-  backupPVCName: kb-backup-data
+  backupPVCName: ""
   backupPVCInitCapacity: ""
   backupPVCStorageClassName: ""
   backupPVCCreatePolicy: ""
   backupPVConfigMapName: ""
   backupPVConfigMapNamespace: ""
+
+## BackupRepo settings
+##
+## @param backupRepo.create - creates a backup repo during installation
+## @param backupRepo.default - set the created repo as the default
+## @param backupRepo.storageProvider - the storage provider used by the repo, options: [s3, oss, minio]
+## @param backupRepo.pvReclaimPolicy - the PV reclaim policy, options: [Retain, Delete]
+## @param backupRepo.volumeCapacity - the capacity for creating PVC
+## @param backupRepo.config - a key-value map containing the settings required by the storage provider
+## @param backupRepo.secrets - a key-value map containing the secret values required by the storage provider
+backupRepo:
+  create: false
+  default: true
+  storageProvider: ""
+  pvReclaimPolicy: "Retain"
+  volumeCapacity: ""
+  config:
+    bucket: ""
+    endpoint: ""
+    region: ""
+  secrets:
+    accessKeyId: ""
+    secretAccessKey: ""
 
 ## Addon controller settings, this will require cluster-admin clusterrole.
 ##
@@ -634,7 +660,7 @@ cloudProvider:
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
 ##
 csi-s3:
-  ## @param backupRepo.enabled -- Enable csi-s3 chart.
+  ## @param csi-s3.enabled -- Enable csi-s3 chart.
   ##
   enabled: false
 
@@ -717,6 +743,16 @@ agamotto:
 
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:
+  ## @param storageClass.name -- Specifies the name of the default storage class.
+  ## If name is not specified and KubeBlocks deployed in a cloud, a default name will be generated.
+  ##
+  name: ""
+
+  ## @param storageClass.create -- Specifies whether the storage class should be created. If storageClass.name is not
+  ## specified or generated, this value will be ignored.
+  ##
+  create: true
+
   mountOptions:
     - noatime
     - nobarrier
@@ -744,3 +780,4 @@ external-dns:
     operator: Equal
     value: "true"
     effect: NoSchedule
+

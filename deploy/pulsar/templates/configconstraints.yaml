@@ -49,6 +49,7 @@ spec:
 
   reloadOptions:
     shellTrigger:
+      sync: true
       command:
         - "update-dynamic-config.sh"
 

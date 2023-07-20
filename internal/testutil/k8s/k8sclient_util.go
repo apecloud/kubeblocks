@@ -315,6 +315,13 @@ func WithCreatedSucceedResult() HandleCreateReturnedObject {
 	}
 }
 
+func WithCreatedFailedResult() HandleCreateReturnedObject {
+	return func(obj client.Object) error {
+		_ = obj
+		return fmt.Errorf("create failed")
+	}
+}
+
 func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObject {
 	mockMap := make(map[client.ObjectKey]client.Object, len(mockObjs))
 	for _, obj := range mockObjs {

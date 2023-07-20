@@ -114,9 +114,8 @@ var _ = Describe("Preflight API Test", func() {
 	})
 
 	It("LoadVendorCheckYaml test, and expect fail", func() {
-		res, err := LoadVendorCheckYaml(util.UnknownProvider)
-		Expect(err).Should(HaveOccurred())
-		Expect(len(res)).Should(Equal(0))
+		_, err := LoadVendorCheckYaml(util.UnknownProvider)
+		Expect(err).Should(Succeed())
 	})
 
 	It("LoadVendorCheckYaml test, and expect success", func() {

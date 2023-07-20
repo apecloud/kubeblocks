@@ -236,7 +236,7 @@ func mockRBACResources() []runtime.Object {
 }
 
 func mockConfigMaps() []runtime.Object {
-	obj := testing.FakeConfigMap(mockName())
+	obj := testing.FakeConfigMap(mockName(), testing.Namespace, map[string]string{"fake": "fake"})
 	// add a config tpl label
 	if obj.ObjectMeta.Labels == nil {
 		obj.ObjectMeta.Labels = make(map[string]string)

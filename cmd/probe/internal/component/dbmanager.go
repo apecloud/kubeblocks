@@ -4,8 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/dapr/kit/logger"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
 type DBManager interface {

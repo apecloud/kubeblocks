@@ -319,6 +319,17 @@ const (
 	DedicatedNode TenancyType = "DedicatedNode"
 )
 
+// AvailabilityPolicyType for cluster affinity policy.
+// +enum
+// +kubebuilder:validation:Enum={zone,node,none}
+type AvailabilityPolicyType string
+
+const (
+	AvailabilityPolicyZone AvailabilityPolicyType = "zone"
+	AvailabilityPolicyNode AvailabilityPolicyType = "node"
+	AvailabilityPolicyNone AvailabilityPolicyType = "none"
+)
+
 // ProgressStatus defines the status of the opsRequest progress.
 // +enum
 // +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}

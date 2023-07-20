@@ -52,13 +52,25 @@ var _ = Describe("Cluster", func() {
 	)
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
-
+	// test if DEFAULT_STORAGE_CLASS is not set in config.yaml
+	fakeNilConfigData := map[string]string{
+		"config.yaml": `# the default storage class name.
+    #DEFAULT_STORAGE_CLASS: ""`,
+	}
+	fakeConfigData := map[string]string{
+		"config.yaml": `# the default storage class name.
+    DEFAULT_STORAGE_CLASS: ""`,
+	}
+	fakeConfigDataWithDefaultSC := map[string]string{
+		"config.yaml": `# the default storage class name.
+    DEFAULT_STORAGE_CLASS: kb-default-sc`,
+	}
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		cd := testing.FakeClusterDef()
 		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault)
-		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion())
+		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName))
 		tf.Client = &clientfake.RESTClient{}
 	})
 
@@ -96,13 +108,25 @@ var _ = Describe("Cluster", func() {
 			clusterDef := testing.FakeClusterDef()
 			resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 				AddConstraints(testapps.ProductionResourceConstraint).
+				AddSelector(appsv1alpha1.ClusterResourceConstraintSelector{
+					ClusterDefRef: clusterDef.Name,
+					Components: []appsv1alpha1.ComponentResourceConstraintSelector{
+						{
+							ComponentDefRef: testing.ComponentDefName,
+							Constraints:     []string{"c1"},
+						},
+					},
+				}).
 				GetObject()
+
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
 				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault),
 				testing.FakeClusterVersion(),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
+				testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData),
+				testing.FakeSecret(types.DefaultNamespace, clusterName),
 				resourceConstraint,
 			)
 			o = &CreateOptions{
@@ -204,10 +228,10 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("should fail if component with storage not meets the constraint", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,storage=500Mi", testing.ExtraComponentDefName)}
+			o.Values = []string{fmt.Sprintf("type=%s,storage=500Mi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 
-			o.Values = []string{fmt.Sprintf("type=%s,storage=1Pi", testing.ExtraComponentDefName)}
+			o.Values = []string{fmt.Sprintf("type=%s,storage=1Pi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
@@ -362,14 +386,14 @@ var _ = Describe("Cluster", func() {
 		})
 
 		Context("validate storageClass", func() {
+
 			It("can get all StorageClasses in K8S and check out if the cluster have a default StorageClasses by GetStorageClasses()", func() {
 				storageClasses, existedDefault, err := getStorageClasses(o.Dynamic)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
 				Expect(existedDefault).Should(BeTrue())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsNotDefault)
-				cd := testing.FakeClusterDef()
-				tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), fakeNotDefaultStorageClass, testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName))
 				storageClasses, existedDefault, err = getStorageClasses(tf.FakeDynamicClient)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))
@@ -379,8 +403,7 @@ var _ = Describe("Cluster", func() {
 			It("can specify the StorageClass and the StorageClass must exist", func() {
 				Expect(validateStorageClass(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
 				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
-				cd := testing.FakeClusterDef()
-				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(testing.FakeClusterDef(), fakeNotDefaultStorageClass, testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName))
 				Expect(validateStorageClass(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
 			})
 
@@ -389,10 +412,23 @@ var _ = Describe("Cluster", func() {
 				spec := vct[0].(map[string]interface{})["spec"]
 				delete(spec.(map[string]interface{}), "storageClassName")
 				Expect(validateStorageClass(o.Dynamic, o.ComponentSpecs)).Should(Succeed())
-				fakeNotDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault)
-				cd := testing.FakeClusterDef()
-				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(cd, fakeNotDefaultStorageClass, testing.FakeClusterVersion())
+				FakeDynamicClientWithNotDefaultSC := testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault), testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName))
 				Expect(validateStorageClass(FakeDynamicClientWithNotDefaultSC, o.ComponentSpecs)).Should(HaveOccurred())
+				// It can validate 'DEFAULT_STORAGE_CLASS' in ConfigMap for cloud K8S
+				FakeDynamicClientWithConfigDefaultSC := testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeStorageClass(testing.StorageClassName+"-other", testing.IsNotDefault), testing.FakeClusterVersion(), testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigDataWithDefaultSC), testing.FakeSecret(types.DefaultNamespace, clusterName))
+				Expect(validateStorageClass(FakeDynamicClientWithConfigDefaultSC, o.ComponentSpecs)).Should(Succeed())
+			})
+
+			It("validateDefaultSCInConfig test", func() {
+				have, err := validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeFalse())
+				have, err = validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigDataWithDefaultSC), testing.FakeSecret(types.DefaultNamespace, clusterName)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeTrue())
+				have, err = validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeNilConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeFalse())
 			})
 		})
 

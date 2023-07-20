@@ -21,7 +21,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 36,
+  "id": 15,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -533,7 +533,7 @@
             "uid": "${prometheus}"
           },
           "editorMode": "code",
-          "expr": "irate(zk_write_latency_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[30s])",
+          "expr": "irate(updatelatency_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\", job=\"zookeeper\"}[30s])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
@@ -631,7 +631,7 @@
             "uid": "${prometheus}"
           },
           "editorMode": "code",
-          "expr": "irate(zk_read_latency_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[30s])",
+          "expr": "irate(readlatency_count{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\", job=\"zookeeper\"}[30s])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
@@ -731,7 +731,7 @@
             "uid": "${prometheus}"
           },
           "editorMode": "code",
-          "expr": "zk_write_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\",quantile=\"0.99\"} or vector(0)",
+          "expr": "updatelatency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\",quantile=\"0.99\", job=\"zookeeper\"} or vector(0)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
@@ -831,7 +831,7 @@
             "uid": "${prometheus}"
           },
           "editorMode": "code",
-          "expr": "zk_read_latency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\", quantile=\"0.99\"} or vector(0)",
+          "expr": "readlatency{app_kubernetes_io_instance=~\"$cluster\", kubernetes_pod_name=~\"$kubernetes_pod_name\", quantile=\"0.99\", job=\"zookeeper\"} or vector(0)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
@@ -1406,8 +1406,8 @@
       {
         "current": {
           "selected": false,
-          "text": "pulsar-cluster",
-          "value": "pulsar-cluster"
+          "text": "test",
+          "value": "test"
         },
         "datasource": {
           "type": "prometheus",

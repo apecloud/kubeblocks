@@ -75,7 +75,6 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 	}
 
 	// don't use default http-client
-	// todo 还没有决定这些数字
 	dialer := &net.Dialer{
 		Timeout: 5 * time.Second,
 	}
@@ -110,10 +109,10 @@ func (cli *OperationClient) GetRole() (string, error) {
 	url := fmt.Sprintf("%s?operation=%s", cli.Url, GetRoleOperation)
 
 	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodGet, nil)
-	defer resp.Body.Close()
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 	result := map[string]string{}
 
 	buf, err := io.ReadAll(resp.Body)

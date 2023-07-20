@@ -117,9 +117,11 @@ spec:
                     - enum:
                       - snapshot
                       - backupTool
+                    default: backupTool
                     description: 'backup method, support: snapshot, backupTool'
                     type: string
                   retentionPeriod:
+                    default: 1d
                     description: retentionPeriod is a time string ending with the
                       'd'|'D'|'h'|'H' character to describe how long the Backup should
                       be retained. if not set, will be retained forever.
@@ -133,6 +135,8 @@ spec:
                     maximum: 1440
                     minimum: 0
                     type: integer
+                required:
+                - method
                 type: object
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an

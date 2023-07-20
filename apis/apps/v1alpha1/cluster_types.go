@@ -108,13 +108,15 @@ type ClusterBackup struct {
 	// retentionPeriod is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
 	// the Backup should be retained. if not set, will be retained forever.
 	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
+	// +kubebuilder:default="1d"
 	// +optional
 	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
 
 	// backup method, support: snapshot, backupTool
 	// +kubebuilder:validation:Enum=snapshot;backupTool
-	// +optional
-	Method dataprotectionv1alpha1.BackupMethod `json:"method,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=backupTool
+	Method dataprotectionv1alpha1.BackupMethod `json:"method"`
 
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +optional

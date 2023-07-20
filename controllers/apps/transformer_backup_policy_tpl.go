@@ -77,12 +77,13 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 			}
 			// build the backup policy from the template.
 			backupPolicy, action := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, &tpl)
+
+			// merge cluster backup configuration to the backup policy.
+			r.mergeClusterBackup(transCtx, origCluster, backupPolicy)
+
 			if backupPolicy == nil {
 				continue
 			}
-
-			// merge cluster backup configuration to the backup policy.
-			r.mergeClusterBackup(origCluster, backupPolicy)
 
 			// if exist multiple backup policy templates and duplicate spec.identifier,
 			// the backupPolicy that may be generated may have duplicate names, and it is necessary to check if it already exists.
@@ -230,9 +231,19 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 }
 
 // mergeClusterBackup merges the cluster backup configuration into the backup policy.
-func (r *BackupPolicyTPLTransformer) mergeClusterBackup(cluster *appsv1alpha1.Cluster,
+func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
+
+	backupEnabled := func() bool {
+		return cluster.Spec.Backup != nil && cluster.Spec.Backup.Enabled
+	}
+
 	if backupPolicy == nil {
+		// backup policy is nil, can not enable cluster backup, so log and return.
+		if backupEnabled() {
+			transCtx.Logger.Info("backup policy is nil, can not enable cluster backup",
+				"namespace", cluster.Namespace, "cluster", cluster.Name)
+		}
 		return
 	}
 
@@ -245,8 +256,8 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(cluster *appsv1alpha1.Cl
 		schedulePolicy.Enable = enable
 	}
 
-	// disable backup if it is not enabled
-	if backup == nil || !backup.Enabled {
+	// disable backup, set all backup schedule to false
+	if !backupEnabled() {
 		setSchedulePolicy(spec.Schedule.Snapshot, false)
 		setSchedulePolicy(spec.Schedule.Datafile, false)
 		setSchedulePolicy(spec.Schedule.Logfile, false)

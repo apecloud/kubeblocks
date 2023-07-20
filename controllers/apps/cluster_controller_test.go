@@ -1970,31 +1970,96 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Creating cluster with backup", func() {
-			backup := &appsv1alpha1.ClusterBackup{
-				Enabled: true,
-				RetentionPeriod: func() *string {
-					retention := "1d"
-					return &retention
-				}(),
-				Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
-				CronExpression: "*/1 * * * *",
-				StartWindowMinutes: func() *int64 {
-					startWindow := int64(10)
-					return &startWindow
-				}(),
+			var testCases = []struct {
+				desc   string
+				backup *appsv1alpha1.ClusterBackup
+			}{
+				{
+					desc: "backup with snapshot method",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled: true,
+						RetentionPeriod: func() *string {
+							retention := "1d"
+							return &retention
+						}(),
+						Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
+						CronExpression: "*/1 * * * *",
+						StartWindowMinutes: func() *int64 {
+							startWindow := int64(10)
+							return &startWindow
+						}(),
+					},
+				},
+				{
+					desc: "disable backup",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled: false,
+						RetentionPeriod: func() *string {
+							retention := "1d"
+							return &retention
+						}(),
+						Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
+						CronExpression: "*/1 * * * *",
+						StartWindowMinutes: func() *int64 {
+							startWindow := int64(10)
+							return &startWindow
+						}(),
+					},
+				},
+				{
+					desc: "backup with backup tool method",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled: true,
+						RetentionPeriod: func() *string {
+							retention := "2d"
+							return &retention
+						}(),
+						Method:         dataprotectionv1alpha1.BackupMethodBackupTool,
+						CronExpression: "*/1 * * * *",
+						StartWindowMinutes: func() *int64 {
+							startWindow := int64(10)
+							return &startWindow
+						}(),
+					},
+				},
 			}
 
-			createClusterWithBackup(backup)
-			By("Checking backup policy created from backup policy template")
-			for _, compDef := range clusterDefObj.Spec.ComponentDefs {
-				policyName := DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
+			for _, t := range testCases {
+				By(t.desc)
+				backup := t.backup
+				createClusterWithBackup(backup)
+				checkSchedulePolicy := func(g Gomega, sp *dataprotectionv1alpha1.SchedulePolicy) {
+					g.Expect(sp).ShouldNot(BeNil())
+					g.Expect(sp.Enable).Should(BeEquivalentTo(backup.Enabled))
+					g.Expect(sp.CronExpression).Should(Equal(backup.CronExpression))
+				}
+				checkPolicy := func(g Gomega, p *dataprotectionv1alpha1.BackupPolicy) {
+					schedule := p.Spec.Schedule
+					switch backup.Method {
+					case dataprotectionv1alpha1.BackupMethodSnapshot:
+						checkSchedulePolicy(g, schedule.Snapshot)
+					case dataprotectionv1alpha1.BackupMethodBackupTool:
+						checkSchedulePolicy(g, schedule.Datafile)
+					}
+					g.Expect(schedule.StartWindowMinutes).Should(Equal(backup.StartWindowMinutes))
+				}
+				checkPolicyDisabled := func(g Gomega, p *dataprotectionv1alpha1.BackupPolicy) {
+					schedule := p.Spec.Schedule
+					switch backup.Method {
+					case dataprotectionv1alpha1.BackupMethodSnapshot:
+						g.Expect(schedule.Snapshot.Enable).Should(BeFalse())
+					case dataprotectionv1alpha1.BackupMethodBackupTool:
+						g.Expect(schedule.Datafile.Enable).Should(BeFalse())
+					}
+				}
+				policyName := DeriveBackupPolicyName(clusterKey.Name, compDefName, "")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
 					func(g Gomega, policy *dataprotectionv1alpha1.BackupPolicy) {
-						schedule := policy.Spec.Schedule
-						g.Expect(schedule.Snapshot).ShouldNot(BeNil())
-						g.Expect(schedule.Snapshot.Enable).Should(BeEquivalentTo(backup.Enabled))
-						g.Expect(schedule.Snapshot.CronExpression).Should(Equal(backup.CronExpression))
-						g.Expect(schedule.StartWindowMinutes).Should(Equal(backup.StartWindowMinutes))
+						if backup.Enabled {
+							checkPolicy(g, policy)
+						} else {
+							checkPolicyDisabled(g, policy)
+						}
 					})).Should(Succeed())
 			}
 		})
@@ -2426,7 +2491,8 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
-		bpt = bpt.AddBackupPolicy(v.Name).AddSnapshotPolicy()
+		bpt = bpt.AddBackupPolicy(v.Name).AddSnapshotPolicy().SetSchedule("0 0 * * *", true)
+		bpt = bpt.AddDatafilePolicy().SetSchedule("0 0 * * *", true)
 		switch v.WorkloadType {
 		case appsv1alpha1.Consensus:
 			bpt.SetTargetRole("leader")

@@ -6,5 +6,5 @@ metadata:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:
   conf: |-
-    {{- .Files.Get "config/zookeeper-config.tpl" | nindent 4 }}
+    {{- .Files.Get "config/zookeeper-env.tpl" | nindent 4 }}
 

@@ -6,5 +6,5 @@ metadata:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:
   conf: |-
-    {{- .Files.Get "config/proxy-config.tpl" | nindent 4 }}
+    {{- .Files.Get "config/proxy-env.tpl" | nindent 4 }}
 

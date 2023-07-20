@@ -6,5 +6,5 @@ metadata:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:
   conf: |-
-    {{- .Files.Get "config/bookies-config.tpl" | nindent 4 }}
+    {{- .Files.Get "config/bookies-env.tpl" | nindent 4 }}
 

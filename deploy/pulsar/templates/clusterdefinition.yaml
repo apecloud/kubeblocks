@@ -749,21 +749,6 @@ spec:
             livenessProbe:
               exec:
                 command:
-                  - timeout
-                  - "30"
-                  - bash
-                  - -c
-                  - echo ruok | nc -q 1 localhost 2181 | grep imok
-              failureThreshold: 10
-              initialDelaySeconds: 5
-              periodSeconds: 30
-              successThreshold: 1
-              timeoutSeconds: 30
-            readinessProbe:
-              exec:
-                command:
-                  - timeout
-                  - "30"
                   - bash
                   - -c
                   - echo ruok | nc -q 1 localhost 2181 | grep imok

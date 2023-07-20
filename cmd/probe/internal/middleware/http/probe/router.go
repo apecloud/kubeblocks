@@ -104,8 +104,12 @@ func RegisterBuiltin() error {
 		}
 	}
 
-	// todo custom init
 	customOp, _ = custom.NewHTTPCustom()
+	empty := make(component.Properties)
+	err := customOp.Init(empty)
+	if err != nil {
+		return errors.Errorf(initErrFmt, "custom", err)
+	}
 
 	return nil
 }
@@ -179,8 +183,8 @@ func route(character string, ctx context.Context, request *ProbeRequest) (*Probe
 	ops, ok := builtinMap[character]
 	// if there is no builtin type, use the custom
 	if !ok {
-		// TODO: impl the custom
-		return nil, nil
+		Logger.Info("No correspond builtin type, use the custom...")
+		return customOp.Dispatch(ctx, request)
 	}
 	return ops.Dispatch(ctx, request)
 }

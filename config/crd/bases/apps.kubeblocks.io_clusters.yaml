@@ -98,6 +98,14 @@ spec:
                     type: array
                     x-kubernetes-list-type: set
                 type: object
+              availabilityPolicy:
+                description: availabilityPolicy describes the availability policy,
+                  including zone, node, and none.
+                enum:
+                - zone
+                - node
+                - none
+                type: string
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an
                   immutable attribute.
@@ -524,6 +532,31 @@ spec:
                 description: 'mode specifies the mode of this cluster, the value of
                   this can be one of the following: Standalone, Replication, RaftGroup.'
                 type: string
+              monitor:
+                description: monitor specifies the configuration of monitor
+                properties:
+                  monitoringInterval:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: monitoringInterval specifies interval of monitoring,
+                      no monitor if set to 0
+                    x-kubernetes-int-or-string: true
+                type: object
+              network:
+                description: network specifies the configuration of network
+                properties:
+                  hostNetworkAccessible:
+                    default: false
+                    description: hostNetworkAccessible specifies whether host network
+                      is accessible. It defaults to false
+                    type: boolean
+                  publiclyAccessible:
+                    default: false
+                    description: publiclyAccessible specifies whether it is publicly
+                      accessible. It defaults to false
+                    type: boolean
+                type: object
               parameters:
                 additionalProperties:
                   type: string
@@ -568,6 +601,14 @@ spec:
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                 type: object
+              tenancy:
+                description: tenancy describes how pods are distributed across node.
+                  SharedNode means multiple pods may share the same node. DedicatedNode
+                  means each pod runs on their own dedicated node.
+                enum:
+                - SharedNode
+                - DedicatedNode
+                type: string
               terminationPolicy:
                 description: Cluster termination policy. Valid values are DoNotTerminate,
                   Halt, Delete, WipeOut. DoNotTerminate will block delete operation.

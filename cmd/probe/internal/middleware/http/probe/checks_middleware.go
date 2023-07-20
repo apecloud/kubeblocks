@@ -138,7 +138,7 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if err == nil {
 			// header has a statusCodeHeader
 			writer.WriteHeader(statusCode)
-			Logger.Info("response abnormal") // todo 没有办法获得更多的信息 && 还有为什么是abnormal
+			Logger.Info("response abnormal")
 		} else {
 			// header has no statusCodeHeader
 			Logger.Info("response has no statusCodeHeader")

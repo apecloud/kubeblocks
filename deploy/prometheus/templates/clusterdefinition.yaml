@@ -31,6 +31,7 @@ spec:
         securityContext:
 {{- toYaml .Values.server.securityContext | nindent 10 }}
         {{- end }}
+        enableServiceLinks: true
         containers:
           - name: configmap-reload
             args:

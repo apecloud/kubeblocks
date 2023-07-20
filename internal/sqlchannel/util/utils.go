@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package probe
+package util
 
 import (
 	"context"
@@ -27,7 +27,6 @@ import (
 	"github.com/go-errors/errors"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -41,16 +40,14 @@ const (
 	tokenKeyInData = "token"
 )
 
-func getToken(ctx context.Context, log logr.Logger) (string, error) {
+func GetToken(ctx context.Context) (string, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Error(err, "get k8s client config failed")
 		return "", err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Error(err, "k8s client create failed")
 		return "", err
 	}
 
@@ -63,7 +60,6 @@ func getToken(ctx context.Context, log logr.Logger) (string, error) {
 		if err == nil {
 			break
 		}
-		log.Error(err, "get secret key failed")
 		time.Sleep(retryInterval)
 	}
 	if err != nil {

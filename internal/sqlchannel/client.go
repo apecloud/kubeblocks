@@ -24,11 +24,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
 
-	dapr "github.com/dapr/go-sdk/client"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
@@ -36,9 +38,15 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
+const (
+	urlTemplate = "http://localhost:%d/v1.0/bindings/%s"
+)
+
 type OperationClient struct {
-	dapr.Client
+	Client           *http.Client
+	Port             int32
 	CharacterType    string
+	Url              string
 	cache            map[string]*OperationResult
 	CacheTTL         time.Duration
 	ReconcileTimeout time.Duration
@@ -46,7 +54,7 @@ type OperationClient struct {
 }
 
 type OperationResult struct {
-	response *dapr.BindingEvent
+	response *http.Response
 	err      error
 	respTime time.Time
 }
@@ -61,19 +69,30 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 
-	port, err := intctrlutil.GetProbeGRPCPort(pod)
+	port, err := intctrlutil.GetProbeHTTPPort(pod)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := dapr.NewClientWithAddress(fmt.Sprintf("%s:%d", ip, port))
-	if err != nil {
-		return nil, err
+	// don't use default http-client
+	// todo 还没有决定这些数字
+	dialer := &net.Dialer{
+		Timeout: 5 * time.Second,
+	}
+	netTransport := &http.Transport{
+		Dial:                dialer.Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+	client := &http.Client{
+		Timeout:   time.Second * 30,
+		Transport: netTransport,
 	}
 
 	operationClient := &OperationClient{
 		Client:           client,
+		Port:             port,
 		CharacterType:    characterType,
+		Url:              fmt.Sprintf(urlTemplate, port, characterType),
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 100 * time.Millisecond,
@@ -84,22 +103,21 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 
 func (cli *OperationClient) GetRole() (string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
+
 	defer cancel()
 
-	// Request sql channel via Dapr SDK
-	req := &dapr.InvokeBindingRequest{
-		Name:      cli.CharacterType,
-		Operation: "getRole",
-		Data:      []byte(""),
-		Metadata:  map[string]string{},
-	}
+	// Http request
+	url := fmt.Sprintf("%s?operation=%s", cli.Url, GetRoleOperation)
 
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodGet, nil)
+	defer resp.Body.Close()
 	if err != nil {
 		return "", err
 	}
 	result := map[string]string{}
-	err = json.Unmarshal(resp.Data, &result)
+
+	buf, err := io.ReadAll(resp.Body)
+	err = json.Unmarshal(buf, &result)
 	if err != nil {
 		return "", err
 	}
@@ -111,21 +129,19 @@ func (cli *OperationClient) GetRole() (string, error) {
 func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
 	defer cancel()
-
-	// Request sql channel via Dapr SDK
-	req := &dapr.InvokeBindingRequest{
-		Name:      cli.CharacterType,
-		Operation: string(ListSystemAccountsOp),
-	}
-
-	var resp *dapr.BindingEvent
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	url := fmt.Sprintf("%s?operation=%s", cli.Url, ListSystemAccountsOp)
+	var resp *http.Response
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	sqlResponse := SQLChannelResponse{}
-	if err = json.Unmarshal(resp.Data, &sqlResponse); err != nil {
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(buf, &sqlResponse); err != nil {
 		return nil, err
 	}
 	if sqlResponse.Event == RespEveFail {
@@ -138,10 +154,10 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
-func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
+func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
 	ch := make(chan *OperationResult, 1)
-	go cli.InvokeComponent(ctxWithReconcileTimeout, req, ch)
-	var resp *dapr.BindingEvent
+	go cli.InvokeComponent(ctxWithReconcileTimeout, url, method, body, ch)
+	var resp *http.Response
 	var err error
 	select {
 	case <-ctxWithReconcileTimeout.Done():
@@ -153,9 +169,13 @@ func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout con
 	return resp, err
 }
 
-func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest, ch chan *OperationResult) {
+func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader, ch chan *OperationResult) {
 	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
 	defer cancel()
+	req, _ := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)
+	token, _ := GetToken(ctxWithRequestTimeout)
+	req.Header.Add("token", token)
+
 	mapKey := GetMapKeyFromRequest(req)
 	operationRes, ok := cli.cache[mapKey]
 	if ok {
@@ -166,7 +186,7 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 		}
 	}
 
-	resp, err := cli.InvokeBinding(ctxWithRequestTimeout, req)
+	resp, err := cli.Client.Do(req)
 	operationRes = &OperationResult{
 		response: resp,
 		err:      err,
@@ -180,19 +200,26 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 	}
 }
 
-func GetMapKeyFromRequest(req *dapr.InvokeBindingRequest) string {
+func GetMapKeyFromRequest(req *http.Request) string {
 	var buf bytes.Buffer
-	buf.WriteString(req.Name)
-	buf.WriteString(req.Operation)
-	buf.Write(req.Data)
-	keys := make([]string, 0, len(req.Metadata))
-	for k := range req.Metadata {
+	buf.WriteString(req.URL.String())
+
+	if req.Body != nil {
+		all, err := io.ReadAll(req.Body)
+		if err != nil {
+			return ""
+		}
+		buf.Write(all)
+	}
+	keys := make([]string, 0, len(req.Header))
+	for k := range req.Header {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Metadata[k]))
+		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Header[k]))
 	}
+
 	return buf.String()
 }
 
@@ -244,6 +271,13 @@ func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLC
 		err       error
 		response  = SQLChannelResponse{}
 	)
+
+	// attach token
+	if token, err := GetToken(context.Background()); err != nil {
+		return response, err
+	} else {
+		request.Metadata["token"] = token
+	}
 
 	if jsonData, err := json.Marshal(request); err != nil {
 		return response, err

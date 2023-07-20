@@ -13,6 +13,3 @@ spec:
   formatterConfig:
     format: yaml
 
-  staticParameters:
-    - none
-

@@ -128,8 +128,8 @@ func (ha *Ha) RunCycle() {
 		if lockOwnerIsLeader && currentMemberIsLeader {
 			ha.logger.Infof("Lock owner is real Leader, demote myself and follow the real leader")
 			_ = ha.dbManager.Demote()
-			_ = ha.dbManager.Follow(cluster)
 		}
+		_ = ha.dbManager.Follow(cluster)
 	}
 }
 

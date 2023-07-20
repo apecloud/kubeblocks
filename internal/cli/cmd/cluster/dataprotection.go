@@ -786,7 +786,11 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 			}
 		}
 		if commonPolicy != nil {
-			commonPolicy.BackupRepoName = &targetVal
+			if targetVal != "" {
+				commonPolicy.BackupRepoName = &targetVal
+			} else {
+				commonPolicy.BackupRepoName = nil
+			}
 		}
 		return nil
 	}

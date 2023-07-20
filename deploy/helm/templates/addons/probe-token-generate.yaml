@@ -4,8 +4,7 @@ metadata:
   name: probe-token
   annotations:
     "helm.sh/hook": post-install
-{{/*    "helm.sh/hook-delete-policy": hook-failed*/}}
     "helm.sh/resource-policy": keep
 type: Opaque
 data:
-  token: YWRtaW4=
+  token: your-base64-token

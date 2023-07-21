@@ -53,7 +53,7 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 	if transCtx.ClusterDef.Spec.Service != nil {
 		for _, name := range transCtx.ClusterDef.Spec.Service.FrontendComponents {
 			compDef := transCtx.ClusterDef.GetComponentDefByName(name)
-			if compDef != nil {
+			if compDef == nil {
 				continue
 			}
 			frontendComponents = append(frontendComponents, *compDef)

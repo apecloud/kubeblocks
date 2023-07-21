@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -108,6 +109,50 @@ type ClusterSpec struct {
 	// network specifies the configuration of network
 	// +optional
 	Network *ClusterNetwork `json:"network,omitempty"`
+
+	// cluster backup configuration.
+	// +optional
+	Backup *ClusterBackup `json:"backup,omitempty"`
+}
+
+type ClusterBackup struct {
+	// enabled defines whether to enable automated backup.
+	// +kubebuilder:default=false
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// retentionPeriod is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
+	// the Backup should be retained. if not set, will be retained forever.
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
+	// +kubebuilder:default="1d"
+	// +optional
+	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
+
+	// backup method, support: snapshot, backupTool.
+	// +kubebuilder:validation:Enum=snapshot;backupTool
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=snapshot
+	Method dataprotectionv1alpha1.BackupMethod `json:"method"`
+
+	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+	// +optional
+	CronExpression string `json:"cronExpression,omitempty"`
+
+	// retryWindowMinutes defines the time window for retrying the job if it misses scheduled
+	// time for any reason. the unit of time is minute.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1440
+	RetryWindowMinutes *int64 `json:"retryWindowMinutes,omitempty"`
+
+	// repoName is the name of the backupRepo, if not set, will use the default backupRepo.
+	// +optional
+	RepoName string `json:"repoName,omitempty"`
+
+	// pitrEnabled defines whether to enable point-in-time recovery.
+	// +kubebuilder:default=false
+	// +optional
+	PITREnabled *bool `json:"pitrEnabled,omitempty"`
 }
 
 type ClusterResources struct {

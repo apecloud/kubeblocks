@@ -151,6 +151,15 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("Create class related objects")
 		testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
 			AddConstraints(testapps.GeneralResourceConstraint).
+			AddSelector(appsv1alpha1.ClusterResourceConstraintSelector{
+				ClusterDefRef: clusterDefName,
+				Components: []appsv1alpha1.ComponentResourceConstraintSelector{
+					{
+						ComponentDefRef: mysqlCompDefName,
+						Rules:           []string{"c1", "c2", "c3", "c4"},
+					},
+				},
+			}).
 			Create(&testCtx).GetObject()
 
 		testapps.NewComponentClassDefinitionFactory("custom", clusterDefObj.Name, mysqlCompDefName).

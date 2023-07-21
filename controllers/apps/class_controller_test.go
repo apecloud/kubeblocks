@@ -62,7 +62,7 @@ var _ = Describe("", func() {
 				Components: []v1alpha1.ComponentResourceConstraintSelector{
 					{
 						ComponentDefRef: componentDefRef,
-						Constraints:     []string{"c1", "c2", "c3", "c4"},
+						Rules:           []string{"c1", "c2", "c3", "c4"},
 					},
 				},
 			}).

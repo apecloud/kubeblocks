@@ -6,7 +6,7 @@ metadata:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
     {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
-  constraints:
+  rules:
   - name: general
     cpu:
       min: "0.5"

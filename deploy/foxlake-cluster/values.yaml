@@ -23,6 +23,21 @@ tolerations: []
 topologyKeys:
   - kubernetes.io/hostname
 
+## @param cpu
+##
+cpu: 1
+
+## @param memory, the unit is Gi
+##
+memory: 2
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
 ## @param storage FoxLake metadb storage size, the unit is Gi
 ##
 storage: 20

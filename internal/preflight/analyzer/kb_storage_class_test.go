@@ -83,7 +83,7 @@ var _ = Describe("kb_storage_class_test", func() {
 				}
 				res, err := analyzer.Analyze(getCollectedFileContents, nil)
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(res[0].IsFail).Should(BeTrue())
+				g.Expect(res[0].IsWarn).Should(BeTrue())
 				g.Expect(res[0].IsPass).Should(BeFalse())
 			}).Should(Succeed())
 		})
@@ -95,7 +95,7 @@ var _ = Describe("kb_storage_class_test", func() {
 				}
 				res, err := analyzer.Analyze(getCollectedFileContents, nil)
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(res[0].IsFail).Should(BeTrue())
+				g.Expect(res[0].IsWarn).Should(BeTrue())
 				g.Expect(res[0].IsPass).Should(BeFalse())
 			}).Should(Succeed())
 		})

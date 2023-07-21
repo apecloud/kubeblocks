@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-tools-script
+data:
+  update-dynamic-config.sh: |
+    #!/bin/sh
+    set -ex
+
+    PULSAR_CLI="/kb/tools/pulsar-admin"
+    PULSAR_CLIENT_CONF="/kb/tools/pulsar-client.conf"
+
+    config="${1:?missing config}"
+    value="${2:?missing value}"
+
+    env PULSAR_CLIENT_CONF=$PULSAR_CLIENT_CONF $PULSAR_CLI brokers update-dynamic-config --config $config --value $value
+
+  install-pulsar-tools.sh: |
+    #!/bin/sh
+    set -ex
+
+    cp /bin/pulsar-admin /kb/tools/pulsar-admin
+
+  install-pulsar-client-config.sh: |
+    #!/bin/sh
+    set -ex
+
+    SRC_PULSAR_CLIENT_CONF="conf/client.conf"
+    PULSAR_CLIENT_CONF="/kb/tools/pulsar-client.conf"
+
+    bin/apply-config-from-env.py $SRC_PULSAR_CLIENT_CONF && cp $SRC_PULSAR_CLIENT_CONF $PULSAR_CLIENT_CONF
+

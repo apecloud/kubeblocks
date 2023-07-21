@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pulsar.name" . }}-client-config-tpl
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  client.conf: |-
+    {{- .Files.Get "config/pulsar-client-config.tpl" | nindent 4 }}
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pulsar.name" . }}-broker-config-tpl
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  broker.conf: |-
+    {{- .Files.Get "config/broker-config.tpl" | nindent 4 }}
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pulsar.name" . }}-proxy-config-tpl
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  proxy.conf: |-
+    {{- .Files.Get "config/proxy-config.tpl" | nindent 4 }}
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pulsar.name" . }}-bookies-config-tpl
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  bookkeeper.conf: |-
+    {{- .Files.Get "config/bookies-config.tpl" | nindent 4 }}

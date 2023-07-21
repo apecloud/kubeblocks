@@ -66,6 +66,7 @@ func TestOperations(t *testing.T) {
 	assert.NotNil(t, pgOps.LegacyOperations[ExecOperation])
 	assert.NotNil(t, pgOps.LegacyOperations[QueryOperation])
 	assert.NotNil(t, pgOps.LegacyOperations[CheckStatusOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[SwitchoverOperation])
 
 	assert.NotNil(t, pgOps.LegacyOperations[ListUsersOp])
 	assert.NotNil(t, pgOps.LegacyOperations[CreateUserOp])
@@ -98,7 +99,6 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
-	_ = b.InitDelay()
 	assert.False(t, b.InitIfNeed())
 
 	// create table
@@ -221,7 +221,6 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
-	_ = b.InitDelay()
 	assert.False(t, b.InitIfNeed())
 
 	ctx := context.TODO()

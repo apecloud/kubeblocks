@@ -319,6 +319,17 @@ const (
 	DedicatedNode TenancyType = "DedicatedNode"
 )
 
+// AvailabilityPolicyType for cluster affinity policy.
+// +enum
+// +kubebuilder:validation:Enum={zone,node,none}
+type AvailabilityPolicyType string
+
+const (
+	AvailabilityPolicyZone AvailabilityPolicyType = "zone"
+	AvailabilityPolicyNode AvailabilityPolicyType = "node"
+	AvailabilityPolicyNone AvailabilityPolicyType = "none"
+)
+
 // ProgressStatus defines the status of the opsRequest progress.
 // +enum
 // +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
@@ -427,19 +438,20 @@ type webhookManager struct {
 
 // CfgFileFormat defines formatter of configuration files.
 // +enum
-// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis}
+// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis,props-plus}
 type CfgFileFormat string
 
 const (
-	Ini        CfgFileFormat = "ini"
-	YAML       CfgFileFormat = "yaml"
-	JSON       CfgFileFormat = "json"
-	XML        CfgFileFormat = "xml"
-	HCL        CfgFileFormat = "hcl"
-	Dotenv     CfgFileFormat = "dotenv"
-	TOML       CfgFileFormat = "toml"
-	Properties CfgFileFormat = "properties"
-	RedisCfg   CfgFileFormat = "redis"
+	Ini            CfgFileFormat = "ini"
+	YAML           CfgFileFormat = "yaml"
+	JSON           CfgFileFormat = "json"
+	XML            CfgFileFormat = "xml"
+	HCL            CfgFileFormat = "hcl"
+	Dotenv         CfgFileFormat = "dotenv"
+	TOML           CfgFileFormat = "toml"
+	Properties     CfgFileFormat = "properties"
+	RedisCfg       CfgFileFormat = "redis"
+	PropertiesPlus CfgFileFormat = "props-plus"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.

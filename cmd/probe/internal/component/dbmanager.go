@@ -10,20 +10,21 @@ import (
 )
 
 type DBManager interface {
-	Initialize()
 	IsRunning() bool
 	IsCurrentMemberInCluster(*dcs.Cluster) bool
 	IsCurrentMemberHealthy() bool
 	IsMemberHealthy(*dcs.Cluster, *dcs.Member) bool
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
+	InitializeCluster(context.Context, *dcs.Cluster) error
 	IsLeader(context.Context, *dcs.Cluster) (bool, error)
 	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
+	IsFirstMember() bool
 	IsDBStartupReady() bool
 	Recover()
 	AddCurrentMemberToCluster(*dcs.Cluster) error
 	DeleteMemberFromCluster(*dcs.Cluster, string) error
-	Premote() error
+	Promote() error
 	Demote() error
 	Follow(*dcs.Cluster) error
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
@@ -33,6 +34,9 @@ type DBManager interface {
 	GetCurrentMemberName() string
 	GetMemberAddrs(*dcs.Cluster) []string
 	GetLogger() logr.Logger
+
+	IsRootCreated(context.Context) (bool, error)
+	CreateRoot(context.Context) error
 }
 
 var managers = make(map[string]DBManager)
@@ -56,6 +60,10 @@ func (mgr *DBManagerBase) GetLogger() logr.Logger {
 
 func (mgr *DBManagerBase) GetCurrentMemberName() string {
 	return mgr.CurrentMemberName
+}
+
+func (mgr *DBManagerBase) IsFirstMember() bool {
+	return strings.HasSuffix(mgr.CurrentMemberName, "-0")
 }
 
 func RegisterManager(characterType string, manager DBManager) {

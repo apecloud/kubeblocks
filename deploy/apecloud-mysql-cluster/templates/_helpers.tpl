@@ -39,9 +39,9 @@ The minimum proxy cpu cores is 0.5 and the maximum cpu cores is 64.
     - queryLog
   resources:
     requests:
-      cpu: {{ $proxyCPU }}
+      cpu: {{ $proxyCPU | quote }}
     limits:
-      cpu: {{ $proxyCPU }}
+      cpu: {{ $proxyCPU | quote }}
 {{- end }}
 
 {{/*

@@ -38,7 +38,7 @@ kind:       "ComponentResourceConstraint"
 metadata:
   name: kb-resource-constraint-general
 spec:
-  constraints:
+  rules:
   - cpu:
       min: 0.5
       max: 128
@@ -60,11 +60,9 @@ spec:
 
 var buildClass = func(cpu string, memory string) *ComponentClassWithRef {
 	return &ComponentClassWithRef{
-		ComponentClassInstance: appsv1alpha1.ComponentClassInstance{
-			ComponentClass: appsv1alpha1.ComponentClass{
-				CPU:    resource.MustParse(cpu),
-				Memory: resource.MustParse(memory),
-			},
+		ComponentClass: appsv1alpha1.ComponentClass{
+			CPU:    resource.MustParse(cpu),
+			Memory: resource.MustParse(memory),
 		},
 	}
 }
@@ -97,10 +95,10 @@ func TestComponentResourceConstraint(t *testing.T) {
 	if err != nil {
 		panic("Failed to unmarshal resource constraint: %v" + err.Error())
 	}
-	var constraints []appsv1alpha1.ResourceConstraint
-	constraints = append(constraints, cf.Spec.Constraints...)
-	sort.Sort(ByConstraintList(constraints))
-	resources := constraints[0].GetMinimalResources()
+	var rules []appsv1alpha1.ResourceConstraintRule
+	rules = append(rules, cf.Spec.Rules...)
+	sort.Sort(ByRuleList(rules))
+	resources := rules[0].GetMinimalResources()
 	assert.Equal(t, resources.Cpu().Cmp(resource.MustParse("0.1")) == 0, true)
 	assert.Equal(t, resources.Memory().Cmp(resource.MustParse("20Mi")) == 0, true)
 }

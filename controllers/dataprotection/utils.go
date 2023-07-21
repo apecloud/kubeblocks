@@ -41,6 +41,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+var (
+	errNoDefaultBackupRepo = fmt.Errorf("no default BackupRepo found")
+)
+
 // byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
 type byBackupStartTime []dataprotectionv1alpha1.Backup
 
@@ -277,7 +281,7 @@ func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dataprotecti
 		defaultRepo = repo
 	}
 	if defaultRepo == nil {
-		return nil, fmt.Errorf("no default BackupRepo found")
+		return nil, errNoDefaultBackupRepo
 	}
 	return defaultRepo, nil
 }

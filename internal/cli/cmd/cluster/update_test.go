@@ -186,7 +186,7 @@ general_log_file=/data/mysql/log/mysqld.log
 				configSpec:  nil,
 				expectedErr: true,
 			}, {
-				dynamic: testing.FakeDynamicClient(testing.FakeConfigMap("config-template")),
+				dynamic: testing.FakeDynamicClient(testing.FakeConfigMap("config-template", testing.Namespace, map[string]string{"fake": "fake"})),
 				configSpec: &appsv1alpha1.ComponentConfigSpec{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						TemplateRef: "config-template",
@@ -195,7 +195,7 @@ general_log_file=/data/mysql/log/mysqld.log
 				},
 				expectedErr: true,
 			}, {
-				dynamic: testing.FakeDynamicClient(testing.FakeConfigMap("config-template")),
+				dynamic: testing.FakeDynamicClient(testing.FakeConfigMap("config-template", testing.Namespace, map[string]string{"fake": "fake"})),
 				configSpec: &appsv1alpha1.ComponentConfigSpec{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						TemplateRef: "config-template",
@@ -204,7 +204,7 @@ general_log_file=/data/mysql/log/mysqld.log
 				},
 				expectedErr: true,
 			}, {
-				dynamic: testing.FakeDynamicClient(testing.FakeConfigMap("config-template"), testing.FakeConfigConstraint("config-constraint")),
+				dynamic: testing.FakeDynamicClient(testing.FakeConfigMap("config-template", testing.Namespace, map[string]string{"fake": "fake"}), testing.FakeConfigConstraint("config-constraint")),
 				configSpec: &appsv1alpha1.ComponentConfigSpec{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						TemplateRef: "config-template",

@@ -15,18 +15,17 @@ spec:
 
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus
     {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster-{{ default .Chart.Version .Values.versionOverride }}/prometheus-cluster-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-15.16.1/prometheus-15.16.1.tgz
     {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-15.16.1.tgz
     {{- end }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
+      version: 15.16.1
       {{- end }}
-
 
     installValues:
       configMapRefs:
@@ -36,14 +35,14 @@ spec:
     valuesMapping:
       valueMap:
         replicaCount: server.replicaCount
-        storageClass: server.persistence.storageClass
-        persistentVolumeEnabled: server.persistence.enabled
+        storageClass: server.persistentVolume.storageClass
+        persistentVolumeEnabled: server.persistentVolume.enabled
 
       jsonMap:
-        tolerations: tolerations
+        tolerations: server.tolerations
 
       resources:
-        storage: server.persistence.size
+        storage: server.persistentVolume.size
         cpu:
           requests: server.resources.requests.cpu
           limits: server.resources.limits.cpu
@@ -54,14 +53,14 @@ spec:
         - name: alertmanager
           valueMap:
             replicaCount: alertmanager.replicaCount
-            storageClass: alertmanager.persistence.storageClass
-            persistentVolumeEnabled: alertmanager.persistence.enabled
+            storageClass: alertmanager.persistentVolume.storageClass
+            persistentVolumeEnabled: alertmanager.persistentVolume.enabled
 
           jsonMap:
-            tolerations: tolerations
+            tolerations: alertmanager.tolerations
 
           resources:
-            storage: alertmanager.persistence.size
+            storage: alertmanager.persistentVolume.size
             cpu:
               requests: alertmanager.resources.requests.cpu
               limits: alertmanager.resources.limits.cpu

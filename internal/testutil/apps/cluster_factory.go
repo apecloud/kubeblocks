@@ -192,6 +192,14 @@ func (factory *MockClusterFactory) SetIssuer(issuer *appsv1alpha1.Issuer) *MockC
 	return factory
 }
 
+func (factory *MockClusterFactory) AddClusterService(serviceName string, serviceType corev1.ServiceType) *MockClusterFactory {
+	factory.get().Spec.Services = append(factory.get().Spec.Services, appsv1alpha1.ClusterComponentService{
+		Name:        serviceName,
+		ServiceType: serviceType,
+	})
+	return factory
+}
+
 func (factory *MockClusterFactory) AddService(serviceName string, serviceType corev1.ServiceType) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {

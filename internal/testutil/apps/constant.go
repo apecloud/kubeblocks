@@ -131,6 +131,19 @@ var (
 		},
 	}
 
+	defaultClusterSvcSpec = appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{
+			{
+				Name: "mysql",
+				TargetPort: intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "mysql",
+				},
+				Port: 3306,
+			},
+		},
+	}
+
 	defaultMySQLContainer = corev1.Container{
 		Name:            DefaultMySQLContainerName,
 		Image:           ApeCloudMySQLImage,

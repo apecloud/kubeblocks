@@ -45,7 +45,7 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 			Spec: appsv1alpha1.ClusterDefinitionSpec{
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
 				Service: &appsv1alpha1.ClusterService{
-					ServiceSpec: appsv1alpha1.ServiceSpec{},
+					ServiceSpec: defaultClusterSvcSpec,
 				},
 			},
 		}, f)
@@ -86,6 +86,11 @@ func (factory *MockClusterDefFactory) AddClusterServicePort(name string, port in
 		Port:     port,
 		Name:     name,
 	})
+	return factory
+}
+
+func (factory *MockClusterDefFactory) SetFrontends(compDefNames []string) *MockClusterDefFactory {
+	factory.get().Spec.Service.FrontendComponents = append(factory.get().Spec.Service.FrontendComponents, compDefNames...)
 	return factory
 }
 

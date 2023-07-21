@@ -54,9 +54,6 @@ svc: {
 			"app.kubernetes.io/name":       "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
-			"app.kubernetes.io/component":  "\(component.compDefName)"
-
-			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 		annotations: service.metadata.annotations
 	}
@@ -64,7 +61,6 @@ svc: {
 		"selector": {
 			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 			"app.kubernetes.io/managed-by": "kubeblocks"
-
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 		ports: service.spec.ports

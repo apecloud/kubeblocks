@@ -32,7 +32,7 @@ kind:       "ComponentResourceConstraint"
 metadata:
   name: kb-resource-constraint-general
 spec:
-  constraints:
+  rules:
   - name: c1
     cpu:
       min: 0.5
@@ -65,7 +65,7 @@ spec:
   - clusterDefRef: apecloud-mysql
     components:
     - componentDefRef: mysql
-      constraints:
+      rules:
       - "c1"
       - "c2"
       - "c3"
@@ -87,15 +87,15 @@ func init() {
 
 func TestGetMinimalResources(t *testing.T) {
 	var resources corev1.ResourceList
-	resources = cf.Spec.Constraints[0].GetMinimalResources()
+	resources = cf.Spec.Rules[0].GetMinimalResources()
 	resources.Cpu().Equal(resource.MustParse("0.5"))
 	resources.Memory().Equal(resource.MustParse("2Gi"))
 
-	resources = cf.Spec.Constraints[1].GetMinimalResources()
+	resources = cf.Spec.Rules[1].GetMinimalResources()
 	resources.Cpu().Equal(resource.MustParse("0.1"))
 	resources.Memory().Equal(resource.MustParse("20Mi"))
 
-	resources = cf.Spec.Constraints[2].GetMinimalResources()
+	resources = cf.Spec.Rules[2].GetMinimalResources()
 	resources.Cpu().Equal(resource.MustParse("0.1"))
 	resources.Memory().Equal(resource.MustParse("0.4Gi"))
 }
@@ -104,13 +104,13 @@ func TestCompleteResources(t *testing.T) {
 	resources := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
 	}
-	cf.Spec.Constraints[0].CompleteResources(resources)
+	cf.Spec.Rules[0].CompleteResources(resources)
 	resources.Memory().Equal(resource.MustParse("4Gi"))
 
-	cf.Spec.Constraints[1].CompleteResources(resources)
+	cf.Spec.Rules[1].CompleteResources(resources)
 	resources.Memory().Equal(resource.MustParse("200Mi"))
 
-	cf.Spec.Constraints[2].CompleteResources(resources)
+	cf.Spec.Rules[2].CompleteResources(resources)
 	resources.Memory().Equal(resource.MustParse("4Gi"))
 }
 
@@ -203,7 +203,7 @@ func TestResourceConstraints(t *testing.T) {
 			requests[corev1.ResourceStorage] = resource.MustParse(item.storage)
 		}
 
-		constraints := cf.FindMatchingConstraints(clusterDefRef, componentDefRef, requests)
+		constraints := cf.FindMatchingRules(clusterDefRef, componentDefRef, requests)
 		assert.Equal(t, item.expect, len(constraints) > 0)
 
 		// if storage is empty, we should also validate function MatchClass which only consider cpu and memory

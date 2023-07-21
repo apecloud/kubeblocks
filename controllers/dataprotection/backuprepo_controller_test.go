@@ -622,5 +622,27 @@ parameters:
 				g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			}).Should(Succeed())
 		})
+
+		It("should update backupRepo.status.isDefault", func() {
+			By("making the repo default")
+			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+				repo.Annotations = map[string]string{
+					constant.DefaultBackupRepoAnnotationKey: trueVal,
+				}
+			})).Should(Succeed())
+			By("checking the repo is default")
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.IsDefault).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("making the repo non default")
+			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+				repo.Annotations = nil
+			})).Should(Succeed())
+			By("checking the repo is not default")
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.IsDefault).Should(BeFalse())
+			})).Should(Succeed())
+		})
 	})
 })

@@ -69,7 +69,7 @@ spec:
         # imagePullPolicy: "{{ template "pulsar.imagePullPolicy" (dict "image" .Values.images.pulsarTools "root" .) }}"
       - name: init-pulsar-client-config
         command:
-          - "/opt/kb-tools/reload/broker-config/install-pulsar-client-config.sh"
+          - "$(TOOLS_SCRIPTS_PATH)/install-pulsar-client-config.sh"
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1

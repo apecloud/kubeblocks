@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -239,11 +240,10 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 	}
 
 	if backupPolicy == nil {
-		// backup policy is nil, can not enable cluster backup, so log and return.
+		// backup policy is nil, can not enable cluster backup, so record event and return.
 		if backupEnabled() {
-			// TODO: should we return an error here?
-			transCtx.Logger.Info("backup policy is nil, can not enable cluster backup",
-				"namespace", cluster.Namespace, "cluster", cluster.Name)
+			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
+				"BackupPolicyNotFound", "backup policy is nil, can not enable cluster backup")
 		}
 		return
 	}
@@ -253,10 +253,9 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 	setSchedulePolicy := func(schedulePolicy *dataprotectionv1alpha1.SchedulePolicy, enable bool) {
 		if schedulePolicy == nil {
 			if enable {
-				// failed to find the schedule policy for backup method, so log and return.
-				// TODO: should we return an error here?
-				transCtx.Logger.Info(fmt.Sprintf("failed to find the schedule policy for backup method %s", backup.Method),
-					"namespace", cluster.Namespace, "cluster", cluster.Name)
+				// failed to find the schedule policy for backup method, so record event and return.
+				transCtx.EventRecorder.Eventf(transCtx.Cluster, corev1.EventTypeWarning, "BackupSchedulePolicyNotFound",
+					"failed to find the schedule policy for backup method %s", backup.Method)
 			}
 			return
 		}
@@ -315,8 +314,8 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		// Now, hscale also maintains a backupPolicy, we can not distinguish the backupPolicy for backup
 		// or hscale, so we can not create a new SchedulePolicy for logfile.
 		// Need a method to distinguish the backupPolicy for backup or hscale in the future.
-		transCtx.Logger.Info("failed to find the schedule policy for PITR",
-			"namespace", cluster.Namespace, "cluster", cluster.Name)
+		transCtx.EventRecorder.Eventf(transCtx.Cluster, corev1.EventTypeWarning,
+			"BackupSchedulePolicyNotFound", "failed to find the schedule policy for PITR")
 	}
 }
 

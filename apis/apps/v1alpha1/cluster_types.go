@@ -152,7 +152,7 @@ type ClusterBackup struct {
 	RepoName string `json:"repoName,omitempty"`
 
 	// pitrEnabled defines whether to enable point-in-time recovery.
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	// +optional
 	PITREnabled *bool `json:"pitrEnabled,omitempty"`
 }

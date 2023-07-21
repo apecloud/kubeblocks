@@ -129,7 +129,7 @@ spec:
                     description: 'backup method, support: snapshot, backupTool.'
                     type: string
                   pitrEnabled:
-                    default: true
+                    default: false
                     description: pitrEnabled defines whether to enable point-in-time
                       recovery.
                     type: boolean

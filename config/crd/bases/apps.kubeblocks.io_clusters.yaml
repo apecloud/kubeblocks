@@ -106,6 +106,55 @@ spec:
                 - node
                 - none
                 type: string
+              backup:
+                description: cluster backup configuration.
+                properties:
+                  cronExpression:
+                    description: the cron expression for schedule, the timezone is
+                      in UTC. see https://en.wikipedia.org/wiki/Cron.
+                    type: string
+                  enabled:
+                    default: false
+                    description: enabled defines whether to enable automated backup.
+                    type: boolean
+                  method:
+                    allOf:
+                    - enum:
+                      - snapshot
+                      - backupTool
+                    - enum:
+                      - snapshot
+                      - backupTool
+                    default: snapshot
+                    description: 'backup method, support: snapshot, backupTool.'
+                    type: string
+                  pitrEnabled:
+                    default: false
+                    description: pitrEnabled defines whether to enable point-in-time
+                      recovery.
+                    type: boolean
+                  repoName:
+                    description: repoName is the name of the backupRepo, if not set,
+                      will use the default backupRepo.
+                    type: string
+                  retentionPeriod:
+                    default: 1d
+                    description: retentionPeriod is a time string ending with the
+                      'd'|'D'|'h'|'H' character to describe how long the Backup should
+                      be retained. if not set, will be retained forever.
+                    pattern: ^\d+[d|D|h|H]$
+                    type: string
+                  retryWindowMinutes:
+                    description: retryWindowMinutes defines the time window for retrying
+                      the job if it misses scheduled time for any reason. the unit
+                      of time is minute.
+                    format: int64
+                    maximum: 1440
+                    minimum: 0
+                    type: integer
+                required:
+                - method
+                type: object
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an
                   immutable attribute.

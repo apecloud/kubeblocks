@@ -252,9 +252,18 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 	spec := &backupPolicy.Spec
 	setSchedulePolicy := func(schedulePolicy *dataprotectionv1alpha1.SchedulePolicy, enable bool) {
 		if schedulePolicy == nil {
+			if enable {
+				// failed to find the schedule policy for backup method, so log and return.
+				// TODO: should we return an error here?
+				transCtx.Logger.Info(fmt.Sprintf("failed to find the schedule policy for backup method %s", backup.Method),
+					"namespace", cluster.Namespace, "cluster", cluster.Name)
+			}
 			return
 		}
 		schedulePolicy.Enable = enable
+		if enable && backup.CronExpression != "" {
+			schedulePolicy.CronExpression = backup.CronExpression
+		}
 	}
 
 	// disable automated backup, set all backup schedule to false
@@ -275,31 +284,17 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		spec.Schedule.RetryWindowMinutes = backup.RetryWindowMinutes
 	}
 
-	var (
-		schedulePolicy     *dataprotectionv1alpha1.SchedulePolicy
-		commonBackupPolicy *dataprotectionv1alpha1.CommonBackupPolicy
-	)
-
+	var commonBackupPolicy *dataprotectionv1alpha1.CommonBackupPolicy
 	switch backup.Method {
 	case dataprotectionv1alpha1.BackupMethodSnapshot:
-		schedulePolicy = spec.Schedule.Snapshot
+		// enable snapshot and disable datafile
+		setSchedulePolicy(spec.Schedule.Snapshot, true)
+		setSchedulePolicy(spec.Schedule.Datafile, false)
 	case dataprotectionv1alpha1.BackupMethodBackupTool:
-		schedulePolicy = spec.Schedule.Datafile
+		// disable snapshot and enable datafile
+		setSchedulePolicy(spec.Schedule.Snapshot, false)
+		setSchedulePolicy(spec.Schedule.Datafile, true)
 		commonBackupPolicy = spec.Datafile
-	}
-
-	if schedulePolicy == nil {
-		// failed to find the schedule policy for backup method, so log and return.
-		// TODO: should we return an error here?
-		transCtx.Logger.Info(fmt.Sprintf("failed to find the schedule policy for backup method %s", backup.Method),
-			"namespace", cluster.Namespace, "cluster", cluster.Name)
-		return
-	}
-
-	// enable specified backup method, set its cron expression and repo name
-	schedulePolicy.Enable = true
-	if backup.CronExpression != "" {
-		schedulePolicy.CronExpression = backup.CronExpression
 	}
 
 	setRepoName := func(bp *dataprotectionv1alpha1.CommonBackupPolicy) {

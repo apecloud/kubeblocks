@@ -70,3 +70,18 @@ spec:
       - name: init-pulsar-client-config
         command:
           - "/opt/kb-tools/reload/broker-config/install-pulsar-client-config.sh"
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: pulsar-common-constraints
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+spec:
+  configurationSchema:
+    cue: ""
+
+  # mysql configuration file format
+  formatterConfig:
+    format: props-plus

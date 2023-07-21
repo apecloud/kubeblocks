@@ -81,6 +81,7 @@ staticParameters:
   - brokerMaxConnectionsPerIp
   - defaultRetentionSizeInMB
   - defaultRetentionTimeInMinutes
+  - messagingProtocols
 
 
 dynamicParameters:

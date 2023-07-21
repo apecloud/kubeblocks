@@ -50,6 +50,11 @@ spec:
           namespace: {{ .Release.Namespace }}
           constraintRef: brokers-config-constraints
           volumeName: pulsar-broker-config
+        - name: client-config
+          templateRef: {{ include "pulsar.name" . }}-client-config-tpl
+          namespace: {{ .Release.Namespace }}
+          constraintRef: pulsar-common-constraints
+          volumeName: pulsar-client-config
       scriptSpecs:
         - name: pulsar-scripts
           templateRef: {{ include "pulsar.name" . }}-scripts
@@ -127,6 +132,7 @@ spec:
             args:
             - |
               set -x
+              /kb-scripts/merge_pulsar_config.py conf/client.conf /opt/pulsar/client-conf/client.conf && \
               cp /opt/pulsar/conf/broker.conf conf/broker.conf && \
               bin/apply-config-from-env.py conf/broker.conf && \
               bin/apply-config-from-env.py conf/client.conf && \
@@ -211,6 +217,8 @@ spec:
               mountPath: /opt/pulsar/conf
             - name: broker-env
               mountPath: /opt/pulsar/none
+            - name: pulsar-client-config
+              mountPath: /opt/pulsar/client-conf
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -264,15 +272,20 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-        - name: proxy-config
-          templateRef: {{ include "pulsar.name" . }}-proxy-conf-tpl
+        - name: proxy-env
+          templateRef: {{ include "pulsar.name" . }}-proxy-env-tpl
           namespace: {{ .Release.Namespace }}
-          volumeName: config-env
+          volumeName: proxy-env
           constraintRef: pulsar-env-constraints
           keys:
             - conf
           asEnvFrom:
             - proxy
+        - name: proxy-config
+          templateRef: {{ include "pulsar.name" . }}-proxy-config-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: pulsar-proxy-config
+          constraintRef: pulsar-common-constraints
       scriptSpecs:
         - name: pulsar-scripts
           templateRef: {{ include "pulsar.name" . }}-scripts
@@ -373,8 +386,10 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /kb-scripts
-              - name: config-env
+              - name: proxy-env
                 mountPath: /opt/pulsar/none
+              - name: pulsar-proxy-config
+                mountPath: /opt/pulsar/conf
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -422,16 +437,21 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-        - name: bookies-config
-          templateRef: {{ include "pulsar.name" . }}-bookies-conf-tpl
+        - name: bookies-env
+          templateRef: {{ include "pulsar.name" . }}-bookies-env-tpl
           namespace: {{ .Release.Namespace }}
           constraintRef: pulsar-env-constraints
-          volumeName: bookies-config-env
+          volumeName: bookies-env
           keys:
             - conf
           asEnvFrom:
             - init-bookies
             - bookies
+        - name: bookies-config
+          templateRef: {{ include "pulsar.name" . }}-bookies-config-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: pulsar-bookies-config
+          constraintRef: pulsar-common-constraints
       scriptSpecs:
         - name: pulsar-scripts
           templateRef: {{ include "pulsar.name" . }}-scripts
@@ -515,8 +535,10 @@ spec:
                 mountPath: /kb-scripts
               - name: annotations
                 mountPath: /etc/annotations
-              - name: bookies-config-env
+              - name: bookies-env
                 mountPath: /opt/pulsar/none
+              - name: pulsar-bookies-config
+                mountPath: /opt/pulsar/conf
           - name: metrics
             image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
@@ -571,8 +593,8 @@ spec:
         templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
         namespace: {{ .Release.Namespace }}
         volumeName: agamotto-configuration
-      - name: bookies-recovery-config
-        templateRef: {{ include "pulsar.name" . }}-recovery-conf-tpl
+      - name: bookies-recovery-env
+        templateRef: {{ include "pulsar.name" . }}-recovery-env-tpl
         namespace: {{ .Release.Namespace }}
         constraintRef: pulsar-env-constraints
         keys:
@@ -696,8 +718,8 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-agamotto-conf-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-        - name: zookeeper-config
-          templateRef: {{ include "pulsar.name" . }}-zookeeper-conf-tpl
+        - name: zookeeper-env
+          templateRef: {{ include "pulsar.name" . }}-zookeeper-env-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: zookeeper-config-env
           constraintRef: pulsar-env-constraints

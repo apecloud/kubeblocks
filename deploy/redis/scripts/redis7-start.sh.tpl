@@ -54,7 +54,8 @@ create_replication() {
     echo "DownwardAPI get primary=$primary" >> /etc/redis/.kb_set_up.log
     echo "KB_POD_NAME=$KB_POD_NAME" >> /etc/redis/.kb_set_up.log
     if [ -z "$primary" ]; then
-      echo "Primary pod information not available. Exiting..."
+      echo "Primary pod information not available. shutdown redis-server..."
+      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD shutdown
       exit 1
     fi
     if [ "$primary" = "$KB_POD_NAME" ]; then

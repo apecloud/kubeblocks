@@ -24,12 +24,14 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type renderTPLCmdOpts struct {
@@ -69,6 +71,7 @@ func (o *renderTPLCmdOpts) complete() error {
 }
 
 func (o *renderTPLCmdOpts) run() error {
+	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	workflow, err := NewWorkflowTemplateRender(o.helmOutputDir, o.opts, o.clusterDef, o.clusterVersion)
 	if err != nil {
 		return err

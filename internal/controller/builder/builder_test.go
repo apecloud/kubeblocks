@@ -512,7 +512,7 @@ var _ = Describe("builder", func() {
 				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
 			}
 
-			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers)
+			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
 			Expect(err).Should(BeNil())
 			Expect(obj).ShouldNot(BeEmpty())
 		})

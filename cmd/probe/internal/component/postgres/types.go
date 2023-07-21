@@ -1,7 +1,9 @@
 package postgres
 
 import (
+	"bufio"
 	"encoding/json"
+	"os"
 	"strconv"
 	"strings"
 
@@ -15,13 +17,6 @@ const (
 	asynchronous = "asynchronous"
 	synchronous  = "synchronous"
 )
-
-type PidFile struct {
-	pid     int32
-	dataDir string
-	startTS int64
-	port    int
-}
 
 const (
 	first            = "first"
@@ -38,6 +33,43 @@ const (
 	priority         = "priority"
 	off              = "off"
 )
+
+type PidFile struct {
+	pid     int32
+	dataDir string
+	startTS int64
+	port    int
+}
+
+func readPidFile(dataDir string) (*PidFile, error) {
+	file := &PidFile{}
+	f, err := os.Open(dataDir + "/postmaster.pid")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	scanner := bufio.NewScanner(f)
+	var text []string
+	for scanner.Scan() {
+		text = append(text, scanner.Text())
+	}
+
+	pid, err := strconv.ParseInt(text[0], 10, 32)
+	if err != nil {
+		return nil, err
+	}
+	file.pid = int32(pid)
+	file.dataDir = text[1]
+	startTS, _ := strconv.ParseInt(text[2], 10, 64)
+	file.startTS = startTS
+	port, _ := strconv.ParseInt(text[3], 10, 64)
+	file.port = int(port)
+
+	return file, nil
+}
 
 type PGStandby struct {
 	Types   string

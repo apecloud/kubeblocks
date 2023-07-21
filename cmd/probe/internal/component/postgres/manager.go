@@ -56,41 +56,8 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 	return Mgr, nil
 }
 
-func (mgr *Manager) readPidFile() (*PidFile, error) {
-	file := &PidFile{}
-	f, err := os.Open(mgr.DataDir + "/postmaster.pid")
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			mgr.Logger.Error(err)
-		}
-	}()
-
-	scanner := bufio.NewScanner(f)
-	var text []string
-	for scanner.Scan() {
-		text = append(text, scanner.Text())
-	}
-
-	pid, err := strconv.ParseInt(text[0], 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	file.pid = int32(pid)
-	file.dataDir = text[1]
-	startTS, _ := strconv.ParseInt(text[2], 10, 64)
-	file.startTS = startTS
-	port, _ := strconv.ParseInt(text[3], 10, 64)
-	file.port = int(port)
-
-	return file, nil
-}
-
 func (mgr *Manager) newProcessFromPidFile() error {
-	pidFile, err := Mgr.readPidFile()
+	pidFile, err := readPidFile(mgr.DataDir)
 	if err != nil {
 		mgr.Logger.Errorf("read pid file failed, err:%v", err)
 		return errors.Wrap(err, "read pid file")

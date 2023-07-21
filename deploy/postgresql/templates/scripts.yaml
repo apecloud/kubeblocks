@@ -82,7 +82,7 @@ data:
 
     # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
     attempt=1
-    max_attempts=60
+    max_attempts=10
     while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
       sleep 5
       attempt=$((attempt + 1))
@@ -99,7 +99,7 @@ data:
     # usage: retry <command>
     # e.g. retry pg_isready -U postgres -h $primary_fqdn -p 5432
     function retry {
-      local max_attempts=20
+      local max_attempts=10
       local attempt=1
       until "$@" || [ $attempt -eq $max_attempts ]; do
         echo "Command '$*' failed. Attempt $attempt of $max_attempts. Retrying in 5 seconds..."

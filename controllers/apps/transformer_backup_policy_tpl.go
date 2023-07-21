@@ -235,7 +235,7 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
 
 	backupEnabled := func() bool {
-		return cluster.Spec.Backup != nil && cluster.Spec.Backup.Enabled
+		return cluster.Spec.Backup != nil && boolValue(cluster.Spec.Backup.Enabled)
 	}
 
 	if backupPolicy == nil {
@@ -275,12 +275,17 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		spec.Schedule.RetryWindowMinutes = backup.RetryWindowMinutes
 	}
 
-	var schedulePolicy *dataprotectionv1alpha1.SchedulePolicy
+	var (
+		schedulePolicy     *dataprotectionv1alpha1.SchedulePolicy
+		commonBackupPolicy *dataprotectionv1alpha1.CommonBackupPolicy
+	)
+
 	switch backup.Method {
 	case dataprotectionv1alpha1.BackupMethodSnapshot:
 		schedulePolicy = spec.Schedule.Snapshot
 	case dataprotectionv1alpha1.BackupMethodBackupTool:
 		schedulePolicy = spec.Schedule.Datafile
+		commonBackupPolicy = spec.Datafile
 	}
 
 	if schedulePolicy == nil {
@@ -291,15 +296,25 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		return
 	}
 
-	// enable specified backup method and set its cron expression
+	// enable specified backup method, set its cron expression and repo name
 	schedulePolicy.Enable = true
 	if backup.CronExpression != "" {
 		schedulePolicy.CronExpression = backup.CronExpression
 	}
 
+	setRepoName := func(bp *dataprotectionv1alpha1.CommonBackupPolicy) {
+		if backup.RepoName == "" || bp == nil {
+			return
+		}
+		bp.BackupRepoName = &backup.RepoName
+	}
+	setRepoName(commonBackupPolicy)
+	setRepoName(spec.Logfile)
+
+	pitrEnabled := boolValue(backup.PITREnabled)
 	if backupPolicy.Spec.Schedule.Logfile != nil {
-		backupPolicy.Spec.Schedule.Logfile.Enable = backup.PITREnabled
-	} else if backup.PITREnabled {
+		backupPolicy.Spec.Schedule.Logfile.Enable = pitrEnabled
+	} else if pitrEnabled {
 		// TODO: if backupPolicy.Spec.Schedule.Logfile is nil, and backup.PITREnabled is true,
 		// should we create a new SchedulePolicy for logfile?
 		// Now, hscale also maintains a backupPolicy, we can not distinguish the backupPolicy for backup

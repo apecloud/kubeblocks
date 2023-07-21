@@ -151,3 +151,10 @@ func evalCEL(ctx context.Context, exp string, cluster *appsv1alpha1.Cluster) (st
 	out, _, err := prg.ContextEval(ctx, map[string]any{"cluster": clusterMap})
 	return fmt.Sprintf("%v", out.Value()), err
 }
+
+func boolValue(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
+}

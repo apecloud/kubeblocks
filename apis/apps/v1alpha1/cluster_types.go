@@ -121,7 +121,7 @@ type ClusterBackup struct {
 	// enabled defines whether to enable automated backup.
 	// +kubebuilder:default=false
 	// +optional
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// retentionPeriod is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
 	// the Backup should be retained. if not set, will be retained forever.
@@ -154,7 +154,7 @@ type ClusterBackup struct {
 	// pitrEnabled defines whether to enable point-in-time recovery.
 	// +kubebuilder:default=true
 	// +optional
-	PITREnabled bool `json:"pitrEnabled,omitempty"`
+	PITREnabled *bool `json:"pitrEnabled,omitempty"`
 }
 
 type ClusterResources struct {

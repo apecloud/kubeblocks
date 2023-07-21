@@ -63,10 +63,13 @@ create_replication() {
       primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
       echo "primary_fqdn=$primary_fqdn" >> /etc/redis/.kb_set_up.log
       retry redis-cli -h $primary_fqdn -p 6379 -a $REDIS_DEFAULT_PASSWORD ping
-      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD replicaof $primary_fqdn 6379 || exit 1
+      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD replicaof $primary_fqdn 6379
+      if [ $? -ne 0 ]; then
+        echo "Failed to create a replication relationship. shutdown redis-server..."
+        redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD shutdown
+      fi
     fi
 }
 
 create_replication &
 start_redis_server
-wait

@@ -22,7 +22,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -43,16 +42,16 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 
 	// construct config manager tools volume
 	toolContainers := make([]appsv1alpha1.ToolConfig, 0)
-	toolSets := cfgutil.NewSet()
+	toolsMap := make(map[string]cfgcm.ConfigSpecMeta)
 	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
 		if buildParam.ToolsImageSpec == nil {
 			continue
 		}
 		for _, toolConfig := range buildParam.ToolsImageSpec.ToolConfigs {
-			if !toolSets.InArray(toolConfig.Name) {
+			if _, ok := toolsMap[toolConfig.Name]; !ok {
 				replaceToolsImageHolder(&toolConfig, podSpec, buildParam.ConfigSpec.VolumeName)
 				toolContainers = append(toolContainers, toolConfig)
-				toolSets.Add(toolConfig.Name)
+				toolsMap[toolConfig.Name] = buildParam
 			}
 		}
 		buildToolsVolumeMount(cfgManagerParams, podSpec, buildParam.ConfigSpec.VolumeName, buildParam.ToolsImageSpec.MountPoint)
@@ -64,7 +63,7 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 		return nil
 	}
 
-	containers, err := builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
+	containers, err := builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers, toolsMap)
 	if err == nil {
 		cfgManagerParams.ToolsContainers = containers
 	}

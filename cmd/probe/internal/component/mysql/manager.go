@@ -293,7 +293,7 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *Manager) Premote() error {
+func (mgr *Manager) Promote() error {
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)

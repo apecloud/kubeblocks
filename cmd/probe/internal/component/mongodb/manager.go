@@ -520,7 +520,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	return status.OK != 0
 }
 
-func (mgr *Manager) Premote() error {
+func (mgr *Manager) Promote() error {
 	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)

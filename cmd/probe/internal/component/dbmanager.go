@@ -23,7 +23,7 @@ type DBManager interface {
 	Recover()
 	AddCurrentMemberToCluster(*dcs.Cluster) error
 	DeleteMemberFromCluster(*dcs.Cluster, string) error
-	Premote() error
+	Promote() error
 	Demote() error
 	Follow(*dcs.Cluster) error
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member

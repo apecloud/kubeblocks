@@ -76,7 +76,7 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Infof("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(cluster) {
 			if ha.dcs.AttempAcquireLock() == nil {
-				err := ha.dbManager.Premote()
+				err := ha.dbManager.Promote()
 				if err != nil {
 					ha.logger.Infof("Take the leader failed: %v", err)
 					_ = ha.dcs.ReleaseLock()
@@ -110,7 +110,7 @@ func (ha *Ha) RunCycle() {
 			ha.logger.Infof("Release leader")
 			_ = ha.dcs.ReleaseLock()
 		} else {
-			_ = ha.dbManager.Premote()
+			_ = ha.dbManager.Promote()
 			_ = ha.dcs.UpdateLock()
 		}
 
@@ -129,7 +129,7 @@ func (ha *Ha) RunCycle() {
 		} else if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Infof("I am the real leader, wait for lock released")
 			// if ha.dcs.AttempAcquireLock() == nil {
-			// 	ha.dbManager.Premote()
+			// 	ha.dbManager.Promote()
 			// }
 		}
 	}

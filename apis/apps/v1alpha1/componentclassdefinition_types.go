@@ -30,11 +30,6 @@ type ComponentClassDefinitionSpec struct {
 }
 
 type ComponentClassGroup struct {
-	// resourceConstraintRef reference to the resource constraint object name, indicates that the series
-	// defined below all conform to the constraint.
-	// +kubebuilder:validation:Required
-	ResourceConstraintRef string `json:"resourceConstraintRef"`
-
 	// template is a class definition template that uses the Go template syntax and allows for variable declaration.
 	// When defining a class in Series, specifying the variable's value is sufficient, as the complete class
 	// definition will be generated through rendering the template.
@@ -100,14 +95,7 @@ type ComponentClassDefinitionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// classes is the list of classes that have been observed for this ComponentClassDefinition
-	Classes []ComponentClassInstance `json:"classes,omitempty"`
-}
-
-type ComponentClassInstance struct {
-	ComponentClass `json:",inline"`
-
-	// resourceConstraintRef reference to the resource constraint object name.
-	ResourceConstraintRef string `json:"resourceConstraintRef,omitempty"`
+	Classes []ComponentClass `json:"classes,omitempty"`
 }
 
 // +genclient
@@ -147,7 +135,7 @@ func (r *ComponentClass) ToResourceRequirements() corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{Requests: requests, Limits: requests}
 }
 
-func (r *ComponentClassInstance) Cmp(b *ComponentClassInstance) int {
+func (r *ComponentClass) Cmp(b *ComponentClass) int {
 	if out := r.CPU.Cmp(b.CPU); out != 0 {
 		return out
 	}

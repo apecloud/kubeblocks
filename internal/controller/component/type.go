@@ -68,3 +68,14 @@ type SynthesizedComponent struct {
 	StatefulSetWorkload   v1alpha1.StatefulSetWorkload           `json:"statefulSetWorkload,omitempty"`
 	ComponentRefEnvs      []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
 }
+
+type CloudProvider string
+
+const (
+	CloudProviderAWS     CloudProvider = "aws"
+	CloudProviderGCP     CloudProvider = "gcp"
+	CloudProviderAliyun  CloudProvider = "aliyun"
+	CloudProviderAzure   CloudProvider = "azure"
+	CloudProviderTencent CloudProvider = "tencent"
+	CloudProviderUnknown CloudProvider = "unknown"
+)

@@ -210,7 +210,9 @@ func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 	return cluster.GetMemberAddrs()
 }
 
-func (mgr *Manager) Initialize() {}
+func (mgr *Manager) InitializeCluster(context.Context, *dcs.Cluster) error {
+	return nil
+}
 
 func (mgr *Manager) IsRunning() bool {
 	if mgr.Proc != nil {
@@ -396,7 +398,7 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) Premote() error {
+func (mgr *Manager) Promote() error {
 	if isLeader, err := mgr.IsLeader(context.TODO(), nil); err == nil && isLeader {
 		mgr.Logger.Infof("i am already a leader, don't need to promote")
 		return nil
@@ -849,4 +851,12 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, me
 	}
 
 	return mgr.IsLeaderWithPool(ctx, pools[0])
+}
+
+func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
+	return true, nil
+}
+
+func (mgr *Manager) CreateRoot(ctx context.Context) error {
+	return nil
 }

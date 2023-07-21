@@ -20,7 +20,7 @@ defaultPulsarImage:
   repository: docker.io/apecloud/pulsar
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 2.11.1
+  tag:
 
 ## Images
 ##
@@ -36,7 +36,7 @@ images:
     # upgrade scenario
     repository: docker.io/apecloud/pulsar
     pullPolicy: IfNotPresent
-    tag: 2.11.1
+    tag: 2.11.2
 
   broker:
     repository: ""

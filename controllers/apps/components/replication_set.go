@@ -189,7 +189,8 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		}
 	}
 
-	for _, pod := range podList {
+	for i := range podList {
+		pod := &podList[i]
 		needUpdate := false
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
@@ -197,13 +198,13 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		switch {
 		case primary == "":
 			// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
-			needUpdate = handlePrimaryNotExistPod(&pod)
+			needUpdate = handlePrimaryNotExistPod(pod)
 		default:
-			needUpdate = handlePrimaryExistPod(&pod, primary)
+			needUpdate = handlePrimaryExistPod(pod, primary)
 		}
 		if needUpdate {
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-				Obj:    &pod,
+				Obj:    pod,
 				Action: ictrltypes.ActionUpdatePtr(),
 			})
 		}

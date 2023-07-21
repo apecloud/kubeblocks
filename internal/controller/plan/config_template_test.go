@@ -26,11 +26,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	ctrlcomp "github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
@@ -210,6 +212,8 @@ single_thread_memory = 294912
 				nil, nil, nil,
 			)
 
+			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
+
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
 
 			rendered, err := cfgBuilder.render(map[string]string{
@@ -229,6 +233,7 @@ single_thread_memory = 294912
 				"invalid_env":       "{{ getEnvByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
 				"invalid_pvc":       "{{ getPVCByName $.podSpec.volumes \"invalid\" }}",
 				"invalid_memory":    "{{ getContainerMemory ( index $.podSpec.containers 1 ) }}",
+				"cluster_domain":    "{{- $.clusterDomain }}",
 			})
 
 			Expect(err).Should(BeNil())
@@ -256,6 +261,7 @@ single_thread_memory = 294912
 			Expect(rendered["invalid_pvc"]).Should(BeEquivalentTo("<no value>"))
 			Expect(rendered["invalid_resource"]).Should(BeEquivalentTo(""))
 			Expect(rendered["invalid_memory"]).Should(BeEquivalentTo("0"))
+			Expect(rendered["cluster_domain"]).Should(BeEquivalentTo("test-domain"))
 		})
 
 		It("test array null check", func() {

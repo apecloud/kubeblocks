@@ -536,6 +536,8 @@ type ServiceSpec struct {
 	// +listMapKey=protocol
 	// +optional
 	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
+
+	// NOTES: name also need to be key
 }
 
 func (r *ServiceSpec) toSVCPorts() []corev1.ServicePort {

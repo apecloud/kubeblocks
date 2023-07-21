@@ -42,26 +42,21 @@ var _ = Describe("create", func() {
 		streams       genericclioptions.IOStreams
 	)
 
-	fillResources := func(o *CreateOptions, cpu string, memory string, storage []string) {
+	fillResources := func(o *CreateOptions, cpu string, memory string) {
 		o.CPU = cpu
 		o.Memory = memory
 		o.ClassName = fmt.Sprintf("custom-%s-%s", cpu, memory)
-		o.Constraint = generalResourceConstraint.Name
 	}
 
 	BeforeEach(func() {
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
-		tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalResourceConstraint, &memoryOptimizedResourceConstraint)
-
 		createOptions = &CreateOptions{
-			Factory:       tf,
 			IOStreams:     streams,
 			ClusterDefRef: "apecloud-mysql",
 			ComponentType: "mysql",
 		}
-		Expect(createOptions.complete(tf)).ShouldNot(HaveOccurred())
 	})
 
 	AfterEach(func() {
@@ -75,55 +70,77 @@ var _ = Describe("create", func() {
 
 	Context("with resource arguments", func() {
 
-		It("should fail if required arguments is missing", func() {
-			fillResources(createOptions, "", "48Gi", nil)
-			Expect(createOptions.validate([]string{"general-12c48g"})).Should(HaveOccurred())
-			fillResources(createOptions, "12", "", nil)
-			Expect(createOptions.validate([]string{"general-12c48g"})).Should(HaveOccurred())
-			fillResources(createOptions, "12", "48g", nil)
-			Expect(createOptions.validate([]string{})).Should(HaveOccurred())
+		Context("without constraints", func() {
+			BeforeEach(func() {
+				tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalResourceConstraintWithoutSelector)
+				createOptions.Factory = tf
+				Expect(createOptions.complete(tf)).ShouldNot(HaveOccurred())
+			})
+
+			It("should succeed if component don't have any constraints", func() {
+				fillResources(createOptions, "1", "100Gi")
+				Expect(createOptions.run()).ShouldNot(HaveOccurred())
+			})
+
 		})
 
-		It("should succeed with required arguments", func() {
-			fillResources(createOptions, "96", "384Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			Expect(createOptions.validate([]string{"general-96c384g"})).ShouldNot(HaveOccurred())
-			Expect(createOptions.run()).ShouldNot(HaveOccurred())
-			Expect(out.String()).Should(ContainSubstring(createOptions.ClassName))
-		})
+		Context("with constraints", func() {
+			BeforeEach(func() {
+				tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalResourceConstraint, &memoryOptimizedResourceConstraint)
+				createOptions.Factory = tf
+				Expect(createOptions.complete(tf)).ShouldNot(HaveOccurred())
+			})
 
-		It("should fail if constraint not existed", func() {
-			fillResources(createOptions, "2", "8Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			createOptions.Constraint = "constraint-not-exist"
-			Expect(createOptions.run()).Should(HaveOccurred())
-		})
+			It("should fail if required arguments is missing", func() {
+				fillResources(createOptions, "", "48Gi")
+				Expect(createOptions.validate([]string{"general-12c48g"})).Should(HaveOccurred())
+				fillResources(createOptions, "12", "")
+				Expect(createOptions.validate([]string{"general-12c48g"})).Should(HaveOccurred())
+				fillResources(createOptions, "12", "48g")
+				Expect(createOptions.validate([]string{})).Should(HaveOccurred())
+			})
 
-		It("should fail if not conformed to constraint", func() {
-			By("memory not conformed to constraint")
-			fillResources(createOptions, "2", "9Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			Expect(createOptions.run()).Should(HaveOccurred())
+			It("should succeed with required arguments", func() {
+				fillResources(createOptions, "96", "384Gi")
+				Expect(createOptions.validate([]string{"general-96c384g"})).ShouldNot(HaveOccurred())
+				Expect(createOptions.run()).ShouldNot(HaveOccurred())
+				Expect(out.String()).Should(ContainSubstring(createOptions.ClassName))
+			})
 
-			By("CPU with invalid step")
-			fillResources(createOptions, "0.6", "0.6Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			Expect(createOptions.run()).Should(HaveOccurred())
-		})
+			It("should fail if not conformed to constraint", func() {
+				By("memory not conformed to constraint")
+				fillResources(createOptions, "2", "9Gi")
+				Expect(createOptions.run()).Should(HaveOccurred())
 
-		It("should fail if class name is conflicted", func() {
-			// class may be conflict only within the same object, so we set the objectName to be consistent with the name of the object classDef
-			createOptions.objectName = "kb.classes.default.apecloud-mysql.mysql"
+				By("CPU with invalid step")
+				fillResources(createOptions, "0.6", "0.6Gi")
+				Expect(createOptions.run()).Should(HaveOccurred())
+			})
 
-			fillResources(createOptions, "1", "1Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
-			createOptions.ClassName = "general-1c1g"
-			Expect(createOptions.run()).Should(HaveOccurred())
+			It("should fail if class name is conflicted", func() {
+				// class may be conflict only within the same object, so we set the objectName to be consistent with the name of the object classDef
+				createOptions.objectName = "kb.classes.default.apecloud-mysql.mysql"
 
-			fillResources(createOptions, "0.5", "0.5Gi", []string{})
-			Expect(createOptions.run()).ShouldNot(HaveOccurred())
+				fillResources(createOptions, "1", "1Gi")
+				createOptions.ClassName = "general-1c1g"
+				Expect(createOptions.run()).Should(HaveOccurred())
 
-			fillResources(createOptions, "0.5", "0.5Gi", []string{})
-			Expect(createOptions.run()).Should(HaveOccurred())
+				fillResources(createOptions, "0.5", "0.5Gi")
+				Expect(createOptions.run()).ShouldNot(HaveOccurred())
+
+				fillResources(createOptions, "0.5", "0.5Gi")
+				Expect(createOptions.run()).Should(HaveOccurred())
+			})
 		})
 	})
 
 	Context("with class definitions file", func() {
+		BeforeEach(func() {
+			tf.FakeDynamicClient = testing.FakeDynamicClient(&classDef, &generalResourceConstraint, &memoryOptimizedResourceConstraint)
+			createOptions.Factory = tf
+			Expect(createOptions.complete(tf)).ShouldNot(HaveOccurred())
+		})
+
 		It("should succeed", func() {
 			createOptions.File = testCustomClassDefsPath
 			Expect(createOptions.run()).ShouldNot(HaveOccurred())

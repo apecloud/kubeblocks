@@ -14,7 +14,8 @@ import (
 	"syscall"
 	"unicode"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
@@ -35,7 +36,7 @@ type Manager struct {
 
 var Mgr *Manager
 
-func NewManager(logger logger.Logger) (*Manager, error) {
+func NewManager(logger logr.Logger) (*Manager, error) {
 	pool, err := pgxpool.NewWithConfig(context.Background(), config.pool)
 	if err != nil {
 		return nil, errors.Errorf("unable to ping the DB: %v", err)
@@ -59,13 +60,13 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 func (mgr *Manager) newProcessFromPidFile() error {
 	pidFile, err := readPidFile(mgr.DataDir)
 	if err != nil {
-		mgr.Logger.Errorf("read pid file failed, err:%v", err)
+		mgr.Logger.Error(err, "read pid file failed, err")
 		return errors.Wrap(err, "read pid file")
 	}
 
 	proc, err := process.NewProcess(pidFile.pid)
 	if err != nil {
-		mgr.Logger.Errorf("new process failed, err:%v", err)
+		mgr.Logger.Error(err, "new process failed, err")
 		return err
 	}
 
@@ -78,7 +79,7 @@ func (mgr *Manager) Query(ctx context.Context, sql string) (result []byte, err e
 }
 
 func (mgr *Manager) QueryWithPool(ctx context.Context, sql string, pool *pgxpool.Pool) (result []byte, err error) {
-	mgr.Logger.Debugf("query: %s", sql)
+	mgr.Logger.Info(fmt.Sprintf("query: %s", sql))
 
 	var rows pgx.Rows
 	if pool != nil {
@@ -121,7 +122,7 @@ func (mgr *Manager) QueryWithPool(ctx context.Context, sql string, pool *pgxpool
 }
 
 func (mgr *Manager) Exec(ctx context.Context, sql string) (result int64, err error) {
-	mgr.Logger.Debugf("exec: %s", sql)
+	mgr.Logger.Info(fmt.Sprintf("exec: %s", sql))
 
 	res, err := mgr.Pool.Exec(ctx, sql)
 	if err != nil {
@@ -150,12 +151,12 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	}
 	err := cmd.Run()
 	if err != nil {
-		mgr.Logger.Infof("DB is not ready: %v", err)
+		mgr.Logger.Error(err, "DB is not ready")
 		return false
 	}
 
 	mgr.DBStartupReady = true
-	mgr.Logger.Infof("DB startup ready")
+	mgr.Logger.Info("DB startup ready")
 	return true
 }
 
@@ -171,7 +172,7 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 		rows, err = mgr.Pool.Query(ctx, sql)
 	}
 	if err != nil {
-		mgr.Logger.Infof("error executing %s: %v", sql, err)
+		mgr.Logger.Error(err, "error executing sql", "sql", sql)
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
@@ -179,7 +180,7 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&isRecovery); err != nil {
-			mgr.Logger.Errorf("Role query error: %v", err)
+			mgr.Logger.Error(err, "Role query error")
 			return "", err
 		}
 		isReady = true
@@ -241,7 +242,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	if member != nil && cluster != nil {
 		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
 		if err != nil || pools[0] == nil {
-			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
+			mgr.Logger.Error(err, "Get other pools failed")
 			return false
 		}
 	}
@@ -249,7 +250,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	// Typically, the synchronous_commit parameter remains consistent between the primary and standby
 	replicationMode, err := mgr.getReplicationMode(ctx)
 	if err != nil {
-		mgr.Logger.Errorf("get db replication mode failed, err:%v", err)
+		mgr.Logger.Error(err, "get db replication mode failed")
 		return false
 	}
 
@@ -262,7 +263,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 
 	walPosition, _ := mgr.getWalPositionWithPool(ctx, pools[0])
 	if mgr.isLagging(walPosition, cluster) {
-		mgr.Logger.Infof("my wal position exceeds max lag")
+		mgr.Logger.Info("my wal position exceeds max lag")
 		return false
 	}
 
@@ -303,14 +304,14 @@ func (mgr *Manager) checkStandbySynchronizedToLeader(ctx context.Context, member
 	sql := "select pg_catalog.current_setting('synchronous_standby_names');"
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s, err:%v", sql, err)
+		mgr.Logger.Error(err, "query sql err", "sql", sql)
 		return false
 	}
 	standbyNames := strings.Split(strings.Split(string(resp), ":")[1], `"`)[1]
 
 	syncStandbys, err := parsePGSyncStandby(standbyNames)
 	if err != nil {
-		mgr.Logger.Errorf("parse pg sync standby failed, err:%v", err)
+		mgr.Logger.Error(err, "parse pg sync standby failed")
 		return false
 	}
 
@@ -354,7 +355,7 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 
 	resp, err := mgr.QueryWithPool(ctx, sql, pool)
 	if err != nil {
-		mgr.Logger.Errorf("get wal position failed, err:%v", err)
+		mgr.Logger.Error(err, "get wal position failed")
 		return 0, err
 	}
 	lsnStr := strings.TrimFunc(string(resp), func(r rune) bool {
@@ -363,7 +364,7 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 
 	lsn, err := strconv.ParseInt(lsnStr, 10, 64)
 	if err != nil {
-		mgr.Logger.Errorf("convert lsnStr to lsn failed, err:%v", err)
+		mgr.Logger.Error(err, "convert lsnStr to lsn failed")
 	}
 
 	return lsn, nil
@@ -400,7 +401,7 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 
 func (mgr *Manager) Promote() error {
 	if isLeader, err := mgr.IsLeader(context.TODO(), nil); err == nil && isLeader {
-		mgr.Logger.Infof("i am already a leader, don't need to promote")
+		mgr.Logger.Info("i am already a leader, don't need to promote")
 		return nil
 	}
 
@@ -416,10 +417,10 @@ func (mgr *Manager) Promote() error {
 
 	err = cmd.Run()
 	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("promote failed, err:%v, stderr:%s", err, stderr.String())
+		mgr.Logger.Error(nil, fmt.Sprintf("promote failed, err:%v, stderr:%s", err, stderr.String()))
 		return err
 	}
-	mgr.Logger.Infof("promote success, response:%s", stdout.String())
+	mgr.Logger.Info("promote success", "response", stdout.String())
 
 	err = mgr.postPromote()
 	if err != nil {
@@ -437,16 +438,16 @@ func (mgr *Manager) postPromote() error {
 }
 
 func (mgr *Manager) Demote() error {
-	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
+	mgr.Logger.Info("current member demoting:" + mgr.CurrentMemberName)
 
 	return mgr.Stop()
 }
 
 func (mgr *Manager) Stop() error {
-	mgr.Logger.Infof("wait for send signal 1 to deactivate sql channel")
+	mgr.Logger.Info("wait for send signal 1 to deactivate sql channel")
 	sqlChannelProc, err := component.GetSQLChannelProc()
 	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		mgr.Logger.Error(err, "can't find sql channel process")
 		return errors.Errorf("can't find sql channel process, err:%v", err)
 	}
 
@@ -463,7 +464,7 @@ func (mgr *Manager) Stop() error {
 
 	err = stopCmd.Run()
 	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
+		mgr.Logger.Error(err, "stop failed", "stderr", stderr.String())
 		return err
 	}
 
@@ -474,13 +475,13 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 	ctx := context.TODO()
 
 	if cluster.Leader == nil || cluster.Leader.Name == "" {
-		mgr.Logger.Warnf("no action coz cluster has no leader")
+		mgr.Logger.Info("no action coz cluster has no leader")
 		return mgr.Start()
 	}
 
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("handle rewind failed, err:%v", err)
+		mgr.Logger.Error(err, "handle rewind failed")
 	}
 
 	needChange, needRestart := mgr.checkRecoveryConf(ctx, cluster.Leader.Name)
@@ -488,7 +489,7 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 		return mgr.follow(needRestart, cluster)
 	}
 
-	mgr.Logger.Infof("no action coz i still follow the leader:%s", cluster.Leader.Name)
+	mgr.Logger.Info("no action coz i still follow the leader: " + cluster.Leader.Name)
 	return nil
 }
 
@@ -516,7 +517,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 
 	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*cluster.GetLeaderMember())})
 	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
+		mgr.Logger.Error(err, "Get other pools failed")
 		return false
 	}
 
@@ -525,13 +526,13 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		return false
 	}
 	if role != binding.PRIMARY {
-		mgr.Logger.Warnf("Leader is still in recovery and can't rewind")
+		mgr.Logger.Info("Leader is still in recovery and can't rewind")
 		return false
 	}
 
 	primaryTimeLine, err := mgr.getPrimaryTimeLine(cluster.GetMemberAddr(*cluster.GetLeaderMember()))
 	if err != nil {
-		mgr.Logger.Errorf("get primary timeLine failed, err:%v", err)
+		mgr.Logger.Error(err, "get primary timeLine failed")
 		return false
 	}
 
@@ -574,7 +575,7 @@ func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
 
 	err := cmd.Run()
 	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get primary time line failed, err:%v, stderr%s", err, stderr.String())
+		mgr.Logger.Error(err, "get primary time line failed", err, "stderr", stderr.String())
 		return 0, err
 	}
 
@@ -633,7 +634,7 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
 
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil || resp == nil {
-		mgr.Logger.Errorf("get received time line failed, err%v", err)
+		mgr.Logger.Error(err, "get received time line failed")
 		return 0
 	}
 
@@ -650,7 +651,7 @@ func (mgr *Manager) getPgControlData() *map[string]string {
 
 	err := cmd.Run()
 	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get pg control data failed, err:%v, stderr: %s", err, stderr.String())
+		mgr.Logger.Error(err, "get pg control data failed", "stderr", stderr.String())
 		return &result
 	}
 
@@ -677,7 +678,7 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 	}
 
 	if strings.Split(primaryInfo["host"], ".")[0] != leaderName {
-		mgr.Logger.Warnf("host not match, need to reload")
+		mgr.Logger.Info("host not match, need to reload")
 		return true, false
 	}
 
@@ -688,12 +689,12 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) map[string]string {
 	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("get primary conn info failed, err:%v", err)
+		mgr.Logger.Error(err, "get primary conn info failed")
 		return nil
 	}
 	result, err := parseSingleQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query failed, err:%v", err)
+		mgr.Logger.Error(err, "parse query failed")
 		return nil
 	}
 	primaryInfoStr := result["setting"].(string)
@@ -710,7 +711,7 @@ func (mgr *Manager) getHistory() []*history {
 func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
 	if mgr.CurrentMemberName == leaderMember.Name {
-		mgr.Logger.Infof("i get the leader key, don't need to follow")
+		mgr.Logger.Info("i get the leader key, don't need to follow")
 		return nil
 	}
 
@@ -719,7 +720,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 
 	pgConf, err := os.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
-		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
+		mgr.Logger.Error(err, "open postgresql.conf failed")
 		return err
 	}
 	defer pgConf.Close()
@@ -727,13 +728,13 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	writer := bufio.NewWriter(pgConf)
 	_, err = writer.WriteString(primaryInfo)
 	if err != nil {
-		mgr.Logger.Errorf("write into postgresql.conf failed, err:%v", err)
+		mgr.Logger.Error(err, "write into postgresql.conf failed")
 		return err
 	}
 
 	err = writer.Flush()
 	if err != nil {
-		mgr.Logger.Errorf("writer flush failed, err:%v", err)
+		mgr.Logger.Error(err, "writer flush failed")
 		return err
 	}
 
@@ -745,11 +746,11 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 
 		err = cmd.Run()
 		if err != nil || stderr.String() != "" {
-			mgr.Logger.Errorf("postgresql reload failed, err:%v, stderr:%s", err, stderr.String())
+			mgr.Logger.Error(err, "postgresql reload failed", "stderr", stderr.String())
 			return err
 		}
 
-		mgr.Logger.Infof("successfully follow new leader:%s", leaderMember.Name)
+		mgr.Logger.Info("successfully follow new leader: " + leaderMember.Name)
 		return nil
 	}
 
@@ -757,10 +758,10 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) Start() error {
-	mgr.Logger.Infof("wait for send signal 2 to activate sql channel")
+	mgr.Logger.Info("wait for send signal 2 to activate sql channel")
 	sqlChannelProc, err := component.GetSQLChannelProc()
 	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		mgr.Logger.Error(err, "can't find sql channel process")
 		return errors.Errorf("can't find sql channel process, err:%v", err)
 	}
 
@@ -794,7 +795,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	}
 	pools, err := mgr.GetOtherPoolsWithHosts(ctx, hosts)
 	if err != nil {
-		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
+		mgr.Logger.Error(err, "Get other pools failed")
 		return nil
 	}
 
@@ -835,7 +836,7 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 
 		resp[i], err = pgxpool.NewWithConfig(ctx, tempConfig)
 		if err != nil {
-			mgr.Logger.Errorf("unable to ping the DB: %v, host:%s", err, host)
+			mgr.Logger.Error(err, "unable to ping the DB", "host", host)
 			continue
 		}
 	}
@@ -846,7 +847,7 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
 	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
+		mgr.Logger.Error(err, "Get leader pools failed")
 		return false, err
 	}
 

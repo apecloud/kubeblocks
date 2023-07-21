@@ -745,7 +745,7 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, container); err != nil {
 			return nil, err
 		}
-		injectZeroResourcesLimitsIfEmpty(&toolContainers[i])
+		injectZeroResourcesLimitsIfEmpty(container)
 		if meta, ok := toolsMap[container.Name]; ok {
 			setToolsScriptsPath(container, meta)
 		}

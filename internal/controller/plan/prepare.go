@@ -53,7 +53,7 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	if err != nil {
 		return err
 	}
-	return fsm.Fire(configfsm.Creating)
+	return fsm.Fire(configfsm.CreatingOrUpdating)
 
 	//clusterName := cluster.Name
 	//namespaceName := cluster.Namespace

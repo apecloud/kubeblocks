@@ -76,7 +76,7 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Infof("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(cluster) {
 			if ha.dcs.AttempAcquireLock() == nil {
-				err := ha.dbManager.Premote()
+				err := ha.dbManager.Promote()
 				if err != nil {
 					ha.logger.Infof("Take the leader failed: %v", err)
 					_ = ha.dcs.ReleaseLock()
@@ -110,7 +110,7 @@ func (ha *Ha) RunCycle() {
 			ha.logger.Infof("Release leader")
 			_ = ha.dcs.ReleaseLock()
 		} else {
-			_ = ha.dbManager.Premote()
+			_ = ha.dbManager.Promote()
 			_ = ha.dcs.UpdateLock()
 		}
 
@@ -129,7 +129,7 @@ func (ha *Ha) RunCycle() {
 		} else if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Infof("I am the real leader, wait for lock released")
 			// if ha.dcs.AttempAcquireLock() == nil {
-			// 	ha.dbManager.Premote()
+			// 	ha.dbManager.Promote()
 			// }
 		}
 	}
@@ -144,16 +144,35 @@ func (ha *Ha) Start() {
 	}
 
 	ha.logger.Debugf("cluster: %v", cluster)
-	isInitialized, _ := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
-	for !isInitialized {
+	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
+	for err != nil || !isInitialized {
 		ha.logger.Infof("Waiting for the database cluster to be initialized.")
 		// TODO: implement dbmanager initialize to replace pod's entrypoint scripts
 		// if I am the node of index 0, then do initialization
-		// ha.dbManager.Initialize()
-		time.Sleep(1 * time.Second)
-		isInitialized, _ = ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
+		if err == nil && !isInitialized && ha.dbManager.IsFirstMember() {
+			ha.logger.Infof("Initialize cluster.")
+			err := ha.dbManager.InitializeCluster(ha.ctx, cluster)
+			if err != nil {
+				ha.logger.Warnf("Cluster initialize failed: %v", err)
+			}
+		}
+		time.Sleep(5 * time.Second)
+		isInitialized, err = ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	}
 	ha.logger.Infof("The database cluster is initialized.")
+
+	isRootCreated, err := ha.dbManager.IsRootCreated(ha.ctx)
+	for err != nil || !isRootCreated {
+		if err == nil && !isRootCreated && ha.dbManager.IsFirstMember() {
+			ha.logger.Infof("Create Root.")
+			err := ha.dbManager.CreateRoot(ha.ctx)
+			if err != nil {
+				ha.logger.Warnf("Cluster initialize failed: %v", err)
+			}
+		}
+		time.Sleep(5 * time.Second)
+		isRootCreated, err = ha.dbManager.IsRootCreated(ha.ctx)
+	}
 
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
@@ -162,7 +181,7 @@ func (ha *Ha) Start() {
 			break
 		}
 		ha.logger.Infof("Waiting for the database Leader to be ready.")
-		time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Second)
 		isExist, _ = ha.dcs.IsLockExist()
 	}
 

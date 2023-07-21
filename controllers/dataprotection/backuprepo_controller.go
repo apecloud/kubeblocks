@@ -125,12 +125,12 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// check storage provider status
 	provider, err := r.checkStorageProviderStatus(reqCtx, repo)
 	if err != nil {
-		_ = r.updateStatusPhase(reqCtx, repo)
+		_ = r.updateStatus(reqCtx, repo)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "check storage provider status failed")
 	}
 	if !meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageProviderReady) {
 		// update status phase to failed
-		if err := r.updateStatusPhase(reqCtx, repo); err != nil {
+		if err := r.updateStatus(reqCtx, repo); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "update status phase failed")
 		}
 		// will reconcile again after the storage provider becomes ready
@@ -140,7 +140,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// create StorageClass and Secret for the CSI driver
 	err = r.createStorageClassAndSecret(reqCtx, repo, provider)
 	if err != nil {
-		_ = r.updateStatusPhase(reqCtx, repo)
+		_ = r.updateStatus(reqCtx, repo)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			"failed to create storage class and secret")
 	}
@@ -151,7 +151,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	//  3. pre-check again if the secret object for CSI got updated
 
 	// update status phase to ready if all conditions are met
-	if err = r.updateStatusPhase(reqCtx, repo); err != nil {
+	if err = r.updateStatus(reqCtx, repo); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			"failed to update BackupRepo status")
 	}
@@ -167,20 +167,22 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *BackupRepoReconciler) updateStatusPhase(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
-	if repo.Status.Phase == dpv1alpha1.BackupRepoDeleting {
-		return nil
-	}
-	phase := dpv1alpha1.BackupRepoFailed
-	if meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageProviderReady) &&
-		meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageClassCreated) {
-		phase = dpv1alpha1.BackupRepoReady
-	}
-	if repo.Status.Phase != phase {
-		patch := client.MergeFrom(repo.DeepCopy())
+func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
+	old := repo.DeepCopy()
+	// not allow to transit to other phase if it is deleting
+	if repo.Status.Phase != dpv1alpha1.BackupRepoDeleting {
+		phase := dpv1alpha1.BackupRepoFailed
+		if meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageProviderReady) &&
+			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageClassCreated) {
+			phase = dpv1alpha1.BackupRepoReady
+		}
 		repo.Status.Phase = phase
-		if err := r.Client.Status().Patch(reqCtx.Ctx, repo, patch); err != nil {
-			return fmt.Errorf("patch failed: %w", err)
+	}
+	repo.Status.IsDefault = repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal
+
+	if !reflect.DeepEqual(old.Status, repo.Status) {
+		if err := r.Client.Status().Patch(reqCtx.Ctx, repo, client.MergeFrom(old)); err != nil {
+			return fmt.Errorf("updateStatus failed: %w", err)
 		}
 	}
 	return nil

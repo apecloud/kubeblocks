@@ -56,6 +56,7 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 func NewClusterDefFactoryWithConnCredential(name string) *MockClusterDefFactory {
 	f := NewClusterDefFactory(name)
 	f.AddClusterServicePort("mysql", 3306)
+	f.AddClusterServicePort("paxos", 13306)
 	f.AddComponentDef(StatefulMySQLComponent, "conn-cred")
 	f.SetConnectionCredential(defaultConnectionCredential, &defaultSvcSpec)
 	return f

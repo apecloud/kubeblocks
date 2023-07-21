@@ -18,6 +18,12 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
+const (
+	addFollowerFmt    = "call dbms_consensus.add_learner('%s');"
+	demoteFollowerFmt = "call dbms_consensus.downgrade_follower('%s');"
+	dropLearnerFmt    = "call dbms_consensus.drop_learner('%s');"
+)
+
 type Manager struct {
 	component.DBManagerBase
 	DB                           *sql.DB
@@ -249,10 +255,42 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 func (mgr *Manager) Recover() {}
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+	// fixme what if there is no leader
+	client, err := mgr.GetLeaderClient(context.Background(), cluster)
+	if err != nil {
+		return err
+	}
+	defer client.Close() //nolint:errcheck
+
+	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
+	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
+	sql := fmt.Sprintf(addFollowerFmt, currentHost)
+	if _, err = client.Exec(sql); err != nil {
+		return err
+	}
+	// todo implement learner
+
 	return nil
 }
 
 func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+	client, err := mgr.GetLeaderClient(context.Background(), cluster)
+	if err != nil {
+		return err
+	}
+	defer client.Close() //nolint:errcheck
+
+	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
+	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
+	sql := fmt.Sprintf(demoteFollowerFmt, currentHost)
+	if _, err = client.Exec(sql); err != nil {
+		return err
+	}
+	sql = fmt.Sprintf(dropLearnerFmt, currentHost)
+	if _, err = client.Exec(sql); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -375,6 +413,10 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
+	// 要是想拿到其他mysql的lag, 有三种方法:
+	// 1. k8s有没性能监控 ?
+	// 2. mysqlOps 获取
+	// 3. 另外有一个地方存着所有实例的lag
 	return nil
 }
 

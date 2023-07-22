@@ -75,6 +75,8 @@ type ClusterService struct {
 	ServiceSpec `json:",inline"`
 
 	// frontendComponents defines the frontend components that can provide service for cluster, ordered by priority.
+	// If this field is not specified, the first component that provides the `ClusterDefinition.spec.componentDefs[].service`
+	// attribute will be used as the frontend component.
 	// +optional
 	FrontendComponents []string `json:"frontendComponents,omitempty" json:"FrontendComponents,omitempty"`
 }

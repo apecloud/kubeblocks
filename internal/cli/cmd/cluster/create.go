@@ -1193,10 +1193,7 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 		return allStorageClasses, existedDefault, nil
 	}
 	existedDefault, err = validateDefaultSCInConfig(dynamic)
-	if err != nil {
-		return allStorageClasses, existedDefault, err
-	}
-	return allStorageClasses, existedDefault, nil
+	return allStorageClasses, existedDefault, err
 }
 
 // validateClusterVersion checks the existence of declared cluster version,

@@ -89,15 +89,29 @@ spec:
           runAsUser: 0
           fsGroup: 103
           runAsGroup: 103
+{{/*        initContainers:*/}}
+{{/*          - name: orioledb-init-container*/}}
+{{/*            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}*/}}
+{{/*            command:*/}}
+{{/*              - /kb-scripts/init_container.sh*/}}
+{{/*            volumeMounts:*/}}
+{{/*              - name: data*/}}
+{{/*                mountPath: /home/postgres/pgdata*/}}
+{{/*              - name: postgresql-config*/}}
+{{/*                mountPath: /home/postgres/conf*/}}
+{{/*              - name: scripts*/}}
+{{/*                mountPath: /kb-scripts*/}}
+{{/*              - name: pod-info*/}}
+{{/*                mountPath: /kb-podinfo*/}}
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             command:
+{{/*              - sleep*/}}
+{{/*              - "10000"*/}}
               - bin/bash
               - -c
               - /kb-scripts/setup.sh
-{{/*              - sleep*/}}
-{{/*              - "10000"*/}}
             securityContext:
               runAsUser: 0
             readinessProbe:
@@ -131,28 +145,30 @@ spec:
               - name: patroni
                 containerPort: 8008
             env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
-              - name: DCS_ENABLE_KUBERNETES_API
-                value: "true"
-              - name: KUBERNETES_USE_CONFIGMAPS
-                value: "true"
+              - name: PATRONI_ETCD3_HOST
+                value: "etcd-etcd:2379"
+{{/*              - name: DCS_ENABLE_KUBERNETES_API*/}}
+{{/*                value: "true"*/}}
+{{/*              - name: KUBERNETES_USE_CONFIGMAPS*/}}
+{{/*                value: "true"*/}}
               - name: SCOPE
                 value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
               - name: KUBERNETES_SCOPE_LABEL
                 value: "apps.kubeblocks.postgres.patroni/scope"
               - name: KUBERNETES_ROLE_LABEL
                 value: "apps.kubeblocks.postgres.patroni/role"
-              - name: KUBERNETES_LABELS
-                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
+{{/*              - name: KUBERNETES_LABELS*/}}
+{{/*                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'*/}}
               - name: RESTORE_DATA_DIR
                 value: /home/postgres/pgdata/kb_restore
               - name: KB_PG_CONFIG_PATH
                 value: /home/postgres/conf/postgresql.conf
-              - name: SPILO_CONFIGURATION
-                value: | ## https://github.com/zalando/patroni#yaml-configuration
-                  bootstrap:
-                    initdb:
-                      - auth-host: md5
-                      - auth-local: trust
+{{/*              - name: SPILO_CONFIGURATION*/}}
+{{/*                value: | ## https://github.com/zalando/patroni#yaml-configuration*/}}
+{{/*                  bootstrap:*/}}
+{{/*                    initdb:*/}}
+{{/*                      - auth-host: md5*/}}
+{{/*                      - auth-local: trust*/}}
               - name: ALLOW_NOSSL
                 value: "true"
               - name: PGROOT
@@ -211,6 +227,8 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
+              - name: PATRONI_POSTGRESQL_DATA_DIR
+                value: /home/postgres/pgdata
           - name: pgbouncer
             imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
             securityContext:

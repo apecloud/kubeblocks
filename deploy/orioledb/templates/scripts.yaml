@@ -5,6 +5,17 @@ metadata:
   labels:
     {{- include "orioledb.labels" . | nindent 4 }}
 data:
+{{/*  init_container.sh: |*/}}
+{{/*    #!/bin/bash*/}}
+{{/*    set -o errexit*/}}
+{{/*    set -e*/}}
+{{/*    #mkdir -p /home/postgres/pgdata/conf*/}}
+{{/*    chmod 750 -R /home/postgres/pgdata*/}}
+{{/*    mkdir -p  /var/lib/postgresql/conf*/}}
+{{/*    cp /home/postgres/conf/postgresql.conf /var/lib/postgresql/conf*/}}
+{{/*    chmod 777 -R /var/lib/postgresql/conf*/}}
+{{/*    cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf*/}}
+    {{/*    chmod 777 /home/postgres/pgdata/conf/postgresql.conf*/}}
   generate_patroni_yaml.py: |
     #!/usr/bin/env python3
     # -*- coding: utf-8 -*-
@@ -38,41 +49,71 @@ data:
             result[key.strip()] = value.strip().strip("'")
         return result
     def main(filename):
-        restore_dir = os.environ.get('RESTORE_DATA_DIR', '')
-        local_config = yaml.safe_load(
-            os.environ.get('SPILO_CONFIGURATION', os.environ.get('PATRONI_CONFIGURATION', ''))) or {}
-        if not 'postgresql' in local_config:
-            local_config['postgresql'] = {}
-        postgresql = local_config['postgresql']
-        postgresql['config_dir'] = '/home/postgres/pgdata/conf'
-        postgresql['custom_conf'] = '/home/postgres/conf/postgresql.conf'
-        # add pg_hba.conf
-        with open('/home/postgres/conf/pg_hba.conf', 'r') as f:
-            lines = read_file_lines(f)
-            if lines:
-                postgresql['pg_hba'] = lines
-        if restore_dir and os.path.isfile(os.path.join(restore_dir, 'kb_restore.signal')):
-            if not 'bootstrap' in local_config:
-                local_config['bootstrap'] = {}
-            with open('/home/postgres/conf/kb_restore.conf', 'r') as f:
-                local_config['bootstrap'].update(yaml.safe_load(f))
-        # point in time recovery(PITR)
-        data_dir = os.environ.get('PGDATA', '')
-        if os.path.isfile("/home/postgres/pgdata/conf/recovery.conf"):
-            with open('/home/postgres/conf/kb_pitr.conf', 'r') as f:
-                pitr_config = yaml.safe_load(f)
-                re_config = postgresql_conf_to_dict("/home/postgres/pgdata/conf/recovery.conf")
-                pitr_config[pitr_config['method']]['recovery_conf'].update(re_config)
-                local_config['bootstrap'].update(pitr_config)
-        write_file(yaml.dump(local_config, default_flow_style=False), filename, True)
+      restore_dir = os.environ.get('RESTORE_DATA_DIR', '')
+      local_config = yaml.safe_load(
+      os.environ.get('SPILO_CONFIGURATION', os.environ.get('PATRONI_CONFIGURATION', ''))) or {}
+      # scope
+      local_config['scope'] = os.environ.get('SCOPE')
+      # name
+      local_config['name'] = filename
+      # restapi
+      local_config['restapi'] = {
+      'listen': '127.0.0.1:8008',
+      'connect_address': '127.0.0.1:8008'
+    }
+      # postgresql
+      if not 'postgresql' in local_config:
+        local_config['postgresql'] = {}
+      postgresql = local_config['postgresql']
+      postgresql['config_dir'] = '/var/lib/postgresql/conf'
+      postgresql['authentication'] = {}
+      postgresql['listen'] = '127.0.0.1:5432'
+      postgresql['connect_address'] = '127.0.0.1:5432'
+      authentication = postgresql['authentication']
+      authentication['superuser'] = {"username": os.environ.get('PGUSER_SUPERUSER'),
+        'password': os.environ.get('PGPASSWORD_SUPERUSER')}
+
+      # add pg_hba.conf
+      with open('/home/postgres/conf/pg_hba.conf', 'r') as f:
+        lines = read_file_lines(f)
+        if lines:
+          postgresql['pg_hba'] = lines
+      if restore_dir and os.path.isfile(os.path.join(restore_dir, 'kb_restore.signal')):
+        if not 'bootstrap' in local_config:
+          local_config['bootstrap'] = {}
+        with open('/home/postgres/conf/kb_restore.conf', 'r') as f:
+          local_config['bootstrap'].update(yaml.safe_load(f))
+      # point in time recovery(PITR)
+      data_dir = os.environ.get('PGDATA', '')
+      if os.path.isfile("/home/postgres/pgdata/conf/recovery.conf"):
+        with open('/home/postgres/conf/kb_pitr.conf', 'r') as f:
+          pitr_config = yaml.safe_load(f)
+          re_config = postgresql_conf_to_dict("/home/postgres/pgdata/conf/recovery.conf")
+          pitr_config[pitr_config['method']]['recovery_conf'].update(re_config)
+          local_config['bootstrap'].update(pitr_config)
+      # bootstrap
+{{/*      if 'bootstrap' not in local_config.keys():*/}}
+{{/*          local_config['bootstrap'] = {*/}}
+{{/*          }*/}}
+      write_file(yaml.dump(local_config, default_flow_style=False), filename, True)
     if __name__ == '__main__':
         main(sys.argv[1])
   create_pg_stat_statements_extension.sql: |
     CREATE EXTENSION pg_stat_statements;
   setup.sh: |
+    chmod 750 -R /home/postgres/pgdata
+    mkdir -p  /var/lib/postgresql/conf
+    cp /home/postgres/conf/postgresql.conf /var/lib/postgresql/conf
+    chmod 777 -R /var/lib/postgresql/conf
     cp /kb-scripts/create_pg_stat_statements_extension.sql /docker-entrypoint-initdb.d
     bash /usr/local/bin/docker-entrypoint.sh postgres
-    su - postgres -c "postgres --hba_file=/home/postgres/conf/pg_hba.conf --config_file=/home/postgres/conf/postgresql.conf -D ${PGDATA}"
+    #su - postgres -c ""
+    python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user1.yaml
+    python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml
+    #python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml
+    chmod 777 /var/lib/postgresql/user1.yaml /var/lib/postgresql/user2.yaml
+    sleep 10000
+    #su - postgres -c "postgres --hba_file=/home/postgres/conf/pg_hba.conf --config_file=/home/postgres/conf/postgresql.conf -D ${PGDATA}"
 {{/*    target_data_dir=/home/postgres/pgdata*/}}
 {{/*    ln -s $target_data_dir $PGDATA*/}}
 {{/*    su - postgres*/}}

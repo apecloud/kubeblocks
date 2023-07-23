@@ -1,0 +1,216 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-postgresql
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  type: postgresql
+  connectionCredential:
+    username: postgres
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-postgresql)"
+  componentDefs:
+    - name: postgresql
+      characterType: postgresql
+      workloadType: Consensus
+      probes:
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      service:
+        ports:
+          - name: tcp-postgresql
+            port: 5432
+            targetPort: tcp-postgresql
+      configSpecs:
+        - name: postgresql-consensusset-configuration
+          templateRef: postgresql12-configuration
+          constraintRef: postgresql12-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+      volumeTypes:
+        - name: data
+          type: data
+      scriptSpecs:
+        - name: postgresql-scripts
+          templateRef: postgresql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
+      consensusSpec:
+        leader:
+          name: leader
+          accessMode: ReadWrite
+        followers:
+          - name: follower
+            accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
+      podSpec:
+        containers:
+          - name: postgresql
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            securityContext:
+              runAsUser: 0
+            command:
+              - /kb-scripts/setup.sh
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 10
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /home/postgres/pgdata
+              - name: postgresql-config
+                mountPath: /home/postgres/conf
+              - name: scripts
+                mountPath: /kb-scripts
+              - name: pod-info
+                mountPath: /kb-podinfo
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+            env:
+              - name: KUBERNETES_USE_CONFIGMAPS
+                value: "true"
+              - name: KUBERNETES_LABELS
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
+              - name: RESTORE_DATA_DIR
+                value: /home/postgres/pgdata/kb_restore
+              - name: KB_PG_CONFIG_PATH
+                value: /home/postgres/conf/postgresql.conf
+              - name: ALLOW_NOSSL
+                value: "true"
+              - name: PGROOT
+                value: /home/postgres/pgdata/pgroot
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+              - name: PGUSER_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: PGPASSWORD_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: PGUSER_ADMIN
+                value: superadmin
+              - name: PGPASSWORD_ADMIN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: PGUSER_STANDBY
+                value: standby
+              - name: PGPASSWORD_STANDBY
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+      systemAccounts:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+          command:
+            - psql
+          args:
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -c
+            - $(KB_ACCOUNT_STATEMENT)
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbdataprotection
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbprobe
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbmonitoring
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);

@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "kblib.roleName" . }}
+  name: {{ include "kblib.clusterRoleName" . }}
   labels:
     {{- include "kblib.clusterLabels" . | nindent 4 }}
 rules:
@@ -51,5 +51,5 @@ rules:
 ---
 {{- include "kblib.serviceAccount" . }}
 ---
-{{- include "kblib.roleBinding" . }}
+{{- include "kblib.clusterRoleBinding" . }}
 {{- end }}

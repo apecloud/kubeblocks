@@ -356,7 +356,7 @@ spec:
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
       logConfigs:
-        {{- range $name,$pattern := .Values.etcdLogConfigs }}
+        {{- range $name,$pattern := .Values.vtconsensusLogConfigs }}
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
@@ -373,6 +373,40 @@ spec:
             targetPort: vtctld-grpcport
       podSpec:
         containers:
+          - name: vtconsensus
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
+            ports:
+              - containerPort: 16000
+                name: port
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: VTCONSENSUS_PORT
+                value: "16000"
+              - name: ETCD_SERVER
+                value: "localhost"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command: ["/scripts/vtconsensus.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: mysql-scale-config
+                mountPath: /conf
           - name: etcd
             imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
@@ -425,40 +459,6 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
-          - name: vtconsensus
-            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
-            ports:
-              - containerPort: 16000
-                name: port
-            env:
-              - name: CELL
-                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
-              - name: MYSQL_ROOT_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-                    optional: false
-              - name: MYSQL_ROOT_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: VTCONSENSUS_PORT
-                value: "16000"
-              - name: ETCD_SERVER
-                value: "localhost"
-              - name: ETCD_PORT
-                value: "2379"
-              - name: TOPOLOGY_FLAGS
-                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
-            command: ["/scripts/vtconsensus.sh"]
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts
-              - name: mysql-scale-config
-                mountPath: /conf
     - name: vtgate
       characterType: mysql
       workloadType: Stateless

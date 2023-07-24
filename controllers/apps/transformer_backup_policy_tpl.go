@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,9 +78,14 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 			}
 			// build the backup policy from the template.
 			backupPolicy, action := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, &tpl)
+
+			// merge cluster backup configuration into the backup policy.
+			r.mergeClusterBackup(transCtx, origCluster, backupPolicy)
+
 			if backupPolicy == nil {
 				continue
 			}
+
 			// if exist multiple backup policy templates and duplicate spec.identifier,
 			// the backupPolicy that may be generated may have duplicate names, and it is necessary to check if it already exists.
 			if _, ok := backupPolicyNames[backupPolicy.Name]; ok {
@@ -214,7 +220,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			TTL: policyTPL.Retention.TTL,
 		}
 	}
-	bpSpec.Schedule.StartWindowMinutes = policyTPL.Schedule.StartWindowMinutes
+	bpSpec.Schedule.RetryWindowMinutes = policyTPL.Schedule.RetryWindowMinutes
 	bpSpec.Schedule.Snapshot = r.convertSchedulePolicy(policyTPL.Schedule.Snapshot)
 	bpSpec.Schedule.Datafile = r.convertSchedulePolicy(policyTPL.Schedule.Datafile)
 	bpSpec.Schedule.Logfile = r.convertSchedulePolicy(policyTPL.Schedule.Logfile)
@@ -223,6 +229,94 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 	bpSpec.Snapshot = r.convertSnapshotPolicy(policyTPL.Snapshot, cluster.Name, *component, workloadType)
 	backupPolicy.Spec = bpSpec
 	return backupPolicy
+}
+
+// mergeClusterBackup merges the cluster backup configuration into the backup policy.
+func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
+
+	backupEnabled := func() bool {
+		return cluster.Spec.Backup != nil && boolValue(cluster.Spec.Backup.Enabled)
+	}
+
+	if backupPolicy == nil {
+		// backup policy is nil, can not enable cluster backup, so record event and return.
+		if backupEnabled() {
+			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
+				"BackupPolicyNotFound", "backup policy is nil, can not enable cluster backup")
+		}
+		return
+	}
+
+	backup := cluster.Spec.Backup
+	spec := &backupPolicy.Spec
+	setSchedulePolicy := func(schedulePolicy *dataprotectionv1alpha1.SchedulePolicy, enable bool) {
+		if schedulePolicy == nil {
+			if enable {
+				// failed to find the schedule policy for backup method, so record event and return.
+				transCtx.EventRecorder.Eventf(transCtx.Cluster, corev1.EventTypeWarning, "BackupSchedulePolicyNotFound",
+					"failed to find the schedule policy for backup method %s", backup.Method)
+			}
+			return
+		}
+		schedulePolicy.Enable = enable
+		if enable && backup.CronExpression != "" {
+			schedulePolicy.CronExpression = backup.CronExpression
+		}
+	}
+
+	// disable automated backup, set all backup schedule to false
+	if !backupEnabled() {
+		setSchedulePolicy(spec.Schedule.Snapshot, false)
+		setSchedulePolicy(spec.Schedule.Datafile, false)
+		setSchedulePolicy(spec.Schedule.Logfile, false)
+		return
+	}
+
+	if backup.RetentionPeriod != nil {
+		spec.Retention = &dataprotectionv1alpha1.RetentionSpec{
+			TTL: backup.RetentionPeriod,
+		}
+	}
+
+	if backup.RetryWindowMinutes != nil {
+		spec.Schedule.RetryWindowMinutes = backup.RetryWindowMinutes
+	}
+
+	var commonBackupPolicy *dataprotectionv1alpha1.CommonBackupPolicy
+	switch backup.Method {
+	case dataprotectionv1alpha1.BackupMethodSnapshot:
+		// enable snapshot and disable datafile
+		setSchedulePolicy(spec.Schedule.Snapshot, true)
+		setSchedulePolicy(spec.Schedule.Datafile, false)
+	case dataprotectionv1alpha1.BackupMethodBackupTool:
+		// disable snapshot and enable datafile
+		setSchedulePolicy(spec.Schedule.Snapshot, false)
+		setSchedulePolicy(spec.Schedule.Datafile, true)
+		commonBackupPolicy = spec.Datafile
+	}
+
+	setRepoName := func(bp *dataprotectionv1alpha1.CommonBackupPolicy) {
+		if backup.RepoName == "" || bp == nil {
+			return
+		}
+		bp.BackupRepoName = &backup.RepoName
+	}
+	setRepoName(commonBackupPolicy)
+	setRepoName(spec.Logfile)
+
+	pitrEnabled := boolValue(backup.PITREnabled)
+	if backupPolicy.Spec.Schedule.Logfile != nil {
+		backupPolicy.Spec.Schedule.Logfile.Enable = pitrEnabled
+	} else if pitrEnabled {
+		// TODO: if backupPolicy.Spec.Schedule.Logfile is nil, and backup.PITREnabled is true,
+		// should we create a new SchedulePolicy for logfile?
+		// Now, hscale also maintains a backupPolicy, we can not distinguish the backupPolicy for backup
+		// or hscale, so we can not create a new SchedulePolicy for logfile.
+		// Need a method to distinguish the backupPolicy for backup or hscale in the future.
+		transCtx.EventRecorder.Eventf(transCtx.Cluster, corev1.EventTypeWarning,
+			"BackupSchedulePolicyNotFound", "failed to find the schedule policy for PITR")
+	}
 }
 
 // getFirstComponent returns the first component name of the componentDefRef.

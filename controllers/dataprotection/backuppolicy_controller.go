@@ -481,8 +481,8 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	if backupPolicy.Spec.Schedule.StartWindowMinutes != nil {
-		startingDeadlineSeconds := *backupPolicy.Spec.Schedule.StartWindowMinutes * 60
+	if backupPolicy.Spec.Schedule.RetryWindowMinutes != nil {
+		startingDeadlineSeconds := *backupPolicy.Spec.Schedule.RetryWindowMinutes * 60
 		cronjobProto.Spec.StartingDeadlineSeconds = &startingDeadlineSeconds
 	}
 	if len(cronJob.Name) == 0 {

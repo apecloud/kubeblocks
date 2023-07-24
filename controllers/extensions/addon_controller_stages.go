@@ -458,7 +458,7 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 	}
 	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, corev1.Container{
 		Name:    "copy-charts",
-		Image:   viper.GetString(constant.KBChartsImage),
+		Image:   addon.Spec.Helm.ChartsImage,
 		Command: []string{"sh", "-c", fmt.Sprintf("cp %s/* /mnt/charts", fromPath)},
 		VolumeMounts: []corev1.VolumeMount{
 			{

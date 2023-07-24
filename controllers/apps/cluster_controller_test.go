@@ -1573,7 +1573,7 @@ var _ = Describe("Cluster Controller", func() {
 	testUpdateKubeBlocksToolsImage := func(compName, compDefName string) {
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(compName, compDefName).
+			AddComponent(compName, compDefName).SetReplicas(1).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 

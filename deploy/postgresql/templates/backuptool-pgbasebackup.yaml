@@ -9,12 +9,6 @@ spec:
   image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
   env:
-    - name: RESTORE_DATA_DIR
-      value: /home/postgres/pgdata/kb_restore
-    - name: TMP_DATA_DIR
-      value: /home/postgres/pgdata/kb_restore/tmp_data
-    - name: TMP_ARCH_DATA_DIR
-      value: /home/postgres/pgdata/kb_restore/arch
     - name: DATA_DIR
       value: /home/postgres/pgdata/pgroot/data
   physical:
@@ -26,8 +20,8 @@ spec:
         set -e;
         cd ${BACKUP_DIR};
         mkdir -p ${DATA_DIR};
-        tar -xvf base.tar.gz -C ${DATA_DIR}/;
-        tar -xvf pg_wal.tar.gz -C ${DATA_DIR}/pg_wal/;
+        tar -xvf base.tar -C ${DATA_DIR}/;
+        tar -xvf pg_wal.tar -C ${DATA_DIR}/pg_wal/;
         echo "done!";
     incrementalRestoreCommands: []
   logical:
@@ -36,9 +30,12 @@ spec:
   backupCommands:
     - sh
     - -c
-    - >
+    - |
       set -e;
+      if [ -d ${BACKUP_DIR} ]; then
+        rm -rf ${BACKUP_DIR}
+      fi
       mkdir -p ${BACKUP_DIR};
-      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR} -Z5 -h ${DB_HOST} -U standby -W;
+      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -c fast -Xs -D ${BACKUP_DIR} -h ${DB_HOST} -U standby -W;
       echo "TOTAL SIZE: $(du -shx ${BACKUP_DIR}|awk '{print $1}')" > ${DATA_DIR}/basebackup.info;
   incrementalBackupCommands: []

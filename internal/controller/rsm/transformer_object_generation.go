@@ -319,7 +319,7 @@ func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *
 	credential := rsm.Spec.Credential
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
 	if len(image) == 0 {
-		image = defaultRoleObservationImage
+		image = DefaultRoleObservationImage
 	}
 	observationDaemonPort := viper.GetInt("ROLE_OBSERVATION_SERVICE_PORT")
 	if observationDaemonPort == 0 {

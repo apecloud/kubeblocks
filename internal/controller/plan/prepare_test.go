@@ -21,6 +21,7 @@ package plan
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -450,7 +451,11 @@ var _ = Describe("Cluster Controller", func() {
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
 					podSpec := sts.Spec.Template.Spec
-					Expect(len(podSpec.Containers)).Should(Equal(3))
+					expectedContainers := 3
+					if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+						expectedContainers = 2
+					}
+					Expect(len(podSpec.Containers)).Should(Equal(expectedContainers))
 				}
 			}
 			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec

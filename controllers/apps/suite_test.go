@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -143,6 +144,9 @@ var _ = BeforeSuite(func() {
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
+	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		viper.SetDefault(constant.KBToolsImage, rsm.DefaultRoleObservationImage)
+	}
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault(constant.EnableRBACManager, true)

@@ -798,3 +798,16 @@ func BuildRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.RoleBinding, error
 
 	return rb, nil
 }
+
+func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.ClusterRoleBinding, error) {
+	const tplFile = "rbac_template.cue"
+
+	crb := &rbacv1.ClusterRoleBinding{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "clusterrolebinding", crb); err != nil {
+		return nil, err
+	}
+
+	return crb, nil
+}

@@ -79,15 +79,23 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			return nil
 		}
 
-		if isRoleBindingExist(transCtx, serviceAccountName) {
+		if isClusterRoleBindingExist(transCtx, serviceAccountName) {
 			continue
 		}
+
+		clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
+		if err != nil {
+			return err
+		}
+		clusterRoleBinding.Subjects[0].Name = serviceAccountName
+		crbVertex := ictrltypes.LifecycleObjectCreate(dag, clusterRoleBinding, root)
+
 		roleBinding, err := builder.BuildRoleBinding(cluster)
 		if err != nil {
 			return err
 		}
 		roleBinding.Subjects[0].Name = serviceAccountName
-		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
+		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, crbVertex)
 
 		serviceAccount, err := builder.BuildServiceAccount(cluster)
 		if err != nil {
@@ -136,31 +144,31 @@ func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName
 	return true
 }
 
-func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
+func isClusterRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      "kb-" + cluster.Name,
 	}
-	rb := &rbacv1.RoleBinding{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb); err != nil {
-		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
-		// the rolebinding is not already present.
+	crb := &rbacv1.ClusterRoleBinding{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb); err != nil {
+		// KubeBlocks will create a cluster role binding only if it has RBAC access priority and
+		// the cluster role binding is not already present.
 		if errors.IsNotFound(err) {
-			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
+			transCtx.Logger.V(1).Info("ClusterRoleBinding not exists", "namespaceName", namespaceName)
 			return false
 		}
-		transCtx.Logger.Error(err, "get role binding failed")
+		transCtx.Logger.Error(err, "get cluster role binding failed")
 		return false
 	}
 
-	if rb.RoleRef.Name != RBACRoleName {
+	if crb.RoleRef.Name != RBACRoleName {
 		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
-			RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
+			RBACRoleName, "clusterrolebinding.RoleRef", crb.RoleRef.Name)
 	}
 
 	isServiceAccountMatch := false
-	for _, sub := range rb.Subjects {
+	for _, sub := range crb.Subjects {
 		if sub.Kind == ServiceAccountKind && sub.Name == serviceAccountName {
 			isServiceAccountMatch = true
 			break
@@ -169,7 +177,7 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 
 	if !isServiceAccountMatch {
 		transCtx.Logger.V(1).Info("rbac manager: ServiceAccount not match", "ServiceAccount",
-			serviceAccountName, "rolebinding.Subjects", rb.Subjects)
+			serviceAccountName, "clusterrolebinding.Subjects", crb.Subjects)
 	}
 	return true
 }

@@ -172,9 +172,9 @@ func kindsForHalt() []client.ObjectList {
 		&appsv1.StatefulSetList{},
 		&appsv1.DeploymentList{},
 		&corev1.ServiceList{},
-		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
-		&policyv1.PodDisruptionBudgetList{},
+		&rbacv1.ClusterRoleBindingList{},
+		&corev1.ServiceAccountList{},
 	}
 	return append(kinds, kindsPlus...)
 }

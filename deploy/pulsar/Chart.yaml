@@ -9,7 +9,7 @@ type: application
 
 version: 0.6.0-alpha.28
 
-appVersion: 2.11.1
+appVersion: 2.11.2
 
 home: https://pulsar.apache.org/
 icon: https://pulsar.apache.org/img/logo-black.svg

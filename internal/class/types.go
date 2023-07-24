@@ -55,15 +55,15 @@ func (b ByResourceList) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
 }
 
-var _ sort.Interface = ByConstraintList{}
+var _ sort.Interface = ByRuleList{}
 
-type ByConstraintList []appsv1alpha1.ResourceConstraint
+type ByRuleList []appsv1alpha1.ResourceConstraintRule
 
-func (m ByConstraintList) Len() int {
+func (m ByRuleList) Len() int {
 	return len(m)
 }
 
-func (m ByConstraintList) Less(i, j int) bool {
+func (m ByRuleList) Less(i, j int) bool {
 	var (
 		resource1 = m[i].GetMinimalResources()
 		resource2 = m[j].GetMinimalResources()
@@ -83,7 +83,7 @@ func (m ByConstraintList) Less(i, j int) bool {
 	return false
 }
 
-func (m ByConstraintList) Swap(i, j int) {
+func (m ByRuleList) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
 }
 
@@ -112,7 +112,7 @@ func (b ByClassResource) Swap(i, j int) {
 }
 
 type ComponentClassWithRef struct {
-	appsv1alpha1.ComponentClassInstance
+	appsv1alpha1.ComponentClass
 
 	ClassDefRef appsv1alpha1.ClassDefRef
 }

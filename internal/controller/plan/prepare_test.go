@@ -387,7 +387,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
-					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], fmt.Sprintf("%s-%s-env", cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName), "env-config"))).Should(BeTrue())
+					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], generateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
 				}
 			}
 		})

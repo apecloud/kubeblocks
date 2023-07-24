@@ -24,12 +24,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -40,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
@@ -93,126 +90,6 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 		return err
 	}
 	return createConfigObjects(cli, ctx, renderWrapper.renderedObjs)
-}
-
-func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec, cli client.Client, ctx context.Context, localObjs []client.Object) error {
-	for _, template := range component.ConfigTemplates {
-		if len(template.AsEnvFrom) != 0 && template.ConfigConstraintRef != "" {
-			cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, template.Name)
-			cm, err := fetchConfigMap(localObjs, cmName, cluster.Namespace, cli, ctx)
-			if err != nil {
-				return err
-			}
-			keys := template.Keys
-			if len(keys) == 0 {
-				keys = cfgutil.ToSet(cm.Data).AsSlice()
-			}
-			for _, key := range keys {
-				if _, ok := cm.Data[key]; !ok {
-					continue
-				}
-				envConfigMap, err := generateEnvMap(cluster, component.Name, template, cmName, key, cm.Data[key], ctx, cli)
-				if err != nil {
-					return cfgcore.WrapError(err, "failed to generate env configmap[%s] key:%s, fileContext:[%s]", cmName, key, cm.Data[key])
-				}
-				injectEnvFrom(podSpec.Containers, template.AsEnvFrom, envConfigMap.Name)
-				injectEnvFrom(podSpec.InitContainers, template.AsEnvFrom, envConfigMap.Name)
-			}
-		}
-	}
-	return nil
-}
-
-func fetchConfigMap(localObjs []client.Object, cmName, namespace string, cli client.Client, ctx context.Context) (*corev1.ConfigMap, error) {
-	var (
-		cmObj = &corev1.ConfigMap{}
-		cmKey = client.ObjectKey{Name: cmName, Namespace: namespace}
-	)
-
-	localObject := findMatchedLocalObject(localObjs, cmKey, generics.ToGVK(cmObj))
-	if localObject != nil {
-		return localObject.(*corev1.ConfigMap), nil
-	}
-	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
-		return nil, err
-	}
-	return cmObj, nil
-}
-
-func generateEnvMap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1alpha1.ComponentConfigSpec, cmName, fileName, fileContext string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
-	ccKey := client.ObjectKey{
-		Namespace: "",
-		Name:      template.ConfigConstraintRef,
-	}
-	cc := &appsv1alpha1.ConfigConstraint{}
-	if err := cli.Get(ctx, ccKey, cc); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
-	}
-	if cc.Spec.FormatterConfig == nil {
-		return nil, cfgcore.MakeError("ConfigConstraint[%v] is not a formatter", cc.Name)
-	}
-
-	keyValue, err := cfgcore.LoadConfigObjectFromContent(cc.Spec.FormatterConfig.Format, fileContext)
-	if err != nil {
-		return nil, err
-	}
-
-	envMap := make(map[string]string, len(keyValue))
-	for key, v := range keyValue {
-		envMap[key] = cast.ToString(v)
-	}
-	cmKey := client.ObjectKey{
-		Name:      strings.Join([]string{cmName, fileName, "env"}, "-"),
-		Namespace: cluster.Namespace,
-	}
-	cm := &corev1.ConfigMap{}
-	if err := cli.Get(ctx, cmKey, cm); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-		cm.Name = cmKey.Name
-		cm.Namespace = cmKey.Namespace
-		cm.Data = envMap
-		cm.Labels = map[string]string{
-			constant.CMTemplateNameLabelKey: template.Name,
-			constant.AppNameLabelKey:        cluster.Spec.ClusterDefRef,
-			constant.AppInstanceLabelKey:    cluster.Name,
-			constant.KBAppComponentLabelKey: componentName,
-		}
-		if err := controllerutil.SetOwnerReference(cluster, cm, scheme); err != nil {
-			return nil, err
-		}
-		return cm, cli.Create(ctx, cm)
-	}
-	cm.Data = envMap
-	return cm, cli.Update(ctx, cm)
-}
-
-func checkEnvFrom(container *corev1.Container, cmName string) bool {
-	for i := range container.EnvFrom {
-		source := &container.EnvFrom[i]
-		if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
-			return true
-		}
-	}
-	return false
-}
-
-func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName string) {
-	sets := cfgutil.NewSet(asEnvFrom...)
-	for i := range containers {
-		container := &containers[i]
-		if sets.InArray(container.Name) && !checkEnvFrom(container, cmName) {
-			container.EnvFrom = append(container.EnvFrom,
-				corev1.EnvFromSource{
-					ConfigMapRef: &corev1.ConfigMapEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: cmName,
-						}},
-				})
-		}
-	}
 }
 
 func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object) error {
@@ -323,7 +200,7 @@ func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildPar
 	}
 	if len(scriptPath) != 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "TOOLS_PATH",
+			Name:  cfgcm.KBConfigManagerPathEnv,
 			Value: strings.Join(scriptPath, ":"),
 		})
 	}

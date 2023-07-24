@@ -24,7 +24,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	corev1 "k8s.io/api/core/v1"
@@ -214,6 +216,108 @@ spec:
 			Expect(err).Should(Succeed())
 			Expect(component.Name).Should(Equal("vtgate"))
 			Expect(component.ComponentDef).Should(Equal("proxy"))
+		})
+
+		It("build affinity correctly", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			By("fill affinity")
+			cluster.Spec.AvailabilityPolicy = appsv1alpha1.AvailabilityPolicyZone
+			cluster.Spec.Tenancy = appsv1alpha1.DedicatedNode
+			By("clear cluster's component spec")
+			cluster.Spec.ComponentSpecs = nil
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.PodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal("topology.kubernetes.io/zone"))
+			Expect(component.PodSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal("kubernetes.io/hostname"))
+		})
+
+		It("build monitor correctly", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			By("enable monitor config in clusterdefinition")
+			clusterDef.Spec.ComponentDefs[0].Monitor = &appsv1alpha1.MonitorConfig{
+				BuiltIn: true,
+			}
+			By("fill monitor")
+			interval := intstr.Parse("0")
+			cluster.Spec.Monitor.MonitoringInterval = &interval
+			By("clear cluster's component spec")
+			cluster.Spec.ComponentSpecs = nil
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.Monitor.Enable).Should(Equal(false))
+			By("set monitor interval to 10s")
+			interval2 := intstr.Parse("10s")
+			cluster.Spec.Monitor.MonitoringInterval = &interval2
+			By("call build")
+			component, err = buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.Monitor.Enable).Should(Equal(true))
+		})
+
+		It("build network correctly", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			By("setup cloud provider")
+			viper.Set(constant.CfgKeyServerInfo, "v1.26.5-gke.1200")
+			By("fill network")
+			cluster.Spec.Network = &appsv1alpha1.ClusterNetwork{
+				HostNetworkAccessible: true,
+				PubliclyAccessible:    false,
+			}
+			By("clear cluster's component spec")
+			cluster.Spec.ComponentSpecs = nil
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.Services[1].Name).Should(Equal("vpc"))
+			Expect(component.Services[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
+			Expect(component.Services[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
 		})
 
 		It("Test replace secretRef env placeholder token", func() {

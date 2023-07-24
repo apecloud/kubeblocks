@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package mongodb
 
 import (
@@ -34,7 +53,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 	defer cancel()
 
 	opts := options.Client().
-		SetHosts([]string{config.host}).
+		SetHosts(config.hosts).
 		SetReplicaSet(config.replSetName).
 		SetAuth(options.Credential{
 			Password: config.password,
@@ -74,17 +93,164 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 
 }
 
-func (mgr *Manager) Initialize() {}
+func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
+	return mgr.InitiateReplSet(ctx, cluster)
+}
+
+// InitiateReplSet is a method to create MongoDB cluster
+func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) error {
+	configMembers := make([]ConfigMember, len(cluster.Members))
+
+	for i, member := range cluster.Members {
+		configMembers[i].ID = i
+		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
+		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
+			configMembers[i].Priority = 2
+		} else {
+			configMembers[i].Priority = 1
+		}
+	}
+
+	config := RSConfig{
+		ID:      mgr.ClusterCompName,
+		Members: configMembers,
+	}
+	client, err := NewLocalUnauthClient(ctx)
+	if err != nil {
+		mgr.Logger.Debugf("Get local unauth client failed: %v", err)
+		return err
+	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
+
+	mgr.Logger.Infof("Initial Replset Config: %v", config)
+	response := client.Database("admin").RunCommand(ctx, bson.M{"replSetInitiate": config})
+	if response.Err() != nil {
+		return response.Err()
+	}
+	return nil
+}
+
+// IsClusterInitialized is a method to check if cluster is initailized or not
+func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
+	if err != nil {
+		mgr.Logger.Debugf("Get leader client failed: %v", err)
+		return false, err
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+
+	ctx1, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
+	defer cancel()
+	rsStatus, err := GetReplSetStatus(ctx1, client)
+	if rsStatus != nil {
+		return rsStatus.Set != "", nil
+	}
+	mgr.Logger.Infof("Get replSet status failed: %v", err)
+
+	if !mgr.IsFirstMember() {
+		return false, nil
+	}
+
+	client, err = NewLocalUnauthClient(ctx)
+	if err != nil {
+		mgr.Logger.Infof("Get local unauth client failed: %v", err)
+		return false, err
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+
+	rsStatus, err = GetReplSetStatus(ctx, client)
+	if rsStatus != nil {
+		return rsStatus.Set != "", nil
+	}
+
+	err = errors.Cause(err)
+	if cmdErr, ok := err.(mongo.CommandError); ok && cmdErr.Name == "NotYetInitialized" {
+		return false, nil
+	}
+	mgr.Logger.Infof("Get replSet status with local unauth client failed: %v", err)
+
+	rsStatus, err = mgr.GetReplSetStatus(ctx)
+	if rsStatus != nil {
+		return rsStatus.Set != "", nil
+	}
+	if err != nil {
+		mgr.Logger.Infof("Get replSet status with local auth client failed: %v", err)
+		return false, err
+	}
+
+	mgr.Logger.Errorf("Get replSet status failed: %v", err)
+	return false, err
+}
+
+func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
+	if !mgr.IsFirstMember() {
+		return true, nil
+	}
+
+	client, err := NewLocalUnauthClient(ctx)
+	if err != nil {
+		mgr.Logger.Infof("Get local unauth client failed: %v", err)
+		return false, err
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+
+	_, err = GetReplSetStatus(ctx, client)
+	if err == nil {
+		return false, nil
+	}
+	err = errors.Cause(err)
+	if cmdErr, ok := err.(mongo.CommandError); ok && cmdErr.Name == "Unauthorized" {
+		return true, nil
+	}
+
+	mgr.Logger.Infof("Get replSet status with local unauth client failed: %v", err)
+
+	_, err = mgr.GetReplSetStatus(ctx)
+	if err == nil {
+		return true, nil
+	}
+
+	mgr.Logger.Infof("Get replSet status with local auth client failed: %v", err)
+	return false, err
+
+}
+
+func (mgr *Manager) CreateRoot(ctx context.Context) error {
+	if !mgr.IsFirstMember() {
+		return nil
+	}
+
+	client, err := NewLocalUnauthClient(ctx)
+	if err != nil {
+		mgr.Logger.Infof("Get local unauth client failed: %v", err)
+		return err
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+
+	role := map[string]interface{}{
+		"role": "root",
+		"db":   "admin",
+	}
+
+	mgr.Logger.Infof("Create user: %s, passwd: %s, roles: %v", config.username, config.password, role)
+	err = CreateUser(ctx, client, config.username, config.password, role)
+	if err != nil {
+		mgr.Logger.Errorf("Create Root failed: %v", err)
+		return err
+	}
+
+	return nil
+}
 
 func (mgr *Manager) IsRunning() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	// defer cancel()
 
-	err := mgr.Client.Ping(ctx, readpref.Primary())
-	if err != nil {
-		mgr.Logger.Infof("DB is not ready: %v", err)
-		return false
-	}
+	// err := mgr.Client.Ping(ctx, readpref.Nearest())
+	// if err != nil {
+	// 	mgr.Logger.Infof("DB is not ready: %v", err)
+	// 	return false
+	// }
 	return true
 }
 
@@ -120,32 +286,7 @@ func (mgr *Manager) GetMemberState(ctx context.Context) (string, error) {
 }
 
 func (mgr *Manager) GetReplSetStatus(ctx context.Context) (*ReplSetStatus, error) {
-	return mgr.GetReplSetStatusWithClient(ctx, mgr.Client)
-}
-
-func (mgr *Manager) GetReplSetStatusWithClient(ctx context.Context, client *mongo.Client) (*ReplSetStatus, error) {
-	status := &ReplSetStatus{}
-
-	resp := client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetStatus", Value: 1}})
-	if resp.Err() != nil {
-		err := errors.Wrap(resp.Err(), "replSetGetStatus")
-		mgr.Logger.Errorf("get replset status failed: %v", err)
-		return nil, err
-	}
-
-	if err := resp.Decode(status); err != nil {
-		err := errors.Wrap(err, "failed to decode rs status")
-		mgr.Logger.Errorf("get replset status failed: %v", err)
-		return nil, err
-	}
-
-	if status.OK != 1 {
-		err := errors.Errorf("mongo says: %s", status.Errmsg)
-		mgr.Logger.Errorf("get replset status failed: %v", err)
-		return nil, err
-	}
-
-	return status, nil
+	return GetReplSetStatus(ctx, mgr.Client)
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dcsMember *dcs.Member) (bool, error) {
@@ -183,88 +324,8 @@ func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, e
 	return resp.IsMaster, nil
 }
 
-func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {
-	return nil
-}
-
-// InitiateReplSet is a method to create MongoDB cluster
-func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
-	configMembers := make([]ConfigMember, len(cluster.Members))
-
-	for i, member := range cluster.Members {
-		configMembers[i].ID = i
-		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
-		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
-			configMembers[i].Priority = 2
-		} else {
-			configMembers[i].Priority = 1
-		}
-	}
-
-	config := RSConfig{
-		ID:      mgr.ClusterCompName,
-		Members: configMembers,
-	}
-
-	response := mgr.Client.Database("admin").RunCommand(context.Background(), bson.M{"replSetInitiate": config})
-	if response.Err() != nil {
-		return response.Err()
-	}
-	return nil
-}
-
 func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {
-	return mgr.GetReplSetConfigWithClient(ctx, mgr.Client)
-}
-
-func (mgr *Manager) GetReplSetConfigWithClient(ctx context.Context, client *mongo.Client) (*RSConfig, error) {
-	resp := ReplSetGetConfig{}
-	res := client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetConfig", Value: 1}})
-	if res.Err() != nil {
-		err := errors.Wrap(res.Err(), "replSetGetConfig")
-		mgr.Logger.Errorf("Get replSet config: %v", err)
-		return nil, err
-	}
-	if err := res.Decode(&resp); err != nil {
-		err := errors.Wrap(err, "failed to decode to replSetGetConfig")
-		mgr.Logger.Errorf("Get replSet config: %v", err)
-		return nil, err
-	}
-
-	if resp.Config == nil {
-		err := errors.Errorf("mongo says: %s", resp.Errmsg)
-		mgr.Logger.Errorf("Get replSet config: %v", err)
-		return nil, err
-	}
-
-	return resp.Config, nil
-}
-
-func (mgr *Manager) SetReplSetConfig(ctx context.Context, rsClient *mongo.Client, cfg *RSConfig) error {
-	resp := OKResponse{}
-
-	mgr.Logger.Infof("Reconfig replSet: %v", cfg)
-
-	res := rsClient.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetReconfig", Value: cfg}})
-	if res.Err() != nil {
-		err := errors.Wrap(res.Err(), "replSetReconfig")
-		mgr.Logger.Errorf("ReConfig replSet failed: %v", err)
-		return err
-	}
-
-	if err := res.Decode(&resp); err != nil {
-		err = errors.Wrap(err, "failed to decode to replSetReconfigResponse")
-		mgr.Logger.Errorf("ReConfig replSet failed: %v", err)
-		return err
-	}
-
-	if resp.OK != 1 {
-		err := errors.Errorf("mongo says: %s", resp.Errmsg)
-		mgr.Logger.Errorf("ReConfig replSet failed: %v", err)
-		return err
-	}
-
-	return nil
+	return GetReplSetConfig(ctx, mgr.Client)
 }
 
 func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
@@ -273,14 +334,14 @@ func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return nil
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
-	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return nil
 	}
 
-	_ = client.Disconnect(context.TODO())
 	return mgr.GetMemberAddrsFromRSConfig(rsConfig)
 }
 
@@ -298,7 +359,7 @@ func (mgr *Manager) GetMemberAddrsFromRSConfig(rsConfig *RSConfig) []string {
 
 func (mgr *Manager) GetReplSetClient(ctx context.Context, cluster *dcs.Cluster) (*mongo.Client, error) {
 	hosts := cluster.GetMemberAddrs()
-	return mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
+	return NewReplSetClient(ctx, hosts)
 }
 
 func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (*mongo.Client, error) {
@@ -308,7 +369,7 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 
 	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
 	host := cluster.GetMemberAddrWithPort(*leaderMember)
-	return mgr.GetReplSetClientWithHosts(context.TODO(), []string{host})
+	return NewReplSetClient(context.TODO(), []string{host})
 }
 
 func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []string) (*mongo.Client, error) {
@@ -341,8 +402,9 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return true
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
-	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		//
@@ -355,7 +417,6 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 		}
 	}
 
-	_ = client.Disconnect(context.TODO())
 	return false
 }
 
@@ -391,10 +452,11 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	if err != nil {
 		return err
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
-	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return err
@@ -413,8 +475,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	rsConfig.Members = append(rsConfig.Members, configMember)
 
 	rsConfig.Version++
-	_ = client.Disconnect(context.TODO())
-	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
+	return SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
 func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
@@ -422,8 +483,9 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 	if err != nil {
 		return err
 	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
-	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return err
@@ -439,8 +501,7 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 
 	rsConfig.Members = configMembers
 	rsConfig.Version++
-	_ = client.Disconnect(context.TODO())
-	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
+	return SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
@@ -449,35 +510,17 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		mgr.Logger.Debugf("Get leader client failed: %v", err)
 		return false
 	}
-	status, err := mgr.GetReplSetStatusWithClient(ctx, client)
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
+
+	status, err := GetReplSetStatus(ctx, client)
 	if err != nil {
 		return false
 	}
 	mgr.Logger.Debugf("cluster status: %v", status)
-	if status.OK != 0 {
-		return true
-	}
-	_ = client.Disconnect(ctx)
-	return false
+	return status.OK != 0
 }
 
-// IsClusterInitialized is a method to check if cluster is initailized or not
-func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	client, err := mgr.GetLeaderClient(ctx, cluster)
-	if err != nil {
-		return true, err
-	}
-
-	rsConfig, err := mgr.GetReplSetConfigWithClient(ctx, client)
-	if rsConfig == nil {
-		mgr.Logger.Errorf("Get replSet config failed: %v", err)
-		return false, err
-	}
-	_ = client.Disconnect(ctx)
-	return rsConfig.ID != "", nil
-}
-
-func (mgr *Manager) Premote() error {
+func (mgr *Manager) Promote() error {
 	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
@@ -485,7 +528,12 @@ func (mgr *Manager) Premote() error {
 	}
 
 	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
-	client, _ := mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
+	client, err := NewReplSetClient(context.TODO(), hosts)
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
+
 	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
 			rsConfig.Members[i].Priority = 2
@@ -495,8 +543,7 @@ func (mgr *Manager) Premote() error {
 	}
 
 	rsConfig.Version++
-	_ = client.Disconnect(context.TODO())
-	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
+	return SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
 func (mgr *Manager) Demote() error {

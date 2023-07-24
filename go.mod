@@ -23,6 +23,8 @@ require (
 	github.com/dapr/dapr v1.9.5
 	github.com/dapr/go-sdk v1.7.0
 	github.com/dapr/kit v0.0.3
+	github.com/deckarep/golang-set v1.8.0
+	github.com/dlclark/regexp2 v1.10.0
 	github.com/docker/cli v20.10.24+incompatible
 	github.com/docker/docker v20.10.24+incompatible
 	github.com/docker/go-connections v0.4.1-0.20190612165340-fd1b1942c4d5
@@ -65,14 +67,14 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/sahilm/fuzzy v0.1.0
 	github.com/sethvargo/go-password v0.2.0
-	github.com/shirou/gopsutil/v3 v3.23.1
+	github.com/shirou/gopsutil/v3 v3.23.6
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
 	github.com/stoewer/go-strcase v1.2.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.4
 	github.com/sykesm/zap-logfmt v0.0.4
 	github.com/valyala/fasthttp v1.41.0
 	github.com/vmware-tanzu/velero v1.10.1
@@ -166,7 +168,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/daviddengcn/go-colortext v1.0.0 // indirect
-	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/deislabs/oras v0.9.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
@@ -338,6 +339,7 @@ require (
 	github.com/savsgio/gotils v0.0.0-20220530130905-52f3993e8d6d // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
+	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/sigstore/fulcio v1.0.0 // indirect
 	github.com/sigstore/rekor v1.0.1 // indirect
@@ -372,7 +374,7 @@ require (
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	github.com/yusufpapurcu/wmi v1.2.2 // indirect
+	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	github.com/zclconf/go-cty v1.12.1 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.6 // indirect
@@ -398,7 +400,7 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230221090011-e4bae7ad2296 // indirect
 	golang.org/x/mod v0.9.0 // indirect
-	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect

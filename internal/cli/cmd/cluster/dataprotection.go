@@ -736,7 +736,8 @@ func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStrea
 			cmdutil.CheckErr(o.runEditBackupPolicy())
 		},
 	}
-	cmd.Flags().StringArrayVar(&o.values, "set", []string{}, "Backup name")
+	cmd.Flags().StringArrayVar(&o.values, "set", []string{},
+		"set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	return cmd
 }
 
@@ -773,6 +774,23 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 		}
 		if schedulePolicy != nil {
 			schedulePolicy.CronExpression = targetVal
+		}
+		return nil
+	}
+	updateRepoName := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
+		// check if the backup repo exists
+		if targetVal != "" {
+			_, err := o.dynamic.Resource(types.BackupRepoGVR()).Get(context.Background(), targetVal, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+		}
+		if commonPolicy != nil {
+			if targetVal != "" {
+				commonPolicy.BackupRepoName = &targetVal
+			} else {
+				commonPolicy.BackupRepoName = nil
+			}
 		}
 		return nil
 	}
@@ -853,6 +871,13 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 			},
 		},
 		{
+			key:      "datafile.backupRepoName",
+			jsonpath: "datafile.backupRepoName",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateRepoName(backupPolicy.Spec.Datafile, targetVal)
+			},
+		},
+		{
 			key:      "logfile.pvc.name",
 			jsonpath: "logfile.persistentVolumeClaim.name",
 			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
@@ -864,6 +889,13 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 			jsonpath: "logfile.persistentVolumeClaim.storageClassName",
 			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
 				return updatePVCStorageClass(backupPolicy.Spec.Logfile, targetVal)
+			},
+		},
+		{
+			key:      "logfile.backupRepoName",
+			jsonpath: "logfile.backupRepoName",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateRepoName(backupPolicy.Spec.Logfile, targetVal)
 			},
 		},
 	}

@@ -45,7 +45,6 @@ var builtinMap = make(map[string]BaseInternalOps)
 var customOp *custom.HTTPCustom
 
 func RegisterBuiltin() error {
-
 	createErrFmt := "%s create err: %v"
 	initErrFmt := "%s init err: %v"
 
@@ -75,7 +74,7 @@ func RegisterBuiltin() error {
 		return errors.Errorf(createErrFmt, "postgres", err)
 	} else {
 		builtinMap["postgres"] = pgOp
-		properties := component.GetProperties("redis")
+		properties := component.GetProperties("postgres")
 		err := pgOp.Init(properties)
 		if err != nil {
 			return errors.Errorf(initErrFmt, "postgres", err)
@@ -117,7 +116,7 @@ func RegisterBuiltin() error {
 func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		// get the character type
-		character := getCharacter(request.URL.Path)
+		character := GetCharacter(request.URL.Path)
 		if character == "" {
 			Logger.Error(nil, "character type missing in path")
 			return
@@ -166,7 +165,7 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func getCharacter(url string) string {
+func GetCharacter(url string) string {
 	if !strings.HasPrefix(url, bindingPath) {
 		return ""
 	}

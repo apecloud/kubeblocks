@@ -105,7 +105,7 @@ var _ = Describe("DataProtection", func() {
 
 			By("test list all namespace")
 			out.Reset()
-			cmd.Flags().Set("all-namespaces", "true")
+			_ = cmd.Flags().Set("all-namespaces", "true")
 			cmd.Run(cmd, nil)
 			fmt.Println(out.String())
 			Expect(out.String()).Should(ContainSubstring(policy2.Name))

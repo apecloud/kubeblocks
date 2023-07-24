@@ -444,7 +444,7 @@ spec:
                 - message: chartsImage is required when chartLocationURL starts with
                     'file://'
                   rule: 'self.chartLocationURL.startsWith(''file://'') ? has(self.chartsImage)
-                    : !has(self.chartsImage)'
+                    : true'
               install:
                 description: Installation parameters.
                 properties:

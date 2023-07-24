@@ -115,7 +115,7 @@ type SelectorRequirement struct {
 }
 
 // HelmTypeInstallSpec defines the Helm installation spec.
-// +kubebuilder:validation:XValidation:rule="self.chartLocationURL.startsWith('file://') ? has(self.chartsImage) : !has(self.chartsImage)",message="chartsImage is required when chartLocationURL starts with 'file://'"
+// +kubebuilder:validation:XValidation:rule="self.chartLocationURL.startsWith('file://') ? has(self.chartsImage) : true",message="chartsImage is required when chartLocationURL starts with 'file://'"
 type HelmTypeInstallSpec struct {
 	// A Helm Chart location URL.
 	// +kubebuilder:validation:Required

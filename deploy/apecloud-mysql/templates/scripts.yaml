@@ -215,8 +215,8 @@ data:
     exec vttablet \
     $topology_fags \
     --alsologtostderr \
-    --log_dir $VTDATAROOT \
-    --log_queries_to_file $VTDATAROOT/$tablet_logfile \
+    $(if [ "$enable_logs" == "true" ]; then echo "--log_dir $VTDATAROOT"; fi) \
+    $(if [ "$enable_query_log" == "true" ]; then echo "--log_queries_to_file $VTDATAROOT/$tablet_logfile"; fi) \
     --tablet-path $alias \
     --tablet_hostname "$tablet_hostname" \
     --init_tablet_type $tablet_type \
@@ -324,7 +324,7 @@ data:
       --alsologtostderr \
       --refresh_interval $refresh_interval \
       --scan_repair_timeout $scan_repair_timeout \
-      --log_dir ${VTDATAROOT} \
+      $(if [ "$enable_logs" == "true" ]; then echo "--log_dir $VTDATAROOT"; fi) \
       --db_username "$MYSQL_ROOT_USER" \
       --db_password "$MYSQL_ROOT_PASSWORD"
     EOF
@@ -349,8 +349,8 @@ data:
       --srv_topo_timeout $srv_topo_timeout \
       --grpc_keepalive_time $grpc_keepalive_time \
       --grpc_keepalive_timeout $grpc_keepalive_timeout \
-      --log_dir $VTDATAROOT \
-      --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
+      $(if [ "$enable_logs" == "true" ]; then echo "--log_dir $VTDATAROOT"; fi) \
+      $(if [ "$enable_query_log" == "true" ]; then echo "--log_queries_to_file $VTDATAROOT/vtgate_querylog.txt"; fi) \
       --port $web_port \
       --grpc_port $grpc_port \
       --mysql_server_port $mysql_server_port \

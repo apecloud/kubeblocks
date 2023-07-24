@@ -62,6 +62,12 @@
 	// Tablet refresh interval. (default 1m0s)
 	tablet_refresh_interval: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
+	// Enable or disable logs. (default true)
+	enable_logs: bool
+
+	// Enable or disable query log. (default true)
+	enable_query_log: bool
+
 	...
 }
 

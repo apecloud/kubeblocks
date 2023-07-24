@@ -14,3 +14,12 @@ buffer_size=10000
 buffer_window=30s
 buffer_max_failover_duration=60s
 buffer_min_time_between_failovers=60s
+
+{{ block "logsBlock" . }}
+{{- if hasKey $.component "enabledLogs" }}
+enable_logs=true
+{{- if mustHas "queryLog" $.component.enabledLogs }}
+enable_query_log=true
+{{- end }}
+{{- end }}
+{{ end }}

@@ -913,7 +913,10 @@ spec:
                 type: string
               replicas:
                 default: 1
-                description: Replicas defines number of Pods
+                description: replicas is the desired number of replicas of the given
+                  Template. These are replicas in the sense that they are instantiations
+                  of the same Template, but individual replicas also have a consistent
+                  identity. If unspecified, defaults to 1.
                 format: int32
                 minimum: 0
                 type: integer

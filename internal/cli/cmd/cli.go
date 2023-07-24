@@ -24,6 +24,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/context"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/login"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -170,6 +174,9 @@ A Command Line Interface for KubeBlocks`,
 
 	// Add subcommands
 	cmd.AddCommand(
+		login.NewLoginCmd(ioStreams),
+		organization.NewOrganizationCmd(ioStreams),
+		context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),

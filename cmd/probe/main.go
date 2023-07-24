@@ -27,6 +27,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
@@ -82,11 +86,15 @@ func main() {
 	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
-	// ha := highavailability.NewHa(logHa)
-	// if ha != nil {
-	// 	defer ha.ShutdownWithWait()
-	// 	go ha.Start()
-	// }
+	development, err := zap.NewDevelopment()
+	if err != nil {
+		panic(fmt.Errorf("fatal error new logger for development: %v", err))
+	}
+	ha := highavailability.NewHa(zapr.NewLogger(development))
+	if ha != nil {
+		defer ha.ShutdownWithWait()
+		go ha.Start()
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

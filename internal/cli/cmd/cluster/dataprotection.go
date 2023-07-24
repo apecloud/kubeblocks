@@ -278,6 +278,9 @@ func printBackupList(o ListBackupOptions) error {
 	if err != nil {
 		return err
 	}
+	if o.AllNamespaces {
+		o.Namespace = ""
+	}
 	backupList, err := dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: o.LabelSelector,
 		FieldSelector: o.FieldSelector,
@@ -294,7 +297,7 @@ func printBackupList(o ListBackupOptions) error {
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(backupList.Items))
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "SOURCE-CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
+	tbl.SetHeader("NAME", "NAMESPACE", "SOURCE-CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
 	for _, obj := range backupList.Items {
 		backup := &dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
@@ -314,12 +317,12 @@ func printBackupList(o ListBackupOptions) error {
 		}
 		if len(o.BackupName) > 0 {
 			if o.BackupName == obj.GetName() {
-				tbl.AddRow(backup.Name, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+				tbl.AddRow(backup.Name, backup.Namespace, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 					durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
 			}
 			continue
 		}
-		tbl.AddRow(backup.Name, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+		tbl.AddRow(backup.Name, backup.Namespace, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp),
 			util.TimeFormat(backup.Status.Expiration))
 	}
@@ -662,6 +665,9 @@ func printBackupPolicyList(o list.ListOptions) error {
 	if err != nil {
 		return err
 	}
+	if o.AllNamespaces {
+		o.Namespace = ""
+	}
 	backupPolicyList, err := dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: o.LabelSelector,
 		FieldSelector: o.FieldSelector,
@@ -676,7 +682,7 @@ func printBackupPolicyList(o list.ListOptions) error {
 	}
 
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "DEFAULT", "CLUSTER", "CREATE-TIME", "STATUS")
+	tbl.SetHeader("NAME", "NAMESPACE", "DEFAULT", "CLUSTER", "CREATE-TIME", "STATUS")
 	for _, obj := range backupPolicyList.Items {
 		defaultPolicy, ok := obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey]
 		backupPolicy := &dpv1alpha1.BackupPolicy{}
@@ -687,7 +693,7 @@ func printBackupPolicyList(o list.ListOptions) error {
 			defaultPolicy = "false"
 		}
 		createTime := obj.GetCreationTimestamp()
-		tbl.AddRow(obj.GetName(), defaultPolicy, obj.GetLabels()[constant.AppInstanceLabelKey],
+		tbl.AddRow(obj.GetName(), obj.GetNamespace(), defaultPolicy, obj.GetLabels()[constant.AppInstanceLabelKey],
 			util.TimeFormat(&createTime), backupPolicy.Status.Phase)
 	}
 	tbl.Print()

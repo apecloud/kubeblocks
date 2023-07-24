@@ -474,7 +474,7 @@ func (c *rsmComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli cl
 }
 
 func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	sts := convertRSMToSTS(c.runningWorkload)
+	sts := ConvertRSMToSTS(c.runningWorkload)
 	if sts.Status.ReadyReplicas == c.Component.Replicas {
 		return nil
 	}
@@ -581,7 +581,7 @@ func (c *rsmComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 	c.WorkloadVertex.Immutable = true
 	rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
-	stsProto := convertRSMToSTS(rsmProto)
+	stsProto := ConvertRSMToSTS(rsmProto)
 	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
 	if err != nil {
 		return err

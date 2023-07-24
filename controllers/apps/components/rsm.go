@@ -65,7 +65,7 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	sts := convertRSMToSTS(rsm)
+	sts := ConvertRSMToSTS(rsm)
 	isRevisionConsistent, err := isStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
@@ -82,7 +82,7 @@ func (r *RSM) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	sts := convertRSMToSTS(rsm)
+	sts := ConvertRSMToSTS(rsm)
 	return statefulSetPodsAreReady(sts, r.getReplicas()), nil
 }
 
@@ -173,7 +173,7 @@ func (r *RSM) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.
 			return nil, nil
 		}
 	case appsv1alpha1.Replication:
-		sts := convertRSMToSTS(rsmObj)
+		sts := ConvertRSMToSTS(rsmObj)
 		podList, err := getRunningPods(ctx, r.Cli, sts)
 		if err != nil {
 			return nil, err

@@ -695,7 +695,7 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 
 // ConvertRSMToSTS converts a rsm to sts
 // TODO(free6om): refactor this func out
-func convertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet {
+func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet {
 	if rsm == nil {
 		return nil
 	}

@@ -152,6 +152,9 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 		if err := b.cli.Status().Patch(b.transCtx.Context, vertex.Obj, patch); err != nil {
 			return err
 		}
+		// if err := b.cli.Status().Update(b.transCtx.Context, vertex.Obj); err != nil {
+		//	return err
+		// }
 	}
 	return nil
 }

@@ -415,6 +415,9 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 
 	service, alternativeServices := separateServices(component.Services)
+	if len(alternativeServices) == 0 {
+		alternativeServices = nil
+	}
 	alternativeServices = fixService(cluster.Namespace, rsmName, component, alternativeServices...)
 	rsmBuilder.SetService(service.Spec).SetAlternativeServices(alternativeServices)
 
@@ -529,6 +532,8 @@ func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.Repli
 		observation.PeriodSeconds = roleProbe.PeriodSeconds
 		observation.TimeoutSeconds = roleProbe.TimeoutSeconds
 		observation.FailureThreshold = roleProbe.FailureThreshold
+		// set to default value
+		observation.SuccessThreshold = 1
 	}
 
 	// TODO(free6om): set default reconfiguration actions after relative addon refactored
@@ -658,7 +663,13 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 	case "redis":
 	case "kafka":
 	}
-	return nil
+	// TODO(free6om): remove this
+	return []workloads.Action{
+		{
+			Image:   "busybox:latest",
+			Command: []string{},
+		},
+	}
 }
 
 func randomString(length int) string {

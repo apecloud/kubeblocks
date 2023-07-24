@@ -377,8 +377,9 @@ var _ = Describe("Cluster Controller", func() {
 	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
 		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
 			Eventually(func(g Gomega) {
-				l := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-				expects(g, &l.Items[0], nil)
+				l := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				sts := components.ConvertRSMToSTS(&l.Items[0])
+				expects(g, sts, nil)
 			}).Should(Succeed())
 			return
 		}

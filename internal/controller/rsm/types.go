@@ -74,7 +74,7 @@ const (
 	shell2httpImage                  = "msoap/shell2http:1.16.0"
 	shell2httpBinaryPath             = "/app/shell2http"
 	shell2httpServePath              = "/role"
-	DefaultRoleObservationImage      = "apecloud/kubeblocks-role-agent:latest"
+	defaultRoleObservationImage      = "apecloud/kubeblocks-role-agent:latest"
 	defaultRoleObservationDaemonPort = 7373
 	roleObservationURIFormat         = "-addr=localhost:%s"
 	defaultActionImage               = "busybox:latest"

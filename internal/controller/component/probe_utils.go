@@ -38,7 +38,7 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole"
+	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
@@ -80,7 +80,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
+		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -202,13 +202,14 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 	return roles
 }
 
-func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.Container,
+func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
-	bindingType := strings.ToLower(characterType)
+	bindingType := strings.ToLower(component.CharacterType)
+	workloadType := component.WorkloadType
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType)
+	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

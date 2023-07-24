@@ -322,6 +322,7 @@ func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *app
 		if logValue, err = buildLogsTPLValues(&compSpec); err != nil {
 			return err
 		}
+		buf.Reset()
 		if err = logTPL.Execute(&buf, logValue); err != nil {
 			return err
 		}

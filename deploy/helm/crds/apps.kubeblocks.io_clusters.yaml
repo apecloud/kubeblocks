@@ -589,7 +589,8 @@ spec:
                     x-kubernetes-int-or-string: true
                 type: object
               services:
-                description: Services expose endpoints that can be accessed by clients.
+                description: Services expose cluster endpoints that can be accessed
+                  by clients.
                 items:
                   properties:
                     annotations:

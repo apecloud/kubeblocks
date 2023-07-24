@@ -252,7 +252,7 @@ var _ = Describe("builder", func() {
 			}
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
 			svcFQDN := fmt.Sprintf("%s.%s.svc", cluster.Name, cluster.Namespace)
-			headlessSvcFQDN := fmt.Sprintf("%s-headless.%s.svc", cluster.Name, cluster.Namespace)
+			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, synthesizedComponent.Name, cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
 			for _, s := range synthesizedComponent.Services[0].Spec.Ports {

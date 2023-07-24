@@ -54,8 +54,7 @@ type ClusterDefinitionSpec struct {
 	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
 	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(FRONTEND_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where FRONTEND_COMP_NAME is the frontend component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(FRONTEND_COMP_NAME).$(NAMESPACE).svc,
-	//    where FRONTEND_COMP_NAME is the frontend component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
+	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME).$(NAMESPACE).svc,
 	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
 	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.

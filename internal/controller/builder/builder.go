@@ -423,7 +423,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_HEX)":             uuidHex,
 		"$(SVC_FQDN)":             fmt.Sprintf("%s.%s.svc", cluster.Name, cluster.Namespace),
 		"$(KB_CLUSTER_COMP_NAME)": cluster.Name + "-" + component.Name,
-		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-headless.%s.svc", cluster.Name, cluster.Namespace),
+		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, component.Name, cluster.Namespace),
 	}
 	if len(component.ClusterServices) > 0 {
 		for _, p := range component.ClusterServices[0].Spec.Ports {

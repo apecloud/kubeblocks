@@ -1,0 +1,90 @@
+package probe
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestGetCharacter(t *testing.T) {
+	t.Run("Wrong Prefix", func(t *testing.T) {
+		character := GetCharacter("/v2.0/bindings/mysql")
+		assert.Equal(t, "", character)
+	})
+
+	t.Run("mysql", func(t *testing.T) {
+		character := GetCharacter("/v1.0/bindings/mysql")
+		assert.Equal(t, "mysql", character)
+	})
+}
+
+func TestGetRouter(t *testing.T) {
+	t.Run("Use Custom to get role", func(t *testing.T) {
+		s := httptest.NewServer(
+			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				_, _ = w.Write([]byte("leader"))
+			}),
+		)
+		defer s.Close()
+
+		addr := s.Listener.Addr().String()
+		index := strings.LastIndex(addr, ":")
+		portStr := addr[index+1:]
+		viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", "["+portStr+"]")
+
+		err := mockRegister()
+		assert.Nil(t, err)
+
+		request := httptest.NewRequest("GET", "/v1.0/bindings/custom?operation=getRole", nil)
+		recorder := httptest.NewRecorder()
+		middleware := SetMiddleware(GetRouter())
+		middleware(recorder, request)
+
+		result := binding.OpsResult{}
+		err = json.Unmarshal(recorder.Body.Bytes(), &result)
+		assert.Nil(t, err)
+		assert.Equal(t, util.OperationSuccess, result["event"])
+		assert.Equal(t, "leader", result["role"])
+	})
+}
+
+func emptyConfig() map[string]component.Properties {
+	viper.Set("KB_POD_NAME", "test-pod-0")
+
+	m := make(map[string]component.Properties)
+	mysqlMap := component.Properties{}
+	mysqlMap["url"] = "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
+
+	m["mysql"] = mysqlMap
+
+	m["redis"] = component.Properties{}
+
+	pgMap := component.Properties{}
+	pgMap["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
+	m["postgres"] = pgMap
+
+	etcdMap := component.Properties{}
+	etcdMap["endpoint"] = "127.0.0.1:2379"
+	m["etcd"] = etcdMap
+
+	mongoMap := component.Properties{}
+	mongoMap["host"] = "127.0.0.1:27017"
+	mongoMap["params"] = "?directConnection=true"
+	m["mongodb"] = mongoMap
+
+	return m
+}
+
+func mockRegister() error {
+	component.Name2Property = emptyConfig()
+	return RegisterBuiltin()
+}

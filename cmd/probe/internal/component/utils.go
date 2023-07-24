@@ -23,7 +23,7 @@ type kv struct {
 	Value string
 }
 
-var name2Property = map[string]Properties{}
+var Name2Property = map[string]Properties{}
 
 func readConfig(filename string) (string, Properties, error) {
 	viper.SetConfigType("yaml")
@@ -53,11 +53,11 @@ func GetAllComponent(dir string) error {
 		if err != nil {
 			return err
 		}
-		name2Property[name] = properties
+		Name2Property[name] = properties
 	}
 	return nil
 }
 
 func GetProperties(name string) Properties {
-	return name2Property[name]
+	return Name2Property[name]
 }

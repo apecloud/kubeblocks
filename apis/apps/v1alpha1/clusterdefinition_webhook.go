@@ -145,11 +145,9 @@ func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorLis
 	}
 }
 
-func (r *ClusterDefinition) validateClusterService(allErrs *field.ErrorList) error {
-	if len(r.Spec.ComponentDefs) > 1 && len(r.Spec.Service.FrontendComponents) == 0 {
-		*allErrs = append(*allErrs,
-			field.Invalid(field.NewPath("spec.service.frontendComponents"), "", "frontendComponents is required when there are more than one component"),
-		)
+func (r *ClusterDefinition) validateClusterService(allErrs *field.ErrorList) {
+	if r.Spec.Service == nil {
+		return
 	}
 
 	validateComponentPort := func(port ServicePort, compDef *ClusterComponentDefinition) {
@@ -178,7 +176,6 @@ func (r *ClusterDefinition) validateClusterService(allErrs *field.ErrorList) err
 			validateComponentPort(port, compDef)
 		}
 	}
-	return nil
 }
 
 // ValidateComponents validate spec.components is legal.

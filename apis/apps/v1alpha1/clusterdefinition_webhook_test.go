@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,10 +30,11 @@ import (
 
 var _ = Describe("clusterDefinition webhook", func() {
 	var (
-		randomStr              = testCtx.GetRandomStr()
-		clusterDefinitionName  = "webhook-cd-" + randomStr
-		clusterDefinitionName2 = "webhook-cd2" + randomStr
-		clusterDefinitionName3 = "webhook-cd3" + randomStr
+		randomStr                = testCtx.GetRandomStr()
+		clusterDefinitionName    = "webhook-cd-" + randomStr
+		clusterDefinitionName2   = "webhook-cd2" + randomStr
+		clusterDefinitionName3   = "webhook-cd3" + randomStr
+		cdWithClusterServiceName = "cd-with-cluster-service" + randomStr
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
@@ -159,6 +161,52 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)).Should(Succeed())
+		})
+
+		It("Should webhook validate cluster service", func() {
+			clusterDef, err := createCDWithClusterService(cdWithClusterServiceName)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			tests := []struct {
+				expectErr    bool
+				expectErrMsg string
+				service      ClusterService
+			}{
+				{
+					expectErr: false,
+					service: ClusterService{
+						ServiceSpec: ServiceSpec{
+							Ports: []ServicePort{
+								{Name: "mysql", Port: 3306, TargetPort: intstr.FromString("mysql")},
+							},
+						},
+						FrontendComponents: []string{"mysql", "vtgate"},
+					},
+				},
+				{
+					expectErr:    true,
+					expectErrMsg: "port paxos not found in frontend component vtgate",
+					service: ClusterService{
+						ServiceSpec: ServiceSpec{
+							Ports: []ServicePort{
+								{Name: "mysql", Port: 3306, TargetPort: intstr.FromString("mysql")},
+								{Name: "paxos", Port: 13306, TargetPort: intstr.FromString("paxos")},
+							},
+						},
+						FrontendComponents: []string{"mysql", "vtgate"},
+					},
+				},
+			}
+			for _, item := range tests {
+				clusterDef.Spec.Service = &item.service
+				if item.expectErr {
+					err := testCtx.CreateObj(ctx, clusterDef)
+					Expect(err).Should(HaveOccurred())
+					Expect(err.Error()).Should(ContainSubstring(item.expectErrMsg))
+				} else {
+					Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(HaveOccurred())
+				}
+			}
 		})
 
 		It("Should webhook validate configSpec", func() {
@@ -340,6 +388,44 @@ spec:
       containers:
       - name: mysql
         image: docker.io/apecloud/apecloud-mysql-server:latest
+`, name)
+	clusterDefinition := &ClusterDefinition{}
+	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
+	return clusterDefinition, err
+}
+
+func createCDWithClusterService(name string) (*ClusterDefinition, error) {
+	clusterDefYaml := fmt.Sprintf(`
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: %s
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mysql)"
+  componentDefs:
+  - name: mysql
+    workloadType: Stateful
+    podSpec:
+      containers:
+      - name: mysql
+        ports:
+        - containerPort: 3306
+          name: mysql
+        - containerPort: 13306
+          name: paxos
+  - name: vtgate
+    workloadType: Stateless
+    podSpec:
+      containers:
+      - name: vtgate
+        ports:
+        - containerPort: 3306
+          name: mysql
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)

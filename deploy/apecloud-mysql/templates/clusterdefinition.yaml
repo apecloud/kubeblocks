@@ -77,9 +77,6 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
-          - name: http
-            port: 80
-            targetPort: rest
       horizontalScalePolicy:
         type: CloneVolume
         backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale
@@ -504,7 +501,7 @@ spec:
             port: 15991
             targetPort: grpcport
           - name: serverport
-            port: 15306
+            port: 3306
             targetPort: serverport
           - name: delvedebug
             port: 40000
@@ -531,7 +528,7 @@ spec:
                 name: webport
               - containerPort: 15991
                 name: grpcport
-              - containerPort: 15306
+              - containerPort: 3306
                 name: serverport
               - containerPort: 40000
                 name: delvedebug

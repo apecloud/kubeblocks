@@ -33,7 +33,7 @@ spec:
         cronExpression: "0 18 * * *"
       logfile:
         enable: false
-        cronExpression: "*/5 * * * *"
+        cronExpression: "*/2 * * * *"
     snapshot:
       target:
         connectionCredentialKey:

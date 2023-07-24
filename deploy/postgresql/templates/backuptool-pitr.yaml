@@ -19,8 +19,6 @@ spec:
       value: "$(VOLUME_DATA_DIR)/pgroot/data"
     - name: CONF_DIR
       value: "$(VOLUME_DATA_DIR)/conf"
-    - name: RECOVERY_TIME
-      value: $KB_RECOVERY_TIME
     - name: TIME_FORMAT
       value: 2006-01-02 15:04:05 MST
     - name: LOG_DIR
@@ -43,6 +41,7 @@ spec:
         if [ -d ${DATA_DIR}.old ]; then echo "${DATA_DIR}.old directory already exists, skip restore."; exit 0; fi
         mkdir -p ${PITR_DIR};
         cd ${PITR_DIR}
+        # TODO Obtain logs directly from WAL archive。
         for i in $(find ${BACKUP_DIR} -name "*.gz"); do
           echo "copying ${i}";
           cp ${i} $(basename $i);
@@ -58,7 +57,7 @@ spec:
         echo "sync;" >> ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
         chmod +x ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
         echo "restore_command='case "%f" in *history) cp ${PITR_DIR}/%f %p ;; *) mv ${PITR_DIR}/%f %p ;; esac'" > ${CONF_DIR}/recovery.conf;
-        echo "recovery_target_time='${RECOVERY_TIME}'" >> ${CONF_DIR}/recovery.conf;
+        echo "recovery_target_time='${KB_RECOVERY_TIME}'" >> ${CONF_DIR}/recovery.conf;
         echo "recovery_target_action='promote'" >> ${CONF_DIR}/recovery.conf;
         echo "recovery_target_timeline='latest'" >> ${CONF_DIR}/recovery.conf;
         mv ${DATA_DIR} ${DATA_DIR}.old;
@@ -69,8 +68,11 @@ spec:
     - -c
     - |
       set -e;
-      EXPIRED_INCR_LOG=${BACKUP_DIR}/$(date -d"7 day ago" +%Y%m%d);
-      if [ -d ${EXPIRED_INCR_LOG} ]; then rm -rf ${EXPIRED_INCR_LOG}; fi
+      if [ ! -z ${LOGFILE_TTL_SECOND} ];then
+        retention_day=$((${LOGFILE_TTL_SECOND}/86400))
+        EXPIRED_INCR_LOG=${BACKUP_DIR}/$(date -d"${retention_day} day ago" +%Y%m%d);
+        if [ -d ${EXPIRED_INCR_LOG} ]; then rm -rf ${EXPIRED_INCR_LOG}; fi
+      fi
       export PGPASSWORD=${DB_PASSWORD}
       PSQL="psql -h ${DB_HOST} -U ${DB_USER}"
       LAST_TRANS=$(pg_waldump $(${PSQL} -Atc "select pg_walfile_name(pg_current_wal_lsn())") --rmgr=Transaction |tail -n 1)

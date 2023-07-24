@@ -627,7 +627,9 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 				pp.FailureThreshold = p.FailureThreshold
 			}
 			if pp.HTTPGet != nil && len(pp.HTTPGet.Scheme) == 0 {
-				pp.HTTPGet.Scheme = p.HTTPGet.Scheme
+				if p.HTTPGet != nil {
+					pp.HTTPGet.Scheme = p.HTTPGet.Scheme
+				}
 			}
 		}
 		if cc.LivenessProbe != nil && c.LivenessProbe != nil {

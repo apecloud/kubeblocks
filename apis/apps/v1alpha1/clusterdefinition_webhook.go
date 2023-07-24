@@ -146,6 +146,12 @@ func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorLis
 }
 
 func (r *ClusterDefinition) validateClusterService(allErrs *field.ErrorList) error {
+	if len(r.Spec.ComponentDefs) > 1 && len(r.Spec.Service.FrontendComponents) == 0 {
+		*allErrs = append(*allErrs,
+			field.Invalid(field.NewPath("spec.service.frontendComponents"), "", "frontendComponents is required when there are more than one component"),
+		)
+	}
+
 	validateComponentPort := func(port ServicePort, compDef *ClusterComponentDefinition) {
 		for _, container := range compDef.PodSpec.Containers {
 			for _, containerPort := range container.Ports {

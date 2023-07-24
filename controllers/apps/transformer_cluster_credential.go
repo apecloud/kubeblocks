@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -92,6 +94,17 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		}
 	}
 	if synthesizedComponent != nil {
+		// validate if there are multiple frontend components
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if comp.ComponentDefRef != synthesizedComponent.ComponentDef {
+				continue
+			}
+			if comp.Name == synthesizedComponent.Name {
+				continue
+			}
+			return fmt.Errorf("frontend component %s conflicted", synthesizedComponent.ComponentDef)
+		}
+
 		secret, err := builder.BuildConnCredential(transCtx.ClusterDef, cluster, synthesizedComponent)
 		if err != nil {
 			return err

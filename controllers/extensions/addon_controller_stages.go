@@ -417,14 +417,15 @@ func useLocalCharts(addon *extensionsv1alpha1.Addon) bool {
 }
 
 // buildLocalChartsPath builds the local charts path if the chartLocationURL starts with "file://"
-func buildLocalChartsPath(addon *extensionsv1alpha1.Addon) string {
+func buildLocalChartsPath(addon *extensionsv1alpha1.Addon) (string, error) {
 	if !useLocalCharts(addon) {
-		return ""
+		return "$(CHART)", nil
 	}
+
 	url := addon.Spec.Helm.ChartLocationURL
 	last := strings.LastIndex(url, "/")
 	name := url[last+1:]
-	return fmt.Sprintf("%s/%s", localChartsPath, name)
+	return fmt.Sprintf("%s/%s", localChartsPath, name), nil
 }
 
 // setSharedVolume sets shared volume to copy helm charts from charts image
@@ -519,26 +520,28 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			r.setRequeueWithErr(err, "")
 			return
 		}
+
+		// set addon installation job to use local charts instead of remote charts,
+		// the init container will copy the local charts to the shared volume
+		chartsPath, err := buildLocalChartsPath(addon)
+		if err != nil {
+			r.setRequeueWithErr(err, "")
+			return
+		}
+
 		helmInstallJob.ObjectMeta.Name = key.Name
 		helmInstallJob.ObjectMeta.Namespace = key.Namespace
 		helmJobPodSpec := &helmInstallJob.Spec.Template.Spec
 		helmContainer := &helmInstallJob.Spec.Template.Spec.Containers[0]
-		args := []string{
+		helmContainer.Args = append([]string{
 			"upgrade",
 			"--install",
 			"$(RELEASE_NAME)",
-		}
-		// set addon installation job to use local charts instead of remote charts,
-		// the init container will copy the local charts to the shared volume
-		chartsPath := buildLocalChartsPath(addon)
-		if chartsPath != "" {
-			args = append(args, chartsPath)
-		} else {
-			args = append(args, "$(CHART)")
-		}
-		args = append(args, "--namespace", "$(RELEASE_NS)", "--create-namespace")
-		args = append(args, viper.GetStringSlice(addonHelmInstallOptKey)...)
-		helmContainer.Args = args
+			chartsPath,
+			"--namespace",
+			"$(RELEASE_NS)",
+			"--create-namespace",
+		}, viper.GetStringSlice(addonHelmInstallOptKey)...)
 
 		installValues := addon.Spec.Helm.BuildMergedValues(addon.Spec.InstallSpec)
 		if err = addon.Spec.Helm.BuildContainerArgs(helmContainer, installValues); err != nil {

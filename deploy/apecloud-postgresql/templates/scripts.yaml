@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ape-postgresql-scripts
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  setup.sh: |
+    #!/bin/bash
+    set -o errexit
+    set -o nounset
+
+    KB_0_POD_NAME_PREFIX="${KB_0_HOSTNAME%%\.*}"
+    # default secondary when pgdata is not empty
+    if [ -d ${PGDATA} ]; then
+      echo "have been initialized"
+    else
+      if [ "$KB_0_POD_NAME_PREFIX" == "$KB_POD_NAME" ]; then
+        chmod -R a+w "postgresql/"
+        gosu postgres initdb -U postgres -D /postgresql/pgconsensus_data
+        echo "use_consensus = true" >> /postgresql/pgconsensus_data/consensus.conf
+
+        gosu postgres postgres -D /postgresql/pgconsensus_data -p 5432 \
+             -c consensus_init_meta=ON \
+             -c consensus_members_info="localhost:5432@1"
+
+        gosu postgres pg_ctl -D /postgresql/pgconsensus_data -l /postgresql/pgconsensus_data/logfile start
+
+        gosu postgres psql -Upostgres -p5432 -c"create role replicator with superuser login password 'replicator';"
+        gosu postgres psql -Upostgres -p5432 -c"create extension if not exists consensus_monitor;"
+      fi
+    fi

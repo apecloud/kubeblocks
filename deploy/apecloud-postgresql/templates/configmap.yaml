@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgresql12-configuration
+  name: ape-postgresql12-configuration
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 data:

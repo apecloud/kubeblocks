@@ -28,8 +28,8 @@ spec:
             targetPort: tcp-postgresql
       configSpecs:
         - name: postgresql-consensusset-configuration
-          templateRef: postgresql12-configuration
-          constraintRef: postgresql12-cc
+          templateRef: ape-postgresql12-configuration
+          constraintRef: ape-postgresql12-cc
           keys:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
@@ -39,8 +39,8 @@ spec:
         - name: data
           type: data
       scriptSpecs:
-        - name: postgresql-scripts
-          templateRef: postgresql-scripts
+        - name: ape-postgresql-scripts
+          templateRef: ape-postgresql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777
@@ -80,29 +80,25 @@ spec:
               - name: dshm
                 mountPath: /dev/shm
               - name: data
-                mountPath: /home/postgres/pgdata
+                mountPath: /postgresql
               - name: postgresql-config
-                mountPath: /home/postgres/conf
+                mountPath: /var/lib/postgresql/conf
               - name: scripts
                 mountPath: /kb-scripts
-              - name: pod-info
-                mountPath: /kb-podinfo
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
+              - containerPort: 15432
+                name: paxos
             env:
+              - name: CONSENSUS_MODE
+                value: "data"
               - name: KUBERNETES_USE_CONFIGMAPS
                 value: "true"
               - name: KUBERNETES_LABELS
                 value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
-              - name: RESTORE_DATA_DIR
-                value: /home/postgres/pgdata/kb_restore
-              - name: KB_PG_CONFIG_PATH
-                value: /home/postgres/conf/postgresql.conf
               - name: ALLOW_NOSSL
                 value: "true"
-              - name: PGROOT
-                value: /home/postgres/pgdata/pgroot
               - name: POD_IP
                 valueFrom:
                   fieldRef:
@@ -133,26 +129,22 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-              - name: PGUSER_STANDBY
-                value: standby
-              - name: PGPASSWORD_STANDBY
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: PGUSER
+              - name: POSTGRES_USER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
                     optional: false
-              - name: PGPASSWORD
+              - name: POSTGRES_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
+              - name: POSTGRESQL_PORT_NUMBER
+                value: "5432"
+              - name: PGDATA
+                value: postgresql/pgconsensus_data
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
@@ -163,12 +155,12 @@ spec:
             - -c
             - $(KB_ACCOUNT_STATEMENT)
           env:
-            - name: PGUSER
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
                   key: username
-            - name: PGPASSWORD
+            - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)

@@ -7,22 +7,10 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: postgresql
+  clusterDefinitionRef: apecloud-postgresql
   componentVersions:
     - componentDefRef: postgresql
-      configSpecs:
-        - name: postgresql-consensusset-configuration
-          templateRef: postgresql12-configuration
-          constraintRef: postgresql12-cc
-          keys:
-            - postgresql.conf
-          namespace: {{ .Release.Namespace }}
-          volumeName: postgresql-config
-          defaultMode: 0777
       versionsContext:
         containers:
           - name: postgresql
-            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
-      systemAccountSpec:
-        cmdExecutorConfig:
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

@@ -3,9 +3,9 @@
 # Declare variables to be passed into your templates.
 
 image:
-  registry:
+  registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/apecloud-postgres
-  tag: 12.15
+  tag: latest
   digest: ""
   pullPolicy: IfNotPresent
   pullSecrets: [ ]

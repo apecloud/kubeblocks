@@ -55,7 +55,11 @@ data:
       # scope
       local_config['scope'] = os.environ.get('SCOPE')
       # name
-      local_config['name'] = filename
+      # etcd3
+      local_config['etcd3'] = {
+          'host':os.environ.get('PATRONI_ETCD3_HOST')
+      }
+      local_config['name'] = os.environ.get('KB_POD_NAME')
       # restapi
       local_config['restapi'] = {
       'listen': '127.0.0.1:8008',
@@ -65,7 +69,9 @@ data:
       if not 'postgresql' in local_config:
         local_config['postgresql'] = {}
       postgresql = local_config['postgresql']
-      postgresql['config_dir'] = '/var/lib/postgresql/conf'
+      postgresql['data_dir'] = os.environ.get('PGDATA')
+      postgresql['config_dir'] = '/home/postgres/pgdata/conf'
+      postgresql['custom_conf'] = '/home/postgres/conf/postgresql.conf'
       postgresql['authentication'] = {}
       postgresql['listen'] = '127.0.0.1:5432'
       postgresql['connect_address'] = '127.0.0.1:5432'
@@ -98,22 +104,28 @@ data:
       write_file(yaml.dump(local_config, default_flow_style=False), filename, True)
     if __name__ == '__main__':
         main(sys.argv[1])
-  create_pg_stat_statements_extension.sql: |
+  init.sql: |
     CREATE EXTENSION pg_stat_statements;
   setup.sh: |
-    chmod 750 -R /home/postgres/pgdata
-    mkdir -p  /var/lib/postgresql/conf
-    cp /home/postgres/conf/postgresql.conf /var/lib/postgresql/conf
-    chmod 777 -R /var/lib/postgresql/conf
-    cp /kb-scripts/create_pg_stat_statements_extension.sql /docker-entrypoint-initdb.d
+    mkdir -p /home/postgres/pgdata/conf
+    chmod 777 -R /home/postgres/pgdata/conf
+    cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
+    chmod 777 /home/postgres/pgdata/conf/postgresql.conf
+
+{{/*    chmod 750 -R /home/postgres/pgdata*/}}
+{{/*    mkdir -p  /var/lib/postgresql/conf*/}}
+    #cp /home/postgres/conf/postgresql.conf /var/lib/postgresql/conf
+    #chmod 777 -R /var/lib/postgresql/conf
+    cp /kb-scripts/init.sql /docker-entrypoint-initdb.d
     bash /usr/local/bin/docker-entrypoint.sh postgres
     #su - postgres -c ""
-    python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user1.yaml
-    python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml
-    #python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml
-    chmod 777 /var/lib/postgresql/user1.yaml /var/lib/postgresql/user2.yaml
     sleep 10000
-    #su - postgres -c "postgres --hba_file=/home/postgres/conf/pg_hba.conf --config_file=/home/postgres/conf/postgresql.conf -D ${PGDATA}"
+    python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/tmp_patroni.yaml
+{{/*    python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml*/}}
+{{/*    #python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml*/}}
+    chmod 777 /var/lib/postgresql/tmp_patroni.yaml
+    #sleep 10000
+    su - postgres -c "patroni /var/lib/postgresql/tmp_patroni.yaml"
 {{/*    target_data_dir=/home/postgres/pgdata*/}}
 {{/*    ln -s $target_data_dir $PGDATA*/}}
 {{/*    su - postgres*/}}

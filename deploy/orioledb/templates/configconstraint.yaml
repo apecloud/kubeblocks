@@ -6,11 +6,11 @@ metadata:
   labels:
     {{- include "orioledb.labels" . | nindent 4 }}
 spec:
-{{/*  reloadOptions:*/}}
-{{/*    tplScriptTrigger:*/}}
-{{/*      sync: false*/}}
-{{/*      scriptConfigMapRef: patroni-reload-script*/}}
-{{/*      namespace: {{ .Release.Namespace }}*/}}
+  reloadOptions:
+    tplScriptTrigger:
+      sync: false
+      scriptConfigMapRef: patroni-reload-script
+      namespace: {{ .Release.Namespace }}
 
   # update patroni master
   selector:

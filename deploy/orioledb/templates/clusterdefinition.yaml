@@ -14,8 +14,32 @@ spec:
     port: "$(SVC_PORT_tcp-orioledb)"
   componentDefs:
     - name: orioledb
-      workloadType: Stateful
+      workloadType: Consensus
       characterType: postgresql
+      consensusSpec:
+        leader:
+          name: leader
+          accessMode: ReadWrite
+        followers:
+          - name: follower
+            accessMode: Readonly
+      switchoverSpec:
+        withCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_NAME)"}'
+        withoutCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)"}'
       customLabelSpecs:
         - key: apps.kubeblocks.postgres.patroni/scope
           value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
@@ -145,8 +169,10 @@ spec:
               - name: patroni
                 containerPort: 8008
             env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
+              - name: PGROOT
+                value: /home/postgres/pgdata/pgroot
               - name: PATRONI_ETCD3_HOST
-                value: "etcd-etcd:2379"
+                value: "etcd-etcd:2379" # todo : not hardcode
 {{/*              - name: DCS_ENABLE_KUBERNETES_API*/}}
 {{/*                value: "true"*/}}
 {{/*              - name: KUBERNETES_USE_CONFIGMAPS*/}}
@@ -173,10 +199,8 @@ spec:
                 value: "true"
               - name: PGROOT
                 value: /home/postgres/pgdata/pgroot
-              - name: PGCONF
-                value: /home/postgres/conf
               - name: PGDATA
-                value: /home/postgres/pgdata
+                value: /home/postgres/pgdata/pgroot/data
               - name: POD_IP
                 valueFrom:
                   fieldRef:
@@ -227,8 +251,8 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-              - name: PATRONI_POSTGRESQL_DATA_DIR
-                value: /home/postgres/pgdata
+{{/*              - name: PATRONI_POSTGRESQL_DATA_DIR*/}}
+{{/*                value: /home/postgres/pgdata/conf/pgroot/data*/}}
           - name: pgbouncer
             imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
             securityContext:

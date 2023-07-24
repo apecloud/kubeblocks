@@ -218,3 +218,8 @@ func (factory *MockClusterFactory) AddRestorePointInTime(restoreTime metav1.Time
 	factory.get().Annotations = annotations
 	return factory
 }
+
+func (factory *MockClusterFactory) SetBackup(backup *appsv1alpha1.ClusterBackup) *MockClusterFactory {
+	factory.get().Spec.Backup = backup
+	return factory
+}

@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -685,7 +686,7 @@ func (c *statefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 	buildWorkLoadAnnotations(stsObjCopy, c.Cluster)
 	stsObjCopy.Spec.Template = stsProto.Spec.Template
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
-	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+	c.updateUpdateStrategy(stsObjCopy, stsProto)
 
 	resolvePodSpecDefaultFields(stsObj.Spec.Template.Spec, &stsObjCopy.Spec.Template.Spec)
 
@@ -698,6 +699,22 @@ func (c *statefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 		return true
 	}
 	return false
+}
+
+func (c *statefulComponentBase) updateUpdateStrategy(stsObj, stsProto *appsv1.StatefulSet) {
+	var objMaxUnavailable *intstr.IntOrString
+	if stsObj.Spec.UpdateStrategy.RollingUpdate != nil {
+		objMaxUnavailable = stsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+	}
+	stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+	if objMaxUnavailable == nil && stsObj.Spec.UpdateStrategy.RollingUpdate != nil {
+		// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
+		// MaxUnavailableStatefulSet feature.
+		// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
+		// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
+		// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
+		stsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
+	}
 }
 
 func (c *statefulComponentBase) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {

@@ -1265,11 +1265,11 @@ func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.V(1).Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return err
 	}
-	for _, update := range basePolicy.BackupStatusUpdates {
+	for index, update := range basePolicy.BackupStatusUpdates {
 		if update.UpdateStage != stage {
 			continue
 		}
-		if err := r.createMetadataCollectionJob(reqCtx, backup, commonPolicy, basePolicy, pathPrefix, update); err != nil {
+		if err := r.createMetadataCollectionJob(reqCtx, backup, commonPolicy, basePolicy, pathPrefix, update, index); err != nil {
 			return err
 		}
 	}
@@ -1281,13 +1281,14 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
 	basePolicy *dataprotectionv1alpha1.BasePolicy,
 	pathPrefix string,
-	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
+	updateInfo dataprotectionv1alpha1.BackupStatusUpdate,
+	index int) error {
 	jobNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	// if specified to use the service account of target pod, the namespace should be the namespace of backup.
 	if updateInfo.UseTargetPodServiceAccount {
 		jobNamespace = backup.Namespace
 	}
-	key := types.NamespacedName{Namespace: jobNamespace, Name: generateUniqueJobName(backup, "status-"+string(updateInfo.UpdateStage))}
+	key := types.NamespacedName{Namespace: jobNamespace, Name: generateUniqueJobName(backup, fmt.Sprintf("status-%d-%s", index, string(updateInfo.UpdateStage)))}
 	job := &batchv1.Job{}
 	// check if job is created
 	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {

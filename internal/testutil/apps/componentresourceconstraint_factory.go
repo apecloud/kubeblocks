@@ -109,8 +109,8 @@ func NewComponentResourceConstraintFactory(name string) *MockComponentResourceCo
 func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraintTplType ResourceConstraintTplType) *MockComponentResourceConstraintFactory {
 	var (
 		tpl            string
-		newConstraints []appsv1alpha1.ResourceConstraint
-		constraints    = factory.get().Spec.Constraints
+		newConstraints []appsv1alpha1.ResourceConstraintRule
+		constraints    = factory.get().Spec.Rules
 	)
 	switch constraintTplType {
 	case GeneralResourceConstraint:
@@ -124,7 +124,7 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 		panic(err)
 	}
 	constraints = append(constraints, newConstraints...)
-	factory.get().Spec.Constraints = constraints
+	factory.get().Spec.Rules = constraints
 	return factory
 }
 

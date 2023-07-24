@@ -55,6 +55,7 @@ import (
 
 var _ = Describe("DataProtection", func() {
 	const policyName = "policy"
+	const repoName = "repo"
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	var out *bytes.Buffer
@@ -104,7 +105,8 @@ var _ = Describe("DataProtection", func() {
 		It("edit-backup-policy", func() {
 			By("fake client")
 			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
-			tf.FakeDynamicClient = testing.FakeDynamicClient(defaultBackupPolicy)
+			repo := testing.FakeBackupRepo(repoName, false)
+			tf.FakeDynamicClient = testing.FakeDynamicClient(defaultBackupPolicy, repo)
 
 			By("test edit backup policy function")
 			o := editBackupPolicyOptions{Factory: tf, IOStreams: streams, GVR: types.BackupPolicyGVR()}
@@ -112,9 +114,17 @@ var _ = Describe("DataProtection", func() {
 			o.values = []string{"schedule.datafile.enable=false", `schedule.datafile.cronExpression="0 17 * * *"`,
 				"schedule.logfile.enable=false", `schedule.logfile.cronExpression="* */1 * * *"`,
 				"schedule.snapshot.enable=false", `schedule.snapshot.cronExpression="0 17 * * *"`,
-				"logfile.pvc.name=test1", "logfile.pvc.storageClassName=t1",
-				"datafile.pvc.name=test1", "datafile.pvc.storageClassName=t1"}
+				"logfile.pvc.name=test1", "logfile.pvc.storageClassName=t1", "logfile.backupRepoName=repo",
+				"datafile.pvc.name=test1", "datafile.pvc.storageClassName=t1", "datafile.backupRepoName=repo"}
 			Expect(o.runEditBackupPolicy()).Should(Succeed())
+
+			By("test unset backup repo")
+			o.values = []string{"datafile.backupRepoName="}
+			Expect(o.runEditBackupPolicy()).Should(Succeed())
+
+			By("test backup repo not exists")
+			o.values = []string{"datafile.backupRepoName=repo1"}
+			Expect(o.runEditBackupPolicy()).Should(MatchError(ContainSubstring(`"repo1" not found`)))
 
 			By("test invalid key")
 			o.values = []string{"schedule.datafile.enable1=false"}

@@ -52,6 +52,11 @@ var _ = Describe("Cluster", func() {
 	)
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
+	// test if DEFAULT_STORAGE_CLASS is not set in config.yaml
+	fakeNilConfigData := map[string]string{
+		"config.yaml": `# the default storage class name.
+    #DEFAULT_STORAGE_CLASS: ""`,
+	}
 	fakeConfigData := map[string]string{
 		"config.yaml": `# the default storage class name.
     DEFAULT_STORAGE_CLASS: ""`,
@@ -108,7 +113,7 @@ var _ = Describe("Cluster", func() {
 					Components: []appsv1alpha1.ComponentResourceConstraintSelector{
 						{
 							ComponentDefRef: testing.ComponentDefName,
-							Constraints:     []string{"c1"},
+							Rules:           []string{"c1"},
 						},
 					},
 				}).
@@ -421,6 +426,9 @@ var _ = Describe("Cluster", func() {
 				have, err = validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeConfigDataWithDefaultSC), testing.FakeSecret(types.DefaultNamespace, clusterName)))
 				Expect(err).Should(Succeed())
 				Expect(have).Should(BeTrue())
+				have, err = validateDefaultSCInConfig(testing.FakeDynamicClient(testing.FakeConfigMap("kubeblocks-manager-config", types.DefaultNamespace, fakeNilConfigData), testing.FakeSecret(types.DefaultNamespace, clusterName)))
+				Expect(err).Should(Succeed())
+				Expect(have).Should(BeFalse())
 			})
 		})
 

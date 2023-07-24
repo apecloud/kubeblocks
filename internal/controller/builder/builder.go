@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -725,7 +726,7 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 	return job, nil
 }
 
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) ([]corev1.Container, error) {
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
 		toolContainer := corev1.Container{
@@ -740,12 +741,23 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		toolContainers = append(toolContainers, toolContainer)
 	}
 	for i := range toolContainers {
-		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i]); err != nil {
+		container := &toolContainers[i]
+		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, container); err != nil {
 			return nil, err
 		}
-		injectZeroResourcesLimitsIfEmpty(&toolContainers[i])
+		injectZeroResourcesLimitsIfEmpty(container)
+		if meta, ok := toolsMap[container.Name]; ok {
+			setToolsScriptsPath(container, meta)
+		}
 	}
 	return toolContainers, nil
+}
+
+func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta) {
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:  cfgcm.KBTOOLSScriptsPathEnv,
+		Value: filepath.Join(cfgcm.KBScriptVolumePath, meta.ConfigSpec.Name),
+	})
 }
 
 func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSnapshotClass, error) {

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,7 +89,7 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 			}
 		}
 	case origCluster.IsUpdating():
-		transCtx.Logger.Info("update cluster status after applying resources ")
+		transCtx.Logger.Info(fmt.Sprintf("update cluster status after applying resources, generation: %d", cluster.Generation))
 		updateObservedGeneration()
 		rootVertex.Action = ictrltypes.ActionStatusPtr()
 	case origCluster.IsStatusUpdating():

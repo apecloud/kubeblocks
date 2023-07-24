@@ -16,13 +16,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/snapshot-controller
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/snapshot-controller-1.7.2/snapshot-controller-1.7.2.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/snapshot-controller-1.7.2.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "snapshot-controller" "version" "1.7.2" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

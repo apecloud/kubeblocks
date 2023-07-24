@@ -13,6 +13,13 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-weaviate)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-weaviate)"
+  service:
+    ports:
+    - name: tcp-weaviate
+      port: 8080
+      targetPort: tcp-weaviate
+    frontendComponents:
+    - weaviate
   componentDefs:
     - name: weaviate
       workloadType: Stateful

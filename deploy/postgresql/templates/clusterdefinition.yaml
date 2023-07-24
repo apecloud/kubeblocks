@@ -12,6 +12,16 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
+  service:
+    ports:
+    - name: tcp-postgresql
+      port: 5432
+      targetPort: tcp-postgresql
+    - name: tcp-pgbouncer
+      port: 6432
+      targetPort: tcp-pgbouncer
+    frontendComponents:
+    - postgresql
   componentDefs:
     - name: postgresql
       workloadType: Replication

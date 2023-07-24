@@ -15,6 +15,13 @@ spec:
     headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_mongodb)"
     headlessHost: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN)"
     headlessPort: "$(SVC_PORT_mongodb)"
+  service:
+    ports:
+    - name: mongodb
+      protocol: TCP
+      port: 27017
+    frontendComponents:
+    - mongodb
   componentDefs:
     - name: mongodb
       characterType: mongodb

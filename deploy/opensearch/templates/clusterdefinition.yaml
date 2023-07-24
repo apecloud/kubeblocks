@@ -12,6 +12,16 @@ spec:
     endpoint: "https://$(SVC_FQDN):$(SVC_PORT_http)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_http)"
+  service:
+    ports:
+    - name: http
+      port: 9200
+      targetPort: http
+    - name: transport
+      port: 9300
+      targetPort: transport
+    frontendComponents:
+    - opensearch
   componentDefs:
     - name: opensearch
       characterType: opensearch

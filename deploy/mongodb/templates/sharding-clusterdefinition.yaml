@@ -15,6 +15,13 @@ spec:
     headlessEndpoint: "$(KB_CLUSTER_COMP_NAME)-0.$(HEADLESS_SVC_FQDN):$(SVC_PORT_tcp-monogdb)"
     headlessHost: "$(POD_NAME_PREFIX)-0.$(HEADLESS_SVC_FQDN)"
     headlessPort: "$(SVC_PORT_tcp-monogdb)"
+  service:
+    ports:
+    - name: mongos
+      port: 27017
+      targetPort: mongos
+    frontendComponents:
+    - mongos
   componentDefs:
     - name: mongos
       scriptSpecs:

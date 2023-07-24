@@ -12,6 +12,18 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tdengine)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tdengine)"
+  service:
+    ports:
+    - name: taosd
+      port: 6030
+      protocol: TCP
+      targetPort: taosd
+    - name: taos-adapter
+      port: 6041
+      protocol: TCP
+      targetPort: taos-adapter
+    frontendComponents:
+    - tdengine
   componentDefs:
     - name: tdengine
       characterType: tdengine

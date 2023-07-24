@@ -13,6 +13,16 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-qdrant)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-qdrant)"
+  service:
+    ports:
+    - name: tcp-qdrant
+      port: 6333
+      targetPort: tcp-qdrant
+    - name: grpc-qdrant
+      port: 6334
+      targetPort: grpc-qdrant
+    frontendComponents:
+    - qdrant
   componentDefs:
     - name: qdrant
       workloadType: Stateful

@@ -13,6 +13,22 @@ spec:
     port: "$(SVC_PORT_tcp-nebula)"
     accesskey: ""
     secretkey: ""
+  service:
+    ports:
+    - name: thrift
+      port: 9669
+      targetPort: thrift
+      protocol: TCP
+    - name: http
+      port: 19669
+      targetPort: http
+      protocol: TCP
+    - name: http2
+      port: 19670
+      targetPort: http2
+      protocol: TCP
+    frontendComponents:
+    - nebula-graphd
   componentDefs:
     - name: nebula-console
       workloadType: Stateless

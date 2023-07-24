@@ -17,6 +17,14 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrlr)"
     kraftClusterID: "$(UUID_STR_B64)" 
     sslCertPassword: "$(RANDOM_PASSWD)"
+  service:
+    ports:
+    - name: kafka-client
+      targetPort: kafka-client
+      port: 9092
+    frontendComponents:
+    - kafka-server
+    - kafka-broker
 
   componentDefs:
     # combined both controller(kraft) and broker. Ref: https://kafka.apache.org/documentation/#kraft_role

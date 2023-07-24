@@ -72,3 +72,11 @@ spec:
   connectionCredential:
     username: root
     password: ""
+  service:
+    ports:
+    - name: client
+      port: 2379
+      targetPort: client
+    frontendComponents:
+    - etcd
+

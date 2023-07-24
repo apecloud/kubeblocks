@@ -12,6 +12,19 @@ spec:
     httpEndpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
     pulsarEndpoint: "pulsar://$(SVC_FQDN):$(SVC_PORT_pulsar)"
     kafkaEndpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-client)"
+  service:
+    ports:
+    - name: pulsar
+      port: 6650
+      targetPort: pulsar
+    - name: http
+      port: 80
+      targetPort: http
+    - name: kafka-client
+      port: 9092
+      targetPort: kafka-client
+    frontendComponents:
+    - pulsar-broker
   componentDefs:
     - name: pulsar-broker
       workloadType: Stateful

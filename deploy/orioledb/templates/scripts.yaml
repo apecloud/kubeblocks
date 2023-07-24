@@ -52,18 +52,19 @@ data:
       restore_dir = os.environ.get('RESTORE_DATA_DIR', '')
       local_config = yaml.safe_load(
       os.environ.get('SPILO_CONFIGURATION', os.environ.get('PATRONI_CONFIGURATION', ''))) or {}
+      podip = os.environ.get('POD_IP')
       # scope
       local_config['scope'] = os.environ.get('SCOPE')
       # name
+      local_config['name'] = os.environ.get('KB_POD_NAME')
       # etcd3
       local_config['etcd3'] = {
           'host':os.environ.get('PATRONI_ETCD3_HOST')
       }
-      local_config['name'] = os.environ.get('KB_POD_NAME')
       # restapi
       local_config['restapi'] = {
-      'listen': '127.0.0.1:8008',
-      'connect_address': '127.0.0.1:8008'
+      'listen': f'{podip}:8008',
+      'connect_address': f'{podip}:8008',
     }
       # postgresql
       if not 'postgresql' in local_config:
@@ -73,22 +74,33 @@ data:
       postgresql['config_dir'] = '/home/postgres/pgdata/conf'
       postgresql['custom_conf'] = '/home/postgres/conf/postgresql.conf'
       postgresql['authentication'] = {}
-      postgresql['listen'] = '127.0.0.1:5432'
-      postgresql['connect_address'] = '127.0.0.1:5432'
+      postgresql['listen'] = '0.0.0.0:5432'
+      postgresql['connect_address'] = f'{podip}:5432'
       authentication = postgresql['authentication']
       authentication['superuser'] = {"username": os.environ.get('PGUSER_SUPERUSER'),
         'password': os.environ.get('PGPASSWORD_SUPERUSER')}
+      authentication['replication'] = {'username':os.environ.get('PGUSER_SUPERUSER'),
+        'password':os.environ.get('POSTGRES_PASSWORD')}
 
       # add pg_hba.conf
       with open('/home/postgres/conf/pg_hba.conf', 'r') as f:
         lines = read_file_lines(f)
         if lines:
           postgresql['pg_hba'] = lines
+
       if restore_dir and os.path.isfile(os.path.join(restore_dir, 'kb_restore.signal')):
         if not 'bootstrap' in local_config:
           local_config['bootstrap'] = {}
         with open('/home/postgres/conf/kb_restore.conf', 'r') as f:
           local_config['bootstrap'].update(yaml.safe_load(f))
+
+      local_config['bootstrap'] = {}
+      bootstrap = local_config['bootstrap']
+      bootstrap['dcs'] = {
+            'postgresql':{
+                'parameters':{'listen_addresses':"0.0.0.0","port":5432}
+             }
+      }
       # point in time recovery(PITR)
       data_dir = os.environ.get('PGDATA', '')
       if os.path.isfile("/home/postgres/pgdata/conf/recovery.conf"):
@@ -116,16 +128,36 @@ data:
 {{/*    mkdir -p  /var/lib/postgresql/conf*/}}
     #cp /home/postgres/conf/postgresql.conf /var/lib/postgresql/conf
     #chmod 777 -R /var/lib/postgresql/conf
-    cp /kb-scripts/init.sql /docker-entrypoint-initdb.d
-    bash /usr/local/bin/docker-entrypoint.sh postgres
     #su - postgres -c ""
-    sleep 10000
+    IFS='-' read -ra parts <<< "$KB_POD_NAME"
+    if [ ${parts[-1]} != '0' ]; then
+      MAX_RETRIES=30
+      WAIT_INTERVAL=5
+      retries=0
+      while [ $retries -lt $MAX_RETRIES ]; do
+        pg_isready -h $KB_ORIOLEDB_0_HOSTNAME
+        if [ $? -eq 0 ]; then
+          echo "PostgreSQL is ready!"
+          break
+        else
+          echo "PostgreSQL is not ready yet. Retrying in $WAIT_INTERVAL seconds..."
+          sleep $WAIT_INTERVAL
+          retries=$((retries + 1))
+        fi
+      done
+    else
+      cp /kb-scripts/init.sql /docker-entrypoint-initdb.d
+      bash /usr/local/bin/docker-entrypoint.sh postgres
+    fi
+    #sleep 10000
     python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/tmp_patroni.yaml
 {{/*    python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml*/}}
 {{/*    #python3 /kb-scripts/generate_patroni_yaml.py /var/lib/postgresql/user2.yaml*/}}
     chmod 777 /var/lib/postgresql/tmp_patroni.yaml
     #sleep 10000
     su - postgres -c "patroni /var/lib/postgresql/tmp_patroni.yaml"
+
+
 {{/*    target_data_dir=/home/postgres/pgdata*/}}
 {{/*    ln -s $target_data_dir $PGDATA*/}}
 {{/*    su - postgres*/}}

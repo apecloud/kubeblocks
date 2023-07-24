@@ -2250,7 +2250,7 @@ var _ = Describe("Cluster Controller", func() {
 				})
 			})
 
-			FIt(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
+			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
 				testUpdateKubeBlocksToolsImage(compName, compDefName)
 			})
 		}

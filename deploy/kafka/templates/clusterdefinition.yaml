@@ -24,7 +24,7 @@ spec:
       port: 9092
     frontendComponents:
     - kafka-server
-    - kafka-broker
+    - controller
 
   componentDefs:
     # combined both controller(kraft) and broker. Ref: https://kafka.apache.org/documentation/#kraft_role

@@ -147,7 +147,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		port := mainContainer.Ports[0]
 		dbPort := port.ContainerPort
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      constant.KBPrefix + "_SERVICE_PORT",
+			Name:      constant.KBEnvServicePort,
 			Value:     strconv.Itoa(int(dbPort)),
 			ValueFrom: nil,
 		})
@@ -156,14 +156,20 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_SERVICE_ROLES",
+		Name:      constant.KBEnvServiceRoles,
 		Value:     string(rolesJSON),
 		ValueFrom: nil,
 	})
 
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
+		Name:      constant.KBEnvCharacterType,
 		Value:     component.CharacterType,
+		ValueFrom: nil,
+	})
+
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      constant.KBEnvWorkloadType,
+		Value:     string(component.WorkloadType),
 		ValueFrom: nil,
 	})
 

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	// Register all components
@@ -49,6 +50,7 @@ import (
 
 	"go.uber.org/automaxprocs/maxprocs"
 
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
@@ -56,12 +58,15 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
 	log        = logger.NewLogger("dapr.runtime")
 	logContrib = logger.NewLogger("dapr.contrib")
+	logHa      = logger.NewLogger("dapr.ha")
 )
 
 func init() {
@@ -128,11 +133,16 @@ func main() {
 	}
 
 	// ha dependent on dbmanager which is initialized by rt.Run
-	// ha := highavailability.NewHa(logHa)
-	// if ha != nil {
-	// 	defer ha.ShutdownWithWait()
-	// 	go ha.Start()
-	// }
+	characterType := viper.GetString(constant.KBEnvCharacterType)
+	workload := viper.GetString(constant.KBEnvWorkloadType)
+	if strings.EqualFold(characterType, "mongodb") ||
+		(strings.EqualFold(characterType, "mysql") && strings.EqualFold(workload, Replication)) {
+		ha := highavailability.NewHa(logHa)
+		if ha != nil {
+			defer ha.ShutdownWithWait()
+			go ha.Start()
+		}
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

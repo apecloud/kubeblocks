@@ -366,11 +366,12 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	ioError := rowMap.GetString("Last_IO_Error")
 	sqlError := rowMap.GetString("Last_SQL_Error")
 	if ioError != "" || sqlError != "" {
+		mgr.Logger.Infof("slave status error, sqlError: %s, ioError: %s", sqlError, ioError)
 		return true
 	}
 
 	masterHost := rowMap.GetString("Master_Host")
-	return strings.HasPrefix(masterHost, leader)
+	return !strings.HasPrefix(masterHost, leader)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {

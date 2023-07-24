@@ -239,7 +239,7 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		return cluster.Spec.Backup != nil && boolValue(cluster.Spec.Backup.Enabled)
 	}
 
-	if backupPolicy == nil {
+	if backupPolicy == nil || cluster.Spec.Backup == nil {
 		// backup policy is nil, can not enable cluster backup, so record event and return.
 		if backupEnabled() {
 			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,

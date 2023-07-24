@@ -53,7 +53,7 @@ func newRSMComponent(cli client.Client,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
 				ComponentSet: &RSM{
-					ComponentSetBase: componentSetBase{
+					componentSetBase: componentSetBase{
 						Cli:                  cli,
 						Cluster:              cluster,
 						SynthesizedComponent: synthesizedComponent,

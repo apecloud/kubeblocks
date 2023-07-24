@@ -26,6 +26,11 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
         - name: mysql-replication-config
           templateRef: mysql8.0.33-config-template

@@ -25,6 +25,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -35,6 +37,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -145,12 +148,12 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		name      string
 		fieldPath string
 	}{
-		{name: "KB_POD_NAME", fieldPath: "metadata.name"},
-		{name: "KB_POD_UID", fieldPath: "metadata.uid"},
-		{name: "KB_NAMESPACE", fieldPath: "metadata.namespace"},
+		{name: constant.KBEnvPodName, fieldPath: "metadata.name"},
+		{name: constant.KBEnvPodUID, fieldPath: "metadata.uid"},
+		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
 		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
-		{name: "KB_NODENAME", fieldPath: "spec.nodeName"},
-		{name: "KB_HOST_IP", fieldPath: "status.hostIP"},
+		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
+		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
 		{name: "KB_POD_IP", fieldPath: "status.podIP"},
 		{name: "KB_POD_IPS", fieldPath: "status.podIPs"},
 		// TODO: need to deprecate following
@@ -201,16 +204,22 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
 			return err
 		}
-		for k, v := range udeMap {
-			if k == "" || v == "" {
+		keys := make([]string, 0)
+		for k := range udeMap {
+			if k == "" || udeMap[k] == "" {
 				continue
 			}
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
 			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
 				Name:  k,
-				Value: v,
+				Value: udeMap[k],
 			})
 		}
 	}
+
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
@@ -750,7 +759,7 @@ func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	return &pdb, nil
 }
 
-func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1.Deployment, error) {
+func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
 	deploy := appsv1.Deployment{}
 	if err := buildFromCUE(tplFile, map[string]any{
@@ -763,7 +772,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 	if component.StatelessSpec != nil {
 		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
 	}
-	if err := processContainersInjection(reqCtx, cluster, component, "", &deploy.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &deploy, nil
@@ -794,17 +803,25 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 	const tplFile = "env_config_template.cue"
 	envData := map[string]string{}
 
-	// build common env
-	commonEnv := buildWorkloadCommonEnv(cluster, component)
-	for k, v := range commonEnv {
-		envData[k] = v
+	// add component envs
+	if component.ComponentRefEnvs != nil {
+		for _, env := range component.ComponentRefEnvs {
+			envData[env.Name] = env.Value
+		}
 	}
 
-	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
-	// build consensus env from cluster.status
-	consensusEnv := buildConsensusSetEnv(cluster, component)
-	for k, v := range consensusEnv {
-		envData[k] = v
+	// build common env, but not for statelsss workload
+	if component.WorkloadType != appsv1alpha1.Stateless {
+		commonEnv := buildWorkloadCommonEnv(cluster, component)
+		for k, v := range commonEnv {
+			envData[k] = v
+		}
+		// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
+		// build consensus env from cluster.status
+		consensusEnv := buildConsensusSetEnv(cluster, component)
+		for k, v := range consensusEnv {
+			envData[k] = v
+		}
 	}
 
 	config := corev1.ConfigMap{}
@@ -891,20 +908,6 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 		return nil, err
 	}
 	return &backup, nil
-}
-
-func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
-	pvcName string,
-	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
-	snapshot := snapshotv1.VolumeSnapshot{}
-	if err := buildFromCUE("snapshot_template.cue", map[string]any{
-		"snapshot_key": snapshotKey,
-		"pvc_name":     pvcName,
-		"sts":          sts,
-	}, "snapshot", &snapshot); err != nil {
-		return nil, err
-	}
-	return &snapshot, nil
 }
 
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
@@ -1019,13 +1022,13 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	return job, nil
 }
 
-func BuildRestoreJob(name, namespace string, image string, command []string,
+func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
 	const tplFile = "restore_job_template.cue"
 	job := &batchv1.Job{}
 	fillMaps := map[string]any{
 		"job.metadata.name":              name,
-		"job.metadata.namespace":         namespace,
+		"job.metadata.namespace":         cluster.Namespace,
 		"job.spec.template.spec.volumes": volumes,
 		"container.image":                image,
 		"container.command":              command,
@@ -1039,30 +1042,16 @@ func BuildRestoreJob(name, namespace string, image string, command []string,
 	if err := buildFromCUE(tplFile, fillMaps, "job", job); err != nil {
 		return nil, err
 	}
+	containers := job.Spec.Template.Spec.Containers
+	if len(containers) > 0 {
+		if err := injectEnvs(cluster, synthesizedComponent, "", &containers[0]); err != nil {
+			return nil, err
+		}
+	}
 	return job, nil
 }
 
-func BuildRestoreJobForFullBackup(
-	restoreJobName string,
-	component *component.SynthesizedComponent,
-	backup *dataprotectionv1alpha1.Backup,
-	backupTool *dataprotectionv1alpha1.BackupTool,
-	pvcName string) (*batchv1.Job, error) {
-	const tplFile = "restore_full_backup_job.cue"
-	job := batchv1.Job{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"restoreJobName": restoreJobName,
-		"component":      component,
-		"backup":         backup,
-		"backupTool":     backupTool,
-		"pvcName":        pvcName,
-	}, "job", &job); err != nil {
-		return nil, err
-	}
-	return &job, nil
-}
-
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) ([]corev1.Container, error) {
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
 		toolContainer := corev1.Container{
@@ -1077,12 +1066,23 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		toolContainers = append(toolContainers, toolContainer)
 	}
 	for i := range toolContainers {
-		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i]); err != nil {
+		container := &toolContainers[i]
+		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, container); err != nil {
 			return nil, err
 		}
-		injectZeroResourcesLimitsIfEmpty(&toolContainers[i])
+		injectZeroResourcesLimitsIfEmpty(container)
+		if meta, ok := toolsMap[container.Name]; ok {
+			setToolsScriptsPath(container, meta)
+		}
 	}
 	return toolContainers, nil
+}
+
+func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta) {
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:  cfgcm.KBTOOLSScriptsPathEnv,
+		Value: filepath.Join(cfgcm.KBScriptVolumePath, meta.ConfigSpec.Name),
+	})
 }
 
 func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSnapshotClass, error) {
@@ -1097,4 +1097,29 @@ func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSna
 		return nil, err
 	}
 	return vsc, nil
+}
+
+func BuildServiceAccount(cluster *appsv1alpha1.Cluster) (*corev1.ServiceAccount, error) {
+	const tplFile = "rbac_template.cue"
+
+	sa := &corev1.ServiceAccount{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "serviceaccount", sa); err != nil {
+		return nil, err
+	}
+	return sa, nil
+}
+
+func BuildRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.RoleBinding, error) {
+	const tplFile = "rbac_template.cue"
+
+	rb := &rbacv1.RoleBinding{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "rolebinding", rb); err != nil {
+		return nil, err
+	}
+
+	return rb, nil
 }

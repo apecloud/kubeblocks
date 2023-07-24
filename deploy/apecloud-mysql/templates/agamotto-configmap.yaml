@@ -6,42 +6,9 @@ metadata:
       {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
   agamotto-config.yaml: |-
-    extensions:
-      memory_ballast:
-        size_mib: 32
-
-    receivers:
-      apecloudmysql:
-        endpoint: ${env:ENDPOINT}
-        username: ${env:MYSQL_USER}
-        password: ${env:MYSQL_PASSWORD}
-        allow_native_passwords: true
-        database:
-        collection_interval: 15s
-        transport: tcp
-
-    processors:
-      memory_limiter:
-        limit_mib: 128
-        spike_limit_mib: 32
-        check_interval: 10s
-
-    exporters:
-      prometheus:
-        endpoint: 0.0.0.0:{{ .Values.metrics.service.port }}
-        send_timestamps: false
-        metric_expiration: 20s
-        enable_open_metrics: false
-        resource_to_telemetry_conversion:
-          enabled: true
-
-    service:
-      telemetry:
-        logs:
-          level: info
-      pipelines:
-        metrics:
-          receivers: [ apecloudmysql ]
-          processors: [ memory_limiter ]
-          exporters: [ prometheus ]
-      extensions: [ ]
+    {{- include "agamotto.config" . | nindent 4 }}
+  agamotto-config-with-proxy.yaml: |-
+    {{- $agamottoConfig := fromYaml (include "agamotto.config" .) -}}
+    {{- $proxyMonitorConfig := fromYaml (include "proxy-monitor.config" .) -}}
+    {{- $agamottoConfigWithProxy := mergeOverwrite $agamottoConfig $proxyMonitorConfig -}}
+    {{- toYaml $agamottoConfigWithProxy | nindent 4}}

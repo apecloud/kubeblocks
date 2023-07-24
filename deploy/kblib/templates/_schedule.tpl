@@ -3,9 +3,9 @@ Define cluster affinity
 */}}
 {{- define "kblib.affinity" }}
 affinity:
-  podAntiAffinity: Preferred
-  {{- if eq .Values.extra.availabilityPolicy "zone" }}
+  podAntiAffinity: {{ .Values.extra.podAntiAffinity }}
   topologyKeys:
+  {{- if eq .Values.extra.availabilityPolicy "zone" }}
     - topology.kubernetes.io/zone
   {{- else if eq .Values.extra.availabilityPolicy "node" }}
     - kubernetes.io/hostname

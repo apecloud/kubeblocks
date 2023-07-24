@@ -52,11 +52,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
-const (
-	kbBuiltinLabelKey   = "addons.extensions.kubeblocks.io"
-	kbBuiltinLabelValue = "true"
-)
-
 var (
 	uninstallExample = templates.Examples(`
 		# uninstall KubeBlocks
@@ -349,15 +344,6 @@ func checkResources(dynamic dynamic.Interface) error {
 		}
 
 		for _, item := range objList.Items {
-			labels := item.GetLabels()
-			if labels == nil {
-				crs[gvr.Resource] = append(crs[gvr.Resource], item.GetName())
-				continue
-			}
-			// skip builtin resources managed by KubeBlocks
-			if v, ok := labels[kbBuiltinLabelKey]; ok && v == kbBuiltinLabelValue {
-				continue
-			}
 			crs[gvr.Resource] = append(crs[gvr.Resource], item.GetName())
 		}
 	}

@@ -31,7 +31,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -73,38 +72,20 @@ func (o *ListOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *ListOptions) run() error {
-	componentClasses, err := class.ListClassesByClusterDefinition(o.dynamic, o.ClusterDefRef)
+	clsMgr, err := class.GetManager(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
-	constraintClassMap := make(map[string]map[string][]*appsv1alpha1.ComponentClassInstance)
-	for compName, items := range componentClasses {
-		for _, item := range items {
-			if _, ok := constraintClassMap[item.ResourceConstraintRef]; !ok {
-				constraintClassMap[item.ResourceConstraintRef] = make(map[string][]*appsv1alpha1.ComponentClassInstance)
-			}
-			constraintClassMap[item.ResourceConstraintRef][compName] = append(constraintClassMap[item.ResourceConstraintRef][compName], item)
-		}
-	}
-	var constraintNames []string
-	for name := range constraintClassMap {
-		constraintNames = append(constraintNames, name)
-	}
-	sort.Strings(constraintNames)
-	for _, constraintName := range constraintNames {
-		for compName, classes := range constraintClassMap[constraintName] {
-			o.printClass(constraintName, compName, classes)
-		}
-		_, _ = fmt.Fprint(o.Out, "\n")
+	for compName, classes := range clsMgr.GetClasses() {
+		o.printClass(compName, classes)
 	}
 	return nil
 }
 
-func (o *ListOptions) printClass(constraintName string, compName string, classes []*appsv1alpha1.ComponentClassInstance) {
+func (o *ListOptions) printClass(compName string, classes []*class.ComponentClassWithRef) {
 	tbl := printer.NewTablePrinter(o.Out)
-	_, _ = fmt.Fprintf(o.Out, "\nConstraint %s:\n", constraintName)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY")
-	sort.Sort(class.ByClassCPUAndMemory(classes))
+	sort.Sort(class.ByClassResource(classes))
 	for _, cls := range classes {
 		tbl.AddRow(compName, cls.Name, cls.CPU.String(), normalizeMemory(cls.Memory))
 	}

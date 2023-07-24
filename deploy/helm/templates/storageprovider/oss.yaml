@@ -1,0 +1,66 @@
+apiVersion: storage.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: oss
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  csiDriverName: ru.yandex.s3.csi
+  csiDriverSecretTemplate: |
+    accessKeyID: {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secretAccessKey: {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    {{ `{{- $region := index .Parameters "region" }}` }}
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "https://oss-%s.aliyuncs.com" $region) }}` }}
+    {{ `{{- end }}` }}
+    endpoint: {{ `{{ $endpoint }}` }}
+
+  storageClassTemplate: |
+    provisioner: ru.yandex.s3.csi
+    parameters:
+      mounter: geesefs
+      # you can set mount options here, for example limit memory cache size (recommended)
+      options: {{ `{{ printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 %s --subdomain" (index .Parameters "mountOptions") }}` }}
+      bucket: {{ `{{ index .Parameters "bucket" }}` }}
+      csi.storage.k8s.io/provisioner-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/provisioner-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/controller-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/controller-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-stage-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-stage-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        region:
+          type: string
+          description: "OSS region, e.g. cn-hangzhou"
+        bucket:
+          type: string
+          description: "OSS bucket"
+        endpoint:
+          type: string
+          description: "OSS endpoint (optional)"
+        mountOptions:
+          type: string
+          description: "mount options for geesefs"
+        accessKeyId:
+          type: string
+          description: "OSS access key"
+        secretAccessKey:
+          type: string
+          description: "OSS secret key"
+
+      required:
+        - bucket
+        - region
+        - accessKeyId
+        - secretAccessKey
+
+    credentialFields:
+      - accessKeyId
+      - secretAccessKey

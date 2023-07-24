@@ -1,0 +1,49 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: llm
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: The large language model.
+  type: Helm
+
+  helm:
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/llm
+    {{- else }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/llm-0.1.0.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 0.1.0
+      {{- end }}
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+  - replicas: 1
+    {{- with .Values.tolerations }}
+    tolerations: {{ toJson . | quote }}
+    {{- end }}
+
+  installable:
+    autoInstall: false

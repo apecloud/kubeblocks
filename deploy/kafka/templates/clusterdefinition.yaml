@@ -29,7 +29,6 @@ spec:
         deployment environments.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
       probes:
       monitor:
         builtIn: false
@@ -109,7 +108,7 @@ spec:
               - name: KAFKA_CFG_METADATA_LOG_DIR
                 value: "/bitnami/kafka/metadata"
               - name: KAFKA_LOG_DIR
-                value: "/opt/bitnami/kafka/logs"
+                value: "/bitnami/kafka/data"
               - name: KAFKA_HEAP_OPTS
                 #value: "-Xmx1024m -Xms1024m"
                 value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
@@ -127,8 +126,8 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
                     optional: false
-              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode
-                value: "false"
+{{/*              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode*/}}
+{{/*                value: "false"*/}}
               - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
                 value: /tools/server-jaas.properties
             ports:
@@ -155,12 +154,10 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
-              - name: metadadata
-                mountPath: /bitnami/kafka/metadata
               - name: data
                 mountPath: /bitnami/kafka
-              - name: logs
-                mountPath: /opt/bitnami/kafka/logs
+              - name: metadata
+                mountPath: /bitnami/kafka/metadata
               - name: scripts
                 mountPath: /scripts/kafka-server-setup.sh
                 subPath: kafka-server-setup.sh
@@ -192,12 +189,11 @@ spec:
                 mountPath: /etc/jmx-kafka
 
     # controller(kraft) Ref: https://kafka.apache.org/documentation/#kraft_role
-    - name: kafka-controller
+    - name: controller
       description: |-
         Kafka controller that act as controllers (kraft) only server.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
       probes:
       monitor:
         builtIn: false
@@ -213,6 +209,7 @@ spec:
         - name: kafka-jmx-configuration-tpl
           templateRef: {{ include "kafka.name" . }}-jmx-configuration-tpl
           volumeName: jmx-config
+          namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: kafka-scripts-tpl
           templateRef: {{ include "kafka.name" . }}-scripts-tpl
@@ -261,7 +258,7 @@ spec:
               - name: KAFKA_CFG_METADATA_LOG_DIR
                 value: "/bitnami/kafka/metadata"
               - name: KAFKA_LOG_DIR
-                value: "/opt/bitnami/kafka/logs"
+                value: "/bitnami/kafka/data"
               - name: KAFKA_HEAP_OPTS
                 #value: "-Xmx1024m -Xms1024m"
                 value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
@@ -299,12 +296,8 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
-              - name: metadadata
-                mountPath: /bitnami/kafka/metadata
-              # - name: data
-              #   mountPath: /bitnami/kafka
-              - name: logs
-                mountPath: /opt/bitnami/kafka/logs
+              - name: metadata
+                mountPath: /bitnami/kafka
               - name: kafka-config
                 mountPath: /scripts/server.properties
                 subPath: server.properties
@@ -351,6 +344,7 @@ spec:
         - name: kafka-jmx-configuration-tpl
           templateRef: {{ include "kafka.name" . }}-jmx-configuration-tpl
           volumeName: jmx-config
+          namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: kafka-scripts-tpl
           templateRef: {{ include "kafka.name" . }}-scripts-tpl
@@ -410,7 +404,7 @@ spec:
               - name: KAFKA_CFG_METADATA_LOG_DIR
                 value: "/bitnami/kafka/metadata"
               - name: KAFKA_LOG_DIR
-                value: "/opt/bitnami/kafka/logs"
+                value: "/bitnami/kafka/data"
               - name: KAFKA_HEAP_OPTS
                 #value: "-Xmx1024m -Xms1024m"
                 value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
@@ -428,8 +422,8 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
                     optional: false
-              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode
-                value: "true"
+{{/*              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode*/}}
+{{/*                value: "true"*/}}
               - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
                 value: /tools/server-jaas.properties
               - name: BROKER_MIN_NODE_ID
@@ -458,8 +452,8 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /bitnami/kafka
-              - name: logs
-                mountPath: /opt/bitnami/kafka/logs
+              - name: metadata
+                mountPath: /bitnami/kafka/metadata
               - name: scripts
                 mountPath: /scripts/kafka-server-setup.sh
                 subPath: kafka-server-setup.sh

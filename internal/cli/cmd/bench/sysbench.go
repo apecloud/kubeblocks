@@ -22,16 +22,18 @@ package bench
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubebench/api/v1alpha1"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -47,74 +49,70 @@ var (
 
 var sysbenchExample = templates.Examples(`
 		# sysbench on a cluster
-		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
 
 		# sysbench on a cluster with different threads
-		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --threads 4,8
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 
 		# sysbench on a cluster with different type
-		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
 
 		# sysbench on a cluster with specified read/write ratio
-		kbcli bench sysbench mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
 
 		# sysbench on a cluster with specified tables and size
-		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
-`)
-
-var sysbenchPrepareExample = templates.Examples(`
-		# sysbench prepare data on a cluster
-		kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb
-
-		# sysbench prepare data on a cluster with specified tables and size
-		kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
-`)
-
-var sysbenchRunExample = templates.Examples(`
-		# sysbench run on a cluster
-		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb
-
-		# sysbench run on a cluster with different threads
-		kbcli bench sysbench run  mycluster --user xxx --password xxx --database mydb --threads 4,8
-
-		# sysbench run on a cluster with different type
-		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
-
-		# sysbench run on a cluster with specified read/write ratio
-		kbcli bench sysbench run  mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
-
-		# sysbench run on a cluster with specified tables and size
-		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
-`)
-
-var sysbenchCleanupExample = templates.Examples(`
-		# sysbench cleanup data on a cluster
-		kbcli bench sysbench cleanup mycluster --user xxx --password xxx --database mydb
-
-		# sysbench cleanup data on a cluster with specified tables and size
-		kbcli bench sysbench cleanup mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 `)
 
 type SysBenchOptions struct {
 	factory   cmdutil.Factory
 	client    clientset.Interface
 	dynamic   dynamic.Interface
+	name      string
 	namespace string
 
-	Mode         string   `json:"mode"`
-	Threads      []int    `json:"thread"`
-	Tables       int      `json:"tables"`
-	Size         int      `json:"size"`
-	Times        int      `json:"times"`
-	Type         []string `json:"type"`
-	ReadPercent  int      `json:"readPercent"`
-	WritePercent int      `json:"writePercent"`
-	Value        string   `json:"value"`
-	Flag         int      `json:"flag"`
+	Threads      []int // the number of threads
+	Tables       int   // the number of tables
+	Size         int   // the data size of per table
+	Duration     int
+	Type         []string
+	ExtraArgs    []string
+	ReadPercent  int
+	WritePercent int
 
 	BenchBaseOptions
 	*cluster.ClusterObjects     `json:"-"`
 	genericclioptions.IOStreams `json:"-"`
+}
+
+func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &SysBenchOptions{
+		factory:   f,
+		IOStreams: streams,
+	}
+
+	cmd := &cobra.Command{
+		Use:               "sysbench [ClusterName]",
+		Short:             "run a SysBench benchmark",
+		Example:           sysbenchExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete(args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+
+	cmd.Flags().StringSliceVar(&o.Type, "type", []string{"oltp_read_write"}, "sysbench type, you can set multiple values")
+	cmd.Flags().IntVar(&o.Size, "size", 25000, "the data size of per table")
+	cmd.Flags().IntVar(&o.Tables, "tables", 10, "the number of tables")
+	cmd.Flags().IntVar(&o.Duration, "duration", 60, "the seconds of running sysbench")
+	cmd.Flags().IntSliceVar(&o.Threads, "threads", []int{4}, "the number of threads, you can set multiple values, like 4,8")
+	cmd.Flags().IntVar(&o.ReadPercent, "read-percent", 0, "the percent of read, only useful when type is oltp_read_write_pct")
+	cmd.Flags().IntVar(&o.WritePercent, "write-percent", 0, "the percent of write, only useful when type is oltp_read_write_pct")
+	o.BenchBaseOptions.AddFlags(cmd)
+
+	return cmd
 }
 
 func (o *SysBenchOptions) Complete(args []string) error {
@@ -122,13 +120,17 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	if len(args) == 0 {
+	// use the first argument as the name of the benchmark
+	if len(args) > 0 {
+		o.name = args[0]
+	}
+	if o.name == "" {
+		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
+	}
+
+	if o.ClusterName == "" {
 		return fmt.Errorf("cluster name should be specified")
 	}
-	if len(args) > 1 {
-		return fmt.Errorf("only support to sysbench one cluster")
-	}
-	clusterName := args[0]
 
 	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -146,7 +148,7 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	clusterGetter := cluster.ObjectsGetter{
 		Client:    o.client,
 		Dynamic:   o.dynamic,
-		Name:      clusterName,
+		Name:      o.ClusterName,
 		Namespace: o.namespace,
 		GetOptions: cluster.GetOptions{
 			WithClusterDef:     true,
@@ -191,10 +193,6 @@ func (o *SysBenchOptions) Validate() error {
 		return err
 	}
 
-	if o.Mode == "" {
-		return fmt.Errorf("mode is required")
-	}
-
 	if len(o.Type) == 0 {
 		return fmt.Errorf("type is required")
 	}
@@ -203,8 +201,8 @@ func (o *SysBenchOptions) Validate() error {
 		return fmt.Errorf("tables must be greater than 0")
 	}
 
-	if o.Times <= 0 {
-		return fmt.Errorf("times must be greater than 0")
+	if o.Duration <= 0 {
+		return fmt.Errorf("duration must be greater than 0")
 	}
 
 	if o.ReadPercent < 0 || o.ReadPercent > 100 {
@@ -218,153 +216,54 @@ func (o *SysBenchOptions) Validate() error {
 }
 
 func (o *SysBenchOptions) Run() error {
-	o.Value = fmt.Sprintf("mode:%s", o.Mode)
-	o.Value = fmt.Sprintf("%s,driver:%s", o.Value, o.Driver)
-	o.Value = fmt.Sprintf("%s,host:%s", o.Value, o.Host)
-	o.Value = fmt.Sprintf("%s,user:%s", o.Value, o.User)
-	o.Value = fmt.Sprintf("%s,password:%s", o.Value, o.Password)
-	o.Value = fmt.Sprintf("%s,port:%d", o.Value, o.Port)
-	o.Value = fmt.Sprintf("%s,db:%s", o.Value, o.Database)
-	o.Value = fmt.Sprintf("%s,tables:%d", o.Value, o.Tables)
-	o.Value = fmt.Sprintf("%s,size:%d", o.Value, o.Size)
-	o.Value = fmt.Sprintf("%s,times:%d", o.Value, o.Times)
-	if len(o.Threads) > 0 {
-		threads := make([]string, 0)
-		for _, thread := range o.Threads {
-			threads = append(threads, fmt.Sprintf("%d", thread))
-		}
-		o.Value = fmt.Sprintf("%s,threads:%s", o.Value, strings.Join(threads, " "))
+	if o.ReadPercent > 0 {
+		o.ExtraArgs = append(o.ExtraArgs, fmt.Sprintf("--read-percent=%d", o.ReadPercent))
 	}
-	if len(o.Type) > 0 {
-		o.Value = fmt.Sprintf("%s,type:%s", o.Value, strings.Join(o.Type, " "))
-	}
-	if o.ReadPercent != 0 && o.WritePercent != 0 {
-		o.Value = fmt.Sprintf("%s,others:--read-percent=%d --write-percent=%d", o.Value, o.ReadPercent, o.WritePercent)
+	if o.WritePercent > 0 {
+		o.ExtraArgs = append(o.ExtraArgs, fmt.Sprintf("--write-percent=%d", o.WritePercent))
 	}
 
-	pod := &corev1.Pod{
+	sysbench := v1alpha1.Sysbench{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Sysbench",
+			APIVersion: types.SysbenchGVR().GroupVersion().String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    o.namespace,
-			GenerateName: fmt.Sprintf("test-sysbench-%s-", o.Mode),
-			Labels: map[string]string{
-				"sysbench": fmt.Sprintf("test-sysbench-%s", o.Database),
-			},
+			Name:      o.name,
+			Namespace: o.namespace,
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "test-sysbench",
-					Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/customsuites:latest",
-					Env: []corev1.EnvVar{
-						{
-							Name:  "TYPE",
-							Value: "2",
-						},
-						{
-							Name:  "FLAG",
-							Value: fmt.Sprintf("%d", o.Flag),
-						},
-						{
-							Name:  "CONFIGS",
-							Value: o.Value,
-						},
-					},
-				},
+		Spec: v1alpha1.SysbenchSpec{
+			Tables:    o.Tables,
+			Size:      o.Size,
+			Threads:   o.Threads,
+			Types:     o.Type,
+			Duration:  o.Duration,
+			ExtraArgs: o.ExtraArgs,
+			Target: v1alpha1.SysbenchTarget{
+				Driver:   o.Driver,
+				Host:     o.Host,
+				Port:     o.Port,
+				User:     o.User,
+				Password: o.Password,
+				Database: o.Database,
 			},
-			RestartPolicy: corev1.RestartPolicyNever,
 		},
 	}
 
-	pod, err := o.client.CoreV1().Pods(o.namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
+	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&sysbench)
 	if err != nil {
-		fmt.Fprintf(o.ErrOut, "failed to create pod: %v\n", err)
 		return err
 	}
-	fmt.Fprintf(o.Out, "pod/%s created\n", pod.Name)
+	obj.SetUnstructuredContent(data)
 
-	return nil
-}
-
-func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &SysBenchOptions{
-		factory:   f,
-		IOStreams: streams,
-	}
-
-	cmd := &cobra.Command{
-		Use:               "sysbench [ClusterName]",
-		Short:             "run a SysBench benchmark",
-		Example:           sysbenchExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args, all))
-		},
-	}
-
-	cmd.PersistentFlags().StringSliceVar(&o.Type, "type", []string{"oltp_read_write"}, "sysbench type, you can set multiple values")
-	cmd.PersistentFlags().IntVar(&o.Size, "size", 25000, "the data size of per table")
-	cmd.PersistentFlags().IntVar(&o.Tables, "tables", 10, "the number of tables")
-	cmd.PersistentFlags().IntVar(&o.Times, "times", 60, "the number of test times")
-	cmd.PersistentFlags().IntSliceVar(&o.Threads, "threads", []int{4}, "the number of threads, you can set multiple values, like 4,8")
-	cmd.PersistentFlags().IntVar(&o.ReadPercent, "read-percent", 0, "the percent of read, only useful when type is oltp_read_write_pct")
-	cmd.PersistentFlags().IntVar(&o.WritePercent, "write-percent", 0, "the percent of write, only useful when type is oltp_read_write_pct")
-	cmd.PersistentFlags().IntVar(&o.Flag, "flag", 0, "the flag of sysbench, 0(normal), 1(long), 2(three nodes)")
-	o.BenchBaseOptions.AddFlags(cmd)
-
-	cmd.AddCommand(newPrepareCmd(f, o), newRunCmd(f, o), newCleanCmd(f, o))
-
-	return cmd
-}
-
-func newPrepareCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:               "prepare [ClusterName]",
-		Short:             "Prepare the data of SysBench for a cluster",
-		Example:           sysbenchPrepareExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args, prepareOperation))
-		},
-	}
-	return cmd
-}
-
-func newRunCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:               "run [ClusterName]",
-		Short:             "Run  SysBench on cluster",
-		Example:           sysbenchRunExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args, runOperation))
-		},
-	}
-	return cmd
-}
-
-func newCleanCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:               "cleanup [ClusterName]",
-		Short:             "Cleanup the data of SysBench for cluster",
-		Example:           sysbenchCleanupExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args, cleanupOperation))
-		},
-	}
-	return cmd
-}
-
-func executeSysBench(o *SysBenchOptions, args []string, mode string) error {
-	o.Mode = mode
-	if err := o.Complete(args); err != nil {
+	obj, err = o.dynamic.Resource(types.SysbenchGVR()).Namespace(o.namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+	if err != nil {
 		return err
 	}
-	if err := o.Validate(); err != nil {
-		return err
-	}
-	if err := o.Run(); err != nil {
-		return err
-	}
+
+	fmt.Fprintf(o.Out, "%s %s created\n", obj.GetKind(), obj.GetName())
 	return nil
 }

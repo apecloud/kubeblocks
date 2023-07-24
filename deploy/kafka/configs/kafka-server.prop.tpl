@@ -1,4 +1,4 @@
-# broker config. generate from https://github.com/apache/kafka/blob/3.4/core/src/main/scala/kafka/server/KafkaConfig.scala#L1127
+# broker config. generate according to https://github.com/apache/kafka/blob/3.3.2/core/src/main/scala/kafka/server/KafkaConfig.scala#L1095
 
 # Default Topic Configuration
 log.segment.bytes=1073741824
@@ -74,7 +74,6 @@ request.timeout.ms=30000
 socket.connection.setup.timeout.ms=10000
 socket.connection.setup.timeout.max.ms=30000
 metadata.log.max.record.bytes.between.snapshots=20971520
-metadata.log.max.snapshot.interval.ms=3600000
 broker.heartbeat.interval.ms=2000
 broker.session.timeout.ms=9000
 sasl.mechanism.controller.protocol=GSSAPI
@@ -146,15 +145,12 @@ transaction.state.log.num.partitions=50
 transaction.state.log.segment.bytes=104857600
 transaction.abort.timed.out.transaction.cleanup.interval.ms=10000
 transaction.remove.expired.transaction.cleanup.interval.ms=3600000
-producer.id.expiration.ms=86400000
-# producer.id.expiration.check.interval.ms=600000
 max.incremental.fetch.session.cache.slots=1000
 fetch.max.bytes=57671680
 metrics.num.samples=2
 metrics.sample.window.ms=30000
 # metric.reporters=
 metrics.recording.level=INFO
-# auto.include.jmx.reporter=true ## will deprecated in Kafka4.0, use metric.reporters instead
 # kafka.metrics.reporters=
 kafka.metrics.polling.interval.secs=10
 quota.window.num=11
@@ -281,6 +277,5 @@ allow.everyone.if.no.acl.found=true
 # zookeeper.ssl.endpoint.identification.algorithm=HTTPS
 # zookeeper.ssl.crl.enable=false
 # zookeeper.ssl.ocsp.enable=false
-# zookeeper.metadata.migration.enable=false
 
 # end (DON'T REMOVE THIS LINE)

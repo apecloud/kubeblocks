@@ -22,12 +22,14 @@ package apps
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -147,7 +149,14 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
-	root.Action = ictrltypes.ActionDeletePtr()
+	// set cluster action to noop until all the sub-resources deleted
+	if len(objs) == 0 {
+		root.Action = ictrltypes.ActionDeletePtr()
+	} else {
+		root.Action = ictrltypes.ActionNoopPtr()
+		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
+		return newRequeueError(time.Second*1, "not all sub-resources deleted")
+	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
@@ -161,13 +170,15 @@ func kindsForHalt() []client.ObjectList {
 	kinds := kindsForDoNotTerminate()
 	kindsPlus := []client.ObjectList{
 		&policyv1.PodDisruptionBudgetList{},
-		&corev1.ServiceList{},
+		&corev1.ServiceAccountList{},
+		&rbacv1.RoleBindingList{},
+		&policyv1.PodDisruptionBudgetList{},
 	}
 	kindsPlus = append(kindsPlus, kinds...)
 	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
 		kindsPlus = append(kindsPlus, &workloads.ReplicatedStateMachineList{})
 	} else {
-		kindsPlus = append(kindsPlus, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})
+		kindsPlus = append(kindsPlus, &corev1.ServiceList{}, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})
 	}
 	return kindsPlus
 }

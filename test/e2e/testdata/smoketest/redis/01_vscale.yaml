@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-vscale
 spec:
-  clusterRef: mycluster-redis-cluster
+  clusterRef: redis-cluster
   type: VerticalScaling
   verticalScaling:
     - componentName: redis

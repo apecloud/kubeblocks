@@ -60,9 +60,22 @@ type SynthesizedComponent struct {
 	TLS                   bool                                   `json:"tls"`
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
 	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"volumeTypes,omitempty"`
+	VolumeProtection      *v1alpha1.VolumeProtectionSpec         `json:"volumeProtection,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	SwitchoverSpec        *v1alpha1.SwitchoverSpec               `json:"switchoverSpec,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
-	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
+	StatefulSetWorkload   v1alpha1.StatefulSetWorkload           `json:"statefulSetWorkload,omitempty"`
+	ComponentRefEnvs      []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
 }
+
+type CloudProvider string
+
+const (
+	CloudProviderAWS     CloudProvider = "aws"
+	CloudProviderGCP     CloudProvider = "gcp"
+	CloudProviderAliyun  CloudProvider = "aliyun"
+	CloudProviderAzure   CloudProvider = "azure"
+	CloudProviderTencent CloudProvider = "tencent"
+	CloudProviderUnknown CloudProvider = "unknown"
+)

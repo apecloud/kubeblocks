@@ -118,7 +118,9 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			verticalScaling := []appsv1alpha1.VerticalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					Class:        testapps.Class1c1gName,
+					ClassDefRef: &appsv1alpha1.ClassDefRef{
+						Class: testapps.Class1c1gName,
+					},
 				},
 			}
 			testVerticalScaling(verticalScaling)

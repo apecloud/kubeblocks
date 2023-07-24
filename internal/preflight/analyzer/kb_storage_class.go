@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	StorageClassPath = "cluster-resources/storage-classes.json"
+	StorageClassPath      = "cluster-resources/storage-classes.json"
+	StorageClassErrorPath = "cluster-resources/storage-classes-error.json"
 )
 
 type AnalyzeStorageClassByKb struct {
@@ -63,11 +64,17 @@ func (a *AnalyzeStorageClassByKb) Analyze(getFile GetCollectedFileContents, find
 func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2.KBStorageClassAnalyze, getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) (*analyze.AnalyzeResult, error) {
 	storageClassesData, err := getFile(StorageClassPath)
 	if err != nil {
-		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return newWarnResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
 	}
+
+	storageClassesErrorData, err := getFile(StorageClassErrorPath)
+	if err != nil && storageClassesErrorData != nil && len(storageClassesErrorData) > 0 && len(storageClassesData) == 0 {
+		return newWarnResultWithMessage(a.Title(), fmt.Sprintf("get nodes list from k8s failed, err:%v", err)), err
+	}
+
 	var storageClasses storagev1beta1.StorageClassList
 	if err = json.Unmarshal(storageClassesData, &storageClasses); err != nil {
-		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get jsonfile failed, err:%v", err)), err
+		return newWarnResultWithMessage(a.Title(), fmt.Sprintf("unmarshal jsonfile failed, err:%v", err)), err
 	}
 
 	for _, storageClass := range storageClasses.Items {

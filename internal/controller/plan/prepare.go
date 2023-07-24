@@ -33,7 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -85,7 +85,10 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	if err := buildConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
 		return cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
-	// TODO config resource objects are updated by the operator
+
+	if err := injectTemplateEnvFrom(cluster, component, podSpec, cli, ctx, renderWrapper.renderedObjs); err != nil {
+		return err
+	}
 	return createConfigObjects(cli, ctx, renderWrapper.renderedObjs)
 }
 
@@ -121,7 +124,7 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 	}
 
 	// delete not exist configmap label
-	deletedLabels := util.MapKeyDifference(existLabels, allTemplateAnnotations)
+	deletedLabels := cfgutil.MapKeyDifference(existLabels, allTemplateAnnotations)
 	for l := range deletedLabels.Iter() {
 		delete(annotations, l)
 	}
@@ -197,7 +200,7 @@ func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildPar
 	}
 	if len(scriptPath) != 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "TOOLS_PATH",
+			Name:  cfgcm.KBConfigManagerPathEnv,
 			Value: strings.Join(scriptPath, ":"),
 		})
 	}
@@ -256,7 +259,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 		if !cfgcore.NeedReloadVolume(configSpec) {
 			continue
 		}
-		sets := util.NewSet()
+		sets := cfgutil.NewSet()
 		for _, container := range config2Containers[configSpec.Name] {
 			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
 			if volume != nil && !sets.InArray(volume.Name) {

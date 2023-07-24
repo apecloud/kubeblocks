@@ -42,8 +42,8 @@ spec:
             description: ComponentResourceConstraintSpec defines the desired state
               of ComponentResourceConstraint
             properties:
-              constraints:
-                description: Component resource constraints
+              rules:
+                description: Component resource constraint rules.
                 items:
                   properties:
                     cpu:
@@ -134,11 +134,79 @@ spec:
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                       type: object
+                    name:
+                      description: The name of the constraint.
+                      type: string
+                    storage:
+                      description: The constraint for storage size.
+                      properties:
+                        max:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          default: 10Ti
+                          description: The maximum size of storage.
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        min:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          default: 20Gi
+                          description: The minimum size of storage.
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                      type: object
                   required:
                   - cpu
                   - memory
+                  - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              selector:
+                description: selector is used to bind the resource constraint to cluster
+                  definitions.
+                items:
+                  properties:
+                    clusterDefRef:
+                      description: clusterDefRef is the name of the cluster definition.
+                      type: string
+                    components:
+                      description: selector is used to bind the resource constraint
+                        to components.
+                      items:
+                        properties:
+                          componentDefRef:
+                            description: componentDefRef is the name of the component
+                              definition in the cluster definition.
+                            type: string
+                          rules:
+                            description: rules are the constraint rules that will
+                              be applied to the component.
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - componentDefRef
+                        - rules
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - componentDefRef
+                      x-kubernetes-list-type: map
+                  required:
+                  - clusterDefRef
+                  - components
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - clusterDefRef
+                x-kubernetes-list-type: map
+            required:
+            - rules
             type: object
         type: object
     served: true

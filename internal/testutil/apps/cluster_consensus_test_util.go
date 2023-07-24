@@ -26,6 +26,7 @@ import (
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -127,7 +128,28 @@ func MockConsensusComponentStsPod(
 		AddRoleLabel(podRole).
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
-		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
+		AddContainer(corev1.Container{
+			Name:  DefaultMySQLContainerName,
+			Image: ApeCloudMySQLImage,
+			LivenessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/hello",
+						Port: intstr.FromInt(1024),
+					},
+				},
+				TimeoutSeconds:   1,
+				PeriodSeconds:    1,
+				FailureThreshold: 1,
+			},
+			StartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(1024),
+					},
+				},
+			},
+		}).
 		CheckedCreate(testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{

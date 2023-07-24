@@ -25,20 +25,23 @@ import (
 )
 
 var _ = Describe("Engine", func() {
-	It("new mysql engine", func() {
-		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis} {
+	It("new engine", func() {
+		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis, statePostgreSQL, stateNebula} {
 			engine, _ := New(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			url := engine.ConnectCommand(nil)
 			Expect(len(url)).Should(Equal(3))
-
-			url = engine.ConnectCommand(nil)
-			Expect(len(url)).Should(Equal(3))
 			// it is a tricky way to check the container name
 			// for the moment, we only support mysql, postgresql and redis
 			// and the container name is the same as the state name
-			Expect(engine.Container()).Should(Equal(typeName))
+			if typeName == stateMysql {
+				// for wesql vtgate component we wuold use the first container, but its name is not mysql
+				Expect(engine.Container()).Should(Equal(""))
+			} else {
+				Expect(engine.Container()).Should(ContainSubstring(typeName))
+			}
+
 		}
 	})
 
@@ -47,5 +50,22 @@ var _ = Describe("Engine", func() {
 		engine, err := New(typeName)
 		Expect(engine).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
+	})
+
+	It("new execute command ", func() {
+		for _, typeName := range []string{stateMysql, statePostgreSQL} {
+			engine, _ := New(typeName)
+			Expect(engine).ShouldNot(BeNil())
+
+			_, _, err := engine.ExecuteCommand([]string{"some", "cmd"})
+			Expect(err).Should(Succeed())
+		}
+		for _, typeName := range []string{stateRedis, stateMongoDB, stateNebula} {
+			engine, _ := New(typeName)
+			Expect(engine).ShouldNot(BeNil())
+
+			_, _, err := engine.ExecuteCommand([]string{"some", "cmd"})
+			Expect(err).Should(HaveOccurred())
+		}
 	})
 })

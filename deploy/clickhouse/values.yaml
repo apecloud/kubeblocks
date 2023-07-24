@@ -42,3 +42,5 @@ zookeeper:
   ##   ...
   ##
   configuration: ""
+
+clusterDomain: ".cluster.local"

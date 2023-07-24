@@ -272,3 +272,53 @@ func TestSetParametersUpdateSource(t *testing.T) {
 	SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
 	require.False(t, IsNotUserReconfigureOperation(cm))
 }
+
+func TestValidateConfigPatch(t *testing.T) {
+	type args struct {
+		patch     *ConfigPatchInfo
+		formatCfg *appsv1alpha1.FormatterConfig
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{{
+		name: "test",
+		args: args{
+			patch:     &ConfigPatchInfo{},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+		},
+		wantErr: false,
+	}, {
+		name: "test",
+		args: args{
+			patch: &ConfigPatchInfo{
+				IsModify: true,
+				UpdateConfig: map[string][]byte{
+					"file1": []byte(`{"a":"b"}`),
+				},
+			},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+		},
+		wantErr: false,
+	}, {
+		name: "test-failed",
+		args: args{
+			patch: &ConfigPatchInfo{
+				IsModify: true,
+				UpdateConfig: map[string][]byte{
+					"file1": []byte(`{"a":null}`),
+				},
+			},
+			formatCfg: &appsv1alpha1.FormatterConfig{Format: appsv1alpha1.YAML},
+		},
+		wantErr: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateConfigPatch(tt.args.patch, tt.args.formatCfg); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

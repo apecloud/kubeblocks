@@ -25,6 +25,7 @@ type BackupPolicyTemplateSpec struct {
 	// clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// backupPolicies is a list of backup policy template for the specified componentDefinition.
@@ -46,10 +47,11 @@ type BackupPolicyTemplateSpec struct {
 }
 
 type BackupPolicy struct {
-	// componentDefRef references componentDef defined in ClusterDefinition spec.
+	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
 	// retention describe how long the Backup should be retained. if not set, will be retained forever.
@@ -82,6 +84,13 @@ type RetentionSpec struct {
 }
 
 type Schedule struct {
+	// retryWindowMinutes defines the time window for starting the job if it misses scheduled
+	// time for any reason. the unit of time is minute.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1440
+	RetryWindowMinutes *int64 `json:"retryWindowMinutes,omitempty"`
+
 	// schedule policy for snapshot backup.
 	// +optional
 	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`
@@ -118,6 +127,7 @@ type CommonBackupPolicy struct {
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupToolName string `json:"backupToolName,omitempty"`
 }

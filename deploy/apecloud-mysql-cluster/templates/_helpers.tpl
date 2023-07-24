@@ -1,49 +1,58 @@
 {{/*
 Define the cluster componnets with proxy.
-The proxy cpu cores is 1/6 of the cluster total cpu cores.
+The proxy cpu cores is 1/6 of the cluster total cpu cores and is multiple of 0.5.
+The minimum proxy cpu cores is 0.5 and the maximum cpu cores is 64.
 */}}
 {{- define "apecloud-mysql-cluster.proxyComponents" }}
-{{- $proxyCPU := (int (ceil (div (mul .Values.replicas .Values.cpu) 6))) }}
-{{- if lt $proxyCPU 2 }}
-{{- $proxyCPU = 2 }}
-{{- end }}
-{{- if gt $proxyCPU 64 }}
+{{- $replicas := (include "apecloud-mysql-cluster.replicas" .) }}
+{{- $proxyCPU := divf (mulf $replicas .Values.cpu) 6.0 }}
+{{- $proxyCPU = divf $proxyCPU 0.5 | ceil | mulf 0.5 }}
+{{- if lt $proxyCPU 0.5 }}
+{{- $proxyCPU = 0.5 }}
+{{- else if gt $proxyCPU 64.0 }}
 {{- $proxyCPU = 64 }}
 {{- end }}
-{{- if eq (mod $proxyCPU 2) 1 }}
-{{- $proxyCPU = add $proxyCPU 1 }}
-{{- end }}
-- name: etcd
-  componentDefRef: etcd # ref clusterdefinition componentDefs.name
+- name: vtcontroller
+  componentDefRef: vtcontroller # ref clusterdefinition componentDefs.name
+  enabledLogs:
+    - log
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
   replicas: 1
-- name: vtctld
-  componentDefRef: vtctld # ref clusterdefinition componentDefs.name
-  replicas: 1
-- name: vtconsensus
-  componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
-  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
 - name: vtgate
   componentDefRef: vtgate # ref clusterdefinition componentDefs.name
   replicas: 1
+  enabledLogs:
+    - error
+    - warning
+    - info
+    - queryLog
   resources:
     requests:
-      cpu: {{ $proxyCPU }}
+      cpu: {{ $proxyCPU | quote }}
     limits:
-      cpu: {{ $proxyCPU }}
+      cpu: {{ $proxyCPU | quote }}
 {{- end }}
 
 {{/*
-Define replica count.
+Define replicas.
 standalone mode: 1
-replication mode: 2
-raftGroup mode: 3 or more
+raftGroup mode: max(replicas, 3)
 */}}
-{{- define "apecloud-mysql-cluster.replicaCount" -}}
+{{- define "apecloud-mysql-cluster.replicas" }}
 {{- if eq .Values.mode "standalone" }}
-replicas: 1
-{{- else if eq .Values.mode "replication" }}
-replicas: {{ max .Values.replicas 2 }}
-{{- else }}
-replicas: {{ max .Values.replicas 3 }}
+{{- 1 }}
+{{- else if eq .Values.mode "raftGroup" }}
+{{- max .Values.replicas 3 }}
 {{- end }}
 {{- end -}}

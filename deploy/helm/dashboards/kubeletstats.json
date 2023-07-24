@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 14282,
   "graphTooltip": 0,
-  "id": 23,
+  "id": 13,
   "links": [
     {
       "asDropdown": false,
@@ -2269,7 +2269,7 @@
             "x": 0,
             "y": 3
           },
-          "id": 51,
+          "id": 76,
           "options": {
             "legend": {
               "calcs": [
@@ -2366,7 +2366,7 @@
             "x": 8,
             "y": 3
           },
-          "id": 52,
+          "id": 77,
           "options": {
             "legend": {
               "calcs": [
@@ -2463,7 +2463,7 @@
             "x": 16,
             "y": 3
           },
-          "id": 53,
+          "id": 78,
           "options": {
             "legend": {
               "calcs": [
@@ -2564,7 +2564,7 @@
             "x": 0,
             "y": 9
           },
-          "id": 75,
+          "id": 79,
           "options": {
             "legend": {
               "calcs": [
@@ -2665,7 +2665,7 @@
             "x": 8,
             "y": 9
           },
-          "id": 57,
+          "id": 80,
           "options": {
             "legend": {
               "calcs": [
@@ -2766,7 +2766,7 @@
             "x": 16,
             "y": 9
           },
-          "id": 73,
+          "id": 81,
           "options": {
             "legend": {
               "calcs": [
@@ -2867,7 +2867,7 @@
             "x": 0,
             "y": 15
           },
-          "id": 59,
+          "id": 82,
           "options": {
             "legend": {
               "calcs": [
@@ -2968,7 +2968,7 @@
             "x": 8,
             "y": 15
           },
-          "id": 58,
+          "id": 83,
           "options": {
             "legend": {
               "calcs": [
@@ -3069,7 +3069,7 @@
             "x": 16,
             "y": 15
           },
-          "id": 60,
+          "id": 84,
           "options": {
             "legend": {
               "calcs": [
@@ -3170,7 +3170,7 @@
             "x": 0,
             "y": 21
           },
-          "id": 61,
+          "id": 85,
           "options": {
             "legend": {
               "calcs": [
@@ -3271,7 +3271,7 @@
             "x": 8,
             "y": 21
           },
-          "id": 54,
+          "id": 86,
           "options": {
             "legend": {
               "calcs": [
@@ -3372,7 +3372,7 @@
             "x": 16,
             "y": 21
           },
-          "id": 55,
+          "id": 87,
           "options": {
             "legend": {
               "calcs": [
@@ -3473,7 +3473,7 @@
             "x": 0,
             "y": 27
           },
-          "id": 56,
+          "id": 88,
           "options": {
             "legend": {
               "calcs": [
@@ -3582,12 +3582,8 @@
         "allValue": ".+",
         "current": {
           "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "pg12",
+          "value": "pg12"
         },
         "datasource": {
           "type": "prometheus",
@@ -3595,9 +3591,9 @@
         },
         "definition": "label_values({__name__=\"k8s_pod_cpu_time_seconds_total\", node=~\"$node\", job=\"$job\"}, app_kubernetes_io_instance)",
         "hide": 0,
-        "includeAll": true,
+        "includeAll": false,
         "label": "cluster",
-        "multi": true,
+        "multi": false,
         "name": "cluster",
         "options": [],
         "query": {

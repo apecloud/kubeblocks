@@ -1,0 +1,17 @@
+CHART NAME: {{ .Chart.Name  }}
+CHART VERSION: {{ .Chart.Version  }}
+APP VERSION: {{ .Chart.AppVersion  }}
+
+** Please be patient while the chart is being deployed **
+
+Connection Credentials:
+    
+    echo "Username       : $(kubectl get secret --namespace {{ .Release.Namespace }} {{ include "kblib.clusterName" . }}-conn-credential -o jsonpath="{.data.username}" | base64 -d)"
+    echo "Password       : $(kubectl get secret --namespace {{ .Release.Namespace }} {{ include "kblib.clusterName" . }}-conn-credential -o jsonpath="{.data.password}" | base64 -d)"
+    echo "Pulsar Endpoint: $(kubectl get secret --namespace {{ .Release.Namespace }} {{ include "kblib.clusterName" . }}-conn-credential -o jsonpath="{.data.pulsarEndpoint}" | base64 -d)"
+    echo "HTTP Endpoint  : $(kubectl get secret --namespace {{ .Release.Namespace }} {{ include "kblib.clusterName" . }}-conn-credential -o jsonpath="{.data.httpEndpoint}" | base64 -d)"
+    echo "Kafka Endpoint : $(kubectl get secret --namespace {{ .Release.Namespace }} {{ include "kblib.clusterName" . }}-conn-credential -o jsonpath="{.data.kafkaEndpoint}" | base64 -d)"
+
+Reference Pulsar Quick Start Guides: https://pulsar.apache.org/docs/2.11.x/
+
+Reference Kafka Quick Start Guides: https://kafka.apache.org/documentation/#quickstart

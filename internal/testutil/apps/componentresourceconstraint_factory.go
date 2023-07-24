@@ -31,36 +31,61 @@ type ResourceConstraintTplType string
 const (
 	GeneralResourceConstraint         ResourceConstraintTplType = "general"
 	MemoryOptimizedResourceConstraint ResourceConstraintTplType = "memory-optimized"
+	ProductionResourceConstraint      ResourceConstraintTplType = "production"
 
 	generalResourceConstraintTemplate = `
-- cpu:
+- name: c1
+  cpu:
     min: 0.5
     max: 2
     step: 0.5
   memory:
     sizePerCPU: 1Gi
-- cpu:
+- name: c2
+  cpu:
     min: 2
     max: 2
   memory:
     sizePerCPU: 2Gi
-- cpu:
-    slots: [2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
+- name: c3
+  cpu:
+    slots: [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
   memory:
     sizePerCPU: 4Gi
+- name: c4
+  cpu:
+    slots: [100, 500]
+  memory:
+    sizePerCPU: 2Gi
 `
 
 	memoryResourceConstraintTemplate = `
-- cpu:
+- name: c1
+  cpu:
     slots: [2, 4, 8, 12, 24, 48]
   memory:
     sizePerCPU: 8Gi
-- cpu:
+- name: c2
+  cpu:
     min: 2
     max: 128
     step: 2
   memory:
     sizePerCPU: 16Gi
+`
+
+	productionResourceConstraintTemplate = `
+- name: c1
+  cpu:
+    min: "0.5"
+    max: 64
+    step: "0.5"
+  memory:
+    minPerCPU: 1Gi
+    maxPerCPU: 32Gi
+  storage:
+    min: 1Gi
+    max: 10Ti
 `
 )
 
@@ -84,19 +109,26 @@ func NewComponentResourceConstraintFactory(name string) *MockComponentResourceCo
 func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraintTplType ResourceConstraintTplType) *MockComponentResourceConstraintFactory {
 	var (
 		tpl            string
-		newConstraints []appsv1alpha1.ResourceConstraint
-		constraints    = factory.get().Spec.Constraints
+		newConstraints []appsv1alpha1.ResourceConstraintRule
+		constraints    = factory.get().Spec.Rules
 	)
 	switch constraintTplType {
 	case GeneralResourceConstraint:
 		tpl = generalResourceConstraintTemplate
 	case MemoryOptimizedResourceConstraint:
 		tpl = memoryResourceConstraintTemplate
+	case ProductionResourceConstraint:
+		tpl = productionResourceConstraintTemplate
 	}
 	if err := yaml.Unmarshal([]byte(tpl), &newConstraints); err != nil {
 		panic(err)
 	}
 	constraints = append(constraints, newConstraints...)
-	factory.get().Spec.Constraints = constraints
+	factory.get().Spec.Rules = constraints
+	return factory
+}
+
+func (factory *MockComponentResourceConstraintFactory) AddSelector(selector appsv1alpha1.ClusterResourceConstraintSelector) *MockComponentResourceConstraintFactory {
+	factory.get().Spec.Selector = append(factory.get().Spec.Selector, selector)
 	return factory
 }

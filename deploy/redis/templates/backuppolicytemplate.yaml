@@ -12,7 +12,11 @@ spec:
     retention:
       ttl: 7d
     schedule:
+      retryWindowMinutes: 120
       snapshot:
+        enable: false
+        cronExpression: "0 18 * * 0"
+      datafile:
         enable: false
         cronExpression: "0 18 * * 0"
     snapshot:
@@ -20,3 +24,8 @@ spec:
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
+    datafile:
+      backupToolName: redis-physical-backup-tool
+      backupsHistoryLimit: 7
+      target:
+        role: secondary

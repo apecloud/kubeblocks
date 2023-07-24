@@ -140,7 +140,6 @@ type UnixSignalTrigger struct {
 
 	// processName is process name, sends unix signal to proc.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ProcessName string `json:"processName"`
 }
 
@@ -163,10 +162,10 @@ type ToolsImageSpec struct {
 }
 
 type ToolConfig struct {
-	// Specify the name of initContainer.
+	// Specify the name of initContainer. Must be a DNS_LABEL name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name,omitempty"`
 
 	// tools Container image name.
@@ -208,6 +207,7 @@ type ScriptConfig struct {
 	// An empty namespace is equivalent to the "default" namespace.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:default="default"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
@@ -216,6 +216,10 @@ type ShellTrigger struct {
 	// command used to execute for reload.
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
+
+	// Specify synchronize updates parameters to the config manager.
+	// +optional
+	Sync *bool `json:"sync,omitempty"`
 }
 
 type TPLScriptTrigger struct {
@@ -243,6 +247,7 @@ type FormatterConfig struct {
 	// dotenv: this was a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
 	// properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
 	// toml: reference wiki: https://en.wikipedia.org/wiki/TOML
+	// props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)
 	// +kubebuilder:validation:Required
 	Format CfgFileFormat `json:"format"`
 }

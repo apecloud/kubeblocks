@@ -41,6 +41,16 @@ const (
 	BackupTypeSnapshot BackupType = "snapshot"
 )
 
+// BackupMethod the backup method
+// +enum
+// +kubebuilder:validation:Enum={snapshot,backupTool}
+type BackupMethod string
+
+const (
+	BackupMethodSnapshot   BackupMethod = "snapshot"
+	BackupMethodBackupTool BackupMethod = "backupTool"
+)
+
 // BaseBackupType the base backup type.
 // +enum
 // +kubebuilder:validation:Enum={full,snapshot}
@@ -97,4 +107,16 @@ type PodRestoreScope string
 const (
 	PodRestoreScopeAll       = "All"
 	PodRestoreScopeReadWrite = "ReadWrite"
+)
+
+// BackupRepoPhase defines phases for BackupRepo CR.
+// +enum
+// +kubebuilder:validation:Enum={PreChecking,Failed,Ready,Deleting}
+type BackupRepoPhase string
+
+const (
+	BackupRepoPreChecking BackupRepoPhase = "PreChecking"
+	BackupRepoFailed      BackupRepoPhase = "Failed"
+	BackupRepoReady       BackupRepoPhase = "Ready"
+	BackupRepoDeleting    BackupRepoPhase = "Deleting"
 )

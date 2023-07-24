@@ -57,21 +57,21 @@ func TestOperations(t *testing.T) {
 	}
 	metadata.Properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
 	_ = pgOps.Init(metadata)
-	assert.Equal(t, "postgres", pgOps.DBType)
-	assert.NotNil(t, pgOps.InitIfNeed)
+	assert.Equal(t, "postgresql", pgOps.DBType)
 	assert.NotNil(t, pgOps.GetRole)
 	assert.Equal(t, 5432, pgOps.DBPort)
-	assert.NotNil(t, pgOps.OperationMap[GetRoleOperation])
-	assert.NotNil(t, pgOps.OperationMap[ExecOperation])
-	assert.NotNil(t, pgOps.OperationMap[QueryOperation])
-	assert.NotNil(t, pgOps.OperationMap[CheckStatusOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[GetRoleOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[ExecOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[QueryOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[CheckStatusOperation])
+	assert.NotNil(t, pgOps.LegacyOperations[SwitchoverOperation])
 
-	assert.NotNil(t, pgOps.OperationMap[ListUsersOp])
-	assert.NotNil(t, pgOps.OperationMap[CreateUserOp])
-	assert.NotNil(t, pgOps.OperationMap[DeleteUserOp])
-	assert.NotNil(t, pgOps.OperationMap[DescribeUserOp])
-	assert.NotNil(t, pgOps.OperationMap[GrantUserRoleOp])
-	assert.NotNil(t, pgOps.OperationMap[RevokeUserRoleOp])
+	assert.NotNil(t, pgOps.LegacyOperations[ListUsersOp])
+	assert.NotNil(t, pgOps.LegacyOperations[CreateUserOp])
+	assert.NotNil(t, pgOps.LegacyOperations[DeleteUserOp])
+	assert.NotNil(t, pgOps.LegacyOperations[DescribeUserOp])
+	assert.NotNil(t, pgOps.LegacyOperations[GrantUserRoleOp])
+	assert.NotNil(t, pgOps.LegacyOperations[RevokeUserRoleOp])
 
 }
 
@@ -95,7 +95,6 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
-	_ = b.InitDelay()
 	assert.False(t, b.InitIfNeed())
 
 	// create table
@@ -214,7 +213,6 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
-	_ = b.InitDelay()
 	assert.False(t, b.InitIfNeed())
 
 	ctx := context.TODO()

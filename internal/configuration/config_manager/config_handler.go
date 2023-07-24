@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configmanager
@@ -171,7 +174,14 @@ type shellCommandHandler struct {
 	filter     regexFilter
 }
 
-func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
+func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
+	logger.V(1).Info(fmt.Sprintf("online update[%v]", updatedParams))
+	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
+	args := make([]string, len(s.arg))
+	return s.execHandler(ctx, updatedParams, args)
+}
+
+func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args []string) error {
 	commonHandle := func(args []string) error {
 		command := exec.CommandContext(ctx, s.command, args...)
 		stdout, err := cfgutil.ExecShellCommand(command)
@@ -183,6 +193,21 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 		copy(args, baseCMD)
 		args = append(args, paramName, paramValue)
 		return commonHandle(args)
+	}
+	for key, value := range updatedParams {
+		if err := volumeHandle(args, key, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
+	commonHandle := func(args []string) error {
+		command := exec.CommandContext(ctx, s.command, args...)
+		stdout, err := cfgutil.ExecShellCommand(command)
+		logger.Info(fmt.Sprintf("exec: [%s], stdout: [%s], stderr:%v", command.String(), stdout, err))
+		return err
 	}
 
 	if mountPoint, ok := s.downwardAPIVolume(event); ok {
@@ -207,12 +232,9 @@ func (s *shellCommandHandler) VolumeHandle(ctx context.Context, event fsnotify.E
 	}
 
 	logger.Info(fmt.Sprintf("updated parameters: %v", updatedParams))
-	for key, value := range updatedParams {
-		if err := volumeHandle(args, key, value); err != nil {
-			return err
-		}
+	if err := s.execHandler(ctx, updatedParams, args); err != nil {
+		return err
 	}
-
 	if len(files) != 0 {
 		return backupLastConfigFiles(files, s.backupPath)
 	}
@@ -270,7 +292,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 	if len(command) == 0 {
 		return nil, cfgcore.MakeError("invalid command: %s", command)
 	}
-	filter, err := createFileRegex(fromConfigSpecMeta(configMeta))
+	filter, err := createFileRegex(fromConfigSpecInfo(configMeta))
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +323,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 	return shellTrigger, nil
 }
 
-func fromConfigSpecMeta(meta *ConfigSpecInfo) string {
+func fromConfigSpecInfo(meta *ConfigSpecInfo) string {
 	if meta == nil || len(meta.ConfigSpec.Keys) == 0 {
 		return ""
 	}

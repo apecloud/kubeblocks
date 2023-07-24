@@ -21,7 +21,7 @@
     {{- $replicas := $compIter.replicas | int }}
     {{- range $i, $_e := until $replicas }}
         <replica>
-            <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc</host>
+            <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc.{{- $.clusterDomain }}</host>
             <port>9000</port>
         </replica>
     {{- end }}
@@ -38,7 +38,7 @@
     {{- $replicas := $compIter.replicas | int }}
     {{- range $i, $_e := until $replicas }}
     <node>
-      <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc</host>
+      <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc.{{- $.clusterDomain }}</host>
       <port>2181</port>
     </node>
     {{- end }}

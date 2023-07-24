@@ -25,6 +25,7 @@ import (
 type ClusterVersionSpec struct {
 	// ref ClusterDefinition.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefinitionRef string `json:"clusterDefinitionRef"`
 

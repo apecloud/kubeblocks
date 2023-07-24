@@ -17,23 +17,33 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // ClusterSpec defines the desired state of Cluster.
 type ClusterSpec struct {
 	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referencing ClusterVersion name.
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
@@ -55,6 +65,16 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// tenancy describes how pods are distributed across node.
+	// SharedNode means multiple pods may share the same node.
+	// DedicatedNode means each pod runs on their own dedicated node.
+	// +optional
+	Tenancy TenancyType `json:"tenancy,omitempty"`
+
+	// availabilityPolicy describes the availability policy, including zone, node, and none.
+	// +optional
+	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
+
 	// affinity is a group of affinity scheduling rules.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
@@ -63,6 +83,96 @@ type ClusterSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// replicas specifies the replicas of the first componentSpec, if the replicas of the first componentSpec is specified, this value will be ignored.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// resources specifies the resources of the first componentSpec, if the resources of the first componentSpec is specified, this value will be ignored.
+	// +optional
+	Resources ClusterResources `json:"resources,omitempty"`
+
+	// storage specifies the storage of the first componentSpec, if the storage of the first componentSpec is specified, this value will be ignored.
+	// +optional
+	Storage ClusterStorage `json:"storage,omitempty"`
+
+	// mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.
+	// +optional
+	Mode ClusterMode `json:"mode,omitempty"`
+
+	// customized parameters that is used in different clusterdefinition
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+
+	// monitor specifies the configuration of monitor
+	// +optional
+	Monitor ClusterMonitor `json:"monitor,omitempty"`
+
+	// network specifies the configuration of network
+	// +optional
+	Network *ClusterNetwork `json:"network,omitempty"`
+
+	// cluster backup configuration.
+	// +optional
+	Backup *ClusterBackup `json:"backup,omitempty"`
+}
+
+type ClusterBackup struct {
+	// enabled defines whether to enable automated backup.
+	// +kubebuilder:default=false
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// retentionPeriod is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
+	// the Backup should be retained. if not set, will be retained forever.
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
+	// +kubebuilder:default="1d"
+	// +optional
+	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
+
+	// backup method, support: snapshot, backupTool.
+	// +kubebuilder:validation:Enum=snapshot;backupTool
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=snapshot
+	Method dataprotectionv1alpha1.BackupMethod `json:"method"`
+
+	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+	// +optional
+	CronExpression string `json:"cronExpression,omitempty"`
+
+	// retryWindowMinutes defines the time window for retrying the job if it misses scheduled
+	// time for any reason. the unit of time is minute.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1440
+	RetryWindowMinutes *int64 `json:"retryWindowMinutes,omitempty"`
+
+	// repoName is the name of the backupRepo, if not set, will use the default backupRepo.
+	// +optional
+	RepoName string `json:"repoName,omitempty"`
+
+	// pitrEnabled defines whether to enable point-in-time recovery.
+	// +kubebuilder:default=false
+	// +optional
+	PITREnabled *bool `json:"pitrEnabled,omitempty"`
+}
+
+type ClusterResources struct {
+
+	// cpu resource needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	CPU resource.Quantity `json:"cpu,omitempty"`
+
+	// memory resource needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Memory resource.Quantity `json:"memory,omitempty"`
+}
+
+type ClusterStorage struct {
+
+	// storage size needed, more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Size resource.Quantity `json:"size,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster.
@@ -102,16 +212,18 @@ type ClusterStatus struct {
 
 // ClusterComponentSpec defines the cluster component spec.
 type ClusterComponentSpec struct {
-	// name defines cluster's component name.
+	// name defines cluster's component name, this name is also part of Service DNS name, so this name will
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=15
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// componentDefRef references the componentDef defined in ClusterDefinition spec.
+	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
@@ -345,19 +457,23 @@ type PersistentVolumeClaimSpec struct {
 }
 
 // ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
-func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
+func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes:      r.AccessModes,
 		Resources:        r.Resources,
-		StorageClassName: r.StorageClassName,
+		StorageClassName: r.GetStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
 	}
 }
 
 // GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
 // it returns preferSC argument.
-func (r PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
+func (r *PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
+	}
+
+	if preferSC == "" {
+		return nil
 	}
 	return &preferSC
 }
@@ -461,12 +577,35 @@ type ClusterComponentService struct {
 
 type ClassDefRef struct {
 	// Name refers to the name of the ComponentClassDefinition.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 
 	// Class refers to the name of the class that is defined in the ComponentClassDefinition.
 	// +kubebuilder:validation:Required
 	Class string `json:"class"`
+}
+
+type ClusterMonitor struct {
+
+	// monitoringInterval specifies interval of monitoring, no monitor if set to 0
+	// +kubebuilder:validation:XIntOrString
+	// +optional
+	MonitoringInterval *intstr.IntOrString `json:"monitoringInterval,omitempty"`
+}
+
+type ClusterNetwork struct {
+
+	// hostNetworkAccessible specifies whether host network is accessible. It defaults to false
+	// +kubebuilder:default=false
+	// +optional
+	HostNetworkAccessible bool `json:"hostNetworkAccessible,omitempty"`
+
+	// publiclyAccessible specifies whether it is publicly accessible. It defaults to false
+	// +kubebuilder:default=false
+	// +optional
+	PubliclyAccessible bool `json:"publiclyAccessible,omitempty"`
 }
 
 // +genclient
@@ -722,4 +861,19 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 // ComponentPodsAreReady checks if the pods of component are ready.
 func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
+}
+
+// GetComponentDefByCluster gets component from ClusterDefinition with compDefName
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster Cluster,
+	compDefName string) (*ClusterComponentDefinition, error) {
+	clusterDef := &ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+	for _, component := range clusterDef.Spec.ComponentDefs {
+		if component.Name == compDefName {
+			return &component, nil
+		}
+	}
+	return nil, ErrNotMatchingCompDef
 }

@@ -117,9 +117,10 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; ok {
 		// opsRequest annotation value in cluster to map
 		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
-			return nil
+			return err
 		}
 	}
+
 	opsNamesInQueue := make([]string, len(opsRecorder))
 	for i, v := range opsRecorder {
 		// judge whether the opsRequest meets the following conditions:
@@ -134,7 +135,10 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
 	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
 		!slices.Contains(opsNamesInQueue, r.Name) {
-		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+		// if TTLSecondsBeforeAbort is not set or 0, return error
+		if r.Spec.TTLSecondsBeforeAbort == nil || *r.Spec.TTLSecondsBeforeAbort == 0 {
+			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+		}
 	}
 	return nil
 }
@@ -199,6 +203,8 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		return r.validateReconfigure(cluster)
 	case SwitchoverType:
 		return r.validateSwitchover(ctx, k8sClient, cluster)
+	case DataScriptType:
+		return r.validateDataScript(ctx, k8sClient, cluster)
 	}
 	return nil
 }
@@ -504,6 +510,48 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	return pvc.Spec.StorageClassName, nil
 }
 
+// validateDataScript validates the data script.
+func (r *OpsRequest) validateDataScript(ctx context.Context, cli client.Client, cluster *Cluster) error {
+	validateScript := func(spec *ScriptSpec) error {
+		rawScripts := spec.Script
+		scriptsFrom := spec.ScriptFrom
+		if len(rawScripts) == 0 && (scriptsFrom == nil) {
+			return fmt.Errorf("spec.scriptSpec.script and spec.scriptSpec.scriptFrom can not be empty at the same time")
+		}
+		if scriptsFrom != nil {
+			if scriptsFrom.ConfigMapRef == nil && scriptsFrom.SecretRef == nil {
+				return fmt.Errorf("spec.scriptSpec.scriptFrom.configMapRefs and spec.scriptSpec.scriptFrom.secretRefs can not be empty at the same time")
+			}
+			for _, configMapRef := range scriptsFrom.ConfigMapRef {
+				if err := cli.Get(ctx, types.NamespacedName{Name: configMapRef.Name, Namespace: r.Namespace}, &corev1.ConfigMap{}); err != nil {
+					return err
+				}
+			}
+			for _, secret := range scriptsFrom.SecretRef {
+				if err := cli.Get(ctx, types.NamespacedName{Name: secret.Name, Namespace: r.Namespace}, &corev1.Secret{}); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	scriptSpec := r.Spec.ScriptSpec
+	if scriptSpec == nil {
+		return notEmptyError("spec.scriptSpec")
+	}
+
+	if err := r.checkComponentExistence(cluster, []string{scriptSpec.ComponentName}); err != nil {
+		return err
+	}
+
+	if err := validateScript(scriptSpec); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // validateVerticalResourceList checks if k8s resourceList is legal
 func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) (string, error) {
 	for k := range resourceList {
@@ -546,21 +594,6 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 	return runningOpsList, nil
 }
 
-// getComponentDefByCluster gets component from ClusterDefinition with compDefName
-func getComponentDefByCluster(ctx context.Context, cli client.Client, cluster Cluster,
-	compDefName string) (*ClusterComponentDefinition, error) {
-	clusterDef := &ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return nil, err
-	}
-	for _, component := range clusterDef.Spec.ComponentDefs {
-		if component.Name == compDefName {
-			return &component, nil
-		}
-	}
-	return nil, nil
-}
-
 // validateSwitchoverResourceList checks if switchover resourceList is legal.
 func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *Cluster, switchoverList []Switchover) error {
 	for _, switchover := range switchoverList {
@@ -569,7 +602,7 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 		}
 
 		// check clusterComponentDefinition whether support switchover
-		compDefObj, err := getComponentDefByCluster(ctx, cli, *cluster, cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
+		compDefObj, err := GetComponentDefByCluster(ctx, cli, *cluster, cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
 		if err != nil {
 			return err
 		}

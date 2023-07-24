@@ -41,11 +41,10 @@ import (
 )
 
 const (
-	configTemplateName   = "reload.yaml"
-	scriptVolumePrefix   = "cm-script-"
-	configVolumePrefix   = "cm-config-"
-	kbScriptVolumePath   = "/opt/kb-tools/reload"
-	kbConfigVolumePath   = "/opt/kb-tools/config"
+	configTemplateName = "reload.yaml"
+	scriptVolumePrefix = "cm-script-"
+	configVolumePrefix = "cm-config-"
+
 	scriptConfigField    = "scripts"
 	formatterConfigField = "formatterConfig"
 
@@ -53,6 +52,14 @@ const (
 	configManagerConfig           = "config-manager.yaml"
 	configManagerConfigMountPoint = "/opt/config-manager"
 	configManagerCMPrefix         = "sidecar-"
+)
+
+const (
+	KBScriptVolumePath = "/opt/kb-tools/reload"
+	KBConfigVolumePath = "/opt/kb-tools/config"
+
+	KBTOOLSScriptsPathEnv  = "TOOLS_SCRIPTS_PATH"
+	KBConfigManagerPathEnv = "TOOLS_PATH"
 )
 
 const KBConfigSpecLazyRenderedYamlFile = "lazy-rendered-config.yaml"
@@ -86,16 +93,19 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, m
 func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecMeta) []corev1.VolumeMount {
 	enableWatchVolume := func(volume corev1.VolumeMount) bool {
 		for _, param := range buildParams {
-			if param.ReloadType != appsv1alpha1.TPLScriptType || param.ConfigSpec.VolumeName != volume.Name {
+			if param.ConfigSpec.VolumeName != volume.Name {
 				continue
 			}
-			triggerOptions := param.ReloadOptions.TPLScriptTrigger
-			if triggerOptions == nil || triggerOptions.Sync == nil {
+			switch param.ReloadType {
+			case appsv1alpha1.TPLScriptType:
+				return cfgcore.IsWatchModuleForTplTrigger(param.ReloadOptions.TPLScriptTrigger)
+			case appsv1alpha1.ShellType:
+				return cfgcore.IsWatchModuleForShellTrigger(param.ReloadOptions.ShellTrigger)
+			default:
 				return true
 			}
-			return !*triggerOptions.Sync
 		}
-		return true
+		return false
 	}
 
 	allVolumeMounts := make([]corev1.VolumeMount, 0, len(volumeDirs))
@@ -158,7 +168,7 @@ func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.V
 	args = append(args, "--operator-update-enable")
 	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
 
-	if err := createOrUpdateConfigMap(frmConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
+	if err := createOrUpdateConfigMap(fromConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
 		return err
 	}
 	args = append(args, "--config", filepath.Join(configManagerConfigMountPoint, configManagerConfig))
@@ -225,7 +235,7 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 	return err
 }
 
-func frmConfigSpecMeta(metas []ConfigSpecMeta) []ConfigSpecInfo {
+func fromConfigSpecMeta(metas []ConfigSpecMeta) []ConfigSpecInfo {
 	configSpecs := make([]ConfigSpecInfo, 0, len(metas))
 	for _, meta := range metas {
 		configSpecs = append(configSpecs, meta.ConfigSpecInfo)
@@ -398,7 +408,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 }
 
 func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
-	mountPoint := filepath.Join(kbScriptVolumePath, configSpec.Name)
+	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,
 		Name:      options.ScriptConfigMapRef,
@@ -415,11 +425,11 @@ func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManag
 }
 
 func GetConfigMountPoint(configSpec appsv1alpha1.ComponentConfigSpec) string {
-	return filepath.Join(kbConfigVolumePath, configSpec.Name)
+	return filepath.Join(KBConfigVolumePath, configSpec.Name)
 }
 
 func GetScriptsMountPoint(configSpec appsv1alpha1.ComponentConfigSpec) string {
-	return filepath.Join(kbScriptVolumePath, configSpec.Name)
+	return filepath.Join(KBScriptVolumePath, configSpec.Name)
 }
 
 func GetScriptsVolumeName(configSpec appsv1alpha1.ComponentConfigSpec) string {

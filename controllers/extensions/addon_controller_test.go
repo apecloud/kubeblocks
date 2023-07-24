@@ -322,6 +322,8 @@ var _ = Describe("Addon controller", func() {
 					InstallOptions: extensionsv1alpha1.HelmInstallOptions{
 						"--debug": "true",
 					},
+					ChartLocationURL: "file:///test-charts.tgz",
+					ChartsImage:      "kubeblocks-charts",
 				}
 			})
 
@@ -341,7 +343,7 @@ var _ = Describe("Addon controller", func() {
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			enablingPhaseCheck(2)
 
-			By("By enabled addon with fake completed install job status")
+			By("By enabled addon with fake completed installation job status")
 			fakeInstallationCompletedJob(2)
 
 			By("By checking init container")

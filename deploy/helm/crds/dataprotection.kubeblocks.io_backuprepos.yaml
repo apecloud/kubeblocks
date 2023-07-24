@@ -17,7 +17,20 @@ spec:
     singular: backuprepo
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .spec.storageProviderRef
+      name: STORAGEPROVIDER
+      type: string
+    - jsonPath: .status.isDefault
+      name: DEFAULT
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: BackupRepo is the Schema for the backuprepos API
@@ -84,11 +97,11 @@ spec:
             description: BackupRepoStatus defines the observed state of BackupRepo
             properties:
               backupPVCName:
-                description: BackupPVCName is the name of the PVC used to store backup
+                description: backupPVCName is the name of the PVC used to store backup
                   data.
                 type: string
               conditions:
-                description: Describes the current state of the repo.
+                description: conditions describes the current state of the repo.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -157,7 +170,7 @@ spec:
                   type: object
                 type: array
               generatedCSIDriverSecret:
-                description: GeneratedCSIDriverSecret references the generated secret
+                description: generatedCSIDriverSecret references the generated secret
                   used by the CSI driver.
                 properties:
                   name:
@@ -170,11 +183,15 @@ spec:
                     type: string
                 type: object
               generatedStorageClassName:
-                description: GeneratedStorageClassName indicates the generated storage
+                description: generatedStorageClassName indicates the generated storage
                   class name.
                 type: string
+              isDefault:
+                description: isDefault indicates whether this backup repo is the default
+                  one.
+                type: boolean
               observedGeneration:
-                description: ObservedGeneration is the latest generation observed
+                description: observedGeneration is the latest generation observed
                   by the controller.
                 format: int64
                 type: integer
@@ -190,8 +207,8 @@ spec:
                   - Failed
                   - Ready
                   - Deleting
-                description: Storage provider reconciliation phases. Valid values
-                  are PreChecking, Failed, Ready, Deleting.
+                description: Backup repo reconciliation phases. Valid values are PreChecking,
+                  Failed, Ready, Deleting.
                 type: string
             type: object
         type: object

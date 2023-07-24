@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 0 * * *'
   push:
-    branches: [ "main", release-*, releasing-* ]
+    branches: [ main, release-*, releasing-* ]
 
 env:
   BASE_BRANCH: origin/main
@@ -16,13 +16,6 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
-      - name: Cancel Previous Runs
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          all_but_latest: true
-          access_token: ${{ github.token }}
-
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0

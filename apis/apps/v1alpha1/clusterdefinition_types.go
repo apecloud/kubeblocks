@@ -743,12 +743,15 @@ func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyTy
 		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
 	}
 
+	zeroPartition := int32(0)
 	switch r.UpdateStrategy {
 	case BestEffortParallelStrategy:
 		m := intstr.FromString("49%")
 		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
 			Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				// explicitly set the partition as 0 to avoid update workload unexpectedly.
+				Partition: &zeroPartition,
 				// alpha feature since v1.24
 				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
 				MaxUnavailable: &m,
@@ -765,6 +768,8 @@ func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyTy
 		return appsv1.OrderedReadyPodManagement, appsv1.StatefulSetUpdateStrategy{
 			Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				// explicitly set the partition as 0 to avoid update workload unexpectedly.
+				Partition: &zeroPartition,
 				// alpha feature since v1.24
 				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
 				MaxUnavailable: &m,

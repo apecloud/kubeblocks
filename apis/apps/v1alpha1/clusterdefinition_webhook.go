@@ -110,6 +110,7 @@ func (r *ClusterDefinition) validate() error {
 		componentMap[v.Name] = struct{}{}
 	}
 
+	r.validateClusterService(&allErrs)
 	r.validateComponents(&allErrs)
 	r.validateLogFilePatternPrefix(&allErrs)
 
@@ -142,6 +143,36 @@ func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorLis
 			}
 		}
 	}
+}
+
+func (r *ClusterDefinition) validateClusterService(allErrs *field.ErrorList) error {
+	validateComponentPort := func(port ServicePort, compDef *ClusterComponentDefinition) {
+		for _, container := range compDef.PodSpec.Containers {
+			for _, containerPort := range container.Ports {
+				if containerPort.Name == port.TargetPort.String() || containerPort.Name == port.TargetPort.String() {
+					return
+				}
+			}
+		}
+		msg := fmt.Sprintf("port %s not found in frontend component %s", port.TargetPort.String(), compDef.Name)
+		*allErrs = append(*allErrs,
+			field.Invalid(field.NewPath("spec.service.ports"), port.TargetPort.String(), msg),
+		)
+	}
+
+	for _, port := range r.Spec.Service.Ports {
+		for _, compDefName := range r.Spec.Service.FrontendComponents {
+			compDef := r.GetComponentDefByName(compDefName)
+			if compDef == nil {
+				*allErrs = append(*allErrs,
+					field.Invalid(field.NewPath("spec.service.frontendComponents"), compDefName, fmt.Sprintf("frontend component %s not found", compDefName)),
+				)
+				continue
+			}
+			validateComponentPort(port, compDef)
+		}
+	}
+	return nil
 }
 
 // ValidateComponents validate spec.components is legal.

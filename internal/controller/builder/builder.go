@@ -786,6 +786,19 @@ func BuildServiceAccount(cluster *appsv1alpha1.Cluster) (*corev1.ServiceAccount,
 	return sa, nil
 }
 
+func BuildRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.RoleBinding, error) {
+	const tplFile = "rbac_template.cue"
+
+	rb := &rbacv1.RoleBinding{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "rolebinding", rb); err != nil {
+		return nil, err
+	}
+
+	return rb, nil
+}
+
 func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.ClusterRoleBinding, error) {
 	const tplFile = "rbac_template.cue"
 

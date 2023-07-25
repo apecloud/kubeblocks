@@ -101,7 +101,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 
 	Context("transformer rbac manager", func() {
-		It("create serviceaccount and clusterrolebinding if not exist", func() {
+		It("create serviceaccount and rolebinding if not exist", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, saKey,
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
@@ -110,13 +110,13 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(err).Should(BeNil())
 			serviceAccount.Name = serviceAccountName
 
-			clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
+			roleBinding, err := builder.BuildRoleBinding(cluster)
 			Expect(err).Should(BeNil())
-			clusterRoleBinding.Subjects[0].Name = serviceAccountName
+			roleBinding.Subjects[0].Name = serviceAccountName
 
 			dagExpected := mockDAG(cluster)
 			ictrltypes.LifecycleObjectCreate(dagExpected, serviceAccount, nil)
-			ictrltypes.LifecycleObjectCreate(dagExpected, clusterRoleBinding, nil)
+			ictrltypes.LifecycleObjectCreate(dagExpected, roleBinding, nil)
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 	})

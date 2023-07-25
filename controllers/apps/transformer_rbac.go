@@ -90,23 +90,30 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		clusterRoleBinding.Subjects[0].Name = serviceAccountName
 		crbVertex := ictrltypes.LifecycleObjectCreate(dag, clusterRoleBinding, root)
 
+		roleBinding, err := builder.BuildRoleBinding(cluster)
+		if err != nil {
+			return err
+		}
+		roleBinding.Subjects[0].Name = serviceAccountName
+		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, crbVertex)
+
 		serviceAccount, err := builder.BuildServiceAccount(cluster)
 		if err != nil {
 			return err
 		}
 		serviceAccount.Name = serviceAccountName
-		// service account must be created before cluster role binding
-		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, crbVertex)
+		// serviceaccount must be created before rolebinding
+		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, rbVertex)
 
 		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
 		for _, statefulSetVertex := range statefulSetVertices {
-			// service account must be created before statefulset
+			// serviceaccount must be created before statefulset
 			dag.Connect(statefulSetVertex, saVertex)
 		}
 
 		deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
 		for _, deploymentVertex := range deploymentVertices {
-			// service account must be created before deployment
+			// serviceaccount must be created before deployment
 			dag.Connect(deploymentVertex, saVertex)
 		}
 	}
@@ -121,8 +128,8 @@ func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName
 	}
 	sa := &corev1.ServiceAccount{}
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa); err != nil {
-		// KubeBlocks will create a cluster role binding only if it has RBAC access priority and
-		// the cluster role binding is not already present.
+		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
+		// the rolebinding is not already present.
 		if errors.IsNotFound(err) {
 			transCtx.Logger.V(1).Info("ServiceAccount not exists", "namespaceName", namespaceName)
 			if sendEvent {

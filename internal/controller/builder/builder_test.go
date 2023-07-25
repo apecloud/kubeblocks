@@ -526,6 +526,15 @@ var _ = Describe("builder", func() {
 			Expect(sa.Name).Should(Equal(expectName))
 		})
 
+		It("builds rolebinding correctly", func() {
+			_, cluster, _ := newClusterObjs(nil)
+			expectName := fmt.Sprintf("kb-%s", cluster.Name)
+			rb, err := BuildRoleBinding(cluster)
+			Expect(err).Should(BeNil())
+			Expect(rb).ShouldNot(BeNil())
+			Expect(rb.Name).Should(Equal(expectName))
+		})
+
 		It("builds clusterrolebinding correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)

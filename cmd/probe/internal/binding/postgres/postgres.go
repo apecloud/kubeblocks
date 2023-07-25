@@ -128,7 +128,7 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 	return 0
 }
 
-func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest) (string, error) {
 	return pgOps.manager.GetMemberStateWithPool(ctx, nil)
 }
 

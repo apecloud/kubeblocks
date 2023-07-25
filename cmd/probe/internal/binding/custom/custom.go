@@ -85,7 +85,7 @@ func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest) (string, error) {
 	if h.actionSvcPorts == nil {
 		return "", nil
 	}
@@ -107,7 +107,7 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, r
 }
 
 func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	role, err := h.GetRole(ctx, req, resp)
+	role, err := h.GetRole(ctx, req)
 	if err != nil {
 		return nil, err
 	}

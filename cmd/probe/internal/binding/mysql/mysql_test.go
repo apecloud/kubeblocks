@@ -90,7 +90,7 @@ func TestGetRole(t *testing.T) {
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
 		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnRows(rows)
 
-		role, err := mysqlOps.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+		role, err := mysqlOps.GetRole(context.Background(), &bindings.InvokeRequest{})
 		assert.Nil(t, err)
 		assert.Equal(t, "Follower", role)
 	})
@@ -98,7 +98,7 @@ func TestGetRole(t *testing.T) {
 	t.Run("GetRole fails", func(t *testing.T) {
 		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnError(errors.New("no record"))
 
-		role, err := mysqlOps.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+		role, err := mysqlOps.GetRole(context.Background(), &bindings.InvokeRequest{})
 		assert.Equal(t, "", role)
 		assert.NotNil(t, err)
 	})

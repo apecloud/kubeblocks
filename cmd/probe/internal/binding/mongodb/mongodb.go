@@ -145,7 +145,7 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 // 	return nil
 // }
 
-func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest) (string, error) {
 	return mongoOps.manager.GetMemberState(ctx)
 }
 

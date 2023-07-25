@@ -51,7 +51,7 @@ func TestETCD(t *testing.T) {
 
 	t.Run("Invoke GetRole", func(t *testing.T) {
 		e := mockEtcd(etcdServer)
-		role, err := e.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+		role, err := e.GetRole(context.Background(), &bindings.InvokeRequest{})
 		if err != nil {
 			t.Errorf("get role error: %s", err)
 		}

@@ -126,19 +126,19 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest) (string, error) {
 	workloadType := request.Metadata[workloadTypeKey]
 	if strings.EqualFold(workloadType, Replication) {
-		return mysqlOps.GetRoleForReplication(ctx, request, response)
+		return mysqlOps.GetRoleForReplication(ctx)
 	}
-	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+	return mysqlOps.GetRoleForConsensus(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
 	return 0
 }
 
-func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context) (string, error) {
 	dcsStore := dcs.GetStore()
 	if dcsStore == nil {
 		return "", nil
@@ -176,7 +176,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 	return "", errors.Errorf("parse query failed, no records")
 }
 
-func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
 	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
@@ -245,7 +245,7 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.In
 	var err error
 
 	if mysqlOps.OriRole == "" {
-		mysqlOps.OriRole, err = mysqlOps.GetRole(ctx, req, resp)
+		mysqlOps.OriRole, err = mysqlOps.GetRole(ctx, req)
 		if err != nil {
 			result["event"] = OperationFailed
 			result["message"] = err.Error()

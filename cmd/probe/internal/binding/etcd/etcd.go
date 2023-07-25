@@ -107,7 +107,7 @@ func (e *Etcd) InitDelay() error {
 	return nil
 }
 
-func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest) (string, error) {
 	etcdResp, err := e.etcd.Status(ctx, e.endpoint)
 	if err != nil {
 		return "", err
@@ -125,7 +125,7 @@ func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *b
 }
 
 func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	role, err := e.GetRole(ctx, req, resp)
+	role, err := e.GetRole(ctx, req)
 	if err != nil {
 		return nil, err
 	}

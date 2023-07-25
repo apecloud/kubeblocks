@@ -146,8 +146,8 @@ var _ = Describe("Volume Protection Operation", func() {
 		"s": Readonly,
 		"l": Readonly,
 	}
-	getGetRoleFn := func(role string, err error) func(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (string, error) {
-		return func(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (string, error) {
+	getGetRoleFn := func(role string, err error) func(context.Context, *bindings.InvokeRequest) (string, error) {
+		return func(context.Context, *bindings.InvokeRequest) (string, error) {
 			if !slices.Contains(maps.Keys(roles), role) {
 				panic(fmt.Sprintf("unknown role: %s", role))
 			}

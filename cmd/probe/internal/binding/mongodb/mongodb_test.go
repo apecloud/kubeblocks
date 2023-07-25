@@ -64,7 +64,7 @@ func TestGetRole(t *testing.T) {
 	err := m.Init(bm)
 	assert.Nil(t, err)
 	m.manager.Client = mt.Client
-	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{})
 	if err != nil {
 		t.Errorf("getRole error: %s", err)
 	}

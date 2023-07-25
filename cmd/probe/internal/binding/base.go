@@ -79,7 +79,7 @@ type BaseOperations struct {
 	Logger                 logger.Logger
 	Metadata               bindings.Metadata
 	InitIfNeed             func() bool
-	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
+	GetRole                func(context.Context, *bindings.InvokeRequest) (string, error)
 	// TODO: need a better way to support the extension for engines.
 	LockInstance     func(ctx context.Context) error
 	UnlockInstance   func(ctx context.Context) error
@@ -233,7 +233,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	ctx1, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	role, err := ops.GetRole(ctx1, req, resp)
+	role, err := ops.GetRole(ctx1, req)
 	if err != nil {
 		ops.Logger.Errorf("error executing checkRole: %v", err)
 		opsRes["event"] = OperationFailed
@@ -282,7 +282,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 		return opsRes, nil
 	}
 
-	role, err := ops.GetRole(ctx, req, resp)
+	role, err := ops.GetRole(ctx, req)
 	if err != nil {
 		ops.Logger.Infof("error executing getRole: %v", err)
 		opsRes["event"] = OperationFailed
@@ -319,7 +319,8 @@ func (ops *BaseOperations) Writable() bool {
 		return true
 	}
 
-	role, err := ops.GetRole(context.TODO(), nil, nil)
+	// TODO: workload type
+	role, err := ops.GetRole(context.TODO(), &bindings.InvokeRequest{Metadata: map[string]string{}})
 	if err != nil {
 		ops.Logger.Infof("GetRole error at checking writable: %s", err.Error())
 		return false

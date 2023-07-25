@@ -288,11 +288,11 @@ func (fakeOps *fakeOperations) CheckStatusOps(ctx context.Context, req *bindings
 	return OpsResult{}, nil
 }
 
-func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest) (string, error) {
 	return testRole, nil
 }
 
-func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *bindings.InvokeRequest) (string, error) {
 	return testRole, fmt.Errorf("mock error")
 }
 

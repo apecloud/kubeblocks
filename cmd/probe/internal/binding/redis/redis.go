@@ -576,7 +576,7 @@ func (r *Redis) Close() error {
 	return r.client.Close()
 }
 
-func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest) (string, error) {
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	// ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	// defer cancel()

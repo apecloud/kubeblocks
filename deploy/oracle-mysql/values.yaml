@@ -1,0 +1,35 @@
+# Default values for mysql.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+image:
+  registry: docker.io
+  repository: mysql
+  pullPolicy: IfNotPresent
+  tag: 8.0.34
+
+## MySQL Authentication parameters
+auth:
+  ## MYSQL_ROOT_HOST
+  rootHost: "%"
+  ## @param auth.createDatabase Whether to create the .Values.auth.database or not
+  ##
+  createDatabase: true
+  ## @param auth.database Name for a custom database to create
+  ## MYSQL_DATABASE
+  database: "mydb"
+  ## @param auth.username Name for a custom user to create
+  ## MYSQL_USER
+  username: "u1"
+  ## MYSQL_PASSWORD
+  password: "u1"
+  ## @param auth.replicationUser MySQL replication user
+  ##
+  replicationUser: "replicator"
+  ## @param auth.replicationPassword MySQL replication user password. Ignored if existing secret is provided
+  ##
+  replicationPassword: ""
+
+nameOverride: ""
+fullnameOverride: ""
+## MySQl ClusterVersion
+clusterVersionOverride: "8.0.34"

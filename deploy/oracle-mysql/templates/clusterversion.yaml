@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: oracle-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: oracle-mysql
+  componentVersions:
+  - componentDefRef: mysql-compdef
+    versionsContext:
+      containers:
+      - name: mysql-container
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

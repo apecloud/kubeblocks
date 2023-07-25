@@ -1,0 +1,18 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "kblib.clusterName" . }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+spec:
+  clusterVersionRef: {{ .Values.version }}
+  terminationPolicy: {{ .Values.extra.terminationPolicy }}
+  {{- include "kblib.affinity" . | indent 2 }}
+  clusterDefinitionRef: oracle-mysql # ref clusterdefinition.name
+  componentSpecs:
+    - name: mysql-comp
+      componentDefRef: mysql-compdef # ref clusterdefinition componentDefs.name
+      replicas: 1
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{- include "kblib.componentStorages" . | indent 6 }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}

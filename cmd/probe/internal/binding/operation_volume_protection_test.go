@@ -277,7 +277,7 @@ var _ = Describe("Volume Protection Operation", func() {
 
 		})
 
-		FIt("disabled - non-writable instance", func() {
+		It("disabled - non-writable instance", func() {
 			obj := newVolumeProtectionObj()
 			obj.BaseOperation.DBRoles = roles
 			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())

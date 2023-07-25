@@ -113,9 +113,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 0 {
-				o.Names = args
-			}
+			o.Names = args
 			util.CheckErr(addonListRun(o))
 		},
 	}

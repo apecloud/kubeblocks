@@ -186,8 +186,8 @@ var _ = Describe("plan builder test", func() {
 			gomock.InOrder(
 				k8sMock.EXPECT().Status().Return(statusWriter),
 				statusWriter.EXPECT().
-					Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, patch client.Patch, _ ...client.PatchOption) error {
+					Update(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.UpdateOption) error {
 						Expect(obj).ShouldNot(BeNil())
 						Expect(obj.Namespace).Should(Equal(rsm.Namespace))
 						Expect(obj.Name).Should(Equal(rsm.Name))

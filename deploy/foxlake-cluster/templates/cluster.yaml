@@ -6,11 +6,12 @@ metadata:
   labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
   annotations:
     kubeblocks.io/extra-env: '{
-    {{- if .Values.defaultStorage.create }}
+    {{- if .Values.storageCreate }}
       "createDefaultStorage":"true",
-      "defaultStorageEndpoint":{{ .Values.defaultStorage.endpoint | quote }},
-      "defaultStorageAccessKeyID":{{ .Values.defaultStorage.accessKey | quote }},
-      "defaultStorageSecretAccessKey":{{ .Values.defaultStorage.secretKey | quote }},
+      "defaultStorageUri":{{ .Values.storageUri | quote }},
+      "defaultStorageEndpoint":{{ .Values.storageEndpoint | quote }},
+      "defaultStorageAccessKeyID":{{ .Values.storageAccessKey | quote }},
+      "defaultStorageSecretAccessKey":{{ .Values.storageSecretKey | quote }},
     {{- end }}
       "MPP_WORKER_TOLERATIONS":{{ .Values.mppWorkerTolerations | quote }}
     }'

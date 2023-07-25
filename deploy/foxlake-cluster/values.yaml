@@ -42,24 +42,36 @@ requests:
 ##
 storage: 20
 
-defaultStorage:
-  ## @param defaultStorage.create If it is true, the default storage will be created automatically.
-  ##
-  create: false
-  ## @param defaultStorage.accessKey Access key for the object storage service.
-  ## For AWS S3 storage, this is the same as AWS_ACCESS_KEY_ID
-  ##
-  accessKey: ""
-  ## @param defaultStorage.secretKey Secret key for the object storage service.
-  ## For AWS S3 storage, this is the same as AWS_SECRET_ACCESS_KEY
-  ##
-  secretKey: ""
-  ## @param defaultStorage.endpoint Endpoint for the object storage service.
-  ## For AWS S3 storage, set it to "s3://<your bucket>.s3.<region>.amazonaws.com/default".
-  ## If the AWS region is in China, set it to "s3://<your bucket>.s3.<region>.amazonaws.com.cn/default", for example:
-  ## "s3://<your bucket>.s3.cn-northwest-1.amazonaws.com.cn/default".
-  ## For MinIO storage, set it to "minio://<your minio endpoint>/<your bucket>/default".
-  ##
-  endpoint: ""
+## @param storageCreate If it is true, the default storage will be created automatically.
+##
+storageCreate: false
+
+## @param storageAccessKey Access key for the object storage service.
+## For AWS S3 storage, this is the same as AWS_ACCESS_KEY_ID
+##
+storageAccessKey: ""
+
+## @param storageSecretKey Secret key for the object storage service.
+## For AWS S3 storage, this is the same as AWS_SECRET_ACCESS_KEY
+##
+storageSecretKey: ""
+
+## @param storageEndpoint Endpoint for the object storage service.
+## For AWS S3 storage, you can use the following link to query the endpoint of the region where the object is located:
+## https://docs.aws.amazon.com/general/latest/gr/s3.html
+##
+storageEndpoint: ""
+
+## @param storageUri Object Storage URI Format.
+## The format of the Object Storage URI is as follows:
+## <StorageProvider>://<bucket>/<prefix>
+## Example:
+## s3://my-bucket/my-folder/my-object
+## minio://my-bucket/my-object
+## In this format:
+## - <StorageProvider> represents the type of storage provider, such as "s3" for AWS S3, "minio" for MinIO, etc.
+## - <bucket> represents the name of the bucket where the object is stored.
+## - <prefix> represents the optional prefix or folder structure within the bucket where the object is located.
+storageUri: ""
 
 mppWorkerTolerations: ""

@@ -30,8 +30,10 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/util/rand"
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/utils/strings/slices"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -139,17 +141,33 @@ var _ = Describe("Volume Protection Operation", func() {
 		return fmt.Errorf("error")
 	}
 
+	roles := map[string]AccessMode{
+		"p": ReadWrite,
+		"s": Readonly,
+		"l": Readonly,
+	}
+	getGetRoleFn := func(role string, err error) func(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (string, error) {
+		return func(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (string, error) {
+			if !slices.Contains(maps.Keys(roles), role) {
+				panic(fmt.Sprintf("unknown role: %s", role))
+			}
+			return role, err
+		}
+	}
+
 	resetVolumeProtectionSpecEnv := func(spec appsv1alpha1.VolumeProtectionSpec) {
 		raw, _ := json.Marshal(spec)
 		os.Setenv(constant.KBEnvVolumeProtectionSpec, string(raw))
 	}
 
 	newVolumeProtectionObj := func() *operationVolumeProtection {
+		logger := logger.NewLogger("volume-protection-test")
 		return &operationVolumeProtection{
-			Logger:    logger.NewLogger("volume-protection-test"),
+			Logger:    logger,
 			Requester: &mockVolumeStatsRequester{},
 			SendEvent: false,
 			BaseOperation: &BaseOperations{
+				Logger:         logger,
 				LockInstance:   lockInstance,
 				UnlockInstance: unlockInstance,
 			},
@@ -257,6 +275,27 @@ var _ = Describe("Volume Protection Operation", func() {
 			Expect(obj.disabled()).Should(BeTrue())
 			Expect(obj.Invoke(ctx, nil, nil)).Should(BeNil())
 
+		})
+
+		FIt("disabled - non-writable instance", func() {
+			obj := newVolumeProtectionObj()
+			obj.BaseOperation.DBRoles = roles
+			Expect(obj.Init(bindings.Metadata{})).Should(Succeed())
+
+			obj.BaseOperation.GetRole = getGetRoleFn("p", fmt.Errorf("error"))
+			Expect(obj.disabled()).Should(BeTrue())
+			Expect(obj.Invoke(ctx, nil, nil)).Should(BeNil())
+
+			obj.BaseOperation.GetRole = getGetRoleFn("p", nil)
+			Expect(obj.disabled()).Should(BeFalse())
+
+			obj.BaseOperation.GetRole = getGetRoleFn("s", nil)
+			Expect(obj.disabled()).Should(BeTrue())
+			Expect(obj.Invoke(ctx, nil, nil)).Should(BeNil())
+
+			obj.BaseOperation.GetRole = getGetRoleFn("l", nil)
+			Expect(obj.disabled()).Should(BeTrue())
+			Expect(obj.Invoke(ctx, nil, nil)).Should(BeNil())
 		})
 
 		It("query stats summary - request error", func() {

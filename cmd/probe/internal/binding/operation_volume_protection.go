@@ -157,8 +157,7 @@ func (o *operationVolumeProtection) Invoke(ctx context.Context, req *bindings.In
 }
 
 func (o *operationVolumeProtection) disabled() bool {
-	// TODO: check the role and skip secondary instances.
-	if len(o.Pod) == 0 || len(o.Volumes) == 0 {
+	if len(o.Pod) == 0 || len(o.Volumes) == 0 || !o.BaseOperation.Writable() {
 		return true
 	}
 	for _, v := range o.Volumes {

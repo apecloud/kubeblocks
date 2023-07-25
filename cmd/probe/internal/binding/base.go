@@ -314,6 +314,25 @@ func (ops *BaseOperations) fwdLegacyOperationCall(kind bindings.OperationKind, c
 	return nil, op.Invoke(ctx, req, rsp)
 }
 
+func (ops *BaseOperations) Writable() bool {
+	if len(ops.DBRoles) == 0 || ops.GetRole == nil {
+		return true
+	}
+
+	role, err := ops.GetRole(context.TODO(), nil, nil)
+	if err != nil {
+		ops.Logger.Infof("GetRole error at checking writable: %s", err.Error())
+		return false
+	}
+
+	for r, mode := range ops.DBRoles {
+		if strings.EqualFold(r, role) {
+			return mode == ReadWrite
+		}
+	}
+	return false
+}
+
 // Component may have some internal roles that needn't be exposed to end user,
 // and not configured in cluster definition, e.g. ETCD's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number

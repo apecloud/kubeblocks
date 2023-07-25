@@ -186,9 +186,9 @@ func (o *CreateOptions) run() error {
 		objName = class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)
 	}
 
-	var compConstraints []v1alpha1.ResourceConstraint
+	var rules []v1alpha1.ResourceConstraintRule
 	for _, constraint := range constraints {
-		compConstraints = append(compConstraints, constraint.FindConstraints(o.ClusterDefRef, o.ComponentType)...)
+		rules = append(rules, constraint.FindRules(o.ClusterDefRef, o.ComponentType)...)
 	}
 
 	for _, item := range classInstances {
@@ -198,13 +198,13 @@ func (o *CreateOptions) run() error {
 		}
 		classNames = append(classNames, item.Name)
 
-		if len(compConstraints) == 0 {
+		if len(rules) == 0 {
 			continue
 		}
 
 		match := false
-		for _, constraint := range compConstraints {
-			if constraint.ValidateResources(item.ToResourceRequirements().Requests) {
+		for _, rule := range rules {
+			if rule.ValidateResources(item.ToResourceRequirements().Requests) {
 				match = true
 				break
 			}

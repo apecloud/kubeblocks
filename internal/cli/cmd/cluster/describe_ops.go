@@ -394,7 +394,7 @@ func (o *describeOpsOptions) printLastConfiguration(configuration appsv1alpha1.L
 		printer.PrintPairStringToLine("Cluster Version", configuration.ClusterVersionRef)
 	case appsv1alpha1.VerticalScalingType:
 		handleVScale := func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration) {
-			tbl.AddRow(cName, compConf.Requests.Cpu(), compConf.Requests.Memory(), compConf.Limits.Cpu(), compConf.Limits.Memory())
+			tbl.AddRow(cName, compConf.Requests.Cpu().String(), compConf.Requests.Memory().String(), compConf.Limits.Cpu().String(), compConf.Limits.Memory().String())
 		}
 		headers := []interface{}{"COMPONENT", "REQUEST-CPU", "REQUEST-MEMORY", "LIMIT-CPU", "LIMIT-MEMORY"}
 		o.printLastConfigurationByOpsType(configuration, headers, handleVScale)
@@ -408,7 +408,7 @@ func (o *describeOpsOptions) printLastConfiguration(configuration appsv1alpha1.L
 		handleVolumeExpansion := func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration) {
 			vcts := compConf.VolumeClaimTemplates
 			for _, v := range vcts {
-				tbl.AddRow(cName, v.Name, v.Storage)
+				tbl.AddRow(cName, v.Name, v.Storage.String())
 			}
 		}
 		headers := []interface{}{"COMPONENT", "VOLUME-CLAIM-TEMPLATE", "STORAGE"}

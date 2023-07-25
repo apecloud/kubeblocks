@@ -136,7 +136,7 @@ if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
       {{- if eq "controller" $c.componentDefRef }}
         {{- $replicas := $c.replicas | int }}
         {{- range $n, $e := until $replicas }}
-          {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.cluster.local" $clusterName $c.name $n $clusterName $c.name $namespace }} #
+          {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.%s" $clusterName $c.name $n $clusterName $c.name $namespace $.clusterDomain }} #
           {{- $voter := printf "%d@%s:9093" ( $n | int ) $podFQDN }}
           {{- $voters = printf "%s,%s" $voters $voter }}
         {{- end }}
@@ -159,7 +159,7 @@ else
     {{- $replicas := $.component.replicas | int }}
     {{- $voters := "" }}
     {{- range $i, $e := until $replicas }}
-      {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.cluster.local" $clusterName $.component.name $i $clusterName $.component.name $namespace }}
+      {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.%s" $clusterName $.component.name $i $clusterName $.component.name $namespace $.clusterDomain }}
       {{- $voter := printf "%d@%s:9093" ( $i | int ) $podFQDN }}
       {{- $voters = printf "%s,%s" $voters $voter }}
     {{- end }}

@@ -42,8 +42,8 @@ spec:
             description: ComponentResourceConstraintSpec defines the desired state
               of ComponentResourceConstraint
             properties:
-              constraints:
-                description: Component resource constraints
+              rules:
+                description: Component resource constraint rules.
                 items:
                   properties:
                     cpu:
@@ -183,15 +183,15 @@ spec:
                             description: componentDefRef is the name of the component
                               definition in the cluster definition.
                             type: string
-                          constraints:
-                            description: constraints are the constraints that will
+                          rules:
+                            description: rules are the constraint rules that will
                               be applied to the component.
                             items:
                               type: string
                             type: array
                         required:
                         - componentDefRef
-                        - constraints
+                        - rules
                         type: object
                       type: array
                       x-kubernetes-list-map-keys:
@@ -206,7 +206,7 @@ spec:
                 - clusterDefRef
                 x-kubernetes-list-type: map
             required:
-            - constraints
+            - rules
             type: object
         type: object
     served: true

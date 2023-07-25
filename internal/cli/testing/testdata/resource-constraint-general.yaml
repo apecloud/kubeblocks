@@ -5,7 +5,7 @@ metadata:
   labels:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
 spec:
-  constraints:
+  rules:
   - name: c1
     cpu:
       min: 0.5
@@ -28,7 +28,7 @@ spec:
   - clusterDefRef: apecloud-mysql
     components:
     - componentDefRef: mysql
-      constraints:
+      rules:
       - "c1"
       - "c2"
       - "c3"

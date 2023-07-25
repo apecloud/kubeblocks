@@ -113,7 +113,7 @@ var _ = Describe("Cluster", func() {
 					Components: []appsv1alpha1.ComponentResourceConstraintSelector{
 						{
 							ComponentDefRef: testing.ComponentDefName,
-							Constraints:     []string{"c1"},
+							Rules:           []string{"c1"},
 						},
 					},
 				}).

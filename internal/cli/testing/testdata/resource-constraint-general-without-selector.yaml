@@ -5,7 +5,7 @@ metadata:
   labels:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
 spec:
-  constraints:
+  rules:
   - name: c1
     cpu:
       min: 0.5

@@ -53,6 +53,9 @@
 	// Enable read write splitting. Valid values are: disable, random, least_global_qps, least_qps, least_rt, least_behind_primary. (default disable)
 	read_write_splitting_policy: string & "disable" | "random" | "least_global_qps" | "least_qps" | "least_rt" | "least_behind_primary"
 
+	// Read write splitting ratio. (default 100)
+	read_write_splitting_ratio: int & (>=0 & <=100)
+
 	// Topo server timeout. (default 1s)
 	srv_topo_timeout: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 

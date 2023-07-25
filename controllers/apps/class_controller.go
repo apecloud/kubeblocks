@@ -100,15 +100,15 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		componentDefRef = classDefinition.GetLabels()[constant.KBAppComponentDefRefLabelKey]
 	)
 
-	var constraints []appsv1alpha1.ResourceConstraint
+	var rules []appsv1alpha1.ResourceConstraintRule
 	for _, constraint := range constraintsMap {
-		constraints = append(constraints, constraint.FindConstraints(clusterDefRef, componentDefRef)...)
+		rules = append(rules, constraint.FindRules(clusterDefRef, componentDefRef)...)
 	}
 
 	for _, v := range classes {
 		match := false
-		for _, constraint := range constraints {
-			if constraint.ValidateResources(v.ToResourceRequirements().Requests) {
+		for _, rule := range rules {
+			if rule.ValidateResources(v.ToResourceRequirements().Requests) {
 				match = true
 				break
 			}

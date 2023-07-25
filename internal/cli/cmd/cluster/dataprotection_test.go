@@ -55,6 +55,7 @@ import (
 
 var _ = Describe("DataProtection", func() {
 	const policyName = "policy"
+	const repoName = "repo"
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	var out *bytes.Buffer
@@ -90,7 +91,9 @@ var _ = Describe("DataProtection", func() {
 			By("fake client")
 			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
 			policy2 := testing.FakeBackupPolicy("policy1", testing.ClusterName)
-			initClient(defaultBackupPolicy, policy2)
+			policy3 := testing.FakeBackupPolicy("policy2", testing.ClusterName)
+			policy3.Namespace = "policy"
+			initClient(defaultBackupPolicy, policy2, policy3)
 
 			By("test list-backup-policy cmd")
 			cmd := NewListBackupPolicyCmd(tf, streams)
@@ -99,12 +102,21 @@ var _ = Describe("DataProtection", func() {
 			Expect(out.String()).Should(ContainSubstring(defaultBackupPolicy.Name))
 			Expect(out.String()).Should(ContainSubstring("true"))
 			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(3))
+
+			By("test list all namespace")
+			out.Reset()
+			_ = cmd.Flags().Set("all-namespaces", "true")
+			cmd.Run(cmd, nil)
+			fmt.Println(out.String())
+			Expect(out.String()).Should(ContainSubstring(policy2.Name))
+			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(4))
 		})
 
 		It("edit-backup-policy", func() {
 			By("fake client")
 			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
-			tf.FakeDynamicClient = testing.FakeDynamicClient(defaultBackupPolicy)
+			repo := testing.FakeBackupRepo(repoName, false)
+			tf.FakeDynamicClient = testing.FakeDynamicClient(defaultBackupPolicy, repo)
 
 			By("test edit backup policy function")
 			o := editBackupPolicyOptions{Factory: tf, IOStreams: streams, GVR: types.BackupPolicyGVR()}
@@ -112,9 +124,17 @@ var _ = Describe("DataProtection", func() {
 			o.values = []string{"schedule.datafile.enable=false", `schedule.datafile.cronExpression="0 17 * * *"`,
 				"schedule.logfile.enable=false", `schedule.logfile.cronExpression="* */1 * * *"`,
 				"schedule.snapshot.enable=false", `schedule.snapshot.cronExpression="0 17 * * *"`,
-				"logfile.pvc.name=test1", "logfile.pvc.storageClassName=t1",
-				"datafile.pvc.name=test1", "datafile.pvc.storageClassName=t1"}
+				"logfile.pvc.name=test1", "logfile.pvc.storageClassName=t1", "logfile.backupRepoName=repo",
+				"datafile.pvc.name=test1", "datafile.pvc.storageClassName=t1", "datafile.backupRepoName=repo"}
 			Expect(o.runEditBackupPolicy()).Should(Succeed())
+
+			By("test unset backup repo")
+			o.values = []string{"datafile.backupRepoName="}
+			Expect(o.runEditBackupPolicy()).Should(Succeed())
+
+			By("test backup repo not exists")
+			o.values = []string{"datafile.backupRepoName=repo1"}
+			Expect(o.runEditBackupPolicy()).Should(MatchError(ContainSubstring(`"repo1" not found`)))
 
 			By("test invalid key")
 			o.values = []string{"schedule.datafile.enable1=false"}
@@ -231,11 +251,19 @@ var _ = Describe("DataProtection", func() {
 		AvailableReplicas := int32(1)
 		backup1.Status.Phase = dpv1alpha1.BackupRunning
 		backup1.Status.AvailableReplicas = &AvailableReplicas
-		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
+		backup2 := testing.FakeBackup("test1")
+		backup2.Namespace = "backup"
+		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1, backup2)
 		Expect(printBackupList(o)).Should(Succeed())
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql"))
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("(AvailablePods: 1)"))
+
+		By("test list all namespace")
+		o.Out.(*bytes.Buffer).Reset()
+		o.AllNamespaces = true
+		Expect(printBackupList(o)).Should(Succeed())
+		Expect(len(strings.Split(strings.Trim(o.Out.(*bytes.Buffer).String(), "\n"), "\n"))).Should(Equal(3))
 	})
 
 	It("restore", func() {

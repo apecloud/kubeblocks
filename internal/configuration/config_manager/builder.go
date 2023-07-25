@@ -41,11 +41,10 @@ import (
 )
 
 const (
-	configTemplateName   = "reload.yaml"
-	scriptVolumePrefix   = "cm-script-"
-	configVolumePrefix   = "cm-config-"
-	kbScriptVolumePath   = "/opt/kb-tools/reload"
-	kbConfigVolumePath   = "/opt/kb-tools/config"
+	configTemplateName = "reload.yaml"
+	scriptVolumePrefix = "cm-script-"
+	configVolumePrefix = "cm-config-"
+
 	scriptConfigField    = "scripts"
 	formatterConfigField = "formatterConfig"
 
@@ -53,6 +52,14 @@ const (
 	configManagerConfig           = "config-manager.yaml"
 	configManagerConfigMountPoint = "/opt/config-manager"
 	configManagerCMPrefix         = "sidecar-"
+)
+
+const (
+	KBScriptVolumePath = "/opt/kb-tools/reload"
+	KBConfigVolumePath = "/opt/kb-tools/config"
+
+	KBTOOLSScriptsPathEnv  = "TOOLS_SCRIPTS_PATH"
+	KBConfigManagerPathEnv = "TOOLS_PATH"
 )
 
 const KBConfigSpecLazyRenderedYamlFile = "lazy-rendered-config.yaml"
@@ -401,7 +408,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 }
 
 func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
-	mountPoint := filepath.Join(kbScriptVolumePath, configSpec.Name)
+	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,
 		Name:      options.ScriptConfigMapRef,
@@ -418,11 +425,11 @@ func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManag
 }
 
 func GetConfigMountPoint(configSpec appsv1alpha1.ComponentConfigSpec) string {
-	return filepath.Join(kbConfigVolumePath, configSpec.Name)
+	return filepath.Join(KBConfigVolumePath, configSpec.Name)
 }
 
 func GetScriptsMountPoint(configSpec appsv1alpha1.ComponentConfigSpec) string {
-	return filepath.Join(kbScriptVolumePath, configSpec.Name)
+	return filepath.Join(KBScriptVolumePath, configSpec.Name)
 }
 
 func GetScriptsVolumeName(configSpec appsv1alpha1.ComponentConfigSpec) string {

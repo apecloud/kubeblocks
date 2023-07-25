@@ -125,17 +125,6 @@ func (o *DeleteOptions) complete() error {
 		return err
 	}
 
-	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
-	if !o.AutoApprove {
-		names := o.ConfirmedNames
-		if len(names) == 0 {
-			names = o.Names
-		}
-		if err = Confirm(names, o.In); err != nil {
-			return err
-		}
-	}
-
 	// get the resources to delete
 	r := o.Factory.NewBuilder().
 		Unstructured().
@@ -151,6 +140,22 @@ func (o *DeleteOptions) complete() error {
 	if err != nil {
 		return err
 	}
+	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
+	if !o.AutoApprove {
+		var names []string
+		var infos []*resource.Info
+		if infos, err = r.Infos(); err != nil {
+			return err
+		}
+		for i := range infos {
+			names = append(names, infos[i].Name)
+		}
+		if err = Confirm(names, o.In); err != nil {
+			return err
+		}
+	}
+	infos, err := r.Infos()
+	fmt.Println(infos)
 	o.Result = r
 	return err
 }
@@ -236,7 +241,7 @@ func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}
-	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
+	_, err := prompt.NewPrompt(fmt.Sprintf("These clusters will be delete:[%s].\nPlease type the name again(separate with white space when more than one):", strings.Join(names, "")),
 		func(entered string) error {
 			enteredNames := strings.Split(entered, " ")
 			sort.Strings(names)

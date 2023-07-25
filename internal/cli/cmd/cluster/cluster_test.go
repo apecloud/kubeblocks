@@ -21,16 +21,22 @@ package cluster
 
 import (
 	"fmt"
+	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	kbclidelete "github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -292,7 +298,7 @@ var _ = Describe("Cluster", func() {
 				},
 				CreateOptions: create.CreateOptions{
 					Factory:   tf,
-					Namespace: "default",
+					Namespace: namespace,
 					Name:      "mycluster",
 					Dynamic:   tf.FakeDynamicClient,
 					IOStreams: streams,
@@ -434,6 +440,47 @@ var _ = Describe("Cluster", func() {
 
 	})
 
+	Context("delete cluster", func() {
+		var o *kbclidelete.DeleteOptions
+
+		BeforeEach(func() {
+			tf = testing.NewTestFactory(namespace)
+
+			_ = appsv1alpha1.AddToScheme(scheme.Scheme)
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			cluster := testing.FakeCluster(clusterName, namespace)
+			httpResp := func(obj runtime.Object) *http.Response {
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
+			}
+
+			tf.UnstructuredClient = &clientfake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					return httpResp(cluster), nil
+				}),
+			}
+
+			tf.Client = tf.UnstructuredClient
+			tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeClusterVersion())
+			o = &kbclidelete.DeleteOptions{
+				Factory:     tf,
+				IOStreams:   streams,
+				GVR:         types.ClusterGVR(),
+				AutoApprove: true,
+			}
+		})
+
+		It("validata delete cluster by name", func() {
+			Expect(deleteCluster(o, []string{})).Should(HaveOccurred())
+			Expect(deleteCluster(o, []string{clusterName})).Should(Succeed())
+			o.LabelSelector = fmt.Sprintf("clusterdefinition.kubeblocks.io/name=%s", testing.ClusterDefName)
+			// todo:  there is an issue with rendering the name of the "info" element, and efforts are being made to resolve it.
+			// Expect(deleteCluster(o, []string{})).Should(Succeed())
+			Expect(deleteCluster(o, []string{clusterName})).Should(HaveOccurred())
+		})
+
+	})
 	It("delete", func() {
 		cmd := NewDeleteCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())

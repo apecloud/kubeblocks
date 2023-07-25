@@ -1030,3 +1030,9 @@ func FakeBackupRepo(name string, isDefault bool) *dpv1alpha1.BackupRepo {
 	}
 	return backupRepo
 }
+
+func FakeClusterList() *appsv1alpha1.ClusterList {
+	clusters := &appsv1alpha1.ClusterList{}
+	clusters.Items = append(clusters.Items, *FakeCluster(ClusterName, Namespace))
+	return clusters
+}

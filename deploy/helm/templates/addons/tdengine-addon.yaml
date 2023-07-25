@@ -15,13 +15,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/tdengine
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/tdengine-{{ default .Chart.Version .Values.versionOverride }}/tdengine-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/tdengine-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "tdengine" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

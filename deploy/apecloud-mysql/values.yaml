@@ -70,9 +70,9 @@ vtgateLogConfigs:
   queryLog: /vtdataroot/vtgate_querylog.txt
 
 vtconsensusLogConfigs:
-  error: /vtdataroot/vtconsensus.ERROR
-  warning: /vtdataroot/vtconsensus.WARNING
-  info: /vtdataroot/vtconsensus.INFO
+  error: /vtdataroot/vtconsensus/vtconsensus.ERROR
+  warning: /vtdataroot/vtconsensus/vtconsensus.WARNING
+  info: /vtdataroot/vtconsensus/vtconsensus.INFO
 
 roleProbe:
   failureThreshold: 2

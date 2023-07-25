@@ -211,7 +211,9 @@ data:
 
     echo "starting vttablet for $alias..."
 
+    VTDATAROOT=$VTDATAROOT/vttablet
     su vitess <<EOF
+    mkdir -p $VTDATAROOT
     exec vttablet \
     $topology_fags \
     --alsologtostderr \
@@ -294,7 +296,9 @@ data:
     vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
     topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
 
+    VTDATAROOT=$VTDATAROOT/vtctld
     su vitess <<EOF
+    mkdir -p $VTDATAROOT
     exec vtctld \
     $topology_fags \
     --alsologtostderr \
@@ -318,7 +322,9 @@ data:
     vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
     topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
 
+    VTDATAROOT=$VTDATAROOT/vtconsensus
     su vitess <<EOF
+    mkdir -p $VTDATAROOT
     exec vtconsensus \
       $topology_fags \
       --alsologtostderr \

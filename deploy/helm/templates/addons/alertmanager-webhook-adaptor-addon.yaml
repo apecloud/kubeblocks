@@ -14,13 +14,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/alertmanager-webhook-adaptor
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/alertmanager-webhook-adaptor-0.1.4/alertmanager-webhook-adaptor-0.1.4.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/alertmanager-webhook-adaptor-0.1.4.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "alertmanager-webhook-adaptor" "version" "0.1.4" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

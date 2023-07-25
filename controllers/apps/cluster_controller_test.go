@@ -1664,7 +1664,7 @@ var _ = Describe("Cluster Controller", func() {
 	testUpdateKubeBlocksToolsImage := func(compName, compDefName string) {
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(compName, compDefName).
+			AddComponent(compName, compDefName).SetReplicas(1).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -2241,6 +2241,10 @@ var _ = Describe("Cluster Controller", func() {
 						PITREnabled: &boolFalse,
 					},
 				},
+				{
+					desc:   "backup is nil",
+					backup: nil,
+				},
 			}
 
 			for _, t := range testCases {
@@ -2276,7 +2280,13 @@ var _ = Describe("Cluster Controller", func() {
 				policyName := DeriveBackupPolicyName(clusterKey.Name, compDefName, "")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
 					func(g Gomega, policy *dataprotectionv1alpha1.BackupPolicy) {
-						if boolValue(backup.Enabled) {
+						if backup == nil {
+							// if cluster.Spec.Backup is nil, will use the default backup policy
+							g.Expect(policy).ShouldNot(BeNil())
+							g.Expect(policy.Spec.Schedule).ShouldNot(BeNil())
+							g.Expect(policy.Spec.Schedule.Snapshot).ShouldNot(BeNil())
+							g.Expect(policy.Spec.Schedule.Snapshot.Enable).Should(BeFalse())
+						} else if boolValue(backup.Enabled) {
 							checkPolicy(g, policy)
 						} else {
 							checkPolicyDisabled(g, policy)

@@ -178,10 +178,7 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 	scheme := *model.GetScheme()
 	ctx := context.Background()
 	ref, err := e.getOwnerUpTo(ctx, object, e.UpToLevel, scheme)
-	if err != nil {
-		return
-	}
-	if ref == nil {
+	if err != nil || ref == nil {
 		return
 	}
 

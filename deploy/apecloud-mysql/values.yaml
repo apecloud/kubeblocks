@@ -92,5 +92,5 @@ wesqlscale:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/apecloud-mysql-scale
-    tag: "latest"
+    tag: "0.1.1"
     pullPolicy: IfNotPresent

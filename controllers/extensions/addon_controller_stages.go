@@ -412,11 +412,62 @@ func getHelmReleaseName(addon *extensionsv1alpha1.Addon) string {
 	return fmt.Sprintf("kb-addon-%s", addon.Name)
 }
 
-func setLocalChartsPath(addon *extensionsv1alpha1.Addon) {
+func useLocalCharts(addon *extensionsv1alpha1.Addon) bool {
+	return addon.Spec.Helm != nil && strings.HasPrefix(addon.Spec.Helm.ChartLocationURL, "file://")
+}
+
+// buildLocalChartsPath builds the local charts path if the chartLocationURL starts with "file://"
+func buildLocalChartsPath(addon *extensionsv1alpha1.Addon) (string, error) {
+	if !useLocalCharts(addon) {
+		return "$(CHART)", nil
+	}
+
 	url := addon.Spec.Helm.ChartLocationURL
 	last := strings.LastIndex(url, "/")
 	name := url[last+1:]
-	addon.Spec.Helm.ChartLocationURL = fmt.Sprintf("%s/%s", localChartsPath, name)
+	return fmt.Sprintf("%s/%s", localChartsPath, name), nil
+}
+
+// setSharedVolume sets shared volume to copy helm charts from charts image
+func setSharedVolume(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.PodSpec) {
+	if !useLocalCharts(addon) {
+		return
+	}
+
+	helmJobPodSpec.Volumes = append(helmJobPodSpec.Volumes, corev1.Volume{
+		Name: "charts",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	})
+
+	helmJobPodSpec.Containers[0].VolumeMounts = append(helmJobPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
+		Name:      "charts",
+		MountPath: localChartsPath,
+	})
+}
+
+// setInitContainer sets init containers to copy dependent charts to shared volume
+func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.PodSpec) {
+	if !useLocalCharts(addon) {
+		return
+	}
+
+	fromPath := addon.Spec.Helm.ChartsPathInImage
+	if fromPath == "" {
+		fromPath = localChartsPath
+	}
+	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, corev1.Container{
+		Name:    "copy-charts",
+		Image:   addon.Spec.Helm.ChartsImage,
+		Command: []string{"sh", "-c", fmt.Sprintf("cp %s/* /mnt/charts", fromPath)},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "charts",
+				MountPath: "/mnt/charts",
+			},
+		},
+	})
 }
 
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
@@ -463,16 +514,21 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			return
 		}
 
-		// set addon installation job to use local charts instead of remote charts,
-		// the init container will copy the local charts to the shared volume
-		setLocalChartsPath(addon)
-
 		var err error
 		helmInstallJob, err = createHelmJobProto(addon)
 		if err != nil {
 			r.setRequeueWithErr(err, "")
 			return
 		}
+
+		// set addon installation job to use local charts instead of remote charts,
+		// the init container will copy the local charts to the shared volume
+		chartsPath, err := buildLocalChartsPath(addon)
+		if err != nil {
+			r.setRequeueWithErr(err, "")
+			return
+		}
+
 		helmInstallJob.ObjectMeta.Name = key.Name
 		helmInstallJob.ObjectMeta.Namespace = key.Namespace
 		helmJobPodSpec := &helmInstallJob.Spec.Template.Spec
@@ -481,7 +537,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			"upgrade",
 			"--install",
 			"$(RELEASE_NAME)",
-			"$(CHART)",
+			chartsPath,
 			"--namespace",
 			"$(RELEASE_NS)",
 			"--create-namespace",
@@ -570,30 +626,11 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 				})
 		}
 
-		// set init containers to copy dependent charts to shared volume
-		helmJobPodSpec.Volumes = append(helmJobPodSpec.Volumes, corev1.Volume{
-			Name: "charts",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		})
-
-		helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, corev1.Container{
-			Name:    "copy-charts",
-			Image:   viper.GetString(constant.KBChartsImage),
-			Command: []string{"sh", "-c", "cp /charts/* /mnt/charts"},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "charts",
-					MountPath: "/mnt/charts",
-				},
-			},
-		})
-
-		helmJobPodSpec.Containers[0].VolumeMounts = append(helmJobPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "charts",
-			MountPath: localChartsPath,
-		})
+		// if chartLocationURL starts with 'file://', it means the charts is from local file system
+		// we will copy the charts from charts image to shared volume. Addon container will use the
+		// charts from shared volume to install the addon.
+		setSharedVolume(addon, helmJobPodSpec)
+		setInitContainer(addon, helmJobPodSpec)
 
 		if err := r.reconciler.Create(ctx, helmInstallJob); err != nil {
 			r.setRequeueWithErr(err, "")

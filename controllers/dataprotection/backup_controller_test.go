@@ -345,13 +345,16 @@ var _ = Describe("Backup Controller test", func() {
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 
-				logJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-post"), Namespace: backupKey.Namespace}
+				logJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-0-pre"), Namespace: backupKey.Namespace}
 				patchK8sJobStatus(logJobKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
 				})).Should(Succeed())
+
+				sizeJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-1-post"), Namespace: backupKey.Namespace}
+				patchK8sJobStatus(sizeJobKey, batchv1.JobComplete)
 
 				By("Check pre job cleaned")
 				Eventually(testapps.CheckObjExists(&testCtx, preJobKey, &batchv1.Job{}, false)).Should(Succeed())

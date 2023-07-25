@@ -29,6 +29,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -94,26 +95,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		clusterObj        *appsv1alpha1.Cluster
 		clusterKey        types.NamespacedName
 	)
-
-	// Testcases
-
-	// checkLatestOpsIsProcessing := func(clusterKey client.ObjectKey, opsType appsv1alpha1.OpsType) {
-	//	Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-	//		con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
-	//		g.Expect(con).ShouldNot(BeNil())
-	//		g.Expect(con.Status).Should(Equal(metav1.ConditionFalse))
-	//		g.Expect(con.Reason).Should(Equal(appsv1alpha1.OpsRequestBehaviourMapper[opsType].ProcessingReasonInClusterCondition))
-	//	})).Should(Succeed())
-	// }
-	//
-	// checkLatestOpsHasProcessed := func(clusterKey client.ObjectKey) {
-	//	Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-	//		con := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
-	//		g.Expect(con).ShouldNot(BeNil())
-	//		g.Expect(con.Status).Should(Equal(metav1.ConditionTrue))
-	//		g.Expect(con.Reason).Should(Equal(lifecycle.ReasonOpsRequestProcessed))
-	//	})).Should(Succeed())
-	// }
 
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
@@ -611,22 +592,33 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 
-		It("HorizontalScaling when the number of pods is inconsistent with the number of replicates", func() {
+		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
 			By("create a cluster with 3 pods")
 			createMysqlCluster(3)
+
 			By("mock component replicas to 4 and actual pods is 3")
 			Expect(testapps.ChangeObj(&testCtx, clusterObj, func(clusterObj *appsv1alpha1.Cluster) {
 				clusterObj.Spec.ComponentSpecs[0].Replicas = 4
 			})).Should(Succeed())
 
 			By("scale down the cluster replicas to 2")
+			phase := appsv1alpha1.OpsPendingPhase
 			replicas := int32(2)
 			ops := createClusterHscaleOps(replicas)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
-				g.Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))
+				phases := []appsv1alpha1.OpsPhase{appsv1alpha1.OpsRunningPhase, appsv1alpha1.OpsFailedPhase}
+				g.Expect(slices.Contains(phases, ops.Status.Phase)).Should(BeTrue())
+				phase = ops.Status.Phase
 			})).Should(Succeed())
 
-			// wait for cluster and component phase are Updating
+			// Since the component replicas is different with running pods, the cluster and component phase may be
+			// Running or Updating, it depends on the timing of cluster reconciling and ops request submission.
+			// If the phase is Updating, ops request will be failed because of cluster phase conflict.
+			if phase == appsv1alpha1.OpsFailedPhase {
+				return
+			}
+
+			By("wait for cluster and component phase are Updating")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
@@ -738,5 +730,4 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 		})
 	})
-
 })

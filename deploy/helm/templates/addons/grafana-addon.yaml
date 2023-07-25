@@ -14,13 +14,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/grafana
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/grafana-6.43.5/grafana-6.43.5.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/grafana-6.43.5.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "grafana" "version" "6.43.5" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

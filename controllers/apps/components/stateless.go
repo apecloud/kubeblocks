@@ -199,6 +199,16 @@ func (c *statelessComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return err
 	}
 
+	// update component info to pods' annotations
+	if err := updateComponentInfoToPods(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+		return err
+	}
+	// patch the current componentSpec workload's custom labels
+	if err := patchWorkloadCustomLabel(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+		reqCtx.Event(c.Cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
+		return err
+	}
+
 	return c.ResolveObjectsAction(reqCtx, cli)
 }
 
@@ -209,6 +219,16 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if c.runningWorkload == nil {
 		return nil
 	}
+	// update component info to pods' annotations
+	if err := updateComponentInfoToPods(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+		return err
+	}
+	// patch the current componentSpec workload's custom labels
+	if err := patchWorkloadCustomLabel(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+		reqCtx.Event(c.Cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
+		return err
+	}
+
 	return c.componentBase.StatusWorkload(reqCtx, cli, c.runningWorkload, nil)
 }
 

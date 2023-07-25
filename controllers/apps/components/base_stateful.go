@@ -210,6 +210,17 @@ func (c *statefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 	}
 
 	c.updateWorkload(c.runningWorkload)
+
+	// update component info to pods' annotations
+	if err := updateComponentInfoToPods(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+		return err
+	}
+	// patch the current componentSpec workload's custom labels
+	if err := patchWorkloadCustomLabel(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+		reqCtx.Event(c.Cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
+		return err
+	}
+
 	return delayedRequeueError
 }
 
@@ -656,6 +667,16 @@ func (c *statefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.Req
 		}
 		// to work around that the scaled PVC will be deleted at object action.
 		if err := c.updateVolumes(reqCtx, cli, stsObj); err != nil {
+			return err
+		}
+
+		// update component info to pods' annotations
+		if err := updateComponentInfoToPods(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+			return err
+		}
+		// patch the current componentSpec workload's custom labels
+		if err := patchWorkloadCustomLabel(reqCtx.Ctx, cli, c.Cluster, c.Component); err != nil {
+			reqCtx.Event(c.Cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
 			return err
 		}
 	}

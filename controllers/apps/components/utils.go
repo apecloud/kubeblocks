@@ -730,3 +730,64 @@ func getImageName(image string) string {
 	}
 	return subs[0]
 }
+
+func updateComponentInfoToPods(
+	ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *componentutil.SynthesizedComponent) error {
+	if cluster == nil || component == nil {
+		return nil
+	}
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.GetName(),
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+	podList := corev1.PodList{}
+	if err := cli.List(ctx, &podList, ml); err != nil {
+		return err
+	}
+	replicasStr := strconv.Itoa(int(component.Replicas))
+	for _, pod := range podList.Items {
+		if pod.Annotations != nil &&
+			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
+			continue
+		}
+		patch := client.MergeFrom(pod.DeepCopy())
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+		pod.Annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
+		if err := cli.Patch(ctx, &pod, patch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// patchWorkloadCustomLabel patches workload custom labels.
+func patchWorkloadCustomLabel(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *componentutil.SynthesizedComponent) error {
+	if cluster == nil || component == nil {
+		return nil
+	}
+	for _, customLabelSpec := range component.CustomLabelSpecs {
+		// TODO if the customLabelSpec.Resources is empty, we should add the label to the workload resources under the component.
+		for _, resource := range customLabelSpec.Resources {
+			gvk, err := parseCustomLabelPattern(resource.GVK)
+			if err != nil {
+				return err
+			}
+			// only handle workload kind
+			if !slices.Contains(getCustomLabelWorkloadKind(), gvk.Kind) {
+				continue
+			}
+			if err := patchGVRCustomLabels(ctx, cli, cluster, resource, component.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

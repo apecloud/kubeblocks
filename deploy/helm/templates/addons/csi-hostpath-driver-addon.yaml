@@ -14,13 +14,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-hostpath-driver
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-hostpath-driver-{{ default .Chart.Version .Values.versionOverride }}/csi-hostpath-driver-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-hostpath-driver-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "csi-hostpath-driver" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

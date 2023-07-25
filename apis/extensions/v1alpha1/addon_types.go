@@ -114,6 +114,8 @@ type SelectorRequirement struct {
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
+// HelmTypeInstallSpec defines the Helm installation spec.
+// +kubebuilder:validation:XValidation:rule="self.chartLocationURL.startsWith('file://') ? has(self.chartsImage) : true",message="chartsImage is required when chartLocationURL starts with 'file://'"
 type HelmTypeInstallSpec struct {
 	// A Helm Chart location URL.
 	// +kubebuilder:validation:Required
@@ -130,6 +132,16 @@ type HelmTypeInstallSpec struct {
 	// valuesMapping defines add-on normalized resources parameters mapped to Helm values' keys.
 	// +optional
 	ValuesMapping HelmValuesMapping `json:"valuesMapping,omitempty"`
+
+	// chartsImage defines the image of Helm charts.
+	// +optional
+	ChartsImage string `json:"chartsImage,omitempty"`
+
+	// chartsPathInImage defines the path of Helm charts in the image. It's used to copy
+	// Helm charts from the image to the shared volume.
+	// +kubeBuilder:default="/charts"
+	// +optional
+	ChartsPathInImage string `json:"chartsPathInImage,omitempty"`
 }
 
 type HelmInstallOptions map[string]string

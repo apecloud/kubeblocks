@@ -20,8 +20,6 @@ image:
   imagePullSecrets: []
   tools:
     repository: apecloud/kubeblocks-tools
-  charts:
-    repository: apecloud/kubeblocks-charts
   datascript:
     repository: apecloud/kubeblocks-datascript
 
@@ -358,7 +356,18 @@ addonController:
 keepAddons: false
 
 ## @param addonChartLocationBase - KubeBlocks official addon's chart location base, to be released in an air-gapped environment.
-addonChartLocationBase: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts
+## if url has prefix "file://", KubeBlocks will use the helm charts copied from the addonChartsImage.
+##
+addonChartLocationBase: file://
+
+## @param addonChartsImage - addon charts image, used to copy Helm charts to the addon job container.
+## @param addonChartsImage.chartsPath - the helm charts path in the addon charts image.
+addonChartsImage:
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/kubeblocks-charts
+  pullPolicy: IfNotPresent
+  tag: ""
+  chartsPath: /charts
 
 ## @param addonHelmInstallOptions - addon helm install options.
 addonHelmInstallOptions:

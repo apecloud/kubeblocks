@@ -14,13 +14,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-otel-collector
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-otel-collector-0.1.2-beta.3/apecloud-otel-collector-0.1.2-beta.3.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-otel-collector-0.1.2-beta.3.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "apecloud-otel-collector" "version" "0.1.2-beta.3" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

@@ -60,6 +60,11 @@ type BaseInternalOps interface {
 	Dispatch(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error)
 }
 
+type GlobalInfo struct {
+	Term       int               `json:"term"`
+	Addr2Roles map[string]string `json:"addr_2_roles"`
+}
+
 type BaseOperations struct {
 	CheckRunningFailedCount    int
 	CheckStatusFailedCount     int
@@ -80,12 +85,14 @@ type BaseOperations struct {
 	Logger                 logr.Logger
 	Metadata               map[string]string
 	InitIfNeed             func() bool
-	GetRole                func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error)
+	GetRole                func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error)
 	// TODO: need a better way to support the extension for engines.
 	LockInstance     func(ctx context.Context) error
 	UnlockInstance   func(ctx context.Context) error
 	LegacyOperations map[OperationKind]LegacyOperation
 	Ops              map[OperationKind]Operation
+	// OriginGlobalInfo is used to indicate the version of the
+	OriginGlobalInfo GlobalInfo
 }
 
 func init() {
@@ -230,9 +237,9 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	ctx1, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	role, err := ops.GetRole(ctx1, req, resp)
+	globalInfo, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
-		ops.Logger.Error(err, "error executing checkRole")
+		ops.Logger.Error(err, "executing checkRole error")
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
@@ -244,18 +251,32 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	}
 
 	ops.CheckRoleFailedCount = 0
-	if isValid, message := ops.roleValidate(role); !isValid {
-		opsRes["event"] = OperationInvalid
-		opsRes["message"] = message
-		return opsRes, nil
+	for _, role := range globalInfo.Addr2Roles {
+		if isValid, message := ops.roleValidate(role); !isValid {
+			opsRes["event"] = OperationInvalid
+			opsRes["message"] = message
+			return opsRes, nil
+		}
+	}
+
+	marshal, err := json.Marshal(globalInfo)
+	if err != nil {
+		ops.Logger.Error(err, "global info marshal error")
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = err.Error()
+		return opsRes, err
 	}
 
 	opsRes["event"] = OperationSuccess
-	opsRes["role"] = role
-	if ops.OriRole != role {
-		ops.OriRole = role
-		SentProbeEvent(ctx, opsRes, ops.Logger)
-	}
+	opsRes["global-info"] = string(marshal)
+
+	//if ops.OriRole != role {
+	//	ops.OriRole = role
+	//	SentProbeEvent(ctx, opsRes, ops.Logger)
+	//}
+
+	// todo determine when to sendProbeEvent. Maybe leave it to controller to decide
+	SentProbeEvent(ctx, opsRes, ops.Logger)
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
 	// If the role remains unchanged consecutively in RoleDetectionThreshold checks after it has changed,
@@ -447,4 +468,20 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 
 	opsRes["event"] = OperationSuccess
 	return opsRes, nil
+}
+
+// compareGlobalInfo returns true if we need to update GlobalInfo
+func (g *GlobalInfo) compareGlobalInfo(another GlobalInfo) bool {
+	if another.Term != g.Term {
+		return another.Term > g.Term
+	}
+
+	// todo how do we decide which one to pick if the terms are same ? By time ?
+	for k, v := range g.Addr2Roles {
+		anotherV := another.Addr2Roles[k]
+		if v != anotherV {
+			return true
+		}
+	}
+	return false
 }

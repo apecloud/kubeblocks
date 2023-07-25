@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strconv"
 	"strings"
 	"time"
@@ -2588,16 +2589,43 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
-			stsKey := types.NamespacedName{
+			workloadKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
 				Name:      clusterKey.Name + "-" + consensusCompName,
 			}
+
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				By("checking workload exists")
+				Eventually(testapps.CheckObjExists(&testCtx, workloadKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
+
+				finalizerName := "test/finalizer"
+				By("set finalizer for workload to prevent it from deletion")
+				Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(wl *workloads.ReplicatedStateMachine) {
+					wl.ObjectMeta.Finalizers = append(wl.ObjectMeta.Finalizers, finalizerName)
+				})()).ShouldNot(HaveOccurred())
+
+				By("Delete the cluster")
+				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+				By("checking cluster keep existing")
+				Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+				By("remove finalizer of sts to get it deleted")
+				Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(wl *workloads.ReplicatedStateMachine) {
+					wl.ObjectMeta.Finalizers = nil
+				})()).ShouldNot(HaveOccurred())
+
+				By("Wait for the cluster to terminate")
+				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+				return
+			}
+
 			By("checking sts exists")
-			Eventually(testapps.CheckObjExists(&testCtx, stsKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, workloadKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
 
 			finalizerName := "test/finalizer"
 			By("set finalizer for sts to prevent it from deletion")
-			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+			Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(sts *appsv1.StatefulSet) {
 				sts.ObjectMeta.Finalizers = append(sts.ObjectMeta.Finalizers, finalizerName)
 			})()).ShouldNot(HaveOccurred())
 
@@ -2608,7 +2636,7 @@ var _ = Describe("Cluster Controller", func() {
 			Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 			By("remove finalizer of sts to get it deleted")
-			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+			Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(sts *appsv1.StatefulSet) {
 				sts.ObjectMeta.Finalizers = nil
 			})()).ShouldNot(HaveOccurred())
 

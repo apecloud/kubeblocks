@@ -124,11 +124,7 @@ var _ = Describe("component module", func() {
 				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
-			expectedContainers := 3
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
-				expectedContainers = 2
-			}
-			Expect(len(component.PodSpec.Containers)).Should(Equal(expectedContainers))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 
 			By("new init container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(

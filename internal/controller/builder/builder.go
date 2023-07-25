@@ -663,13 +663,7 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 	case "redis":
 	case "kafka":
 	}
-	// TODO(free6om): remove this
-	return []workloads.Action{
-		{
-			Image:   "busybox:latest",
-			Command: []string{},
-		},
-	}
+	return nil
 }
 
 func randomString(length int) string {

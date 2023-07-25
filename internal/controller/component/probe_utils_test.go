@@ -96,11 +96,7 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
-				Expect(len(component.PodSpec.Containers)).Should(Equal(2))
-			} else {
-				Expect(len(component.PodSpec.Containers)).Should(Equal(3))
-			}
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})
 
@@ -143,11 +139,7 @@ var _ = Describe("probe_utils", func() {
 				},
 			}
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			expectedContainers := 3
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
-				expectedContainers = 2
-			}
-			Expect(len(component.PodSpec.Containers)).Should(Equal(expectedContainers))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 		})
 
 		It("build volume protection probe container with RBAC", func() {
@@ -170,11 +162,7 @@ var _ = Describe("probe_utils", func() {
 			}
 			viper.SetDefault(constant.EnableRBACManager, true)
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			expectedContainers := 4
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
-				expectedContainers = 3
-			}
-			Expect(len(component.PodSpec.Containers)).Should(Equal(expectedContainers))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
 			spec := &appsv1alpha1.VolumeProtectionSpec{}
 			for _, e := range component.PodSpec.Containers[0].Env {
 				if e.Name == constant.KBEnvVolumeProtectionSpec {

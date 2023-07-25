@@ -105,7 +105,6 @@ func init() {
 // clusterdefinition, backuppolicy, jobs, secrets
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
 // +kubebuilder:rbac:groups=batch,resources=jobs/finalizers,verbs=update
@@ -137,6 +136,23 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// cluster is under deletion, do nothing
 	if !cluster.GetDeletionTimestamp().IsZero() {
 		reqCtx.Log.V(1).Info("Cluster is under deletion.", "cluster", req.NamespacedName)
+		// get sysaccount jobs for this cluster and delete them
+		jobs := &batchv1.JobList{}
+		options := client.ListOptions{}
+
+		client.InNamespace(reqCtx.Req.Namespace).ApplyToList(&options)
+		client.MatchingLabels{constant.AppInstanceLabelKey: reqCtx.Req.Name}.ApplyToList(&options)
+		client.HasLabels{constant.ClusterAccountLabelKey}.ApplyToList(&options)
+
+		if err := r.Client.List(reqCtx.Ctx, jobs, &options); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+
+		for _, job := range jobs.Items {
+			patch := client.MergeFrom(job.DeepCopy())
+			controllerutil.RemoveFinalizer(&job, constant.DBClusterFinalizerName)
+			_ = r.Client.Patch(context.Background(), &job, patch)
+		}
 		return intctrlutil.Reconciled()
 	}
 

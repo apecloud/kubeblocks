@@ -19,10 +19,10 @@ For Windows users, PowerShell version should be 5.0 or higher.
 
 ## Install kbcli
 
-kbcli now supports macOS, Windows, and Linux.
+kbcli now supports MacOS, Windows, and Linux.
 
 <Tabs>
-<TabItem value="macOS" label="macOS" default>
+<TabItem value="MacOS" label="MacOS" default>
 
 You can install kbcli with `curl` or `brew`.
 

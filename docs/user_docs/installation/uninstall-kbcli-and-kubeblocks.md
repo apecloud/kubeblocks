@@ -40,15 +40,6 @@ kbcli kubeblocks uninstall
 <TabItem value="helm" label="helm" default>
 
 ```bash
-helm uninstall kubeblocks -n kb-system
-```
-
-</TabItem>
-</Tabs>
-
-
-**Use Helm to uninstall KubeBlocks**
-```bash
 helm uninstall kubeblocks --namespace kb-system
 ```
 
@@ -57,13 +48,22 @@ Helm does not delete CRD objects. You can delete the ones KubeBlocks created wit
 kubectl get crd -o name | grep kubeblocks.io | xargs kubectl delete
 ```
 
-**Use YAML to uninstall KubeBlocks**
 
-If you prefer to not use Helm, you can generate YAMLs from the KubeBlocks chart and uninstall using kubectl.
+</TabItem>
+
+<TabItem value="yaml" label="yaml" default>
+
+You can generate YAMLs from the KubeBlocks chart and uninstall using kubectl.
 
 ```bash
 helm template kubeblocks kubeblocks/kubeblocks --namespace kb-system | kubectl delete -f -
 ```
+
+
+</TabItem>
+
+</Tabs>
+
 
 ## Uninstall kbcli
 

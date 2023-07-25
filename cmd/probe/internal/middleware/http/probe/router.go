@@ -27,17 +27,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/go-errors/errors"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 

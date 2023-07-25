@@ -26,14 +26,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 func TestInit(t *testing.T) {

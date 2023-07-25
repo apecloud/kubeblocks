@@ -24,10 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-
 	"os"
 	"strings"
 	"testing"
@@ -35,7 +31,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 

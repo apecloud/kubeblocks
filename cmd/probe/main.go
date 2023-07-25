@@ -27,18 +27,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
 	"go.uber.org/automaxprocs/maxprocs"
+	"go.uber.org/zap"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
 var port int

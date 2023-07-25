@@ -22,10 +22,9 @@ package kafka
 import (
 	"testing"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
 	"github.com/stretchr/testify/assert"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 

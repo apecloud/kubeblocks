@@ -31,14 +31,13 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3client"
+	"go.uber.org/zap"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
 const (

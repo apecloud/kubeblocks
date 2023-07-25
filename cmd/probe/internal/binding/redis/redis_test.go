@@ -27,11 +27,9 @@ import (
 	"testing"
 
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/go-redis/redismock/v9"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"

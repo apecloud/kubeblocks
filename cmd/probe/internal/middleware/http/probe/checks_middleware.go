@@ -28,11 +28,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
-
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
-
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 

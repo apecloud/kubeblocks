@@ -24,12 +24,11 @@ import (
 	"testing"
 
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+	"go.uber.org/zap"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )

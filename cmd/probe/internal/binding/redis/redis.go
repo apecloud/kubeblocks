@@ -26,14 +26,11 @@ import (
 	"strings"
 	"sync"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
 	// import this json-iterator package to replace the default
@@ -41,6 +38,7 @@ import (
 	json "github.com/json-iterator/go"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	rediscomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/redis"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )

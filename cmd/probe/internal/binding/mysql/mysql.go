@@ -29,20 +29,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
 	"github.com/go-logr/logr"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
-
+	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
@@ -217,6 +213,84 @@ func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, reques
 		return role, nil
 	}
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
+}
+
+func (mysqlOps *MysqlOperations) getTerm(ctx context.Context) (int, error) {
+	sql := "select CURRENT_TERM from information_schema.wesql_cluster_local;"
+
+	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
+	if err != nil {
+		mysqlOps.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		return -1, errors.Wrapf(err, "error executing %s", sql)
+	}
+
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+
+	var term int
+	for rows.Next() {
+		err := rows.Scan(&term)
+		if err != nil {
+			return -1, err
+		}
+	}
+
+	return term, nil
+}
+
+func (mysqlOps *MysqlOperations) GetGlobalInfo(ctx context.Context, request *binding.ProbeRequest, response *binding.ProbeResponse) (OpsResult, error) {
+	opsResult := OpsResult{}
+	globalInfo := GlobalInfo{Addr2Roles: make(map[string]string)}
+
+	// todo check is leader ?
+	//if isLeader, err := mysqlOps.manager.IsLeader(ctx, nil); err != nil || !isLeader{
+	//	return opsResult, errors.New("not a leader")
+	//}
+
+	term, err := mysqlOps.getTerm(ctx)
+	if err != nil {
+		opsResult["event"] = OperationFailed
+		opsResult["message"] = errors.Errorf("Query term error: %v", err)
+		return opsResult, err
+	}
+	opsResult["term"] = term
+
+	sql := "select IP_PORT, ROLE from information_schema.wesql_cluster_global;"
+	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+
+	if err != nil {
+		opsResult["event"] = OperationFailed
+		opsResult["message"] = errors.Errorf("Query sql %s error: %v", sql, err)
+		return opsResult, err
+	}
+
+	var ipPort, role string
+	for rows.Next() {
+		if err := rows.Scan(&ipPort, &role); err != nil {
+			mysqlOps.Logger.Error(err, "Get global info err")
+			opsResult["event"] = OperationFailed
+			opsResult["message"] = errors.Errorf("Get global info err: %v", err)
+			return opsResult, err
+		}
+		globalInfo.Addr2Roles[ipPort] = role
+	}
+
+	marshal, err := json.Marshal(globalInfo)
+	if err != nil {
+		opsResult["event"] = OperationFailed
+		opsResult["message"] = errors.Errorf("Get global info err: %v", err)
+		return opsResult, err
+	}
+
+	opsResult["event"] = OperationSuccess
+	opsResult["message"] = string(marshal)
+	return opsResult, nil
 }
 
 func (mysqlOps *MysqlOperations) LockInstance(ctx context.Context) error {

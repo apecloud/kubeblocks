@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"reflect"
 	"strconv"
 	"strings"
@@ -51,6 +50,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	rsmpkg "github.com/apecloud/kubeblocks/internal/controller/rsm"
@@ -2043,7 +2043,6 @@ var _ = Describe("Cluster Controller", func() {
 					})()).ShouldNot(HaveOccurred())
 				}
 			}
-
 
 			By("delete the cluster and should preserved PVC,Secret,CM resources")
 			deleteCluster := func(termPolicy appsv1alpha1.TerminationPolicyType) {

@@ -216,13 +216,6 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	//err = (&workloads2.ReplicatedStateMachineReconciler{
-	//	Client:   k8sManager.GetClient(),
-	//	Scheme:   k8sManager.GetScheme(),
-	//	Recorder: k8sManager.GetEventRecorderFor("rsm-controller"),
-	//}).SetupWithManager(k8sManager)
-	//Expect(err).ToNot(HaveOccurred())
-
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	appsv1alpha1.RegisterWebhookManager(k8sManager)

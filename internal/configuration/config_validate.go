@@ -95,7 +95,7 @@ func (s *schemaValidator) Validate(data map[string]string) error {
 		if s.filter(key) {
 			continue
 		}
-		cfg, err := loadConfigObjectFromContent(s.cfgType, data)
+		cfg, err := LoadConfigObjectFromContent(s.cfgType, data)
 		if err != nil {
 			return err
 		}

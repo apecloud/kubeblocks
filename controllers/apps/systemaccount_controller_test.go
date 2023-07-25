@@ -519,6 +519,57 @@ var _ = Describe("SystemAccount Controller", func() {
 				Expect(k8sClient.Delete(ctx, cluster)).To(Succeed())
 			}
 		})
+
+		It("Should remove jobs neither completed nor failed on cluster deletion", func() {
+			var totalJobs int
+			for testName, testCase := range mysqlTestCases {
+				var (
+					acctList   appsv1alpha1.KBAccountType
+					jobsNum    int
+					secretsNum int
+				)
+
+				for _, acc := range testCase.accounts {
+					resource := testCase.resourceMap[acc]
+					acctList |= acc.GetAccountID()
+					jobsNum += resource.jobNum
+					secretsNum += resource.secretNum
+				}
+				totalJobs += jobsNum
+
+				// get a cluster instance from map, created during preparation
+				clusterKey, ok := clustersMap[testName]
+				Expect(ok).To(BeTrue())
+
+				// patch cluster to running
+				patchClusterToRunning(clusterKey, testCase.componentName)
+
+				// get latest cluster object
+				cluster := &appsv1alpha1.Cluster{}
+				Expect(k8sClient.Get(ctx, clusterKey, cluster)).Should(Succeed())
+				ml := getLabelsForSecretsAndJobs(componentUniqueKey{namespace: cluster.Namespace, clusterName: cluster.Name, componentName: testCase.componentName})
+
+				By("Verify accounts to be created")
+				Eventually(func(g Gomega) {
+					accounts := getAccounts(g, cluster, ml)
+					g.Expect(accounts).To(BeEquivalentTo(acctList))
+				}).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					jobs := &batchv1.JobList{}
+					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
+				}).Should(Succeed())
+
+				By("Delete cluster before jobs are done, all jobs should be removed")
+				Expect(k8sClient.Delete(ctx, cluster)).To(Succeed())
+				Eventually(func(g Gomega) {
+					jobs := &batchv1.JobList{}
+					g.Expect(k8sClient.List(ctx, jobs, ml)).To(Succeed())
+					g.Expect(len(jobs.Items)).To(BeEquivalentTo(0))
+				}).Should(Succeed())
+			}
+		})
 	}) // end of context
 
 	Context("When Update Cluster", func() {

@@ -216,6 +216,10 @@ type ShellTrigger struct {
 	// command used to execute for reload.
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
+
+	// Specify synchronize updates parameters to the config manager.
+	// +optional
+	Sync *bool `json:"sync,omitempty"`
 }
 
 type TPLScriptTrigger struct {
@@ -243,6 +247,7 @@ type FormatterConfig struct {
 	// dotenv: this was a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
 	// properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
 	// toml: reference wiki: https://en.wikipedia.org/wiki/TOML
+	// props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)
 	// +kubebuilder:validation:Required
 	Format CfgFileFormat `json:"format"`
 }

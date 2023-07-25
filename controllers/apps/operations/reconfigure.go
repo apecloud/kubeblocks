@@ -342,10 +342,10 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return processMergedFailed(resource, true,
 			cfgcore.WrapError(err, "failed to get config template in the component[%s]", componentName))
 	}
-	return r.doMergeAndPersist(reqCtx, cli, clusterName, componentName, spec.Reconfigure, resource, configSpecs)
+	return r.sync(reqCtx, cli, clusterName, componentName, spec.Reconfigure, resource, configSpecs)
 }
 
-func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
+func (r *reconfigureAction) sync(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	clusterName, componentName string,
 	reconfigure *appsv1alpha1.Reconfigure,
@@ -375,7 +375,7 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 			return processMergedFailed(resource, true,
 				cfgcore.MakeError("current configSpec not support reconfigure, configSpec: %v", configSpec.Name))
 		}
-		result := updateCfgParams(config, *configSpec, client.ObjectKey{
+		result := updateConfigConfigmapResource(config, *configSpec, client.ObjectKey{
 			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.Name),
 			Namespace: resource.Cluster.Namespace,
 		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)

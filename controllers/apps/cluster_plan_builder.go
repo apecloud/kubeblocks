@@ -252,7 +252,7 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		}
 	case ictrltypes.PATCH:
 		patch := client.MergeFrom(node.ObjCopy)
-		if err := c.cli.Patch(c.transCtx.Context, node.Obj, patch); !apierrors.IsNotFound(err) {
+		if err := c.cli.Patch(c.transCtx.Context, node.Obj, patch); err != nil && !apierrors.IsNotFound(err) {
 			c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error", node.ObjCopy))
 			return err
 		}

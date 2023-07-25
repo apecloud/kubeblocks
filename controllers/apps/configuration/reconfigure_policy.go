@@ -231,12 +231,18 @@ func enableSyncReload(policyType appsv1alpha1.UpgradePolicy, options *appsv1alph
 }
 
 func enableSyncTrigger(options *appsv1alpha1.ReloadOptions) bool {
-	if options == nil || options.TPLScriptTrigger == nil {
+	if options == nil {
 		return false
 	}
 
-	trigger := options.TPLScriptTrigger
-	return trigger.Sync != nil && *trigger.Sync
+	if options.TPLScriptTrigger != nil {
+		return !cfgcore.IsWatchModuleForTplTrigger(options.TPLScriptTrigger)
+	}
+
+	if options.ShellTrigger != nil {
+		return !cfgcore.IsWatchModuleForShellTrigger(options.ShellTrigger)
+	}
+	return false
 }
 
 func withSucceed(succeedCount int32) func(status *ReturnedStatus) {

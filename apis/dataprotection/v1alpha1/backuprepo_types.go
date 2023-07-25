@@ -49,30 +49,34 @@ type BackupRepoSpec struct {
 
 // BackupRepoStatus defines the observed state of BackupRepo
 type BackupRepoStatus struct {
-	// Storage provider reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.
+	// Backup repo reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.
 	// +kubebuilder:validation:Enum={PreChecking,Failed,Ready,Deleting}
 	// +optional
 	Phase BackupRepoPhase `json:"phase,omitempty"`
 
-	// Describes the current state of the repo.
+	// conditions describes the current state of the repo.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// ObservedGeneration is the latest generation observed by the controller.
+	// observedGeneration is the latest generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// GeneratedCSIDriverSecret references the generated secret used by the CSI driver.
+	// generatedCSIDriverSecret references the generated secret used by the CSI driver.
 	// +optional
 	GeneratedCSIDriverSecret *corev1.SecretReference `json:"generatedCSIDriverSecret,omitempty"`
 
-	// GeneratedStorageClassName indicates the generated storage class name.
+	// generatedStorageClassName indicates the generated storage class name.
 	// +optional
 	GeneratedStorageClassName string `json:"generatedStorageClassName,omitempty"`
 
-	// BackupPVCName is the name of the PVC used to store backup data.
+	// backupPVCName is the name of the PVC used to store backup data.
 	// +optional
 	BackupPVCName string `json:"backupPVCName,omitempty"`
+
+	// isDefault indicates whether this backup repo is the default one.
+	// +optional
+	IsDefault bool `json:"isDefault,omitempty"`
 }
 
 // +genclient
@@ -81,6 +85,10 @@ type BackupRepoStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=backuprepos,categories={kubeblocks},scope=Cluster
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="STORAGEPROVIDER",type="string",JSONPath=".spec.storageProviderRef"
+// +kubebuilder:printcolumn:name="DEFAULT",type="boolean",JSONPath=`.status.isDefault`
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BackupRepo is the Schema for the backuprepos API
 type BackupRepo struct {

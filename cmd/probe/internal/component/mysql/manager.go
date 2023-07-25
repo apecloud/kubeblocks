@@ -79,7 +79,9 @@ func getIndex(memberName string) (int, error) {
 	return strconv.Atoi(memberName[i+1:])
 }
 
-func (mgr *Manager) Initialize() {}
+func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
+	return nil
+}
 
 func (mgr *Manager) IsRunning() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -291,7 +293,7 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *Manager) Premote() error {
+func (mgr *Manager) Promote() error {
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
@@ -410,4 +412,12 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) 
 	}
 
 	return members
+}
+
+func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
+	return true, nil
+}
+
+func (mgr *Manager) CreateRoot(ctx context.Context) error {
+	return nil
 }

@@ -47,4 +47,11 @@ spec:
       {{- end }}
 
   installable:
-    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "csi-s3" ) "enabled" }}
+    {{- $autoInstall := (get ( get ( .Values | toYaml | fromYaml ) "csi-s3" ) "enabled") }}
+    {{- /* auto install csi-s3 if it's required by backup repos */ -}}
+    {{- if .Values.backupRepo.create }}
+      {{- if eq .Values.backupRepo.storageProvider "s3" "oss" "minio" }}
+        {{- $autoInstall = true }}
+      {{- end }}
+    {{- end }}
+    autoInstall: {{ $autoInstall }}

@@ -55,7 +55,6 @@ type CreateOptions struct {
 	Factory       cmdutil.Factory
 	dynamic       dynamic.Interface
 	ClusterDefRef string
-	Constraint    string
 	ComponentType string
 	ClassName     string
 	CPU           string
@@ -64,8 +63,8 @@ type CreateOptions struct {
 }
 
 var classCreateExamples = templates.Examples(`
-    # Create a class with constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which has 1 CPU core and 1Gi memory
-    kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi
+    # Create a class for component mysql in cluster definition apecloud-mysql, which has 1 CPU core and 1Gi memory
+    kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --cpu 1 --memory 1Gi
 
     # Create classes for component mysql in cluster definition apecloud-mysql, with classes defined in file
     kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
@@ -88,7 +87,6 @@ func NewCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd.Flags().StringVar(&o.ComponentType, "type", "", "Specify component type")
 	util.CheckErr(cmd.MarkFlagRequired("type"))
 
-	cmd.Flags().StringVar(&o.Constraint, "constraint", "", "Specify resource constraint")
 	cmd.Flags().StringVar(&o.CPU, corev1.ResourceCPU.String(), "", "Specify component CPU cores")
 	cmd.Flags().StringVar(&o.Memory, corev1.ResourceMemory.String(), "", "Specify component memory size")
 
@@ -141,7 +139,7 @@ func (o *CreateOptions) run() error {
 	}
 
 	var (
-		classInstances       []*v1alpha1.ComponentClassInstance
+		classInstances       []*v1alpha1.ComponentClass
 		componentClassGroups []v1alpha1.ComponentClassGroup
 	)
 
@@ -164,16 +162,12 @@ func (o *CreateOptions) run() error {
 			classInstances = append(classInstances, cls)
 		}
 	} else {
-		if _, ok := constraints[o.Constraint]; !ok {
-			return fmt.Errorf("resource constraint %s is not found", o.Constraint)
-		}
 		cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
 		if err != nil {
 			return err
 		}
 		componentClassGroups = []v1alpha1.ComponentClassGroup{
 			{
-				ResourceConstraintRef: o.Constraint,
 				Series: []v1alpha1.ComponentClassSeries{
 					{
 						Classes: []v1alpha1.ComponentClass{cls},
@@ -181,7 +175,7 @@ func (o *CreateOptions) run() error {
 				},
 			},
 		}
-		classInstances = append(classInstances, &v1alpha1.ComponentClassInstance{ComponentClass: cls, ResourceConstraintRef: o.Constraint})
+		classInstances = append(classInstances, &cls)
 	}
 
 	var (
@@ -191,20 +185,33 @@ func (o *CreateOptions) run() error {
 	if objName == "" {
 		objName = class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType)
 	}
-	for _, item := range classInstances {
-		constraint, ok := constraints[item.ResourceConstraintRef]
-		if !ok {
-			return fmt.Errorf("resource constraint %s is not found", item.ResourceConstraintRef)
-		}
-		clsDefRef := v1alpha1.ClassDefRef{Name: objName, Class: item.Name}
 
+	var rules []v1alpha1.ResourceConstraintRule
+	for _, constraint := range constraints {
+		rules = append(rules, constraint.FindRules(o.ClusterDefRef, o.ComponentType)...)
+	}
+
+	for _, item := range classInstances {
+		clsDefRef := v1alpha1.ClassDefRef{Name: objName, Class: item.Name}
 		if clsMgr.HasClass(o.ComponentType, clsDefRef) {
 			return fmt.Errorf("class name conflicted %s", item.Name)
 		}
-		if !constraint.MatchClass(item) {
-			return fmt.Errorf("class %s does not conform to constraint %s", item.Name, item.ResourceConstraintRef)
-		}
 		classNames = append(classNames, item.Name)
+
+		if len(rules) == 0 {
+			continue
+		}
+
+		match := false
+		for _, rule := range rules {
+			if rule.ValidateResources(item.ToResourceRequirements().Requests) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return fmt.Errorf("class %s does not conform to its constraints", item.Name)
+		}
 	}
 
 	obj, err := o.dynamic.Resource(types.ComponentClassDefinitionGVR()).Get(context.TODO(), objName, metav1.GetOptions{})
@@ -297,29 +304,5 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 				}
 			}
 			return componentTypes, cobra.ShellCompDirectiveNoFileComp
-		}))
-	util.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"constraint",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var constraints []string
-			client, err := f.DynamicClient()
-			if err != nil {
-				return constraints, cobra.ShellCompDirectiveNoFileComp
-			}
-
-			objs, err := client.Resource(types.ComponentResourceConstraintGVR()).List(context.Background(), metav1.ListOptions{})
-			if err != nil {
-				return constraints, cobra.ShellCompDirectiveNoFileComp
-			}
-			var constraintList v1alpha1.ComponentResourceConstraintList
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &constraintList); err != nil {
-				return constraints, cobra.ShellCompDirectiveNoFileComp
-			}
-			for _, item := range constraintList.Items {
-				if _, ok := item.GetLabels()[types.ResourceConstraintProviderLabelKey]; ok {
-					constraints = append(constraints, item.GetName())
-				}
-			}
-			return constraints, cobra.ShellCompDirectiveNoFileComp
 		}))
 }

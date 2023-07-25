@@ -21,8 +21,10 @@ package preflight
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,10 +36,18 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
+)
+
+const (
+	StorageClassPath       = "cluster-resources/storage-classes.json"
+	StorageClassErrorsPath = "cluster-resources/storage-classes-errors.json"
 )
 
 func CollectPreflight(f cmdutil.Factory, helmOpts *values.Options, ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
@@ -183,7 +193,7 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	//	// todo user defined cluster collector
 	// }
 
-	collectResults, err := CollectCluster(ctx, collectOpts, collectors, allCollectorsMap, kbPreflight, helmOpts)
+	collectResults, err := CollectCluster(ctx, collectOpts, collectors, allCollectorsMap, kbPreflight, helmOpts, k8sClient)
 	return &collectResults, err
 }
 
@@ -194,6 +204,7 @@ func CollectCluster(ctx context.Context,
 	allCollectorsMap map[reflect.Type][]pkgcollector.Collector,
 	kbPreflight *preflightv1beta2.Preflight,
 	helmOpts *values.Options,
+	client *kubernetes.Clientset,
 ) (preflight.CollectResult, error) {
 	var foundForbidden bool
 	allCollectedData := make(map[string][]byte)
@@ -302,9 +313,49 @@ func CollectCluster(ctx context.Context,
 			allCollectedData[k] = v
 		}
 	}
-
+	retryErrorCausedByMetricsUnavailable(ctx, opts, client, allCollectedData)
 	collectResult.AllCollectedData = allCollectedData
 	return collectResult, nil
+}
+
+func retryErrorCausedByMetricsUnavailable(ctx context.Context, opts preflight.CollectOpts, client *kubernetes.Clientset, data map[string][]byte) {
+	handleStorageClassError(ctx, opts, client, data)
+}
+
+func handleStorageClassError(ctx context.Context, _ preflight.CollectOpts, client *kubernetes.Clientset, data map[string][]byte) {
+	storageClassError, ok := data[StorageClassErrorsPath]
+	if !ok {
+		return
+	}
+	var errorStrs []string
+	if err := json.Unmarshal(storageClassError, &errorStrs); err != nil || len(errorStrs) == 0 || !isMetricsUnavailableError(errorStrs[0]) {
+		return
+	}
+	storageClasses, err := client.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+	if err != nil || storageClasses.Items == nil || len(storageClasses.Items) == 0 {
+		return
+	}
+	gvk, err := apiutil.GVKForObject(storageClasses, scheme.Scheme)
+	if err == nil {
+		storageClasses.GetObjectKind().SetGroupVersionKind(gvk)
+	}
+
+	for i, o := range storageClasses.Items {
+		gvk, err := apiutil.GVKForObject(&o, scheme.Scheme)
+		if err == nil {
+			storageClasses.Items[i].GetObjectKind().SetGroupVersionKind(gvk)
+		}
+	}
+
+	scBytes, err := json.MarshalIndent(storageClasses, "", "  ")
+	if err != nil {
+		return
+	}
+	data[StorageClassPath] = scBytes
+}
+
+func isMetricsUnavailableError(str string) bool {
+	return strings.Contains(str, "the server is currently unable to handle the request")
 }
 
 func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.HostPreflight, f cmdutil.Factory, progressCh chan interface{}) (*preflight.CollectResult, error) {

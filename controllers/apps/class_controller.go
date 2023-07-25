@@ -94,17 +94,31 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 	}
 
 	patch := client.MergeFrom(classDefinition.DeepCopy())
-	var classList []appsv1alpha1.ComponentClassInstance
+	var (
+		classList       []appsv1alpha1.ComponentClass
+		clusterDefRef   = classDefinition.GetLabels()[constant.ClusterDefLabelKey]
+		componentDefRef = classDefinition.GetLabels()[constant.KBAppComponentDefRefLabelKey]
+	)
+
+	var rules []appsv1alpha1.ResourceConstraintRule
+	for _, constraint := range constraintsMap {
+		rules = append(rules, constraint.FindRules(clusterDefRef, componentDefRef)...)
+	}
+
 	for _, v := range classes {
-		constraint, ok := constraintsMap[v.ResourceConstraintRef]
-		if !ok {
-			return intctrlutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("resource constraint %s not found", v.ResourceConstraintRef))
+		match := false
+		for _, rule := range rules {
+			if rule.ValidateResources(v.ToResourceRequirements().Requests) {
+				match = true
+				break
+			}
 		}
-		if !constraint.MatchClass(v) {
-			return intctrlutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("class %s does not conform to constraint %s", v.Name, v.ResourceConstraintRef))
+		if !match {
+			return intctrlutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("class %s does not conform to any constraints", v.Name))
 		}
 		classList = append(classList, *v)
 	}
+
 	classDefinition.Status.Classes = classList
 	classDefinition.Status.ObservedGeneration = classDefinition.Generation
 	if err = r.Client.Status().Patch(ctx, classDefinition, patch); err != nil {

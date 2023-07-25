@@ -72,6 +72,7 @@ var _ = Describe("template", func() {
 			"postgresql",
 			"redis",
 			"clickhouse",
+			"kafka",
 		}
 		helmOutputRoot, err := os.MkdirTemp(os.TempDir(), "test")
 		Expect(err).Should(Succeed())

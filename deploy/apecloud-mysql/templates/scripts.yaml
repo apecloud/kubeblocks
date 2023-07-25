@@ -363,6 +363,7 @@ data:
       --pid_file $VTDATAROOT/vtgate.pid \
       --mysql_auth_server_impl none \
       --read_write_splitting_policy $read_write_splitting_policy  \
+      --read_write_splitting_ratio $read_write_splitting_ratio  \
       --read_after_write_consistency $read_after_write_consistency \
       --read_after_write_timeout $read_after_write_timeout \
       --enable_buffer=$enable_buffer \

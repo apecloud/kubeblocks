@@ -52,7 +52,7 @@ type Manager struct {
 }
 
 func NewManager(classDefinitionList v1alpha1.ComponentClassDefinitionList, constraintList v1alpha1.ComponentResourceConstraintList) (*Manager, error) {
-	classes, err := GetClasses(classDefinitionList)
+	classes, err := getClasses(classDefinitionList)
 	if err != nil {
 		return nil, err
 	}
@@ -85,11 +85,11 @@ func (r *Manager) HasClass(compType string, classDefRef v1alpha1.ClassDefRef) bo
 
 var (
 	ErrClassNotFound   = fmt.Errorf("class not found")
-	ErrInvalidResource = fmt.Errorf("invalid resource")
+	ErrInvalidResource = fmt.Errorf("resource is not conform to the constraints, please check the ComponentResourceConstraint API")
 )
 
 // ValidateResources validates if the resources of the component is invalid
-func (r *Manager) ValidateResources(comp *v1alpha1.ClusterComponentSpec) error {
+func (r *Manager) ValidateResources(clusterDefRef string, comp *v1alpha1.ClusterComponentSpec) error {
 	if comp.ClassDefRef != nil && comp.ClassDefRef.Class != "" {
 		if r.HasClass(comp.ComponentDefRef, *comp.ClassDefRef) {
 			return nil
@@ -97,40 +97,36 @@ func (r *Manager) ValidateResources(comp *v1alpha1.ClusterComponentSpec) error {
 		return ErrClassNotFound
 	}
 
-	if len(r.constraints) == 0 {
+	var rules []v1alpha1.ResourceConstraintRule
+	for _, constraint := range r.constraints {
+		rules = append(rules, constraint.FindRules(clusterDefRef, comp.ComponentDefRef)...)
+	}
+	if len(rules) == 0 {
 		return nil
 	}
 
-	for _, constraint := range r.constraints {
-		resources := corev1.ResourceList{}
-		for k, v := range comp.Resources.Requests {
-			resources[k] = v
-		}
-		// validate cpu and memory
-		result := constraint.FindMatchingConstraints(resources)
-		if len(result) == 0 {
+	for _, rule := range rules {
+		if !rule.ValidateResources(comp.Resources.Requests) {
 			continue
 		}
 
 		// validate volume
-		for _, rule := range result {
-			match := true
-			// all volumes should match the constraints
-			for _, volume := range comp.VolumeClaimTemplates {
-				if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
-					match = false
-					break
-				}
+		match := true
+		// all volumes should match the rules
+		for _, volume := range comp.VolumeClaimTemplates {
+			if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
+				match = false
+				break
 			}
-			if match {
-				return nil
-			}
+		}
+		if match {
+			return nil
 		}
 	}
 	return ErrInvalidResource
 }
 
-func (r *Manager) GetResources(comp *v1alpha1.ClusterComponentSpec) (corev1.ResourceList, error) {
+func (r *Manager) GetResources(clusterDefRef string, comp *v1alpha1.ClusterComponentSpec) (corev1.ResourceList, error) {
 	result := corev1.ResourceList{}
 
 	if comp.ClassDefRef != nil && comp.ClassDefRef.Class != "" {
@@ -141,36 +137,37 @@ func (r *Manager) GetResources(comp *v1alpha1.ClusterComponentSpec) (corev1.Reso
 		return corev1.ResourceList{corev1.ResourceCPU: cls.CPU, corev1.ResourceMemory: cls.Memory}, nil
 	}
 
-	if len(r.constraints) == 0 {
+	var rules []v1alpha1.ResourceConstraintRule
+	for _, constraint := range r.constraints {
+		rules = append(rules, constraint.FindRules(clusterDefRef, comp.ComponentDefRef)...)
+	}
+	if len(rules) == 0 {
 		return nil, nil
 	}
 
 	var resourcesList []corev1.ResourceList
-	for _, constraint := range r.constraints {
+	for _, rule := range rules {
 		resources := corev1.ResourceList{}
 		for k, v := range comp.Resources.Requests {
 			resources[k] = v
 		}
-		rules := constraint.FindMatchingConstraints(resources)
-		if len(rules) == 0 {
+		if !rule.ValidateResources(resources) {
 			continue
 		}
-		for _, rule := range rules {
-			match := true
-			for _, volume := range comp.VolumeClaimTemplates {
-				if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
-					match = false
-					break
-				}
+		match := true
+		for _, volume := range comp.VolumeClaimTemplates {
+			if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
+				match = false
+				break
 			}
-			if !match {
-				continue
-			}
-			if resources.Cpu().IsZero() && resources.Memory().IsZero() {
-				resourcesList = append(resourcesList, rule.GetMinimalResources())
-			} else {
-				resourcesList = append(resourcesList, rule.CompleteResources(resources))
-			}
+		}
+		if !match {
+			continue
+		}
+		if resources.Cpu().IsZero() && resources.Memory().IsZero() {
+			resourcesList = append(resourcesList, rule.GetMinimalResources())
+		} else {
+			resourcesList = append(resourcesList, rule.CompleteResources(resources))
 		}
 	}
 	if len(resourcesList) == 0 {
@@ -200,7 +197,7 @@ func (r *Manager) ChooseClass(comp *v1alpha1.ClusterComponentSpec) (*ComponentCl
 				continue
 			}
 
-			if cls == nil || cls.Cmp(&v.ComponentClassInstance) > 0 {
+			if cls == nil || cls.Cmp(&v.ComponentClass) > 0 {
 				cls = v
 			}
 		}
@@ -266,7 +263,7 @@ func GetCustomClassObjectName(cdName string, componentName string) string {
 	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
 }
 
-func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string][]*ComponentClassWithRef, error) {
+func getClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string][]*ComponentClassWithRef, error) {
 	var (
 		compTypeLabel    = "apps.kubeblocks.io/component-def-ref"
 		componentClasses = make(map[string][]*ComponentClassWithRef)
@@ -284,8 +281,8 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 			for idx := range classDefinition.Status.Classes {
 				cls := classDefinition.Status.Classes[idx]
 				classes = append(classes, &ComponentClassWithRef{
-					ComponentClassInstance: cls,
-					ClassDefRef:            v1alpha1.ClassDefRef{Name: classDefinition.Name, Class: cls.Name},
+					ComponentClass: cls,
+					ClassDefRef:    v1alpha1.ClassDefRef{Name: classDefinition.Name, Class: cls.Name},
 				})
 			}
 		} else {
@@ -295,8 +292,8 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 			}
 			for k, v := range classMap {
 				classes = append(classes, &ComponentClassWithRef{
-					ClassDefRef:            k,
-					ComponentClassInstance: *v,
+					ClassDefRef:    k,
+					ComponentClass: *v,
 				})
 			}
 		}
@@ -331,7 +328,7 @@ func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.Com
 }
 
 // ParseComponentClasses parses ComponentClassDefinition to component classes
-func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[v1alpha1.ClassDefRef]*v1alpha1.ComponentClassInstance, error) {
+func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[v1alpha1.ClassDefRef]*v1alpha1.ComponentClass, error) {
 	genClass := func(nameTpl string, bodyTpl string, vars []string, args []string) (v1alpha1.ComponentClass, error) {
 		var result v1alpha1.ComponentClass
 		values := make(map[string]interface{})
@@ -356,7 +353,7 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 		return result, nil
 	}
 
-	parser := func(group v1alpha1.ComponentClassGroup, series v1alpha1.ComponentClassSeries, class v1alpha1.ComponentClass) (*v1alpha1.ComponentClassInstance, error) {
+	parser := func(group v1alpha1.ComponentClassGroup, series v1alpha1.ComponentClassSeries, class v1alpha1.ComponentClass) (*v1alpha1.ComponentClass, error) {
 		if len(class.Args) > 0 {
 			cls, err := genClass(series.NamingTemplate, group.Template, group.Vars, class.Args)
 			if err != nil {
@@ -369,18 +366,15 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 			class.CPU = cls.CPU
 			class.Memory = cls.Memory
 		}
-		result := &v1alpha1.ComponentClassInstance{
-			ComponentClass: v1alpha1.ComponentClass{
-				Name:   class.Name,
-				CPU:    class.CPU,
-				Memory: class.Memory,
-			},
-			ResourceConstraintRef: group.ResourceConstraintRef,
+		result := &v1alpha1.ComponentClass{
+			Name:   class.Name,
+			CPU:    class.CPU,
+			Memory: class.Memory,
 		}
 		return result, nil
 	}
 
-	result := make(map[v1alpha1.ClassDefRef]*v1alpha1.ComponentClassInstance)
+	result := make(map[v1alpha1.ClassDefRef]*v1alpha1.ComponentClass)
 	for _, group := range classDefinition.Spec.Groups {
 		for _, series := range group.Series {
 			for _, class := range series.Classes {

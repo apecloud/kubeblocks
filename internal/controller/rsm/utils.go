@@ -172,6 +172,10 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 	return roleMap
 }
 
+func SetMembersStatusForTest(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
+	setMembersStatus(rsm, pods)
+}
+
 func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)

@@ -46,6 +46,10 @@ func NewStatefulSetReconciler(mgr ctrl.Manager) error {
 	return newComponentWorkloadReconciler(mgr, "statefulset-controller", generics.StatefulSetSignature, generics.PodSignature)
 }
 
+func NewRSMReconciler(mgr ctrl.Manager) error {
+	return newComponentWorkloadReconciler(mgr, "rsm-controller", generics.RSMSignature, generics.StatefulSetSignature)
+}
+
 func newComponentWorkloadReconciler[T generics.Object, PT generics.PObject[T], LT generics.ObjList[T], S generics.Object, PS generics.PObject[S], LS generics.ObjList[S]](
 	mgr ctrl.Manager, name string, _ func(T, LT), _ func(S, LS)) error {
 	return (&componentWorkloadReconciler[T, PT, S, PS]{

@@ -48,7 +48,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	workloads2 "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -182,6 +181,11 @@ var _ = BeforeSuite(func() {
 	err = components.NewDeploymentReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		err = components.NewRSMReconciler(k8sManager)
+		Expect(err).ToNot(HaveOccurred())
+	}
+
 	err = (&k8score.EventReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
@@ -212,12 +216,12 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&workloads2.ReplicatedStateMachineReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("rsm-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
+	//err = (&workloads2.ReplicatedStateMachineReconciler{
+	//	Client:   k8sManager.GetClient(),
+	//	Scheme:   k8sManager.GetScheme(),
+	//	Recorder: k8sManager.GetEventRecorderFor("rsm-controller"),
+	//}).SetupWithManager(k8sManager)
+	//Expect(err).ToNot(HaveOccurred())
 
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 

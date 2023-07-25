@@ -700,6 +700,7 @@ func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet 
 		return nil
 	}
 	sts := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		SetUID(rsm.UID).
 		AddLabelsInMap(rsm.Labels).
 		AddAnnotationsInMap(rsm.Annotations).
 		SetReplicas(*rsm.Spec.Replicas).

@@ -469,6 +469,11 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
 			os.Exit(1)
 		}
+
+		if err = components.NewRSMReconciler(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "RSM")
+			os.Exit(1)
+		}
 	}
 
 	if viper.GetBool(storageFlagKey.viperName()) {

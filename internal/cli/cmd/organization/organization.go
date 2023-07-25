@@ -3,6 +3,7 @@ package organization
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
@@ -47,9 +48,10 @@ type Organization interface {
 }
 
 type OrganizationOption struct {
-	Name        string
-	Description string
-	DisplayName string
+	Name         string
+	Description  string
+	DisplayName  string
+	OutputFormat string
 
 	Organization Organization
 
@@ -158,6 +160,8 @@ func newOrgDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", "table", "Output format (table|yaml|json)")
+
 	return cmd
 }
 
@@ -260,7 +264,6 @@ func (o *OrganizationOption) runCurrent() error {
 	return nil
 }
 
-// TODO: print organization in a table format.
 func (o *OrganizationOption) runDescribe() error {
 	token := GetToken()
 	orgItem, err := o.Organization.getOrganization(token, o.Name)
@@ -268,6 +271,37 @@ func (o *OrganizationOption) runDescribe() error {
 		return errors.Wrap(err, "Failed to get organization.")
 	}
 
+	switch strings.ToLower(o.OutputFormat) {
+	case "yaml":
+		return o.printYAML(orgItem)
+	case "json":
+		return o.printJSON(orgItem)
+	case "table":
+		fallthrough
+	default:
+		return o.printTable(orgItem)
+	}
+}
+
+func (o *OrganizationOption) printYAML(orgItem *OrgItem) error {
+	body, err := json.Marshal(orgItem)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(o.Out, "%s\n", body)
+	return nil
+}
+
+func (o *OrganizationOption) printJSON(orgItem *OrgItem) error {
+	body, err := json.MarshalIndent(orgItem, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(o.Out, "%s\n", body)
+	return nil
+}
+
+func (o *OrganizationOption) printTable(orgItem *OrgItem) error {
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 5, WidthMax: 120},
@@ -293,7 +327,6 @@ func (o *OrganizationOption) runDescribe() error {
 	)
 
 	tbl.Print()
-
 	return nil
 }
 

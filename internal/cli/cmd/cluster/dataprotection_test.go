@@ -91,7 +91,9 @@ var _ = Describe("DataProtection", func() {
 			By("fake client")
 			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
 			policy2 := testing.FakeBackupPolicy("policy1", testing.ClusterName)
-			initClient(defaultBackupPolicy, policy2)
+			policy3 := testing.FakeBackupPolicy("policy2", testing.ClusterName)
+			policy3.Namespace = "policy"
+			initClient(defaultBackupPolicy, policy2, policy3)
 
 			By("test list-backup-policy cmd")
 			cmd := NewListBackupPolicyCmd(tf, streams)
@@ -100,6 +102,14 @@ var _ = Describe("DataProtection", func() {
 			Expect(out.String()).Should(ContainSubstring(defaultBackupPolicy.Name))
 			Expect(out.String()).Should(ContainSubstring("true"))
 			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(3))
+
+			By("test list all namespace")
+			out.Reset()
+			_ = cmd.Flags().Set("all-namespaces", "true")
+			cmd.Run(cmd, nil)
+			fmt.Println(out.String())
+			Expect(out.String()).Should(ContainSubstring(policy2.Name))
+			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(4))
 		})
 
 		It("edit-backup-policy", func() {
@@ -241,11 +251,19 @@ var _ = Describe("DataProtection", func() {
 		AvailableReplicas := int32(1)
 		backup1.Status.Phase = dpv1alpha1.BackupRunning
 		backup1.Status.AvailableReplicas = &AvailableReplicas
-		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
+		backup2 := testing.FakeBackup("test1")
+		backup2.Namespace = "backup"
+		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1, backup2)
 		Expect(printBackupList(o)).Should(Succeed())
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql"))
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("(AvailablePods: 1)"))
+
+		By("test list all namespace")
+		o.Out.(*bytes.Buffer).Reset()
+		o.AllNamespaces = true
+		Expect(printBackupList(o)).Should(Succeed())
+		Expect(len(strings.Split(strings.Trim(o.Out.(*bytes.Buffer).String(), "\n"), "\n"))).Should(Equal(3))
 	})
 
 	It("restore", func() {

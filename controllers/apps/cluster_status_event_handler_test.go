@@ -21,6 +21,8 @@ package apps
 
 import (
 	"context"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/spf13/viper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -178,14 +180,24 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("watch warning event from StatefulSet, but mismatch condition ")
 			// wait for StatefulSet created by cluster controller
-			stsName := clusterName + "-" + statefulMySQLCompName
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
-				func(g Gomega, fetched *appsv1.StatefulSet) {
-					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
-				})).Should(Succeed())
+			workloadName := clusterName + "-" + statefulMySQLCompName
+			var kd string
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				kd = constant.RSMKind
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
+					func(g Gomega, fetched *workloads.ReplicatedStateMachine) {
+						g.Expect(fetched.Generation).To(BeEquivalentTo(1))
+					})).Should(Succeed())
+			} else {
+				kd = constant.StatefulSetKind
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
+					func(g Gomega, fetched *appsv1.StatefulSet) {
+						g.Expect(fetched.Generation).To(BeEquivalentTo(1))
+					})).Should(Succeed())
+			}
 			stsInvolvedObject := corev1.ObjectReference{
-				Name:      stsName,
-				Kind:      constant.StatefulSetKind,
+				Name:      workloadName,
+				Kind:      kd,
 				Namespace: testCtx.DefaultNamespace,
 			}
 			event.InvolvedObject = stsInvolvedObject

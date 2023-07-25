@@ -21,6 +21,9 @@ package apps
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/spf13/viper"
+	appsv1 "k8s.io/api/apps/v1"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -295,8 +298,14 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-				sts := stsList.Items[0]
+				var sts appsv1.StatefulSet
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+					sts = *components.ConvertRSMToSTS(&rsmList.Items[0])
+				} else {
+					stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+					sts = stsList.Items[0]
+				}
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
 				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)

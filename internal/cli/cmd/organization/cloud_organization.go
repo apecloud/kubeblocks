@@ -2,11 +2,12 @@ package organization
 
 import (
 	"encoding/json"
-	"github.com/pkg/errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type CloudOrganization struct {

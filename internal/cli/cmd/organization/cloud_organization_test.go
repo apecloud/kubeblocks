@@ -13,7 +13,8 @@ func mockServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/v1/organizations/test_org":
-			if r.Method == http.MethodGet {
+			switch r.Method {
+			case http.MethodGet:
 				org := OrgItem{
 					ID:          "test_id",
 					Name:        "test_org",
@@ -32,11 +33,11 @@ func mockServer() *httptest.Server {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(jsonData)
-			} else if r.Method == http.MethodPost {
-				w.WriteHeader(http.StatusCreated)
-			} else if r.Method == http.MethodDelete {
+			case http.MethodDelete:
 				w.WriteHeader(http.StatusOK)
-			} else {
+			case http.MethodPost:
+				w.WriteHeader(http.StatusCreated)
+			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
 

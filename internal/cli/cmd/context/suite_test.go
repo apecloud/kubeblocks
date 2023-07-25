@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package context
 
 import (
-	ginkgo_context "github.com/onsi/ginkgo/v2"
 	"testing"
+
+	ginkgo_context "github.com/onsi/ginkgo/v2"
 
 	. "github.com/onsi/gomega"
 )

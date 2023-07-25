@@ -3,6 +3,7 @@ package organization
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -76,7 +77,7 @@ func newOrgListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &OrganizationOption{
 		IOStreams: streams,
 		Organization: &CloudOrganization{
-			APIURL:  APIPath,
+			APIURL:  APIURL,
 			APIPath: APIPath,
 		},
 	}
@@ -95,7 +96,14 @@ func newOrgListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{IOStreams: streams}
+	o := &OrganizationOption{
+		IOStreams: streams,
+		Organization: &CloudOrganization{
+			APIURL:  APIURL,
+			APIPath: APIPath,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use:   "switch",
 		Short: "Switch organization.",
@@ -110,7 +118,14 @@ func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func NewOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{IOStreams: streams}
+	o := &OrganizationOption{
+		IOStreams: streams,
+		Organization: &CloudOrganization{
+			APIURL:  APIURL,
+			APIPath: APIPath,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use:   "current",
 		Short: "Current organization.",
@@ -125,7 +140,14 @@ func NewOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{IOStreams: streams}
+	o := &OrganizationOption{
+		IOStreams: streams,
+		Organization: &CloudOrganization{
+			APIURL:  APIURL,
+			APIPath: APIPath,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use:   "describe",
 		Short: "Describe organization.",
@@ -140,7 +162,14 @@ func newOrgDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgAddCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{IOStreams: streams}
+	o := &OrganizationOption{
+		IOStreams: streams,
+		Organization: &CloudOrganization{
+			APIURL:  APIURL,
+			APIPath: APIPath,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add organization.",
@@ -157,7 +186,14 @@ func newOrgAddCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgDeleteCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{IOStreams: streams}
+	o := &OrganizationOption{
+		IOStreams: streams,
+		Organization: &CloudOrganization{
+			APIURL:  APIURL,
+			APIPath: APIPath,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete organization.",

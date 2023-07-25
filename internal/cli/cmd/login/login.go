@@ -55,7 +55,12 @@ func (o *LoginOptions) loginWithOrg() error {
 		return err
 	}
 
-	org := &organization.OrganizationOption{}
+	org := &organization.OrganizationOption{
+		Organization: &organization.CloudOrganization{
+			APIURL:  organization.APIURL,
+			APIPath: organization.APIPath,
+		},
+	}
 	if ok, err := org.Organization.IsValidOrganization(token, o.OrgName); !ok {
 		return err
 	}
@@ -129,7 +134,12 @@ func (o *LoginOptions) login() (string, error) {
 }
 
 func getFirstOrg(token string) (string, error) {
-	org := &organization.OrganizationOption{}
+	org := &organization.OrganizationOption{
+		Organization: &organization.CloudOrganization{
+			APIURL:  organization.APIURL,
+			APIPath: organization.APIPath,
+		},
+	}
 	organizations, err := org.Organization.GetOrganizations(token)
 	if err != nil {
 		return "", err
@@ -145,6 +155,8 @@ func getFirstContext(token string, orgName string) (string, error) {
 	c := &context.CloudContext{
 		OrgName: orgName,
 		Token:   token,
+		APIURL:  organization.APIURL,
+		APIPath: organization.APIPath,
 	}
 	contexts, err := c.GetContexts()
 	if err != nil {

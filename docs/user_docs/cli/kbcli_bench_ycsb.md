@@ -1,48 +1,47 @@
 ---
-title: kbcli bench pgbench
+title: kbcli bench ycsb
 ---
 
-Run pgbench against a PostgreSQL cluster
+Run YCSB benchmark on a cluster
 
 ```
-kbcli bench pgbench [BenchmarkName] [flags]
+kbcli bench ycsb [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # pgbench run on a cluster
-  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  # ycsb on a cluster
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # pgbench run on a cluster with different threads and different client
-  kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
+  # ycsb on a cluster with different threads
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
   
-  # pgbench run on a cluster with specified transactions
-  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --transactions 1000
+  # ycsb on a cluster with different record number and operation number
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --record-count 10000 --operation-count 10000
   
-  # pgbench run on a cluster with specified seconds
-  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
-  
-  # pgbench run on a cluster with select only
-  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
+  # ycsb on a cluster read/write balanced
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --read-proportion 50 --update-proportion 50
 ```
 
 ### Options
 
 ```
-      --clients ints       The number of clients to use for pgbench (default [1])
-      --cluster string     the cluster of database
-      --database string    database name
-      --duration int       The seconds to run pgbench for (default 60)
-  -h, --help               help for pgbench
-      --host string        the host of database
-      --password string    the password of database
-      --port int           the port of database
-      --scale int          The scale factor to use for pgbench (default 1)
-      --select             Run pgbench with select only
-      --threads int        The number of threads to use for pgbench (default 1)
-      --transactions int   The number of transactions to run for pgbench
-      --user string        the user of database
+      --cluster string                     the cluster of database
+      --database string                    database name
+  -h, --help                               help for ycsb
+      --host string                        the host of database
+      --insert-proportion int              the proportion of operations that are inserts
+      --operation-count int                the number of operations to use during the run phase (default 1000)
+      --password string                    the password of database
+      --port int                           the port of database
+      --read-modify-write-proportion int   the proportion of operations that are read then modify a record
+      --read-proportion int                the proportion of operations that are reads
+      --record-count int                   the number of records to use (default 1000)
+      --scan-proportion int                the proportion of operations that are scans
+      --threads ints                       the number of threads to use (default [1])
+      --update-proportion int              the proportion of operations that are updates
+      --user string                        the user of database
 ```
 
 ### Options inherited from parent commands

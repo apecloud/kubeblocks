@@ -5,7 +5,7 @@ title: kbcli bench sysbench
 run a SysBench benchmark
 
 ```
-kbcli bench sysbench [ClusterName] [flags]
+kbcli bench sysbench [BenchmarkName] [flags]
 ```
 
 ### Examples
@@ -21,7 +21,7 @@ kbcli bench sysbench [ClusterName] [flags]
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
   
   # sysbench on a cluster with specified read/write ratio
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 20
   
   # sysbench on a cluster with specified tables and size
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000

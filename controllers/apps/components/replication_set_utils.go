@@ -86,18 +86,6 @@ func genReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatu
 	return nil
 }
 
-// getAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
-func getAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
-	podList, err := GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
-	if err != nil {
-		return nil, err
-	}
-	if len(podList.Items) != 1 {
-		return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
-	}
-	return &podList.Items[0], nil
-}
-
 // updateObjRoleLabel updates the value of the role label of the object.
 func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 	ctx context.Context, cli client.Client, obj T, role string) error {
@@ -117,6 +105,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	compName string,
 	pod *corev1.Pod,
 	newRole string) error {
+	reqCtx.Log.Info("receive role change event", "podName", pod.Name, "current pod role label", pod.Labels[constant.RoleLabelKey], "new role", newRole)
 	// if newRole is not Primary or Secondary, ignore it.
 	if !slices.Contains([]string{constant.Primary, constant.Secondary}, newRole) {
 		reqCtx.Log.Info("replicationSet new role is invalid, please check", "new role", newRole)
@@ -127,10 +116,6 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		reqCtx.Log.Info("pod current role label equals to new role, ignore it", "new role", newRole)
 		return nil
 	}
-	// in case of adding new node
-	// if newRole != "" {
-	// 	return updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole)
-	// }
 
 	// if switchPolicy is not Noop, return
 	clusterCompSpec := getClusterComponentSpecByName(*cluster, compName)
@@ -139,29 +124,15 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 
-	oldPrimaryPod, err := getAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, *cluster, compName)
-	if err != nil {
-		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent gets old primary pod failed", "error", err)
-		return err
-	}
-	if oldPrimaryPod == nil {
+	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary
+	if newRole == constant.Secondary {
+		// update old primary pod to secondary
+		if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, constant.Secondary); err != nil {
+			return err
+		}
+		reqCtx.Log.Info("update old primary pod to secondary success", "podName", pod.Name, "newRole", newRole)
 		return nil
 	}
-	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary,
-	// we do not deal with this situation here, the demote labeling process of old primary to secondary is handled
-	// in another reconciliation triggered by role change event from secondary -> new primary,
-	// this is to avoid simultaneous occurrence of two primary or no primary at the same time
-	if oldPrimaryPod.Name == pod.Name {
-		reqCtx.Log.Info("pod is old primary and new role is secondary, do not deal with this situation",
-			"podName", pod.Name, "newRole", newRole)
-		return nil
-	}
-
-	// update old primary pod to secondary
-	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, constant.Secondary); err != nil {
-		return err
-	}
-	reqCtx.Log.Info("update old primary pod to secondary success", "old primary podName", oldPrimaryPod.Name)
 
 	// update secondary pod to primary
 	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, constant.Primary); err != nil {

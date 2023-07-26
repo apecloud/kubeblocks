@@ -20,6 +20,9 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         containers:
           - name: mysql-container

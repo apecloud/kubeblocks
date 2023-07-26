@@ -11,8 +11,7 @@ spec:
   componentSpecs:
     - name: mysql-comp
       componentDefRef: mysql-compdef # ref clusterdefinition componentDefs.name
-      replicas: 1
-      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      replicas: {{ .Values.replicas }}
       {{- include "kblib.componentStorages" . | indent 6 }}
       {{- include "kblib.componentResources" . | indent 6 }}
       {{- include "kblib.componentServices" . | indent 6 }}

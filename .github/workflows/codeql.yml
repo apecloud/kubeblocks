@@ -8,7 +8,7 @@ on:
 
 env:
   BASE_BRANCH: origin/main
-  GO_VERSION: "1.20"
+  GO_VERSION: "1.20.5"
 
 jobs:
   trigger-mode:

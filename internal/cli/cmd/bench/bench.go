@@ -299,3 +299,29 @@ func registerClusterCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 		},
 	))
 }
+
+func validateBenchmarkExist(factory cmdutil.Factory, streams genericclioptions.IOStreams, name string) error {
+	var infos []*resource.Info
+	for _, gvr := range benchGVRList {
+		bench := list.NewListOptions(factory, streams, gvr)
+
+		bench.Print = false
+		result, err := bench.Run()
+		if err != nil {
+			return err
+		}
+
+		benchInfos, err := result.Infos()
+		if err != nil {
+			return err
+		}
+		infos = append(infos, benchInfos...)
+	}
+
+	for _, info := range infos {
+		if info.Name == name {
+			return fmt.Errorf("benchmark %s already exists", name)
+		}
+	}
+	return nil
+}

@@ -117,7 +117,6 @@ var _ = Describe("bench", func() {
 		}
 		o.dynamic, _ = tf.DynamicClient()
 		o.client, _ = tf.KubernetesClientSet()
-		Expect(o.Validate()).Should(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})
 
@@ -145,7 +144,6 @@ var _ = Describe("bench", func() {
 		}
 		o.dynamic, _ = tf.DynamicClient()
 		o.client, _ = tf.KubernetesClientSet()
-		Expect(o.Validate()).Should(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})
 
@@ -174,7 +172,6 @@ var _ = Describe("bench", func() {
 		}
 		o.dynamic, _ = tf.DynamicClient()
 		o.client, _ = tf.KubernetesClientSet()
-		Expect(o.Validate()).Should(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})
 

@@ -188,6 +188,10 @@ func (o *YcsbOptions) Validate() error {
 		return err
 	}
 
+	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
+		return err
+	}
+
 	if o.RecordCount < 0 {
 		return fmt.Errorf("record count should be positive")
 	}

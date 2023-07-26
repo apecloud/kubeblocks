@@ -104,50 +104,6 @@ jobs:
           asset_name: ${{ env.CLI_NAME }}.exe
           asset_content_type: application/octet-stream
 
-#      - name: Upload release assets to an existing kubeblocks's release
-#        uses: echapmanFromBunnings/upload-release-assets@1.3
-#        with:
-#          releaseTag: ${{ env.TAG_NAME }}
-#          githubToken: ${{ secrets.GITHUB_TOKEN }}
-#          files: |
-#            ./dist/*.tar.gz
-
-#      - name: upload release kbcli windows amd64 asset # to github/apecloud/kbcli/release
-#        continue-on-error: true
-#        uses: actions/upload-release-asset@main
-#        with:
-#          upload_url: ${{ env.UPLOAD_URL }}
-#          asset_path: ./dist/${{ env.CLI_NAME }}-windows-amd64-${{ env.TAG_NAME }}.zip
-#          asset_name: ${{ env.CLI_NAME }}-windows-amd64-${{ env.TAG_NAME }}.zip
-#          asset_content_type: application/zip
-#
-#      - name: upload release kbcli windows arm64 asset # to github/apecloud/kbcli/release
-#        continue-on-error: true
-#        uses: actions/upload-release-asset@main
-#        with:
-#          upload_url: ${{ env.UPLOAD_URL }}
-#          asset_path: ./dist/${{ env.CLI_NAME }}-windows-arm64-${{ env.TAG_NAME }}.zip
-#          asset_name: ${{ env.CLI_NAME }}-windows-arm64-${{ env.TAG_NAME }}.zip
-#          asset_content_type: application/zip
-#
-#      - name: upload release kubeblocks windows amd64 asset # to github/apecloud/kbcli/release
-#        continue-on-error: true
-#        uses: actions/upload-release-asset@main
-#        with:
-#          upload_url: ${{ steps.get_release.outputs.upload_url }}
-#          asset_path: ./dist/${{ env.CLI_NAME }}-windows-amd64-${{ env.TAG_NAME }}.zip
-#          asset_name: ${{ env.CLI_NAME }}-windows-amd64-${{ env.TAG_NAME }}.zip
-#          asset_content_type: application/zip
-#
-#      - name: upload release kubeblocks windows arm64 asset # to github/apecloud/kubeblocks/release
-#        continue-on-error: true
-#        uses: actions/upload-release-asset@main
-#        with:
-#          upload_url: ${{ steps.get_release.outputs.upload_url }}
-#          asset_path: ./dist/${{ env.CLI_NAME }}-windows-arm64-${{ env.TAG_NAME }}.zip
-#          asset_name: ${{ env.CLI_NAME }}-windows-arm64-${{ env.TAG_NAME }}.zip
-#          asset_content_type: application/zip
-
       - name: Upload kbcli Artifact
         uses: actions/upload-artifact@v3
         with:

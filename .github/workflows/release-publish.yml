@@ -95,6 +95,7 @@ jobs:
             --type 3 \
             --github-repo ${{ env.CLI_REPO }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
+
       - name: upload kbcli.exe to kbcli's release page for winget
         uses: actions/upload-release-asset@main
         with:
@@ -102,15 +103,6 @@ jobs:
           asset_path: ${{ github.workspace }}/dist/kbcli_windows_amd64_v1/${{ env.CLI_NAME }}.exe
           asset_name: ${{ env.CLI_NAME }}.exe
           asset_content_type: application/octet-stream
-
-      - name: Upload release assets to an existing kubeblocks's release
-        uses: echapmanFromBunnings/upload-release-assets@1.3
-        with:
-          releaseTag: ${{ env.TAG_NAME }}
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            ./dist/*.tar.gz
-            ./dist/*.zip
 
       - name: Upload kbcli Artifact
         uses: actions/upload-artifact@v3
@@ -152,6 +144,30 @@ jobs:
                   --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
               fi
           done
+      # to github.com/apelcould/kubeblocks/release
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.3.2
+
+      - name: upload release asset ${{ matrix.os }}
+        if: ${{ matrix.os != 'windows-amd64' && matrix.os != 'windows-arm64' }}
+        continue-on-error: true
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: upload release asset ${{ matrix.os }}
+        if: ${{ matrix.os == 'windows-amd64' || matrix.os == 'windows-arm64' }}
+        continue-on-error: true
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
+          asset_content_type: application/zip
 
   remove-artifact:
     needs: upload-release-assert

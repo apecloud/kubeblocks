@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -35,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -215,16 +217,6 @@ var _ = Describe("Consensus Component", func() {
 			clusterComp := getClusterComponentSpecByName(*cluster, consensusCompName)
 			Expect(clusterComp).ShouldNot(BeNil())
 
-			//By("test patchGVRCustomLabels of clusterDefinition")
-			//resource := &appsv1alpha1.GVKResource{
-			//	Selector: getComponentMatchLabels(cluster.Name, consensusCompName),
-			//}
-			//customLabelSpec := &appsv1alpha1.CustomLabelSpec{
-			//	Key:       "custom-label-key",
-			//	Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
-			//	Resources: []appsv1alpha1.GVKResource{*resource},
-			//}
-
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Stateless, statelessCompName)
@@ -301,6 +293,41 @@ var _ = Describe("Consensus Component", func() {
 			Expect(err).Should(Succeed())
 			Expect(componentName).Should(Equal(consensusCompName))
 			Expect(componentDef).ShouldNot(BeNil())
+		})
+	})
+
+	Context("Custom Label test", func() {
+		Context("parseCustomLabelPattern func", func() {
+			It("should parse pattern well", func() {
+				pattern := "v1/Pod"
+				gvk, err := parseCustomLabelPattern(pattern)
+				Expect(err).Should(BeNil())
+				Expect(gvk.Group).Should(BeEmpty())
+				Expect(gvk.Version).Should(Equal("v1"))
+				Expect(gvk.Kind).Should(Equal("Pod"))
+				pattern = "apps/v1/StatefulSet"
+				gvk, err = parseCustomLabelPattern(pattern)
+				Expect(err).Should(BeNil())
+				Expect(gvk.Group).Should(Equal("apps"))
+				Expect(gvk.Version).Should(Equal("v1"))
+				Expect(gvk.Kind).Should(Equal("StatefulSet"))
+			})
+		})
+		Context("updateCustomLabelToObj func", func() {
+			It("should update label well", func() {
+				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
+				customLabelSpec := appsv1alpha1.CustomLabelSpec{
+					Key:       "custom-label-key",
+					Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
+					Resources: []appsv1alpha1.GVKResource{*resource},
+				}
+				pod := builder.NewPodBuilder("foo", "bar").GetObject()
+				clusterName, uid, componentName := "foo", "1234-5678", "workload"
+				err := updateCustomLabelToObj(clusterName, uid, componentName, []appsv1alpha1.CustomLabelSpec{customLabelSpec}, constant.PodKind, pod)
+				Expect(err).Should(BeNil())
+				Expect(pod.Labels).ShouldNot(BeNil())
+				Expect(pod.Labels["custom-label-key"]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, componentName)))
+			})
 		})
 	})
 })

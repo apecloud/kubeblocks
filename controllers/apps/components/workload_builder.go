@@ -94,13 +94,15 @@ func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
+		cluster := b.Comp.GetCluster()
 		component := b.Comp.GetSynthesizedComponent()
-		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		sts, err := builder.BuildSts(b.ReqCtx, cluster, component, b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}
 
-		if err = updateCustomLabelToObj(b.Comp.GetCluster(), component, constant.StatefulSetKind, sts); err != nil {
+		if err = updateCustomLabelToObj(cluster.Name, string(cluster.UID), component.Name,
+			component.CustomLabelSpecs, constant.StatefulSetKind, sts); err != nil {
 			return nil, err
 		}
 

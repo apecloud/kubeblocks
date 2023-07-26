@@ -445,8 +445,8 @@ func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) 
 }
 
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
-func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName, strToReplace string) string {
-	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster.Name, string(cluster.UID), componentName)
+func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace string) string {
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
 
@@ -705,11 +705,11 @@ func updateCustomLabelToPods(ctx context.Context,
 				// pod already in dag, merge labels
 				if idx >= 0 {
 					v, _ := podVertices[idx].(*ictrltypes.LifecycleVertex)
-					updateObjLabel(cluster, component.Name, customLabelSpec, v.Obj)
+					updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, v.Obj)
 					continue
 				}
 				pod := &podList.Items[i]
-				updateObjLabel(cluster, component.Name, customLabelSpec, pod)
+				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pod)
 				dag.AddVertex(ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
 			}
 		}
@@ -717,10 +717,10 @@ func updateCustomLabelToPods(ctx context.Context,
 	return nil
 }
 
-func updateObjLabel(cluster *appsv1alpha1.Cluster, componentName string, customLabelSpec appsv1alpha1.CustomLabelSpec,
+func updateObjLabel(clusterName, uid, componentName string, customLabelSpec appsv1alpha1.CustomLabelSpec,
 	obj client.Object) {
-	key := replaceKBEnvPlaceholderTokens(cluster, componentName, customLabelSpec.Key)
-	value := replaceKBEnvPlaceholderTokens(cluster, componentName, customLabelSpec.Value)
+	key := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, customLabelSpec.Key)
+	value := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, customLabelSpec.Value)
 
 	labels := obj.GetLabels()
 	if labels == nil {
@@ -730,14 +730,10 @@ func updateObjLabel(cluster *appsv1alpha1.Cluster, componentName string, customL
 	obj.SetLabels(labels)
 }
 
-func updateCustomLabelToObj(cluster *appsv1alpha1.Cluster,
-	component *componentutil.SynthesizedComponent,
+func updateCustomLabelToObj(clusterName, uid, componentName string,
+	customLabelSpecs []appsv1alpha1.CustomLabelSpec,
 	kind string, obj client.Object) error {
-	if cluster == nil || component == nil {
-		return nil
-	}
-
-	for _, customLabelSpec := range component.CustomLabelSpecs {
+	for _, customLabelSpec := range customLabelSpecs {
 		for _, res := range customLabelSpec.Resources {
 			gvk, err := parseCustomLabelPattern(res.GVK)
 			if err != nil {
@@ -746,7 +742,7 @@ func updateCustomLabelToObj(cluster *appsv1alpha1.Cluster,
 			if gvk.Kind != kind {
 				continue
 			}
-			updateObjLabel(cluster, component.Name, customLabelSpec, obj)
+			updateObjLabel(clusterName, uid, componentName, customLabelSpec, obj)
 		}
 	}
 	return nil

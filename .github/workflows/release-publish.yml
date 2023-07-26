@@ -176,6 +176,7 @@ jobs:
           release_result="${{ env.TAG_NAME }}-kbcli"
           touch ${release_result}
           echo 'release-result='${release_result} >> $GITHUB_OUTPUT
+          
           CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
           if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
@@ -188,7 +189,6 @@ jobs:
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-
           echo tag_name=${{ env.TAG_NAME }} >> $GITHUB_OUTPUT
 
       - name: delete cache

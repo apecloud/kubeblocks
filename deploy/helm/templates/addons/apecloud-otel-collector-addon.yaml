@@ -24,7 +24,7 @@ spec:
 
     installValues:
       configMapRefs:
-        - name: {{ include "addon.agamotto.name" . }}-chart-kubeblocks-values
+        - name: {{ include "addon.apecloud-otel-collector.name" . }}-chart-kubeblocks-values
           key: values-kubeblocks-override.yaml
 
     valuesMapping:

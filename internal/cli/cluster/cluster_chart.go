@@ -23,7 +23,6 @@ import (
 	"compress/gzip"
 	"embed"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -201,7 +200,8 @@ func (c *ChartInfo) buildClusterSchema() error {
 
 func (c *ChartInfo) buildClusterDef() error {
 	cht := c.Chart
-	clusterFilePath := filepath.Join(templatesDir, clusterFile)
+	// use filepath.Join(templatesDir, clusterFile) will make the clusterFilePath in windows
+	clusterFilePath := templatesDir + "/" + clusterFile
 	for _, tpl := range cht.Templates {
 		if tpl.Name != clusterFilePath {
 			continue

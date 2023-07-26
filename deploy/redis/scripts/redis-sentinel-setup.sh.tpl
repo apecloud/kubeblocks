@@ -18,7 +18,7 @@ set -ex
 {{- $primary_pod = printf "%s-%s-%d.%s-%s-headless.%s.svc" $clusterName $redis_component.name $candidate_instance_index $clusterName $redis_component.name $namespace }}
 {{- $sentinel_monitor := printf "%s-%s %s" $clusterName $redis_component.name $primary_pod }}
 {{- /* build sentinel config */}}
-echo "port 26379" >> /etc/sentinel/redis-sentinel.conf
+echo "port 26379" > /etc/sentinel/redis-sentinel.conf
 echo "sentinel resolve-hostnames yes" >> /etc/sentinel/redis-sentinel.conf
 echo "sentinel announce-hostnames yes" >> /etc/sentinel/redis-sentinel.conf
 echo "sentinel monitor {{ $sentinel_monitor }} 6379 2" >> /etc/sentinel/redis-sentinel.conf

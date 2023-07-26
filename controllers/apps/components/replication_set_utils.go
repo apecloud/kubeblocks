@@ -124,22 +124,12 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 
-	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary
-	if newRole == constant.Secondary {
-		// update old primary pod to secondary
-		if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, constant.Secondary); err != nil {
-			return err
-		}
-		reqCtx.Log.Info("update old primary pod to secondary success", "podName", pod.Name, "newRole", newRole)
-		return nil
-	}
-
-	// update secondary pod to primary
-	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, constant.Primary); err != nil {
+	// update pod role label with newRole
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole); err != nil {
+		reqCtx.Log.Info("failed to update pod role label", "podName", pod.Name, "newRole", newRole, "err", err)
 		return err
 	}
-	reqCtx.Log.Info("update secondary pod to primary success", "new primary podName", pod.Name)
-
+	reqCtx.Log.Info("succeed to update pod role label", "podName", pod.Name, "newRole", newRole)
 	return nil
 }
 

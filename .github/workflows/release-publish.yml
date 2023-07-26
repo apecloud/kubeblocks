@@ -160,7 +160,7 @@ jobs:
           asset_content_type: application/gzip
 
       - name: upload release asset ${{ matrix.os }}
-        if: ${{ matrix.os != 'windows-amd64' && matrix.os != 'windows-arm64' }}
+        if: ${{ matrix.os == 'windows-amd64' || matrix.os == 'windows-arm64' }}
         continue-on-error: true
         uses: actions/upload-release-asset@main
         with:

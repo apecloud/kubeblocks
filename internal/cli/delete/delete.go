@@ -34,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
@@ -241,7 +242,9 @@ func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}
-	_, err := prompt.NewPrompt(fmt.Sprintf("These clusters will be delete:[%s].\nPlease type the name again(separate with white space when more than one):", strings.Join(names, "")),
+	fmt.Printf("These clusters will be delete:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
+	// '\n' in NewPrompt will break the output
+	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
 		func(entered string) error {
 			enteredNames := strings.Split(entered, " ")
 			sort.Strings(names)

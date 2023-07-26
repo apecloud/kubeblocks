@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -96,6 +97,10 @@ func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 		component := b.Comp.GetSynthesizedComponent()
 		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
 		if err != nil {
+			return nil, err
+		}
+
+		if err = updateCustomLabelToObj(b.Comp.GetCluster(), component, constant.StatefulSetKind, sts); err != nil {
 			return nil, err
 		}
 

@@ -215,56 +215,15 @@ var _ = Describe("Consensus Component", func() {
 			clusterComp := getClusterComponentSpecByName(*cluster, consensusCompName)
 			Expect(clusterComp).ShouldNot(BeNil())
 
-			By("test updateObjLabel function")
-			stsObj := stsList.Items[0]
-			err = updateObjLabel(ctx, k8sClient, stsObj, "test", "test")
-			Expect(err).Should(Succeed())
-
-			By("test patchGVRCustomLabels of clusterDefinition")
-			resource := &appsv1alpha1.GVKResource{
-				Selector: getComponentMatchLabels(cluster.Name, consensusCompName),
-			}
-			customLabelSpec := &appsv1alpha1.CustomLabelSpec{
-				Key:       "custom-label-key",
-				Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
-				Resources: []appsv1alpha1.GVKResource{*resource},
-			}
-			By("test statefulSet resource patchGVRCustomLabels")
-			resource.GVK = "apps/v1/StatefulSet"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Pod resource patchGVRCustomLabels")
-			resource.GVK = "v1/Pod"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Deployment resource patchGVRCustomLabels")
-			resource.GVK = "apps/v1/Deployment"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Service resource patchGVRCustomLabels")
-			resource.GVK = "/v1/Service"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test ConfigMap resource patchGVRCustomLabels")
-			resource.GVK = "/v1/ConfigMap"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test CronJob resource patchGVRCustomLabels")
-			resource.GVK = "batch/v1/CronJob"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Invalid resource patchGVRCustomLabels")
-			resource.GVK = "Invalid"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err.Error()).Should(ContainSubstring("invalid pattern"))
-			By("test Invalid resource patchGVRCustomLabels")
-			resource.GVK = "apps/v1/Invalid"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err.Error()).Should(ContainSubstring("kind is not supported for custom labels"))
-
-			By("test getCustomLabelWorkloadKind")
-			workloadList := getCustomLabelWorkloadKind()
-			Expect(len(workloadList)).Should(Equal(5))
+			//By("test patchGVRCustomLabels of clusterDefinition")
+			//resource := &appsv1alpha1.GVKResource{
+			//	Selector: getComponentMatchLabels(cluster.Name, consensusCompName),
+			//}
+			//customLabelSpec := &appsv1alpha1.CustomLabelSpec{
+			//	Key:       "custom-label-key",
+			//	Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
+			//	Resources: []appsv1alpha1.GVKResource{*resource},
+			//}
 
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -35,6 +36,9 @@ func (b *statelessComponentWorkloadBuilder) BuildWorkload() componentWorkloadBui
 	buildfn := func() ([]client.Object, error) {
 		deploy, err := builder.BuildDeploy(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
 		if err != nil {
+			return nil, err
+		}
+		if err = updateCustomLabelToObj(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), constant.DeploymentKind, deploy); err != nil {
 			return nil, err
 		}
 		b.Workload = deploy

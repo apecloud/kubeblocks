@@ -315,6 +315,17 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
+		By("Mocking a retained backup")
+		backupPolicyName := "test-backup-policy"
+		backupName := "test-backup"
+		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+			SetBackupPolicyName(backupPolicyName).
+			SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
+			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
+			WithRandomName().
+			Create(&testCtx).GetObject()
+		backupKey := client.ObjectKeyFromObject(backup)
+
 		// REVIEW: this test flow
 
 		By("Delete the cluster")
@@ -322,6 +333,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Wait for the cluster to terminate")
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+
+		By("Checking backup should exist")
+		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{}, true)).Should(Succeed())
 	}
 
 	testDoNotTerminate := func(compName, compDefName string) {

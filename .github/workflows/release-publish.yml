@@ -184,11 +184,13 @@ jobs:
           else
               echo "error" > ${release_result}
           fi
+          
           bash .github/utils/utils.sh --type 12 \
             --tag-name ${{ env.TAG_NAME }} \
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          
           echo tag_name=${{ env.TAG_NAME }} >> $GITHUB_OUTPUT
 
       - name: delete cache

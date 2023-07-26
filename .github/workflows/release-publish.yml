@@ -156,7 +156,7 @@ jobs:
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
           asset_path: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-          asset_name: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
           asset_content_type: application/gzip
 
       - name: upload release asset ${{ matrix.os }}
@@ -166,7 +166,7 @@ jobs:
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
           asset_path: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
-          asset_name: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
+          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
           asset_content_type: application/zip
 
   remove-artifact:

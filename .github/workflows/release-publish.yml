@@ -3,7 +3,6 @@ name: RELEASE-PUBLISH
 on:
   release:
     types:
-      - push
       - published
 
 permissions:
@@ -177,7 +176,6 @@ jobs:
           release_result="${{ env.TAG_NAME }}-kbcli"
           touch ${release_result}
           echo 'release-result='${release_result} >> $GITHUB_OUTPUT
-
           CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
           if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
@@ -185,7 +183,6 @@ jobs:
           else
               echo "error" > ${release_result}
           fi
-
           bash .github/utils/utils.sh --type 12 \
             --tag-name ${{ env.TAG_NAME }} \
             --content "${CONTENT}"\

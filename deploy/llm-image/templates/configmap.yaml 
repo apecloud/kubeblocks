@@ -16,3 +16,4 @@ data:
     job_queue_size=1000
     model_store=/data/model-store
     model_snapshot={"name":"startup.cfg","modelCount":1,"models":{"KB_LLM_MODEL_NAME_PLACEHOLDER":{"1.0":{"defaultVersion":true,"marName":"KB_LLM_MODEL_NAME_PLACEHOLDER.mar","minWorkers":3,"maxWorkers":3,"batchSize":1,"maxBatchDelay":100,"responseTimeout":120}}}}
+    install_py_dep_per_model=true

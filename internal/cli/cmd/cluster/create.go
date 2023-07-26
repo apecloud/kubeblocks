@@ -621,6 +621,13 @@ const (
 	clusterRoleBindingPrefix = "kb-"
 )
 
+var (
+	rbacAPIGroup    = "rbac.authorization.k8s.io"
+	saKind          = "ServiceAccount"
+	roleKind        = "Role"
+	clusterRoleKind = "ClusterRole"
+)
+
 // buildDependenciesFn creates dependencies function for components, e.g. postgresql depends on
 // a service account, a role and a rolebinding
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
@@ -635,64 +642,39 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		return nil
 	}
 
+	var (
+		ctx          = context.TODO()
+		labels       = buildResourceLabels(o.Name)
+		applyOptions = metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
+	)
+
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 
-	ctx := context.TODO()
-	if err := o.createServiceAccount(ctx, dryRun); err != nil {
+	if err := o.createServiceAccount(ctx, labels, applyOptions); err != nil {
 		return err
 	}
-	if err := o.createRoleAndBinding(ctx, dryRun); err != nil {
+	if err := o.createRoleAndBinding(ctx, labels, applyOptions); err != nil {
 		return err
 	}
-	if err := o.createClusterRoleAndBinding(ctx, dryRun); err != nil {
+	if err := o.createClusterRoleAndBinding(ctx, labels, applyOptions); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *CreateOptions) serviceAccountName() string {
-	return saNamePrefix + o.Name
-}
-
-func (o *CreateOptions) roleName() string {
-	return roleNamePrefix + o.Name
-}
-
-func (o *CreateOptions) roleBindingName() string {
-	return roleBindingNamePrefix + o.Name
-}
-
-func (o *CreateOptions) clusterRoleName() string {
-	return clusterRolePrefix + o.Name
-}
-
-func (o *CreateOptions) clusterRoleBindingName() string {
-	return clusterRoleBindingPrefix + o.Name
-}
-
-func (o *CreateOptions) createServiceAccount(ctx context.Context, dryRun []string) error {
-	var (
-		saName       = o.serviceAccountName()
-		labels       = buildResourceLabels(o.Name)
-		applyOptions = metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
-	)
-
+func (o *CreateOptions) createServiceAccount(ctx context.Context, labels map[string]string, opts metav1.ApplyOptions) error {
+	saName := saNamePrefix + o.Name
 	klog.V(1).Infof("create service account %s", saName)
 	sa := corev1ac.ServiceAccount(saName, o.Namespace).WithLabels(labels)
-	_, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(ctx, sa, applyOptions)
+	_, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(ctx, sa, opts)
 	return err
 }
 
-func (o *CreateOptions) createRoleAndBinding(ctx context.Context, dryRun []string) error {
+func (o *CreateOptions) createRoleAndBinding(ctx context.Context, labels map[string]string, opts metav1.ApplyOptions) error {
 	var (
-		saName          = o.serviceAccountName()
-		roleName        = o.roleName()
-		roleBindingName = o.roleBindingName()
-		labels          = buildResourceLabels(o.Name)
-		applyOptions    = metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
-		rbacAPIGroup    = "rbac.authorization.k8s.io"
-		saKind          = "ServiceAccount"
-		rbacKind        = "Role"
+		saName          = saNamePrefix + o.Name
+		roleName        = roleNamePrefix + o.Name
+		roleBindingName = roleBindingNamePrefix + o.Name
 	)
 
 	klog.V(1).Infof("create role %s", roleName)
@@ -737,7 +719,7 @@ func (o *CreateOptions) createRoleAndBinding(ctx context.Context, dryRun []strin
 		}
 		role.Rules = append(role.Rules, rules...)
 	}
-	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(ctx, role, applyOptions); err != nil {
+	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(ctx, role, opts); err != nil {
 		return err
 	}
 
@@ -752,23 +734,18 @@ func (o *CreateOptions) createRoleAndBinding(ctx context.Context, dryRun []strin
 		}...).
 		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
 			APIGroup: &rbacAPIGroup,
-			Kind:     &rbacKind,
+			Kind:     &roleKind,
 			Name:     &roleName,
 		})
-	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(ctx, roleBinding, applyOptions)
+	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(ctx, roleBinding, opts)
 	return err
 }
 
-func (o *CreateOptions) createClusterRoleAndBinding(ctx context.Context, dryRun []string) error {
+func (o *CreateOptions) createClusterRoleAndBinding(ctx context.Context, labels map[string]string, opts metav1.ApplyOptions) error {
 	var (
-		saName                 = o.serviceAccountName()
-		clusterRoleName        = o.clusterRoleName()
-		clusterRoleBindingName = o.clusterRoleBindingName()
-		labels                 = buildResourceLabels(o.Name)
-		applyOptions           = metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
-		rbacAPIGroup           = "rbac.authorization.k8s.io"
-		saKind                 = "ServiceAccount"
-		rbacKind               = "ClusterRole"
+		saName                 = saNamePrefix + o.Name
+		clusterRoleName        = clusterRolePrefix + o.Name
+		clusterRoleBindingName = clusterRoleBindingPrefix + o.Name
 	)
 
 	klog.V(1).Infof("create cluster role %s", clusterRoleName)
@@ -779,7 +756,7 @@ func (o *CreateOptions) createClusterRoleAndBinding(ctx context.Context, dryRun 
 			Verbs:     []string{"get", "list"},
 		},
 	}...).WithLabels(labels)
-	if _, err := o.Client.RbacV1().ClusterRoles().Apply(ctx, clusterRole, applyOptions); err != nil {
+	if _, err := o.Client.RbacV1().ClusterRoles().Apply(ctx, clusterRole, opts); err != nil {
 		return err
 	}
 
@@ -794,10 +771,10 @@ func (o *CreateOptions) createClusterRoleAndBinding(ctx context.Context, dryRun 
 		}...).
 		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
 			APIGroup: &rbacAPIGroup,
-			Kind:     &rbacKind,
+			Kind:     &clusterRoleKind,
 			Name:     &clusterRoleName,
 		})
-	_, err := o.Client.RbacV1().ClusterRoleBindings().Apply(ctx, clusterRoleBinding, applyOptions)
+	_, err := o.Client.RbacV1().ClusterRoleBindings().Apply(ctx, clusterRoleBinding, opts)
 	return err
 }
 

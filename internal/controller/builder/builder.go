@@ -775,39 +775,24 @@ func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSna
 }
 
 func BuildServiceAccount(cluster *appsv1alpha1.Cluster) (*corev1.ServiceAccount, error) {
-	const tplFile = "rbac_template.cue"
-
-	sa := &corev1.ServiceAccount{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster": cluster,
-	}, "serviceaccount", sa); err != nil {
-		return nil, err
-	}
-	return sa, nil
+	return buildRBACObject[corev1.ServiceAccount](cluster, "serviceaccount")
 }
 
 func BuildRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.RoleBinding, error) {
-	const tplFile = "rbac_template.cue"
-
-	rb := &rbacv1.RoleBinding{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster": cluster,
-	}, "rolebinding", rb); err != nil {
-		return nil, err
-	}
-
-	return rb, nil
+	return buildRBACObject[rbacv1.RoleBinding](cluster, "rolebinding")
 }
 
 func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.ClusterRoleBinding, error) {
-	const tplFile = "rbac_template.cue"
+	return buildRBACObject[rbacv1.ClusterRoleBinding](cluster, "clusterrolebinding")
+}
 
-	crb := &rbacv1.ClusterRoleBinding{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster": cluster,
-	}, "clusterrolebinding", crb); err != nil {
+func buildRBACObject[Tp corev1.ServiceAccount | rbacv1.RoleBinding | rbacv1.ClusterRoleBinding](
+	cluster *appsv1alpha1.Cluster, key string) (*Tp, error) {
+	const tplFile = "rbac_template.cue"
+	var obj Tp
+	pObj := &obj
+	if err := buildFromCUE(tplFile, map[string]any{"cluster": cluster}, key, pObj); err != nil {
 		return nil, err
 	}
-
-	return crb, nil
+	return pObj, nil
 }

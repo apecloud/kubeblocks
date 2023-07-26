@@ -68,7 +68,6 @@ clusterrolebinding: {
 	kind:       "ClusterRoleBinding"
 	metadata: {
 		name:      "kb-\(cluster.metadata.name)"
-		namespace: cluster.metadata.namespace
 		labels: {
 			"app.kubernetes.io/name":       cluster.spec.clusterDefinitionRef
 			"app.kubernetes.io/instance":   cluster.metadata.name

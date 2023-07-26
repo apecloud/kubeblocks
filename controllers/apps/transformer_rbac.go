@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/viper"
@@ -102,7 +103,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			return err
 		}
 		serviceAccount.Name = serviceAccountName
-		// serviceaccount must be created before rolebinding
+		// serviceaccount must be created before rolebinding and clusterrolebinding
 		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, rbVertex)
 
 		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
@@ -158,7 +159,7 @@ func isClusterRoleBindingExist(transCtx *ClusterTransformContext, serviceAccount
 			transCtx.Logger.V(1).Info("ClusterRoleBinding not exists", "namespaceName", namespaceName)
 			return false
 		}
-		transCtx.Logger.Error(err, "get cluster role binding failed")
+		transCtx.Logger.Error(err, fmt.Sprintf("get cluster role binding failed: %s", namespaceName))
 		return false
 	}
 

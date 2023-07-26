@@ -149,6 +149,35 @@ var _ = Describe("bench", func() {
 		Expect(o.Run()).Should(BeNil())
 	})
 
+	It("ycsb command", func() {
+		cmd := NewYcsbCmd(tf, streams)
+		Expect(cmd != nil).Should(BeTrue())
+	})
+
+	It("test ycsb run", func() {
+		o := &YcsbOptions{
+			BenchBaseOptions: BenchBaseOptions{
+				Driver:      "mysql",
+				Database:    "test",
+				Host:        "svc-1",
+				Port:        3306,
+				User:        "test",
+				Password:    "test",
+				ClusterName: "test",
+			},
+			RecordCount:    1000,
+			OperationCount: 1000,
+			Threads:        []int{1},
+			factory:        tf,
+			namespace:      namespace,
+			IOStreams:      streams,
+		}
+		o.dynamic, _ = tf.DynamicClient()
+		o.client, _ = tf.KubernetesClientSet()
+		Expect(o.Validate()).Should(BeNil())
+		Expect(o.Run()).Should(BeNil())
+	})
+
 	It("parse driver and endpoint", func() {
 		driver, host, port, err := getDriverAndHostAndPort(cluster, testing.FakeServices())
 		Expect(err).Should(BeNil())

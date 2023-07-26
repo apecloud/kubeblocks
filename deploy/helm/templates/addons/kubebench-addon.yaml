@@ -15,22 +15,13 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/kubebench
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/kubebench-0.0.1/kubebench-0.0.1.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/kubebench-0.0.1.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "kubebench" "version" "0.0.1" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: 0.0.1
       {{- end }}
-
-    installValues:
-      setValues:
-        - "version=0.0.1"
 
     valuesMapping:
       valueMap:

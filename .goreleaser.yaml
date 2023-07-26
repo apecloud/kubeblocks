@@ -22,10 +22,10 @@ builds:
     goos:
       - linux
       - windows
-      - darwin
+#      - darwin
     goarch:
       - amd64
-      - arm64
+#      - arm64
     env:
       - ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.20
       - CGO_ENABLED=0
@@ -52,8 +52,7 @@ archives:
       {{- .Tag }}
     format_overrides:
       - goos: windows
-        format:
-          zip
+        format: zip
 
 nfpms:
   -
@@ -81,9 +80,9 @@ checksum:
   name_template: '{{ .ProjectName }}-checksums.txt'
   algorithm: sha256
 
-signs:
-  - artifacts: checksum
-    args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
+#signs:
+#  - artifacts: checksum
+#    args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
 
 snapshot:
   name_template: "{{ .Version }}"

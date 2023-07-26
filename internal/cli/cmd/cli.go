@@ -61,7 +61,15 @@ import (
 )
 
 const (
-	cliName = "kbcli"
+	cliName       = "kbcli"
+	longInWindows = `
+██╗  ██╗██████╗  ██████╗██╗     ██╗
+██║ ██╔╝██╔══██╗██╔════╝██║     ██║
+█████╔╝ ██████╔╝██║     ██║     ██║
+██╔═██╗ ██╔══██╗██║     ██║     ██║
+██║  ██╗██████╔╝╚██████╗███████╗██║
+╚═╝  ╚═╝╚═════╝  ╚═════╝╚══════╝╚═╝
+A Command Line Interface for KubeBlocks`
 )
 
 func init() {
@@ -148,6 +156,9 @@ A Command Line Interface for KubeBlocks`,
 			}
 			return nil
 		},
+	}
+	if util.IsWindows() {
+		cmd.Long = longInWindows
 	}
 
 	// Start from this point we get warnings on flags that contain "_" separators

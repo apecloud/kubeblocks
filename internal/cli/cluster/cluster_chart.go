@@ -202,6 +202,7 @@ func (c *ChartInfo) buildClusterSchema() error {
 func (c *ChartInfo) buildClusterDef() error {
 	cht := c.Chart
 	clusterFilePath := filepath.Join(templatesDir, clusterFile)
+	fmt.Printf("clusterFilePath = %s\n", clusterFilePath)
 	for _, tpl := range cht.Templates {
 		if tpl.Name != clusterFilePath {
 			continue

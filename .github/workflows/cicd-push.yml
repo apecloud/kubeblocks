@@ -11,7 +11,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
-  GO_VERSION: "1.20"
+  GO_VERSION: "1.20.5"
 
 jobs:
   trigger-mode:
@@ -192,7 +192,7 @@ jobs:
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
-      GO_VERSION: "1.20"
+      GO_VERSION: "1.20.5"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
@@ -204,7 +204,7 @@ jobs:
     with:
       MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
-      GO_VERSION: "1.20"
+      GO_VERSION: "1.20.5"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit

@@ -118,6 +118,7 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 func (o *SysBenchOptions) Complete(args []string) error {
 	var err error
+	var driver string
 	var host string
 	var port int
 
@@ -129,51 +130,48 @@ func (o *SysBenchOptions) Complete(args []string) error {
 		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
 	}
 
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster name should be specified")
+	if o.ClusterName != "" {
+		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+
+		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+			return err
+		}
+
+		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+			return err
+		}
+
+		clusterGetter := cluster.ObjectsGetter{
+			Client:    o.client,
+			Dynamic:   o.dynamic,
+			Name:      o.ClusterName,
+			Namespace: o.namespace,
+			GetOptions: cluster.GetOptions{
+				WithClusterDef:     true,
+				WithService:        true,
+				WithPod:            true,
+				WithEvent:          true,
+				WithPVC:            true,
+				WithDataProtection: true,
+			},
+		}
+		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+			return err
+		}
+		driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+		if err != nil {
+			return err
+		}
 	}
 
-	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
+	if v, ok := sysbenchDriverMap[driver]; ok && o.Driver == "" {
+		o.Driver = v
 	}
 
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-		return err
-	}
-
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-		return err
-	}
-
-	clusterGetter := cluster.ObjectsGetter{
-		Client:    o.client,
-		Dynamic:   o.dynamic,
-		Name:      o.ClusterName,
-		Namespace: o.namespace,
-		GetOptions: cluster.GetOptions{
-			WithClusterDef:     true,
-			WithService:        true,
-			WithPod:            true,
-			WithEvent:          true,
-			WithPVC:            true,
-			WithDataProtection: true,
-		},
-	}
-	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-	o.Driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-	if err != nil {
-		return err
-	}
-	if driver, ok := sysbenchDriverMap[o.Driver]; ok {
-		o.Driver = driver
-	} else {
-		return fmt.Errorf("unsupported driver %s", o.Driver)
-	}
-
-	if o.Host == "" || o.Port == 0 {
+	if o.Host == "" && o.Port == 0 {
 		o.Host = host
 		o.Port = port
 	}
@@ -192,6 +190,17 @@ func (o *SysBenchOptions) Complete(args []string) error {
 func (o *SysBenchOptions) Validate() error {
 	if err := o.BaseValidate(); err != nil {
 		return err
+	}
+
+	var supported bool
+	for _, v := range sysbenchDriverMap {
+		if v == o.Driver {
+			supported = true
+			break
+		}
+	}
+	if !supported {
+		return fmt.Errorf("driver %s is not supported", o.Driver)
 	}
 
 	if o.User == "" {

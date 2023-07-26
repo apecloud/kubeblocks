@@ -89,14 +89,11 @@ func (o *BenchBaseOptions) BaseValidate() error {
 		return fmt.Errorf("port is required")
 	}
 
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster is required")
-	}
-
 	return nil
 }
 
 func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&o.Driver, "driver", "", "the driver of database")
 	cmd.Flags().StringVar(&o.Database, "database", "", "database name")
 	cmd.Flags().StringVar(&o.Host, "host", "", "the host of database")
 	cmd.Flags().StringVar(&o.User, "user", "", "the user of database")

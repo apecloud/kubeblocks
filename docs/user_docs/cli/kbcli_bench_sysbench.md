@@ -32,6 +32,7 @@ kbcli bench sysbench [BenchmarkName] [flags]
 ```
       --cluster string      the cluster of database
       --database string     database name
+      --driver string       the driver of database
       --duration int        the seconds of running sysbench (default 60)
   -h, --help                help for sysbench
       --host string         the host of database

@@ -113,6 +113,7 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 func (o *PgBenchOptions) Complete(args []string) error {
 	var err error
+	var driver string
 	var host string
 	var port int
 
@@ -124,50 +125,48 @@ func (o *PgBenchOptions) Complete(args []string) error {
 		o.name = fmt.Sprintf("pgbench-%s", util.RandRFC1123String(6))
 	}
 
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster name should be specified")
+	if o.ClusterName != "" {
+		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+
+		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+			return err
+		}
+
+		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+			return err
+		}
+
+		clusterGetter := cluster.ObjectsGetter{
+			Client:    o.client,
+			Dynamic:   o.dynamic,
+			Name:      o.ClusterName,
+			Namespace: o.namespace,
+			GetOptions: cluster.GetOptions{
+				WithClusterDef:     true,
+				WithService:        true,
+				WithPod:            true,
+				WithEvent:          true,
+				WithPVC:            true,
+				WithDataProtection: true,
+			},
+		}
+		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+			return err
+		}
+		driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+		if err != nil {
+			return err
+		}
 	}
 
-	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
+	if o.Driver == "" {
+		o.Driver = driver
 	}
 
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-		return err
-	}
-
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-		return err
-	}
-
-	clusterGetter := cluster.ObjectsGetter{
-		Client:    o.client,
-		Dynamic:   o.dynamic,
-		Name:      o.ClusterName,
-		Namespace: o.namespace,
-		GetOptions: cluster.GetOptions{
-			WithClusterDef:     true,
-			WithService:        true,
-			WithPod:            true,
-			WithEvent:          true,
-			WithPVC:            true,
-			WithDataProtection: true,
-		},
-	}
-	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-	o.Driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-	if err != nil {
-		return err
-	}
-
-	if o.Driver != pgBenchDriver {
-		return fmt.Errorf("pgbench only support to run against PostgreSQL cluster, your cluster's driver is %s", o.Driver)
-	}
-
-	if o.Host == "" || o.Port == 0 {
+	if o.Host == "" && o.Port == 0 {
 		o.Host = host
 		o.Port = port
 	}
@@ -178,6 +177,10 @@ func (o *PgBenchOptions) Complete(args []string) error {
 func (o *PgBenchOptions) Validate() error {
 	if err := o.BaseValidate(); err != nil {
 		return err
+	}
+
+	if o.Driver != pgBenchDriver {
+		return fmt.Errorf("pgbench only support to run against PostgreSQL cluster, your cluster's driver is %s", o.Driver)
 	}
 
 	if len(o.Clients) == 0 {

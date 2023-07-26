@@ -33,6 +33,7 @@ kbcli bench pgbench [BenchmarkName] [flags]
       --clients ints       The number of clients to use for pgbench (default [1])
       --cluster string     the cluster of database
       --database string    database name
+      --driver string      the driver of database
       --duration int       The seconds to run pgbench for (default 60)
   -h, --help               help for pgbench
       --host string        the host of database

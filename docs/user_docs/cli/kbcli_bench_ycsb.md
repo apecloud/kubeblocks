@@ -29,6 +29,7 @@ kbcli bench ycsb [BenchmarkName] [flags]
 ```
       --cluster string                     the cluster of database
       --database string                    database name
+      --driver string                      the driver of database
   -h, --help                               help for ycsb
       --host string                        the host of database
       --insert-proportion int              the proportion of operations that are inserts

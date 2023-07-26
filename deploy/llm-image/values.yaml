@@ -1,0 +1,6 @@
+image:
+  repository: pytorch/torchserve
+  pullPolicy: IfNotPresent
+  registry: docker.io
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 0.8.1-cpu

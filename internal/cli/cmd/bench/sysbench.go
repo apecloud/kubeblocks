@@ -41,7 +41,7 @@ import (
 )
 
 var (
-	driverMap = map[string]string{
+	sysbenchDriverMap = map[string]string{
 		"mysql":      "mysql",
 		"postgresql": "pgsql",
 	}
@@ -58,7 +58,7 @@ var sysbenchExample = templates.Examples(`
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
 
 		# sysbench on a cluster with specified read/write ratio
-		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 20
 
 		# sysbench on a cluster with specified tables and size
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
@@ -92,10 +92,9 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:               "sysbench [ClusterName]",
-		Short:             "run a SysBench benchmark",
-		Example:           sysbenchExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Use:     "sysbench [BenchmarkName]",
+		Short:   "run a SysBench benchmark",
+		Example: sysbenchExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(args))
 			cmdutil.CheckErr(o.Validate())
@@ -111,6 +110,8 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd.Flags().IntVar(&o.ReadPercent, "read-percent", 0, "the percent of read, only useful when type is oltp_read_write_pct")
 	cmd.Flags().IntVar(&o.WritePercent, "write-percent", 0, "the percent of write, only useful when type is oltp_read_write_pct")
 	o.BenchBaseOptions.AddFlags(cmd)
+
+	registerClusterCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -166,7 +167,7 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	if err != nil {
 		return err
 	}
-	if driver, ok := driverMap[o.Driver]; ok {
+	if driver, ok := sysbenchDriverMap[o.Driver]; ok {
 		o.Driver = driver
 	} else {
 		return fmt.Errorf("unsupported driver %s", o.Driver)
@@ -191,6 +192,14 @@ func (o *SysBenchOptions) Complete(args []string) error {
 func (o *SysBenchOptions) Validate() error {
 	if err := o.BaseValidate(); err != nil {
 		return err
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
 	}
 
 	if len(o.Type) == 0 {

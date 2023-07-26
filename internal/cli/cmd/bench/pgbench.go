@@ -88,7 +88,7 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:     "pgbench",
+		Use:     "pgbench [BenchmarkName]",
 		Short:   "Run pgbench against a PostgreSQL cluster",
 		Example: pgbenchExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -105,6 +105,9 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().IntVar(&o.Transactions, "transactions", 0, "The number of transactions to run for pgbench")
 	cmd.Flags().IntVar(&o.Duration, "duration", 60, "The seconds to run pgbench for")
 	cmd.Flags().BoolVar(&o.Select, "select", false, "Run pgbench with select only")
+
+	registerClusterCompletionFunc(cmd, f)
+
 	return cmd
 }
 
@@ -179,6 +182,14 @@ func (o *PgBenchOptions) Validate() error {
 
 	if len(o.Clients) == 0 {
 		return fmt.Errorf("clients should be specified")
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
 	}
 
 	return nil

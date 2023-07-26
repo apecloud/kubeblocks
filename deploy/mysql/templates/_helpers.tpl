@@ -62,7 +62,7 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Agamotto config
+apecloud-otel config
 */}}
 {{- define "agamotto.config" -}}
 extensions:
@@ -137,7 +137,7 @@ service:
 {{- end }}
 
 {{/*
-Agamotto config for proxy
+apecloud-otel config for proxy
 */}}
 {{- define "proxy-monitor.config" -}}
 receivers:

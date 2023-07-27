@@ -331,20 +331,8 @@ func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.B
 	}
 	// build env of recovery time
 	spec := &backupTool.Spec
-	timeFormat := time.RFC3339
-	envTimeEnvIdx := -1
-	for i, env := range spec.Env {
-		if env.Value == "$KB_RECOVERY_TIME" {
-			envTimeEnvIdx = i
-		} else if env.Name == constant.DPTimeFormat {
-			timeFormat = env.Value
-		}
-	}
-	if envTimeEnvIdx != -1 {
-		spec.Env[envTimeEnvIdx].Value = p.restoreTime.UTC().Format(timeFormat)
-	} else {
-		headEnv = append(headEnv, corev1.EnvVar{Name: constant.DPKBRecoveryTime, Value: p.restoreTime.UTC().Format(timeFormat)})
-	}
+	timeFormat := p.getTimeFormat(spec.Env)
+	headEnv = append(headEnv, corev1.EnvVar{Name: constant.DPKBRecoveryTime, Value: p.restoreTime.UTC().Format(timeFormat)})
 	headEnv = append(headEnv, corev1.EnvVar{Name: constant.DPKBRecoveryTimestamp, Value: strconv.FormatInt(p.restoreTime.Unix(), 10)})
 	// build env of backup startTime and user contexts
 	if baseBackup.Status.Manifests != nil {
@@ -576,19 +564,16 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 	}
 
 	// builds env
-	backupDataPath := fmt.Sprintf("/%s/%s", backup.Name, backup.Namespace)
-	manifests := backup.Status.Manifests
-	if manifests != nil && manifests.BackupTool != nil {
-		backupDataPath = fmt.Sprintf("/%s%s", backup.Name, manifests.BackupTool.FilePath)
-	}
 	env := []corev1.EnvVar{
 		{
-			Name:  "BACKUP_NAME",
+			Name:  constant.DPBackupName,
 			Value: backup.Name,
-		}, {
-			Name:  "BACKUP_DIR",
-			Value: backupDataPath,
-		}}
+		},
+	}
+	manifests := backup.Status.Manifests
+	if manifests != nil && manifests.BackupTool != nil {
+		env = append(env, corev1.EnvVar{Name: constant.DPBackupDIR, Value: fmt.Sprintf("/%s%s", backup.Name, manifests.BackupTool.FilePath)})
+	}
 	// merges env from backup tool.
 	env = append(env, backupTool.Spec.Env...)
 	objs = make([]client.Object, 0)
@@ -825,4 +810,13 @@ func (p *RestoreManager) BuildCommonLabels(synthesizedComponent *component.Synth
 		constant.AppInstanceLabelKey:    p.Cluster.Name,
 		constant.KBAppComponentLabelKey: synthesizedComponent.Name,
 	}
+}
+
+func (p *RestoreManager) getTimeFormat(envs []corev1.EnvVar) string {
+	for _, env := range envs {
+		if env.Name == constant.DPTimeFormat {
+			return env.Value
+		}
+	}
+	return time.RFC3339
 }

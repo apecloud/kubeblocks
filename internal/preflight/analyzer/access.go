@@ -32,7 +32,7 @@ import (
 
 func GetClusterVersionPath() string {
 	// hardcode ClusterVersionPath will make preflight fail in windows
-	// due to the correct path is "cluster-info\cluster_version.json"
+	// due to the correct path is "cluster-info\cluster_version.json" in windows
 	return filepath.Join("cluster-info", "cluster_version.json")
 }
 

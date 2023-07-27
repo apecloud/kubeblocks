@@ -47,3 +47,5 @@ spec:
       mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR}
       tar -czvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz ./
       echo "INFO: save data file successfully"
+      TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
+      echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info

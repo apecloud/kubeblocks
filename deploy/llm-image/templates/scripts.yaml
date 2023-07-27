@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-scripts
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+data:
+  start.sh: |
+    #!/bin/sh
+    cp /llm/config/config.properties /config.properties
+    sed -i "s/KB_LLM_MODEL_NAME_PLACEHOLDER/\${MODEL_NAME}/g" /config.properties
+    echo "running config:"
+    cat /config.properties
+    torchserve --start --foreground --model-store /llm/storage --ts-config /config.properties

@@ -5,7 +5,6 @@ metadata:
   labels:
     {{- include "llm.labels" . | nindent 4}}
 spec:
-  type: etcd
   componentDefs:
     - name: llm
       workloadType: Stateless
@@ -20,6 +19,12 @@ spec:
           templateRef: llm-config-template
           volumeName: config
           namespace: {{ .Release.Namespace }}
+      scriptSpecs:
+        - name: llm-scripts
+          templateRef: llm-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       service:
         ports:
           - name: ts
@@ -60,17 +65,12 @@ spec:
             volumeMounts:
               - mountPath: /llm/config/
                 name: config
+              - name: scripts
+                mountPath: /scripts
               - mountPath: /llm/storage
                 name: model-store
             command:
-              - /bin/sh
-              - -c
-              - |
-                cp /llm/config/config.properties /config.properties
-                sed -i "s/KB_LLM_MODEL_NAME_PLACEHOLDER/${MODEL_NAME}/g" /config.properties
-                echo "running config:"
-                cat /config.properties
-                torchserve --start --foreground --model-store /llm/storage --ts-config /config.properties
+              - /scripts/start.sh
             ports:
               - name: ts
                 containerPort: 8080
@@ -78,6 +78,33 @@ spec:
                 containerPort: 8081
               - name: ts-metrics
                 containerPort: 8082
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /ping
+                port: ts
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /ping
+                port: ts
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /ping
+                port: ts
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
   connectionCredential:
     username: root
     password: ""

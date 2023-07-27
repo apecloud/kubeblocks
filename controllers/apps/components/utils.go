@@ -626,6 +626,7 @@ func getCustomLabelSupportKind() []string {
 	}
 }
 
+// updateComponentInfoToPods patches current component's replicas to all belonging pods, as an annotation.
 func updateComponentInfoToPods(
 	ctx context.Context,
 	cli client.Client,

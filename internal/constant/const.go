@@ -141,7 +141,6 @@ const (
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
-	CMConfigurationNewAnnotationKey             = "config.kubeblocks.io/new-config" // CMConfigurationNewAnnotationKey indicates whether this configmap is rendered by first time
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"

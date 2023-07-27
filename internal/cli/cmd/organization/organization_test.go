@@ -101,19 +101,5 @@ var _ = Describe("Test Organization", func() {
 			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runDescribe()).Should(Succeed())
 		})
-
-		It("test organization add ", func() {
-			cmd := newOrgListCmd(streams)
-			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate(cmd)).Should(Succeed())
-			Expect(o.runAdd()).Should(Succeed())
-		})
-
-		It("test organization delete ", func() {
-			cmd := newOrgListCmd(streams)
-			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate(cmd)).Should(Succeed())
-			Expect(o.runDelete()).Should(Succeed())
-		})
 	})
 })

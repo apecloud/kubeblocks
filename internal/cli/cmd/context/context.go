@@ -39,7 +39,6 @@ func NewContextCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		NewContextUseCmd(streams),
 		NewContextCurrentCmd(streams),
 		NewContextDescribeCmd(streams),
-		NewContextRemoveCmd(streams),
 	)
 	return cmd
 }
@@ -107,21 +106,6 @@ func NewContextUseCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func NewContextRemoveCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &ContextOptions{IOStreams: streams}
-
-	cmd := &cobra.Command{
-		Use:   "remove",
-		Short: "Remove context.",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.validate(cmd))
-			cmdutil.CheckErr(o.runRemove())
-		},
-	}
-	return cmd
-}
-
 func (o *ContextOptions) validate(cmd *cobra.Command) error {
 	if cmd.Name() != "list" && cmd.Name() != "current" {
 		if o.ContextName == "" {
@@ -173,8 +157,4 @@ func (o *ContextOptions) runDescribe() error {
 
 func (o *ContextOptions) runUse() error {
 	return o.Context.showUseContext()
-}
-
-func (o *ContextOptions) runRemove() error {
-	return o.Context.showRemoveContext()
 }

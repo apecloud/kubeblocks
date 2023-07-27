@@ -86,12 +86,5 @@ var _ = ginkgo_context.Describe("Test Cloud Context", func() {
 			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runUse()).Should(Succeed())
 		})
-
-		ginkgo_context.It("test context remove ", func() {
-			cmd := NewContextRemoveCmd(streams)
-			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate(cmd)).Should(Succeed())
-			Expect(o.runRemove()).Should(Succeed())
-		})
 	})
 })

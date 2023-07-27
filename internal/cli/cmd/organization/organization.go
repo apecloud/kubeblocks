@@ -50,8 +50,6 @@ type Organization interface {
 
 type OrganizationOption struct {
 	Name         string
-	Description  string
-	DisplayName  string
 	OutputFormat string
 
 	Organization Organization
@@ -77,10 +75,8 @@ func NewOrganizationCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.AddCommand(
 		newOrgListCmd(streams),
 		newOrgSwitchCmd(streams),
-		NewOrgCurrentCmd(streams),
+		newOrgCurrentCmd(streams),
 		newOrgDescribeCmd(streams),
-		newOrgAddCmd(streams),
-		newOrgDeleteCmd(streams),
 	)
 
 	return cmd
@@ -118,7 +114,7 @@ func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func NewOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
@@ -147,41 +143,7 @@ func newOrgDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", "human", "Output format (table|yaml|json)")
-
-	return cmd
-}
-
-func newOrgAddCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := newOrganizationOption(streams)
-
-	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Add organization.",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.validate(cmd))
-			cmdutil.CheckErr(o.runAdd())
-		},
-	}
-	cmd.Flags().StringVarP(&o.Description, "description", "n", "", "organization description")
-	cmd.Flags().StringVarP(&o.DisplayName, "display-name", "d", "", "organization display name")
-
-	return cmd
-}
-
-func newOrgDeleteCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := newOrganizationOption(streams)
-
-	cmd := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete organization.",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.validate(cmd))
-			cmdutil.CheckErr(o.runDelete())
-		},
-	}
+	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", "human", "Output format (human|yaml|json)")
 
 	return cmd
 }
@@ -223,7 +185,6 @@ func (o *OrganizationOption) runList() error {
 	return nil
 }
 
-// TODO:check whether the newly set organization exists.
 func (o *OrganizationOption) runSwitch() error {
 	token := GetToken()
 	oldOrganizationName, err := o.Organization.switchOrganization(token, o.Name)
@@ -306,38 +267,5 @@ func (o *OrganizationOption) printTable(orgItem *OrgItem) error {
 	)
 
 	tbl.Print()
-	return nil
-}
-
-func (o *OrganizationOption) runAdd() error {
-	token := GetToken()
-
-	organization := OrganizationOption{
-		Name:        o.Name,
-		Description: o.Description,
-		DisplayName: o.DisplayName,
-	}
-	body, err := json.Marshal(organization)
-	if err != nil {
-		return err
-	}
-
-	err = o.Organization.addOrganization(token, body)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(o.Out, "Organization %s added.\n", o.Name)
-	return nil
-}
-
-func (o *OrganizationOption) runDelete() error {
-	token := GetToken()
-	err := o.Organization.deleteOrganization(token, o.Name)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(o.Out, "Organization %s deleted.\n", o.Name)
 	return nil
 }

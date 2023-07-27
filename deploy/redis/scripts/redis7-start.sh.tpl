@@ -1,9 +1,8 @@
 #!/bin/sh
 set -ex
+# build redis.conf
 echo "include /etc/conf/redis.conf" >> /etc/redis/redis.conf
 echo "replica-announce-ip $KB_POD_FQDN" >> /etc/redis/redis.conf
-echo "masteruser $REDIS_REPL_USER" >> /etc/redis/redis.conf
-echo "masterauth $REDIS_REPL_PASSWORD" >> /etc/redis/redis.conf
 {{- $data_root := getVolumePathByName ( index $.podSpec.containers 0 ) "data" }}
 if [ -f /data/users.acl ]; then
   sed -i "/user default on/d" /data/users.acl
@@ -12,9 +11,20 @@ if [ -f /data/users.acl ]; then
 else
   touch /data/users.acl
 fi
-echo "user default on allcommands allkeys >$REDIS_DEFAULT_PASSWORD" >> /data/users.acl
-echo "user $REDIS_REPL_USER on +psync +replconf +ping >$REDIS_REPL_PASSWORD" >> /data/users.acl
-echo "user $REDIS_SENTINEL_USER on allchannels +multi +slaveof +ping +exec +subscribe +config|rewrite +role +publish +info +client|setname +client|kill +script|kill >$REDIS_SENTINEL_PASSWORD" >> /data/users.acl
+if [ ! -z "$REDIS_REPL_PASSWORD" ]; then
+  echo "masteruser $REDIS_REPL_USER" >> /etc/redis/redis.conf
+  echo "masterauth $REDIS_REPL_PASSWORD" >> /etc/redis/redis.conf
+  echo "user $REDIS_REPL_USER on +psync +replconf +ping >$REDIS_REPL_PASSWORD" >> /data/users.acl
+fi
+if [ ! -z "$REDIS_SENTINEL_PASSWORD" ]; then
+  echo "user $REDIS_SENTINEL_USER on allchannels +multi +slaveof +ping +exec +subscribe +config|rewrite +role +publish +info +client|setname +client|kill +script|kill >$REDIS_SENTINEL_PASSWORD" >> /data/users.acl
+fi
+if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
+  echo "protected-mode yes" >> /etc/redis/redis.conf
+  echo "user default on allcommands allkeys >$REDIS_DEFAULT_PASSWORD" >> /data/users.acl
+else
+  echo "protected-mode no" >> /etc/redis/redis.conf
+fi
 echo "aclfile /data/users.acl" >> /etc/redis/redis.conf
 
 # usage: retry <command>
@@ -55,7 +65,11 @@ create_replication() {
     echo "KB_POD_NAME=$KB_POD_NAME" >> /etc/redis/.kb_set_up.log
     if [ -z "$primary" ]; then
       echo "Primary pod information not available. shutdown redis-server..."
-      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD shutdown
+      if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
+        redis-cli -h 127.0.0.1 -p 6379 -a "$REDIS_DEFAULT_PASSWORD" shutdown
+      else
+        redis-cli -h 127.0.0.1 -p 6379 shutdown
+      fi
       exit 1
     fi
     if [ "$primary" = "$KB_POD_NAME" ]; then
@@ -63,11 +77,20 @@ create_replication() {
     else
       primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
       echo "primary_fqdn=$primary_fqdn" >> /etc/redis/.kb_set_up.log
-      retry redis-cli -h $primary_fqdn -p 6379 -a $REDIS_DEFAULT_PASSWORD ping
-      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD replicaof $primary_fqdn 6379
+      if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
+        retry redis-cli -h $primary_fqdn -p 6379 -a "$REDIS_DEFAULT_PASSWORD" ping
+        redis-cli -h 127.0.0.1 -p 6379 -a "$REDIS_DEFAULT_PASSWORD" replicaof $primary_fqdn 6379
+      else
+        retry redis-cli -h $primary_fqdn -p 6379 ping
+        redis-cli -h 127.0.0.1 -p 6379 replicaof $primary_fqdn 6379
+      fi
       if [ $? -ne 0 ]; then
         echo "Failed to create a replication relationship. shutdown redis-server..."
-        redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD shutdown
+        if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
+          redis-cli -h 127.0.0.1 -p 6379 -a "$REDIS_DEFAULT_PASSWORD" shutdown
+        else
+          redis-cli -h 127.0.0.1 -p 6379 shutdown
+        fi
       fi
     fi
 }

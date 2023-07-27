@@ -155,8 +155,6 @@ func (o *DeleteOptions) complete() error {
 			return err
 		}
 	}
-	infos, err := r.Infos()
-	fmt.Println(infos)
 	o.Result = r
 	return err
 }

@@ -20,6 +20,7 @@ spec:
         set -e;
         cd ${BACKUP_DIR};
         mkdir -p ${DATA_DIR};
+        # compatible with gzip compression for version 0.5.0
         if [ -f base.tar.gz ];then
           tar -xvf base.tar.gz -C ${DATA_DIR}/;
         else

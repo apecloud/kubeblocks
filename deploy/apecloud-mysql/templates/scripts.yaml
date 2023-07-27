@@ -245,7 +245,11 @@ data:
     --pid_file $VTDATAROOT/vttablet.pid \
     --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
     --table-acl-config-mode=$table_acl_config_mode \
-    --disable_active_reparents
+    --disable_active_reparents \
+    $(if [ -n "$table_acl_config" ]; then echo "--table-acl-config $table_acl_config"; fi) \
+    $(if [ "$queryserver_config_strict_table_acl" == "true" ]; then echo "--queryserver-config-strict-table-acl"; fi) \
+    $(if [ "$enforce_tableacl_config" == "true" ]; then echo "--enforce-tableacl-config"; fi) \
+    --table-acl-config-reload-interval $table_acl_config_reload_interval
     EOF
   etcd.sh: |-
     #!/bin/bash
@@ -367,7 +371,6 @@ data:
       --tablet_refresh_interval $tablet_refresh_interval \
       --service_map 'grpc-vtgateservice' \
       --pid_file $VTDATAROOT/vtgate.pid \
-      --mysql_auth_server_impl none \
       --read_write_splitting_policy $read_write_splitting_policy  \
       --read_write_splitting_ratio $read_write_splitting_ratio  \
       --read_after_write_consistency $read_after_write_consistency \
@@ -376,7 +379,12 @@ data:
       --buffer_size $buffer_size \
       --buffer_window $buffer_window \
       --buffer_max_failover_duration $buffer_max_failover_duration \
-      --buffer_min_time_between_failovers $buffer_min_time_between_failovers
+      --buffer_min_time_between_failovers $buffer_min_time_between_failovers \
+      $(if [ "$mysql_server_require_secure_transport" == "true" ]; then echo "--mysql_server_require_secure_transport"; fi) \
+      $(if [ -n "$mysql_server_ssl_cert" ]; then echo "--mysql_server_ssl_cert $mysql_server_ssl_cert"; fi) \
+      $(if [ -n "$mysql_server_ssl_key" ]; then echo "--mysql_server_ssl_key $mysql_server_ssl_key"; fi) \
+      $(if [ -n "$mysql_auth_server_static_file" ]; then echo "--mysql_auth_server_static_file $mysql_auth_server_static_file"; fi) \
+    --mysql_auth_server_impl $mysql_auth_server_impl
     EOF
   binlog-collector.sh: |-
     #!/bin/bash

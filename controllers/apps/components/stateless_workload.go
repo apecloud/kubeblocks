@@ -22,7 +22,6 @@ package components
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
@@ -34,14 +33,8 @@ var _ componentWorkloadBuilder = &statelessComponentWorkloadBuilder{}
 
 func (b *statelessComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		cluster := b.Comp.GetCluster()
-		component := b.Comp.GetSynthesizedComponent()
-		deploy, err := builder.BuildDeploy(b.ReqCtx, cluster, component, b.EnvConfig.Name)
+		deploy, err := builder.BuildDeploy(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
 		if err != nil {
-			return nil, err
-		}
-		if err = updateCustomLabelToObj(cluster.Name, string(cluster.UID), component.Name,
-			component.CustomLabelSpecs, constant.DeploymentKind, deploy); err != nil {
 			return nil, err
 		}
 		b.Workload = deploy

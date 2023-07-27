@@ -313,7 +313,7 @@ var _ = Describe("Consensus Component", func() {
 				Expect(gvk.Kind).Should(Equal("StatefulSet"))
 			})
 		})
-		Context("updateCustomLabelToObj func", func() {
+		Context("updateCustomLabelToObjs func", func() {
 			It("should update label well", func() {
 				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
 				customLabelSpec := appsv1alpha1.CustomLabelSpec{
@@ -323,7 +323,7 @@ var _ = Describe("Consensus Component", func() {
 				}
 				pod := builder.NewPodBuilder("foo", "bar").GetObject()
 				clusterName, uid, componentName := "foo", "1234-5678", "workload"
-				err := updateCustomLabelToObj(clusterName, uid, componentName, []appsv1alpha1.CustomLabelSpec{customLabelSpec}, constant.PodKind, pod)
+				err := updateCustomLabelToObjs(clusterName, uid, componentName, []appsv1alpha1.CustomLabelSpec{customLabelSpec}, []client.Object{pod})
 				Expect(err).Should(BeNil())
 				Expect(pod.Labels).ShouldNot(BeNil())
 				Expect(pod.Labels["custom-label-key"]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, componentName)))

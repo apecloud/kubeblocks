@@ -42,6 +42,7 @@ import (
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -612,6 +613,19 @@ func getImageName(image string) string {
 	return subs[0]
 }
 
+// getCustomLabelSupportKind returns the kinds that support custom label.
+func getCustomLabelSupportKind() []string {
+	return []string{
+		constant.CronJobKind,
+		constant.StatefulSetKind,
+		constant.DeploymentKind,
+		constant.ReplicaSetKind,
+		constant.ServiceKind,
+		constant.ConfigMapKind,
+		constant.PodKind,
+	}
+}
+
 func updateComponentInfoToPods(
 	ctx context.Context,
 	cli client.Client,
@@ -730,19 +744,33 @@ func updateObjLabel(clusterName, uid, componentName string, customLabelSpec apps
 	obj.SetLabels(labels)
 }
 
-func updateCustomLabelToObj(clusterName, uid, componentName string,
+func updateCustomLabelToObjs(clusterName, uid, componentName string,
 	customLabelSpecs []appsv1alpha1.CustomLabelSpec,
-	kind string, obj client.Object) error {
-	for _, customLabelSpec := range customLabelSpecs {
-		for _, res := range customLabelSpec.Resources {
-			gvk, err := parseCustomLabelPattern(res.GVK)
-			if err != nil {
-				return err
+	objs []client.Object) error {
+	for _, obj := range objs {
+		kinds, _, err := model.GetScheme().ObjectKinds(obj)
+		if err != nil {
+			return err
+		}
+		if len(kinds) != 1 {
+			return fmt.Errorf("expected exactly 1 kind for object %T, but found %s kinds", obj, kinds)
+		}
+		kind := kinds[0].Kind
+		if !slices.Contains(getCustomLabelSupportKind(), kind) {
+			continue
+		}
+
+		for _, customLabelSpec := range customLabelSpecs {
+			for _, res := range customLabelSpec.Resources {
+				gvk, err := parseCustomLabelPattern(res.GVK)
+				if err != nil {
+					return err
+				}
+				if gvk.Kind != kind {
+					continue
+				}
+				updateObjLabel(clusterName, uid, componentName, customLabelSpec, obj)
 			}
-			if gvk.Kind != kind {
-				continue
-			}
-			updateObjLabel(clusterName, uid, componentName, customLabelSpec, obj)
 		}
 	}
 	return nil

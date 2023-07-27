@@ -8,6 +8,7 @@ image:
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: 8.0.30-5.alpha9.20230606.gf80d546.9
+  smartEngineTag: 8.0.30-5.alpha10.20230725.g8d05885.10
 
 ## MySQL Cluster parameters
 cluster:

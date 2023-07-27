@@ -12,6 +12,16 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: mysql8.0-smartengine-config-template
+  labels:
+   {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  my.cnf: |-
+   {{- .Files.Get "config/mysql8-config-smartengine.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: vtgate-config-template
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}

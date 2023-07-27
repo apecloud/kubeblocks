@@ -724,7 +724,7 @@ func updateCustomLabelToPods(ctx context.Context,
 				}
 				pod := &podList.Items[i]
 				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pod)
-				dag.AddVertex(ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
+				dag.AddVertex(&ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
 			}
 		}
 	}

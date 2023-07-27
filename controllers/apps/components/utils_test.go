@@ -37,6 +37,9 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -164,7 +167,7 @@ var _ = Describe("Consensus Component", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		// testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -313,6 +316,7 @@ var _ = Describe("Consensus Component", func() {
 				Expect(gvk.Kind).Should(Equal("StatefulSet"))
 			})
 		})
+
 		Context("updateCustomLabelToObjs func", func() {
 			It("should update label well", func() {
 				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
@@ -326,7 +330,36 @@ var _ = Describe("Consensus Component", func() {
 				err := updateCustomLabelToObjs(clusterName, uid, componentName, []appsv1alpha1.CustomLabelSpec{customLabelSpec}, []client.Object{pod})
 				Expect(err).Should(BeNil())
 				Expect(pod.Labels).ShouldNot(BeNil())
-				Expect(pod.Labels["custom-label-key"]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, componentName)))
+				Expect(pod.Labels[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, componentName)))
+			})
+		})
+
+		Context("updateCustomLabelToPods func", func() {
+			It("should work well", func() {
+				_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+					clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
+				sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+				pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
+				customLabelSpec := appsv1alpha1.CustomLabelSpec{
+					Key:       "custom-label-key",
+					Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
+					Resources: []appsv1alpha1.GVKResource{*resource},
+				}
+				comp := &component.SynthesizedComponent{
+					Name:             consensusCompName,
+					CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{customLabelSpec},
+				}
+				dag := graph.NewDAG()
+				dag.AddVertex(&types.LifecycleVertex{Obj: pods[0], Action: types.ActionUpdatePtr()})
+				Expect(updateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
+				podVertices := types.FindAll[*corev1.Pod](dag)
+				Expect(podVertices).Should(HaveLen(3))
+				for _, vertex := range podVertices {
+					v, _ := vertex.(*types.LifecycleVertex)
+					Expect(v.Obj.GetLabels()).ShouldNot(BeNil())
+					Expect(v.Obj.GetLabels()[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
+				}
 			})
 		})
 	})

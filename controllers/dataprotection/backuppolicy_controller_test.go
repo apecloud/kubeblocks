@@ -396,7 +396,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				// mock a backupTool
 				backupTool := createStatefulKindBackupTool()
 
-				testLogfileBackupWithstatefulSet := func() {
+				testLogfileBackupWithStatefulSet := func() {
 					By("init test resources")
 					// mock a cluster
 					cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -512,7 +512,8 @@ var _ = Describe("Backup Policy Controller", func() {
 					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
 						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupRunning))
 					})).Should(Succeed())
-					By("delete cluster, expect to backup phase to Completed")
+
+					By("delete cluster, expect the backup phase to Completed")
 					testapps.DeleteObject(&testCtx, types.NamespacedName{
 						Name:      clusterName,
 						Namespace: testCtx.DefaultNamespace,
@@ -526,18 +527,18 @@ var _ = Describe("Backup Policy Controller", func() {
 
 					// disabled logfile
 					Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
-						backupPolicy.Spec.Schedule.Logfile.Enable = true
+						backupPolicy.Spec.Schedule.Logfile.Enable = false
 					})).Should(Succeed())
 				}
 
-				testLogfileBackupWithstatefulSet()
+				testLogfileBackupWithStatefulSet()
 
 				// clear backupPolicy
 				testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, client.InNamespace(testCtx.DefaultNamespace),
 					client.HasLabels{testCtx.TestObjLabelKey})
 
 				// test again for create a cluster with same name
-				testLogfileBackupWithstatefulSet()
+				testLogfileBackupWithStatefulSet()
 
 			})
 		})

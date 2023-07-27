@@ -3,30 +3,61 @@ kind: ConfigMap
 metadata:
   name: ape-postgresql-scripts
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "apecloud-postgresql.labels" . | nindent 4 }}
 data:
   setup.sh: |
     #!/bin/bash
     set -o errexit
     set -o nounset
 
-    KB_0_POD_NAME_PREFIX="${KB_0_HOSTNAME%%\.*}"
+    . /kb-scripts/libsetup.sh
+
+    export POSTGRESQL_BIN_DIR="/usr/local/bin"
+    export KB_0_POD_NAME_PREFIX="${KB_0_HOSTNAME%%\.*}"
+    export POSTGRESQL_INIT_MAX_TIMEOUT=60
+    export POSTGRESQL_REPLICATION_PASSWORD=$POSTGRES_PASSWORD
+
     # default secondary when pgdata is not empty
     if [ -d ${PGDATA} ]; then
       echo "have been initialized"
     else
       if [ "$KB_0_POD_NAME_PREFIX" == "$KB_POD_NAME" ]; then
-        chmod -R a+w "postgresql/"
-        gosu postgres initdb -U postgres -D /postgresql/pgconsensus_data
-        echo "use_consensus = true" >> /postgresql/pgconsensus_data/consensus.conf
-
-        gosu postgres postgres -D /postgresql/pgconsensus_data -p 5432 \
-             -c consensus_init_meta=ON \
-             -c consensus_members_info="localhost:5432@1"
-
-        gosu postgres pg_ctl -D /postgresql/pgconsensus_data -l /postgresql/pgconsensus_data/logfile start
-
-        gosu postgres psql -Upostgres -p5432 -c"create role replicator with superuser login password 'replicator';"
-        gosu postgres psql -Upostgres -p5432 -c"create extension if not exists consensus_monitor;"
+        postgresql_master_init
+      else
+        postgresql_slave_init
       fi
     fi
+
+    postgres -D $PGDATA
+  libsetup.sh: |
+    postgresql_master_init() {
+      initdb -U postgres -D $PGDATA
+
+      echo "use_consensus = true" >> $PGDATA/consensus.conf
+      postgres -D $PGDATA -p 5432 \
+           -c consensus_init_meta=ON \
+           -c consensus_members_info="$KB_POD_FQDN:$POSTGRESQL_PORT_NUMBER@1"
+    }
+    ###############
+    postgresql_slave_init() {
+      local -r check_args=("-U" "$POSTGRES_USER" "-h" "$KB_0_HOSTNAME" "-p" "$POSTGRESQL_PORT_NUMBER" "-d" "postgres")
+      local check_cmd=("$POSTGRESQL_BIN_DIR"/pg_isready)
+      local ready_counter=$POSTGRESQL_INIT_MAX_TIMEOUT
+
+      while ! POSTGRES_PASSWORD=$POSTGRESQL_REPLICATION_PASSWORD "${check_cmd[@]}" "${check_args[@]}"; do
+        sleep 1
+        ready_counter=$((ready_counter - 1))
+        if ((ready_counter <= 0)); then
+            echo "PostgreSQL master is not ready after $POSTGRESQL_INIT_MAX_TIMEOUT seconds"
+            exit 1
+        fi
+      done
+
+      system_identifier=`psql -U postgres -h $KB_0_HOSTNAME -p 5432  -t -A  -c "select system_identifier from pg_control_system();"`
+      initdb -U postgres -D $PGDATA -i $system_identifier
+
+      echo "use_consensus = true" >> $PGDATA/consensus.conf
+      postgres -D $PGDATA -p 5432 \
+           -c consensus_init_meta=ON \
+           -c consensus_members_info="$KB_POD_FQDN:$POSTGRESQL_PORT_NUMBER"
+    }

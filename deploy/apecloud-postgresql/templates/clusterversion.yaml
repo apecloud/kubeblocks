@@ -5,7 +5,7 @@ metadata:
   annotations:
     kubeblocks.io/is-default-cluster-version: "false"
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "apecloud-postgresql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-postgresql
   componentVersions:

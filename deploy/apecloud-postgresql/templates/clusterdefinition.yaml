@@ -3,7 +3,7 @@ kind: ClusterDefinition
 metadata:
   name: apecloud-postgresql
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "apecloud-postgresql.labels" . | nindent 4 }}
 spec:
   type: postgresql
   connectionCredential:
@@ -55,27 +55,22 @@ spec:
           name: learner
           accessMode: Readonly
       podSpec:
+        initContainers:
+          - name: init-permissions
+            image: busybox
+            securityContext:
+              runAsUser: 0
+            command: [ "chmod", "a+w", "/postgresql" ]
+            volumeMounts:
+              - name: data
+                mountPath: /postgresql
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
-              runAsUser: 0
+              runAsUser: 999
             command:
               - /kb-scripts/setup.sh
-            readinessProbe:
-              failureThreshold: 3
-              initialDelaySeconds: 10
-              periodSeconds: 30
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - -ee
-                  - |
-                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
-                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -88,15 +83,13 @@ spec:
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
-              - containerPort: 15432
-                name: paxos
+              - name: paxos
+                containerPort: 15432
             env:
               - name: CONSENSUS_MODE
                 value: "data"
               - name: KUBERNETES_USE_CONFIGMAPS
                 value: "true"
-              - name: KUBERNETES_LABELS
-                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
               - name: ALLOW_NOSSL
                 value: "true"
               - name: POD_IP
@@ -204,5 +197,5 @@ spec:
               type: CreateByStmt
               scope: AnyPods
               statements:
-                creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                creation: CREATE ROLE REPLICATOR WITH SUPERUSER LOGIN PASSWORD 'replicator';
+                deletion: DROP ROLE IF EXISTS $(USERNAME);

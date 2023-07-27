@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -448,21 +447,17 @@ var _ = Describe("Cluster", func() {
 
 			_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			cluster := testing.FakeCluster(clusterName, namespace)
-			httpResp := func(obj runtime.Object) *http.Response {
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
-			}
+			clusters := testing.FakeClusterList()
 
 			tf.UnstructuredClient = &clientfake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 				Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					return httpResp(cluster), nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &clusters.Items[0])}, nil
 				}),
 			}
 
 			tf.Client = tf.UnstructuredClient
-			tf.FakeDynamicClient = testing.FakeDynamicClient(cluster, testing.FakeClusterDef(), testing.FakeClusterVersion())
 			o = &kbclidelete.DeleteOptions{
 				Factory:     tf,
 				IOStreams:   streams,

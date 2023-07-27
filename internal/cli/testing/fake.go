@@ -1032,7 +1032,15 @@ func FakeBackupRepo(name string, isDefault bool) *dpv1alpha1.BackupRepo {
 }
 
 func FakeClusterList() *appsv1alpha1.ClusterList {
-	clusters := &appsv1alpha1.ClusterList{}
+	clusters := &appsv1alpha1.ClusterList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "15",
+		},
+		Items: []appsv1alpha1.Cluster{
+			*FakeCluster(ClusterName, Namespace),
+			*FakeCluster(ClusterName+"-other", Namespace),
+		},
+	}
 	clusters.Items = append(clusters.Items, *FakeCluster(ClusterName, Namespace))
 	return clusters
 }

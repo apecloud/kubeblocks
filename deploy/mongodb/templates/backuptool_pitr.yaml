@@ -25,8 +25,8 @@ spec:
       set -e
       export MONGODB_URI="mongodb://${MONGODB_ROOT_USER}:${MONGODB_ROOT_PASSWORD}@${DB_HOST}:27017/?authSource=admin&replicaSet=${KB_CLUSTER_COMP_NAME}"
       export WALG_FILE_PREFIX=${BACKUP_DIR}
-      echo "wal-g oplog-replay ${BACKUP_START_TIMESTAMP}.1 ${KB_RECOVERY_TIMESTAMP}.1"
-      wal-g oplog-replay ${BACKUP_START_TIMESTAMP}.1 ${KB_RECOVERY_TIMESTAMP}.1
+      echo "wal-g oplog-replay ${BASE_BACKUP_START_TIMESTAMP}.1 ${KB_RECOVERY_TIMESTAMP}.1"
+      wal-g oplog-replay ${BASE_BACKUP_START_TIMESTAMP}.1 ${KB_RECOVERY_TIMESTAMP}.1
     incrementalRestoreCommands: []
   backupCommands:
     - bash

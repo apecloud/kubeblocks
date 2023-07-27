@@ -17,7 +17,7 @@ data:
   replicaset-post-start.sh: |-
     {{- .Files.Get "scripts/replicaset-post-start.tpl" | nindent 4 }}
   backup-log-collector.sh: |-
-    {{- .Files.Get "scripts/backup-log-collector.tpl" | nindent 4 }}
+    {{- .Files.Get "scripts/backup-log-collector.sh" | nindent 4 }}
   shard-agent.sh: |-
     #!/bin/sh
     

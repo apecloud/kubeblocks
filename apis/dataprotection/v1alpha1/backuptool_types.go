@@ -70,7 +70,7 @@ type BackupToolSpec struct {
 
 	// backup tool can support physical restore, in this case, restore must be RESTART database.
 	// +kubebuilder:validation:Required
-	Physical BackupToolRestoreCommand `json:"physical"`
+	Physical PhysicalConfig `json:"physical"`
 
 	// backup tool can support logical restore, in this case, restore NOT RESTART database.
 	// +optional
@@ -86,6 +86,14 @@ type LogicalConfig struct {
 	// +optional
 	// +kubebuilder:default=All
 	PodScope PodRestoreScope `json:"podScope,omitempty"`
+}
+
+type PhysicalConfig struct {
+	BackupToolRestoreCommand `json:",inline"`
+
+	// relyOnLogfile defines whether the current recovery relies on log files
+	// +optional
+	RelyOnLogfile *bool `json:"relyOnLogfile,omitempty"`
 }
 
 // BackupToolRestoreCommand defines the restore commands of BackupTool

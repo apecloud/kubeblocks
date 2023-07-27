@@ -771,9 +771,11 @@ var _ = Describe("Cluster Controller", func() {
 										Value: "test-value",
 									},
 								},
-								Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
-									RestoreCommands: []string{
-										"echo \"hello world\"",
+								Physical: dataprotectionv1alpha1.PhysicalConfig{
+									BackupToolRestoreCommand: dataprotectionv1alpha1.BackupToolRestoreCommand{
+										RestoreCommands: []string{
+											"echo \"hello world\"",
+										},
 									},
 								},
 							},

@@ -34,17 +34,19 @@ import (
 )
 
 const (
-	namespace                                 = "test"
-	testDefaultClassDefsPath                  = "../../testing/testdata/class.yaml"
-	testCustomClassDefsPath                   = "../../testing/testdata/custom_class.yaml"
-	testGeneralResourceConstraintPath         = "../../testing/testdata/resource-constraint-general.yaml"
-	testMemoryOptimizedResourceConstraintPath = "../../testing/testdata/resource-constraint-memory-optimized.yaml"
+	namespace                                        = "test"
+	testDefaultClassDefsPath                         = "../../testing/testdata/class.yaml"
+	testCustomClassDefsPath                          = "../../testing/testdata/custom_class.yaml"
+	testGeneralResourceConstraintPath                = "../../testing/testdata/resource-constraint-general.yaml"
+	testMemoryOptimizedResourceConstraintPath        = "../../testing/testdata/resource-constraint-memory-optimized.yaml"
+	testGeneralResourceConstraintWithoutSelectorPath = "../../testing/testdata/resource-constraint-general-without-selector.yaml"
 )
 
 var (
-	classDef                          appsv1alpha1.ComponentClassDefinition
-	generalResourceConstraint         appsv1alpha1.ComponentResourceConstraint
-	memoryOptimizedResourceConstraint appsv1alpha1.ComponentResourceConstraint
+	classDef                                 appsv1alpha1.ComponentClassDefinition
+	generalResourceConstraint                appsv1alpha1.ComponentResourceConstraint
+	generalResourceConstraintWithoutSelector appsv1alpha1.ComponentResourceConstraint
+	memoryOptimizedResourceConstraint        appsv1alpha1.ComponentResourceConstraint
 )
 
 var _ = BeforeSuite(func() {
@@ -58,6 +60,11 @@ var _ = BeforeSuite(func() {
 	generalResourceConstraintBytes, err := os.ReadFile(testGeneralResourceConstraintPath)
 	Expect(err).ShouldNot(HaveOccurred())
 	err = yaml.Unmarshal(generalResourceConstraintBytes, &generalResourceConstraint)
+	Expect(err).ShouldNot(HaveOccurred())
+
+	generalResourceConstraintWithoutSelectorBytes, err := os.ReadFile(testGeneralResourceConstraintWithoutSelectorPath)
+	Expect(err).ShouldNot(HaveOccurred())
+	err = yaml.Unmarshal(generalResourceConstraintWithoutSelectorBytes, &generalResourceConstraintWithoutSelector)
 	Expect(err).ShouldNot(HaveOccurred())
 
 	memoryOptimizedResourceConstraintBytes, err := os.ReadFile(testMemoryOptimizedResourceConstraintPath)

@@ -157,3 +157,13 @@ fullnameOverride: ""
 # The RBAC permission used by cluster component pod, now include event.create
 serviceAccount:
   name: ""
+
+# Cluster domain
+#
+clusterDomain: ".cluster.local"
+
+
+# test suites
+tests:
+  benchmark:
+    kafka2Kafka: true

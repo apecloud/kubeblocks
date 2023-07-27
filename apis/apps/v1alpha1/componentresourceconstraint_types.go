@@ -28,11 +28,48 @@ import (
 
 // ComponentResourceConstraintSpec defines the desired state of ComponentResourceConstraint
 type ComponentResourceConstraintSpec struct {
-	// Component resource constraints
-	Constraints []ResourceConstraint `json:"constraints,omitempty"`
+	// Component resource constraint rules.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:Required
+	Rules []ResourceConstraintRule `json:"rules"`
+
+	// selector is used to bind the resource constraint to cluster definitions.
+	// +listType=map
+	// +listMapKey=clusterDefRef
+	// +optional
+	Selector []ClusterResourceConstraintSelector `json:"selector,omitempty"`
 }
 
-type ResourceConstraint struct {
+type ClusterResourceConstraintSelector struct {
+	// clusterDefRef is the name of the cluster definition.
+	// +kubebuilder:validation:Required
+	ClusterDefRef string `json:"clusterDefRef"`
+
+	// selector is used to bind the resource constraint to components.
+	// +listType=map
+	// +listMapKey=componentDefRef
+	// +kubebuilder:validation:Required
+	Components []ComponentResourceConstraintSelector `json:"components"`
+}
+
+type ComponentResourceConstraintSelector struct {
+	// componentDefRef is the name of the component definition in the cluster definition.
+	// +kubebuilder:validation:Required
+	ComponentDefRef string `json:"componentDefRef"`
+
+	// rules are the constraint rules that will be applied to the component.
+	// +kubebuilder:validation:Required
+	Rules []string `json:"rules"`
+}
+
+type ResourceConstraintRule struct {
+	// The name of the constraint.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
 	// The constraint for vcpu cores.
 	// +kubebuilder:validation:Required
 	CPU CPUConstraint `json:"cpu"`
@@ -137,7 +174,7 @@ func init() {
 }
 
 // ValidateCPU validates if the CPU meets the constraint
-func (m *ResourceConstraint) ValidateCPU(cpu *resource.Quantity) bool {
+func (m *ResourceConstraintRule) ValidateCPU(cpu *resource.Quantity) bool {
 	if cpu.IsZero() {
 		return true
 	}
@@ -164,7 +201,7 @@ func (m *ResourceConstraint) ValidateCPU(cpu *resource.Quantity) bool {
 }
 
 // ValidateMemory validates if the memory meets the constraint
-func (m *ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
+func (m *ResourceConstraintRule) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
 	if memory.IsZero() {
 		return true
 	}
@@ -201,7 +238,7 @@ func (m *ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *reso
 }
 
 // ValidateStorage validates if the storage meets the constraint
-func (m *ResourceConstraint) ValidateStorage(storage *resource.Quantity) bool {
+func (m *ResourceConstraintRule) ValidateStorage(storage *resource.Quantity) bool {
 	if storage.IsZero() {
 		return true
 	}
@@ -216,7 +253,7 @@ func (m *ResourceConstraint) ValidateStorage(storage *resource.Quantity) bool {
 }
 
 // ValidateResources validates if the resources meets the constraint
-func (m *ResourceConstraint) ValidateResources(r corev1.ResourceList) bool {
+func (m *ResourceConstraintRule) ValidateResources(r corev1.ResourceList) bool {
 	if !m.ValidateCPU(r.Cpu()) {
 		return false
 	}
@@ -232,7 +269,7 @@ func (m *ResourceConstraint) ValidateResources(r corev1.ResourceList) bool {
 	return true
 }
 
-func (m *ResourceConstraint) CompleteResources(r corev1.ResourceList) corev1.ResourceList {
+func (m *ResourceConstraintRule) CompleteResources(r corev1.ResourceList) corev1.ResourceList {
 	if r.Cpu().IsZero() || !r.Memory().IsZero() {
 		return corev1.ResourceList{corev1.ResourceCPU: *r.Cpu(), corev1.ResourceMemory: *r.Memory()}
 	}
@@ -250,7 +287,7 @@ func (m *ResourceConstraint) CompleteResources(r corev1.ResourceList) corev1.Res
 }
 
 // GetMinimalResources gets the minimal resources meets the constraint
-func (m *ResourceConstraint) GetMinimalResources() corev1.ResourceList {
+func (m *ResourceConstraintRule) GetMinimalResources() corev1.ResourceList {
 	var (
 		minCPU    resource.Quantity
 		minMemory resource.Quantity
@@ -281,26 +318,55 @@ func (m *ResourceConstraint) GetMinimalResources() corev1.ResourceList {
 	return corev1.ResourceList{corev1.ResourceCPU: minCPU, corev1.ResourceMemory: minMemory}
 }
 
-// FindMatchingConstraints find all constraints that resource satisfies.
-func (c *ComponentResourceConstraint) FindMatchingConstraints(r corev1.ResourceList) []ResourceConstraint {
-	if c == nil {
-		return nil
-	}
-	var constraints []ResourceConstraint
-	for _, constraint := range c.Spec.Constraints {
-		if constraint.ValidateResources(r) {
-			constraints = append(constraints, constraint)
+// FindMatchingRules find all constraint rules that resource satisfies.
+func (c *ComponentResourceConstraint) FindMatchingRules(
+	clusterDefRef string,
+	componentDefRef string,
+	resources corev1.ResourceList) []ResourceConstraintRule {
+
+	rules := c.FindRules(clusterDefRef, componentDefRef)
+	var result []ResourceConstraintRule
+	for _, rule := range rules {
+		if rule.ValidateResources(resources) {
+			result = append(result, rule)
 		}
 	}
-	return constraints
+	return result
 }
 
-// MatchClass checks if the class meets the constraints
-func (c *ComponentResourceConstraint) MatchClass(class *ComponentClassInstance) bool {
+// MatchClass checks if the class meets the constraint rules.
+func (c *ComponentResourceConstraint) MatchClass(clusterDefRef, componentDefRef string, class *ComponentClass) bool {
 	request := corev1.ResourceList{
 		corev1.ResourceCPU:    class.CPU,
 		corev1.ResourceMemory: class.Memory,
 	}
-	constraints := c.FindMatchingConstraints(request)
+	constraints := c.FindMatchingRules(clusterDefRef, componentDefRef, request)
 	return len(constraints) > 0
+}
+
+// FindRules find all constraint rules that the component should conform to.
+func (c *ComponentResourceConstraint) FindRules(clusterDefRef, componentDefRef string) []ResourceConstraintRule {
+	rules := make(map[string]bool)
+	for _, selector := range c.Spec.Selector {
+		if selector.ClusterDefRef != clusterDefRef {
+			continue
+		}
+		for _, item := range selector.Components {
+			if item.ComponentDefRef != componentDefRef {
+				continue
+			}
+			for _, name := range item.Rules {
+				rules[name] = true
+			}
+		}
+	}
+
+	var result []ResourceConstraintRule
+	for _, rule := range c.Spec.Rules {
+		if _, ok := rules[rule.Name]; !ok {
+			continue
+		}
+		result = append(result, rule)
+	}
+	return result
 }

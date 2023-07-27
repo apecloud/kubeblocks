@@ -2,7 +2,7 @@
 title: kbcli login
 ---
 
-Login command.
+Authenticate with the KubeBlocks Cloud
 
 ```
 kbcli login [flags]
@@ -11,9 +11,10 @@ kbcli login [flags]
 ### Options
 
 ```
-  -c, --context string   Context name.
-  -h, --help             help for login
-  -o, --org string       Organization name.
+      --client-id string   The client ID for the KubeBlocks cloud application.
+  -h, --help               help for login
+      --no-browser         Do not open the browser for authentication.
+      --site string        The KubeBlocks Auth API Base URL. (default "https://tenent2.jp.auth0.com")
 ```
 
 ### Options inherited from parent commands
@@ -27,6 +28,7 @@ kbcli login [flags]
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
+      --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.

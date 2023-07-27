@@ -1,0 +1,56 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: apecloud-otel-collector
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": apecloud
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: apecloud-otel-collector is a high-performance data collection agent with luxuriant function, which inspired by OpenTelemetry.
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "apecloud-otel-collector" "version" "0.1.2-beta.3" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 0.1.2-beta.3
+      {{- end }}
+
+    installValues:
+      configMapRefs:
+        - name: {{ include "addon.apecloud-otel-collector.name" . }}-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - enabled: true
+      {{- $tolerations := .Values.tolerations }}
+      {{- $dataPlaneTolerations := .Values.dataPlane.tolerations }}
+      {{- $mergedTolerations := concat $tolerations $dataPlaneTolerations }}
+      {{- with $mergedTolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+  installable:
+    autoInstall: {{ .Values.agamotto.enabled }}
+
+

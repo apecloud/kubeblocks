@@ -44,6 +44,8 @@ spec:
         sleep 1
       done
       echo "INFO: start to save data file..."
-      mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR}
+      mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR} && sync
       tar -czvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz ./
-      echo "INFO: save data file successfully"
+      echo "INFO: save data file successfully" && sync
+      TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
+      echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info && sync

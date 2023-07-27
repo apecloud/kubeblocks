@@ -274,7 +274,7 @@ func ResourceIsEmpty(res *resource.Quantity) bool {
 	return false
 }
 
-func GetPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) {
+func GetPodStatus(pods []corev1.Pod) (running, waiting, succeeded, failed int) {
 	for _, pod := range pods {
 		switch pod.Status.Phase {
 		case corev1.PodRunning:
@@ -613,6 +613,15 @@ func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
 	// if KubeBlocks is upgraded, there will be multiple secrets
 	if err == nil && len(secrets.Items) >= 1 {
 		return secrets.Items[0].Namespace, nil
+	}
+	return "", errors.New("failed to get KubeBlocks installation namespace")
+}
+
+// GetKubeBlocksNamespaceByDynamic gets namespace of KubeBlocks installation, infer namespace from helm secrets
+func GetKubeBlocksNamespaceByDynamic(dynamic dynamic.Interface) (string, error) {
+	list, err := dynamic.Resource(types.SecretGVR()).List(context.TODO(), metav1.ListOptions{LabelSelector: types.KubeBlocksHelmLabel})
+	if err == nil && len(list.Items) >= 1 {
+		return list.Items[0].GetNamespace(), nil
 	}
 	return "", errors.New("failed to get KubeBlocks installation namespace")
 }

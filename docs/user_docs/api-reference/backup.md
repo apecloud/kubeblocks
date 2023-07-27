@@ -2687,14 +2687,14 @@ string
 <tbody>
 <tr>
 <td>
-<code>startWindowMinutes</code><br/>
+<code>retryWindowMinutes</code><br/>
 <em>
 int64
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>startWindowMinutes defines the time window for starting the job if it misses scheduled<br />time for any reason. the unit of time is minute.</p><br />
+<p>retryWindowMinutes defines the time window for starting the job if it misses scheduled<br />time for any reason. the unit of time is minute.</p><br />
 </td>
 </tr>
 <tr>

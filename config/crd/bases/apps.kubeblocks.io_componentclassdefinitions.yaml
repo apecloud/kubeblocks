@@ -46,11 +46,6 @@ spec:
                   the same constraint.
                 items:
                   properties:
-                    resourceConstraintRef:
-                      description: resourceConstraintRef reference to the resource
-                        constraint object name, indicates that the series defined
-                        below all conform to the constraint.
-                      type: string
                     series:
                       description: series is a series of class definitions.
                       items:
@@ -114,8 +109,6 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
-                  required:
-                  - resourceConstraintRef
                   type: object
                 type: array
             type: object
@@ -149,10 +142,6 @@ spec:
                       x-kubernetes-int-or-string: true
                     name:
                       description: name is the class name
-                      type: string
-                    resourceConstraintRef:
-                      description: resourceConstraintRef reference to the resource
-                        constraint object name.
                       type: string
                   type: object
                 type: array

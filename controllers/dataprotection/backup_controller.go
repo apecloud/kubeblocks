@@ -343,6 +343,8 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
+	updateLabels := map[string]string{}
+
 	// TODO: get pod with matching labels to do backup.
 	var targetCluster dataprotectionv1alpha1.TargetCluster
 	var isStatefulSetKind bool
@@ -360,17 +362,19 @@ func (r *BackupReconciler) doNewPhaseAction(
 			backup.Status.Manifests.BackupTool = &dataprotectionv1alpha1.BackupToolManifestsStatus{}
 		}
 		// handle the PVC used in this backup
-		pvcName, pvName, err := r.handlePersistentVolumeClaim(reqCtx, backup, backupPolicy.Name, commonPolicy)
-		if err != nil {
-			if errors.Is(err, errBreakReconcile) {
-				// wait for the PVC to be created
-				return intctrlutil.Reconciled()
+		if backup.Status.PersistentVolumeClaimName == "" {
+			pvcName, pvName, err := r.handlePersistentVolumeClaim(reqCtx, backup, backupPolicy.Name, commonPolicy, updateLabels)
+			if err != nil {
+				if errors.Is(err, errBreakReconcile) {
+					// wait for the PVC to be created
+					return intctrlutil.Reconciled()
+				}
+				return r.updateStatusIfFailed(reqCtx, backup, err)
 			}
-			return r.updateStatusIfFailed(reqCtx, backup, err)
+			// record volume name
+			backup.Status.PersistentVolumeClaimName = pvcName
+			backup.Status.Manifests.BackupTool.VolumeName = pvName
 		}
-		// record volume name
-		backup.Status.PersistentVolumeClaimName = pvcName
-		backup.Status.Manifests.BackupTool.VolumeName = pvName
 		// save the backup message for restore
 		backupToolName := commonPolicy.BackupToolName
 		backup.Status.BackupToolName = backupToolName
@@ -394,7 +398,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 
 	cluster := r.getCluster(reqCtx, target)
-	if hasPatch, err := r.patchBackupObjectMeta(reqCtx, backup, target, cluster); err != nil {
+	if hasPatch, err := r.patchBackupObjectMeta(reqCtx, backup, target, cluster, updateLabels); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	} else if hasPatch {
 		return intctrlutil.Reconciled()
@@ -457,17 +461,27 @@ func (r *BackupReconciler) cleanupFailedJob(reqCtx intctrlutil.RequestCtx, backu
 func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	backupPolicyName string,
-	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) (pvcName string, pvName string, err error) {
-	// check the legacy PVC field first for compatibility,
-	// and fallback to the backup repo approach if the legacy PVC field is empty
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
+	updateLabels map[string]string) (pvcName string, pvName string, err error) {
+	// check the PVC from the backup repo
+	pvcName, pvName, err = r.handlePVCByBackupRepo(reqCtx, backup, backupPolicyName, commonPolicy, updateLabels)
+	if err == nil || !errors.Is(err, errNoDefaultBackupRepo) {
+		return pvcName, pvName, err
+	}
+
+	// fallback to the legacy PVC field for compatibility
 	if commonPolicy.PersistentVolumeClaim.Name != nil {
 		pvcName = *commonPolicy.PersistentVolumeClaim.Name
 	}
 	pvName, err = r.handlePersistentVolumeClaimLegacy(reqCtx, backup.Spec.BackupType, backupPolicyName, commonPolicy)
-	if err == nil || !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeBackupPVCNameIsEmpty) {
-		return pvcName, pvName, err
-	}
+	return pvcName, pvName, err
+}
 
+func (r *BackupReconciler) handlePVCByBackupRepo(reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup,
+	backupPolicyName string,
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
+	updateLabels map[string]string) (pvcName string, pvName string, err error) {
 	// check the PVC from backup repo
 	repo, err := r.getBackupRepo(reqCtx, backup, commonPolicy)
 	if err != nil {
@@ -489,12 +503,7 @@ func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.Reques
 	}
 	if err == nil {
 		// the PVC is already present, bind the backup to the repo
-		if backup.Labels == nil {
-			backup.Labels = map[string]string{}
-		}
-		if backup.Labels[dataProtectionBackupRepoKey] == "" {
-			backup.Labels[dataProtectionBackupRepoKey] = repo.Name
-		}
+		updateLabels[dataProtectionBackupRepoKey] = repo.Name
 		return pvcName, pvc.Spec.VolumeName, nil
 	}
 	// the PVC is not present
@@ -1025,7 +1034,8 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	targetPod *corev1.Pod,
-	cluster *appsv1alpha1.Cluster) (bool, error) {
+	cluster *appsv1alpha1.Cluster,
+	updateLabels map[string]string) (bool, error) {
 	if backup.Labels == nil {
 		backup.Labels = make(map[string]string)
 	}
@@ -1041,6 +1051,9 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	}
 	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
+	for k, v := range updateLabels {
+		backup.Labels[k] = v
+	}
 	if backup.Annotations == nil {
 		backup.Annotations = make(map[string]string)
 	}
@@ -1252,11 +1265,11 @@ func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.V(1).Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return err
 	}
-	for _, update := range basePolicy.BackupStatusUpdates {
+	for index, update := range basePolicy.BackupStatusUpdates {
 		if update.UpdateStage != stage {
 			continue
 		}
-		if err := r.createMetadataCollectionJob(reqCtx, backup, commonPolicy, basePolicy, pathPrefix, update); err != nil {
+		if err := r.createMetadataCollectionJob(reqCtx, backup, commonPolicy, basePolicy, pathPrefix, update, index); err != nil {
 			return err
 		}
 	}
@@ -1268,13 +1281,14 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
 	basePolicy *dataprotectionv1alpha1.BasePolicy,
 	pathPrefix string,
-	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
+	updateInfo dataprotectionv1alpha1.BackupStatusUpdate,
+	index int) error {
 	jobNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	// if specified to use the service account of target pod, the namespace should be the namespace of backup.
 	if updateInfo.UseTargetPodServiceAccount {
 		jobNamespace = backup.Namespace
 	}
-	key := types.NamespacedName{Namespace: jobNamespace, Name: generateUniqueJobName(backup, "status-"+string(updateInfo.UpdateStage))}
+	key := types.NamespacedName{Namespace: jobNamespace, Name: generateUniqueJobName(backup, fmt.Sprintf("status-%d-%s", index, string(updateInfo.UpdateStage)))}
 	job := &batchv1.Job{}
 	// check if job is created
 	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {

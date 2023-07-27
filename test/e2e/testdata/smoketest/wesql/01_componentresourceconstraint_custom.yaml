@@ -9,7 +9,7 @@ metadata:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
   name: kb-resource-constraint-custom
 spec:
-  constraints:
+  rules:
     - cpu:
         max: 2
         min: "0.1"

@@ -1,0 +1,49 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: postgres-wal-g
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+spec:
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.2
+  deployKind: job
+  env:
+    - name: DATA_DIR
+      value: /home/postgres/pgdata/pgroot/data
+    - name: WAL_DIR
+      value: $(DATA_DIR)/pg_wal
+    - name: WALG_PG_WAL_SIZE
+      value: "16"
+    - name: WALG_TAR_SIZE_THRESHOLD
+      value: "4294967296"
+    - name: WALG_UPLOAD_DISK_CONCURRENCY
+      value: "8"
+  physical:
+    restoreCommands:
+      - bash
+      - -c
+      - |
+        #!/bin/bash
+        # NOTE: this basebackup only support for pitr.
+        set -e;
+        mkdir -p ${DATA_DIR};
+        # TODO check KB_RECOVERY_TIME, if not exits, do wal-log restore.
+        WALG_FILE_PREFIX=${BACKUP_DIR} wal-g backup-fetch ${DATA_DIR} LATEST
+        echo "done!";
+    incrementalRestoreCommands: []
+  logical:
+    restoreCommands: []
+    incrementalRestoreCommands: []
+  backupCommands:
+    - bash
+    - -c
+    - |-
+      set -e;
+      # TODO check if pitr is enabled
+      if [ -d ${BACKUP_DIR} ]; then
+        rm -rf ${BACKUP_DIR}
+      fi
+      mkdir -p ${BACKUP_DIR}
+      WALG_FILE_PREFIX=${BACKUP_DIR} PGHOST=${DB_HOST} PGUSER=postgres PGPASSWORD=${DB_PASSWORD} PGPORT=5432 wal-g backup-push ${DATA_DIR}
+      echo "TOTAL SIZE: $(du -shx ${BACKUP_DIR}|awk '{print $1}')" > ${DATA_DIR}/basebackup.info;
+  incrementalBackupCommands: []

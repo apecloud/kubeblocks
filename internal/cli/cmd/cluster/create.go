@@ -253,7 +253,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
-	// o.CreateOptions.CreateDependencies = o.CreateDependencies
+	o.CreateOptions.CreateDependencies = o.CreateDependencies
 	o.CreateOptions.CleanUpFn = o.CleanUp
 	return o
 }
@@ -595,7 +595,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	var comps []map[string]interface{}
 	for _, compSpec := range compSpecs {
 		// validate component classes
-		if err = clsMgr.ValidateResources(compSpec); err != nil {
+		if err = clsMgr.ValidateResources(o.ClusterDefRef, compSpec); err != nil {
 			return nil, err
 		}
 
@@ -1188,7 +1188,12 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 			existedDefault = true
 		}
 	}
-	return allStorageClasses, existedDefault, nil
+	// for cloud k8s we will check the kubeblocks-manager-config
+	if existedDefault {
+		return allStorageClasses, existedDefault, nil
+	}
+	existedDefault, err = validateDefaultSCInConfig(dynamic)
+	return allStorageClasses, existedDefault, err
 }
 
 // validateClusterVersion checks the existence of declared cluster version,
@@ -1299,4 +1304,35 @@ func setKeys() []string {
 		string(keyStorageClass),
 		string(keySwitchPolicy),
 	}
+}
+
+// validateDefaultSCInConfig will verify if the ConfigMap of Kubeblocks is configured with the DEFAULT_STORAGE_CLASS.
+// When we install Kubeblocks, certain configurations will be rendered in a ConfigMap named kubeblocks-manager-config.
+// You can find the details in deploy/helm/template/configmap.yaml.
+func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
+	// todo:  types.KubeBlocksManagerConfigMapName almost is hard code, add a unique label for kubeblocks-manager-config
+	namespace, err := util.GetKubeBlocksNamespaceByDynamic(dynamic)
+	if err != nil {
+		return false, err
+	}
+	cfg, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(namespace).Get(context.Background(), types.KubeBlocksManagerConfigMapName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	var config map[string]interface{}
+	if cfg.Object["data"] == nil {
+		return false, nil
+	}
+	data := cfg.Object["data"].(map[string]interface{})
+	if data["config.yaml"] == nil {
+		return false, nil
+	}
+	err = yaml.Unmarshal([]byte(data["config.yaml"].(string)), &config)
+	if err != nil {
+		return false, err
+	}
+	if config["DEFAULT_STORAGE_CLASS"] == nil {
+		return false, nil
+	}
+	return len(config["DEFAULT_STORAGE_CLASS"].(string)) != 0, nil
 }

@@ -124,16 +124,6 @@ ClusterVersion command.
 * [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
-## [context](kbcli_context.md)
-
-Context command.
-
-* [kbcli context current](kbcli_context_current.md)	 - Current context.
-* [kbcli context describe](kbcli_context_describe.md)	 - Describe context.
-* [kbcli context list](kbcli_context_list.md)	 - List context.
-* [kbcli context use](kbcli_context_use.md)	 - Use context.
-
-
 ## [dashboard](kbcli_dashboard.md)
 
 List and open the KubeBlocks dashboards.
@@ -181,7 +171,13 @@ KubeBlocks operation commands.
 
 ## [login](kbcli_login.md)
 
-Login command.
+Authenticate with the KubeBlocks Cloud
+
+
+
+## [logout](kbcli_logout.md)
+
+Log out of the KubeBlocks Cloud
 
 
 
@@ -201,16 +197,6 @@ Data migration between two data sources.
 
 Print the list of flags inherited by all commands.
 
-
-
-## [org](kbcli_org.md)
-
-Organization command.
-
-* [kbcli org current](kbcli_org_current.md)	 - Current organization.
-* [kbcli org describe](kbcli_org_describe.md)	 - Describe organization.
-* [kbcli org list](kbcli_org_list.md)	 - List organizations.
-* [kbcli org switch](kbcli_org_switch.md)	 - Switch organization.
 
 
 ## [playground](kbcli_playground.md)

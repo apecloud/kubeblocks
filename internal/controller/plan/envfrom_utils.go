@@ -41,10 +41,10 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 	var err error
 	var cm *corev1.ConfigMap
 
-	injectConfigmap := func(keyFile, fileContext string, configSpec appsv1alpha1.ComponentConfigSpec, cmName string) error {
-		envConfigMap, err := createEnvFromConfigmap(cluster, component.Name, configSpec, client.ObjectKeyFromObject(cm), keyFile, fileContext, ctx, cli)
+	injectConfigmap := func(envMap map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cmName string) error {
+		envConfigMap, err := createEnvFromConfigmap(cluster, component.Name, configSpec, client.ObjectKeyFromObject(cm), envMap, ctx, cli)
 		if err != nil {
-			return cfgcore.WrapError(err, "failed to generate env configmap[%s] key:%s, fileContext:[%s]", cmName, keyFile, fileContext)
+			return cfgcore.WrapError(err, "failed to generate env configmap[%s]", cmName)
 		}
 		injectEnvFrom(podSpec.Containers, configSpec.AsEnvFrom, envConfigMap.Name)
 		injectEnvFrom(podSpec.InitContainers, configSpec.AsEnvFrom, envConfigMap.Name)
@@ -59,16 +59,55 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 		if cm, err = fetchConfigmap(localObjs, cmName, cluster.Namespace, cli, ctx); err != nil {
 			return err
 		}
-		for _, key := range fromConfigSpec(template, cm) {
-			if _, ok := cm.Data[key]; !ok {
-				continue
-			}
-			if err = injectConfigmap(key, cm.Data[key], template, cmName); err != nil {
-				return err
-			}
+		cc, err := getConfigConstraint(template, cli, ctx)
+		if err != nil {
+			return err
+		}
+		envMap, err := fromConfigmapFiles(fromConfigSpec(template, cm), cm, cc.FormatterConfig)
+		if err != nil {
+			return err
+		}
+		if len(envMap) == 0 {
+			continue
+		}
+		if err := injectConfigmap(envMap, template, cmName); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func getConfigConstraint(template appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (*appsv1alpha1.ConfigConstraintSpec, error) {
+	ccKey := client.ObjectKey{
+		Namespace: "",
+		Name:      template.ConfigConstraintRef,
+	}
+	cc := &appsv1alpha1.ConfigConstraint{}
+	if err := cli.Get(ctx, ccKey, cc); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+	}
+	if cc.Spec.FormatterConfig == nil {
+		return nil, cfgcore.MakeError("ConfigConstraint[%v] is not a formatter", cc.Name)
+	}
+	return &cc.Spec, nil
+}
+
+func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *appsv1alpha1.FormatterConfig) (map[string]string, error) {
+	mergeMap := func(dst, src map[string]string) {
+		for key, val := range src {
+			dst[key] = val
+		}
+	}
+
+	gEnvMap := make(map[string]string)
+	for _, file := range keys {
+		envMap, err := fromFileContent(formatter, cm.Data[file])
+		if err != nil {
+			return nil, err
+		}
+		mergeMap(gEnvMap, envMap)
+	}
+	return gEnvMap, nil
 }
 
 func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli client.Client, ctx context.Context) (*corev1.ConfigMap, error) {
@@ -87,29 +126,13 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	return cmObj, nil
 }
 
-func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1alpha1.ComponentConfigSpec, originKey client.ObjectKey, fileName, fileContext string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
-	ccKey := client.ObjectKey{
-		Namespace: "",
-		Name:      template.ConfigConstraintRef,
-	}
-	cc := &appsv1alpha1.ConfigConstraint{}
-	if err := cli.Get(ctx, ccKey, cc); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
-	}
-	if cc.Spec.FormatterConfig == nil {
-		return nil, cfgcore.MakeError("ConfigConstraint[%v] is not a formatter", cc.Name)
-	}
-
-	envMap, err := fromFileContent(cc.Spec.FormatterConfig, fileContext)
-	if err != nil {
-		return nil, err
-	}
+func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1alpha1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
-		Name:      generateEnvFromName(originKey.Name, fileName),
+		Name:      generateEnvFromName(originKey.Name),
 		Namespace: originKey.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
-	err = cli.Get(ctx, cmKey, cm)
+	err := cli.Get(ctx, cmKey, cm)
 	if err == nil {
 		return cm, nil
 	}
@@ -179,27 +202,23 @@ func fromConfigSpec(configSpec appsv1alpha1.ComponentConfigSpec, cm *corev1.Conf
 }
 
 func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1alpha1.ConfigConstraintSpec, cli client.Client, ctx context.Context) error {
-	if len(configSpec.AsEnvFrom) == 0 {
+	if len(configSpec.AsEnvFrom) == 0 || cc == nil || cc.FormatterConfig == nil {
 		return nil
 	}
-	for _, key := range fromConfigSpec(configSpec, cmObj) {
-		if _, ok := cmObj.Data[key]; !ok {
-			continue
-		}
-		envMap, err := fromFileContent(cc.FormatterConfig, cmObj.Data[key])
-		if err != nil {
-			return err
-		}
-		if err := updateEnvFromConfigmap(client.ObjectKeyFromObject(cmObj), key, envMap, cli, ctx); err != nil {
-			return err
-		}
+	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FormatterConfig)
+	if err != nil {
+		return err
 	}
-	return nil
+	if len(envMap) == 0 {
+		return nil
+	}
+
+	return updateEnvFromConfigmap(client.ObjectKeyFromObject(cmObj), envMap, cli, ctx)
 }
 
-func updateEnvFromConfigmap(origObj client.ObjectKey, fileName string, envMap map[string]string, cli client.Client, ctx context.Context) error {
+func updateEnvFromConfigmap(origObj client.ObjectKey, envMap map[string]string, cli client.Client, ctx context.Context) error {
 	cmKey := client.ObjectKey{
-		Name:      generateEnvFromName(origObj.Name, fileName),
+		Name:      generateEnvFromName(origObj.Name),
 		Namespace: origObj.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
@@ -214,6 +233,6 @@ func updateEnvFromConfigmap(origObj client.ObjectKey, fileName string, envMap ma
 	return nil
 }
 
-func generateEnvFromName(originName, keyFile string) string {
-	return strings.Join([]string{originName, keyFile, "env"}, "-")
+func generateEnvFromName(originName string) string {
+	return strings.Join([]string{originName, "envfrom"}, "-")
 }

@@ -41,23 +41,17 @@ func TestToResourceRequirements(t *testing.T) {
 
 func TestCmp(t *testing.T) {
 	var (
-		cls1 = ComponentClassInstance{
-			ComponentClass: ComponentClass{
-				CPU:    resource.MustParse("1"),
-				Memory: resource.MustParse("1Gi"),
-			},
+		cls1 = ComponentClass{
+			CPU:    resource.MustParse("1"),
+			Memory: resource.MustParse("1Gi"),
 		}
-		cls2 = ComponentClassInstance{
-			ComponentClass: ComponentClass{
-				CPU:    resource.MustParse("2"),
-				Memory: resource.MustParse("1Gi"),
-			},
+		cls2 = ComponentClass{
+			CPU:    resource.MustParse("2"),
+			Memory: resource.MustParse("1Gi"),
 		}
-		cls3 = ComponentClassInstance{
-			ComponentClass: ComponentClass{
-				CPU:    resource.MustParse("2"),
-				Memory: resource.MustParse("2Gi"),
-			},
+		cls3 = ComponentClass{
+			CPU:    resource.MustParse("2"),
+			Memory: resource.MustParse("2Gi"),
 		}
 	)
 	assert.True(t, cls1.Cmp(&cls2) < 0)

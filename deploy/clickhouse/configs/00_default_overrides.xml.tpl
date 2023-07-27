@@ -21,8 +21,7 @@
     {{- $replicas := $compIter.replicas | int }}
     {{- range $i, $_e := until $replicas }}
         <replica>
-            # TODO: clusterDomain 'cluster.local' requires configurable
-            <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc.cluster.local</host>
+            <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc.{{- $.clusterDomain }}</host>
             <port>9000</port>
         </replica>
     {{- end }}
@@ -39,8 +38,7 @@
     {{- $replicas := $compIter.replicas | int }}
     {{- range $i, $_e := until $replicas }}
     <node>
-       # TODO: clusterDomain 'cluster.local' requires configurable
-      <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc.cluster.local</host>
+      <host>{{ $clusterName }}-{{ $compIter.name }}-{{ $i }}.{{ $clusterName }}-{{ $compIter.name }}-headless.{{ $namespace }}.svc.{{- $.clusterDomain }}</host>
       <port>2181</port>
     </node>
     {{- end }}

@@ -108,7 +108,7 @@ var _ = Describe("helper", func() {
 
 	It("get configmap by name", func() {
 		cmName := "test-cm"
-		dynamic := testing.FakeDynamicClient(testing.FakeConfigMap(cmName))
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigMap(cmName, testing.Namespace, map[string]string{"fake": "fake"}))
 		cm, err := GetConfigMapByName(dynamic, testing.Namespace, cmName)
 		Expect(err).Should(Succeed())
 		Expect(cm).ShouldNot(BeNil())

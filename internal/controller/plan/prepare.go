@@ -200,7 +200,7 @@ func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildPar
 	}
 	if len(scriptPath) != 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "TOOLS_PATH",
+			Name:  cfgcm.KBConfigManagerPathEnv,
 			Value: strings.Join(scriptPath, ":"),
 		})
 	}

@@ -14,7 +14,7 @@ kbcli bench pgbench [BenchmarkName] [flags]
   # pgbench run on a cluster
   kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
   
-  # pgbench run on a cluster with different threads and different client
+  # pgbench run on a cluster with  threads and  client count
   kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
   
   # pgbench run on a cluster with specified transactions

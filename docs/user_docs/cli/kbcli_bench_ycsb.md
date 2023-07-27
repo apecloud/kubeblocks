@@ -14,13 +14,13 @@ kbcli bench ycsb [BenchmarkName] [flags]
   # ycsb on a cluster
   kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # ycsb on a cluster with different threads
+  # ycsb on a cluster with threads count
   kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
   
-  # ycsb on a cluster with different record number and operation number
+  # ycsb on a cluster with record number and operation number
   kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --record-count 10000 --operation-count 10000
   
-  # ycsb on a cluster read/write balanced
+  # ycsb on a cluster mixed read/write
   kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --read-proportion 50 --update-proportion 50
 ```
 
@@ -32,16 +32,16 @@ kbcli bench ycsb [BenchmarkName] [flags]
       --driver string                      the driver of database
   -h, --help                               help for ycsb
       --host string                        the host of database
-      --insert-proportion int              the proportion of operations that are inserts
+      --insert-proportion int              the percentage of insert operations in benchmark
       --operation-count int                the number of operations to use during the run phase (default 1000)
       --password string                    the password of database
       --port int                           the port of database
-      --read-modify-write-proportion int   the proportion of operations that are read then modify a record
-      --read-proportion int                the proportion of operations that are reads
+      --read-modify-write-proportion int   the percentage of read-modify-write operations in benchmark, which read a record, modify it, and write it back
+      --read-proportion int                the percentage of read operations in benchmark
       --record-count int                   the number of records to use (default 1000)
-      --scan-proportion int                the proportion of operations that are scans
+      --scan-proportion int                the percentage of scan operations in benchmark
       --threads ints                       the number of threads to use (default [1])
-      --update-proportion int              the proportion of operations that are updates
+      --update-proportion int              the percentage of update operations in benchmark
       --user string                        the user of database
 ```
 

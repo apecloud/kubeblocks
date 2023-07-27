@@ -53,13 +53,13 @@ var ycsbExample = templates.Examples(`
 # ycsb on a cluster
 kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-# ycsb on a cluster with different threads
+# ycsb on a cluster with threads count
 kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 
-# ycsb on a cluster with different record number and operation number
+# ycsb on a cluster with record number and operation number
 kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --record-count 10000 --operation-count 10000
 
-# ycsb on a cluster read/write balanced
+# ycsb on a cluster mixed read/write
 kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --read-proportion 50 --update-proportion 50
 `)
 
@@ -106,11 +106,11 @@ func NewYcsbCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().IntSliceVar(&o.Threads, "threads", []int{1}, "the number of threads to use")
 	cmd.Flags().IntVar(&o.RecordCount, "record-count", 1000, "the number of records to use")
 	cmd.Flags().IntVar(&o.OperationCount, "operation-count", 1000, "the number of operations to use during the run phase")
-	cmd.Flags().IntVar(&o.ReadProportion, "read-proportion", 0, "the proportion of operations that are reads")
-	cmd.Flags().IntVar(&o.UpdateProportion, "update-proportion", 0, "the proportion of operations that are updates")
-	cmd.Flags().IntVar(&o.InsertProportion, "insert-proportion", 0, "the proportion of operations that are inserts")
-	cmd.Flags().IntVar(&o.ScanProportion, "scan-proportion", 0, "the proportion of operations that are scans")
-	cmd.Flags().IntVar(&o.ReadModifyWriteProportion, "read-modify-write-proportion", 0, "the proportion of operations that are read then modify a record")
+	cmd.Flags().IntVar(&o.ReadProportion, "read-proportion", 0, "the percentage of read operations in benchmark")
+	cmd.Flags().IntVar(&o.UpdateProportion, "update-proportion", 0, "the percentage of update operations in benchmark")
+	cmd.Flags().IntVar(&o.InsertProportion, "insert-proportion", 0, "the percentage of insert operations in benchmark")
+	cmd.Flags().IntVar(&o.ScanProportion, "scan-proportion", 0, "the percentage of scan operations in benchmark")
+	cmd.Flags().IntVar(&o.ReadModifyWriteProportion, "read-modify-write-proportion", 0, "the percentage of read-modify-write operations in benchmark, which read a record, modify it, and write it back")
 
 	registerClusterCompletionFunc(cmd, f)
 

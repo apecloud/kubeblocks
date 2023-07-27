@@ -51,10 +51,10 @@ var sysbenchExample = templates.Examples(`
 		# sysbench on a cluster
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with different threads
+		# sysbench on a cluster with threads count
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 
-		# sysbench on a cluster with different type
+		# sysbench on a cluster with type
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
 
 		# sysbench on a cluster with specified read/write ratio

@@ -28,7 +28,7 @@ data:
       fi
     fi
 
-    postgres -D $PGDATA
+    postgres -D $PGDATA --hba_file=/var/lib/postgresql/conf/pg_hba.conf
   libsetup.sh: |
     postgresql_master_init() {
       initdb -U postgres -D $PGDATA

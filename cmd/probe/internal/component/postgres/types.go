@@ -13,6 +13,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+var (
+	InvalidWorkLoadType = errors.New("invalid workload type")
+)
+
 const (
 	asynchronous = "asynchronous"
 	synchronous  = "synchronous"

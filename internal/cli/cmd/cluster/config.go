@@ -227,8 +227,8 @@ func (r *reconfigureOptions) syncClusterComponent() error {
 	if err != nil {
 		return makeClusterNotExistErr(r.clusterName)
 	}
-	if len(componentNames) != 1 {
-		return cfgcore.MakeError("please specify a component as there are more than one component in cluster.")
+	if len(componentNames) == 0 {
+		return cfgcore.MakeError("not any component in cluster[%s].", r.clusterName)
 	}
 	r.componentName = componentNames[0]
 	return nil

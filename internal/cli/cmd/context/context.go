@@ -5,9 +5,21 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 )
+
+var contextExample = templates.Examples(`
+	// Get the context name currently used by the user.
+	kbcli context current 
+	// List all contexts created by the current user.
+	kbcli context list
+	// Get the description information of context context1.
+	kbcli context describe context1
+	// Switch to context context2.
+	kbcli context use context2
+`)
 
 const (
 	localContext = "local"
@@ -31,8 +43,10 @@ type ContextOptions struct {
 
 func NewContextCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "context",
-		Short: "Context command.",
+		Use: "context",
+		Short: "kbcli context allows you to manage cloud context. This command is currently only applicable to cloud," +
+			" and currently does not support switching the context of the local k8s cluster.",
+		Example: contextExample,
 	}
 	cmd.AddCommand(
 		NewContextListCmd(streams),
@@ -48,7 +62,7 @@ func NewContextListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List context.",
+		Short: "List all created contexts.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))
@@ -63,7 +77,7 @@ func NewContextCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "current",
-		Short: "Current context.",
+		Short: "Get the currently used context.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))
@@ -78,7 +92,7 @@ func NewContextDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "describe",
-		Short: "Describe context.",
+		Short: "Get the description information of a context.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))
@@ -96,7 +110,7 @@ func NewContextUseCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "use",
-		Short: "Use context.",
+		Short: "Use another context that you have already created.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))

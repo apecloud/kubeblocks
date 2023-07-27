@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubectl/pkg/util/templates"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -14,6 +16,17 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
+
+var organizationExample = templates.Examples(`
+	// Get the organization name currently used by the user.
+	kbcli org current 
+	// List all organizations the current user has joined.
+	kbcli org list
+	// Get the description information of organization org1.
+	kbcli org describe org1
+	// Switch to organization org2.
+	kbcli org switch org2
+`)
 
 const (
 	APIURL  = "http://a8ff89cbeec444c82b90c5f83a117b39-16361bbd933bde33.elb.cn-northwest-1.amazonaws.com.cn:8086"
@@ -69,8 +82,9 @@ func newOrganizationOption(streams genericclioptions.IOStreams) *OrganizationOpt
 
 func NewOrganizationCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "org",
-		Short: "Organization command.",
+		Use:     "org",
+		Short:   "kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.",
+		Example: organizationExample,
 	}
 	cmd.AddCommand(
 		newOrgListCmd(streams),
@@ -87,7 +101,7 @@ func newOrgListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List organizations.",
+		Short: "List all organizations you have joined.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))
@@ -103,7 +117,7 @@ func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "switch",
-		Short: "Switch organization.",
+		Short: "Switch to another organization you are already a member of.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))
@@ -119,7 +133,7 @@ func newOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "current",
-		Short: "Current organization.",
+		Short: "Get current organization.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))
@@ -135,7 +149,7 @@ func newOrgDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "describe",
-		Short: "Describe organization.",
+		Short: "Get the description information of an organization.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete(args))
 			cmdutil.CheckErr(o.validate(cmd))

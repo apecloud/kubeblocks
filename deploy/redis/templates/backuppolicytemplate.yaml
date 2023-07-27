@@ -29,3 +29,6 @@ spec:
       backupsHistoryLimit: 7
       target:
         role: secondary
+      backupStatusUpdates:
+      - updateStage: post
+        useTargetPodServiceAccount: true

@@ -50,7 +50,7 @@ func (a *AnalyzeClusterAccess) IsExcluded() (bool, error) {
 
 func (a *AnalyzeClusterAccess) Analyze(getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) ([]*analyze.AnalyzeResult, error) {
 	isAccess := true
-	collected, err := getFile(ClusterVersionPath)
+	collected, err := getFile(GetClusterVersionPath())
 	if err != nil {
 		isAccess = false
 	} else {

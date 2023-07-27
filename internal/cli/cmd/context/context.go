@@ -22,8 +22,9 @@ type Context interface {
 }
 
 type ContextOptions struct {
-	ContextName string
-	Context     Context
+	ContextName  string
+	Context      Context
+	OutputFormat string
 
 	genericclioptions.IOStreams
 }
@@ -85,6 +86,9 @@ func NewContextDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			cmdutil.CheckErr(o.runDescribe())
 		},
 	}
+
+	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", "human", "Output format (table|yaml|json)")
+
 	return cmd
 }
 
@@ -141,12 +145,13 @@ func (o *ContextOptions) complete(args []string) error {
 		if currentOrgAndContext.CurrentContext != localContext {
 			token := organization.GetToken()
 			o.Context = &CloudContext{
-				ContextName: o.ContextName,
-				Token:       token,
-				OrgName:     currentOrgAndContext.CurrentOrganization,
-				IOStreams:   o.IOStreams,
-				APIURL:      organization.APIURL,
-				APIPath:     organization.APIPath,
+				ContextName:  o.ContextName,
+				Token:        token,
+				OrgName:      currentOrgAndContext.CurrentOrganization,
+				IOStreams:    o.IOStreams,
+				APIURL:       organization.APIURL,
+				APIPath:      organization.APIPath,
+				OutputFormat: o.OutputFormat,
 			}
 		}
 	}

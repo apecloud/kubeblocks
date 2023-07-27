@@ -10,6 +10,7 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
@@ -17,11 +18,12 @@ import (
 )
 
 type CloudContext struct {
-	ContextName string
-	Token       string
-	OrgName     string
-	APIURL      string
-	APIPath     string
+	ContextName  string
+	Token        string
+	OrgName      string
+	APIURL       string
+	APIPath      string
+	OutputFormat string
 
 	genericclioptions.IOStreams
 }
@@ -114,6 +116,39 @@ func (c *CloudContext) showContext() error {
 		return errors.Wrapf(err, "Failed to get context %s.", c.ContextName)
 	}
 
+	switch strings.ToLower(c.OutputFormat) {
+	case "yaml":
+		return c.printYAML(cloudContext)
+	case "json":
+		return c.printJSON(cloudContext)
+	case "human":
+		fallthrough
+	default:
+		return c.printTable(cloudContext)
+	}
+}
+
+func (c *CloudContext) printYAML(ctxRes *CloudContextResponse) error {
+	yamlData, err := yaml.Marshal(ctxRes)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(c.Out, "%s", string(yamlData))
+	return nil
+}
+
+func (c *CloudContext) printJSON(ctxRes *CloudContextResponse) error {
+	jsonData, err := json.MarshalIndent(ctxRes, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(c.Out, "%s", string(jsonData))
+	return nil
+}
+
+func (c *CloudContext) printTable(ctxRes *CloudContextResponse) error {
 	tbl := printer.NewTablePrinter(c.Out)
 	tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 8, WidthMax: 120},
@@ -130,20 +165,20 @@ func (c *CloudContext) showContext() error {
 	)
 
 	createAt := convertTimestampToHumanReadable(
-		cloudContext.Metadata.CreatedAt.Seconds,
-		cloudContext.Metadata.CreatedAt.Nanos,
+		ctxRes.Metadata.CreatedAt.Seconds,
+		ctxRes.Metadata.CreatedAt.Nanos,
 	)
 	modifiedAt := convertTimestampToHumanReadable(
-		cloudContext.Metadata.ModifiedAt.Seconds,
-		cloudContext.Metadata.ModifiedAt.Nanos,
+		ctxRes.Metadata.ModifiedAt.Seconds,
+		ctxRes.Metadata.ModifiedAt.Nanos,
 	)
 	tbl.AddRow(
-		cloudContext.Metadata.Name,
-		cloudContext.Metadata.Description,
-		cloudContext.Metadata.Project,
-		cloudContext.Metadata.Organization,
-		cloudContext.Metadata.Partner,
-		cloudContext.Metadata.ID,
+		ctxRes.Metadata.Name,
+		ctxRes.Metadata.Description,
+		ctxRes.Metadata.Project,
+		ctxRes.Metadata.Organization,
+		ctxRes.Metadata.Partner,
+		ctxRes.Metadata.ID,
 		createAt,
 		modifiedAt,
 	)
@@ -217,7 +252,7 @@ func (c *CloudContext) showUseContext() error {
 		return errors.Wrapf(err, "Failed to switch context to %s.", c.ContextName)
 	}
 
-	fmt.Fprintf(c.Out, "From %s switched to context %s.\n", oldContextName, c.ContextName)
+	fmt.Fprintf(c.Out, "Successfully switched from %s to context %s.\n", oldContextName, c.ContextName)
 	return nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
@@ -58,6 +59,16 @@ type OrganizationOption struct {
 	genericclioptions.IOStreams
 }
 
+func newOrganizationOption(streams genericclioptions.IOStreams) *OrganizationOption {
+	return &OrganizationOption{
+		IOStreams: streams,
+		Organization: &CloudOrganization{
+			APIURL:  APIURL,
+			APIPath: APIPath,
+		},
+	}
+}
+
 func NewOrganizationCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "org",
@@ -76,20 +87,14 @@ func NewOrganizationCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgListCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{
-		IOStreams: streams,
-		Organization: &CloudOrganization{
-			APIURL:  APIURL,
-			APIPath: APIPath,
-		},
-	}
+	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List organizations.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.validate(cmd))
 			cmdutil.CheckErr(o.runList())
 		},
 	}
@@ -98,20 +103,14 @@ func newOrgListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{
-		IOStreams: streams,
-		Organization: &CloudOrganization{
-			APIURL:  APIURL,
-			APIPath: APIPath,
-		},
-	}
+	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
 		Use:   "switch",
 		Short: "Switch organization.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.validate(cmd))
 			cmdutil.CheckErr(o.runSwitch())
 		},
 	}
@@ -120,20 +119,14 @@ func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func NewOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{
-		IOStreams: streams,
-		Organization: &CloudOrganization{
-			APIURL:  APIURL,
-			APIPath: APIPath,
-		},
-	}
+	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
 		Use:   "current",
 		Short: "Current organization.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.validate(cmd))
 			cmdutil.CheckErr(o.runCurrent())
 		},
 	}
@@ -142,44 +135,32 @@ func NewOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{
-		IOStreams: streams,
-		Organization: &CloudOrganization{
-			APIURL:  APIURL,
-			APIPath: APIPath,
-		},
-	}
+	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
 		Use:   "describe",
 		Short: "Describe organization.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.validate(cmd))
 			cmdutil.CheckErr(o.runDescribe())
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", "table", "Output format (table|yaml|json)")
+	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", "human", "Output format (table|yaml|json)")
 
 	return cmd
 }
 
 func newOrgAddCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{
-		IOStreams: streams,
-		Organization: &CloudOrganization{
-			APIURL:  APIURL,
-			APIPath: APIPath,
-		},
-	}
+	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add organization.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.validate(cmd))
 			cmdutil.CheckErr(o.runAdd())
 		},
 	}
@@ -190,20 +171,14 @@ func newOrgAddCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func newOrgDeleteCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OrganizationOption{
-		IOStreams: streams,
-		Organization: &CloudOrganization{
-			APIURL:  APIURL,
-			APIPath: APIPath,
-		},
-	}
+	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete organization.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.validate(cmd))
 			cmdutil.CheckErr(o.runDelete())
 		},
 	}
@@ -211,7 +186,12 @@ func newOrgDeleteCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func (o *OrganizationOption) validate() error {
+func (o *OrganizationOption) validate(cmd *cobra.Command) error {
+	if cmd.Name() == "switch" || cmd.Name() == "describe" {
+		if o.Name == "" {
+			return errors.New("Organization name is required.")
+		}
+	}
 	return nil
 }
 
@@ -222,7 +202,6 @@ func (o *OrganizationOption) complete(args []string) error {
 	return nil
 }
 
-// TODO: print organization list in a table format.
 func (o *OrganizationOption) runList() error {
 	token := GetToken()
 	organizations, err := o.Organization.GetOrganizations(token)
@@ -251,7 +230,7 @@ func (o *OrganizationOption) runSwitch() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "From %s switched to organization: %s\n", oldOrganizationName, o.Name)
+	fmt.Fprintf(o.Out, "Successfully switched from %s to organization: %s\n", oldOrganizationName, o.Name)
 	return nil
 }
 
@@ -268,7 +247,7 @@ func (o *OrganizationOption) runDescribe() error {
 	token := GetToken()
 	orgItem, err := o.Organization.getOrganization(token, o.Name)
 	if err != nil {
-		return errors.Wrap(err, "Failed to get organization.")
+		return err
 	}
 
 	switch strings.ToLower(o.OutputFormat) {
@@ -276,7 +255,7 @@ func (o *OrganizationOption) runDescribe() error {
 		return o.printYAML(orgItem)
 	case "json":
 		return o.printJSON(orgItem)
-	case "table":
+	case "human":
 		fallthrough
 	default:
 		return o.printTable(orgItem)
@@ -284,7 +263,7 @@ func (o *OrganizationOption) runDescribe() error {
 }
 
 func (o *OrganizationOption) printYAML(orgItem *OrgItem) error {
-	body, err := json.Marshal(orgItem)
+	body, err := yaml.Marshal(orgItem)
 	if err != nil {
 		return err
 	}

@@ -75,38 +75,44 @@ var _ = Describe("Test Organization", func() {
 	Context("test organization", func() {
 		args := []string{"test", "test", "test"}
 		It("test organization list ", func() {
+			cmd := newOrgListCmd(streams)
 			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate()).Should(Succeed())
+			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runList()).Should(Succeed())
 		})
 
 		It("test organization switch ", func() {
+			cmd := newOrgListCmd(streams)
 			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate()).Should(Succeed())
+			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runSwitch()).Should(Succeed())
 		})
 
 		It("test organization current ", func() {
+			cmd := newOrgListCmd(streams)
 			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate()).Should(Succeed())
+			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runCurrent()).Should(Succeed())
 		})
 
 		It("test organization describe ", func() {
+			cmd := newOrgListCmd(streams)
 			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate()).Should(Succeed())
+			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runDescribe()).Should(Succeed())
 		})
 
 		It("test organization add ", func() {
+			cmd := newOrgListCmd(streams)
 			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate()).Should(Succeed())
+			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runAdd()).Should(Succeed())
 		})
 
 		It("test organization delete ", func() {
+			cmd := newOrgListCmd(streams)
 			Expect(o.complete(args)).Should(Succeed())
-			Expect(o.validate()).Should(Succeed())
+			Expect(o.validate(cmd)).Should(Succeed())
 			Expect(o.runDelete()).Should(Succeed())
 		})
 	})

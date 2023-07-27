@@ -1,4 +1,4 @@
-package login
+package login2
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ type LoginOptions struct {
 func NewLoginCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &LoginOptions{IOStreams: streams}
 	cmd := &cobra.Command{
-		Use:   "login",
+		Use:   "login2",
 		Short: "Login command.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.run())

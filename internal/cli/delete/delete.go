@@ -143,13 +143,18 @@ func (o *DeleteOptions) complete() error {
 	}
 	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
 	if !o.AutoApprove {
-		var names []string
-		var infos []*resource.Info
-		if infos, err = r.Infos(); err != nil {
-			return err
+		names := o.ConfirmedNames
+		if len(o.LabelSelector) != 0 {
+			var infos []*resource.Info
+			if infos, err = r.Infos(); err != nil {
+				return err
+			}
+			for i := range infos {
+				names = append(names, infos[i].Name)
+			}
 		}
-		for i := range infos {
-			names = append(names, infos[i].Name)
+		if len(names) == 0 {
+			names = o.Names
 		}
 		if err = Confirm(names, o.In); err != nil {
 			return err
@@ -240,7 +245,7 @@ func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}
-	fmt.Printf("These clusters will be delete:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
+	fmt.Printf("These clusters will be deleted:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
 	// '\n' in NewPrompt will break the output
 	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
 		func(entered string) error {

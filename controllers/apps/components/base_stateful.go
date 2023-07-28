@@ -206,6 +206,18 @@ func (c *statefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 	}
 
 	c.updateWorkload(c.runningWorkload)
+
+	// update component info to pods' annotations
+	if err := updateComponentInfoToPods(reqCtx.Ctx, cli, c.Cluster, c.Component, c.Dag); err != nil {
+		return err
+	}
+
+	// patch the current componentSpec workload's custom labels
+	if err := updateCustomLabelToPods(reqCtx.Ctx, cli, c.Cluster, c.Component, c.Dag); err != nil {
+		reqCtx.Event(c.Cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
+		return err
+	}
+
 	return delayedRequeueError
 }
 

@@ -650,5 +650,11 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
+	m := bson.M{"fsyncUnlock": 1}
+	response := mgr.Client.Database("admin").RunCommand(ctx, m)
+	if response.Err() != nil {
+		mgr.Logger.Infof("Unlock db failed: %v", response)
+		return response.Err()
+	}
 	return nil
 }

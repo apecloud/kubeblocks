@@ -443,9 +443,23 @@ func (mgr *Manager) CreateRoot(ctx context.Context) error {
 }
 
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	setReadOnly := `set global read_only=on;`
+
+	_, err := mgr.DB.Exec(setReadOnly)
+	if err != nil {
+		mgr.Logger.Errorf("Lock err: %v", err)
+		return err
+	}
 	return nil
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
+	setReadOnlyOff := `set global read_only=off;`
+
+	_, err := mgr.DB.Exec(setReadOnlyOff)
+	if err != nil {
+		mgr.Logger.Errorf("Unlock err: %v", err)
+		return err
+	}
 	return nil
 }

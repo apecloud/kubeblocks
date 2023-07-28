@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package context
 
 import (
@@ -49,15 +68,15 @@ func NewContextCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Example: contextExample,
 	}
 	cmd.AddCommand(
-		NewContextListCmd(streams),
-		NewContextUseCmd(streams),
-		NewContextCurrentCmd(streams),
-		NewContextDescribeCmd(streams),
+		newContextListCmd(streams),
+		newContextUseCmd(streams),
+		newContextCurrentCmd(streams),
+		newContextDescribeCmd(streams),
 	)
 	return cmd
 }
 
-func NewContextListCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
@@ -72,7 +91,7 @@ func NewContextListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func NewContextCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
@@ -87,7 +106,7 @@ func NewContextCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func NewContextDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
@@ -105,7 +124,7 @@ func NewContextDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func NewContextUseCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextUseCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
@@ -117,15 +136,17 @@ func NewContextUseCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			cmdutil.CheckErr(o.runUse())
 		},
 	}
+
 	return cmd
 }
 
 func (o *ContextOptions) validate(cmd *cobra.Command) error {
-	if cmd.Name() != "list" && cmd.Name() != "current" {
+	if cmd.Name() == "describe" || cmd.Name() == "use" {
 		if o.ContextName == "" {
 			return errors.New("context name is required")
 		}
 	}
+
 	return nil
 }
 
@@ -141,7 +162,10 @@ func (o *ContextOptions) complete(args []string) error {
 
 	if o.Context == nil {
 		if currentOrgAndContext.CurrentContext != localContext {
-			token := organization.GetToken()
+			token, err := organization.GetToken()
+			if err != nil {
+				return err
+			}
 			o.Context = &CloudContext{
 				ContextName:  o.ContextName,
 				Token:        token,

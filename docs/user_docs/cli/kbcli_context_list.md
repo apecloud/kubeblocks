@@ -2,7 +2,7 @@
 title: kbcli context list
 ---
 
-List context.
+List all created contexts.
 
 ```
 kbcli context list [flags]
@@ -40,7 +40,7 @@ kbcli context list [flags]
 
 ### SEE ALSO
 
-* [kbcli context](kbcli_context.md)	 - Context command.
+* [kbcli context](kbcli_context.md)	 - kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

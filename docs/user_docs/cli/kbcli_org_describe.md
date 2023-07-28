@@ -2,7 +2,7 @@
 title: kbcli org describe
 ---
 
-Describe organization.
+Get the description information of an organization.
 
 ```
 kbcli org describe [flags]
@@ -41,7 +41,7 @@ kbcli org describe [flags]
 
 ### SEE ALSO
 
-* [kbcli org](kbcli_org.md)	 - Organization command.
+* [kbcli org](kbcli_org.md)	 - kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

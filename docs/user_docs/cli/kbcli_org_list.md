@@ -2,7 +2,7 @@
 title: kbcli org list
 ---
 
-List organizations.
+List all organizations you have joined.
 
 ```
 kbcli org list [flags]
@@ -40,7 +40,7 @@ kbcli org list [flags]
 
 ### SEE ALSO
 
-* [kbcli org](kbcli_org.md)	 - Organization command.
+* [kbcli org](kbcli_org.md)	 - kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

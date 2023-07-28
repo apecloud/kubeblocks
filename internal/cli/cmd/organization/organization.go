@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package organization
 
 import (
@@ -5,14 +24,13 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubectl/pkg/util/templates"
-
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
@@ -53,18 +71,18 @@ type CurrentOrgAndContext struct {
 }
 
 type Organization interface {
-	getOrganization(token string, name string) (*OrgItem, error)
-	GetOrganizations(token string) (*Organizations, error)
-	switchOrganization(token string, name string) (string, error)
-	addOrganization(token string, body []byte) error
-	deleteOrganization(token string, name string) error
-	IsValidOrganization(token string, name string) (bool, error)
+	getOrganization(name string) (*OrgItem, error)
+	GetOrganizations() (*Organizations, error)
+	switchOrganization(name string) (string, error)
+	getCurrentOrganization() (string, error)
+	addOrganization(body []byte) error
+	deleteOrganization(name string) error
+	IsValidOrganization(name string) (bool, error)
 }
 
 type OrganizationOption struct {
 	Name         string
 	OutputFormat string
-
 	Organization Organization
 
 	genericclioptions.IOStreams
@@ -73,10 +91,6 @@ type OrganizationOption struct {
 func newOrganizationOption(streams genericclioptions.IOStreams) *OrganizationOption {
 	return &OrganizationOption{
 		IOStreams: streams,
-		Organization: &CloudOrganization{
-			APIURL:  APIURL,
-			APIPath: APIPath,
-		},
 	}
 }
 
@@ -175,14 +189,32 @@ func (o *OrganizationOption) complete(args []string) error {
 	if len(args) > 0 {
 		o.Name = args[0]
 	}
+
+	token, err := GetToken()
+	if err != nil {
+		return err
+	}
+
+	if o.Organization == nil {
+		o.Organization = &CloudOrganization{
+			Token:   token,
+			APIURL:  APIURL,
+			APIPath: APIPath,
+		}
+	}
+
 	return nil
 }
 
 func (o *OrganizationOption) runList() error {
-	token := GetToken()
-	organizations, err := o.Organization.GetOrganizations(token)
+	organizations, err := o.Organization.GetOrganizations()
 	if err != nil {
 		return err
+	}
+
+	if len(organizations.Items) == 0 {
+		fmt.Fprintln(o.Out, "you are currently not join in any organization")
+		return nil
 	}
 
 	tbl := printer.NewTablePrinter(o.Out)
@@ -200,8 +232,7 @@ func (o *OrganizationOption) runList() error {
 }
 
 func (o *OrganizationOption) runSwitch() error {
-	token := GetToken()
-	oldOrganizationName, err := o.Organization.switchOrganization(token, o.Name)
+	oldOrganizationName, err := o.Organization.switchOrganization(o.Name)
 	if err != nil {
 		return err
 	}
@@ -210,17 +241,16 @@ func (o *OrganizationOption) runSwitch() error {
 }
 
 func (o *OrganizationOption) runCurrent() error {
-	currentOrgAndContext, err := GetCurrentOrgAndContext()
+	currentOrg, err := o.Organization.getCurrentOrganization()
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "Current organization: %s\n", currentOrgAndContext.CurrentOrganization)
+	fmt.Fprintf(o.Out, "Current organization: %s\n", currentOrg)
 	return nil
 }
 
 func (o *OrganizationOption) runDescribe() error {
-	token := GetToken()
-	orgItem, err := o.Organization.getOrganization(token, o.Name)
+	orgItem, err := o.Organization.getOrganization(o.Name)
 	if err != nil {
 		return err
 	}

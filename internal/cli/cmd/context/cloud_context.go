@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package context
 
 import (
@@ -113,7 +132,7 @@ type CloudContextResponse struct {
 func (c *CloudContext) showContext() error {
 	cloudContext, err := c.GetContext()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get context %s.", c.ContextName)
+		return errors.Wrapf(err, "Failed to get context %s", c.ContextName)
 	}
 
 	switch strings.ToLower(c.OutputFormat) {
@@ -190,7 +209,7 @@ func (c *CloudContext) printTable(ctxRes *CloudContextResponse) error {
 func (c *CloudContext) showContexts() error {
 	cloudContexts, err := c.GetContexts()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get contexts.")
+		return errors.Wrapf(err, "Failed to get contexts, please check your organization name")
 	}
 
 	tbl := printer.NewTablePrinter(c.Out)
@@ -230,7 +249,7 @@ func (c *CloudContext) showContexts() error {
 	}
 	tbl.Print()
 
-	if ok := WriteContexts(cloudContexts); ok != nil {
+	if ok := writeContexts(cloudContexts); ok != nil {
 		return errors.Wrapf(err, "Failed to write contexts.")
 	}
 	return nil
@@ -303,6 +322,10 @@ func (c *CloudContext) getCurrentContext() (string, error) {
 		return "", errors.Wrap(err, "Failed to get current context.")
 	}
 
+	if ok, err := c.isValidContext(currentOrgAndContext.CurrentContext); !ok {
+		return "", err
+	}
+
 	return currentOrgAndContext.CurrentContext, nil
 }
 
@@ -342,6 +365,10 @@ func (c *CloudContext) isValidContext(contextName string) (bool, error) {
 		return false, errors.Wrap(err, "Failed to get contexts.")
 	}
 
+	if cloudContexts == nil || len(cloudContexts.Items) == 0 {
+		return false, errors.Wrap(err, "No context found, please create a context on cloud.")
+	}
+
 	for _, item := range cloudContexts.Items {
 		if item.Metadata.Name == contextName {
 			return true, nil
@@ -351,7 +378,7 @@ func (c *CloudContext) isValidContext(contextName string) (bool, error) {
 	return false, errors.Errorf("Context %s does not exist.", contextName)
 }
 
-func WriteContexts(contexts *CloudContextsResponse) error {
+func writeContexts(contexts *CloudContextsResponse) error {
 	jsonData, err := json.MarshalIndent(contexts, "", "    ")
 	if err != nil {
 		return err

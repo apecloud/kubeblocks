@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package organization
 
 import (
@@ -5,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"fmt"
+	"os"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
@@ -13,7 +33,7 @@ type MockOrganization struct {
 	genericclioptions.IOStreams
 }
 
-func (m *MockOrganization) getOrganization(token string, name string) (*OrgItem, error) {
+func (m *MockOrganization) getOrganization(name string) (*OrgItem, error) {
 	return &OrgItem{
 		ID:          "test",
 		Name:        "test",
@@ -24,7 +44,7 @@ func (m *MockOrganization) getOrganization(token string, name string) (*OrgItem,
 	}, nil
 }
 
-func (m *MockOrganization) GetOrganizations(token string) (*Organizations, error) {
+func (m *MockOrganization) GetOrganizations() (*Organizations, error) {
 	return &Organizations{
 		Items: []OrgItem{
 			{
@@ -39,22 +59,22 @@ func (m *MockOrganization) GetOrganizations(token string) (*Organizations, error
 	}, nil
 }
 
-func (m *MockOrganization) switchOrganization(token string, name string) (string, error) {
+func (m *MockOrganization) switchOrganization(name string) (string, error) {
 	fmt.Printf("switch to %s\n", name)
 	return "", nil
 }
 
-func (m *MockOrganization) addOrganization(token string, body []byte) error {
+func (m *MockOrganization) addOrganization(body []byte) error {
 	fmt.Printf("add organization %s\n", string(body))
 	return nil
 }
 
-func (m *MockOrganization) deleteOrganization(token string, name string) error {
+func (m *MockOrganization) deleteOrganization(name string) error {
 	fmt.Printf("delete organization %s\n", name)
 	return nil
 }
 
-func (m *MockOrganization) IsValidOrganization(token string, name string) (bool, error) {
+func (m *MockOrganization) IsValidOrganization(name string) (bool, error) {
 	fmt.Printf("check organization %s\n", name)
 	return true, nil
 }
@@ -67,13 +87,16 @@ var _ = Describe("Test Organization", func() {
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		o = &OrganizationOption{IOStreams: streams, Organization: &MockOrganization{}}
+		os.Setenv("TEST_ENV", "true")
 	})
 
 	AfterEach(func() {
+		defer os.Unsetenv("TEST_ENV")
 	})
 
 	Context("test organization", func() {
 		args := []string{"test", "test", "test"}
+
 		It("test organization list ", func() {
 			cmd := newOrgListCmd(streams)
 			Expect(o.complete(args)).Should(Succeed())

@@ -2,7 +2,7 @@
 title: kbcli context describe
 ---
 
-Describe context.
+Get the description information of a context.
 
 ```
 kbcli context describe [flags]
@@ -41,7 +41,7 @@ kbcli context describe [flags]
 
 ### SEE ALSO
 
-* [kbcli context](kbcli_context.md)	 - Context command.
+* [kbcli context](kbcli_context.md)	 - kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

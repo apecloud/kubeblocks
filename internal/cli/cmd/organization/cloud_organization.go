@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package organization
 
 import (
@@ -11,13 +30,14 @@ import (
 )
 
 type CloudOrganization struct {
+	Token   string
 	APIURL  string
 	APIPath string
 }
 
-func (o *CloudOrganization) getOrganization(token string, name string) (*OrgItem, error) {
+func (o *CloudOrganization) getOrganization(name string) (*OrgItem, error) {
 	path := strings.Join([]string{o.APIURL, o.APIPath, "organizations", name}, "/")
-	response, err := NewRequest(http.MethodGet, path, token, nil)
+	response, err := NewRequest(http.MethodGet, path, o.Token, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to get organization.")
 	}
@@ -31,9 +51,9 @@ func (o *CloudOrganization) getOrganization(token string, name string) (*OrgItem
 	return &orgItem, nil
 }
 
-func (o *CloudOrganization) GetOrganizations(token string) (*Organizations, error) {
+func (o *CloudOrganization) GetOrganizations() (*Organizations, error) {
 	path := strings.Join([]string{o.APIURL, o.APIPath, "organizations"}, "/")
-	response, err := NewRequest(http.MethodGet, path, token, nil)
+	response, err := NewRequest(http.MethodGet, path, o.Token, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to get organizations.")
 	}
@@ -47,8 +67,8 @@ func (o *CloudOrganization) GetOrganizations(token string) (*Organizations, erro
 	return &organizations, nil
 }
 
-func (o *CloudOrganization) switchOrganization(token string, name string) (string, error) {
-	if ok, err := o.IsValidOrganization(token, name); !ok {
+func (o *CloudOrganization) switchOrganization(name string) (string, error) {
+	if ok, err := o.IsValidOrganization(name); !ok {
 		return "", err
 	}
 
@@ -64,8 +84,20 @@ func (o *CloudOrganization) switchOrganization(token string, name string) (strin
 	return oldOrganizationName, nil
 }
 
-func (o *CloudOrganization) IsValidOrganization(token string, name string) (bool, error) {
-	organizations, err := o.GetOrganizations(token)
+func (o *CloudOrganization) getCurrentOrganization() (string, error) {
+	currentOrgAndContext, err := GetCurrentOrgAndContext()
+	if err != nil {
+		return "", err
+	}
+
+	if ok, err := o.IsValidOrganization(currentOrgAndContext.CurrentOrganization); !ok {
+		return "", err
+	}
+	return currentOrgAndContext.CurrentOrganization, nil
+}
+
+func (o *CloudOrganization) IsValidOrganization(name string) (bool, error) {
+	organizations, err := o.GetOrganizations()
 	if err != nil {
 		return false, errors.Wrap(err, "Failed to get organizations.")
 	}
@@ -77,9 +109,9 @@ func (o *CloudOrganization) IsValidOrganization(token string, name string) (bool
 	return false, errors.Errorf("Organization %s not found.", name)
 }
 
-func (o *CloudOrganization) addOrganization(token string, body []byte) error {
+func (o *CloudOrganization) addOrganization(body []byte) error {
 	path := strings.Join([]string{o.APIURL, o.APIPath, "organizations"}, "/")
-	_, err := NewRequest(http.MethodPost, path, token, body)
+	_, err := NewRequest(http.MethodPost, path, o.Token, body)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add organization.")
 	}
@@ -87,33 +119,14 @@ func (o *CloudOrganization) addOrganization(token string, body []byte) error {
 	return nil
 }
 
-func (o *CloudOrganization) deleteOrganization(token string, name string) error {
+func (o *CloudOrganization) deleteOrganization(name string) error {
 	path := strings.Join([]string{o.APIURL, o.APIPath, "organizations", name}, "/")
-	_, err := NewRequest(http.MethodDelete, path, token, nil)
+	_, err := NewRequest(http.MethodDelete, path, o.Token, nil)
 	if err != nil {
 		return errors.Wrap(err, "Failed to delete organization.")
 	}
 
 	return nil
-}
-
-func GetToken() string {
-	filePath, err := GetTokenFilePath()
-	if err != nil {
-		return ""
-	}
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return ""
-	}
-
-	var token map[string]string
-	err = json.Unmarshal(data, &token)
-	if err != nil {
-		return ""
-	}
-
-	return token["token"]
 }
 
 // SetCurrentOrgAndContext TODO:Check whether the newly set context and org exist.
@@ -161,6 +174,14 @@ func GetCurrentOrgAndContext() (*CurrentOrgAndContext, error) {
 	err = json.Unmarshal(data, &currentOrgAndContext)
 	if err != nil {
 		return nil, errors.Wrap(err, "Invalid current organization and context format.")
+	}
+
+	if currentOrgAndContext.CurrentOrganization == "" {
+		return nil, errors.New("No organization available, please join an organization.")
+	}
+
+	if currentOrgAndContext.CurrentContext == "" {
+		return nil, errors.New("No context available, please create a context.")
 	}
 
 	return &currentOrgAndContext, nil

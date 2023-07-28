@@ -2,7 +2,20 @@
 title: kbcli org
 ---
 
-Organization command.
+kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
+
+### Examples
+
+```
+  // Get the organization name currently used by the user.
+  kbcli org current
+  // List all organizations the current user has joined.
+  kbcli org list
+  // Get the description information of organization org1.
+  kbcli org describe org1
+  // Switch to organization org2.
+  kbcli org switch org2
+```
 
 ### Options
 
@@ -37,10 +50,10 @@ Organization command.
 ### SEE ALSO
 
 
-* [kbcli org current](kbcli_org_current.md)	 - Current organization.
-* [kbcli org describe](kbcli_org_describe.md)	 - Describe organization.
-* [kbcli org list](kbcli_org_list.md)	 - List organizations.
-* [kbcli org switch](kbcli_org_switch.md)	 - Switch organization.
+* [kbcli org current](kbcli_org_current.md)	 - Get current organization.
+* [kbcli org describe](kbcli_org_describe.md)	 - Get the description information of an organization.
+* [kbcli org list](kbcli_org_list.md)	 - List all organizations you have joined.
+* [kbcli org switch](kbcli_org_switch.md)	 - Switch to another organization you are already a member of.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

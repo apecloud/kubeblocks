@@ -71,7 +71,7 @@ func TestOperations(t *testing.T) {
 	assert.NotNil(t, pgOps.OperationsMap[DeleteUserOp])
 	assert.NotNil(t, pgOps.OperationsMap[DescribeUserOp])
 	assert.NotNil(t, pgOps.OperationsMap[GrantUserRoleOp])
-	assert.NotNil(t, pgOps.OperationsMaperRoleOp])
+	assert.NotNil(t, pgOps.OperationsMap[RevokeUserRoleOp])
 
 }
 

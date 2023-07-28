@@ -65,7 +65,7 @@ func TestInit(t *testing.T) {
 	assert.NotNil(t, mysqlOps.GetRole)
 	assert.Equal(t, 3306, mysqlOps.DBPort)
 	assert.NotNil(t, mysqlOps.OperationsMap[GetRoleOperation])
-	assert.NotNil(t, mysqlOps.OperationsMapration])
+	assert.NotNil(t, mysqlOps.OperationsMap[CheckStatusOperation])
 	assert.NotNil(t, mysqlOps.OperationsMap[GetLagOperation])
 	assert.NotNil(t, mysqlOps.OperationsMap[ExecOperation])
 	assert.NotNil(t, mysqlOps.OperationsMap[QueryOperation])
@@ -75,7 +75,7 @@ func TestInit(t *testing.T) {
 	assert.NotNil(t, mysqlOps.OperationsMap[DeleteUserOp])
 	assert.NotNil(t, mysqlOps.OperationsMap[DescribeUserOp])
 	assert.NotNil(t, mysqlOps.OperationsMap[GrantUserRoleOp])
-	assert.NotNil(t, mysqlOps.OperationsMapvokeUserRoleOp])
+	assert.NotNil(t, mysqlOps.OperationsMap[RevokeUserRoleOp])
 	// Clear out previously set viper variables
 	viper.Reset()
 }

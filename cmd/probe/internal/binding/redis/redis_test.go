@@ -59,7 +59,7 @@ func TestRedisInit(t *testing.T) {
 	defer r.Close()
 	// make sure operations are inited
 	assert.NotNil(t, r.client)
-	assert.NotNil(t, r.OperationsMapsOp])
+	assert.NotNil(t, r.OperationsMap[ListUsersOp])
 	assert.NotNil(t, r.OperationsMap[CreateUserOp])
 	assert.NotNil(t, r.OperationsMap[DeleteUserOp])
 	assert.NotNil(t, r.OperationsMap[DescribeUserOp])

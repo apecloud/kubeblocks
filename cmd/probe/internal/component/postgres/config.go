@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -48,6 +49,13 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	config.database = poolConfig.ConnConfig.Database
 	config.maxConns = poolConfig.MaxConns
 	config.minConns = poolConfig.MinConns
+
+	if viper.IsSet("KB_SERVICE_USER") {
+		config.username = viper.GetString("KB_SERVICE_USER")
+	}
+	if viper.IsSet("KB_SERVICE_PASSWORD") {
+		config.password = viper.GetString("KB_SERVICE_PASSWORD")
+	}
 
 	return config, nil
 }

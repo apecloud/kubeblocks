@@ -3,11 +3,13 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
+	"github.com/spf13/viper"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
@@ -91,7 +93,7 @@ func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 		mgr.Logger.Errorf("parse query failed, err:%v", sql, err)
 	}
 	for _, m := range *result {
-		addrs = append(addrs, m["ip_port"])
+		addrs = append(addrs, strings.Split(m["ip_port"], ":")[0])
 	}
 
 	return addrs
@@ -157,7 +159,7 @@ func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) err
 
 	_, err = mgr.ExecWithPool(ctx, sql, pools[0])
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
 
@@ -182,7 +184,7 @@ func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host 
 
 	_, err = mgr.ExecWithPool(ctx, sql, pools[0])
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
 
@@ -200,11 +202,42 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 }
 
 func (mgr *Manager) PromoteConsensus() error {
+	ctx := context.TODO()
+	if isLeader, err := mgr.IsLeader(context.TODO(), nil); isLeader && err == nil {
+		mgr.Logger.Infof("i am already the leader, don't need to promote")
+		return nil
+	}
+
+	sql := `select ip_port from consensus_cluster_status where server_id = (select current_leader from consensus_member_status);`
+	resp, err := mgr.Query(ctx, sql)
+	if err != nil {
+		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		return err
+	}
+
+	result, err := parseSingleQuery(string(resp))
+	if err != nil {
+		return err
+	}
+
+	currentLeaderAddr := strings.Split(result["ip_port"].(string), ":")[0]
+	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{currentLeaderAddr})
+	if err != nil || pools[0] == nil {
+		mgr.Logger.Errorf("get current leader pool failed, err%v", err)
+		return err
+	}
+
+	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("$KB_POD_FQDN"), config.port)
+	_, err = mgr.ExecWithPool(ctx, promoteSQL, pools[0])
+	if err != nil {
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		return err
+	}
+
 	return nil
 }
 
 func (mgr *Manager) DemoteConsensus() error {
-	// for consensus, promote and demote in one action, don't need to do anything
 	return nil
 }
 

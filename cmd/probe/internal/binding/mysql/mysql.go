@@ -52,14 +52,6 @@ type QueryRes []map[string]interface{}
 var _ BaseInternalOps = &MysqlOperations{}
 
 const (
-	// other general settings for DB connections.
-	maxIdleConnsKey    = "maxIdleConns"
-	maxOpenConnsKey    = "maxOpenConns"
-	connMaxLifetimeKey = "connMaxLifetime"
-	connMaxIdleTimeKey = "connMaxIdleTime"
-)
-
-const (
 	superUserPriv = "SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.*"
 	readWritePriv = "SELECT, INSERT, UPDATE, DELETE ON *.*"
 	readOnlyRPriv = "SELECT ON *.*"

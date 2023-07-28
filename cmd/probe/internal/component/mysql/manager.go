@@ -238,7 +238,7 @@ func (mgr *Manager) IsCurrentMemberHealthy() bool {
 func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
 	var db *sql.DB
 	var err error
-	if member != nil {
+	if member != nil && member.Name != mgr.CurrentMemberName {
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
@@ -277,7 +277,7 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		mgr.Logger.Infof("cluster has no leader, wait for leader to take the lock")
+		mgr.Logger.Infof("IsClusterHealthy: has no leader.")
 		return true
 	}
 

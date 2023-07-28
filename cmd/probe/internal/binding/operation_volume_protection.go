@@ -43,7 +43,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -93,7 +92,7 @@ func newVolumeProtectionOperation(logger logr.Logger, ops *BaseOperations) *oper
 }
 
 func (o *operationVolumeProtection) Kind() OperationKind {
-	return util.VolumeProtection
+	return VolumeProtection
 }
 
 func (o *operationVolumeProtection) Init(metadata Properties) error {

@@ -32,7 +32,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
@@ -349,7 +348,7 @@ func assertResponse(t *testing.T, res *binding.ProbeResponse, err error, event s
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.NotNil(t, res.Metadata)
-	opsRes := OpsResult{}
+	opsRes := binding.OpsResult{}
 	err = json.Unmarshal(res.Data, &opsRes)
 	assert.NoError(t, err)
 	t.Logf("ops result: %v", opsRes)

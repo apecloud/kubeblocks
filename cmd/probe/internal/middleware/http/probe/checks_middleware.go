@@ -112,14 +112,6 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if method == http.MethodGet && strings.HasPrefix(uri.Path, bindingPath) {
 			request.Method = http.MethodPost
 
-			//switch operation := uri.Query().Get(operationKey); OperationKind(operation) {
-			//case CheckStatusOperation, CheckRunningOperation, CheckRoleOperation, VolumeProtection, ListSystemAccountsOp:
-			//	body := GetRequestBody(operation, uri.Query())
-			//	request.Body = io.NopCloser(bytes.NewReader(body))
-			//default:
-			//	Logger.Info("unknown probe operation", "operation", operation)
-			//}
-
 			operation := uri.Query().Get(operationKey)
 			if strings.HasPrefix(operation, "get") || strings.HasPrefix(operation, "check") || strings.HasPrefix(operation, "list") {
 				body := GetRequestBody(operation, uri.Query())

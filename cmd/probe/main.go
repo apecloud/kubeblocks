@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	// Register all components
@@ -134,9 +133,8 @@ func main() {
 
 	// ha dependent on dbmanager which is initialized by rt.Run
 	characterType := viper.GetString(constant.KBEnvCharacterType)
-	workload := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(characterType, "mongodb") ||
-		(strings.EqualFold(characterType, "mysql") && strings.EqualFold(workload, Replication)) {
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if IsHAAvailable(characterType, workloadType) {
 		ha := highavailability.NewHa(logHa)
 		if ha != nil {
 			defer ha.ShutdownWithWait()

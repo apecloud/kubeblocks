@@ -19,8 +19,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package internal
 
+import "strings"
+
 const (
 	WorkloadTypeKey = "workloadType"
 	Replication     = "Replication"
 	Consensus       = "Consensus"
 )
+
+func IsHAAvailable(characterType, workloadType string) bool {
+	switch strings.ToLower(characterType) {
+	case "mongodb":
+		return true
+	case "mysql":
+		if strings.EqualFold(workloadType, Replication) {
+			return true
+		}
+	}
+	return false
+}

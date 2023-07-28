@@ -99,6 +99,9 @@ var _ = Describe("PITR Functions", func() {
 			mysqlCompType      = "replicasets"
 			mysqlCompName      = "mysql"
 			nginxCompType      = "proxy"
+			topologyKey        = "testTopologyKey"
+			labelKey           = "testNodeLabelKey"
+			labelValue         = "testLabelValue"
 		)
 
 		var (
@@ -127,6 +130,13 @@ var _ = Describe("PITR Functions", func() {
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
+				SetClusterAffinity(&appsv1alpha1.Affinity{
+					PodAntiAffinity: appsv1alpha1.Required,
+					TopologyKeys:    []string{topologyKey},
+					NodeLabels: map[string]string{
+						labelKey: labelValue,
+					},
+				}).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddRestorePointInTime(metav1.Time{Time: stopTime.Time}, sourceCluster).
 				Create(&testCtx).GetObject()

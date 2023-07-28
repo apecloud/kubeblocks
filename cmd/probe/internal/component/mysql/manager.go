@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package mysql
 
 import (
@@ -366,11 +385,12 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	ioError := rowMap.GetString("Last_IO_Error")
 	sqlError := rowMap.GetString("Last_SQL_Error")
 	if ioError != "" || sqlError != "" {
+		mgr.Logger.Infof("slave status error, sqlError: %s, ioError: %s", sqlError, ioError)
 		return true
 	}
 
 	masterHost := rowMap.GetString("Master_Host")
-	return strings.HasPrefix(masterHost, leader)
+	return !strings.HasPrefix(masterHost, leader)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {

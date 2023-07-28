@@ -14,13 +14,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-15.16.1/prometheus-15.16.1.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-15.16.1.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "prometheus" "version" "15.16.1" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

@@ -69,7 +69,10 @@ func readPidFile(dataDir string) (*PidFile, error) {
 	file.dataDir = text[1]
 	startTS, _ := strconv.ParseInt(text[2], 10, 64)
 	file.startTS = startTS
-	port, _ := strconv.ParseInt(text[3], 10, 64)
+	port, err := strconv.ParseInt(text[3], 10, 32)
+	if err != nil {
+		return nil, err
+	}
 	file.port = int(port)
 
 	return file, nil

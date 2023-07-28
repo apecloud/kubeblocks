@@ -16,13 +16,8 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-mysql
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "apecloud-mysql" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

@@ -40,6 +40,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backuprepo"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
@@ -63,6 +64,11 @@ import (
 const (
 	cliName = "kbcli"
 )
+
+// TODO: add more commands
+var cloudCmds = map[string]bool{
+	"logout": true,
+}
 
 func init() {
 	if _, err := util.GetCliHomeDir(); err != nil {
@@ -146,6 +152,9 @@ A Command Line Interface for KubeBlocks`,
 			if cmd.Name() == cobra.ShellCompRequestCmd {
 				kcplugin.SetupPluginCompletion(cmd, args)
 			}
+			if cloudCmds[cmd.Name()] && !auth.IsLoggedIn() {
+				return fmt.Errorf("use 'kbcli login' to login first")
+			}
 			return nil
 		},
 	}
@@ -170,6 +179,8 @@ A Command Line Interface for KubeBlocks`,
 
 	// Add subcommands
 	cmd.AddCommand(
+		auth.NewLogin(ioStreams),
+		auth.NewLogout(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),

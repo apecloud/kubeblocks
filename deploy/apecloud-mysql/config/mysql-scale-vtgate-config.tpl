@@ -6,6 +6,7 @@ grpc_keepalive_time=10s
 grpc_keepalive_timeout=10s
 tablet_refresh_interval=1m
 read_write_splitting_policy=disable
+read_write_splitting_ratio=100
 read_after_write_consistency=EVENTUAL
 read_after_write_timeout=30.0
 enable_buffer=false

@@ -399,8 +399,7 @@ func httpClient() (*http.Client, error) {
 	return &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				RootCAs:            certPool,
-				InsecureSkipVerify: true,
+				RootCAs: certPool,
 			},
 		},
 	}, nil

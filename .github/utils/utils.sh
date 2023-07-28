@@ -418,8 +418,8 @@ release_message() {
 }
 
 send_message() {
-    if [[ "$TAG_NAME" != "v"*"."*"."* ]]; then
-        echo "invalid tag name"
+    if [[ "$TAG_NAME" != "v"*"."*"."* || "$TAG_NAME" == *"test"* ]]; then
+        echo "ignore send message"
         return
     fi
 

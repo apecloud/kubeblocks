@@ -35,7 +35,7 @@ spec:
       #!/bin/bash
       mkdir -p ${BACKUP_DIR} && cd ${BACKUP_DIR}
       # retention 8 days by default
-      retention_minute=11520
+      retention_minute=""
       if [ ! -z ${LOGFILE_TTL_SECOND} ];then
         retention_minute=$((${LOGFILE_TTL_SECOND}/60))
       fi
@@ -92,14 +92,16 @@ spec:
       }
       # purge the expired files
       purge_expired_files() {
-        purgeCounter=$((purgeCounter+3))
-        if [ $purgeCounter -ge 60 ]; then
-           purgeCounter=0
-           fileCount=$(find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" | wc -l)
-           find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" -exec rm -rf {} \;
-           if [ ${fileCount} -gt 0 ]; then
-              echo "clean up expired oplog file successfully, file count: ${fileCount}"
-           fi
+        if [ ! -z ${LOGFILE_TTL_SECOND} ];then
+          purgeCounter=$((purgeCounter+3))
+          if [ $purgeCounter -ge 60 ]; then
+             purgeCounter=0
+             fileCount=$(find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" | wc -l)
+             find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" -exec rm -rf {} \;
+             if [ ${fileCount} -gt 0 ]; then
+                echo "clean up expired oplog file successfully, file count: ${fileCount}"
+             fi
+          fi
         fi
       }
       # create oplog push process

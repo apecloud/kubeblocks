@@ -63,7 +63,7 @@ func (e *Etcd) Init(metadata bindings.Metadata) error {
 	e.BaseOperations.GetRole = e.GetRole
 	e.BaseOperations.LockInstance = e.LockInstance
 	e.BaseOperations.UnlockInstance = e.UnlockInstance
-	e.LegacyOperations[GetRoleOperation] = e.GetRoleOps
+	e.OperationsMap[GetRoleOperation] = e.GetRoleOps
 	return nil
 }
 

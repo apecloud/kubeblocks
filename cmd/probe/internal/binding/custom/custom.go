@@ -80,7 +80,7 @@ func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
 	h.BaseOperations.GetRole = h.GetRole
 	h.BaseOperations.LockInstance = h.LockInstance
 	h.BaseOperations.UnlockInstance = h.UnlockInstance
-	h.LegacyOperations[CheckRoleOperation] = h.CheckRoleOps
+	h.OperationsMap[CheckRoleOperation] = h.CheckRoleOps
 
 	return nil
 }

@@ -21,9 +21,11 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/dapr/kit/logger"
+	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
@@ -106,10 +108,20 @@ func (mgr *DBManagerBase) IsFirstMember() bool {
 }
 
 func RegisterManager(characterType string, manager DBManager) {
+	characterType = strings.ToLower(characterType)
 	managers[characterType] = manager
 }
 
 func GetManager(characterType string) DBManager {
 	characterType = strings.ToLower(characterType)
 	return managers[characterType]
+}
+
+func GetDefaultManager() (DBManager, error) {
+	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
+	if characterType == "" {
+		return nil, fmt.Errorf("KB_SERVICE_CHARACTER_TYPE not set")
+	}
+
+	return GetManager(characterType), nil
 }

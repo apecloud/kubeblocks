@@ -396,15 +396,15 @@ func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []strin
 	return client, err
 }
 
-func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
-	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return true
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
+	defer client.Disconnect(ctx) //nolint:errcheck
 
-	rsConfig, err := GetReplSetConfig(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		//
@@ -420,11 +420,11 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	return false
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	return mgr.IsMemberHealthy(nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context) bool {
+	return mgr.IsMemberHealthy(ctx, nil, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	var memberName string
 	if member != nil {
 		memberName = member.Name
@@ -432,7 +432,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 		memberName = mgr.CurrentMemberName
 	}
 
-	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	rsStatus, _ := mgr.GetReplSetStatus(ctx)
 	if rsStatus == nil {
 		return false
 	}
@@ -510,7 +510,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		mgr.Logger.Debugf("Get leader client failed: %v", err)
 		return false
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
+	defer client.Disconnect(ctx) //nolint:errcheck
 
 	status, err := GetReplSetStatus(ctx, client)
 	if err != nil {
@@ -551,6 +551,10 @@ func (mgr *Manager) Demote() error {
 	return nil
 }
 
+func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+	return nil
+}
+
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
 	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
 	if rsStatus == nil {
@@ -587,8 +591,8 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
-	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	rsStatus, _ := mgr.GetReplSetStatus(ctx)
 	if rsStatus == nil {
 		return nil
 	}
@@ -611,9 +615,9 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 }
 
 // HasOtherHealthyMembers Are there any healthy members other than the leader?
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
-	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	rsStatus, _ := mgr.GetReplSetStatus(ctx)
 	if rsStatus == nil {
 		return members
 	}
@@ -635,6 +639,16 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) 
 	return members
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	m := bson.M{"fsync": 1, "lock": true, "comment": reason}
+	response := mgr.Client.Database("admin").RunCommand(ctx, m)
+	if response.Err() != nil {
+		mgr.Logger.Infof("Lock db (%s) failed: %v", reason, response)
+		return response.Err()
+	}
+	return nil
+}
+
+func (mgr *Manager) Unlock(ctx context.Context) error {
 	return nil
 }

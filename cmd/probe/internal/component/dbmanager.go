@@ -30,31 +30,51 @@ import (
 
 type DBManager interface {
 	IsRunning() bool
-	IsCurrentMemberInCluster(*dcs.Cluster) bool
-	IsCurrentMemberHealthy() bool
-	IsMemberHealthy(*dcs.Cluster, *dcs.Member) bool
-	IsClusterHealthy(context.Context, *dcs.Cluster) bool
-	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
+
+	IsDBStartupReady() bool
+
+	// Functions related to cluster initialization.
 	InitializeCluster(context.Context, *dcs.Cluster) error
+	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
+	IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool
+
+	// Functions related to cluster healthy check.
+	IsCurrentMemberHealthy(context.Context) bool
+	IsClusterHealthy(context.Context, *dcs.Cluster) bool
+
+	// Member healthy check
+	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
+	HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member
+	HasOtherHealthyMembers(context.Context, *dcs.Cluster, string) []*dcs.Member
+
+	// Functions related to member check.
 	IsLeader(context.Context, *dcs.Cluster) (bool, error)
 	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
 	IsFirstMember() bool
-	IsDBStartupReady() bool
-	Recover()
+
 	AddCurrentMemberToCluster(*dcs.Cluster) error
 	DeleteMemberFromCluster(*dcs.Cluster, string) error
+
+	// Functions related to HA
 	Promote() error
 	Demote() error
 	Follow(*dcs.Cluster) error
+	Recover()
+
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
 	// IsHealthiestMember(*dcs.Cluster) bool
-	HasOtherHealthyLeader(*dcs.Cluster) *dcs.Member
-	HasOtherHealthyMembers(*dcs.Cluster, string) []*dcs.Member
+
 	GetCurrentMemberName() string
 	GetMemberAddrs(*dcs.Cluster) []string
 
+	// Functions related to account manage
 	IsRootCreated(context.Context) (bool, error)
 	CreateRoot(context.Context) error
+
+	// Readonly lock for disk full
+	Lock(context.Context, string) error
+	Unlock(context.Context) error
+
 	GetLogger() logger.Logger
 }
 

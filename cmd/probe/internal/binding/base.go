@@ -430,12 +430,12 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 			opsRes["message"] = fmt.Sprintf("candidate %s not exists", candidate)
 			return opsRes, nil
 		}
-		if !manager.IsMemberHealthy(cluster, candidateMember) {
+		if !manager.IsMemberHealthy(ctx, cluster, candidateMember) {
 			opsRes["event"] = OperationFailed
 			opsRes["message"] = fmt.Sprintf("candidate %s is unhealthy", candidate)
 			return opsRes, nil
 		}
-	} else if len(manager.HasOtherHealthyMembers(cluster, leader)) == 0 {
+	} else if len(manager.HasOtherHealthyMembers(ctx, cluster, leader)) == 0 {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = "candidate is not set and has no other healthy members"
 		return opsRes, nil

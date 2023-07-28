@@ -22,6 +22,8 @@ package k8score
 import (
 	"strings"
 
+	"github.com/go-errors/errors"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -38,10 +40,11 @@ import (
 type RoleChangeEventHandler struct{}
 
 var _ EventHandler = &RoleChangeEventHandler{}
+var term int
 
 // Handle handles role changed event.
 func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.Reason != string(probeutil.CheckRoleOperation) {
+	if event.Reason != string(probeutil.GetGlobalInfoOperation) {
 		return nil
 	}
 	var (
@@ -53,7 +56,10 @@ func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Re
 		return nil
 	}
 
-	if _, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
+	//if _, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
+	//	return err
+	//}
+	if err = handleGlobalInfoEvent(cli, reqCtx, recorder, event); err != nil {
 		return err
 	}
 
@@ -116,4 +122,97 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return role, components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
 	}
 	return role, nil
+}
+
+// handleGlobalInfoEvent handles role changed event and return role.
+func handleGlobalInfoEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+	// parse probe event message
+	global := ParseProbeGlobalInfo(reqCtx, event)
+	if global == nil {
+		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
+		return nil
+	}
+
+	// if probe event operation is not implemented, check role failed or invalid, ignore it
+	if global.Event == ProbeEventOperationNotImpl || global.Event == ProbeEventCheckRoleFailed || global.Event == ProbeEventRoleInvalid {
+		reqCtx.Log.Info("probe event failed")
+		return nil
+	}
+
+	// check term
+	if global.Term < term {
+		reqCtx.Log.Info("out of date message", "message", event.Message)
+		return nil
+	}
+	term = global.Term
+
+	// get all pods in the same namespace
+	pods := &corev1.PodList{}
+	err := cli.List(reqCtx.Ctx, pods, client.InNamespace(event.InvolvedObject.Namespace))
+	if err != nil || len(pods.Items) == 0 {
+		return err
+	}
+
+	// get involved pod
+	pod := &corev1.Pod{}
+	for _, p := range pods.Items {
+		if p.Name == event.InvolvedObject.Name {
+			pod = &p
+			break
+		}
+	}
+	// event belongs to old pod with the same name, ignore it
+	if pod.UID != event.InvolvedObject.UID {
+		return nil
+	}
+
+	// get cluster obj of the pod
+	cluster := &appsv1alpha1.Cluster{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: event.InvolvedObject.Namespace,
+		Name:      pod.Labels[constant.AppInstanceLabelKey],
+	}, cluster); err != nil {
+		return err
+	}
+
+	// get component name
+	reqCtx.Log.V(1).Info("handle role changed event", "event uid", event.UID, "cluster", cluster.Name, "pod", pod.Name)
+	compName, componentDef, err := components.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
+	if err != nil {
+		return err
+	}
+
+	// pod involved is a follower, just update single pod
+	if global.Message != "" {
+		role := strings.ToLower(global.Message)
+		return components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
+	}
+
+	switch componentDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		for _, pod := range pods.Items {
+			role, ok := global.Addr2Role[pod.Status.PodIP]
+			if !ok {
+				reqCtx.Log.Error(errors.Errorf("No pod has ip %s", pod.Status.PodIP), "ip not found")
+				continue
+			}
+			err := components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, &pod, role)
+			if err != nil {
+				return err
+			}
+		}
+	case appsv1alpha1.Replication:
+		for _, pod := range pods.Items {
+			role, ok := global.Addr2Role[pod.Status.PodIP]
+			if !ok {
+				reqCtx.Log.Error(errors.Errorf("No pod has ip %s", pod.Status.PodIP), "ip not found")
+				continue
+			}
+			err := components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, &pod, role)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

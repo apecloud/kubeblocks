@@ -64,7 +64,34 @@ func buildPodTopologySpreadConstraints(
 	return topologySpreadConstraints
 }
 
-func buildPodAffinity(
+func BuildAffinity(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.Affinity {
+	affinityTopoKey := func(policyType appsv1alpha1.AvailabilityPolicyType) string {
+		switch policyType {
+		case appsv1alpha1.AvailabilityPolicyZone:
+			return "topology.kubernetes.io/zone"
+		case appsv1alpha1.AvailabilityPolicyNode:
+			return "kubernetes.io/hostname"
+		}
+		return ""
+	}
+	var affinity *appsv1alpha1.Affinity
+	if len(cluster.Spec.Tenancy) > 0 || len(cluster.Spec.AvailabilityPolicy) > 0 {
+		affinity = &appsv1alpha1.Affinity{
+			PodAntiAffinity: appsv1alpha1.Preferred,
+			TopologyKeys:    []string{affinityTopoKey(cluster.Spec.AvailabilityPolicy)},
+			Tenancy:         cluster.Spec.Tenancy,
+		}
+	}
+	if cluster.Spec.Affinity != nil {
+		affinity = cluster.Spec.Affinity
+	}
+	if clusterCompSpec.Affinity != nil {
+		affinity = clusterCompSpec.Affinity
+	}
+	return affinity
+}
+
+func BuildPodAffinity(
 	cluster *appsv1alpha1.Cluster,
 	clusterOrCompAffinity *appsv1alpha1.Affinity,
 	component *SynthesizedComponent,

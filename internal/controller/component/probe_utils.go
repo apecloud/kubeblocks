@@ -39,6 +39,7 @@ import (
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
 	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole"
+	getGlobalInfoFormat       = "/v1.0/bindings/%s?operation=getGlobalInfo"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
@@ -132,15 +133,10 @@ func buildProbeContainer() (*corev1.Container, error) {
 }
 
 func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
-	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Image = viper.GetString(constant.KBProbeImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"probe", "--app-id", "batch-sdk",
-		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
-		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
-		"--log-level", logLevel,
-		"--config", "/config/probe/config.yaml",
-		"--components-path", "/config/probe/components"}
+	container.Command = []string{"probe",
+		"--port", "3501"}
 
 	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
 		mainContainer := component.PodSpec.Containers[0]
@@ -208,7 +204,7 @@ func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType)
+	httpGet.Path = fmt.Sprintf(getGlobalInfoFormat, bindingType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
@@ -41,6 +40,13 @@ import (
 type LegacyOperation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
+
+type GlobalInfo struct {
+	Event     string            `json:"event,omitempty"`
+	Term      int               `json:"term,omitempty"`
+	Addr2Role map[string]string `json:"map,omitempty"`
+	Message   string            `json:"message,omitempty"`
+}
 
 type Operation interface {
 	Kind() OperationKind
@@ -60,11 +66,6 @@ type BaseInternalOps interface {
 	Dispatch(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error)
 }
 
-type GlobalInfo struct {
-	Term       int               `json:"term"`
-	Addr2Roles map[string]string `json:"addr_2_roles"`
-}
-
 type BaseOperations struct {
 	CheckRunningFailedCount    int
 	CheckStatusFailedCount     int
@@ -81,18 +82,18 @@ type BaseOperations struct {
 	DBAddress              string
 	DBType                 string
 	OriRole                string
+	OriGlobalInfo          *GlobalInfo
 	DBRoles                map[string]AccessMode
 	Logger                 logr.Logger
 	Metadata               map[string]string
 	InitIfNeed             func() bool
-	GetRole                func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error)
+	GetRole                func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error)
+	GetGlobalInfo          func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error)
 	// TODO: need a better way to support the extension for engines.
 	LockInstance     func(ctx context.Context) error
 	UnlockInstance   func(ctx context.Context) error
 	LegacyOperations map[OperationKind]LegacyOperation
 	Ops              map[OperationKind]Operation
-	// OriginGlobalInfo is used to indicate the version of the
-	OriginGlobalInfo GlobalInfo
 }
 
 func init() {
@@ -124,24 +125,25 @@ func (ops *BaseOperations) Init(properties component.Properties) {
 
 	ops.Metadata = properties
 	ops.LegacyOperations = map[OperationKind]LegacyOperation{
-		CheckRunningOperation: ops.CheckRunningOps,
-		CheckRoleOperation:    ops.CheckRoleOps,
-		GetRoleOperation:      ops.GetRoleOps,
-		VolumeProtection:      ops.volumeProtection,
-		SwitchoverOperation:   ops.SwitchoverOps,
+		CheckRunningOperation:  ops.CheckRunningOps,
+		CheckRoleOperation:     ops.CheckRoleOps,
+		GetRoleOperation:       ops.GetRoleOps,
+		VolumeProtection:       ops.volumeProtection,
+		SwitchoverOperation:    ops.SwitchoverOps,
+		GetGlobalInfoOperation: ops.GetGlobalInfoOps,
 	}
 
-	ops.Ops = map[OperationKind]Operation{
-		VolumeProtection: newVolumeProtectionOperation(ops.Logger, ops),
-	}
+	// ops.Ops = map[OperationKind]Operation{
+	//	VolumeProtection: newVolumeProtectionOperation(ops.Logger, ops),
+	//}
 	ops.DBAddress = ops.getAddress()
 
-	for kind, op := range ops.Ops {
-		if err := op.Init(properties); err != nil {
-			ops.Logger.Error(err, fmt.Sprintf("init operation %s error", kind))
-			// panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
-		}
-	}
+	// for kind, op := range ops.Ops {
+	//	if err := op.Init(properties); err != nil {
+	//		ops.Logger.Error(err, fmt.Sprintf("init operation %s error", kind))
+	//		// panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
+	//	}
+	//}
 }
 
 func (ops *BaseOperations) RegisterOperation(opsKind OperationKind, operation LegacyOperation) {
@@ -237,7 +239,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	ctx1, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	globalInfo, err := ops.GetRole(ctx1, req, resp)
+	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
 		ops.Logger.Error(err, "executing checkRole error")
 		opsRes["event"] = OperationFailed
@@ -251,32 +253,16 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	}
 
 	ops.CheckRoleFailedCount = 0
-	for _, role := range globalInfo.Addr2Roles {
-		if isValid, message := ops.roleValidate(role); !isValid {
-			opsRes["event"] = OperationInvalid
-			opsRes["message"] = message
-			return opsRes, nil
-		}
+	if isValid, message := ops.roleValidate(role); !isValid {
+		opsRes["event"] = OperationInvalid
+		opsRes["message"] = message
+		return opsRes, nil
 	}
 
-	marshal, err := json.Marshal(globalInfo)
-	if err != nil {
-		ops.Logger.Error(err, "global info marshal error")
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = err.Error()
-		return opsRes, err
+	if ops.OriRole != role {
+		ops.OriRole = role
+		SentProbeEvent(ctx, opsRes, ops.Logger)
 	}
-
-	opsRes["event"] = OperationSuccess
-	opsRes["global-info"] = string(marshal)
-
-	//if ops.OriRole != role {
-	//	ops.OriRole = role
-	//	SentProbeEvent(ctx, opsRes, ops.Logger)
-	//}
-
-	// todo determine when to sendProbeEvent. Maybe leave it to controller to decide
-	SentProbeEvent(ctx, opsRes, ops.Logger)
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
 	// If the role remains unchanged consecutively in RoleDetectionThreshold checks after it has changed,
@@ -314,6 +300,51 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 	}
 	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
+	return opsRes, nil
+}
+
+func (ops *BaseOperations) GetGlobalInfoOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	opsRes["operation"] = GetGlobalInfoOperation
+	if ops.GetGlobalInfo == nil {
+		message := fmt.Sprintf("getGlobalInfo operation is not implemented for %v", ops.DBType)
+		ops.Logger.Error(fmt.Errorf("not implemented"), message)
+		opsRes["event"] = OperationNotImplemented
+		opsRes["message"] = message
+		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
+		return opsRes, nil
+	}
+
+	globalInfo, err := ops.GetGlobalInfo(ctx, req, resp)
+	if err != nil {
+		ops.Logger.Error(err, "error executing GlobalInfo")
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = err.Error()
+		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
+			ops.Logger.Info("getRole failed continuously", "failed times", ops.CheckRoleFailedCount)
+			SentProbeEvent(ctx, opsRes, ops.Logger)
+		}
+		// todo: just reuse the checkRoleFailCount temporarily
+		ops.CheckRoleFailedCount++
+		return opsRes, nil
+	}
+
+	ops.CheckRoleFailedCount = 0
+
+	for _, role := range globalInfo.Addr2Role {
+		if isValid, message := ops.roleValidate(role); !isValid {
+			opsRes["event"] = OperationInvalid
+			opsRes["message"] = message
+			return opsRes, nil
+		}
+	}
+
+	if ops.OriGlobalInfo == nil || globalInfo.ShouldUpdate(*ops.OriGlobalInfo) {
+		ops.OriGlobalInfo = &globalInfo
+		globalInfo.Transform(opsRes)
+		SentProbeEvent(ctx, opsRes, ops.Logger)
+	}
+
 	return opsRes, nil
 }
 
@@ -470,18 +501,28 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 	return opsRes, nil
 }
 
-// compareGlobalInfo returns true if we need to update GlobalInfo
-func (g *GlobalInfo) compareGlobalInfo(another GlobalInfo) bool {
-	if another.Term != g.Term {
-		return another.Term > g.Term
+func (g *GlobalInfo) ShouldUpdate(another GlobalInfo) bool {
+	if g.Term != another.Term {
+		return g.Term < another.Term
 	}
-
-	// todo how do we decide which one to pick if the terms are same ? By time ?
-	for k, v := range g.Addr2Roles {
-		anotherV := another.Addr2Roles[k]
-		if v != anotherV {
+	if g.Message != another.Message || g.Event != another.Event {
+		return true
+	}
+	for k, v := range g.Addr2Role {
+		if s, ok := another.Addr2Role[k]; ok {
+			if s != v {
+				return true
+			}
+		} else {
 			return true
 		}
 	}
 	return false
+}
+
+func (g *GlobalInfo) Transform(result OpsResult) {
+	result["event"] = g.Event
+	result["term"] = g.Term
+	result["message"] = g.Message
+	result["map"] = g.Addr2Role
 }

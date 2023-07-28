@@ -63,6 +63,7 @@ const (
 
 const (
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBProbeImage             = "KUBEBLOCKS_PROBE_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBChartsImage            = "KUBEBLOCKS_CHARTS_IMAGE"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"

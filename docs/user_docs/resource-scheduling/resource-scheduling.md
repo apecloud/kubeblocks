@@ -72,7 +72,7 @@ spec:
     - kubernetes.io/hostname
     nodeLabels:
       topology.kubernetes.io/zone: us-east-1a
-    tenancy: sharedNode
+    tenancy: SharedNode
   tolerations:
   - key: EngineType
     operator: Equal
@@ -81,7 +81,7 @@ spec:
   componentSpecs:
   - name: mysql
     componentDefRef: mysql
-    affnity:
+    affinity:
       podAntiAffinity: Required
       topologyKeys:
         - kubernetes.io/hostname

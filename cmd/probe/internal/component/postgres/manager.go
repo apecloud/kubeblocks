@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
 	"os"
 	"os/exec"
 	"strconv"
@@ -121,9 +122,19 @@ func (mgr *Manager) QueryWithPool(ctx context.Context, sql string, pool *pgxpool
 }
 
 func (mgr *Manager) Exec(ctx context.Context, sql string) (result int64, err error) {
+	return mgr.ExecWithPool(ctx, sql, nil)
+}
+
+func (mgr *Manager) ExecWithPool(ctx context.Context, sql string, pool *pgxpool.Pool) (result int64, err error) {
 	mgr.Logger.Debugf("exec: %s", sql)
 
-	res, err := mgr.Pool.Exec(ctx, sql)
+	var res pgconn.CommandTag
+	if pool != nil {
+		res, err = pool.Exec(ctx, sql)
+		defer pool.Close()
+	} else {
+		res, err = mgr.Pool.Exec(ctx, sql)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("error executing query: %w", err)
 	}
@@ -131,6 +142,14 @@ func (mgr *Manager) Exec(ctx context.Context, sql string) (result int64, err err
 	result = res.RowsAffected()
 
 	return
+}
+
+func (mgr *Manager) QueryOthers(sql string, member *dcs.Member) {
+
+}
+
+func (mgr *Manager) ExecOthers(sql string, member *dcs.Member) {
+
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -180,7 +199,7 @@ func (mgr *Manager) IsLeaderWithPool(ctx context.Context, pool *pgxpool.Pool) (b
 		return false, errors.Wrap(err, "check is leader")
 	}
 
-	return role == binding.PRIMARY, nil
+	return role == binding.PRIMARY || role == binding.LEADER, nil
 }
 
 func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
@@ -346,9 +365,17 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	}
 }
 
-// TODO:
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	return mgr.IsDBStartupReady(), nil
+	switch mgr.workLoadType {
+	case Consensus:
+		return mgr.IsClusterInitializedConsensus(ctx, cluster)
+	case Replication:
+		// for replication, the setup script imposes a constraint where the successful startup of the primary database (db0)
+		// is a prerequisite for the successful launch of the remaining databases.
+		return mgr.IsDBStartupReady(), nil
+	default:
+		return false, InvalidWorkLoadType
+	}
 }
 
 func (mgr *Manager) Promote() error {

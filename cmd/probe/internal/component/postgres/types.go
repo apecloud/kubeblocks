@@ -259,3 +259,14 @@ func parsePrimaryConnInfo(str string) map[string]string {
 
 	return result
 }
+
+func parseQuery(str string) (*[]map[string]string, error) {
+	var result *[]map[string]string
+
+	err := json.Unmarshal([]byte(str), &result)
+	if err != nil {
+		return nil, errors.Errorf("json unmarshal failed, err:%v", err)
+	}
+
+	return result, nil
+}

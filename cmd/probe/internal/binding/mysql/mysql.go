@@ -32,12 +32,14 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -117,84 +119,23 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	workloadType := request.Metadata[WorkloadTypeKey]
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if strings.EqualFold(workloadType, Replication) {
-		return mysqlOps.GetRoleForReplication(ctx, request, response)
+		dcsStore := dcs.GetStore()
+		if dcsStore == nil {
+			return "", nil
+		}
+		k8sStore := dcsStore.(*dcs.KubernetesStore)
+		cluster := k8sStore.GetClusterFromCache()
+		if cluster == nil || !cluster.IsLocked() {
+			return "", nil
+		}
 	}
-	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+	return mysqlOps.manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
 	return 0
-}
-
-func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	dcsStore := dcs.GetStore()
-	if dcsStore == nil {
-		return "", nil
-	}
-	k8sStore := dcsStore.(*dcs.KubernetesStore)
-	cluster := k8sStore.GetClusterFromCache()
-	if cluster == nil || !cluster.IsLocked() {
-		return "", nil
-	} else if !dcsStore.HasLock() {
-		return SECONDARY, nil
-	}
-
-	getReadOnlySQL := `show global variables like 'read_only';`
-	data, err := mysqlOps.query(ctx, getReadOnlySQL)
-	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySQL, err)
-		return "", errors.Wrapf(err, "error executing %s", getReadOnlySQL)
-	}
-
-	queryRes := &QueryRes{}
-	err = json.Unmarshal(data, queryRes)
-	if err != nil {
-		return "", errors.Errorf("parse query failed, err:%v", err)
-	}
-
-	for _, mapVal := range *queryRes {
-		if mapVal["Variable_name"] == "read_only" {
-			if mapVal["Value"].(string) == "OFF" {
-				return PRIMARY, nil
-			} else if mapVal["Value"].(string) == "ON" {
-				return SECONDARY, nil
-			}
-		}
-	}
-	return "", errors.Errorf("parse query failed, no records")
-}
-
-func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-
-	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
-	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
-		return "", errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var curLeader string
-	var role string
-	var serverID string
-	var isReady bool
-	for rows.Next() {
-		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
-			mysqlOps.Logger.Errorf("Role query error: %v", err)
-			return role, err
-		}
-		isReady = true
-	}
-	if isReady {
-		return role, nil
-	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (mysqlOps *MysqlOperations) LockInstance(ctx context.Context) error {

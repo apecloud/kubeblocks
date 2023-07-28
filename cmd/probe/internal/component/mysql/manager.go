@@ -393,6 +393,50 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	return !strings.HasPrefix(masterHost, leader)
 }
 
+func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
+	sql := "show slave status"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		return false, err
+	}
+
+	if len(rowMap) == 0 {
+		return false, nil
+	}
+	ioRunning := rowMap.GetString("Slave_IO_Running")
+	sqlRunning := rowMap.GetString("Slave_SQL_Running")
+	if ioRunning == "Yes" || sqlRunning == "Yes" {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
+	sql := "show slave hosts"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		return false, err
+	}
+
+	if len(rowMap) == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
 	return nil
 }

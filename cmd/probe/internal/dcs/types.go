@@ -96,6 +96,10 @@ func (c *Cluster) GetMemberAddr(member Member) string {
 	return fmt.Sprintf("%s.%s-headless.%s.svc", member.Name, c.ClusterCompName, c.Namespace)
 }
 
+func (c *Cluster) GetMemberAddrWithName(name string) string {
+	return fmt.Sprintf("%s.%s-headless.%s.svc", name, c.ClusterCompName, c.Namespace)
+}
+
 func (c *Cluster) GetMemberAddrs() []string {
 	hosts := make([]string, len(c.Members))
 	for i, member := range c.Members {

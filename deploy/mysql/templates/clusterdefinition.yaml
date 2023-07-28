@@ -92,7 +92,7 @@ spec:
               - name: DB_TYPE
                 value: MySQL
               - name: ENDPOINT
-                value: {{ printf "localhost:3306" }}
+                value: "localhost:3306"
               - name: MYSQL_USER
                 valueFrom:
                   secretKeyRef:

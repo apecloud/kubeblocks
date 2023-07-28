@@ -141,7 +141,8 @@ func (o *DeleteOptions) complete() error {
 	if err != nil {
 		return err
 	}
-	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
+	// confirm names to delete, use ConfirmedNames first or the names selected by labels, if it is empty, use Names
+	// if it uses the label-selector, confirm the resources‘ names that meet the label requirements
 	if !o.AutoApprove {
 		names := o.ConfirmedNames
 		if len(o.LabelSelector) != 0 {

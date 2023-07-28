@@ -52,7 +52,14 @@ start_redis_server() {
 }
 
 create_replication() {
-    # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
+    # Waiting for redis-server to start
+    if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
+      retry redis-cli -h 127.0.0.1 -p 6379 -a "$REDIS_DEFAULT_PASSWORD" ping
+    else
+      retry redis-cli -h 127.0.0.1 -p 6379 ping
+    fi
+
+    # Waiting for primary pod information from the DownwardAPI annotation to be available
     attempt=1
     max_attempts=20
     while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
@@ -72,6 +79,8 @@ create_replication() {
       fi
       exit 1
     fi
+
+    # create a replication relationship, if failed, shutdown redis-server
     if [ "$primary" = "$KB_POD_NAME" ]; then
       echo "primary instance skip create a replication relationship."
     else

@@ -108,12 +108,6 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-            lifecycle:
-              postStart:
-                exec:
-                  command:
-                    - /scripts/replicaset-post-start.sh
-                    - MONGODB
             volumeMounts:
               - mountPath: /data/mongodb
                 name: data

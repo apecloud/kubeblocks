@@ -17,26 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package internal
 
-import (
-	"os"
+import "strings"
+
+const (
+	WorkloadTypeKey = "workloadType"
+	Replication     = "Replication"
+	Consensus       = "Consensus"
 )
 
-func MaxInt64(x, y int64) int64 {
-	if x > y {
-		return x
+func IsHAAvailable(characterType, workloadType string) bool {
+	switch strings.ToLower(characterType) {
+	case "mongodb":
+		return true
+	case "mysql":
+		if strings.EqualFold(workloadType, Replication) {
+			return true
+		}
 	}
-	return y
-}
-
-func GetSQLChannelProc() (*os.Process, error) {
-	// sqlChannel pid is usually 1
-	sqlChannelPid := os.Getppid()
-	sqlChannelProc, err := os.FindProcess(sqlChannelPid)
-	if err != nil {
-		return nil, err
-	}
-
-	return sqlChannelProc, nil
+	return false
 }

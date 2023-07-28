@@ -34,5 +34,6 @@ spec:
       replicas: 1
     - name: foxlake-metadb
       componentDefRef: foxlake-metadb
+      {{- include "kblib.componentResources" . | indent 6 }}
       replicas: 1
       {{- include "kblib.componentStorages" . | indent 6 }}

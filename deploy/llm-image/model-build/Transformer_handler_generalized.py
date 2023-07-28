@@ -1,4 +1,4 @@
-# ref: https://github.com/pytorch/serve/blob/master/examples/Huggingface_Transformers/README.md
+# official doc ref: https://github.com/pytorch/serve/blob/master/examples/Huggingface_Transformers/README.md
 import ast
 import json
 import logging
@@ -43,9 +43,6 @@ class TransformersSeqClassifierHandler(BaseHandler, ABC):
         self.manifest = ctx.manifest
         properties = ctx.system_properties
         model_dir = properties.get("model_dir")
-        print("cttest")
-        print("model_dir:")
-        print(model_dir)
         if "serializedFile" in self.manifest["model"]:
             serialized_file = self.manifest["model"]["serializedFile"]
             model_pt_path = os.path.join(model_dir, serialized_file)
@@ -320,8 +317,11 @@ class TransformersSeqClassifierHandler(BaseHandler, ABC):
                 # Need to move the first device, as the trasnformer model has been placed there
                 # https://github.com/huggingface/transformers/blob/v4.17.0/src/transformers/models/gpt2/modeling_gpt2.py#L970
                 input_ids_batch = input_ids_batch.to("cuda:0")
+            # outputs = self.model.generate(
+            #     input_ids_batch, max_length=50, do_sample=True, top_p=0.95, top_k=60
+            # )
             outputs = self.model.generate(
-                input_ids_batch, max_length=50, do_sample=True, top_p=0.95, top_k=60
+                input_ids_batch, max_length=50
             )
             for i, x in enumerate(outputs):
                 inferences.append(

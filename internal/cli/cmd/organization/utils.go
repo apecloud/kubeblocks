@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package organization
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 
@@ -71,4 +72,23 @@ func GetToken() (string, error) {
 		return tokenRes.IDToken, nil
 	}
 	return "", errors.New("Failed to get token")
+}
+
+func GetCurrentOrgAndContext() (*CurrentOrgAndContext, error) {
+	filePath, err := GetCurrentOrgAndContextFilePath()
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to get current organization and context file: %s", filePath)
+	}
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to read current organization and context file: %s", filePath)
+	}
+
+	var currentOrgAndContext CurrentOrgAndContext
+	err = json.Unmarshal(data, &currentOrgAndContext)
+	if err != nil {
+		return nil, errors.Wrap(err, "Invalid current organization and context format.")
+	}
+
+	return &currentOrgAndContext, nil
 }

@@ -85,15 +85,15 @@ func (o *CloudOrganization) switchOrganization(name string) (string, error) {
 }
 
 func (o *CloudOrganization) getCurrentOrganization() (string, error) {
-	currentOrgAndContext, err := GetCurrentOrgAndContext()
+	currentOrg, err := getCurrentOrganization()
 	if err != nil {
 		return "", err
 	}
 
-	if ok, err := o.IsValidOrganization(currentOrgAndContext.CurrentOrganization); !ok {
+	if ok, err := o.IsValidOrganization(currentOrg); !ok {
 		return "", err
 	}
-	return currentOrgAndContext.CurrentOrganization, nil
+	return currentOrg, nil
 }
 
 func (o *CloudOrganization) IsValidOrganization(name string) (bool, error) {
@@ -160,29 +160,14 @@ func SetCurrentOrgAndContext(currentOrgAndContext *CurrentOrgAndContext) error {
 	return nil
 }
 
-func GetCurrentOrgAndContext() (*CurrentOrgAndContext, error) {
-	filePath, err := GetCurrentOrgAndContextFilePath()
+func getCurrentOrganization() (string, error) {
+	currentOrgAndContext, err := GetCurrentOrgAndContext()
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get current organization and context file: %s", filePath)
-	}
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to read current organization and context file: %s", filePath)
-	}
-
-	var currentOrgAndContext CurrentOrgAndContext
-	err = json.Unmarshal(data, &currentOrgAndContext)
-	if err != nil {
-		return nil, errors.Wrap(err, "Invalid current organization and context format.")
+		return "", err
 	}
 
 	if currentOrgAndContext.CurrentOrganization == "" {
-		return nil, errors.New("No organization available, please join an organization.")
+		return "", errors.New("No organization available, please join an organization.")
 	}
-
-	if currentOrgAndContext.CurrentContext == "" {
-		return nil, errors.New("No context available, please create a context.")
-	}
-
-	return &currentOrgAndContext, nil
+	return currentOrgAndContext.CurrentOrganization, nil
 }

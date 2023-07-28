@@ -27,22 +27,18 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/go-logr/zapr"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.uber.org/automaxprocs/maxprocs"
-	"go.uber.org/zap"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
 var port int
 var configDir string
 
 const (
-	DefaultPort       = 7373
+	DefaultPort       = 3501
 	DefaultConfigPath = "config/probe"
 )
 
@@ -75,7 +71,7 @@ func main() {
 
 	http.HandleFunc("/", probe.SetMiddleware(probe.GetRouter()))
 	go func() {
-		addr := fmt.Sprintf("localhost:%d", port)
+		addr := fmt.Sprintf(":%d", port)
 		err := http.ListenAndServe(addr, nil)
 		if err != nil {
 			panic(fmt.Errorf("fatal error listen on port %d", port))
@@ -83,15 +79,15 @@ func main() {
 	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
-	development, err := zap.NewDevelopment()
-	if err != nil {
-		panic(fmt.Errorf("fatal error new logger for development: %v", err))
-	}
-	ha := highavailability.NewHa(zapr.NewLogger(development))
-	if ha != nil {
-		defer ha.ShutdownWithWait()
-		go ha.Start()
-	}
+	//development, err := zap.NewDevelopment()
+	//if err != nil {
+	//	panic(fmt.Errorf("fatal error new logger for development: %v", err))
+	//}
+	//ha := highavailability.NewHa(zapr.NewLogger(development))
+	//if ha != nil {
+	//	defer ha.ShutdownWithWait()
+	//	go ha.Start()
+	//}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

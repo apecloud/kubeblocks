@@ -1,6 +1,6 @@
 ---
 title: Failure simulation and automatic recovery
-description: Automatic recovery of a cluster
+description: Automatic recovery of cluster
 keywords: [mysql, high availability, failure simulation, automatic recovery]
 sidebar_position: 1
 ---
@@ -27,10 +27,10 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
   ```bash
   probes:
-  roleProbe:
-    failureThreshold: 3
-    periodSeconds: 2
-    timeoutSeconds: 1
+    roleProbe:
+      failureThreshold: 3
+      periodSeconds: 2
+      timeoutSeconds: 1
   ```
 
 ### Leader pod fault

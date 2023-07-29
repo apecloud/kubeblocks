@@ -27,7 +27,7 @@ kbcli cluster explain-config [flags]
 ### Options
 
 ```
-      --component string       Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter."
+      --components strings     Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter."
       --config-specs strings   Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)
   -h, --help                   help for explain-config
       --param string           Specify the name of parameter to be query. It clearly display the details of the parameter.

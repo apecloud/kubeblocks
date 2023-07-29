@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -177,15 +178,17 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	if len(podList) == 0 {
 		return nil, nil
 	}
-	primary := ""
+	primary := make([]string, 0)
+	emptyRolePod := make([]string, 0)
 	vertexes := make([]graph.Vertex, 0)
 	for _, pod := range podList {
 		role, ok := pod.Labels[constant.RoleLabelKey]
 		if !ok || role == "" {
+			emptyRolePod = append(emptyRolePod, pod.Name)
 			continue
 		}
 		if role == constant.Primary {
-			primary = pod.Name
+			primary = append(primary, pod.Name)
 		}
 	}
 
@@ -196,11 +199,14 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 			pod.Annotations = map[string]string{}
 		}
 		switch {
-		case primary == "":
-			// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+		case len(emptyRolePod) == len(podList):
+			// if the workload is newly created, and the role label is not set, we set the pod with index=0 as the primary by default.
 			needUpdate = handlePrimaryNotExistPod(pod)
 		default:
-			needUpdate = handlePrimaryExistPod(pod, primary)
+			if len(primary) != 1 {
+				return nil, errors.New(fmt.Sprintf("the number of primary pod is not equal to 1, primary pod: %v", primary))
+			}
+			needUpdate = handlePrimaryExistPod(pod, primary[0])
 		}
 		if needUpdate {
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
@@ -230,7 +236,7 @@ func handlePrimaryExistPod(pod *corev1.Pod, primary string) bool {
 	needPatch := false
 	if pod.Name != primary {
 		role, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok || role != constant.Secondary {
+		if !ok || role == "" {
 			pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
 			needPatch = true
 		}

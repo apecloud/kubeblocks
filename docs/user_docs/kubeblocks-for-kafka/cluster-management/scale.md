@@ -60,10 +60,10 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
    metadata:
      name: ops-vertical-scaling
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: ivy85
      type: VerticalScaling 
      verticalScaling:
-     - componentName: mysql
+     - componentName: broker
        requests:
          memory: "2Gi"
          cpu: "1000m"
@@ -83,14 +83,14 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: mysql-cluster
+     name: ivy85
      namespace: default
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
      componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
+     - name: broker
+       componentDefRef: broker
        replicas: 1
        resources: # Change the values of resources.
          requests:
@@ -140,12 +140,12 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 - You are not recommended to perform horizontal scaling on controller node, including the controller node both in combined mode and separated node.
 - When scaling in horizontally, you must know the topic partition storage, if the topic has only one replication, data loss may caused when you scale in broker.
 
-  ```bash
-  kbcli cluster list mysql-cluster
-  >
-  NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-  mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
-  ```
+ ```bash
+kbcli cluster list
+>
+NAME    NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
+ivy85   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
+```
 
 ### Steps
 
@@ -160,8 +160,12 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    --components="mysql" --replicas=3
    ```
 
-   - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replicas with the specified components.
+ 
+   - `--components` value can be `broker` or `controller`.
+     - broker: all nodes in the combined mode, or all the broker node in the separated node.
+     - controller: all the correponding nodes in the separated mode.
+   - `--memory` describes the requested and limited size of the component memory.
+   - `--cpu` describes the requested and limited size of the component CPU.
 
    **Option 2.** Create an OpsRequest
 
@@ -174,10 +178,10 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    metadata:
      name: ops-horizontal-scaling
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: ivy85
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: mysql
+     - componentName: broker
        replicas: 3
    EOF
    ```
@@ -195,14 +199,14 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: mysql-cluster
+     name: ivy85
      namespace: default
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2 
      componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
+     - name: broker
+       componentDefRef: broker
        replicas: 1 # Change the pod amount.
        volumeClaimTemplates:
        - name: data
@@ -220,7 +224,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    Check the cluster STATUS to identify the horizontal scaling status.
 
    ```bash
-   kbcli cluster list mysql-cluster
+   kbcli cluster list ivy85
    ```
 
    - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
@@ -229,7 +233,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe mysql-cluster
+    kbcli cluster describe ivy85
     ```
 
 ### Handle the snapshot exception
@@ -241,7 +245,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/mysql-cluster-mysql-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/ivy85-kafka-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"

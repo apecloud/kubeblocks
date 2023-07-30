@@ -127,7 +127,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 // handleGlobalInfoEvent handles role changed event and return role.
 func handleGlobalInfoEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	// parse probe event message
-	global := ParseProbeGlobalInfo(reqCtx, event)
+	global := ParseProbeEventMessage(reqCtx, event)
 	if global == nil {
 		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
 		return nil

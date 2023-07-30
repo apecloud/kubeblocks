@@ -23,16 +23,10 @@ package k8score
 type ProbeEventType string
 
 type ProbeMessage struct {
-	Event        ProbeEventType `json:"event,omitempty"`
-	Message      string         `json:"message,omitempty"`
-	OriginalRole string         `json:"originalRole,omitempty"`
-	Role         string         `json:"role,omitempty"`
-}
-
-type ProbeGlobalInfo struct {
-	Operation string            `json:"operation,omitempty"`
-	Event     ProbeEventType    `json:"event,omitempty"`
-	Term      int               `json:"term,omitempty"`
-	Addr2Role map[string]string `json:"map,omitempty"`
-	Message   string            `json:"message,omitempty"`
+	Event        ProbeEventType    `json:"event,omitempty"`
+	Message      string            `json:"message,omitempty"`
+	OriginalRole string            `json:"originalRole,omitempty"`
+	Role         string            `json:"role,omitempty"`
+	Term         int               `json:"term,omitempty"`
+	Addr2Role    map[string]string `json:"map,omitempty"`
 }

@@ -48,15 +48,3 @@ func ParseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 	}
 	return message
 }
-
-// ParseProbeGlobalInfo parses probe event of global info.
-func ParseProbeGlobalInfo(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *ProbeGlobalInfo {
-	info := &ProbeGlobalInfo{}
-	err := json.Unmarshal([]byte(event.Message), info)
-	if err != nil {
-		// not role related message, ignore it
-		reqCtx.Log.Error(err, "not global message", "message", event.Message)
-		return nil
-	}
-	return info
-}

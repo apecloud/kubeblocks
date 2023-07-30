@@ -102,7 +102,8 @@ func (o *InstallOptions) compare(args []string) error {
 	}
 	// update repo
 	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
-		return err
+
+		return fmt.Errorf(err.Error())
 	}
 	// check version is available
 	if exists, err := versionExists(versionA); !exists {
@@ -123,7 +124,7 @@ func (o *InstallOptions) compare(args []string) error {
 
 // buildTemplate builds `helm template` InstallOpts for KubeBlocks
 func (o *InstallOptions) buildTemplate(version string) *helm.InstallOpts {
-	ops := helm.GetTemplateInstallOps(types.KubeBlocksChartName, fmt.Sprintf("%s/%s", types.KubeBlocksChartName, types.KubeBlocksChartName), version, "default")
+	ops := helm.GetTemplateInstallOps(types.KubeBlocksChartName, fmt.Sprintf("%s/%s", types.KubeBlocksChartName, types.KubeBlocksChartName), version, o.Namespace)
 	ops.Wait = o.Wait
 	ops.ValueOpts = &o.ValueOpts
 	ops.CreateNamespace = o.CreateNamespace
@@ -134,12 +135,12 @@ func (o *InstallOptions) buildTemplate(version string) *helm.InstallOpts {
 func (o *InstallOptions) showDiff(version1, version2 string) error {
 	// use `helm template` get the chart manifest
 	helmInstallOpts := o.buildTemplate(version1)
-	releaseA, err := helmInstallOpts.Install(helm.NewFakeConfig("default"))
+	releaseA, err := helmInstallOpts.Install(helm.NewFakeConfig(o.Namespace))
 	if err != nil {
 		return err
 	}
 	helmInstallOpts.Version = version2
-	releaseB, err := helmInstallOpts.Install(helm.NewFakeConfig("default"))
+	releaseB, err := helmInstallOpts.Install(helm.NewFakeConfig(o.Namespace))
 	if err != nil {
 		return err
 	}

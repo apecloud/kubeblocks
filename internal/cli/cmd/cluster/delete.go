@@ -45,6 +45,8 @@ var (
 	deleteExample = templates.Examples(`
 		# delete a cluster named mycluster
 		kbcli cluster delete mycluster
+		# delete a cluster by label selector
+		kbcli cluster delete --selector clusterdefinition.kubeblocks.io/name=apecloud-mysql
 `)
 
 	rbacEnabled = false
@@ -70,8 +72,8 @@ func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func deleteCluster(o *delete.DeleteOptions, args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("missing cluster name")
+	if len(args) == 0 && len(o.LabelSelector) == 0 {
+		return fmt.Errorf("missing cluster name or a lable selector")
 	}
 	o.Names = args
 	return o.Run()

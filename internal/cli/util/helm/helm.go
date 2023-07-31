@@ -323,7 +323,7 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 
 	if _, err := client.Run(i.Name); err != nil {
 		if i.ForceUninstall {
-			// Removed secrets left over when uninstalling kubeblocks, when addon CRD is uninstalled before kubeblocks.
+			// Remove secrets left over when uninstalling kubeblocks, when addon CRD is uninstalled before kubeblocks.
 			secretCount, errRemove := i.RemoveRemainSecrets(cfg)
 			if secretCount == 0 {
 				return err

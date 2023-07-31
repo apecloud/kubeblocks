@@ -211,7 +211,7 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		if needUpdate {
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
 				Obj:    pod,
-				Action: ictrltypes.ActionUpdatePtr(),
+				Action: ictrltypes.ActionPatchPtr(),
 			})
 		}
 	}

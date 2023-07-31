@@ -60,7 +60,7 @@ kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database
 # tpcc on a cluster with transactions count
 kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --transactions 1000
 
-# tpcc on a cluster with duration
+# tpcc on a cluster with duration 10 minutes
 kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --duration 10
 `)
 

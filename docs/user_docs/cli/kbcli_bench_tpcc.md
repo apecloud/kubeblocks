@@ -23,7 +23,7 @@ kbcli bench tpcc [flags]
   # tpcc on a cluster with transactions count
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --transactions 1000
   
-  # tpcc on a cluster with duration
+  # tpcc on a cluster with duration 10 minutes
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --duration 10
 ```
 
@@ -33,6 +33,7 @@ kbcli bench tpcc [flags]
       --cluster string           the cluster of database
       --database string          database name
       --delivery int             specify the percentage of transactions that should be delivery (default 4)
+      --driver string            the driver of database
       --duration int             specify the number of minutes to run (default 1)
       --extra-args stringArray   specify the extra arguments
   -h, --help                     help for tpcc

@@ -57,14 +57,17 @@ var connectExample = templates.Examples(`
 		# connect to a specified component
 		kbcli cluster connect mycluster --component mycomponent
 
-		# show cli connection example
+		# show cli connection example with password mask
 		kbcli cluster connect mycluster --show-example --client=cli
 
-		# show java connection example
+		# show java connection example with password mask
 		kbcli cluster connect mycluster --show-example --client=java
 
-		# show all connection examples
-		kbcli cluster connect mycluster --show-example`)
+		# show all connection examples with password mask
+		kbcli cluster connect mycluster --show-example 
+
+		# show cli connection examples with real password 
+		kbcli cluster connect mycluster --show-example --client=cli --show-password`)
 
 const passwordMask = "******"
 

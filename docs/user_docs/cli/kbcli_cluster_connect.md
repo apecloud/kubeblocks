@@ -42,6 +42,7 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
   -h, --help               help for connect
   -i, --instance string    The instance name to connect.
       --show-example       Show how to connect to cluster/instance from different clients.
+      --show-password      Show password in example.
 ```
 
 ### Options inherited from parent commands

@@ -21,6 +21,20 @@ spec:
           failureThreshold: {{ .Values.roleProbe.failureThreshold }}
           periodSeconds: {{ .Values.roleProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+          actions:
+            - image: "arey/mysql-client:latest"
+              command:
+              - mysql
+              - "-h127.0.0.1"
+              - "-P3306"
+              - "-u$KB_SERVICE_USER"
+              - "-p$KB_SERVICE_PASSWORD"
+              - "-N"
+              - "-B"
+              - "-e"
+              - "\"select CURRENT_TERM,IP_PORT,t1.ROLE from INFORMATION_SCHEMA.wesql_cluster_global t1,INFORMATION_SCHEMA.wesql_cluster_local;\""
+              - "|"
+              - "xargs echo -n"
       monitor:
         builtIn: false
         exporterConfig:

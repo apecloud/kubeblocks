@@ -149,7 +149,7 @@ var _ = Describe("Volume Protection Operation", func() {
 		optVolProt.SendEvent = false
 		optVolProt.Readonly = false
 		optVolProt.Pod = os.Getenv(constant.KBEnvPodName)
-		optVolProt.initVolumes()
+		Expect(optVolProt.initVolumes()).ShouldNot(HaveOccurred())
 	}
 
 	cleanAll := func() {
@@ -181,7 +181,6 @@ var _ = Describe("Volume Protection Operation", func() {
 	Context("Volume Protection", func() {
 		It("init - succeed", func() {
 			obj := optVolProt
-			obj.initVolumes()
 			Expect(obj.Pod).Should(Equal(podName))
 			Expect(obj.HighWatermark).Should(Equal(volumeProtectionSpec.HighWatermark))
 			Expect(len(obj.Volumes)).Should(Equal(len(volumeProtectionSpec.Volumes)))

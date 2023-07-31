@@ -77,7 +77,7 @@ clusterrolebinding: {
 	roleRef: {
 		apiGroup: "rbac.authorization.k8s.io"
 		kind:     "ClusterRole"
-		name:     "kubeblocks-cluster-pod-role"
+		name:     "kubeblocks-volume-protection-pod-role"
 	}
 	subjects: [{
 		kind:      "ServiceAccount"

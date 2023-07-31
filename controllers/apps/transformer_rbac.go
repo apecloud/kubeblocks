@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -43,8 +44,9 @@ type RBACTransformer struct{}
 var _ graph.Transformer = &RBACTransformer{}
 
 const (
-	RBACRoleName       = "kubeblocks-cluster-pod-role"
-	ServiceAccountKind = "ServiceAccount"
+	RBACRoleName        = "kubeblocks-cluster-pod-role"
+	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
+	ServiceAccountKind  = "ServiceAccount"
 )
 
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
@@ -56,26 +58,20 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		return err
 	}
 
-	var hasProbes bool
-	for _, compDef := range clusterDef.Spec.ComponentDefs {
-		if compDef.Probes != nil {
-			hasProbes = true
-		}
-	}
-
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
 		if serviceAccountName == "" {
-			if !hasProbes {
+			if !needToCreateRBAC(clusterDef) {
 				return nil
 			}
 			serviceAccountName = "kb-" + cluster.Name
 		}
 
 		if !viper.GetBool(constant.EnableRBACManager) {
-			transCtx.Logger.V(1).Info("rbac manager is not enabled")
+			transCtx.Logger.V(1).Info("rbac manager is disabled")
 			if !isServiceAccountExist(transCtx, serviceAccountName, true) {
-				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")
+				return ictrlutil.NewRequeueError(time.Second,
+					fmt.Sprintf("RBAC manager is disabed, but service account %s is not exsit", serviceAccountName))
 			}
 			return nil
 		}
@@ -121,6 +117,15 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	return nil
 }
 
+func needToCreateRBAC(clusterDef *appsv1alpha1.ClusterDefinition) bool {
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		if compDef.Probes != nil || compDef.VolumeProtectionSpec != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName string, sendEvent bool) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
@@ -163,9 +168,9 @@ func isClusterRoleBindingExist(transCtx *ClusterTransformContext, serviceAccount
 		return false
 	}
 
-	if crb.RoleRef.Name != RBACRoleName {
+	if crb.RoleRef.Name != RBACClusterRoleName {
 		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
-			RBACRoleName, "clusterrolebinding.RoleRef", crb.RoleRef.Name)
+			RBACClusterRoleName, "clusterrolebinding.RoleRef", crb.RoleRef.Name)
 	}
 
 	isServiceAccountMatch := false

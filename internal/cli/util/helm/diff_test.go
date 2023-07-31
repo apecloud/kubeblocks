@@ -333,7 +333,7 @@ kubeblocks-opsrequest-editor-role   Added
 		})
 	})
 
-	Context("test outputAPIDiff", func() {
+	Context("test outputCRDDiff", func() {
 		var apiA map[string]any
 		var properties = map[any]any{}
 
@@ -401,7 +401,7 @@ kubeblocks-opsrequest-editor-role   Added
 		It("test Added and Removed", func() {
 			out.Reset()
 			apiB := removeAPIAndAddAPI()
-			outputAPIDiff(apiA, apiB, "Fake CRD", &out)
+			outputCRDDiff(apiA, apiB, "Fake CRD", &out)
 			Expect(out.String()).Should(Equal(`Fake CRD
 API              IS-REQUIRED   MODE      DETAILS             
 spec.newApi      false         Added                         
@@ -412,7 +412,7 @@ spec.namespace   false         Removed   {"type":"string"}
 		It("test Modified", func() {
 			out.Reset()
 			apiB := modifyTheField()
-			outputAPIDiff(apiA, apiB, "Fake CRD", &out)
+			outputCRDDiff(apiA, apiB, "Fake CRD", &out)
 			Expect(out.String()).Should(Equal(`Fake CRD
 API         IS-REQUIRED   MODE       DETAILS                                                 
 spec.name   true          Modified   {"type":"string"} -> {"maxLength":63,"type":"string"}   
@@ -420,7 +420,7 @@ spec.name   true          Modified   {"type":"string"} -> {"maxLength":63,"type"
 `))
 			out.Reset()
 			apiB = modifyTheRequired()
-			outputAPIDiff(apiA, apiB, "Fake CRD", &out)
+			outputCRDDiff(apiA, apiB, "Fake CRD", &out)
 			Expect(out.String()).Should(Equal(`Fake CRD
 API         IS-REQUIRED     MODE       DETAILS   
 spec.name   true -> false   Modified             

@@ -212,7 +212,7 @@ func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, 
 			if err != nil {
 				return err
 			}
-			outputAPIDiff(apiContentsA, apiContentsB, strings.Split(key, ",")[0], out)
+			outputCRDDiff(apiContentsA, apiContentsB, strings.Split(key, ",")[0], out)
 		} else {
 			mayRemoveCRD = append(mayRemoveCRD, manifestA.Name)
 		}
@@ -366,8 +366,8 @@ func deleteLabel(object *map[interface{}]interface{}, s string) {
 	}
 }
 
-// outputAPIDiff will compare and output the differences between crdA and crdB for the same crd named crdName
-func outputAPIDiff(crdA, crdB map[string]any, crdName string, out io.Writer) {
+// outputCRDDiff will compare and output the differences between crdA and crdB for the same crd named crdName
+func outputCRDDiff(crdA, crdB map[string]any, crdName string, out io.Writer) {
 	fmt.Fprintf(out, "%s\n", printer.BoldYellow(crdName))
 	tblPrinter := printer.NewTablePrinter(out)
 	tblPrinter.SetHeader("API", "IS-REQUIRED", "MODE", "DETAILS")

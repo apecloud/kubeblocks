@@ -324,7 +324,7 @@ func (ops *BaseOperations) GetGlobalInfoOps(ctx context.Context, req *ProbeReque
 			ops.Logger.Info("getRole failed continuously", "failed times", ops.CheckRoleFailedCount)
 			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
-		// todo: just reuse the checkRoleFailCount temporarily
+		// just reuse the checkRoleFailCount temporarily
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
 	}

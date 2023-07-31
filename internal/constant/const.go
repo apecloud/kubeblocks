@@ -221,6 +221,13 @@ const (
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
+
+	ProbeAgentMountName = "shell2http-mount"
+	ProbeAgentMountPath = "/shell2http"
+	ProbeAgent          = "shell2http"
+	ProbeAgentImage     = "msoap/shell2http:1.16.0"
+	OriginBinaryPath    = "/app/shell2http"
+	DefaultActionImage  = "busybox:latest"
 )
 
 const (

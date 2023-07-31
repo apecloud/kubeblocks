@@ -315,19 +315,10 @@ func addTokenEnv(container *corev1.Container) {
 	})
 }
 
-const (
-	mountName          = "shell2http-mount"
-	mountPath          = "/shell2http"
-	shell2http         = "shell2http"
-	shell2httpImage    = "msoap/shell2http:1.16.0"
-	originBinaryPath   = "/app/shell2http"
-	defaultActionImage = "busybox:latest"
-)
-
 func injectHttp2Shell(pod *corev1.PodSpec) {
 	// inject shared volume
 	agentVolume := corev1.Volume{
-		Name: mountName,
+		Name: constant.ProbeAgentMountName,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
@@ -336,18 +327,18 @@ func injectHttp2Shell(pod *corev1.PodSpec) {
 
 	// inject shell2http
 	volumeMount := corev1.VolumeMount{
-		Name:      mountName,
-		MountPath: mountPath,
+		Name:      constant.ProbeAgentMountName,
+		MountPath: constant.ProbeAgentMountPath,
 	}
-	binPath := strings.Join([]string{mountPath, shell2http}, "/")
+	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
 	initContainer := corev1.Container{
-		Name:            shell2http,
-		Image:           shell2httpImage,
+		Name:            constant.ProbeAgent,
+		Image:           constant.ProbeAgentImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    []corev1.VolumeMount{volumeMount},
 		Command: []string{
 			"cp",
-			originBinaryPath,
+			constant.OriginBinaryPath,
 			binPath,
 		},
 	}
@@ -359,15 +350,15 @@ func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.Clust
 	credentialEnv []corev1.EnvVar) {
 	actions := probeSetting.Actions
 	volumeMount := corev1.VolumeMount{
-		Name:      mountName,
-		MountPath: mountPath,
+		Name:      constant.ProbeAgentMountName,
+		MountPath: constant.ProbeAgentMountPath,
 	}
-	binPath := strings.Join([]string{mountPath, shell2http}, "/")
+	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
 
 	for i, action := range actions {
 		image := action.Image
 		if len(action.Image) == 0 {
-			image = defaultActionImage
+			image = constant.DefaultActionImage
 		}
 
 		command := []string{

@@ -22,7 +22,7 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"math"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -197,7 +197,7 @@ func (mgr *Manager) IsMemberHealthyConsensus(cluster *dcs.Cluster, member *dcs.M
 	}
 
 	connected := result["connected"] == "true"
-	logDelayNum, _ := strconv.ParseInt(result["log_delay_num"].(string), 10, 64)
+	logDelayNum := int64(math.Round(result["log_delay_num"].(float64)))
 
 	return connected && logDelayNum <= cluster.HaConfig.GetMaxLagOnSwitchover()
 }
@@ -246,7 +246,7 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		mgr.Logger.Infof("cluster has no leader, wait for leader to take the lock")
-		return false
+		return true
 	}
 
 	if leaderMember.Name == mgr.CurrentMemberName {

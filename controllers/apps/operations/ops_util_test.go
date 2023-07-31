@@ -98,7 +98,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock component failed time reaches the threshold, expect for opsRequest is Failed")
 			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
-			compStatus.LastTransitionTime = metav1.Time{Time: compStatus.LastTransitionTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
+			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
 			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
 			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
 			Expect(err).Should(BeNil())

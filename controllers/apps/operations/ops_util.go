@@ -105,15 +105,22 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if compStatus, ok = opsRequest.Status.Components[k]; !ok {
 			compStatus = appsv1alpha1.OpsRequestComponentStatus{}
 		}
+		lastFailedTime := compStatus.LastFailedTime
 		if components.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
-			if compStatus.LastTransitionTime.IsZero() || time.Now().Before(compStatus.LastTransitionTime.Add(componentFailedTimeout)) {
-				requeueTimeAfterFailed = componentFailedTimeout - time.Since(compStatus.LastTransitionTime.Time)
+			if lastFailedTime.IsZero() {
+				lastFailedTime = metav1.Now()
 			}
+			if time.Now().Before(lastFailedTime.Add(componentFailedTimeout)) {
+				requeueTimeAfterFailed = componentFailedTimeout - time.Since(lastFailedTime.Time)
+			}
+		} else if !lastFailedTime.IsZero() {
+			// reset lastFailedTime if component is not failed
+			lastFailedTime = metav1.Time{}
 		}
 		if compStatus.Phase != v.Phase {
 			compStatus.Phase = v.Phase
-			compStatus.LastTransitionTime = metav1.Now()
+			compStatus.LastFailedTime = lastFailedTime
 		}
 		clusterComponent := opsRes.Cluster.Spec.GetComponentByName(k)
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, progressResource{

@@ -609,9 +609,9 @@ spec:
               components:
                 additionalProperties:
                   properties:
-                    lastTransitionTime:
-                      description: lastTransitionTime is the last time the condition
-                        transitioned from one phase to another.
+                    lastFailedTime:
+                      description: lastFailedTime is the last time the component phase
+                        transitioned to Failed or Abnormal.
                       format: date-time
                       type: string
                     message:

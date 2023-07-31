@@ -178,17 +178,17 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	if len(podList) == 0 {
 		return nil, nil
 	}
-	primary := make([]string, 0)
-	emptyRolePod := make([]string, 0)
+	primaryPods := make([]string, 0)
+	emptyRolePods := make([]string, 0)
 	vertexes := make([]graph.Vertex, 0)
 	for _, pod := range podList {
 		role, ok := pod.Labels[constant.RoleLabelKey]
 		if !ok || role == "" {
-			emptyRolePod = append(emptyRolePod, pod.Name)
+			emptyRolePods = append(emptyRolePods, pod.Name)
 			continue
 		}
 		if role == constant.Primary {
-			primary = append(primary, pod.Name)
+			primaryPods = append(primaryPods, pod.Name)
 		}
 	}
 
@@ -199,14 +199,14 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 			pod.Annotations = map[string]string{}
 		}
 		switch {
-		case len(emptyRolePod) == len(podList):
+		case len(emptyRolePods) == len(podList):
 			// if the workload is newly created, and the role label is not set, we set the pod with index=0 as the primary by default.
 			needUpdate = handlePrimaryNotExistPod(pod)
 		default:
-			if len(primary) != 1 {
+			if len(primaryPods) != 1 {
 				return nil, errors.New(fmt.Sprintf("the number of primary pod is not equal to 1, primary pod: %v", primary))
 			}
-			needUpdate = handlePrimaryExistPod(pod, primary[0])
+			needUpdate = handlePrimaryExistPod(pod, primaryPods[0])
 		}
 		if needUpdate {
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{

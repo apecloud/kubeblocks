@@ -147,6 +147,7 @@ func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp 
 	if err != nil {
 		return GlobalInfo{}, err
 	}
+	h.Logger.Info("GetGlobalInfo get result", "result", res)
 
 	return res, nil
 }

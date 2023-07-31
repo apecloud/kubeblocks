@@ -108,7 +108,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if components.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
 			if compStatus.LastTransitionTime.IsZero() || time.Now().Before(compStatus.LastTransitionTime.Add(componentFailedTimeout)) {
-				requeueTimeAfterFailed = componentFailedTimeout - (time.Now().Sub(compStatus.LastTransitionTime.Time))
+				requeueTimeAfterFailed = componentFailedTimeout - time.Since(compStatus.LastTransitionTime.Time)
 			}
 		}
 		if compStatus.Phase != v.Phase {

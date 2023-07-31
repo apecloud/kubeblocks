@@ -92,7 +92,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("expect for opsRequest is running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsPhase, requeueAfter, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
+			opsPhase, _, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
@@ -100,10 +100,9 @@ var _ = Describe("OpsUtil functions", func() {
 			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
 			compStatus.LastTransitionTime = metav1.Time{Time: compStatus.LastTransitionTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
 			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
-			opsPhase, requeueAfter, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
+			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
-			Expect(requeueAfter).Should(Equal(time.Duration(0)))
 
 		})
 

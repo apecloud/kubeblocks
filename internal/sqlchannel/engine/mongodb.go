@@ -45,8 +45,8 @@ func newMongoDB() *mongodb {
 		examples: map[ClientType]buildConnectExample{
 			CLI: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# mongodb client connection example
-mongosh mongodb://%s:%s@%s/%s?replicaset=%s-%s
-`, info.User, info.Password, info.HeadlessEndpoint, info.Database, info.ClusterName, info.ComponentName)
+mongosh mongodb://%s:%s@%s/%s
+`, info.User, info.Password, info.Host, info.Database)
 			},
 		},
 	}

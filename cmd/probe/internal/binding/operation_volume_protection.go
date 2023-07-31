@@ -43,6 +43,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (
@@ -102,7 +103,7 @@ func init() {
 	optVolProt.Logger.Infof("succeed to init volume protection, pod: %s, spec: %s", optVolProt.Pod, optVolProt.buildVolumesMsg())
 }
 
-func (ops *BaseOperations) VolumeProtection(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) VolumeProtectionOps(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
 	if optVolProt.disabled() {
 		ops.Logger.Infof("The volume protection operation is disabled")
 		return nil, nil
@@ -123,6 +124,52 @@ func (ops *BaseOperations) VolumeProtection(ctx context.Context, req *bindings.I
 		rsp.Data = []byte(msg)
 	}
 	return nil, err
+}
+
+func (ops *BaseOperations) LockOps(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	manager, err := component.GetDefaultManager()
+	if err != nil || manager == nil {
+		msg := fmt.Sprintf("Get DB manager failed: %v", err)
+		ops.Logger.Warnf(msg)
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = msg
+		return opsRes, nil
+	}
+
+	err = manager.Lock(ctx, "disk full")
+	if err != nil {
+		msg := fmt.Sprintf("Lock DB failed: %v", err)
+		ops.Logger.Warnf(msg)
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = msg
+		return opsRes, nil
+	}
+	opsRes["event"] = OperationSuccess
+	return opsRes, nil
+}
+
+func (ops *BaseOperations) UnlockOps(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	manager, err := component.GetDefaultManager()
+	if err != nil || manager == nil {
+		msg := fmt.Sprintf("Get DB manager failed: %v", err)
+		ops.Logger.Warnf(msg)
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = msg
+		return opsRes, nil
+	}
+
+	err = manager.Unlock(ctx)
+	if err != nil {
+		msg := fmt.Sprintf("Unlock DB failed: %v", err)
+		ops.Logger.Warnf(msg)
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = msg
+		return opsRes, nil
+	}
+	opsRes["event"] = OperationSuccess
+	return opsRes, nil
 }
 
 func (o *operationVolumeProtection) initVolumes() error {

@@ -109,8 +109,10 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		CheckRunningOperation: ops.CheckRunningOps,
 		CheckRoleOperation:    ops.CheckRoleOps,
 		GetRoleOperation:      ops.GetRoleOps,
-		VolumeProtection:      ops.VolumeProtection,
+		VolumeProtection:      ops.VolumeProtectionOps,
 		SwitchoverOperation:   ops.SwitchoverOps,
+		LockOperation:         ops.LockOps,
+		UnlockOperation:       ops.UnlockOps,
 	}
 
 	ops.DBAddress = ops.getAddress()

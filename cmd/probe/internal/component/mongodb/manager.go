@@ -640,21 +640,61 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 }
 
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
-	m := bson.M{"fsync": 1, "lock": true, "comment": reason}
+	mgr.Logger.Infof("Lock db: %s", reason)
+	m := bson.D{
+		{Key: "fsync", Value: 1},
+		{Key: "lock", Value: true},
+		{Key: "comment", Value: reason},
+	}
+	lockResp := LockResp{}
+
 	response := mgr.Client.Database("admin").RunCommand(ctx, m)
 	if response.Err() != nil {
-		mgr.Logger.Infof("Lock db (%s) failed: %v", reason, response)
+		mgr.Logger.Infof("Lock db (%s) failed: %v", reason, response.Err())
 		return response.Err()
 	}
+	if err := response.Decode(&lockResp); err != nil {
+		err := errors.Wrap(err, "failed to decode lock response")
+		return err
+	}
+
+	if lockResp.OK != 1 {
+		err := errors.Errorf("mongo says: %s", lockResp.Errmsg)
+		return err
+	}
+	mgr.Logger.Infof("Lock db success times: %d", lockResp.LockCount)
 	return nil
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
+	mgr.Logger.Infof("Unlock db")
 	m := bson.M{"fsyncUnlock": 1}
+	unlockResp := LockResp{}
 	response := mgr.Client.Database("admin").RunCommand(ctx, m)
 	if response.Err() != nil {
-		mgr.Logger.Infof("Unlock db failed: %v", response)
+		mgr.Logger.Infof("Unlock db failed: %v", response.Err())
 		return response.Err()
 	}
+	if err := response.Decode(&unlockResp); err != nil {
+		err := errors.Wrap(err, "failed to decode unlock response")
+		return err
+	}
+
+	if unlockResp.OK != 1 {
+		err := errors.Errorf("mongo says: %s", unlockResp.Errmsg)
+		return err
+	}
+	for unlockResp.LockCount > 0 {
+		response = mgr.Client.Database("admin").RunCommand(ctx, m)
+		if response.Err() != nil {
+			mgr.Logger.Infof("Unlock db failed: %v", response)
+			return response.Err()
+		}
+		if err := response.Decode(&unlockResp); err != nil {
+			err := errors.Wrap(err, "failed to decode unlock response")
+			return err
+		}
+	}
+	mgr.Logger.Infof("Unlock db success")
 	return nil
 }

@@ -20,9 +20,9 @@ kbcli kubeblocks uninstall [flags]
 ```
       --auto-approve       Skip interactive approval before uninstalling KubeBlocks
   -h, --help               help for uninstall
-      --remove-namespace   Removed default created "kb-system" namespace or not
-      --remove-pvcs        Removed PersistentVolumeClaim or not
-      --remove-pvs         Removed PersistentVolume or not
+      --remove-namespace   Remove default created "kb-system" namespace or not
+      --remove-pvcs        Remove PersistentVolumeClaim or not
+      --remove-pvs         Remove PersistentVolume or not
       --timeout duration   Time to wait for uninstalling KubeBlocks, such as --timeout=5m (default 5m0s)
       --wait               Wait for KubeBlocks to be uninstalled, including all the add-ons. It will wait for a --timeout period (default true)
 ```

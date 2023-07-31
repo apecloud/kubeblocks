@@ -79,9 +79,11 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return err
 	}
 
+	injectHttp2Shell(component.PodSpec)
+
 	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
+		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort), component.PodSpec)
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -136,7 +138,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Image = viper.GetString(constant.KBProbeImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"probe",
-		"--port", "3501"}
+		"--port", "3501"} // fixme: port shouldn't be const, it should be probeSvcHTTPPort
 
 	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
 		mainContainer := component.PodSpec.Containers[0]
@@ -160,6 +162,13 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Env = append(container.Env, corev1.EnvVar{
 		Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
 		Value:     component.CharacterType,
+		ValueFrom: nil,
+	})
+
+	// todo: only support consensus now, to enable ReplicationSet in the future
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      constant.KBPrefix + "_CONSENSUS_SET_ACTION_SVC_LIST",
+		Value:     viper.GetString(constant.KBPrefix + "_CONSENSUS_SET_ACTION_SVC_LIST"),
 		ValueFrom: nil,
 	})
 
@@ -199,7 +208,7 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 }
 
 func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.Container,
-	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int, pod *corev1.PodSpec) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
@@ -212,6 +221,26 @@ func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+
+	base := probeSvcHTTPPort + 2
+	portNeeded := len(probeSetting.Actions)
+	activePorts := make([]int32, portNeeded)
+	for i := 0; i < portNeeded; i++ {
+		activePorts[i] = int32(base + i)
+	}
+	activePorts, err := getAvailableContainerPorts(pod.Containers, activePorts)
+	if err != nil {
+		return
+	}
+	marshal, err := json.Marshal(activePorts)
+	if err != nil {
+		return
+	}
+	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", string(marshal))
+
+	// todo: we don't have credentialEnv so far
+	injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkRole", nil)
+
 	addTokenEnv(roleChangedContainer)
 }
 
@@ -284,4 +313,81 @@ func addTokenEnv(container *corev1.Container) {
 		Value:     token,
 		ValueFrom: nil,
 	})
+}
+
+const (
+	mountName          = "shell2http-mount"
+	mountPath          = "/shell2http"
+	shell2http         = "shell2http"
+	shell2httpImage    = "msoap/shell2http:1.16.0"
+	originBinaryPath   = "/app/shell2http"
+	defaultActionImage = "busybox:latest"
+)
+
+func injectHttp2Shell(pod *corev1.PodSpec) {
+	// inject shared volume
+	agentVolume := corev1.Volume{
+		Name: mountName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+	pod.Volumes = append(pod.Volumes, agentVolume)
+
+	// inject shell2http
+	volumeMount := corev1.VolumeMount{
+		Name:      mountName,
+		MountPath: mountPath,
+	}
+	binPath := strings.Join([]string{mountPath, shell2http}, "/")
+	initContainer := corev1.Container{
+		Name:            shell2http,
+		Image:           shell2httpImage,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		VolumeMounts:    []corev1.VolumeMount{volumeMount},
+		Command: []string{
+			"cp",
+			originBinaryPath,
+			binPath,
+		},
+	}
+	pod.InitContainers = append(pod.InitContainers, initContainer)
+}
+
+func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
+	port []int32, path, usage string,
+	credentialEnv []corev1.EnvVar) {
+	actions := probeSetting.Actions
+	volumeMount := corev1.VolumeMount{
+		Name:      mountName,
+		MountPath: mountPath,
+	}
+	binPath := strings.Join([]string{mountPath, shell2http}, "/")
+
+	for i, action := range actions {
+		image := action.Image
+		if len(action.Image) == 0 {
+			image = defaultActionImage
+		}
+
+		command := []string{
+			binPath,
+			"-port", fmt.Sprintf("%d", port[i]),
+			"-export-all-vars",
+			"-form",
+			path,
+			strings.Join(action.Command, " "),
+		}
+
+		container := corev1.Container{
+			Name:            fmt.Sprintf("%s-action-%d", usage, i),
+			Image:           image,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			VolumeMounts:    []corev1.VolumeMount{volumeMount},
+			Env:             credentialEnv,
+			Command:         command,
+		}
+
+		pod.Containers = append(pod.Containers, container)
+	}
 }

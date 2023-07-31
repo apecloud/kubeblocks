@@ -85,9 +85,11 @@ func (h *HTTPCustom) Init(metadata component.Properties) error {
 
 	h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
+	h.BaseOperations.GetGlobalInfo = h.GetGlobalInfo
 	h.BaseOperations.LockInstance = h.LockInstance
 	h.BaseOperations.UnlockInstance = h.UnlockInstance
 	h.LegacyOperations[CheckRoleOperation] = h.CheckRoleOps
+	h.LegacyOperations[GetGlobalInfoOperation] = h.GetGlobalInfoOps
 
 	return nil
 }
@@ -98,19 +100,19 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 	}
 
 	var (
-		lastOutput string
+		lastOutput []byte
 		err        error
 	)
 
 	for _, port := range *h.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
 		lastOutput, err = h.callAction(ctx, u)
 		if err != nil {
 			return "", err
 		}
 	}
 
-	return lastOutput, nil
+	return string(lastOutput), nil
 }
 
 func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
@@ -121,6 +123,33 @@ func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *Pr
 	opsRes := OpsResult{}
 	opsRes["role"] = role
 	return opsRes, nil
+}
+
+func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (GlobalInfo, error) {
+	if h.actionSvcPorts == nil {
+		return GlobalInfo{}, nil
+	}
+
+	var (
+		lastOutput []byte
+		err        error
+	)
+
+	for _, port := range *h.actionSvcPorts {
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
+		lastOutput, err = h.callAction(ctx, u)
+		if err != nil {
+			return GlobalInfo{}, err
+		}
+	}
+
+	res := GlobalInfo{}
+	err = json.Unmarshal(lastOutput, &res)
+	if err != nil {
+		return GlobalInfo{}, err
+	}
+
+	return res, nil
 }
 
 func (h *HTTPCustom) LockInstance(ctx context.Context) error {
@@ -134,28 +163,28 @@ func (h *HTTPCustom) UnlockInstance(ctx context.Context) error {
 }
 
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort
-func (h *HTTPCustom) callAction(ctx context.Context, url string) (string, error) {
+func (h *HTTPCustom) callAction(ctx context.Context, url string) ([]byte, error) {
 	// compose http request
 	request, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// send http request
 	resp, err := h.client.Do(request)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	// parse http response
 	if resp.StatusCode/100 != 2 {
-		return "", fmt.Errorf("received status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("received status code %d", resp.StatusCode)
 	}
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(b), err
+	return b, err
 }

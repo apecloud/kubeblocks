@@ -472,9 +472,19 @@ var _ = Describe("builder", func() {
 			}
 			cluster := &appsv1alpha1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace},
+				Spec: appsv1alpha1.ClusterSpec{
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "testKey",
+							Value:    "testVaule",
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
 			}
 			job, err := BuildRestoreJob(cluster, component, key.Name, "", []string{"sh"}, volumes, volumeMounts, env, nil)
 			Expect(err).Should(BeNil())
+			Expect(job.Spec.Template.Spec.Tolerations[0].Key).Should(Equal("testKey"))
 			Expect(job).ShouldNot(BeNil())
 			Expect(job.Name).Should(Equal(key.Name))
 		})

@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -120,10 +119,6 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 			return err
 		}
 		updateCMConfigSpecLabels(newCMObj, configSpec)
-		if newCMObj.Annotations == nil {
-			newCMObj.Annotations = make(map[string]string)
-		}
-		newCMObj.Annotations[constant.CMConfigurationNewAnnotationKey] = strconv.FormatBool(origCMObj == nil)
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}

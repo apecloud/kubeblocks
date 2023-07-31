@@ -1364,7 +1364,9 @@ func setKeys() []string {
 	}
 }
 
-// validateDefaultSCInConfig will verify if the ConfigMap of Kubeblocks is configured with the DEFAULT_STORAGE_CLASS
+// validateDefaultSCInConfig will verify if the ConfigMap of Kubeblocks is configured with the DEFAULT_STORAGE_CLASS.
+// When we install Kubeblocks, certain configurations will be rendered in a ConfigMap named kubeblocks-manager-config.
+// You can find the details in deploy/helm/template/configmap.yaml.
 func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
 	// todo:  types.KubeBlocksManagerConfigMapName almost is hard code, add a unique label for kubeblocks-manager-config
 	namespace, err := util.GetKubeBlocksNamespaceByDynamic(dynamic)
@@ -1376,7 +1378,13 @@ func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
 		return false, err
 	}
 	var config map[string]interface{}
+	if cfg.Object["data"] == nil {
+		return false, nil
+	}
 	data := cfg.Object["data"].(map[string]interface{})
+	if data["config.yaml"] == nil {
+		return false, nil
+	}
 	err = yaml.Unmarshal([]byte(data["config.yaml"].(string)), &config)
 	if err != nil {
 		return false, err

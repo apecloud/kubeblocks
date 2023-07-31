@@ -21,14 +21,22 @@ package cluster
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"path/filepath"
+	"sort"
+	"strings"
 
+	"github.com/spf13/cast"
 	corev1 "k8s.io/api/core/v1"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -45,6 +53,17 @@ type configEditContext struct {
 
 	original string
 	edited   string
+}
+
+type parameterSchema struct {
+	name        string
+	valueType   string
+	miniNum     string
+	maxiNum     string
+	enum        []string
+	description string
+	scope       string
+	dynamic     bool
 }
 
 func (c *configEditContext) getOriginal() string {
@@ -105,4 +124,138 @@ func fromKeyValuesToMap(params []cfgcore.VisualizedParam, file string) map[strin
 		}
 	}
 	return result
+}
+
+func (pt *parameterSchema) enumFormatter(maxFieldLength int) string {
+	if len(pt.enum) == 0 {
+		return ""
+	}
+	v := strings.Join(pt.enum, ",")
+	if maxFieldLength > 0 && len(v) > maxFieldLength {
+		v = v[:maxFieldLength] + "..."
+	}
+	return v
+}
+
+func (pt *parameterSchema) rangeFormatter() string {
+	const (
+		r          = "-"
+		rangeBegin = "["
+		rangeEnd   = "]"
+	)
+
+	if len(pt.maxiNum) == 0 && len(pt.miniNum) == 0 {
+		return ""
+	}
+
+	v := rangeBegin
+	if len(pt.miniNum) != 0 {
+		v += pt.miniNum
+	}
+	if len(pt.maxiNum) != 0 {
+		v += r
+		v += pt.maxiNum
+	} else if len(v) != 0 {
+		v += r
+	}
+	v += rangeEnd
+	return v
+}
+
+func getAllowedValues(pt *parameterSchema, maxFieldLength int) string {
+	if len(pt.enum) != 0 {
+		return pt.enumFormatter(maxFieldLength)
+	}
+	return pt.rangeFormatter()
+}
+
+func printSingleParameterSchema(pt *parameterSchema) {
+	printer.PrintTitle("Configure Constraint")
+	// print column "PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "DESCRIPTION"
+	printer.PrintPairStringToLine("Parameter Name", pt.name)
+	printer.PrintPairStringToLine("Allowed Values", getAllowedValues(pt, -1))
+	printer.PrintPairStringToLine("Scope", pt.scope)
+	printer.PrintPairStringToLine("Dynamic", cast.ToString(pt.dynamic))
+	printer.PrintPairStringToLine("Type", pt.valueType)
+	printer.PrintPairStringToLine("Description", pt.description)
+}
+
+// printConfigParameterSchema prints the conditions of resource.
+func printConfigParameterSchema(paramTemplates []*parameterSchema, out io.Writer, maxFieldLength int) {
+	if len(paramTemplates) == 0 {
+		return
+	}
+
+	sort.SliceStable(paramTemplates, func(i, j int) bool {
+		x1 := paramTemplates[i]
+		x2 := paramTemplates[j]
+		return strings.Compare(x1.name, x2.name) < 0
+	})
+
+	tbl := printer.NewTablePrinter(out)
+	tbl.SetStyle(printer.TerminalStyle)
+	printer.PrintTitle("Parameter Explain")
+	tbl.SetHeader("PARAMETER NAME", "ALLOWED VALUES", "SCOPE", "DYNAMIC", "TYPE", "DESCRIPTION")
+	for _, pt := range paramTemplates {
+		tbl.AddRow(pt.name, getAllowedValues(pt, maxFieldLength), pt.scope, cast.ToString(pt.dynamic), pt.valueType, pt.description)
+	}
+	tbl.Print()
+}
+
+func generateParameterSchema(paramName string, property apiext.JSONSchemaProps) (*parameterSchema, error) {
+	toString := func(v interface{}) (string, error) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	}
+	pt := &parameterSchema{
+		name:        paramName,
+		valueType:   property.Type,
+		description: strings.TrimSpace(property.Description),
+	}
+	if property.Minimum != nil {
+		b, err := toString(property.Minimum)
+		if err != nil {
+			return nil, err
+		}
+		pt.miniNum = b
+	}
+	if property.Maximum != nil {
+		b, err := toString(property.Maximum)
+		if err != nil {
+			return nil, err
+		}
+		pt.maxiNum = b
+	}
+	if property.Enum != nil {
+		pt.enum = make([]string, len(property.Enum))
+		for i, v := range property.Enum {
+			b, err := toString(v)
+			if err != nil {
+				return nil, err
+			}
+			pt.enum[i] = b
+		}
+	}
+	return pt, nil
+}
+
+func getComponentNames(cluster *appsv1alpha1.Cluster) []string {
+	var components []string
+	for _, component := range cluster.Spec.ComponentSpecs {
+		components = append(components, component.Name)
+	}
+	return components
+}
+
+func findTplByName(tpls []appsv1alpha1.ComponentConfigSpec, tplName string) *appsv1alpha1.ComponentConfigSpec {
+	for i := range tpls {
+		tpl := &tpls[i]
+		if tpl.Name == tplName {
+			return tpl
+		}
+	}
+	return nil
 }

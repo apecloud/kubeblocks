@@ -52,8 +52,7 @@ archives:
       {{- .Tag }}
     format_overrides:
       - goos: windows
-        format:
-          zip
+        format: zip
 
 nfpms:
   -

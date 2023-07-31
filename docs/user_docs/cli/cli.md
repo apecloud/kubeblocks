@@ -41,6 +41,7 @@ Run a benchmark.
 * [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 * [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run tpcc benchmark
 
 
 ## [builder](kbcli_builder.md)

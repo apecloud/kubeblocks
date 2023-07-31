@@ -239,7 +239,7 @@ func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.
 	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", string(marshal))
 
 	// todo: we don't have credentialEnv so far
-	injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkRole", nil)
+	injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkrole", nil)
 
 	addTokenEnv(roleChangedContainer)
 }

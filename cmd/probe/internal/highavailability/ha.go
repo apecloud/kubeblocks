@@ -85,7 +85,7 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Infof("Current member is not in cluster, add it to cluster")
 		_ = ha.dbManager.AddCurrentMemberToCluster(cluster)
 
-	case !ha.dbManager.IsCurrentMemberHealthy():
+	case !ha.dbManager.IsCurrentMemberHealthy(cluster):
 		ha.logger.Infof("DB Service is not healthy,  do some recover")
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()

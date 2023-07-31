@@ -106,7 +106,7 @@ func (store *KubernetesStore) Initialize() error {
 				Labels:    labelsMap,
 				Annotations: map[string]string{
 					"ttl":                ttl,
-					"MaxLagOnSwitchover": "0",
+					"MaxLagOnSwitchover": "1024",
 				},
 				// OwnerReferences: ownerReference,
 			},
@@ -244,11 +244,18 @@ func (store *KubernetesStore) CreateLock() error {
 		return err
 	}
 
+	labelsMap := map[string]string{
+		"app.kubernetes.io/instance":        store.clusterName,
+		"app.kubernetes.io/managed-by":      "kubeblocks",
+		"apps.kubeblocks.io/component-name": store.componentName,
+	}
+
 	store.logger.Infof("k8s store initializing, create leader ConfigMap: %s", leaderName)
 	if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      store.clusterCompName + "-leader",
 			Namespace: store.namespace,
+			Labels:    labelsMap,
 			Annotations: map[string]string{
 				"leader":       leaderName,
 				"acquire-time": nowStr,

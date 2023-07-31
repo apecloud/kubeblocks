@@ -150,6 +150,8 @@ spec:
                 value: "5432"
               - name: PGDATA
                 value: postgresql/pgconsensus_data
+              - name: KB_WORKLOAD_TYPE
+                value: Consensus
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
@@ -157,6 +159,7 @@ spec:
             - psql
           args:
             - -h$(KB_ACCOUNT_ENDPOINT)
+            - -Upostgres
             - -c
             - $(KB_ACCOUNT_STATEMENT)
           env:
@@ -183,31 +186,3 @@ spec:
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
                 deletion: DROP USER IF EXISTS $(USERNAME);
-          - name: kbdataprotection
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
-          - name: kbprobe
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
-          - name: kbmonitoring
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
-          - name: kbreplicator
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE ROLE REPLICATOR WITH SUPERUSER LOGIN PASSWORD 'replicator';
-                deletion: DROP ROLE IF EXISTS $(USERNAME);

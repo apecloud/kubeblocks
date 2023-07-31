@@ -112,9 +112,9 @@ func (o *InstallOptions) Upgrade() error {
 	}
 
 	// add helm repo
-	s := spinner.New(o.Out, spinnerMsg("Added and update repo "+types.KubeBlocksChartName))
+	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksChartName))
 	defer s.Fail()
-	// Added repo, if exists, will update it
+	// Add repo, if exists, will update it
 	if err = helm.AddRepo(newHelmRepoEntry()); err != nil {
 		return err
 	}

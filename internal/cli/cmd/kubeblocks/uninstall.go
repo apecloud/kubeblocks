@@ -93,9 +93,9 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	}
 
 	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
-	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Removed PersistentVolume or not")
-	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Removed PersistentVolumeClaim or not")
-	cmd.Flags().BoolVar(&o.RemoveNamespace, "remove-namespace", false, "Removed default created \"kb-system\" namespace or not")
+	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
+	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
+	cmd.Flags().BoolVar(&o.RemoveNamespace, "remove-namespace", false, "Remove default created \"kb-system\" namespace or not")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for uninstalling KubeBlocks, such as --timeout=5m")
 	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be uninstalled, including all the add-ons. It will wait for a --timeout period")
 	return cmd
@@ -169,7 +169,7 @@ func (o *UninstallOptions) Uninstall() error {
 		chart.Uninstall(o.HelmCfg))
 
 	// remove repo
-	printSpinner(newSpinner("Removed helm repo "+types.KubeBlocksChartName),
+	printSpinner(newSpinner("Remove helm repo "+types.KubeBlocksChartName),
 		helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName}))
 
 	// get KubeBlocks objects, then try to remove them
@@ -179,7 +179,7 @@ func (o *UninstallOptions) Uninstall() error {
 	}
 
 	// remove finalizers of custom resources, then that will be deleted
-	printSpinner(newSpinner("Removed built-in custom resources"), removeCustomResources(o.Dynamic, objs))
+	printSpinner(newSpinner("Remove built-in custom resources"), removeCustomResources(o.Dynamic, objs))
 
 	var gvrs []schema.GroupVersionResource
 	for k := range objs {
@@ -201,12 +201,12 @@ func (o *UninstallOptions) Uninstall() error {
 		if v, ok := objs[gvr]; !ok || len(v.Items) == 0 {
 			continue
 		}
-		printSpinner(newSpinner("Removed "+gvr.Resource), deleteObjects(o.Dynamic, gvr, objs[gvr]))
+		printSpinner(newSpinner("Remove "+gvr.Resource), deleteObjects(o.Dynamic, gvr, objs[gvr]))
 	}
 
 	// delete namespace if it is default namespace
 	if o.Namespace == types.DefaultNamespace && o.RemoveNamespace {
-		printSpinner(newSpinner("Removed namespace "+types.DefaultNamespace),
+		printSpinner(newSpinner("Remove namespace "+types.DefaultNamespace),
 			deleteNamespace(o.Client, types.DefaultNamespace))
 	}
 

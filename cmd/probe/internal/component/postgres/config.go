@@ -44,8 +44,6 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	config.password = poolConfig.ConnConfig.Password
 	config.host = poolConfig.ConnConfig.Host
 	config.port = int(poolConfig.ConnConfig.Port)
-	config.pool = poolConfig
-	config.url = url
 	config.database = poolConfig.ConnConfig.Database
 	config.maxConns = poolConfig.MaxConns
 	config.minConns = poolConfig.MinConns
@@ -56,6 +54,13 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	if viper.IsSet("KB_SERVICE_PASSWORD") {
 		config.password = viper.GetString("KB_SERVICE_PASSWORD")
 	}
+
+	config.url = config.GetConnectURLWithHost(config.host)
+	pool, err := pgxpool.ParseConfig(config.url)
+	if err != nil {
+		return nil, errors.Errorf("error opening DB connection: %v", err)
+	}
+	config.pool = pool
 
 	return config, nil
 }

@@ -21,7 +21,8 @@ kbcli kubeblocks compare version [OTHER-VERSION] [flags]
 ### Options
 
 ```
-  -h, --help   help for compare
+      --detail   show the different detail between two kubeblocks version
+  -h, --help     help for compare
 ```
 
 ### Options inherited from parent commands

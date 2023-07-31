@@ -48,10 +48,15 @@ func (mgr *Manager) IsConsensusReadyUp() bool {
 		return false
 	}
 
-	return result["username"] == "consensus_monitor"
+	return result["extname"] == "consensus_monitor"
 }
 
 func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	if !mgr.IsFirstMember() {
+		mgr.Logger.Infof("i am not the first member, wait for first member Initializing")
+		return true, nil
+	}
+
 	if mgr.IsDBStartupReady() {
 		return false, nil
 	}
@@ -69,15 +74,10 @@ func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *
 		return false, err
 	}
 
-	return result["username"] == "replicator", nil
+	return result["usename"] != nil, nil
 }
 
 func (mgr *Manager) InitializeClusterConsensus(ctx context.Context, cluster *dcs.Cluster) error {
-	if !mgr.IsConsensusReadyUp() {
-		mgr.Logger.Warnf("paxos has not ready up")
-		return nil
-	}
-
 	sql := "create role replicator with superuser login password 'replicator';" +
 		"create extension if not exists consensus_monitor;"
 

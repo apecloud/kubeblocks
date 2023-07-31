@@ -259,6 +259,9 @@ func parsePgLsn(str string) int64 {
 func parseSingleQuery(str string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	str = strings.Trim(str, "[]")
+	if str == "" {
+		return result, nil
+	}
 
 	err := json.Unmarshal([]byte(str), &result)
 	if err != nil {

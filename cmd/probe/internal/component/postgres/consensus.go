@@ -3,12 +3,13 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/viper"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
@@ -49,7 +50,7 @@ func (mgr *Manager) InitializeClusterConsensus(ctx context.Context, cluster *dcs
 }
 
 func (mgr *Manager) GetMemberStateWithPoolConsensus(ctx context.Context, pool *pgxpool.Pool) (string, error) {
-	sql := `select role from consensus_cluster_status where server_id = (select server_id from consensus_member_status);`
+	sql := `select paxos_role from consensus_member_status;`
 
 	resp, err := mgr.QueryWithPool(ctx, sql, pool)
 	if err != nil {
@@ -63,7 +64,23 @@ func (mgr *Manager) GetMemberStateWithPoolConsensus(ctx context.Context, pool *p
 		return "", err
 	}
 
-	return result["role"].(string), nil
+	// TODO:paxos roles are currently represented by numbers, will change to string in the future
+	var role string
+	switch result["paxos_role"].(string) {
+	case "0":
+		role = binding.FOLLOWER
+	case "1":
+		role = binding.CANDIDATE
+	case "2":
+		role = binding.LEADER
+	case "3":
+		role = binding.LEARNER
+	default:
+		mgr.Logger.Warnf("get invalid role number:%s", result["paxos_role"].(string))
+		role = ""
+	}
+
+	return role, nil
 }
 
 func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {

@@ -487,6 +487,10 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
+	// lastTransitionTime is the last time the condition transitioned from one phase to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+
 	// progressDetails describes the progress details of the component for this operation.
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`

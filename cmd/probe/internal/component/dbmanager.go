@@ -125,3 +125,108 @@ func GetDefaultManager() (DBManager, error) {
 
 	return GetManager(characterType), nil
 }
+
+type FakeManager struct {
+	DBManagerBase
+}
+
+var _ DBManager = &FakeManager{}
+
+func (*FakeManager) IsRunning() bool {
+	return true
+}
+
+func (*FakeManager) IsDBStartupReady() bool {
+	return true
+}
+
+func (*FakeManager) InitializeCluster(context.Context, *dcs.Cluster) error {
+	return fmt.Errorf("NotSupported")
+}
+func (*FakeManager) IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error) {
+	return false, fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool {
+	return true
+}
+
+func (*FakeManager) IsCurrentMemberHealthy(context.Context) bool {
+	return true
+}
+
+func (*FakeManager) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
+	return true
+}
+
+func (*FakeManager) IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool {
+	return true
+}
+
+func (*FakeManager) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {
+	return nil
+}
+
+func (*FakeManager) HasOtherHealthyMembers(context.Context, *dcs.Cluster, string) []*dcs.Member {
+	return nil
+}
+
+func (*FakeManager) IsLeader(context.Context, *dcs.Cluster) (bool, error) {
+	return false, fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error) {
+	return false, fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) IsFirstMember() bool {
+	return true
+}
+
+func (*FakeManager) AddCurrentMemberToCluster(*dcs.Cluster) error {
+	return fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
+	return fmt.Errorf("NotSuppported")
+}
+
+func (*FakeManager) Promote() error {
+	return fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) Demote() error {
+	return fmt.Errorf("NotSuppported")
+}
+
+func (*FakeManager) Follow(*dcs.Cluster) error {
+	return fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) Recover() {
+
+}
+
+func (*FakeManager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
+	return nil
+}
+
+func (*FakeManager) GetMemberAddrs(*dcs.Cluster) []string {
+	return nil
+}
+
+func (*FakeManager) IsRootCreated(context.Context) (bool, error) {
+	return false, fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) CreateRoot(context.Context) error {
+	return fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) Lock(context.Context, string) error {
+	return fmt.Errorf("NotSuppported")
+}
+
+func (*FakeManager) Unlock(context.Context) error {
+	return fmt.Errorf("NotSuppported")
+}

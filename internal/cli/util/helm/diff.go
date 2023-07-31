@@ -63,6 +63,7 @@ var (
 		"description",
 		"image",
 		"chartLocationURL",
+		"chartsImage",
 	}
 
 	labelBlackList = []string{

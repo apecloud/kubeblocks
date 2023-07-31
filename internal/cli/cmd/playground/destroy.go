@@ -354,7 +354,7 @@ func (o *destroyOptions) uninstallKubeBlocks(client kubernetes.Interface, dynami
 }
 
 func (o *destroyOptions) removeKubeConfig() error {
-	s := spinner.New(o.Out, spinnerMsg("Remove kubeconfig from "+defaultKubeConfigPath))
+	s := spinner.New(o.Out, spinnerMsg("Removed kubeconfig from "+defaultKubeConfigPath))
 	defer s.Fail()
 	if err := kubeConfigRemove(o.prevCluster.KubeConfig, defaultKubeConfigPath); err != nil {
 		if os.IsNotExist(err) {
@@ -386,7 +386,7 @@ func (o *destroyOptions) removeKubeConfig() error {
 
 // remove state file
 func (o *destroyOptions) removeStateFile() error {
-	s := spinner.New(o.Out, spinnerMsg("Remove state file %s", o.stateFilePath))
+	s := spinner.New(o.Out, spinnerMsg("Removed state file %s", o.stateFilePath))
 	defer s.Fail()
 	if err := removeStateFile(o.stateFilePath); err != nil {
 		return err

@@ -48,7 +48,7 @@ func (mgr *Manager) IsConsensusReadyUp() bool {
 		return false
 	}
 
-	return result["extname"] == "consensus_monitor"
+	return result["extname"] != nil
 }
 
 func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
@@ -57,7 +57,7 @@ func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *
 		return true, nil
 	}
 
-	if mgr.IsDBStartupReady() {
+	if !mgr.IsDBStartupReady() {
 		return false, nil
 	}
 
@@ -83,7 +83,6 @@ func (mgr *Manager) InitializeClusterConsensus(ctx context.Context, cluster *dcs
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
 
@@ -128,16 +127,20 @@ func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 	ctx := context.TODO()
 	sql := `select ip_port from consensus_cluster_status;`
 	var addrs []string
+	var err error
+	pools := []*pgxpool.Pool{nil}
 
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return nil
 	}
 
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
-		return nil
+	if leaderMember.Name != mgr.CurrentMemberName {
+		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
+		if err != nil || pools[0] == nil {
+			mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
+			return nil
+		}
 	}
 
 	resp, err := mgr.QueryWithPool(ctx, sql, pools[0])
@@ -229,18 +232,8 @@ func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host 
 	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
 		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), config.port)
 
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		return errors.New("get leader member failed")
-	}
-
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
-		return err
-	}
-
-	_, err = mgr.ExecWithPool(ctx, sql, pools[0])
+	// only leader can delete member, so don't need to get pool
+	_, err := mgr.ExecWithPool(ctx, sql, nil)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
@@ -256,6 +249,9 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 		return false
 	}
 
+	if leaderMember.Name == mgr.CurrentMemberName {
+		return mgr.IsCurrentMemberHealthy()
+	}
 	return mgr.IsMemberHealthy(cluster, leaderMember)
 }
 

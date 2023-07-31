@@ -140,12 +140,12 @@ type ClusterBackup struct {
 	// +optional
 	CronExpression string `json:"cronExpression,omitempty"`
 
-	// retryWindowMinutes defines the time window for retrying the job if it misses scheduled
-	// time for any reason. the unit of time is minute.
+	// startingDeadlineMinutes defines the deadline in minutes for starting the backup job
+	// if it misses scheduled time for any reason.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1440
-	RetryWindowMinutes *int64 `json:"retryWindowMinutes,omitempty"`
+	StartingDeadlineMinutes *int64 `json:"startingDeadlineMinutes,omitempty"`
 
 	// repoName is the name of the backupRepo, if not set, will use the default backupRepo.
 	// +optional

@@ -220,7 +220,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			TTL: policyTPL.Retention.TTL,
 		}
 	}
-	bpSpec.Schedule.RetryWindowMinutes = policyTPL.Schedule.RetryWindowMinutes
+	bpSpec.Schedule.StartingDeadlineMinutes = policyTPL.Schedule.StartingDeadlineMinutes
 	bpSpec.Schedule.Snapshot = r.convertSchedulePolicy(policyTPL.Schedule.Snapshot)
 	bpSpec.Schedule.Datafile = r.convertSchedulePolicy(policyTPL.Schedule.Datafile)
 	bpSpec.Schedule.Logfile = r.convertSchedulePolicy(policyTPL.Schedule.Logfile)
@@ -279,8 +279,8 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		}
 	}
 
-	if backup.RetryWindowMinutes != nil {
-		spec.Schedule.RetryWindowMinutes = backup.RetryWindowMinutes
+	if backup.StartingDeadlineMinutes != nil {
+		spec.Schedule.StartingDeadlineMinutes = backup.StartingDeadlineMinutes
 	}
 
 	var commonBackupPolicy *dataprotectionv1alpha1.CommonBackupPolicy

@@ -84,7 +84,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		expectProgressCount      int32
 		completedProgressCount   int32
 		checkAllClusterComponent bool
-		compFailedRequeueAfter   time.Duration
+		requeueTimeAfterFailed   time.Duration
 	)
 	componentNameMap := opsRequest.GetComponentNameSet()
 	// if no specified components, we should check the all components phase of cluster.
@@ -107,9 +107,8 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		}
 		if components.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
-			if !compStatus.LastTransitionTime.IsZero() &&
-				time.Now().After(compStatus.LastTransitionTime.Add(componentFailedTimeout)) {
-				compFailedRequeueAfter = componentFailedTimeout - (time.Now().Sub(compStatus.LastTransitionTime.Time))
+			if compStatus.LastTransitionTime.IsZero() || time.Now().Before(compStatus.LastTransitionTime.Add(componentFailedTimeout)) {
+				requeueTimeAfterFailed = componentFailedTimeout - (time.Now().Sub(compStatus.LastTransitionTime.Time))
 			}
 		}
 		if compStatus.Phase != v.Phase {
@@ -146,9 +145,9 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if isFailed {
-		if compFailedRequeueAfter != 0 {
+		if requeueTimeAfterFailed != 0 {
 			// component failure may be temporary, waiting for component failure timeout.
-			return opsRequestPhase, compFailedRequeueAfter, nil
+			return opsRequestPhase, requeueTimeAfterFailed, nil
 		}
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}

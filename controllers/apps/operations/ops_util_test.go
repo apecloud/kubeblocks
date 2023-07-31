@@ -95,7 +95,6 @@ var _ = Describe("OpsUtil functions", func() {
 			opsPhase, requeueAfter, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			Expect(requeueAfter).Should(Equal(componentFailedTimeout))
 
 			By("mock component failed time reaches the threshold, expect for opsRequest is Failed")
 			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]

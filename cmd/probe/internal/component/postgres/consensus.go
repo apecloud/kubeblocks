@@ -34,6 +34,23 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
+func (mgr *Manager) IsConsensusReadyUp() bool {
+	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus_monitor';`
+	resp, err := mgr.Query(context.TODO(), sql)
+	if err != nil {
+		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		return false
+	}
+
+	result, err := parseSingleQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse query failed, err:%v", err)
+		return false
+	}
+
+	return result["username"] == "consensus_monitor"
+}
+
 func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if mgr.IsDBStartupReady() {
 		return false, nil
@@ -56,8 +73,8 @@ func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *
 }
 
 func (mgr *Manager) InitializeClusterConsensus(ctx context.Context, cluster *dcs.Cluster) error {
-	if isLeader, err := mgr.IsLeader(ctx, cluster); !isLeader || err != nil {
-		mgr.Logger.Warnf("current Paxos state has not change to leader")
+	if !mgr.IsConsensusReadyUp() {
+		mgr.Logger.Warnf("paxos has not ready up")
 		return nil
 	}
 

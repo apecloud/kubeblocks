@@ -172,11 +172,7 @@ func (mgr *Manager) ExecOthers(sql string, member *dcs.Member) {
 
 }
 
-func (mgr *Manager) IsDBStartupReady() bool {
-	if mgr.DBStartupReady {
-		return true
-	}
-
+func (mgr *Manager) IsPgReady() bool {
 	cmd := exec.Command("pg_isready")
 	if config.username != "" {
 		cmd.Args = append(cmd.Args, "-U", config.username)
@@ -190,6 +186,22 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	err := cmd.Run()
 	if err != nil {
 		mgr.Logger.Infof("DB is not ready: %v", err)
+		return false
+	}
+
+	return true
+}
+
+func (mgr *Manager) IsDBStartupReady() bool {
+	if mgr.DBStartupReady {
+		return true
+	}
+
+	if !mgr.IsPgReady() {
+		return false
+	}
+
+	if mgr.workLoadType == Consensus && !mgr.IsConsensusReadyUp() {
 		return false
 	}
 

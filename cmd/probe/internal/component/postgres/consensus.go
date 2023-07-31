@@ -56,6 +56,11 @@ func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *
 }
 
 func (mgr *Manager) InitializeClusterConsensus(ctx context.Context, cluster *dcs.Cluster) error {
+	if isLeader, err := mgr.IsLeader(ctx, cluster); !isLeader || err != nil {
+		mgr.Logger.Warnf("current Paxos state has not change to leader")
+		return nil
+	}
+
 	sql := "create role replicator with superuser login password 'replicator';" +
 		"create extension if not exists consensus_monitor;"
 
@@ -85,17 +90,17 @@ func (mgr *Manager) GetMemberStateWithPoolConsensus(ctx context.Context, pool *p
 
 	// TODO:paxos roles are currently represented by numbers, will change to string in the future
 	var role string
-	switch result["paxos_role"].(string) {
-	case "0":
+	switch result["paxos_role"].(float64) {
+	case 0:
 		role = binding.FOLLOWER
-	case "1":
+	case 1:
 		role = binding.CANDIDATE
-	case "2":
+	case 2:
 		role = binding.LEADER
-	case "3":
+	case 3:
 		role = binding.LEARNER
 	default:
-		mgr.Logger.Warnf("get invalid role number:%s", result["paxos_role"].(string))
+		mgr.Logger.Warnf("get invalid role number:%s", result["paxos_role"].(float64))
 		role = ""
 	}
 

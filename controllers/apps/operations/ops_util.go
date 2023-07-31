@@ -78,13 +78,13 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		return opsRequestPhase, 0, err
 	}
 	var (
-		opsRequest                  = opsRes.OpsRequest
-		isFailed                    bool
-		ok                          bool
-		expectProgressCount         int32
-		completedProgressCount      int32
-		checkAllClusterComponent    bool
-		compFailedOrAbnormalTimeout bool
+		opsRequest               = opsRes.OpsRequest
+		isFailed                 bool
+		ok                       bool
+		expectProgressCount      int32
+		completedProgressCount   int32
+		checkAllClusterComponent bool
+		compFailedRequeueAfter   time.Duration
 	)
 	componentNameMap := opsRequest.GetComponentNameSet()
 	// if no specified components, we should check the all components phase of cluster.
@@ -105,15 +105,16 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if compStatus, ok = opsRequest.Status.Components[k]; !ok {
 			compStatus = appsv1alpha1.OpsRequestComponentStatus{}
 		}
+		if components.IsFailedOrAbnormal(v.Phase) {
+			isFailed = true
+			if !compStatus.LastTransitionTime.IsZero() &&
+				time.Now().After(compStatus.LastTransitionTime.Add(componentFailedTimeout)) {
+				compFailedRequeueAfter = componentFailedTimeout - (time.Now().Sub(compStatus.LastTransitionTime.Time))
+			}
+		}
 		if compStatus.Phase != v.Phase {
 			compStatus.Phase = v.Phase
 			compStatus.LastTransitionTime = metav1.Now()
-		}
-		if components.IsFailedOrAbnormal(v.Phase) {
-			isFailed = true
-			if time.Now().After(compStatus.LastTransitionTime.Add(componentFailedTimeout)) {
-				compFailedOrAbnormalTimeout = true
-			}
 		}
 		clusterComponent := opsRes.Cluster.Spec.GetComponentByName(k)
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, progressResource{
@@ -145,9 +146,9 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if isFailed {
-		if !compFailedOrAbnormalTimeout {
+		if compFailedRequeueAfter != 0 {
 			// component failure may be temporary, waiting for component failure timeout.
-			return opsRequestPhase, componentFailedTimeout, nil
+			return opsRequestPhase, compFailedRequeueAfter, nil
 		}
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}

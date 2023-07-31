@@ -22,7 +22,6 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"strconv"
 	"strings"
 
@@ -31,6 +30,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 

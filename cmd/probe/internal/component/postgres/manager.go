@@ -280,8 +280,8 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	}
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	return mgr.IsMemberHealthy(nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(cluster *dcs.Cluster) bool {
+	return mgr.IsMemberHealthy(cluster, nil)
 }
 
 func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
@@ -349,10 +349,6 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 }
 
 func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
-	// TODO: for test
-	if cluster == nil {
-		return false
-	}
 	lag := cluster.GetOpTime() - walPosition
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }

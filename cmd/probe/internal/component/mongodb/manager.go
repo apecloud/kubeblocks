@@ -420,7 +420,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	return false
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy() bool {
+func (mgr *Manager) IsCurrentMemberHealthy(cluster *dcs.Cluster) bool {
 	return mgr.IsMemberHealthy(nil, nil)
 }
 

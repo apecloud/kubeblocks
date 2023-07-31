@@ -99,7 +99,7 @@ func (mgr *Manager) GetMemberStateWithPoolConsensus(ctx context.Context, pool *p
 	}
 
 	result, err := parseSingleQuery(string(resp))
-	if err != nil {
+	if err != nil || result["paxos_role"] == nil {
 		mgr.Logger.Errorf("parse query failed, err:%v", err)
 		return "", err
 	}
@@ -164,7 +164,8 @@ func (mgr *Manager) IsCurrentMemberInClusterConsensus(cluster *dcs.Cluster) bool
 	memberAddrs := mgr.GetMemberAddrs(cluster)
 	if memberAddrs == nil {
 		mgr.Logger.Errorf("can't get addresses of members")
-		return false
+		// in order to execute subsequent code
+		return true
 	}
 
 	return slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName))
@@ -175,7 +176,17 @@ func (mgr *Manager) IsMemberHealthyConsensus(cluster *dcs.Cluster, member *dcs.M
 
 	pools := []*pgxpool.Pool{nil}
 	var err error
-	if member != nil && cluster != nil {
+
+	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		return true
+	}
+	// only leader can get the cluster healthy view
+	if leaderMember.Name != mgr.CurrentMemberName {
+		member = leaderMember
+	}
+
+	if member != nil {
 		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
 		if err != nil || pools[0] == nil {
 			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
@@ -196,8 +207,14 @@ func (mgr *Manager) IsMemberHealthyConsensus(cluster *dcs.Cluster, member *dcs.M
 		return false
 	}
 
-	connected := result["connected"] == "true"
-	logDelayNum := int64(math.Round(result["log_delay_num"].(float64)))
+	var connected bool
+	var logDelayNum int64
+	if result["connected"] != nil {
+		connected = result["connected"].(bool)
+	}
+	if result["log_delay_num"] != nil {
+		logDelayNum = int64(math.Round(result["log_delay_num"].(float64)))
+	}
 
 	return connected && logDelayNum <= cluster.HaConfig.GetMaxLagOnSwitchover()
 }
@@ -250,7 +267,8 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 	}
 
 	if leaderMember.Name == mgr.CurrentMemberName {
-		return mgr.IsCurrentMemberHealthy()
+		// will check current member healthy soon
+		return true
 	}
 	return mgr.IsMemberHealthy(cluster, leaderMember)
 }
@@ -270,7 +288,7 @@ func (mgr *Manager) PromoteConsensus() error {
 	}
 
 	result, err := parseSingleQuery(string(resp))
-	if err != nil {
+	if err != nil || result["ip_port"] == nil {
 		return err
 	}
 

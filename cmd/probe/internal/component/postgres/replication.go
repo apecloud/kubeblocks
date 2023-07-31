@@ -77,7 +77,7 @@ func (mgr *Manager) IsMemberHealthyReplication(cluster *dcs.Cluster, member *dcs
 
 	pools := []*pgxpool.Pool{nil}
 	var err error
-	if member != nil && cluster != nil {
+	if member != nil {
 		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
 		if err != nil || pools[0] == nil {
 			mgr.Logger.Errorf("Get other pools failed, err:%v", err)

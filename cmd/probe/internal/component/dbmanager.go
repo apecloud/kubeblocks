@@ -31,7 +31,7 @@ import (
 type DBManager interface {
 	IsRunning() bool
 	IsCurrentMemberInCluster(*dcs.Cluster) bool
-	IsCurrentMemberHealthy() bool
+	IsCurrentMemberHealthy(*dcs.Cluster) bool
 	IsMemberHealthy(*dcs.Cluster, *dcs.Member) bool
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)

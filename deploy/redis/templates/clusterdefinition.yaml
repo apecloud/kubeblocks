@@ -105,7 +105,7 @@ spec:
                   command:
                     - /bin/bash
                     - -c
-                    - "redis-cli -a $REDIS_DEFAULT_PASSWORD acl save"
+                    - /scripts/redis-preStop.sh
           - name: metrics
             image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}

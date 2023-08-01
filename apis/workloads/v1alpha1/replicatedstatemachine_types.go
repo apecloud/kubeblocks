@@ -59,7 +59,7 @@ type ReplicatedStateMachineSpec struct {
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
 	// AlternativeServices defines Alternative Services selector pattern specifier.
-	// can be used for create Readonly service.
+	// can be used for creating Readonly service.
 	// +optional
 	AlternativeServices []corev1.Service `json:"alternativeServices,omitempty"`
 

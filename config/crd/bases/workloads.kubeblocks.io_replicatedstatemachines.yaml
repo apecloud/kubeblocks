@@ -73,7 +73,7 @@ spec:
                 type: string
               alternativeServices:
                 description: AlternativeServices defines Alternative Services selector
-                  pattern specifier. can be used for create Readonly service.
+                  pattern specifier. can be used for creating Readonly service.
                 items:
                   description: Service is a named abstraction of software service
                     (for example, mysql) consisting of local port (for example 3306)

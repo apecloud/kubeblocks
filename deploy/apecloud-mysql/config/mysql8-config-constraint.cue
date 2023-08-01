@@ -187,7 +187,7 @@
 	default_password_lifetime: int & >=0 & <=65535 | *0
 
 	// The default storage engine (table type).
-	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM"  | "xengine" | "XENGINE"  | "smartengine" | "SMARTENGINE" | "INNODB" | "innodb"
+	default_storage_engine?: string & "InnoDB" | "MRG_MYISAM" | "BLACKHOLE" | "CSV" | "MEMORY" | "FEDERATED" | "ARCHIVE" | "MyISAM" | "xengine" | "XENGINE" | "smartengine" | "SMARTENGINE" | "INNODB" | "innodb"
 
 	// Server current time zone
 	default_time_zone?: string

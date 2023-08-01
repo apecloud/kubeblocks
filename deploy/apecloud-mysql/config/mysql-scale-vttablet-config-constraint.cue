@@ -38,17 +38,17 @@
 	// Table acl config mode. Valid values are: simple, mysqlbased. (default simple)
 	table_acl_config_mode: string & "simple" | "mysqlbased"
 
-    // path to table access checker config file (json file);
+	// path to table access checker config file (json file);
 	table_acl_config: string
 
 	// Ticker to reload ACLs. Duration flag, format e.g.: 30s. Default: 30s
 	table_acl_config_reload_interval: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
-    // only allow queries that pass table acl checks if true
+	// only allow queries that pass table acl checks if true
 	queryserver_config_strict_table_acl: bool
 
-    // if this flag is true, vttablet will fail to start if a valid tableacl config does not exist
-    enforce_tableacl_config: bool
+	// if this flag is true, vttablet will fail to start if a valid tableacl config does not exist
+	enforce_tableacl_config: bool
 
 	...
 }

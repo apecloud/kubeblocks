@@ -8966,13 +8966,14 @@ spec:
                                           privileges.
                                         type: string
                                       deletion:
-                                        description: deletion specifies statement
+                                        description: 'deletion specifies statement
                                           how to delete this account. Used in combination
                                           with `CreateionStatement` to delete the
                                           account before create it. For instance,
                                           one usually uses `drop user if exists` statement
                                           followed by `create user` statement to create
-                                          an account.
+                                          an account. Deprecated: this field is deprecated,
+                                          use `update` instead.'
                                         type: string
                                       update:
                                         description: update specifies statement how

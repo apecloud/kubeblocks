@@ -24,7 +24,7 @@ data:
         if [[ $line =~ ^[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9_.]*$ ]]; then
           echo $line
           eval "export $line"
-        elif ! [[ $line =~ ^[[:space:]]*# ]]; then 
+        elif ! [[ -z $line  || $line =~ ^[[:space:]]*# ]]; then 
           echo "bad format: $line"
         fi
       done <<< "$(echo -e "$config_content")"
@@ -211,12 +211,14 @@ data:
 
     echo "starting vttablet for $alias..."
 
+    VTDATAROOT=$VTDATAROOT/vttablet
     su vitess <<EOF
+    mkdir -p $VTDATAROOT
     exec vttablet \
     $topology_fags \
     --alsologtostderr \
-    --log_dir $VTDATAROOT \
-    --log_queries_to_file $VTDATAROOT/$tablet_logfile \
+    $(if [ "$enable_logs" == "true" ]; then echo "--log_dir $VTDATAROOT"; fi) \
+    $(if [ "$enable_query_log" == "true" ]; then echo "--log_queries_to_file $VTDATAROOT/$tablet_logfile"; fi) \
     --tablet-path $alias \
     --tablet_hostname "$tablet_hostname" \
     --init_tablet_type $tablet_type \
@@ -243,7 +245,11 @@ data:
     --pid_file $VTDATAROOT/vttablet.pid \
     --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
     --table-acl-config-mode=$table_acl_config_mode \
-    --disable_active_reparents
+    --disable_active_reparents \
+    $(if [ -n "$table_acl_config" ]; then echo "--table-acl-config $table_acl_config"; fi) \
+    $(if [ "$queryserver_config_strict_table_acl" == "true" ]; then echo "--queryserver-config-strict-table-acl"; fi) \
+    $(if [ "$enforce_tableacl_config" == "true" ]; then echo "--enforce-tableacl-config"; fi) \
+    --table-acl-config-reload-interval $table_acl_config_reload_interval
     EOF
   etcd.sh: |-
     #!/bin/bash
@@ -294,7 +300,9 @@ data:
     vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
     topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
 
+    VTDATAROOT=$VTDATAROOT/vtctld
     su vitess <<EOF
+    mkdir -p $VTDATAROOT
     exec vtctld \
     $topology_fags \
     --alsologtostderr \
@@ -318,13 +326,15 @@ data:
     vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
     topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
 
+    VTDATAROOT=$VTDATAROOT/vtconsensus
     su vitess <<EOF
+    mkdir -p $VTDATAROOT
     exec vtconsensus \
       $topology_fags \
       --alsologtostderr \
       --refresh_interval $refresh_interval \
       --scan_repair_timeout $scan_repair_timeout \
-      --log_dir ${VTDATAROOT} \
+      $(if [ "$enable_logs" == "true" ]; then echo "--log_dir $VTDATAROOT"; fi) \
       --db_username "$MYSQL_ROOT_USER" \
       --db_password "$MYSQL_ROOT_PASSWORD"
     EOF
@@ -349,8 +359,8 @@ data:
       --srv_topo_timeout $srv_topo_timeout \
       --grpc_keepalive_time $grpc_keepalive_time \
       --grpc_keepalive_timeout $grpc_keepalive_timeout \
-      --log_dir $VTDATAROOT \
-      --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
+      $(if [ "$enable_logs" == "true" ]; then echo "--log_dir $VTDATAROOT"; fi) \
+      $(if [ "$enable_query_log" == "true" ]; then echo "--log_queries_to_file $VTDATAROOT/vtgate_querylog.txt"; fi) \
       --port $web_port \
       --grpc_port $grpc_port \
       --mysql_server_port $mysql_server_port \
@@ -361,7 +371,6 @@ data:
       --tablet_refresh_interval $tablet_refresh_interval \
       --service_map 'grpc-vtgateservice' \
       --pid_file $VTDATAROOT/vtgate.pid \
-      --mysql_auth_server_impl none \
       --read_write_splitting_policy $read_write_splitting_policy  \
       --read_write_splitting_ratio $read_write_splitting_ratio  \
       --read_after_write_consistency $read_after_write_consistency \
@@ -370,7 +379,12 @@ data:
       --buffer_size $buffer_size \
       --buffer_window $buffer_window \
       --buffer_max_failover_duration $buffer_max_failover_duration \
-      --buffer_min_time_between_failovers $buffer_min_time_between_failovers
+      --buffer_min_time_between_failovers $buffer_min_time_between_failovers \
+      $(if [ "$mysql_server_require_secure_transport" == "true" ]; then echo "--mysql_server_require_secure_transport"; fi) \
+      $(if [ -n "$mysql_server_ssl_cert" ]; then echo "--mysql_server_ssl_cert $mysql_server_ssl_cert"; fi) \
+      $(if [ -n "$mysql_server_ssl_key" ]; then echo "--mysql_server_ssl_key $mysql_server_ssl_key"; fi) \
+      $(if [ -n "$mysql_auth_server_static_file" ]; then echo "--mysql_auth_server_static_file $mysql_auth_server_static_file"; fi) \
+    --mysql_auth_server_impl $mysql_auth_server_impl
     EOF
   binlog-collector.sh: |-
     #!/bin/bash

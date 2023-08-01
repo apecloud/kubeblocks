@@ -29,8 +29,14 @@
 	// Duration for how long a request should be buffered at most. (default 10s)
 	buffer_window: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
-	// Enable buffering (stalling) of primary traffic during failovers.
+	// Enable buffering (stalling) of primary traffic during failovers. (default false)
 	enable_buffer: bool
+
+	// Enable or disable logs. (default true)
+	enable_logs: bool
+
+	// Enable or disable query log. (default true)
+	enable_query_log: bool
 
 	// At startup, the tabletGateway will wait up to this duration to get at least one tablet per keyspace/shard/tablet type. (default 30s)
 	gateway_initial_tablet_timeout: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
@@ -61,6 +67,21 @@
 
 	// Tablet refresh interval. (default 1m0s)
 	tablet_refresh_interval: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
+
+    //Which auth server implementation to use. Options: none, static, mysqlbased. (default "none")
+    mysql_auth_server_impl: string &"none" | "static" | "mysqlbased"
+
+    //JSON File to read the users/passwords from, need set mysql_auth_server_impl to static.
+    mysql_auth_server_static_file: string
+
+    //Path to ssl key for mysql server plugin SSL
+    mysql_server_ssl_key: string
+
+    //Path to the ssl cert for mysql server plugin SSL
+    mysql_server_ssl_cert: string
+
+    //Reject insecure connections but only if mysql_server_ssl_cert and mysql_server_ssl_key are provided.(default "false")
+    mysql_server_require_secure_transport: bool
 
 	...
 }

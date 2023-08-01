@@ -263,7 +263,7 @@ var _ = Describe("Replication Component", func() {
 			vertexes, err = replicationComponent.HandleRoleChange(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
 			Expect(len(vertexes)).To(Equal(int(replicas)))
-			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.UPDATE).To(BeTrue())
+			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.PATCH).To(BeTrue())
 
 			By("Test handleRoleChange when statefulSet h-scale out a new Pod with no role label")
 			status.Replicas = 3
@@ -276,7 +276,7 @@ var _ = Describe("Replication Component", func() {
 			vertexes, err = replicationComponent.HandleRoleChange(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
 			Expect(len(vertexes)).To(Equal(3))
-			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.UPDATE).To(BeTrue())
+			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.PATCH).To(BeTrue())
 		})
 	})
 })

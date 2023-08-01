@@ -181,20 +181,24 @@ func (mgr *Manager) IsMemberHealthyConsensus(cluster *dcs.Cluster, member *dcs.M
 	if leaderMember == nil {
 		return true
 	}
+
 	// only leader can get the cluster healthy view
 	if leaderMember.Name != mgr.CurrentMemberName {
-		member = leaderMember
-	}
-
-	if member != nil {
-		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
+		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
 		if err != nil || pools[0] == nil {
 			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
 			return false
 		}
 	}
 
-	sql := `select connected, log_delay_num from consensus_cluster_health where server_id = (select server_id from consensus_member_status);`
+	var IPPort string
+	if member != nil {
+		IPPort = getConsensusIPPort(cluster, member.Name)
+	} else {
+		IPPort = getConsensusIPPort(cluster, mgr.CurrentMemberName)
+	}
+
+	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
 	resp, err := mgr.QueryWithPool(ctx, sql, pools[0])
 	if err != nil {
 		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
@@ -299,7 +303,7 @@ func (mgr *Manager) PromoteConsensus() error {
 		return err
 	}
 
-	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("$KB_POD_FQDN"), config.port)
+	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("KB_POD_FQDN"), config.port)
 	_, err = mgr.ExecWithPool(ctx, promoteSQL, pools[0])
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)

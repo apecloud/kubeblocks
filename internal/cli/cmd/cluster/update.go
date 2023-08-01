@@ -298,20 +298,20 @@ const defaultSectionName = "default"
 // reconfigureLogVariables reconfigures the log variables of cluster
 func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) error {
 	var (
-		err             error
-		configSpec      *appsv1alpha1.ComponentConfigSpec
-		logValue        *gotemplate.TplValues
-		logVariables    map[string]string
-		unstructuredObj *unstructured.Unstructured
+		err        error
+		configSpec *appsv1alpha1.ComponentConfigSpec
+		logValue   *gotemplate.TplValues
 	)
 
 	createReconfigureOps := func(compSpec appsv1alpha1.ClusterComponentSpec, configSpec *appsv1alpha1.ComponentConfigSpec, logValue *gotemplate.TplValues) error {
 		var (
-			buf            bytes.Buffer
-			keyName        string
-			configTemplate *corev1.ConfigMap
-			formatter      *appsv1alpha1.FormatterConfig
-			logTPL         *template.Template
+			buf             bytes.Buffer
+			keyName         string
+			configTemplate  *corev1.ConfigMap
+			formatter       *appsv1alpha1.FormatterConfig
+			logTPL          *template.Template
+			logVariables    map[string]string
+			unstructuredObj *unstructured.Unstructured
 		)
 
 		if configTemplate, formatter, err = findConfigTemplateInfo(o.dynamic, configSpec); err != nil {

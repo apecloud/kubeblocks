@@ -42,10 +42,10 @@ type LegacyOperation func(ctx context.Context, req *ProbeRequest, resp *ProbeRes
 type OpsResult map[string]interface{}
 
 type GlobalInfo struct {
-	Event     string            `json:"event,omitempty"`
-	Term      int               `json:"term,omitempty"`
-	Addr2Role map[string]string `json:"map,omitempty"`
-	Message   string            `json:"message,omitempty"`
+	Event        string            `json:"event,omitempty"`
+	Term         int               `json:"term,omitempty"`
+	PodName2Role map[string]string `json:"map,omitempty"`
+	Message      string            `json:"message,omitempty"`
 }
 
 type Operation interface {
@@ -331,7 +331,7 @@ func (ops *BaseOperations) GetGlobalInfoOps(ctx context.Context, req *ProbeReque
 
 	ops.CheckRoleFailedCount = 0
 
-	for _, role := range globalInfo.Addr2Role {
+	for _, role := range globalInfo.PodName2Role {
 		if isValid, message := ops.roleValidate(role); !isValid {
 			opsRes["event"] = OperationInvalid
 			opsRes["message"] = message
@@ -508,8 +508,8 @@ func (g *GlobalInfo) ShouldUpdate(another GlobalInfo) bool {
 	if g.Message != another.Message || g.Event != another.Event {
 		return true
 	}
-	for k, v := range g.Addr2Role {
-		if s, ok := another.Addr2Role[k]; ok {
+	for k, v := range g.PodName2Role {
+		if s, ok := another.PodName2Role[k]; ok {
 			if s != v {
 				return true
 			}
@@ -524,5 +524,5 @@ func (g *GlobalInfo) Transform(result OpsResult) {
 	result["event"] = g.Event
 	result["term"] = g.Term
 	result["message"] = g.Message
-	result["map"] = g.Addr2Role
+	result["map"] = g.PodName2Role
 }

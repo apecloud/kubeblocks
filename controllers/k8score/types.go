@@ -28,5 +28,5 @@ type ProbeMessage struct {
 	OriginalRole string            `json:"originalRole,omitempty"`
 	Role         string            `json:"role,omitempty"`
 	Term         int               `json:"term,omitempty"`
-	Addr2Role    map[string]string `json:"map,omitempty"`
+	PodName2Role map[string]string `json:"map,omitempty"`
 }

@@ -22,8 +22,6 @@ package k8score
 import (
 	"strings"
 
-	"github.com/go-errors/errors"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -146,15 +144,13 @@ func handleGlobalInfoEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, rec
 	}
 	term = global.Term
 
-	// get all pods in the same namespace
+	// get pod
+	pod := &corev1.Pod{}
 	pods := &corev1.PodList{}
 	err := cli.List(reqCtx.Ctx, pods, client.InNamespace(event.InvolvedObject.Namespace))
 	if err != nil || len(pods.Items) == 0 {
 		return err
 	}
-
-	// get involved pod
-	pod := &corev1.Pod{}
 	for _, p := range pods.Items {
 		if p.Name == event.InvolvedObject.Name {
 			pod = &p
@@ -191,26 +187,20 @@ func handleGlobalInfoEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, rec
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		for _, pod := range pods.Items {
-			role, ok := global.Addr2Role[pod.Status.PodIP]
-			if !ok {
-				reqCtx.Log.Error(errors.Errorf("No pod has ip %s", pod.Status.PodIP), "ip not found")
-				continue
-			}
-			err := components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, &pod, role)
-			if err != nil {
-				return err
+			if role, ok := global.PodName2Role[pod.Name]; ok {
+				err := components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, &pod, role)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	case appsv1alpha1.Replication:
 		for _, pod := range pods.Items {
-			role, ok := global.Addr2Role[pod.Status.PodIP]
-			if !ok {
-				reqCtx.Log.Error(errors.Errorf("No pod has ip %s", pod.Status.PodIP), "ip not found")
-				continue
-			}
-			err := components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, &pod, role)
-			if err != nil {
-				return err
+			if role, ok := global.PodName2Role[pod.Status.PodIP]; ok {
+				err := components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, &pod, role)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}

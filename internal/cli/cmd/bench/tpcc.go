@@ -117,6 +117,8 @@ func NewTpccCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().IntVar(&o.StockLevel, "stock-level", 4, "specify the percentage of transactions that should be stock level")
 	cmd.Flags().StringArrayVar(&o.ExtraArgs, "extra-args", []string{}, "specify the extra arguments")
 
+	registerClusterCompletionFunc(cmd, f)
+
 	return cmd
 }
 
@@ -199,6 +201,14 @@ func (o *TpccOptions) Validate() error {
 	}
 	if !supported {
 		return fmt.Errorf("driver %s is not supported", o.Driver)
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
 	}
 
 	if o.WareHouses < 1 {

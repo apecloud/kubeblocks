@@ -58,23 +58,16 @@ func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
 	}
 }
 
-// func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
-//	return client.MatchingLabels{
-//		constant.AppInstanceLabelKey:  cluster.Name,
-//		constant.AppManagedByLabelKey: constant.AppName,
-//	}
-// }
-
 // getClusterOwningObjects reads objects owned by our cluster with kinds and label matching specifier.
-func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster,
-	matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterOwningObjects, error) {
+func getClusterOwningObjects(transCtx *ClusterTransformContext,
+	cluster appsv1alpha1.Cluster,
+	matchLabels client.MatchingLabels,
+	namespacedKinds []client.ObjectList,
+	nonNamespacedKinds []client.ObjectList) (clusterOwningObjects, error) {
 	// list what kinds of object cluster owns
 	objs := make(clusterOwningObjects)
-	inNS := client.InNamespace(cluster.Namespace)
-	for _, list := range kinds {
-		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
-			return nil, err
-		}
+
+	parseUnderlyingObjs := func(list client.ObjectList) error {
 		// reflect get list.Items
 		items := reflect.ValueOf(list).Elem().FieldByName("Items")
 		l := items.Len()
@@ -83,9 +76,28 @@ func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1al
 			object := items.Index(i).Addr().Interface().(client.Object)
 			name, err := getGVKName(object, rscheme)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			objs[*name] = object
+		}
+		return nil
+	}
+
+	inNS := client.InNamespace(cluster.Namespace)
+	for _, list := range namespacedKinds {
+		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
+			return nil, err
+		}
+		if err := parseUnderlyingObjs(list); err != nil {
+			return nil, err
+		}
+	}
+	for _, list := range nonNamespacedKinds {
+		if err := transCtx.Client.List(transCtx.Context, list, matchLabels); err != nil {
+			return nil, err
+		}
+		if err := parseUnderlyingObjs(list); err != nil {
+			return nil, err
 		}
 	}
 	return objs, nil

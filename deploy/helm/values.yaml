@@ -57,8 +57,12 @@ fullnameOverride: ""
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get;update;patch
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update
 ##
+##   groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
+##   groups=rbac.authorization.k8s.io,resources=clusterrolebindings/status,verbs=get;update;patch
+##   groups=rbac.authorization.k8s.io,resources=clusterrolebindings/finalizers,verbs=update
+##
 ## If it is set to false, then you will need to create the service account
-## named `cluster.ComponentSpec.ServiceAccountName` and the corresponding role binding
+## named `cluster.ComponentSpec.ServiceAccountName` and the corresponding (cluster) role binding
 ## manually or through the cluster's Helm template, as shown in the example:
 ##   helm install mysql apecloud-mysql-cluster
 rbac:

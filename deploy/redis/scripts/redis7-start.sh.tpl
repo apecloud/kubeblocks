@@ -43,6 +43,19 @@ retry() {
 }
 
 start_redis_server() {
+    # Waiting for controller patches pod-role information to the DownwardAPI annotation available before start redis server
+    attempt=1
+    max_attempts=20
+    while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/pod-role)" ]; do
+      echo "Waiting for pod-role information from the DownwardAPI annotation to be available, attempt $attempt of $max_attempts..."
+      sleep 5
+      attempt=$((attempt + 1))
+    done
+    pod_role=$(cat /kb-podinfo/pod-role)
+    echo "DownwardAPI get pod_role=$pod_role" >> /etc/redis/.kb_set_up.log
+    if [ -z "$pod_role" ]; then
+      exit 1
+    fi
     exec redis-server /etc/redis/redis.conf \
     --loadmodule /opt/redis-stack/lib/redisearch.so ${REDISEARCH_ARGS} \
     --loadmodule /opt/redis-stack/lib/redisgraph.so ${REDISGRAPH_ARGS} \

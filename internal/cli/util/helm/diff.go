@@ -180,7 +180,8 @@ func ParseContent(content string) (*MappingResult, error) {
 }
 
 // OutputDiff output the difference between different version for a chart
-// todo: do not use GetUnifiedDiffString but have a clear way ,for
+// releaseA corresponds to versionA and releaseB corresponds to versionB.
+// if detail is true, the detailed lines in YAML will be displayed
 func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, versionB string, out io.Writer, detail bool) error {
 	manifestsMapA, err := buildManifestMapByRelease(releaseA)
 	if err != nil {

@@ -70,7 +70,7 @@ func newCompareCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.compare(args, showDetail))
 		},
 	}
-	cmd.Flags().BoolVar(&showDetail, "detail", false, "show the different detail between two kubeblocks version")
+	cmd.Flags().BoolVar(&showDetail, "details", false, "show the different details between two kubeblocks version")
 	return cmd
 }
 

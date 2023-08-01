@@ -2054,6 +2054,12 @@ var _ = Describe("Cluster Controller", func() {
 			var (
 				boolTrue  = true
 				boolFalse = false
+				int64Ptr  = func(in int64) *int64 {
+					return &in
+				}
+				strPtr = func(s string) *string {
+					return &s
+				}
 			)
 
 			var testCases = []struct {
@@ -2063,55 +2069,37 @@ var _ = Describe("Cluster Controller", func() {
 				{
 					desc: "backup with snapshot method",
 					backup: &appsv1alpha1.ClusterBackup{
-						Enabled: &boolTrue,
-						RetentionPeriod: func() *string {
-							retention := "1d"
-							return &retention
-						}(),
-						Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
-						CronExpression: "*/1 * * * *",
-						RetryWindowMinutes: func() *int64 {
-							startWindow := int64(10)
-							return &startWindow
-						}(),
-						PITREnabled: &boolTrue,
-						RepoName:    backupRepoName,
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         strPtr("1d"),
+						Method:                  dataprotectionv1alpha1.BackupMethodSnapshot,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
 					},
 				},
 				{
 					desc: "disable backup",
 					backup: &appsv1alpha1.ClusterBackup{
-						Enabled: &boolFalse,
-						RetentionPeriod: func() *string {
-							retention := "1d"
-							return &retention
-						}(),
-						Method:         dataprotectionv1alpha1.BackupMethodSnapshot,
-						CronExpression: "*/1 * * * *",
-						RetryWindowMinutes: func() *int64 {
-							startWindow := int64(10)
-							return &startWindow
-						}(),
-						PITREnabled: &boolTrue,
-						RepoName:    backupRepoName,
+						Enabled:                 &boolFalse,
+						RetentionPeriod:         strPtr("1d"),
+						Method:                  dataprotectionv1alpha1.BackupMethodSnapshot,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
 					},
 				},
 				{
 					desc: "backup with backup tool method",
 					backup: &appsv1alpha1.ClusterBackup{
-						Enabled: &boolTrue,
-						RetentionPeriod: func() *string {
-							retention := "2d"
-							return &retention
-						}(),
-						Method:         dataprotectionv1alpha1.BackupMethodBackupTool,
-						CronExpression: "*/1 * * * *",
-						RetryWindowMinutes: func() *int64 {
-							startWindow := int64(10)
-							return &startWindow
-						}(),
-						RepoName:    backupRepoName,
-						PITREnabled: &boolFalse,
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         strPtr("2d"),
+						Method:                  dataprotectionv1alpha1.BackupMethodBackupTool,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						RepoName:                backupRepoName,
+						PITREnabled:             &boolFalse,
 					},
 				},
 				{
@@ -2139,7 +2127,7 @@ var _ = Describe("Cluster Controller", func() {
 					}
 					g.Expect(schedule.Logfile.Enable).Should(BeEquivalentTo(*backup.PITREnabled))
 					g.Expect(*p.Spec.Logfile.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
-					g.Expect(schedule.RetryWindowMinutes).Should(Equal(backup.RetryWindowMinutes))
+					g.Expect(schedule.StartingDeadlineMinutes).Should(Equal(backup.StartingDeadlineMinutes))
 				}
 				checkPolicyDisabled := func(g Gomega, p *dataprotectionv1alpha1.BackupPolicy) {
 					schedule := p.Spec.Schedule

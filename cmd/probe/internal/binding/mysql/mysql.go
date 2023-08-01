@@ -301,7 +301,7 @@ func (mysqlOps *MysqlOperations) GetGlobalInfoForConsensus(ctx context.Context, 
 			ip2Roles[ip] = role
 		}
 		globalInfo.Event = OperationSuccess
-		globalInfo.Addr2Role = ip2Roles
+		globalInfo.PodName2Role = ip2Roles
 	}
 	return globalInfo, nil
 }

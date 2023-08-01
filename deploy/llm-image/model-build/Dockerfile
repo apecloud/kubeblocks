@@ -1,6 +1,6 @@
 FROM pytorch/torchserve as torchserve
-COPY ./gpt2/pytorch_model.bin .
-COPY ./gpt2/config.json .
+COPY ./pytorch_model.bin .
+COPY ./config.json .
 COPY ./Transformer_handler_generalized.py .
 COPY ./setup_config.json .
 COPY ./requirements.txt .

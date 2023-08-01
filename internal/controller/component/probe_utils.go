@@ -249,7 +249,7 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
-	return component.VolumeProtection != nil && viper.GetBool(constant.EnableRBACManager)
+	return component.VolumeProtection != nil
 }
 
 func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {

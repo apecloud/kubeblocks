@@ -62,3 +62,26 @@ rolebinding: {
 		namespace: cluster.metadata.namespace
 	}]
 }
+
+clusterrolebinding: {
+	apiVersion: "rbac.authorization.k8s.io/v1"
+	kind:       "ClusterRoleBinding"
+	metadata: {
+		name:      "kb-\(cluster.metadata.name)"
+		labels: {
+			"app.kubernetes.io/name":       cluster.spec.clusterDefinitionRef
+			"app.kubernetes.io/instance":   cluster.metadata.name
+			"app.kubernetes.io/managed-by": "kubeblocks"
+		}
+	}
+	roleRef: {
+		apiGroup: "rbac.authorization.k8s.io"
+		kind:     "ClusterRole"
+		name:     "kubeblocks-volume-protection-pod-role"
+	}
+	subjects: [{
+		kind:      "ServiceAccount"
+		name:      "kb-\(cluster.metadata.name)"
+		namespace: cluster.metadata.namespace
+	}]
+}

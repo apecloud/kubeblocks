@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -256,6 +257,13 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	execStmts := make([]string, 0)
 
 	statements := accountConfig.ProvisionPolicy.Statements
+
+	if strategy == inPlaceUpdate && len(statements.UpdateStatement) == 0 {
+		// if update statement is empty, use reCreate strategy, which will drop and create the account.
+		strategy = reCreate
+		klog.Warningf("account %s in cluster %s exists, but its update statement is not set, will use %s strategy to update account.", userName, key.clusterName, strategy)
+	}
+
 	if strategy == inPlaceUpdate {
 		// use update statement
 		stmt := componetutil.ReplaceNamedVars(namedVars, statements.UpdateStatement, -1, true)

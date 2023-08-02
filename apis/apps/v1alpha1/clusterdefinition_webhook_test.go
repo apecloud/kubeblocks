@@ -155,10 +155,23 @@ var _ = Describe("clusterDefinition webhook", func() {
 			// reset account setting
 			mockAccounts[0].ProvisionPolicy.Type = CreateByStmt
 
+			By("Create accounts with empty deletion and update statements, should fail")
+			deletionStmt := mockAccounts[1].ProvisionPolicy.Statements.DeletionStatement
+			mockAccounts[1].ProvisionPolicy.Statements.DeletionStatement = ""
+			clusterDef.Spec.ComponentDefs[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    passwdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+			// reset account setting
+			mockAccounts[1].ProvisionPolicy.Statements.DeletionStatement = deletionStmt
+
 			By("By creating a new clusterDefinition with valid accounts")
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)).Should(Succeed())
+
 		})
 
 		It("Should webhook validate configSpec", func() {

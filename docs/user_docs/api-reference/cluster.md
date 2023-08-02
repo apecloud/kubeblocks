@@ -6754,6 +6754,20 @@ ClusterComponentPhase
 </tr>
 <tr>
 <td>
+<code>lastFailedTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>lastFailedTime is the last time the component phase transitioned to Failed or Abnormal.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>progressDetails</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ProgressStatusDetail">
@@ -7895,6 +7909,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>update specifies statement how to update account&rsquo;s password.</p><br />
 </td>
 </tr>
@@ -7907,7 +7922,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>deletion specifies statement how to delete this account.<br />Used in combination with <code>CreateionStatement</code> to delete the account before create it.<br />For instance, one usually uses <code>drop user if exists</code> statement followed by <code>create user</code> statement to create an account.</p><br />
+<p>deletion specifies statement how to delete this account.<br />Used in combination with <code>CreateionStatement</code> to delete the account before create it.<br />For instance, one usually uses <code>drop user if exists</code> statement followed by <code>create user</code> statement to create an account.<br />Deprecated: this field is deprecated, use <code>update</code> instead.</p><br />
 </td>
 </tr>
 </tbody>

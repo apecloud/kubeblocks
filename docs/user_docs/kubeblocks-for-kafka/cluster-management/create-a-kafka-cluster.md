@@ -2,7 +2,7 @@
 title: Create cluster for kafka
 description: Guide for cluster creation for kafka
 keywords: [kafka, cluster, management]
-sidebar_position: 2
+sidebar_position: 1
 sidebar_label: Snapshot backup and restore
 ---
 

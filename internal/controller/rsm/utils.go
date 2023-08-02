@@ -95,21 +95,16 @@ func sortMembers[T any](membersStatus []T,
 	getRoleFunc getRole, getOrdinalFunc getOrdinal,
 	reverse bool) {
 	sort.SliceStable(membersStatus, func(i, j int) bool {
+		if reverse {
+			i, j = j, i
+		}
 		roleI := getRoleFunc(i)
 		roleJ := getRoleFunc(j)
-		if reverse {
-			roleI, roleJ = roleJ, roleI
-		}
-
 		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
 			ordinal1 := getOrdinalFunc(i)
 			ordinal2 := getOrdinalFunc(j)
-			if reverse {
-				ordinal1, ordinal2 = ordinal2, ordinal1
-			}
 			return ordinal1 < ordinal2
 		}
-
 		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
 	})
 }
@@ -333,7 +328,7 @@ func getPodOrdinal(podName string) (int, error) {
 	return strconv.Atoi(subMatches[2])
 }
 
-// ordinal is the ordinal of pod which this action apply to
+// ordinal is the ordinal of pod which this action applies to
 func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
 	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer(action)); err != nil {
 		return err

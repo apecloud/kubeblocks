@@ -113,7 +113,6 @@ spec:
                     properties:
                       name:
                         description: the secret name
-                        maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       passwordKey:

@@ -144,10 +144,10 @@ spec:
                       be retained. if not set, will be retained forever.
                     pattern: ^\d+[d|D|h|H]$
                     type: string
-                  retryWindowMinutes:
-                    description: retryWindowMinutes defines the time window for retrying
-                      the job if it misses scheduled time for any reason. the unit
-                      of time is minute.
+                  startingDeadlineMinutes:
+                    description: startingDeadlineMinutes defines the deadline in minutes
+                      for starting the backup job if it misses scheduled time for
+                      any reason.
                     format: int64
                     maximum: 1440
                     minimum: 0

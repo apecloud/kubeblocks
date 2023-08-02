@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -44,6 +45,10 @@ func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	controllerutil.AddFinalizer(rootVertex.Obj, constant.DBClusterFinalizerName)
 	for _, vertex := range vertices {
 		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		// TODO: skip to set ownership for ClusterRoleBinding which is a cluster-scoped object.
+		if _, ok := v.Obj.(*rbacv1.ClusterRoleBinding); ok {
+			continue
+		}
 		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, rscheme, constant.DBClusterFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue

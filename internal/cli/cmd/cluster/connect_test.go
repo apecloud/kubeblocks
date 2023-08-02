@@ -135,7 +135,7 @@ var _ = Describe("connection", func() {
 		Expect(o.runShowExample()).Should(Succeed())
 	})
 
-	It("getUserAndPassword", func() {
+	Context("getConnectionInfo", func() {
 		const (
 			user     = "test-user"
 			password = "test-password"
@@ -148,10 +148,25 @@ var _ = Describe("connection", func() {
 		}
 		secretList := &corev1.SecretList{}
 		secretList.Items = []corev1.Secret{secret}
-		u, p, err := getUserAndPassword(testing.FakeClusterDef(), secretList)
-		Expect(err).Should(Succeed())
-		Expect(u).Should(Equal(user))
-		Expect(p).Should(Equal(password))
+		It("getUserAndPassword", func() {
+			u, p, err := getUserAndPassword(testing.FakeClusterDef(), secretList)
+			Expect(err).Should(Succeed())
+			Expect(u).Should(Equal(user))
+			Expect(p).Should(Equal(password))
+		})
+
+		It("--show-password", func() {
+			o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
+			Expect(o.validate([]string{clusterName})).Should(Succeed())
+			Expect(o.complete()).Should(Succeed())
+			info, err := o.getConnectionInfo()
+			Expect(err).Should(Succeed())
+			Expect(info.Password).Should(Equal(passwordMask))
+			o.showPassword = true
+			info, err = o.getConnectionInfo()
+			Expect(err).Should(Succeed())
+			Expect(info.Password).Should(Equal(password))
+		})
 	})
 })
 

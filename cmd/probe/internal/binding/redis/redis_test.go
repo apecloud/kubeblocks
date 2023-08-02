@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -559,6 +560,7 @@ func TestRedisAccounts(t *testing.T) {
 
 func mockRedisOps(t *testing.T) (*Redis, redismock.ClientMock) {
 	client, mock := redismock.NewClientMock()
+	viper.SetDefault("KB_ROLECHECK_DELAY", "0")
 
 	if client == nil || mock == nil {
 		t.Fatalf("failed to mock a redis client")

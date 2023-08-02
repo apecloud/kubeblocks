@@ -595,12 +595,17 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 			if vmount, ok := volumeMountMap[volume.Name]; ok {
 				volumeMounts = append(volumeMounts, vmount)
 			}
-
 		}
 		jobName := p.GetDatafileRestoreJobName(pvcName)
 		job, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
 			backupTool.Spec.Physical.RestoreCommands, volumes, volumeMounts, env, backupTool.Spec.Resources)
 		if err != nil {
+			return nil, err
+		}
+		// if the workload uses local pv, the job's affinity should consistent with workload.
+		// so datafile job should contain cluster affinity constraints.
+		affinity := component.BuildAffinity(p.Cluster, p.Cluster.Spec.GetComponentByName(synthesizedComponent.Name))
+		if job.Spec.Template.Spec.Affinity, err = component.BuildPodAffinity(p.Cluster, affinity, synthesizedComponent); err != nil {
 			return nil, err
 		}
 		if p.Scheme != nil {

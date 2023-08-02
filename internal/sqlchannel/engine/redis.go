@@ -39,7 +39,13 @@ func newRedis() *redis {
 			Client:    "redis-cli",
 			Container: "redis",
 		},
-		examples: map[ClientType]buildConnectExample{},
+		examples: map[ClientType]buildConnectExample{
+			CLI: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# redis client connection example
+redis-cli -h %s -p %s
+`, info.Host, info.Port)
+			},
+		},
 	}
 }
 
@@ -60,8 +66,7 @@ func (r redis) Container() string {
 }
 
 func (r redis) ConnectExample(info *ConnectionInfo, client string) string {
-	// TODO implement me
-	panic("implement me")
+	return buildExample(info, client, r.examples)
 }
 
 func (r redis) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {

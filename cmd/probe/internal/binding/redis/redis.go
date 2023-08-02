@@ -21,10 +21,12 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -53,8 +55,9 @@ var (
 )
 
 var (
-	redisUser   = "default"
-	redisPasswd = ""
+	redisUser      = "default"
+	redisPasswd    = ""
+	roleCheckDelay = 60 * time.Second
 )
 
 // Redis is a redis output binding.
@@ -62,9 +65,10 @@ type Redis struct {
 	client         redis.UniversalClient
 	clientSettings *rediscomponent.Settings
 
-	mu     sync.Mutex
-	ctx    context.Context
-	cancel context.CancelFunc
+	mu      sync.Mutex
+	ctx     context.Context
+	cancel  context.CancelFunc
+	startAt time.Time
 
 	BaseOperations
 }
@@ -88,8 +92,13 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 		redisPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
+	if viper.IsSet("KB_ROLECHECK_DELAY") {
+		roleCheckDelay = time.Duration(viper.GetInt("KB_ROLECHECK_DELAY")) * time.Second
+	}
+
 	r.Logger.Debug("Initializing Redis binding")
 	r.DBType = "redis"
+	r.startAt = time.Now()
 	r.InitIfNeed = r.initIfNeed
 	r.BaseOperations.GetRole = r.GetRole
 
@@ -578,6 +587,11 @@ func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, re
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	// ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	// defer cancel()
+
+	if roleCheckDelay > 0 && r.startAt.After(time.Now().Add(0-roleCheckDelay)) {
+		return "", errors.New("role check delay")
+	}
+
 	ctx1 := ctx
 	section := "Replication"
 

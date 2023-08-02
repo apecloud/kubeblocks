@@ -48,7 +48,7 @@ var pgbenchExample = templates.Examples(`
 # pgbench run on a cluster
 kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
 
-# pgbench run on a cluster with different threads and different client
+# pgbench run on a cluster with  threads and  client count
 kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
 
 # pgbench run on a cluster with specified transactions
@@ -88,7 +88,7 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:     "pgbench",
+		Use:     "pgbench [BenchmarkName]",
 		Short:   "Run pgbench against a PostgreSQL cluster",
 		Example: pgbenchExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -105,11 +105,15 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().IntVar(&o.Transactions, "transactions", 0, "The number of transactions to run for pgbench")
 	cmd.Flags().IntVar(&o.Duration, "duration", 60, "The seconds to run pgbench for")
 	cmd.Flags().BoolVar(&o.Select, "select", false, "Run pgbench with select only")
+
+	registerClusterCompletionFunc(cmd, f)
+
 	return cmd
 }
 
 func (o *PgBenchOptions) Complete(args []string) error {
 	var err error
+	var driver string
 	var host string
 	var port int
 
@@ -121,50 +125,48 @@ func (o *PgBenchOptions) Complete(args []string) error {
 		o.name = fmt.Sprintf("pgbench-%s", util.RandRFC1123String(6))
 	}
 
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster name should be specified")
+	if o.ClusterName != "" {
+		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+
+		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+			return err
+		}
+
+		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+			return err
+		}
+
+		clusterGetter := cluster.ObjectsGetter{
+			Client:    o.client,
+			Dynamic:   o.dynamic,
+			Name:      o.ClusterName,
+			Namespace: o.namespace,
+			GetOptions: cluster.GetOptions{
+				WithClusterDef:     true,
+				WithService:        true,
+				WithPod:            true,
+				WithEvent:          true,
+				WithPVC:            true,
+				WithDataProtection: true,
+			},
+		}
+		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+			return err
+		}
+		driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+		if err != nil {
+			return err
+		}
 	}
 
-	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
+	if o.Driver == "" {
+		o.Driver = driver
 	}
 
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-		return err
-	}
-
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-		return err
-	}
-
-	clusterGetter := cluster.ObjectsGetter{
-		Client:    o.client,
-		Dynamic:   o.dynamic,
-		Name:      o.ClusterName,
-		Namespace: o.namespace,
-		GetOptions: cluster.GetOptions{
-			WithClusterDef:     true,
-			WithService:        true,
-			WithPod:            true,
-			WithEvent:          true,
-			WithPVC:            true,
-			WithDataProtection: true,
-		},
-	}
-	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-	o.Driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-	if err != nil {
-		return err
-	}
-
-	if o.Driver != pgBenchDriver {
-		return fmt.Errorf("pgbench only support to run against PostgreSQL cluster, your cluster's driver is %s", o.Driver)
-	}
-
-	if o.Host == "" || o.Port == 0 {
+	if o.Host == "" && o.Port == 0 {
 		o.Host = host
 		o.Port = port
 	}
@@ -177,8 +179,24 @@ func (o *PgBenchOptions) Validate() error {
 		return err
 	}
 
+	if o.Driver != pgBenchDriver {
+		return fmt.Errorf("pgbench only supports to run against PostgreSQL cluster, your cluster's driver is %s", o.Driver)
+	}
+
 	if len(o.Clients) == 0 {
 		return fmt.Errorf("clients should be specified")
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
+	}
+
+	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
+		return err
 	}
 
 	return nil

@@ -225,17 +225,15 @@ func (mgr *Manager) IsRunning() bool {
 	return mgr.newProcessFromPidFile() == nil
 }
 
-func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
+func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	return mgr.IsMemberHealthy(nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context) bool {
+	return mgr.IsMemberHealthy(ctx, nil, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
-	ctx := context.TODO()
-
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	pools := []*pgxpool.Pool{nil}
 	var err error
 	if member != nil && cluster != nil {
@@ -777,9 +775,7 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
-	ctx := context.TODO()
-
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err == nil && isLeader {
 		// if current member is leader, just return
@@ -809,11 +805,11 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 
 	for i, m := range cluster.Members {
-		if m.Name != leader && mgr.IsMemberHealthy(cluster, &m) {
+		if m.Name != leader && mgr.IsMemberHealthy(ctx, cluster, &m) {
 			members = append(members, &cluster.Members[i])
 		}
 	}
@@ -858,5 +854,13 @@ func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
 }
 
 func (mgr *Manager) CreateRoot(ctx context.Context) error {
+	return nil
+}
+
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	return nil
+}
+
+func (mgr *Manager) Unlock(ctx context.Context) error {
 	return nil
 }

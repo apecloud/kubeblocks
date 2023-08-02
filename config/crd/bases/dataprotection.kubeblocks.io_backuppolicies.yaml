@@ -56,7 +56,6 @@ spec:
                   backupRepoName:
                     description: refer to BackupRepo and the backup data will be stored
                       in the corresponding repo.
-                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupStatusUpdates:
@@ -98,7 +97,6 @@ spec:
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
-                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -139,7 +137,6 @@ spec:
                       name:
                         description: the name of PersistentVolumeClaim to store backup
                           data.
-                        maxLength: 63
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
@@ -153,12 +150,10 @@ spec:
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
-                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
-                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
@@ -168,7 +163,6 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
-                        maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     type: object
@@ -231,7 +225,6 @@ spec:
                         properties:
                           name:
                             description: the secret name
-                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -259,7 +252,6 @@ spec:
                   backupRepoName:
                     description: refer to BackupRepo and the backup data will be stored
                       in the corresponding repo.
-                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupStatusUpdates:
@@ -301,7 +293,6 @@ spec:
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
-                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -342,7 +333,6 @@ spec:
                       name:
                         description: the name of PersistentVolumeClaim to store backup
                           data.
-                        maxLength: 63
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
@@ -356,12 +346,10 @@ spec:
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
-                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
-                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
@@ -371,7 +359,6 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
-                        maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     type: object
@@ -434,7 +421,6 @@ spec:
                         properties:
                           name:
                             description: the secret name
-                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -650,7 +636,6 @@ spec:
                         properties:
                           name:
                             description: the secret name
-                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:

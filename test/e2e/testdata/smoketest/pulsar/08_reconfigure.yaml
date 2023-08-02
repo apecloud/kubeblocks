@@ -1,18 +1,16 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: mysql-cluster-reconfiguring-
+  generateName: pulsar-volume-reconfigure-
 spec:
-  clusterRef: mysql-cluster
+  clusterRef: pulsar-cluster
   reconfigure:
     componentName: mysql
     configurations:
       - keys:
-          - key: my.cnf
+          - key: bookkeeper.conf
             parameters:
-              - key: general_log
-                value: "OFF"
-              - key: max_connections
-                value: "2000"
+              - key: lostBookieRecoveryDelay
+                value: "1000"
         name: mysql-consensusset-config
   type: Reconfiguring

@@ -37,6 +37,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// componentFailedTimeout when the duration of component failure exceeds this threshold, it is determined that opsRequest has failed
+const componentFailedTimeout = 30 * time.Second
+
 var _ error = &WaitForClusterPhaseErr{}
 
 type WaitForClusterPhaseErr struct {
@@ -81,6 +84,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		expectProgressCount      int32
 		completedProgressCount   int32
 		checkAllClusterComponent bool
+		requeueTimeAfterFailed   time.Duration
 	)
 	componentNameMap := opsRequest.GetComponentNameSet()
 	// if no specified components, we should check the all components phase of cluster.
@@ -97,15 +101,26 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
 			continue
 		}
-		if components.IsFailedOrAbnormal(v.Phase) {
-			isFailed = true
-		}
 		var compStatus appsv1alpha1.OpsRequestComponentStatus
 		if compStatus, ok = opsRequest.Status.Components[k]; !ok {
 			compStatus = appsv1alpha1.OpsRequestComponentStatus{}
 		}
+		lastFailedTime := compStatus.LastFailedTime
+		if components.IsFailedOrAbnormal(v.Phase) {
+			isFailed = true
+			if lastFailedTime.IsZero() {
+				lastFailedTime = metav1.Now()
+			}
+			if time.Now().Before(lastFailedTime.Add(componentFailedTimeout)) {
+				requeueTimeAfterFailed = componentFailedTimeout - time.Since(lastFailedTime.Time)
+			}
+		} else if !lastFailedTime.IsZero() {
+			// reset lastFailedTime if component is not failed
+			lastFailedTime = metav1.Time{}
+		}
 		if compStatus.Phase != v.Phase {
 			compStatus.Phase = v.Phase
+			compStatus.LastFailedTime = lastFailedTime
 		}
 		clusterComponent := opsRes.Cluster.Spec.GetComponentByName(k)
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, progressResource{
@@ -137,6 +152,10 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if isFailed {
+		if requeueTimeAfterFailed != 0 {
+			// component failure may be temporary, waiting for component failure timeout.
+			return opsRequestPhase, requeueTimeAfterFailed, nil
+		}
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	if completedProgressCount != expectProgressCount {

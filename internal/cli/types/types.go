@@ -169,6 +169,7 @@ const (
 	KubebenchAPIVersion = "v1alpha1"
 	ResourcePgBench     = "pgbenches"
 	ResourceSysBench    = "sysbenches"
+	ResourceYcsb        = "ycsbs"
 )
 
 const (
@@ -401,4 +402,8 @@ func PgBenchGVR() schema.GroupVersionResource {
 
 func SysbenchGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourceSysBench}
+}
+
+func YcsbGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourceYcsb}
 }

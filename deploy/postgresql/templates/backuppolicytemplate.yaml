@@ -24,7 +24,7 @@ spec:
     retention:
       ttl: 7d
     schedule:
-      retryWindowMinutes: 120
+      startingDeadlineMinutes: 120
       snapshot:
         enable: false
         cronExpression: "0 18 * * *"

@@ -1,51 +1,48 @@
 ---
-title: kbcli cluster connect
+title: kbcli bench ycsb
 ---
 
-Connect to a cluster or instance.
+Run YCSB benchmark on a cluster
 
 ```
-kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
+kbcli bench ycsb [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # connect to a specified cluster, default connect to the leader/primary instance
-  kbcli cluster connect mycluster
+  # ycsb on a cluster
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # connect to cluster as user
-  kbcli cluster connect mycluster --as-user myuser
+  # ycsb on a cluster with threads count
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
   
-  # connect to a specified instance
-  kbcli cluster connect -i mycluster-instance-0
+  # ycsb on a cluster with record number and operation number
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --record-count 10000 --operation-count 10000
   
-  # connect to a specified component
-  kbcli cluster connect mycluster --component mycomponent
-  
-  # show cli connection example with password mask
-  kbcli cluster connect mycluster --show-example --client=cli
-  
-  # show java connection example with password mask
-  kbcli cluster connect mycluster --show-example --client=java
-  
-  # show all connection examples with password mask
-  kbcli cluster connect mycluster --show-example
-  
-  # show cli connection examples with real password
-  kbcli cluster connect mycluster --show-example --client=cli --show-password
+  # ycsb on a cluster mixed read/write
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --read-proportion 50 --update-proportion 50
 ```
 
 ### Options
 
 ```
-      --as-user string     Connect to cluster as user
-      --client string      Which client connection example should be output, only valid if --show-example is true.
-      --component string   The component to connect. If not specified, pick up the first one.
-  -h, --help               help for connect
-  -i, --instance string    The instance name to connect.
-      --show-example       Show how to connect to cluster/instance from different clients.
-      --show-password      Show password in example.
+      --cluster string                     the cluster of database
+      --database string                    database name
+      --driver string                      the driver of database
+  -h, --help                               help for ycsb
+      --host string                        the host of database
+      --insert-proportion int              the percentage of insert operations in benchmark
+      --operation-count int                the number of operations to use during the run phase (default 1000)
+      --password string                    the password of database
+      --port int                           the port of database
+      --read-modify-write-proportion int   the percentage of read-modify-write operations in benchmark, which read a record, modify it, and write it back
+      --read-proportion int                the percentage of read operations in benchmark
+      --record-count int                   the number of records to use (default 1000)
+      --scan-proportion int                the percentage of scan operations in benchmark
+      --threads ints                       the number of threads to use (default [1])
+      --update-proportion int              the percentage of update operations in benchmark
+      --user string                        the user of database
 ```
 
 ### Options inherited from parent commands
@@ -58,7 +55,6 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -69,12 +65,11 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

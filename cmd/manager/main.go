@@ -47,7 +47,6 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -368,16 +367,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("pvc-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
-			os.Exit(1)
-		}
-
-		if err = components.NewStatefulSetReconciler(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
-			os.Exit(1)
-		}
-
-		if err = components.NewDeploymentReconciler(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 			os.Exit(1)
 		}
 

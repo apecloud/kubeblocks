@@ -60,6 +60,7 @@ var benchGVRList = []schema.GroupVersionResource{
 	types.PgBenchGVR(),
 	types.SysbenchGVR(),
 	types.YcsbGVR(),
+	types.TpccGVR(),
 }
 
 type BenchBaseOptions struct {
@@ -114,6 +115,7 @@ func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewSysBenchCmd(f, streams),
 		NewPgBenchCmd(f, streams),
 		NewYcsbCmd(f, streams),
+		NewTpccCmd(f, streams),
 		newListCmd(f, streams),
 		newDeleteCmd(f, streams),
 	)

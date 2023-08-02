@@ -67,7 +67,7 @@ clusterrolebinding: {
 	apiVersion: "rbac.authorization.k8s.io/v1"
 	kind:       "ClusterRoleBinding"
 	metadata: {
-		name:      "kb-\(cluster.metadata.name)"
+		name: "kb-\(cluster.metadata.name)"
 		labels: {
 			"app.kubernetes.io/name":       cluster.spec.clusterDefinitionRef
 			"app.kubernetes.io/instance":   cluster.metadata.name

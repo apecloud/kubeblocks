@@ -233,6 +233,17 @@ func (r *SystemAccountSpec) validate(allErrs *field.ErrorList) {
 			continue
 		}
 
+		if sysAccount.ProvisionPolicy.Statements != nil {
+			updateStmt := sysAccount.ProvisionPolicy.Statements.UpdateStatement
+			deletionStmt := sysAccount.ProvisionPolicy.Statements.DeletionStatement
+			if len(updateStmt) == 0 && len(deletionStmt) == 0 {
+				*allErrs = append(*allErrs,
+					field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.statements"),
+						sysAccount.Name, "either statements.update or statements.deletion should be specified."))
+				continue
+			}
+		}
+
 		if provisionPolicy.Type == ReferToExisting && sysAccount.ProvisionPolicy.SecretRef == nil {
 			*allErrs = append(*allErrs,
 				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.secretRef"),

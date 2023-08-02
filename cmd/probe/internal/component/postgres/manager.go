@@ -172,13 +172,12 @@ func (mgr *Manager) ExecOthers(sql string, member *dcs.Member) {
 
 }
 
-func (mgr *Manager) IsPgReady() bool {
+func (mgr *Manager) IsPgReady(host string) bool {
 	cmd := exec.Command("pg_isready")
+	cmd.Args = append(cmd.Args, "-h", host)
+
 	if config.username != "" {
 		cmd.Args = append(cmd.Args, "-U", config.username)
-	}
-	if config.host != "" {
-		cmd.Args = append(cmd.Args, "-h", config.host)
 	}
 	if config.port != 0 {
 		cmd.Args = append(cmd.Args, "-p", strconv.FormatUint(uint64(config.port), 10))
@@ -197,7 +196,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 		return true
 	}
 
-	if !mgr.IsPgReady() {
+	if !mgr.IsPgReady(config.host) {
 		return false
 	}
 

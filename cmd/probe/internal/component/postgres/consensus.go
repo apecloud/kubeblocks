@@ -224,6 +224,12 @@ func (mgr *Manager) IsMemberHealthyConsensus(cluster *dcs.Cluster, member *dcs.M
 }
 
 func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) error {
+	// Test whether the host can be resolved into an ip address
+	if !mgr.IsPgReady(cluster.GetMemberAddrWithName(mgr.GetCurrentMemberName())) {
+		mgr.Logger.Warnf("wait for pg startup ready")
+		return nil
+	}
+
 	ctx := context.TODO()
 	sql := fmt.Sprintf(`alter system consensus add follower '%s:%d';`,
 		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), config.port)
@@ -251,7 +257,7 @@ func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) err
 func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host string) error {
 	ctx := context.TODO()
 	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
-		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), config.port)
+		cluster.GetMaxNumMemberAddr(), config.port)
 
 	// only leader can delete member, so don't need to get pool
 	_, err := mgr.ExecWithPool(ctx, sql, nil)

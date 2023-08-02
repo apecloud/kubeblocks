@@ -20,237 +20,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
-	"context"
-	"time"
-
-	"github.com/google/go-cmp/cmp"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/util/podutils"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type RSM struct {
-	componentSetBase
+type rsmComponent struct {
+	rsmComponentBase
 }
 
-var _ componentSet = &RSM{}
+var _ Component = &rsmComponent{}
 
-func (r *RSM) getName() string {
-	if r.SynthesizedComponent != nil {
-		return r.SynthesizedComponent.Name
-	}
-	return r.ComponentSpec.Name
-}
+const workloadType = "RSM"
 
-func (r *RSM) getReplicas() int32 {
-	if r.SynthesizedComponent != nil {
-		return r.SynthesizedComponent.Replicas
-	}
-	return r.ComponentSpec.Replicas
-}
-
-func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
-	if obj == nil {
-		return false, nil
-	}
-	rsm, ok := obj.(*workloads.ReplicatedStateMachine)
-	if !ok {
-		return false, nil
-	}
-	sts := ConvertRSMToSTS(rsm)
-	isRevisionConsistent, err := isStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
-	if err != nil {
-		return false, err
-	}
-	targetReplicas := r.getReplicas()
-	return statefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas), nil
-}
-
-func (r *RSM) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
-	if obj == nil {
-		return false, nil
-	}
-	rsm, ok := obj.(*workloads.ReplicatedStateMachine)
-	if !ok {
-		return false, nil
-	}
-	sts := ConvertRSMToSTS(rsm)
-	return statefulSetPodsAreReady(sts, r.getReplicas()), nil
-}
-
-func (r *RSM) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if pod == nil {
-		return false
-	}
-	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
-}
-
-func (r *RSM) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
-	return "", nil
-}
-
-// GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (r *RSM) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string,
-	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
-	rsmList := &workloads.ReplicatedStateMachineList{}
-	podList, err := getCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, rsmList)
-	if err != nil || len(rsmList.Items) == 0 {
-		return "", nil, err
-	}
-	statusMessages := appsv1alpha1.ComponentMessageMap{}
-	// if the failed pod is not controlled by the latest revision
-	podIsControlledByLatestRevision := func(pod *corev1.Pod, rsm *workloads.ReplicatedStateMachine) bool {
-		return rsm.Status.ObservedGeneration == rsm.Generation && intctrlutil.GetPodRevision(pod) == rsm.Status.UpdateRevision
-	}
-	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
-		rsm := workload.(*workloads.ReplicatedStateMachine)
-		// if component is up running but pod is not ready, this pod should be failed.
-		// for example: full disk cause readiness probe failed and serve is not available.
-		// but kubelet only sets the container is not ready and pod is also Running.
-		if originPhaseIsUpRunning {
-			return !intctrlutil.PodIsReady(pod) && podIsControlledByLatestRevision(pod, rsm)
-		}
-		isFailed, _, message := IsPodFailedAndTimedOut(pod)
-		existLatestRevisionFailedPod := isFailed && podIsControlledByLatestRevision(pod, rsm)
-		if existLatestRevisionFailedPod {
-			statusMessages.SetObjectMessage(pod.Kind, pod.Name, message)
-		}
-		return existLatestRevisionFailedPod
-	}
-	rsmObj := rsmList.Items[0]
-	return getComponentPhaseWhenPodsNotReady(podList, &rsmObj, r.getReplicas(),
-		rsmObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), statusMessages, nil
-}
-
-func (r *RSM) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
-	return nil, nil
-}
-
-func (r *RSM) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	if r.SynthesizedComponent.WorkloadType != appsv1alpha1.Consensus &&
-		r.SynthesizedComponent.WorkloadType != appsv1alpha1.Replication {
-		return nil, nil
-	}
-
-	// update cluster.status.component.consensusSetStatus based on the existences for all pods
-	componentName := r.getName()
-	rsmObj, _ := obj.(*workloads.ReplicatedStateMachine)
-	switch r.SynthesizedComponent.WorkloadType {
-	case appsv1alpha1.Consensus:
-		// first, get the old status
-		var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
-		if v, ok := r.Cluster.Status.Components[componentName]; ok {
-			oldConsensusSetStatus = v.ConsensusSetStatus
-		}
-		// create the initial status
-		newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
-			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Name:       "",
-				Pod:        constant.ComponentStatusDefaultPodName,
-				AccessMode: appsv1alpha1.None,
-			},
-		}
-		// then, set the new status
-		setConsensusSetStatusRolesByRSM(newConsensusSetStatus, rsmObj)
-		// if status changed, do update
-		if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
-			if err := initClusterComponentStatusIfNeed(r.Cluster, componentName, appsv1alpha1.Consensus); err != nil {
-				return nil, err
-			}
-			componentStatus := r.Cluster.Status.Components[componentName]
-			componentStatus.ConsensusSetStatus = newConsensusSetStatus
-			r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
-
-			return nil, nil
-		}
-	case appsv1alpha1.Replication:
-		sts := ConvertRSMToSTS(rsmObj)
-		podList, err := getRunningPods(ctx, r.Cli, sts)
-		if err != nil {
-			return nil, err
-		}
-		if len(podList) == 0 {
-			return nil, nil
-		}
-		primary := ""
-		vertexes := make([]graph.Vertex, 0)
-		for _, pod := range podList {
-			role, ok := pod.Labels[constant.RoleLabelKey]
-			if !ok || role == "" {
-				continue
-			}
-			if role == constant.Primary {
-				primary = pod.Name
-			}
-		}
-
-		for _, pod := range podList {
-			needUpdate := false
-			if pod.Annotations == nil {
-				pod.Annotations = map[string]string{}
-			}
-			switch {
-			case primary == "":
-				// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
-				needUpdate = handlePrimaryNotExistPod(&pod)
-			default:
-				needUpdate = handlePrimaryExistPod(&pod, primary)
-			}
-			if needUpdate {
-				vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-					Obj:    &pod,
-					Action: ictrltypes.ActionUpdatePtr(),
-				})
-			}
-		}
-		// rebuild cluster.status.components.replicationSet.status
-		if err := rebuildReplicationSetClusterStatus(r.Cluster, appsv1alpha1.Replication, componentName, podList); err != nil {
-			return nil, err
-		}
-		return vertexes, nil
-	}
-
-	return nil, nil
-}
-
-func setConsensusSetStatusRolesByRSM(newConsensusSetStatus *appsv1alpha1.ConsensusSetStatus, rsmObj *workloads.ReplicatedStateMachine) {
-	for _, memberStatus := range rsmObj.Status.MembersStatus {
-		status := appsv1alpha1.ConsensusMemberStatus{
-			Name:       memberStatus.Name,
-			Pod:        memberStatus.PodName,
-			AccessMode: appsv1alpha1.AccessMode(memberStatus.AccessMode),
-		}
-		switch {
-		case memberStatus.IsLeader:
-			newConsensusSetStatus.Leader = status
-		case memberStatus.CanVote:
-			newConsensusSetStatus.Followers = append(newConsensusSetStatus.Followers, status)
-		default:
-			newConsensusSetStatus.Learner = &status
-		}
-	}
-}
-
-func newRSM(cli client.Client,
+func newRSMComponent(cli client.Client,
+	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
-	spec *appsv1alpha1.ClusterComponentSpec,
-	def appsv1alpha1.ClusterComponentDefinition) *RSM {
-	return &RSM{
-		componentSetBase: componentSetBase{
-			Cli:                  cli,
-			Cluster:              cluster,
-			SynthesizedComponent: nil,
-			ComponentSpec:        spec,
-			ComponentDef:         &def,
+	clusterVersion *appsv1alpha1.ClusterVersion,
+	synthesizedComponent *component.SynthesizedComponent,
+	dag *graph.DAG) *rsmComponent {
+	comp := &rsmComponent{
+		rsmComponentBase: rsmComponentBase{
+			componentBase: componentBase{
+				Client:         cli,
+				Recorder:       recorder,
+				Cluster:        cluster,
+				ClusterVersion: clusterVersion,
+				Component:      synthesizedComponent,
+				ComponentSet: &RSM{
+					componentSetBase: componentSetBase{
+						Cli:                  cli,
+						Cluster:              cluster,
+						SynthesizedComponent: synthesizedComponent,
+						ComponentSpec:        nil,
+						ComponentDef:         nil,
+					},
+				},
+				Dag:            dag,
+				WorkloadVertex: nil,
+			},
 		},
 	}
+	return comp
+}
+
+func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	action *ictrltypes.LifecycleAction) componentWorkloadBuilder {
+	builder := &rsmComponentWorkloadBuilder{
+		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
+			ReqCtx:        reqCtx,
+			Client:        cli,
+			Comp:          c,
+			DefaultAction: action,
+			Error:         nil,
+			EnvConfig:     nil,
+			Workload:      nil,
+		},
+	}
+	builder.ConcreteBuilder = builder
+	return builder
+}
+
+func (c *rsmComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
+	return workloadType
+}
+
+func (c *rsmComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
+	return c.rsmComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+}
+
+func (c *rsmComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return c.rsmComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+}
+
+func (c *rsmComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return c.rsmComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+}
+
+func (c *rsmComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return c.rsmComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

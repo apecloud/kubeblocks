@@ -34,6 +34,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
@@ -49,17 +50,6 @@ type MysqlOperations struct {
 type QueryRes []map[string]interface{}
 
 var _ BaseInternalOps = &MysqlOperations{}
-
-const (
-	// other general settings for DB connections.
-	maxIdleConnsKey    = "maxIdleConns"
-	maxOpenConnsKey    = "maxOpenConns"
-	connMaxLifetimeKey = "connMaxLifetime"
-	connMaxIdleTimeKey = "connMaxIdleTime"
-	workloadTypeKey    = "workloadType"
-	Replication        = "Replication"
-	Consensus          = "Consensus"
-)
 
 const (
 	superUserPriv = "SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.*"
@@ -127,7 +117,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	workloadType := request.Metadata[workloadTypeKey]
+	workloadType := request.Metadata[WorkloadTypeKey]
 	if strings.EqualFold(workloadType, Replication) {
 		return mysqlOps.GetRoleForReplication(ctx, request, response)
 	}

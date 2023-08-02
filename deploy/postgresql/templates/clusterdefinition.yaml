@@ -235,6 +235,7 @@ spec:
                     key: password
                     optional: false
           - name: pgbouncer
+            image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ default .Values.pgbouncer.image.tag }}
             imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
             securityContext:
               runAsUser: 0

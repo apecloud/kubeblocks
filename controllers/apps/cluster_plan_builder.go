@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -265,10 +264,6 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		}
 		// delete secondary objects
 		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
-			// retain backup for data protection even if the cluster is wiped out.
-			if strings.EqualFold(node.Obj.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
-				return nil
-			}
 			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
 			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {

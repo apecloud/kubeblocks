@@ -45,7 +45,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -174,17 +173,6 @@ var _ = BeforeSuite(func() {
 		Recorder: k8sManager.GetEventRecorderFor("ops-request-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
-
-	err = components.NewStatefulSetReconciler(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = components.NewDeploymentReconciler(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
-		err = components.NewRSMReconciler(k8sManager)
-		Expect(err).ToNot(HaveOccurred())
-	}
 
 	err = (&k8score.EventReconciler{
 		Client:   k8sManager.GetClient(),

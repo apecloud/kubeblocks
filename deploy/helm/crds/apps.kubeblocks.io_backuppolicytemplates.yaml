@@ -298,14 +298,6 @@ spec:
                           - cronExpression
                           - enable
                           type: object
-                        retryWindowMinutes:
-                          description: retryWindowMinutes defines the time window
-                            for starting the job if it misses scheduled time for any
-                            reason. the unit of time is minute.
-                          format: int64
-                          maximum: 1440
-                          minimum: 0
-                          type: integer
                         snapshot:
                           description: schedule policy for snapshot backup.
                           properties:
@@ -320,6 +312,14 @@ spec:
                           - cronExpression
                           - enable
                           type: object
+                        startingDeadlineMinutes:
+                          description: startingDeadlineMinutes defines the deadline
+                            in minutes for starting the backup job if it misses scheduled
+                            time for any reason.
+                          format: int64
+                          maximum: 1440
+                          minimum: 0
+                          type: integer
                       type: object
                     snapshot:
                       description: the policy for snapshot backup.

@@ -40,6 +40,7 @@ Run a benchmark.
 * [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
 * [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
+* [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
 
 
 ## [builder](kbcli_builder.md)
@@ -167,6 +168,18 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks status](kbcli_kubeblocks_status.md)	 - Show list of resource KubeBlocks uses or owns.
 * [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
+
+
+## [login](kbcli_login.md)
+
+Authenticate with the KubeBlocks Cloud
+
+
+
+## [logout](kbcli_logout.md)
+
+Log out of the KubeBlocks Cloud
+
 
 
 ## [migration](kbcli_migration.md)

@@ -51,6 +51,8 @@ var (
 	cueTemplate embed.FS
 )
 
+type CreateDependency func(dryRun []string) error
+
 type DryRunStrategy int
 
 const (
@@ -92,6 +94,9 @@ type CreateOptions struct {
 
 	// CleanUpFn will be executed after creating failed.
 	CleanUpFn func() error
+
+	// CreateDependencies will be executed before creating.
+	CreateDependencies CreateDependency
 
 	// Quiet minimize unnecessary output
 	Quiet bool
@@ -171,6 +176,13 @@ func (o *CreateOptions) Run() error {
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 
+		// create dependencies
+		if o.CreateDependencies != nil {
+			if err = o.CreateDependencies(createOptions.DryRun); err != nil {
+				return err
+			}
+		}
+
 		// create kubernetes resource
 		resObj, err = o.Dynamic.Resource(o.GVR).Namespace(o.Namespace).Create(context.TODO(), resObj, createOptions)
 		if err != nil {
@@ -206,6 +218,10 @@ func (o *CreateOptions) Run() error {
 }
 
 func (o *CreateOptions) CleanUp() error {
+	if o.CreateDependencies == nil {
+		return nil
+	}
+
 	if o.CleanUpFn != nil {
 		return o.CleanUpFn()
 	}

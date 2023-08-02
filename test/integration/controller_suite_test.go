@@ -322,12 +322,6 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = components.NewStatefulSetReconciler(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = components.NewDeploymentReconciler(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
 	err = (&k8score.EventReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),

@@ -13,7 +13,7 @@ spec:
   type: Helm
 
   helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "llm" "version" "0.1.0" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "llm" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:

@@ -26,12 +26,28 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
         - name: mysql-replication-config
           templateRef: mysql8.0.33-config-template
           constraintRef: mysql8.0.33-config-constraints
           volumeName: mysql-config
           namespace: {{ .Release.Namespace }}
+        - name: agamotto-configuration
+          templateRef: mysql-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
+          defaultMode: 0777
+      scriptSpecs:
+        - name: mysql-scripts
+          templateRef: mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       volumeTypes:
         - name: data
           type: data
@@ -66,3 +82,40 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
+          - name: metrics
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+            env:
+              - name: DB_TYPE
+                value: MySQL
+              - name: ENDPOINT
+                value: "localhost:3306"
+              - name: MYSQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+            command: ["/scripts/agamotto.sh"]
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
+              - name: data
+                mountPath: /data/mysql
+              - name: log-data
+                mountPath: /var/log/kubeblocks
+                readOnly: false
+              - name: scripts
+                mountPath: /scripts

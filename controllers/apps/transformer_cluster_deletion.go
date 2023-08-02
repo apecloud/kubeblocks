@@ -139,18 +139,31 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return err
 	}
 
+	toDeleteObjs := func(objs clusterOwningObjects) []client.Object {
+		var delObjs []client.Object
+		for _, obj := range objs {
+			// retain backup for data protection even if the cluster is wiped out.
+			if strings.EqualFold(obj.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
+				continue
+			}
+			delObjs = append(delObjs, obj)
+		}
+		return delObjs
+	}
+
 	// add objects deletion vertex
 	objs, err := getClusterOwningObjects(transCtx, *cluster, ml, toDeleteKinds...)
 	if err != nil {
 		return err
 	}
-	for _, o := range objs {
+	delObjs := toDeleteObjs(objs)
+	for _, o := range delObjs {
 		vertex := &ictrltypes.LifecycleVertex{Obj: o, Action: ictrltypes.ActionDeletePtr()}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
 	// set cluster action to noop until all the sub-resources deleted
-	if len(objs) == 0 {
+	if len(delObjs) == 0 {
 		root.Action = ictrltypes.ActionDeletePtr()
 	} else {
 		root.Action = ictrltypes.ActionNoopPtr()
@@ -172,7 +185,7 @@ func kindsForHalt() []client.ObjectList {
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
-		&policyv1.PodDisruptionBudgetList{},
+		&rbacv1.ClusterRoleBindingList{},
 	}
 	kindsPlus = append(kindsPlus, kinds...)
 	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {

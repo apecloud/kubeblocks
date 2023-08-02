@@ -45,6 +45,8 @@ var (
 	deleteExample = templates.Examples(`
 		# delete a cluster named mycluster
 		kbcli cluster delete mycluster
+		# delete a cluster by label selector
+		kbcli cluster delete --selector clusterdefinition.kubeblocks.io/name=apecloud-mysql
 `)
 
 	rbacEnabled = false
@@ -70,8 +72,8 @@ func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func deleteCluster(o *delete.DeleteOptions, args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("missing cluster name")
+	if len(args) == 0 && len(o.LabelSelector) == 0 {
+		return fmt.Errorf("missing cluster name or a lable selector")
 	}
 	o.Names = args
 	return o.Run()
@@ -120,10 +122,12 @@ func deleteDependencies(client kubernetes.Interface, ns string, name string) err
 
 	klog.V(1).Infof("delete dependencies for cluster %s", name)
 	var (
-		saName          = saNamePrefix + name
-		roleName        = roleNamePrefix + name
-		roleBindingName = roleBindingNamePrefix + name
-		allErr          []error
+		saName                 = saNamePrefix + name
+		roleName               = roleNamePrefix + name
+		roleBindingName        = roleBindingNamePrefix + name
+		clusterRoleName        = clusterRolePrefix + name
+		clusterRoleBindingName = clusterRoleBindingPrefix + name
+		allErr                 []error
 	)
 
 	// now, delete the dependencies, for postgresql, we delete sa, role and rolebinding
@@ -137,9 +141,27 @@ func deleteDependencies(client kubernetes.Interface, ns string, name string) err
 		return false
 	}
 
-	// delete rolebinding
-	klog.V(1).Infof("delete rolebinding %s", roleBindingName)
+	// delete cluster role binding
+	klog.V(1).Infof("delete cluster role binding %s", clusterRoleBindingName)
+	if err := client.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete cluster role
+	klog.V(1).Infof("delete cluster role %s", clusterRoleName)
+	if err := client.RbacV1().ClusterRoles().Delete(ctx, clusterRoleName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete role binding
+	klog.V(1).Infof("delete role binding %s", roleBindingName)
 	if err := client.RbacV1().RoleBindings(ns).Delete(ctx, roleBindingName, deleteOptions); checkErr(err) {
+		allErr = append(allErr, err)
+	}
+
+	// delete role
+	klog.V(1).Infof("delete role %s", roleName)
+	if err := client.RbacV1().Roles(ns).Delete(ctx, roleName, deleteOptions); checkErr(err) {
 		allErr = append(allErr, err)
 	}
 
@@ -149,11 +171,6 @@ func deleteDependencies(client kubernetes.Interface, ns string, name string) err
 		allErr = append(allErr, err)
 	}
 
-	// delete role
-	klog.V(1).Infof("delete role %s", roleName)
-	if err := client.RbacV1().Roles(ns).Delete(ctx, roleName, deleteOptions); checkErr(err) {
-		allErr = append(allErr, err)
-	}
 	return errors.NewAggregate(allErr)
 }
 

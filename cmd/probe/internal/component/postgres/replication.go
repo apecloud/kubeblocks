@@ -72,9 +72,7 @@ func (mgr *Manager) GetMemberStateWithPoolReplication(ctx context.Context, pool 
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
-func (mgr *Manager) IsMemberHealthyReplication(cluster *dcs.Cluster, member *dcs.Member) bool {
-	ctx := context.TODO()
-
+func (mgr *Manager) IsMemberHealthyReplication(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	pools := []*pgxpool.Pool{nil}
 	var err error
 	if member != nil {

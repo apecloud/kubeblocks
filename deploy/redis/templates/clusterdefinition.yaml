@@ -99,6 +99,17 @@ spec:
               - name: REDIS_ARGS
                 value: "--requirepass $(REDIS_PASSWORD)"
             command: ["/scripts/redis-start.sh"]
+            readinessProbe:
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              timeoutSeconds: 1
+              successThreshold: 1
+              failureThreshold: 5
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - /scripts/redis-ping.sh 1
             lifecycle:
               preStop:
                 exec:

@@ -1,7 +1,7 @@
 GO ?= go
 GOPATH ?= $(shell $(GO) env GOPATH)
 
-GINKGO_VERSION = 2.6.1
+GINKGO_VERSION = 2.9.1
 GINKGO = $(GOPATH)/bin/ginkgo
 HELM_VERSION ?= v3.9.0
 

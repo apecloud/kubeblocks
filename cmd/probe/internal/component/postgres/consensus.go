@@ -125,6 +125,7 @@ func (mgr *Manager) GetMemberStateWithPoolConsensus(ctx context.Context, pool *p
 
 func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 	ctx := context.TODO()
+
 	sql := `select ip_port from consensus_cluster_status;`
 	var addrs []string
 	var err error
@@ -160,7 +161,7 @@ func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 	return addrs
 }
 
-func (mgr *Manager) IsCurrentMemberInClusterConsensus(cluster *dcs.Cluster) bool {
+func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, cluster *dcs.Cluster) bool {
 	memberAddrs := mgr.GetMemberAddrs(cluster)
 	if memberAddrs == nil {
 		mgr.Logger.Errorf("can't get addresses of members")
@@ -171,9 +172,7 @@ func (mgr *Manager) IsCurrentMemberInClusterConsensus(cluster *dcs.Cluster) bool
 	return slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName))
 }
 
-func (mgr *Manager) IsMemberHealthyConsensus(cluster *dcs.Cluster, member *dcs.Member) bool {
-	ctx := context.TODO()
-
+func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	pools := []*pgxpool.Pool{nil}
 	var err error
 
@@ -280,7 +279,7 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 		// will check current member healthy soon
 		return true
 	}
-	return mgr.IsMemberHealthy(cluster, leaderMember)
+	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
 }
 
 func (mgr *Manager) PromoteConsensus() error {

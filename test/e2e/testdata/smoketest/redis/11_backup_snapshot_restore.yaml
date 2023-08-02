@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: mycluster-redis-cluster-snapshot
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"redis\":\"redis-cluster-redis-backup-policy\"}"
+    kubeblocks.io/restore-from-backup: "{\"redis\":\"backup-snapshot-mycluster-redis\"}"
 spec:
   clusterDefinitionRef: redis  # ref clusterDefinition.name
   clusterVersionRef: redis-7.0.6 # ref clusterVersion.name

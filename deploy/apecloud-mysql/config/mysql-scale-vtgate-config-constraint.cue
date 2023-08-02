@@ -68,20 +68,20 @@
 	// Tablet refresh interval. (default 1m0s)
 	tablet_refresh_interval: =~"[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+$"
 
-    //Which auth server implementation to use. Options: none, static, mysqlbased. (default "none")
-    mysql_auth_server_impl: string &"none" | "static" | "mysqlbased"
+	//Which auth server implementation to use. Options: none, static, mysqlbased. (default "none")
+	mysql_auth_server_impl: string & "none" | "static" | "mysqlbased"
 
-    //JSON File to read the users/passwords from, need set mysql_auth_server_impl to static.
-    mysql_auth_server_static_file: string
+	//JSON File to read the users/passwords from, need set mysql_auth_server_impl to static.
+	mysql_auth_server_static_file: string
 
-    //Path to ssl key for mysql server plugin SSL
-    mysql_server_ssl_key: string
+	//Path to ssl key for mysql server plugin SSL
+	mysql_server_ssl_key: string
 
-    //Path to the ssl cert for mysql server plugin SSL
-    mysql_server_ssl_cert: string
+	//Path to the ssl cert for mysql server plugin SSL
+	mysql_server_ssl_cert: string
 
-    //Reject insecure connections but only if mysql_server_ssl_cert and mysql_server_ssl_key are provided.(default "false")
-    mysql_server_require_secure_transport: bool
+	//Reject insecure connections but only if mysql_server_ssl_cert and mysql_server_ssl_key are provided.(default "false")
+	mysql_server_require_secure_transport: bool
 
 	...
 }

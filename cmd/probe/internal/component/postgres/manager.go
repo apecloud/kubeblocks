@@ -267,10 +267,10 @@ func (mgr *Manager) IsRunning() bool {
 	return mgr.newProcessFromPidFile() == nil
 }
 
-func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
+func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
 	switch mgr.workLoadType {
 	case Consensus:
-		return mgr.IsCurrentMemberInClusterConsensus(cluster)
+		return mgr.IsCurrentMemberInClusterConsensus(ctx, cluster)
 	case Replication:
 		return true
 	default:
@@ -279,16 +279,16 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	}
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy(cluster *dcs.Cluster) bool {
-	return mgr.IsMemberHealthy(cluster, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	return mgr.IsMemberHealthy(ctx, cluster, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	switch mgr.workLoadType {
 	case Consensus:
-		return mgr.IsMemberHealthyConsensus(cluster, member)
+		return mgr.IsMemberHealthyConsensus(ctx, cluster, member)
 	case Replication:
-		return mgr.IsMemberHealthyReplication(cluster, member)
+		return mgr.IsMemberHealthyReplication(ctx, cluster, member)
 	default:
 		mgr.Logger.Errorf("check current member healthy failed, err:%v", InvalidWorkLoadType)
 		return false
@@ -546,9 +546,7 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
-	ctx := context.TODO()
-
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err == nil && isLeader {
 		// if current member is leader, just return
@@ -578,11 +576,11 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 
 	for i, m := range cluster.Members {
-		if m.Name != leader && mgr.IsMemberHealthy(cluster, &m) {
+		if m.Name != leader && mgr.IsMemberHealthy(ctx, cluster, &m) {
 			members = append(members, &cluster.Members[i])
 		}
 	}
@@ -627,5 +625,13 @@ func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
 }
 
 func (mgr *Manager) CreateRoot(ctx context.Context) error {
+	return nil
+}
+
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	return nil
+}
+
+func (mgr *Manager) Unlock(ctx context.Context) error {
 	return nil
 }

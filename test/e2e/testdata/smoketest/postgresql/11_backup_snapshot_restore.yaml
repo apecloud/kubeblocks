@@ -90,10 +90,10 @@ kind: Cluster
 metadata:
   name: pg-cluster-snapshot
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"postgresql\":\"backup-snapshot-mycluster\"}"
+    kubeblocks.io/restore-from-backup: "{\"postgresql\":\"backup-snapshot-pg\"}"
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.1
+  clusterVersionRef: postgresql-14.7.2
   terminationPolicy: WipeOut
   componentSpecs:
     - name: postgresql
@@ -108,4 +108,4 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 20Gi
+                storage: 21Gi

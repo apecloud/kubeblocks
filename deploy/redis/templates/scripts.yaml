@@ -28,7 +28,7 @@ data:
       cmd="redis-cli -h localhost -p 6379 ping"
     fi
     response=$(timeout -s 3 $1 $cmd)
-    if [ "$?" -eq "124" ]; then
+    if [ $? -eq 124 ]; then
       echo "Timed out"
       exit 1
     fi
@@ -45,7 +45,7 @@ data:
       cmd="redis-cli -h localhost -p 26379 ping"
     fi
     response=$(timeout -s 3 $1 $cmd)
-    if [ "$?" -eq "124" ]; then
+    if [ $? -eq 124 ]; then
       echo "Timed out"
       exit 1
     fi

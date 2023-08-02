@@ -115,6 +115,7 @@ type UserInfo struct {
 	Expired  string        `json:"expired,omitempty"`
 	ExpireAt time.Duration `json:"expireAt,omitempty"`
 	RoleName string        `json:"roleName,omitempty"`
+	Database string        `json:"database,omitempty"`
 }
 
 // SQLChannelRequest is the request for sqlchannel

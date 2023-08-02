@@ -91,6 +91,25 @@ func ExecuteObject[T customizedObjType](ctx context.Context, ops BaseInternalOps
 	return opsTerminateOnSucc(result, metadata, msgTplRend(object))
 }
 
+func ExecuteObjectWithDB[T customizedObjType](ctx context.Context, ops RMDBInternalOps, req *bindings.InvokeRequest,
+	opsKind bindings.OperationKind, sqlTplRend cmdRender[T], msgTplRend cmdRender[T], object T) (OpsResult, error) {
+	var (
+		result = OpsResult{}
+		err    error
+	)
+
+	metadata := opsMetadata{Operation: opsKind, StartTime: getAndFormatNow()}
+
+	sql := sqlTplRend(object)
+	metadata.Extra = sql
+	ops.GetLogger().Debugf("ExecObject with cmd: %s", sql)
+
+	if _, err = ops.InternalExecWithDB(ctx, sql, db); err != nil {
+		return opsTerminateOnErr(result, metadata, err)
+	}
+	return opsTerminateOnSucc(result, metadata, msgTplRend(object))
+}
+
 func QueryObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, req *bindings.InvokeRequest,
 	opsKind bindings.OperationKind, sqlTplRend cmdRender[T], dataProcessor resultRender[T], object T) (OpsResult, error) {
 	var (

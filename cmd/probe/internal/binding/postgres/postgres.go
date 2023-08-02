@@ -81,7 +81,7 @@ type PostgresOperations struct {
 	BaseOperations
 }
 
-var _ BaseInternalOps = &PostgresOperations{}
+var _ RMDBInternalOps = &PostgresOperations{}
 
 // NewPostgres returns a new PostgreSQL output binding.
 func NewPostgres(logger logger.Logger) bindings.OutputBinding {
@@ -232,6 +232,16 @@ func (pgOps *PostgresOperations) InternalQuery(ctx context.Context, sql string) 
 // InternalExec is used for internal execution, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) InternalExec(ctx context.Context, sql string) (result int64, err error) {
 	return pgOps.manager.Exec(ctx, sql)
+}
+
+// InternalQueryWithDB is used for internal query, implements BaseInternalOps interface
+func (pgOps *PostgresOperations) InternalQueryWithDB(ctx context.Context, sql string, db string) (result []byte, err error) {
+	return pgOps.manager.QueryWithDB(ctx, sql, db)
+}
+
+// InternalExecWithDB is used for internal execution, implements BaseInternalOps interface
+func (pgOps *PostgresOperations) InternalExecWithDB(ctx context.Context, sql string, db string) (result int64, err error) {
+	return pgOps.manager.ExecWithDB(ctx, sql, db)
 }
 
 // GetLogger is used for getting logger, implements BaseInternalOps interface

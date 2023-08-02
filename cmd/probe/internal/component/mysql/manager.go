@@ -463,3 +463,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (mgr *Manager) ConnectDB(ctx context.Context, db string) (*sql.DB, error) {
+	return config.ConnectToDB(db)
+}

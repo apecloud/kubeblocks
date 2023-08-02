@@ -53,6 +53,11 @@ type BaseInternalOps interface {
 	GetRunningPort() int
 }
 
+type RMDBInternalOps interface {
+	BaseInternalOps
+	InternalQueryWithDB(ctx context.Context, sql string, db string) ([]byte, error)
+	InternalExecWithDB(ctx context.Context, sql string, db string) (int64, error)
+}
 type BaseOperations struct {
 	CheckRunningFailedCount    int
 	CheckStatusFailedCount     int

@@ -77,3 +77,8 @@ func (config *Config) GetConnectURLWithHost(host string) string {
 	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s pool_min_conns=%d pool_max_conns=%d",
 		config.username, config.password, host, config.port, config.database, config.minConns, config.maxConns)
 }
+
+func (config *Config) GetConnectToDB(db string) string {
+	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s pool_min_conns=%d pool_max_conns=%d",
+		config.username, config.password, config.host, config.port, db, config.minConns, config.maxConns)
+}

@@ -32,7 +32,6 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -49,13 +48,13 @@ type MysqlOperations struct {
 
 type QueryRes []map[string]interface{}
 
-var _ BaseInternalOps = &MysqlOperations{}
+var _ RMDBInternalOps = &MysqlOperations{}
 
 const (
-	superUserPriv = "SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.*"
-	readWritePriv = "SELECT, INSERT, UPDATE, DELETE ON *.*"
-	readOnlyRPriv = "SELECT ON *.*"
-	noPriv        = "USAGE ON *.*"
+	superUserPriv = "ALL PRIVILEGES"
+	readWritePriv = "SELECT, INSERT, UPDATE, DELETE"
+	readOnlyRPriv = "SELECT"
+	noPriv        = "USAGE"
 
 	listUserTpl  = "SELECT user AS userName, CASE password_expired WHEN 'N' THEN 'F' ELSE 'T' END as expired FROM mysql.user WHERE host = '%' and user <> 'root' and user not like 'kb%';"
 	showGrantTpl = "SHOW GRANTS FOR '%s'@'%%';"
@@ -314,29 +313,98 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 	return result, nil
 }
 
-func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte, error) {
-	mysqlOps.Logger.Debugf("query: %s", sql)
-	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
+func (mysqlOps *MysqlOperations) query(ctx context.Context, query string) ([]byte, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	mysqlOps.Logger.Debugf("query: %s", query)
+
+	rows, err = mysqlOps.manager.DB.QueryContext(ctx, query)
+
 	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
+		return nil, errors.Wrapf(err, "error executing %s", query)
 	}
+
 	defer func() {
 		_ = rows.Close()
 		_ = rows.Err()
 	}()
+
 	result, err := mysqlOps.jsonify(rows)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
+		return nil, errors.Wrapf(err, "error marshalling query result for %s", query)
 	}
 	return result, nil
 }
 
-func (mysqlOps *MysqlOperations) exec(ctx context.Context, sql string) (int64, error) {
-	mysqlOps.Logger.Debugf("exec: %s", sql)
-	res, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error executing %s", sql)
+func (mysqlOps *MysqlOperations) queryWithDB(ctx context.Context, query string, db string) ([]byte, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	mysqlOps.Logger.Debugf("query: %s", query)
+	if len(db) == 0 {
+		return nil, errors.New("empty db name")
 	}
+	conn, err := mysqlOps.manager.ConnectDB(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	rows, err = conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error executing %s", query)
+	}
+
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+		conn.Close()
+	}()
+
+	result, err := mysqlOps.jsonify(rows)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error marshalling query result for %s", query)
+	}
+	return result, nil
+}
+
+func (mysqlOps *MysqlOperations) exec(ctx context.Context, query string) (int64, error) {
+	var (
+		res sql.Result
+		err error
+	)
+	mysqlOps.Logger.Debugf("exec: %s", query)
+
+	res, err = mysqlOps.manager.DB.ExecContext(ctx, query)
+
+	if err != nil {
+		return 0, errors.Wrapf(err, "error executing %s", query)
+	}
+	return res.RowsAffected()
+}
+
+func (mysqlOps *MysqlOperations) execWithDB(ctx context.Context, query string, db string) (int64, error) {
+	var (
+		res sql.Result
+		err error
+	)
+	mysqlOps.Logger.Debugf("exec: %s", query)
+
+	conn, err := mysqlOps.manager.ConnectDB(ctx, db)
+	if err != nil {
+		return 0, err
+	}
+
+	res, err = conn.ExecContext(ctx, query)
+
+	if err != nil {
+		return 0, errors.Wrapf(err, "error executing %s", query)
+	}
+	defer func() {
+		conn.Close()
+	}()
+
 	return res.RowsAffected()
 }
 
@@ -420,6 +488,16 @@ func (mysqlOps *MysqlOperations) InternalExec(ctx context.Context, sql string) (
 	return mysqlOps.exec(ctx, sql)
 }
 
+// InternalQueryWithDB is used for internal query, implements BaseInternalOps interface
+func (mysqlOps *MysqlOperations) InternalQueryWithDB(ctx context.Context, sql string, db string) ([]byte, error) {
+	return mysqlOps.queryWithDB(ctx, sql, db)
+}
+
+// InternalExecWithDB is used for internal execution, implements BaseInternalOps interface
+func (mysqlOps *MysqlOperations) InternalExecWithDB(ctx context.Context, sql string, db string) (int64, error) {
+	return mysqlOps.execWithDB(ctx, sql, db)
+}
+
 // GetLogger is used for getting logger, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) GetLogger() logger.Logger {
 	return mysqlOps.Logger
@@ -470,24 +548,31 @@ func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *bindi
 			if err != nil {
 				return nil, err
 			}
-			user := UserInfo{}
-			// only keep one role name of the highest privilege
-			userRoles := make([]RoleType, 0)
+
+			if len(roles) == 0 {
+				return nil, fmt.Errorf("no such user %s", object.UserName)
+			}
+
+			users := make([]UserInfo, 0)
+			var userName string
 			for _, roleMap := range roles {
 				for k, v := range roleMap {
-					if len(user.UserName) == 0 {
-						user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
+					if len(userName) == 0 {
+						userName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
 					}
-					mysqlRoleType := mysqlOps.priv2Role(strings.TrimPrefix(v, "GRANT "))
-					userRoles = append(userRoles, mysqlRoleType)
+					mysqlRoleType, database := mysqlOps.priv2Role(v)
+					if mysqlRoleType == NoPrivileges || mysqlRoleType == InvalidRole {
+						continue
+					}
+					users = append(users, UserInfo{UserName: userName, RoleName: string(mysqlRoleType), Database: database})
 				}
 			}
-			// sort roles by weight
-			slices.SortFunc(userRoles, SortRoleByWeight)
-			if len(userRoles) > 0 {
-				user.RoleName = (string)(userRoles[0])
+			// if no privileges, return empty
+			if len(users) == 0 {
+				users = append(users, UserInfo{UserName: object.UserName, RoleName: string(NoPrivileges), Database: ""})
 			}
-			if jsonData, err := json.Marshal([]UserInfo{user}); err != nil {
+
+			if jsonData, err := json.Marshal(users); err != nil {
 				return nil, err
 			} else {
 				return string(jsonData), nil
@@ -573,9 +658,10 @@ func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bind
 		object     = UserInfo{}
 		sqlTplRend = func(user UserInfo) string {
 			// render sql stmts
-			roleDesc, _ := mysqlOps.role2Priv(user.RoleName)
+			priv, _ := mysqlOps.role2Priv(user.RoleName)
+			role := fmt.Sprintf("%s on %s.*", priv, user.Database)
 			// update privilege
-			sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
+			sql := fmt.Sprintf(sqlTpl, role, user.UserName)
 			return sql
 		}
 		msgTplRend = func(user UserInfo) string {
@@ -600,22 +686,58 @@ func (mysqlOps *MysqlOperations) role2Priv(roleName string) (string, error) {
 		return readWritePriv, nil
 	case ReadOnlyRole:
 		return readOnlyRPriv, nil
+	default:
+		return "", fmt.Errorf("role name: %s is not supported", roleName)
 	}
-	return "", fmt.Errorf("role name: %s is not supported", roleName)
 }
 
-func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
-	if strings.HasPrefix(priv, readOnlyRPriv) {
-		return ReadOnlyRole
+func (mysqlOps *MysqlOperations) priv2Role(privileges string) (RoleType, string) {
+
+	tokenize := func(priv string) (string, string) {
+		// tokenize privilege with GRANT and ON
+		// e.g. GRANT SELECT, INSERT, UPDATE, DELETE ON *.* TO 'user'@'%'
+		// => [GRANT SELECT, INSERT, UPDATE, DELETE, ON *.* TO 'user'@'%']
+		// e.g. GRANT ALL PRIVILEGES ON *.* TO 'user'@'%'
+		// => [GRANT ALL PRIVILEGES, ON *.* TO 'user'@'%']
+		// split by ON
+		// resutls = ["GRANT SELECT, INSERT, UPDATE, DELETE", "*.* TO 'user'@'%'"]
+		results := strings.Split(priv, " ON ")
+		if len(results) != 2 {
+			return "", ""
+		}
+		// split by GRANT
+		// privs := ["", "SELECT, INSERT, UPDATE, DELETE"]
+		privs := strings.Split(results[0], "GRANT ")
+		if len(privs) != 2 {
+			return "", ""
+		}
+
+		// split by TO
+		// targets := ["*.*", "'user'@'%'"]
+		targets := strings.Split(results[1], " TO ")
+		database := targets[0]
+		if database == "*.*" {
+			database = "ALL DATABASES"
+		} else {
+			database = strings.Split(database, ".")[0]
+		}
+		return privs[1], database
 	}
-	if strings.HasPrefix(priv, readWritePriv) {
-		return ReadWriteRole
+
+	priv, db := tokenize(privileges)
+	if len(priv) == 0 {
+		return InvalidRole, ""
 	}
-	if strings.HasPrefix(priv, superUserPriv) {
-		return SuperUserRole
+	switch priv {
+	case noPriv:
+		return NoPrivileges, db
+	case readOnlyRPriv:
+		return ReadOnlyRole, db
+	case readWritePriv:
+		return ReadWriteRole, db
+	case superUserPriv:
+		return SuperUserRole, db
+	default:
+		return CustomizedRole, db
 	}
-	if strings.HasPrefix(priv, noPriv) {
-		return NoPrivileges
-	}
-	return CustomizedRole
 }

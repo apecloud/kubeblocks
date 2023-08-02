@@ -193,3 +193,19 @@ func (config *Config) GetDBPort() int {
 func GetConfig() *Config {
 	return config
 }
+
+func (config *Config) ConnectToDB(db string) (*sql.DB, error) {
+	mysqlConfig, err := mysql.ParseDSN(config.url)
+	if err != nil {
+		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
+	}
+	mysqlConfig.User = config.username
+	mysqlConfig.Passwd = config.password
+	mysqlConfig.DBName = db
+	mysqlDB, err := sql.Open("mysql", mysqlConfig.FormatDSN())
+	if err != nil {
+		return nil, errors.Wrap(err, "error opening DB connection")
+	}
+
+	return mysqlDB, nil
+}

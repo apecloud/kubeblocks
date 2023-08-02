@@ -133,6 +133,53 @@ func (mgr *Manager) Exec(ctx context.Context, sql string) (result int64, err err
 	return
 }
 
+func (mgr *Manager) QueryWithDB(ctx context.Context, sql string, db string) (result []byte, err error) {
+	if len(db) == 0 {
+		return nil, fmt.Errorf("db name is empty")
+	}
+	pool, err := mgr.ConnectDB(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to db: %w", err)
+	}
+	defer func() {
+		pool.Close()
+	}()
+	return mgr.QueryWithPool(ctx, sql, pool)
+}
+
+func (mgr *Manager) ExecWithDB(ctx context.Context, sql string, db string) (result int64, err error) {
+	mgr.Logger.Debugf("exec: %s", sql)
+	if len(db) == 0 {
+		return 0, fmt.Errorf("db name is empty")
+	}
+	pool, err := mgr.ConnectDB(ctx, db)
+	if err != nil {
+		return 0, fmt.Errorf("error connecting to db: %w", err)
+	}
+	res, err := pool.Exec(ctx, sql)
+	if err != nil {
+		return 0, fmt.Errorf("error executing query: %w", err)
+	}
+	return res.RowsAffected(), nil
+}
+
+func (mgr *Manager) ExecOnDB(ctx context.Context, sql string, db string) (result int64, err error) {
+	mgr.Logger.Debugf("exec: %s", sql)
+	pool, err := mgr.ConnectDB(ctx, db)
+	if err != nil {
+		return 0, fmt.Errorf("error connecting to db: %w", err)
+	}
+	defer pool.Close()
+
+	res, err := pool.Exec(ctx, sql)
+	if err != nil {
+		return 0, fmt.Errorf("error executing query: %w", err)
+	}
+
+	result = res.RowsAffected()
+	return
+}
+
 func (mgr *Manager) IsDBStartupReady() bool {
 	if mgr.DBStartupReady {
 		return true
@@ -863,4 +910,17 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
 	return nil
+}
+
+func (mgr *Manager) ConnectDB(ctx context.Context, db string) (*pgxpool.Pool, error) {
+	tempConfig, err := pgxpool.ParseConfig(config.GetConnectToDB(db))
+	if err != nil {
+		return nil, errors.Wrap(err, "new temp config")
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, tempConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to connect the DB")
+	}
+	return pool, nil
 }

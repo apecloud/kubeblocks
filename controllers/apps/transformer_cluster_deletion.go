@@ -91,7 +91,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			return nil
 		}
 
-		objs, err := getClusterOwningObjects(transCtx, *cluster, ml, toPreserveKinds, nil)
+		objs, err := getClusterOwningNamespacedObjects(transCtx, *cluster, ml, toPreserveKinds)
 		if err != nil {
 			return err
 		}
@@ -150,12 +150,21 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return delObjs
 	}
 
-	// add objects deletion vertex
-	objs, err := getClusterOwningObjects(transCtx, *cluster, ml, toDeleteNamespacedKinds, toDeleteNonNamespacedKinds)
+	// add namespaced objects deletion vertex
+	namespacedObjs, err := getClusterOwningNamespacedObjects(transCtx, *cluster, ml, toDeleteNamespacedKinds)
 	if err != nil {
 		return err
 	}
-	delObjs := toDeleteObjs(objs)
+	delObjs := toDeleteObjs(namespacedObjs)
+
+	// add non-namespaced objects deletion vertex
+	nonNamespacedObjs, err := getClusterOwningNonNamespacedObjects(transCtx, *cluster,
+		getAppInstanceAndManagedByML(*cluster), toDeleteNonNamespacedKinds)
+	if err != nil {
+		return err
+	}
+	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
+
 	for _, o := range delObjs {
 		vertex := &ictrltypes.LifecycleVertex{Obj: o, Action: ictrltypes.ActionDeletePtr()}
 		dag.AddVertex(vertex)

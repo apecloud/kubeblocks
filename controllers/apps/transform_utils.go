@@ -58,16 +58,40 @@ func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
 	}
 }
 
-// getClusterOwningObjects reads objects owned by our cluster with kinds and label matching specifier.
-func getClusterOwningObjects(transCtx *ClusterTransformContext,
+func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.Name,
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+}
+
+// getClusterOwningNamespacedObjects reads namespaced objects owned by our cluster with kinds.
+func getClusterOwningNamespacedObjects(transCtx *ClusterTransformContext,
 	cluster appsv1alpha1.Cluster,
-	matchLabels client.MatchingLabels,
-	namespacedKinds []client.ObjectList,
-	nonNamespacedKinds []client.ObjectList) (clusterOwningObjects, error) {
+	labels client.MatchingLabels,
+	kinds []client.ObjectList) (clusterOwningObjects, error) {
+	inNS := client.InNamespace(cluster.Namespace)
+	return getClusterOwningObjectsWithOptions(transCtx, kinds, inNS, labels)
+}
+
+// getClusterOwningNonNamespacedObjects reads non-namespaced objects owned by our cluster with kinds.
+func getClusterOwningNonNamespacedObjects(transCtx *ClusterTransformContext,
+	_ appsv1alpha1.Cluster,
+	labels client.MatchingLabels,
+	kinds []client.ObjectList) (clusterOwningObjects, error) {
+	return getClusterOwningObjectsWithOptions(transCtx, kinds, labels)
+}
+
+// getClusterOwningObjectsWithOptions reads objects owned by our cluster with kinds and specified options.
+func getClusterOwningObjectsWithOptions(transCtx *ClusterTransformContext,
+	kinds []client.ObjectList,
+	opts ...client.ListOption) (clusterOwningObjects, error) {
 	// list what kinds of object cluster owns
 	objs := make(clusterOwningObjects)
-
-	parseUnderlyingObjs := func(list client.ObjectList) error {
+	for _, list := range kinds {
+		if err := transCtx.Client.List(transCtx.Context, list, opts...); err != nil {
+			return nil, err
+		}
 		// reflect get list.Items
 		items := reflect.ValueOf(list).Elem().FieldByName("Items")
 		l := items.Len()
@@ -76,28 +100,9 @@ func getClusterOwningObjects(transCtx *ClusterTransformContext,
 			object := items.Index(i).Addr().Interface().(client.Object)
 			name, err := getGVKName(object, rscheme)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			objs[*name] = object
-		}
-		return nil
-	}
-
-	inNS := client.InNamespace(cluster.Namespace)
-	for _, list := range namespacedKinds {
-		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
-			return nil, err
-		}
-		if err := parseUnderlyingObjs(list); err != nil {
-			return nil, err
-		}
-	}
-	for _, list := range nonNamespacedKinds {
-		if err := transCtx.Client.List(transCtx.Context, list, matchLabels); err != nil {
-			return nil, err
-		}
-		if err := parseUnderlyingObjs(list); err != nil {
-			return nil, err
 		}
 	}
 	return objs, nil

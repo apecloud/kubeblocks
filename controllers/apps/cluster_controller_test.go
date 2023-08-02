@@ -30,6 +30,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -1190,8 +1191,10 @@ var _ = Describe("Cluster Controller", func() {
 	testReCreateClusterWithRBAC := func(compName, compDefName string) {
 		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
 
-		By("Creating a cluster with target service account name")
-		serviceAccountName := "test-service-account"
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		serviceAccountName := "test-sa-" + randomStr
+
+		By(fmt.Sprintf("Creating a cluster with random service account %s", serviceAccountName))
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(3).

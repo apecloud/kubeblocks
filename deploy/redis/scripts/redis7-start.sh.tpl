@@ -37,8 +37,12 @@ retry() {
     sleep 3
   done
   if [ $attempt -eq $max_attempts ]; then
-    echo "Command '$*' failed after $max_attempts attempts. Exiting..."
-    exit 1
+    echo "Command '$*' failed after $max_attempts attempts. shutdown redis-server..."
+    if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
+      redis-cli -h 127.0.0.1 -p 6379 -a "$REDIS_DEFAULT_PASSWORD" shutdown
+    else
+      redis-cli -h 127.0.0.1 -p 6379 shutdown
+    fi
   fi
 }
 

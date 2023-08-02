@@ -48,12 +48,16 @@ func newCompareCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			IOStreams: streams,
 		},
 	}
+	var showDetail bool
 	cmd := &cobra.Command{
 		Use:     "compare version [OTHER-VERSION]",
 		Short:   "List the changes between two different version KubeBlocks.",
 		Args:    cobra.MaximumNArgs(2),
 		Example: diffExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) >= 2 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
 			allVers, _ := getHelmChartVersions(types.KubeBlocksChartName)
 			var names []string
 			for _, v := range allVers {
@@ -63,9 +67,10 @@ func newCompareCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(o.compare(args))
+			util.CheckErr(o.compare(args, showDetail))
 		},
 	}
+	cmd.Flags().BoolVar(&showDetail, "details", false, "show the different details between two kubeblocks version")
 	return cmd
 }
 
@@ -95,14 +100,15 @@ func (o *InstallOptions) validateCompareVersion(args []string, versionA, version
 	return nil
 }
 
-func (o *InstallOptions) compare(args []string) error {
+func (o *InstallOptions) compare(args []string, detail bool) error {
 	var versionA, versionB string
 	if err := o.validateCompareVersion(args, &versionA, &versionB); err != nil {
 		return err
 	}
 	// update repo
 	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
-		return err
+
+		return fmt.Errorf(err.Error())
 	}
 	// check version is available
 	if exists, err := versionExists(versionA); !exists {
@@ -118,12 +124,12 @@ func (o *InstallOptions) compare(args []string) error {
 		}
 		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", versionB)
 	}
-	return o.showDiff(versionA, versionB)
+	return o.showDiff(versionA, versionB, detail)
 }
 
 // buildTemplate builds `helm template` InstallOpts for KubeBlocks
 func (o *InstallOptions) buildTemplate(version string) *helm.InstallOpts {
-	ops := helm.GetTemplateInstallOps(types.KubeBlocksChartName, fmt.Sprintf("%s/%s", types.KubeBlocksChartName, types.KubeBlocksChartName), version, "default")
+	ops := helm.GetTemplateInstallOps(types.KubeBlocksChartName, fmt.Sprintf("%s/%s", types.KubeBlocksChartName, types.KubeBlocksChartName), version, o.Namespace)
 	ops.Wait = o.Wait
 	ops.ValueOpts = &o.ValueOpts
 	ops.CreateNamespace = o.CreateNamespace
@@ -131,17 +137,17 @@ func (o *InstallOptions) buildTemplate(version string) *helm.InstallOpts {
 	return ops
 }
 
-func (o *InstallOptions) showDiff(version1, version2 string) error {
+func (o *InstallOptions) showDiff(version1, version2 string, detail bool) error {
 	// use `helm template` get the chart manifest
 	helmInstallOpts := o.buildTemplate(version1)
-	releaseA, err := helmInstallOpts.Install(helm.NewFakeConfig("default"))
+	releaseA, err := helmInstallOpts.Install(helm.NewFakeConfig(o.Namespace))
 	if err != nil {
 		return err
 	}
 	helmInstallOpts.Version = version2
-	releaseB, err := helmInstallOpts.Install(helm.NewFakeConfig("default"))
+	releaseB, err := helmInstallOpts.Install(helm.NewFakeConfig(o.Namespace))
 	if err != nil {
 		return err
 	}
-	return helm.OutputDiff(releaseA, releaseB, version1, version2, o.Out)
+	return helm.OutputDiff(releaseA, releaseB, version1, version2, o.Out, detail)
 }

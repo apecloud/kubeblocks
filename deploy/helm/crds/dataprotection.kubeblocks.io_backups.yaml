@@ -61,7 +61,6 @@ spec:
             properties:
               backupPolicyName:
                 description: Which backupPolicy is applied to perform this backup
-                maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               backupType:

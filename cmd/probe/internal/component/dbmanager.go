@@ -46,6 +46,9 @@ type DBManager interface {
 
 	// Member healthy check
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
+	// HasOtherHealthyLeader is applicable only to consensus cluster,
+	// where the db's internal role services as the source of truth.
+	// for replicationset cluster,  HasOtherHealthyLeader will always be false.
 	HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member
 	HasOtherHealthyMembers(context.Context, *dcs.Cluster, string) []*dcs.Member
 
@@ -59,6 +62,10 @@ type DBManager interface {
 
 	// Functions related to HA
 	Promote() error
+	// IsPromoted is applicable only to consensus cluster, which is used to
+	// check if DB has complete switchover.
+	// for replicationset cluster,  it will always be true.
+	IsPromoted(context.Context) bool
 	Demote() error
 	Follow(*dcs.Cluster) error
 	Recover()
@@ -106,6 +113,13 @@ func (mgr *DBManagerBase) GetCurrentMemberName() string {
 
 func (mgr *DBManagerBase) IsFirstMember() bool {
 	return strings.HasSuffix(mgr.CurrentMemberName, "-0")
+}
+
+func (mgr *DBManagerBase) IsPromoted(context.Context) bool {
+	return true
+}
+func (mgr *DBManagerBase) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	return nil
 }
 
 func RegisterManager(characterType string, manager DBManager) {
@@ -194,6 +208,10 @@ func (*FakeManager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
 
 func (*FakeManager) Promote() error {
 	return fmt.Errorf("NotSupported")
+}
+
+func (*FakeManager) IsPromoted(context.Context) bool {
+	return true
 }
 
 func (*FakeManager) Demote() error {

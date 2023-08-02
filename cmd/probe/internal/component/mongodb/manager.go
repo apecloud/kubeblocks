@@ -520,6 +520,27 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	return status.OK != 0
 }
 
+func (mgr *Manager) IsPromoted(ctx context.Context) bool {
+	isLeader, err := mgr.IsLeader(ctx, nil)
+	if err != nil || !isLeader {
+		return false
+	}
+
+	rsConfig, err := mgr.GetReplSetConfig(ctx)
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return false
+	}
+	for i := range rsConfig.Members {
+		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+			if rsConfig.Members[i].Priority == 2 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (mgr *Manager) Promote() error {
 	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
 	if rsConfig == nil {
@@ -527,15 +548,13 @@ func (mgr *Manager) Promote() error {
 		return err
 	}
 
-	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
-	client, err := NewReplSetClient(context.TODO(), hosts)
-	if err != nil {
-		return err
-	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
-
 	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+			if rsConfig.Members[i].Priority == 2 {
+				mgr.Logger.Debugf("Current member already has the highest priority!")
+				return nil
+			}
+
 			rsConfig.Members[i].Priority = 2
 		} else if rsConfig.Members[i].Priority == 2 {
 			rsConfig.Members[i].Priority = 1
@@ -543,6 +562,13 @@ func (mgr *Manager) Promote() error {
 	}
 
 	rsConfig.Version++
+
+	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
+	client, err := NewReplSetClient(context.TODO(), hosts)
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(context.TODO()) //nolint:errcheck
 	return SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 

@@ -31,7 +31,7 @@ type Cluster struct {
 	Members         []Member
 	Switchover      *Switchover
 	Extra           map[string]string
-	resource        interface{}
+	resource        any
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -124,7 +124,9 @@ type Leader struct {
 	AcquireTime int64
 	RenewTime   int64
 	TTL         int
-	Resource    interface{}
+	DBTimeStamp int64
+	Extra       map[string]string
+	Resource    any
 }
 
 type Member struct {

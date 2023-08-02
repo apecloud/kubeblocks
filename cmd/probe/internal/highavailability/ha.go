@@ -78,8 +78,9 @@ func (ha *Ha) RunCycle() {
 		}
 		_ = ha.dbManager.Follow(cluster)
 
-	case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
-		ha.logger.Errorf("The cluster is not healthy, wait...")
+	// Just for healthy check and send event if unhealthy?
+	// case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
+	// 	ha.logger.Errorf("The cluster is not healthy, wait...")
 
 	case !ha.dbManager.IsCurrentMemberInCluster(ha.ctx, cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(cluster)):
 		ha.logger.Infof("Current member is not in cluster, add it to cluster")
@@ -115,23 +116,27 @@ func (ha *Ha) RunCycle() {
 				_ = ha.dcs.ReleaseLock()
 				break
 			} else if cluster.Switchover.Candidate == "" || cluster.Switchover.Candidate == ha.dbManager.GetCurrentMemberName() {
+				if !ha.dbManager.IsPromoted(ha.ctx) {
+					break
+				}
 				_ = ha.dcs.DeleteSwitchover()
 			}
 		}
 
-		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
-			ha.logger.Infof("Refresh leader ttl")
-			_ = ha.dcs.UpdateLock()
-			if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(cluster)) {
-				ha.DecreaseClusterReplicas(cluster)
-			}
-
-		} else if ha.dbManager.HasOtherHealthyLeader(ha.ctx, cluster) != nil {
+		if ha.dbManager.HasOtherHealthyLeader(ha.ctx, cluster) != nil {
+			// this case is applicable only to consensus cluster, where the db's internal
+			// role services as the source of truth.
+			// for replicationset cluster,  HasOtherHealthyLeader will always be false.
 			ha.logger.Infof("Release leader")
 			_ = ha.dcs.ReleaseLock()
-		} else {
-			_ = ha.dbManager.Promote()
-			_ = ha.dcs.UpdateLock()
+			break
+		}
+		_ = ha.dbManager.Promote()
+		ha.logger.Infof("Refresh leader ttl")
+		_ = ha.dcs.UpdateLock()
+
+		if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(cluster)) {
+			ha.DecreaseClusterReplicas(cluster)
 		}
 
 	case !ha.dcs.HasLock():

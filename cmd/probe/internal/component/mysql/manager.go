@@ -441,26 +441,27 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-	isLeader, err := mgr.IsLeader(ctx, cluster)
-	if err == nil && isLeader {
-		// if current member is leader, just return
-		return nil
-	}
+// func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+// 	return nil
+// 	isLeader, err := mgr.IsLeader(ctx, cluster)
+// 	if err == nil && isLeader {
+// 		// if current member is leader, just return
+// 		return nil
+// 	}
 
-	for _, member := range cluster.Members {
-		if member.Name == mgr.CurrentMemberName {
-			continue
-		}
+// 	for _, member := range cluster.Members {
+// 		if member.Name == mgr.CurrentMemberName {
+// 			continue
+// 		}
 
-		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
-		if err == nil && isLeader {
-			return &member
-		}
-	}
+// 		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
+// 		if err == nil && isLeader {
+// 			return &member
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // HasOtherHealthyMembers checks if there are any healthy members, excluding the leader
 func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {

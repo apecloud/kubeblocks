@@ -494,6 +494,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 		mgr.Logger.Errorf("Lock err: %v", err)
 		return err
 	}
+	mgr.IsLocked = true
 	return nil
 }
 
@@ -505,5 +506,6 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 		mgr.Logger.Errorf("Unlock err: %v", err)
 		return err
 	}
+	mgr.IsLocked = false
 	return nil
 }

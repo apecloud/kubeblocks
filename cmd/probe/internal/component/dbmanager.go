@@ -89,6 +89,7 @@ type DBManagerBase struct {
 	DataDir           string
 	Logger            logger.Logger
 	DBStartupReady    bool
+	IsLocked          bool
 }
 
 func (mgr *DBManagerBase) IsDBStartupReady() bool {

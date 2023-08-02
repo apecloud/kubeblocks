@@ -662,6 +662,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 		err := errors.Errorf("mongo says: %s", lockResp.Errmsg)
 		return err
 	}
+	mgr.IsLocked = true
 	mgr.Logger.Infof("Lock db success times: %d", lockResp.LockCount)
 	return nil
 }
@@ -695,6 +696,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 			return err
 		}
 	}
+	mgr.IsLocked = false
 	mgr.Logger.Infof("Unlock db success")
 	return nil
 }

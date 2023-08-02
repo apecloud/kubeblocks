@@ -42,6 +42,7 @@ spec:
             emptyDir: {}
         initContainers:
           - name: model
+            # TODO: CT move to cv
             image: lynnleelhl/gpt2:latest
             imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
             command:

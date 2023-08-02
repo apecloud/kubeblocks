@@ -15,3 +15,22 @@ spec:
             env:
               - name: MODEL_NAME
                 value: "gpt2"
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: baichuan
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: llm
+  componentVersions:
+    - componentDefRef: llm
+      versionsContext:
+        containers:
+          - name: llm
+            image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+            env:
+              - name: MODEL_NAME
+                value: "baichuan"

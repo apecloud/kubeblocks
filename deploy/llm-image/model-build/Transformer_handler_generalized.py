@@ -80,7 +80,7 @@ class TransformersSeqClassifierHandler(BaseHandler, ABC):
             elif self.setup_config["mode"] == "token_classification":
                 self.model = AutoModelForTokenClassification.from_pretrained(model_dir)
             elif self.setup_config["mode"] == "text_generation":
-                self.model = AutoModelForCausalLM.from_pretrained(model_dir)
+                self.model = AutoModelForCausalLM.from_pretrained(model_dir, low_cpu_mem_usage=True)
             else:
                 logger.warning("Missing the operation mode.")
             # Using the Better Transformer integration to speedup the inference

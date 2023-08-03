@@ -7,20 +7,20 @@ metadata:
 spec:
   clusterDefinitionRef: neon
   componentVersions:
-    - componentDefRef: neon-storage-broker
+    - componentDefRef: neon-storagebroker
       versionsContext:
         containers:
-        - name: neon-storage-broker
+        - name: neon-storagebroker
           image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
     - componentDefRef: neon-safe-keeper
       versionsContext:
         containers:
-        - name: neon-safe-keeper
+        - name: neon-safekeeper
           image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-    - componentDefRef: neon-page-server
+    - componentDefRef: neon-pageserver
       versionsContext:
         containers:
-        - name: neon-page-server
+        - name: neon-pageserver
           image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
     - componentDefRef: neon-compute
       versionsContext:

@@ -1,0 +1,39 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: risingwave-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "risingwave.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: risingwave
+  componentVersions:
+  - componentDefRef: meta
+    versionsContext:
+      containers:
+      - name: meta
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+  - componentDefRef: frontend
+    versionsContext:
+      containers:
+      - name: frontend
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+  - componentDefRef: compute
+    versionsContext:
+      containers:
+      - name: compute
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+  - componentDefRef: compactor
+    versionsContext:
+      containers:
+      - name: compactor
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+  - componentDefRef: connector
+    versionsContext:
+      containers:
+      - name: connector
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}

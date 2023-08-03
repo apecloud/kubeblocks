@@ -219,8 +219,6 @@ spec:
               - name: scripts
                 mountPath: /scripts
           - name: vttablet
-            image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
               - containerPort: 15100
                 name: vttabletport

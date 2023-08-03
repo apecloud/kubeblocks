@@ -171,6 +171,9 @@
 	// smartengine enable
 	"smartengine"?: string & "0" | "1" | "OFF" | "ON"
 
+	// smartengine enable
+	"loose_smartengine"?: string & "0" | "1" | "OFF" | "ON"
+
 	// Abort a recursive common table expression if it does more than this number of iterations.
 	cte_max_recursion_depth: int & >=0 & <=4294967295 | *1000
 

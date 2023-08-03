@@ -254,7 +254,7 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	return nil, nil
 }
 
-// getComponentPVCSizeByName get pvc size by name
+// getComponentPVCSizeByName gets pvc size by name
 func getComponentPVCSizeByName(args interface{}, pvcName string) (int64, error) {
 	component, err := fromJSONObject[component.SynthesizedComponent](args)
 	if err != nil {
@@ -268,7 +268,7 @@ func getComponentPVCSizeByName(args interface{}, pvcName string) (int64, error) 
 	return -1, nil
 }
 
-// getPVCSize get pvc size by name
+// getPVCSize gets pvc size by name
 func getPVCSize(args interface{}) (int64, error) {
 	pvcTemp, err := fromJSONObject[corev1.PersistentVolumeClaimTemplate](args)
 	if err != nil {

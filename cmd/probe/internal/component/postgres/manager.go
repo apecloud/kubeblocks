@@ -629,9 +629,26 @@ func (mgr *Manager) CreateRoot(ctx context.Context) error {
 }
 
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	mgr.Logger.Infof("Lock db: %s", reason)
+	sql := "alter system set default_transaction_read_only=on;" +
+		"select pg_reload_conf();"
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
+	sql := "alter system set default_transaction_read_only=off;" +
+		"select pg_reload_conf();"
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

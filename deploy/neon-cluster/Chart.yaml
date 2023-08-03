@@ -1,0 +1,11 @@
+apiVersion: v2
+name: nebula-cluster
+description: Nebula Graph Cluster Helm Chart for KubeBlocks.
+type: application
+version: 0.5.1-beta.0
+appVersion: "v3.5.0"
+maintainers:
+  - name: Shanshan Ying
+    email: shanshan.ying@apecloud.com
+  - name: Xuntao Cheng
+    email: xuntao.cheng@vesoft.com

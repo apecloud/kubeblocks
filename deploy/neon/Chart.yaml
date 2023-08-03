@@ -1,0 +1,10 @@
+apiVersion: v2
+name: neon-storage-broker
+description: Neon storage broker
+type: application
+version: 1.2.0
+appVersion: "0.1.0"
+kubeVersion: "^1.18.x-x"
+home: https://neon.tech
+sources:
+  - https://github.com/neondatabase/neon

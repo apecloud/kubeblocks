@@ -1,0 +1,105 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: neon
+  labels:
+    {{- include "neon.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-neon)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-neon)"
+    accesskey: ""
+    secretkey: ""
+  componentDefs:
+    - name: neon-storagebroker
+      workloadType: Stateful
+      characterType: storagebroker
+      podSpec:
+        containers:
+          - name: neon-storagebroker
+            imagePullPolicy: IfNotPresent
+            command:
+              - "storage_broker"
+              - "-l"
+              - "0.0.0.0:50051"
+    - name: neon-safekeeper
+      workloadType: Stateful
+      characterType: safekeeper
+      componentDefRef:
+        - &storagebrokerRef
+          componentDefName: neon-storagebroker
+          componentRefEnv:
+            - name: NEON_BROKER_SVC
+              valueFrom:
+                type: HeadlessServiceRef
+                format: $(POD_FQDN){{ .Values.clusterDomain }}
+                joinWith: ","
+      podSpec:
+        containers:
+          - name: neon-safekeeper
+            imagePullPolicy: IfNotPresent
+            command:
+              - "safekeeper"
+              - "--id=1"
+              - "-D"
+              - "/data"
+              - "--broker-endpoint=http://${NEON_BROKER_SVC}:50051"
+              - "-l"
+              - "${NEON_BROKER_SVC}:5454"
+              - "--listen-http=0.0.0.0:7676"
+    - name: neon-pageserver
+      workloadType: Stateful
+      characterType: pageserver
+      componentDefRef:
+        - *storagebrokerRef
+      podSpec:
+        containers:
+          - name: neon-pageserver
+            imagePullPolicy: IfNotPresent
+            command:
+              - "pageserver"
+              - "-D"
+              - "/data"
+              - "-c"
+              - "id=1"
+              - "-c"
+              - "broker_endpoint=http://${NEON_BROKER_SVC}:50051"
+              - "-c"
+              - "listen_pg_addr=0.0.0.0:6400"
+              - "-c"
+              - "listen_http_addr=0.0.0.0:9898"
+              - "-c"
+              - "pg_distrib_dir=/opt/neondatabase-neon/pg_install"
+    - name: neon-compute
+      workloadType: Stateful
+      characterType: compute
+      componentDefRef:
+        - componentDefName: neon-safekeeper
+          componentRefEnv:
+            - name: NEON_SAFEKEEPER_SVC
+              valueFrom:
+                type: HeadlessServiceRef
+                format: $(POD_FQDN){{ .Values.clusterDomain }}
+                joinWith: ","
+        - componentDefName: neon-pageserver
+          componentRefEnv:
+            - name: NEON_PAGESERVER_SVC
+              valueFrom:
+                type: HeadlessServiceRef
+                format: $(POD_FQDN){{ .Values.clusterDomain }}
+                joinWith: ","
+      podSpec:
+        containers:
+          - name: neon-compute
+            imagePullPolicy: IfNotPresent
+            command: ["/compute.sh"]
+            ports:
+              - "55432:55432"
+            environment:
+              - name: PAGESERVER
+                value: ${NEON_PAGESERVER_SVC}
+              - name: SAFEKEEPERS
+                value: ${NEON_SAFEKEEPER_SVC}:5454

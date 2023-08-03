@@ -1,0 +1,118 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "neon-cluster.name" . }}
+  labels:
+    {{ include "neon-cluster.labels" . | indent 4 }}
+spec:
+  clusterDefinitionRef: neon
+  clusterVersionRef: neon-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.neon.terminationPolicy }}
+  componentSpecs:
+    - name: neon-storagebroker
+      componentDefRef: neon-storagebroker
+      replicas: 1
+      {{- with  .Values.neon.console.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+    - name: neon-safekeeper
+      componentDefRef: neon-safekeeper
+      replicas: {{ .Values.neon.graphd.replicas }}
+      {{- with  .Values.neon.graphd.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: logs # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.neon.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.neon.graphd.logStorage }}
+    - name: neon-pageserver
+      componentDefRef: neon-pageserver
+      replicas: {{ .Values.neon.metad.replicas }}
+      {{- with  .Values.neon.metad.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.neon.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.neon.metad.dataStorage }}
+        - name: logs # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.neon.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.neon.metad.logStorage }}
+    - name: neon-compute
+      componentDefRef: neon-compute
+      replicas: {{ .Values.neon.storaged.replicas }}
+      {{- with  .Values.neon.storaged.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.neon.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.neon.storaged.dataStorage }}
+        - name: logs # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.neon.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.neon.storaged.logStorage }}

@@ -1,0 +1,29 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: neon-{{ default .Chart.AppVersion }}
+  labels:
+    {{- include "neon.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: neon
+  componentVersions:
+    - componentDefRef: neon-storage-broker
+      versionsContext:
+        containers:
+        - name: neon-storage-broker
+          image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+    - componentDefRef: neon-safe-keeper
+      versionsContext:
+        containers:
+        - name: neon-safe-keeper
+          image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+    - componentDefRef: neon-page-server
+      versionsContext:
+        containers:
+        - name: neon-page-server
+          image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+    - componentDefRef: neon-compute
+      versionsContext:
+        containers:
+        - name: neon-compute
+          image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}

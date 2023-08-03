@@ -264,7 +264,9 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	return true
 }
 
-func (mgr *Manager) Recover() {}
+func (mgr *Manager) Recover(context.Context) error {
+	return nil
+}
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	return nil
@@ -312,7 +314,7 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *Manager) Promote() error {
+func (mgr *Manager) Promote(ctx context.Context) error {
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
@@ -325,7 +327,7 @@ func (mgr *Manager) Promote() error {
 	return nil
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	setReadOnly := `set global read_only=on;set global super_read_only=on;`
 
 	_, err := mgr.DB.Exec(setReadOnly)
@@ -336,7 +338,7 @@ func (mgr *Manager) Demote() error {
 	return nil
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return fmt.Errorf("cluster has no leader")
@@ -347,7 +349,7 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	if !mgr.isRecoveryConfOutdate(context.TODO(), cluster.Leader.Name) {
+	if !mgr.isRecoveryConfOutdate(ctx, cluster.Leader.Name) {
 		return nil
 	}
 

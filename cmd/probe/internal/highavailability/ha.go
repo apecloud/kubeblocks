@@ -76,7 +76,7 @@ func (ha *Ha) RunCycle() {
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
 		}
-		_ = ha.dbManager.Follow(cluster)
+		_ = ha.dbManager.Follow(ha.ctx, cluster)
 
 	// Just for healthy check and send event if unhealthy?
 	// case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
@@ -97,7 +97,7 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Infof("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			if ha.dcs.AttempAcquireLock() == nil {
-				err := ha.dbManager.Promote()
+				err := ha.dbManager.Promote(ha.ctx)
 				if err != nil {
 					ha.logger.Infof("Take the leader failed: %v", err)
 					_ = ha.dcs.ReleaseLock()
@@ -112,11 +112,12 @@ func (ha *Ha) RunCycle() {
 		if cluster.Switchover != nil {
 			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() ||
 				(cluster.Switchover.Candidate != "" && cluster.Switchover.Candidate != ha.dbManager.GetCurrentMemberName()) {
-				_ = ha.dbManager.Demote()
+				_ = ha.dbManager.Demote(ha.ctx)
 				_ = ha.dcs.ReleaseLock()
 				break
 			} else if cluster.Switchover.Candidate == "" || cluster.Switchover.Candidate == ha.dbManager.GetCurrentMemberName() {
 				if !ha.dbManager.IsPromoted(ha.ctx) {
+					// wait and retry
 					break
 				}
 				_ = ha.dcs.DeleteSwitchover()
@@ -131,7 +132,7 @@ func (ha *Ha) RunCycle() {
 			_ = ha.dcs.ReleaseLock()
 			break
 		}
-		_ = ha.dbManager.Promote()
+		_ = ha.dbManager.Promote(ha.ctx)
 		ha.logger.Infof("Refresh leader ttl")
 		_ = ha.dcs.UpdateLock()
 
@@ -146,14 +147,13 @@ func (ha *Ha) RunCycle() {
 		// TODO: In the event that the database service and SQL channel both go down concurrently, eg. Pod deleted,
 		// there is no healthy leader node and the lock remains unreleased, attempt to acquire the leader lock.
 
-		leaderMember := cluster.GetLeaderMember()
-		lockOwnerIsLeader, _ := ha.dbManager.IsLeaderMember(ha.ctx, cluster, leaderMember)
-		currentMemberIsLeader, _ := ha.dbManager.IsLeader(context.TODO(), cluster)
-		if lockOwnerIsLeader && currentMemberIsLeader {
-			ha.logger.Infof("Lock owner is real Leader, demote myself and follow the real leader")
-			_ = ha.dbManager.Demote()
-		}
-		_ = ha.dbManager.Follow(cluster)
+		// leaderMember := cluster.GetLeaderMember()
+		// lockOwnerIsLeader, _ := ha.dbManager.IsLeaderMember(ha.ctx, cluster, leaderMember)
+		// currentMemberIsLeader, _ := ha.dbManager.IsLeader(context.TODO(), cluster)
+		// if lockOwnerIsLeader && currentMemberIsLeader {
+		// ha.logger.Infof("Lock owner is real Leader, demote myself and follow the real leader")
+		_ = ha.dbManager.Demote(ha.ctx)
+		_ = ha.dbManager.Follow(ha.ctx, cluster)
 	}
 }
 
@@ -224,7 +224,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 	if strings.HasPrefix(deleteHost, ha.dbManager.GetCurrentMemberName()) {
 		ha.logger.Infof("The last pod %s is the primary member and cannot be deleted. waiting "+
 			"for The controller to perform a switchover to a new primary member before this pod can be removed. ", deleteHost)
-		_ = ha.dbManager.Demote()
+		_ = ha.dbManager.Demote(ha.ctx)
 		_ = ha.dcs.ReleaseLock()
 		return
 	}

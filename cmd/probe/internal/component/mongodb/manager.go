@@ -445,7 +445,9 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	return false
 }
 
-func (mgr *Manager) Recover() {}
+func (mgr *Manager) Recover(context.Context) error {
+	return nil
+}
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
@@ -541,8 +543,8 @@ func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 	return false
 }
 
-func (mgr *Manager) Promote() error {
-	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
+func (mgr *Manager) Promote(ctx context.Context) error {
+	rsConfig, err := mgr.GetReplSetConfig(ctx)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return err
@@ -568,16 +570,16 @@ func (mgr *Manager) Promote() error {
 	if err != nil {
 		return err
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
-	return SetReplSetConfig(context.TODO(), client, rsConfig)
+	defer client.Disconnect(ctx) //nolint:errcheck
+	return SetReplSetConfig(ctx, client, rsConfig)
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	// mongodb do premote and demote in one action, here do nothing.
 	return nil
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	return nil
 }
 

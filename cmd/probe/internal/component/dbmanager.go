@@ -60,15 +60,17 @@ type DBManager interface {
 	AddCurrentMemberToCluster(*dcs.Cluster) error
 	DeleteMemberFromCluster(*dcs.Cluster, string) error
 
-	// Functions related to HA
-	Promote() error
 	// IsPromoted is applicable only to consensus cluster, which is used to
 	// check if DB has complete switchover.
 	// for replicationset cluster,  it will always be true.
 	IsPromoted(context.Context) bool
-	Demote() error
-	Follow(*dcs.Cluster) error
-	Recover()
+	// Functions related to HA
+	// The functions should be idempotent, indicating that if they have been executed in one ha cycle,
+	// any subsequent calls during that cycle will have no effect.
+	Promote(context.Context) error
+	Demote(context.Context) error
+	Follow(context.Context, *dcs.Cluster) error
+	Recover(context.Context) error
 
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
 	// IsHealthiestMember(*dcs.Cluster) bool
@@ -206,7 +208,7 @@ func (*FakeManager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
 	return fmt.Errorf("NotSuppported")
 }
 
-func (*FakeManager) Promote() error {
+func (*FakeManager) Promote(context.Context) error {
 	return fmt.Errorf("NotSupported")
 }
 
@@ -214,15 +216,16 @@ func (*FakeManager) IsPromoted(context.Context) bool {
 	return true
 }
 
-func (*FakeManager) Demote() error {
+func (*FakeManager) Demote(context.Context) error {
 	return fmt.Errorf("NotSuppported")
 }
 
-func (*FakeManager) Follow(*dcs.Cluster) error {
+func (*FakeManager) Follow(context.Context, *dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*FakeManager) Recover() {
+func (*FakeManager) Recover(context.Context) error {
+	return nil
 
 }
 

@@ -4,6 +4,7 @@
 {{- /*  2. string variable 'xxx' */}}
 {{- /*  3. type convert to number */}}
 {{- range $pk, $pv := $.arg0 }}
+	{{- $pk = trimPrefix "loose_" $pk }}
 	{{- $pk = replace "-" "_" $pk }}
 	{{- $var_int := -1 }}
     {{- if $pv | regexMatch "^\\d+$" }}

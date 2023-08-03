@@ -169,10 +169,10 @@ ssl_cert={{ $cert_file }}
 ssl_key={{ $key_file }}
 {{- end }}
 
-## xengine base config
+## smartengine base config
 #default_storage_engine=smartengine
 default_tmp_storage_engine=innodb
-smartengine=0
+loose_smartengine=0
 
 # log_error_verbosity=3
 # binlog_format=ROW

@@ -183,7 +183,7 @@ func newDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 func (o *benchListOption) run() error {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Fprintf(o.Out, "it's seems that kubebech is not running, please run `kbcli addon enable kubebech` to install it or check the kubebech pod status.\n")
+			fmt.Fprintf(o.Out, "it seems that kubebench is not running, please run `kbcli addon enable kubebench` to install it or check the kubebench pod status.\n")
 		}
 	}()
 
@@ -196,7 +196,7 @@ func (o *benchListOption) run() error {
 		result, err := bench.Run()
 		if err != nil {
 			if strings.Contains(err.Error(), "the server doesn't have a resource type") {
-				fmt.Fprintf(o.Out, "kubebech is not installed, please run `kbcli addon enable kubebech` to install it.\n")
+				fmt.Fprintf(o.Out, "kubebench is not installed, please run `kbcli addon enable kubebench` to install it.\n")
 				return nil
 			}
 			return err

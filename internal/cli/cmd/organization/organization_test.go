@@ -64,6 +64,11 @@ func (m *MockOrganization) switchOrganization(name string) (string, error) {
 	return "", nil
 }
 
+func (m *MockOrganization) getCurrentOrganization() (string, error) {
+	fmt.Printf("get current organization\n")
+	return "", nil
+}
+
 func (m *MockOrganization) addOrganization(body []byte) error {
 	fmt.Printf("add organization %s\n", string(body))
 	return nil

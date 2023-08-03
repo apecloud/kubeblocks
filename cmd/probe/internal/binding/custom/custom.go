@@ -27,6 +27,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/zapr"
@@ -142,8 +144,27 @@ func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp 
 		}
 	}
 
-	res := GlobalInfo{}
-	err = json.Unmarshal(lastOutput, &res)
+	parseCSV := func(input []byte) (GlobalInfo, error) {
+		res := GlobalInfo{PodName2Role: map[string]string{}}
+		str := string(input)
+		lines := strings.Split(str, "\n")
+		for _, line := range lines {
+			fields := strings.Split(line, ",")
+			if len(fields) != 3 {
+				return res, err
+			}
+			res.Term, err = strconv.Atoi(fields[0])
+			if err != nil {
+				return res, err
+			}
+			k := fields[1]
+			v := fields[2]
+			res.PodName2Role[k] = v
+		}
+		return res, nil
+	}
+
+	res, err := parseCSV(lastOutput)
 	if err != nil {
 		return GlobalInfo{}, err
 	}

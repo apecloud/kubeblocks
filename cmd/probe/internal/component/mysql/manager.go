@@ -276,15 +276,15 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 	return nil
 }
 
-func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		mgr.Logger.Infof("IsClusterHealthy: has no leader.")
-		return true
-	}
+// func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+// 	leaderMember := cluster.GetLeaderMember()
+// 	if leaderMember == nil {
+// 		mgr.Logger.Infof("IsClusterHealthy: has no leader.")
+// 		return true
+// 	}
 
-	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
-}
+// 	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
+// }
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {

@@ -38,10 +38,15 @@ type DBManager interface {
 	// Functions related to cluster initialization.
 	InitializeCluster(context.Context, *dcs.Cluster) error
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
+	// IsCurrentMemberInCluster check if current member is configured in cluster for consensus.
+	// it will always return true for replicationset.
 	IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool
 
 	// Functions related to cluster healthy check.
 	IsCurrentMemberHealthy(context.Context) bool
+	// IsClusterHealthy is only for consensus cluster healthy check.
+	// For Replication cluster IsClusterHealthy will always return true,
+	// and its cluster's healthty is equal to leader member's heathly.
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 
 	// Member healthy check
@@ -120,6 +125,11 @@ func (mgr *DBManagerBase) IsFirstMember() bool {
 func (mgr *DBManagerBase) IsPromoted(context.Context) bool {
 	return true
 }
+
+func (mgr *DBManagerBase) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
+	return true
+}
+
 func (mgr *DBManagerBase) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }

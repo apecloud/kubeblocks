@@ -76,11 +76,13 @@ func (ha *Ha) RunCycle() {
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
 		}
-		_ = ha.dbManager.Follow(ha.ctx, cluster)
+		// _ = ha.dbManager.Follow(ha.ctx, cluster)
 
-	// Just for healthy check and send event if unhealthy?
-	// case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
-	// 	ha.logger.Errorf("The cluster is not healthy, wait...")
+	// IsClusterHealthy is just for consensus cluster healthy check.
+	// For Replication cluster IsClusterHealthy will always return true,
+	// and its cluster's healthty is equal to leader member's heathly.
+	case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
+		ha.logger.Errorf("The cluster is not healthy, wait...")
 
 	case !ha.dbManager.IsCurrentMemberInCluster(ha.ctx, cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(cluster)):
 		ha.logger.Infof("Current member is not in cluster, add it to cluster")

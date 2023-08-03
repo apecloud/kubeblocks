@@ -42,8 +42,6 @@ type DBManager interface {
 	// it will always return true for replicationset.
 	IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool
 
-	// Functions related to cluster healthy check.
-	IsCurrentMemberHealthy(context.Context) bool
 	// IsClusterHealthy is only for consensus cluster healthy check.
 	// For Replication cluster IsClusterHealthy will always return true,
 	// and its cluster's healthty is equal to leader member's heathly.
@@ -51,6 +49,8 @@ type DBManager interface {
 
 	// Member healthy check
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
+	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
+
 	// HasOtherHealthyLeader is applicable only to consensus cluster,
 	// where the db's internal role services as the source of truth.
 	// for replicationset cluster,  HasOtherHealthyLeader will always be false.
@@ -104,6 +104,7 @@ type DBManagerBase struct {
 	Logger            logger.Logger
 	DBStartupReady    bool
 	IsLocked          bool
+	DBState           *dcs.DBState
 }
 
 func (mgr *DBManagerBase) IsDBStartupReady() bool {
@@ -178,7 +179,7 @@ func (*FakeManager) IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool
 	return true
 }
 
-func (*FakeManager) IsCurrentMemberHealthy(context.Context) bool {
+func (*FakeManager) IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool {
 	return true
 }
 

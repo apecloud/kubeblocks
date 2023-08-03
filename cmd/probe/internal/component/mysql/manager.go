@@ -230,12 +230,13 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context) bool {
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	_, _ = mgr.EnsureServerID(ctx)
-	return mgr.IsMemberHealthy(ctx, nil, nil)
+	return mgr.IsMemberHealthy(ctx, cluster, nil)
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	mgr.DBState = nil
 	var db *sql.DB
 	var err error
 	if member != nil && member.Name != mgr.CurrentMemberName {
@@ -252,15 +253,37 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		db = mgr.DB
 	}
 
-	roSQL := `select 1`
-	rows, err := db.Query(roSQL)
-	if rows != nil {
-		defer rows.Close()
+	if cluster.Leader != nil && cluster.Leader.Name == mgr.CurrentMemberName {
+		if !mgr.WriteCheck(ctx, db) {
+			return false
+		}
 	}
+	return mgr.ReadCheck(ctx, db)
+}
+
+func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) bool {
+	writeSQL := fmt.Sprintf(`BEGIN;
+CREATE DATABASE IF NOT EXISTS kubeblocks;
+CREATE TABLE IF NOT EXISTS kubeblocks.kb_health_check(type INT, check_ts BIGINT, PRIMARY KEY(type));
+INSERT INTO kubeblocks.kb_health_check VALUES(%d, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE check_ts = UNIX_TIMESTAMP();
+COMMIT;`, component.CheckStatusType)
+	_, err := db.ExecContext(ctx, writeSQL)
 	if err != nil {
-		mgr.Logger.Infof("Check Member failed: %v", err)
+		mgr.Logger.Infof("SQL %s executing failed: %v", writeSQL, err)
 		return false
 	}
+	return true
+}
+
+func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
+	readSQL := fmt.Sprintf(`select check_ts from kubeblocks.kb_health_check where type=%d limit 1;`, component.CheckStatusType)
+	var OpTimestamp int64
+	err := db.QueryRowContext(ctx, readSQL).Scan(&OpTimestamp)
+	if err != nil {
+		mgr.Logger.Infof("SQL %s query failed: %v", readSQL, err)
+		return false
+	}
+	mgr.DBState = &dcs.DBState{OpTimestamp: OpTimestamp}
 	return true
 }
 

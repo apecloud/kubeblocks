@@ -9,7 +9,6 @@ spec: # ClusterSpec struct
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
       monitor: false
       replicas: 1
-      serviceAccountName: kb-release-name-apecloud-mysql-cluster
       enabledLogs:     ["slow","error"]
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
@@ -31,7 +30,6 @@ spec: # ClusterSpec struct
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
       monitor: false
       replicas: 3
-      serviceAccountName: kb-release-name-apecloud-mysql-cluster
       enabledLogs:     ["slow","error"]
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name

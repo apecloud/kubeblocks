@@ -25,7 +25,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -253,7 +252,7 @@ func (mysqlOps *MysqlOperations) GetGlobalInfo(ctx context.Context, request *Pro
 
 func (mysqlOps *MysqlOperations) GetGlobalInfoForConsensus(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error) {
 	globalInfo := GlobalInfo{}
-	ip2Roles := make(map[string]string)
+	podName2Role := make(map[string]string)
 
 	term, role, err := mysqlOps.getTermAndRole(ctx)
 	if err != nil {
@@ -291,17 +290,12 @@ func (mysqlOps *MysqlOperations) GetGlobalInfoForConsensus(ctx context.Context, 
 			role = strings.ToLower(role)
 			portStartIndex := strings.LastIndex(ipPort, ":")
 			domainName := ipPort[:portStartIndex]
-			addrs, err := net.LookupHost(domainName)
-			if err != nil || len(addrs) == 0 {
-				globalInfo.Event = OperationFailed
-				globalInfo.Message = fmt.Sprintf("Get ip from domainName error: %v", err)
-				return globalInfo, nil
-			}
-			ip := addrs[0]
-			ip2Roles[ip] = role
+			firstDot := strings.Index(domainName, ".")
+			podName := domainName[:firstDot]
+			podName2Role[podName] = role
 		}
 		globalInfo.Event = OperationSuccess
-		globalInfo.PodName2Role = ip2Roles
+		globalInfo.PodName2Role = podName2Role
 	}
 	return globalInfo, nil
 }

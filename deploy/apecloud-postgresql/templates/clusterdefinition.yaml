@@ -102,26 +102,6 @@ spec:
                   fieldRef:
                     apiVersion: v1
                     fieldPath: metadata.namespace
-              - name: PGUSER_SUPERUSER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-                    optional: false
-              - name: PGPASSWORD_SUPERUSER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: PGUSER_ADMIN
-                value: superadmin
-              - name: PGPASSWORD_ADMIN
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
               - name: POSTGRES_USER
                 valueFrom:
                   secretKeyRef:
@@ -150,8 +130,6 @@ spec:
                 value: "5432"
               - name: PGDATA
                 value: postgresql/pgconsensus_data
-              - name: KB_WORKLOAD_TYPE
-                value: Consensus
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}

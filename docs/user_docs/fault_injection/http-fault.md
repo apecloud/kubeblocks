@@ -7,7 +7,7 @@ sidebar_label: Simulate HTTP faults
 
 # Simulate HTTP faults
 
-HTTP chaos experiments simulate the fault scenarios during the HTTP request and response processing. Currently, HTTPChaos supports simulating the following fault types:
+HTTPChaos experiments simulate the fault scenarios during the HTTP request and response processing. Currently, HTTPChaos supports simulating the following fault types:
 
 * abort: interrupts the connection
 * delay: injects latency into the request or response
@@ -32,44 +32,179 @@ This table below describes the general flags for network faults.
 
 📎 Table 1. kbcli fault network http flags description
 
-| Option                   | Description               |
-| :----------------------- | :------------------------ |
-| `--port` | It specifies the inject port and the default one is 80. |
-| `--method` | It specifies the inject method and the default method is `GET`. |
-| `--target` | It specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time. |
-| `--path` | The URI path of the target request. Supports [Matching wildcards](https://www.wikiwand.com/en/Matching_wildcards). |
-| `--code` | Specifies the status code responded by target. It is effective only when `target=response`. |
+| Option                   | Description               | Default value | Required |
+| :----------------------- | :------------------------ | :------------ | :------- |
+| `--target` | It specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time. | Request | No |
+| `--port` | It specifies the TCP port that the target service listens. | 80 | No |
+| `--path` | The URI path of the target request. Supports [Matching wildcards](https://www.wikiwand.com/en/Matching_wildcards). | * | No |
+| `--method` | It specifies the URL that the target requests. | `GET` | No |
+| `--code` | It specifies the status code responded by the target. It is effective only when `target=response`. | 0 | No |
 
-### abort
+### Abort
 
-The command below injects 1-minute abort chaos to the specified Pod for 1 minute.
+The command below injects 1-minute abort chaos to the specified Pod.
 
 ```bash
 kbcli fault network http abort --duration=1m
 ```
 
-### delay
+### Delay
 
-The command below injects latency chaos to the specified Pod for 15 seconds.
+The command below injects a 15-second latency chaos to the specified Pod.
 
 ```bash
 kbcli fault network http delay --delay=15s
 ```
 
-### replace
+### Replace
 
-The command below replace part of content in HTTP request or response messages for 1 minute.
+The command below replaces part of content in HTTP request or response messages for 1 minute.
 
 ```bash
 kbcli fault network http replace --replace-method=PUT --duration=1m
 ```
 
-### patch
+### Patch
 
-The command below adds additional content to HTTP request or response messages.
+The command below adds additional contents to HTTP request or response messages.
 
 ```bash
 kbcli fault network http patch --body='{"key":""}' --type=JSON --duration=30s
 ```
 
 ## Simulate fault injections by YAML file
+
+This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-http-chaos-on-kubernetes/#create-experiments-using-yaml-files) for details.
+
+### HTTP-abort example
+
+1. Write the experiment configuration to the `http-abort.yaml` file.
+
+    In the following example, Chaos Mesh injects 1-minute abort chaos to the specified Pod for 1 minute.
+
+    ```yaml
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: HTTPChaos
+    metadata:
+      creationTimestamp: null
+      generateName: http-chaos-
+      namespace: default
+    spec:
+      abort: true
+      duration: 1m
+      method: GET
+      mode: all
+      path: '*'
+      port: 80
+      selector:
+        namespaces:
+        - default
+      target: Request
+    ```
+
+2. Run `kubectl` to start an experiment.
+
+   ```bash
+   kubectl apply -f ./http-abort.yaml
+   ```
+
+### HTTP-delay example
+
+
+1. Write the experiment configuration to the `http-delay.yaml` file.
+
+    In the following example, Chaos Mesh injects a 15-second latency chaos to the specified Pod.
+
+    ```yaml
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: HTTPChaos
+    metadata:
+      creationTimestamp: null
+      generateName: http-chaos-
+      namespace: default
+    spec:
+      delay: 15s
+      duration: 10s
+      method: GET
+      mode: all
+      path: '*'
+      port: 80
+      selector:
+        namespaces:
+        - default
+      target: Request
+    ```
+
+2. Run `kubectl` to start an experiment.
+
+   ```bash
+   kubectl apply -f ./http-delay.yaml
+   ```
+
+### HTTP-replace example
+
+1. Write the experiment configuration to the `http-replace.yaml` file.
+
+    In the following example, Chaos Mesh replaces part of content in HTTP request or response messages for 1 minute.
+
+    ```yaml
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: HTTPChaos
+    metadata:
+      creationTimestamp: null
+      generateName: http-chaos-
+      namespace: default
+    spec:
+      duration: 1m
+      method: GET
+      mode: all
+      path: '*'
+      port: 80
+      replace:
+        method: PUT
+      selector:
+        namespaces:
+        - default
+      target: Request
+    ```
+
+2. Run `kubectl` to start an experiment.
+
+   ```bash
+   kubectl apply -f ./http-replace.yaml
+   ```
+
+### HTTP-patch example
+
+1. Write the experiment configuration to the `http-patch.yaml` file.
+
+    In the following example, Chaos Mesh adds additional contents to HTTP request or response messages.
+
+    ```yaml
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: HTTPChaos
+    metadata:
+      creationTimestamp: null
+      generateName: http-chaos-
+      namespace: default
+    spec:
+      duration: 30s
+      method: GET
+      mode: all
+      patch:
+        body:
+          type: JSON
+          value: '{"key":""}'
+      path: '*'
+      port: 80
+      selector:
+        namespaces:
+        - default
+      target: Request
+    ```
+
+2. Run `kubectl` to start an experiment.
+
+   ```bash
+   kubectl apply -f ./http-patch.yaml
+   ```

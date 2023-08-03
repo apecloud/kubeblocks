@@ -1,11 +1,13 @@
 ---
-title: Configure IM alert
-description: How to enable IM alert
-keywords: [mysql, alert, alert message]
+title: Configure alert
+description: How to enable alert
+keywords: [mysql, alert, alert message, email alert]
 sidebar_position: 2
 ---
 
-# Configure IM alert
+# Configure alert
+
+## Configure IM alert
 
 Alerts are mainly used for daily error response to improve system availability. KubeBlocks has a built-in set of common alert rules and integrates multiple notification channels. The alert capability of KubeBlocks can meet the operation and maintenance requirements of production-level online clusters.
 
@@ -15,7 +17,7 @@ The alert function is the same for all.
 
 :::
 
-## Alert rules
+### Alert rules
 
 The built-in generic alert rules of KubeBlocks meet the needs of various data products and provide an out-of-the-box experience without further configurations. These alert rules provide the best practice for cluster operation and maintenance, which further improve alert accuracy and reduce the probability of false negatives and false positives by experience-based smoothing windows, alert thresholds, alert levels, and alert indicators.
 
@@ -47,7 +49,7 @@ kbcli dashboard list
 kbcli dashboard open kubeblocks-prometheus-server # Here is an example and fill in the actual name based on the above dashboard list
 ```
 
-## Configure IM alert
+### Configure IM alert
 
 The alert message notification of KubeBlocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
 
@@ -55,80 +57,84 @@ AlertManager integrates a set of notification channels, such as Email and Slack.
 
 This tutorial takes configuring Feishu as the notification channel as an example.
 
-### Before you start
+***Steps:***
+
+Before you start
 
 To receive alerts, you need to deploy monitoring add-ons and enable cluster monitoring first. Refer to [Monitor database](monitor-database.md) for details.
 
-### Configure alert channels
+1. Configure alert channels.
 
-Refer to the following guides to configure your alert channels.
+   Refer to the following guides to configure your alert channels.
 
-* [Feishu custom bot](https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN)
-* [DingTalk custom bot](https://open.dingtalk.com/document/orgapp/custom-robot-access)
-* [WeChat Enterprise custom bot](https://developer.work.weixin.qq.com/document/path/91770)
-* [Slack](https://api.slack.com/messaging/webhooks)
+   * [Feishu custom bot](https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN)
+   * [DingTalk custom bot](https://open.dingtalk.com/document/orgapp/custom-robot-access)
+   * [WeChat Enterprise custom bot](https://developer.work.weixin.qq.com/document/path/91770)
+   * [Slack](https://api.slack.com/messaging/webhooks)
 
-:::note
+  :::note
 
-* Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts.
-* The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
+  * Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts.
+  * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
 
-:::
+  :::
 
-### Configure the receiver
+2. Configure the receiver.
 
-To improve ease of use, `kbcli` develops the `alert` subcommand to simplify the receiver configuration. You can set the notification channels and receivers by the `alert` subcommand. This subcommand also supports condition filters, such as cluster names and severity levels. After the configuration succeeds, it takes effect dynamically without the service restarting.
+   To improve ease of use, `kbcli` develops the `alert` subcommand to simplify the receiver configuration. You can set the notification channels and receivers by the `alert` subcommand. This subcommand also supports condition filters, such as cluster names and severity levels. After the configuration succeeds, it takes effect dynamically without the service restarting.
 
-Add an alert receiver.
-   
-   ```bash
-   kbcli alert add-receiver --webhook='xxx' --cluster=xx --severity=xx
-   ```
+   1. Add an alert receiver.
 
-***Example***
+      ```bash
+      kbcli alert add-receiver --webhook='xxx' --cluster=xx --severity=xx
+      ```
 
-   The following commands show how to add a receiver to Feishu based on different requirements.
-   The webhook address below is an example and you need to replace it with the actual address before running the command.
+      ***Example***
 
-   ```bash
-   # Signature authentication is disabled
-   kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo'
+      The following commands show how to add a receiver to Feishu based on different requirements.
+      The webhook address below is an example and you need to replace it with the actual address before running the command.
 
-   # Signature authentication is enabled and sign is used as the value of token
-   kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=sign'
+      ```bash
+      # Signature authentication is disabled
+      kbcli alert add-receiver \
+      --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo'
 
-   # Only receive the alerts from a cluster named mysql-cluster
-   kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql-cluster
+      # Signature authentication is enabled and sign is used as the value of token
+      kbcli alert add-receiver \
+      --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=sign'
 
-   # Only receive the critical alerts from a cluster named mysql-cluster
-   kbcli alert add-receiver \
-   --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql-cluster --severity=critical
-   ```
+      # Only receive the alerts from a cluster named mysql-cluster
+      kbcli alert add-receiver \
+      --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql-cluster
 
-:::note
+      # Only receive the critical alerts from a cluster named mysql-cluster
+      kbcli alert add-receiver \
+      --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql-cluster --severity=critical
+      ```
 
-For the detailed command description, run `kbcli alert add-receiver -h`.
+  :::note
 
-:::
+  For the detailed command description, run `kbcli alert add-receiver -h`.
 
-View the notification configurations.
+  :::
 
-  ```bash
-  kbcli alert list-receivers
-  ```
+   2. View the receiver list to verify whether the new receiver is added. 
 
-Delete the notification channel and receiver if you want to disable the alert function.
+      You can also view the notification configurations by this command.
 
-  ```bash
-  kbcli alert delete-receiver <receiver-name>
-  ```
+      ```bash
+      kbcli alert list-receivers
+      ```
 
-## Troubleshooting
+   3. (Optional) Delete the notification channel and receiver if you want to disable the alert function.
 
-If you cannot receive alert notices, run the commands below to troubleshoot the logs of AlertManager and AlertManager-Webhook-Adaptor add-ons. 
+      ```bash
+      kbcli alert delete-receiver <receiver-name>
+      ```
+
+### IM alert troubleshooting
+
+If you cannot receive alert notices, run the commands below to troubleshoot the logs of AlertManager and AlertManager-Webhook-Adaptor add-ons.
 
 ```bash
 # Find the corresponding Pod of AlertManager and get Pod name
@@ -143,3 +149,46 @@ kubectl get pods -n kb-system -l 'app.kubernetes.io/name=alertmanager-webhook-ad
 # Search AlertManager-Webhook-Adaptor logs
 kubectl logs <pod-name> -n kb-system -c alertmanager-webhook-adaptor
 ```
+
+## Configure email alert
+
+KubeBlocks also supports email alert.
+
+1. Configure SMTP server.
+
+   ```bash
+   kbcli alert config-smtpserver 
+   --smtp-from alert-test@apecloud.com \
+   --smtp-smarthost smtp.feishu.cn:587 \
+   --smtp-auth-username alert-test@apecloud.com \
+   --smtp-auth-password 123456abc \
+   --smtp-auth-identity alert-test@apecloud.com
+   ```
+
+2. View the SMTP server list to verify whether the above server is added successfully.
+
+   You can also view the configuration details by this command.
+
+   ```bash
+   kbcli alert list-smtpserver
+   ```
+
+3. Add email receiver.
+
+   ```bash
+   kbcli alert add-receiver --email='user1@kubeblocks.io'
+   ```
+
+   KubeBlocks email alert now supports receiving emails from a specified cluster and of a certain severity. You can set this function by using `--cluster` and `--severity` flags.
+
+  * `--cluster`: Only receive emails from a specified cluster.
+
+    ```bash
+    kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
+    ```
+
+  * `--severity`: Only receive emails from a specified cluster and the alert severity is warning.
+
+    ```bash
+    kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
+    ```

@@ -33,11 +33,19 @@ kubectl edit configmap dns-server-config -n chaos-mesh
 
 DNS faults can be simulated as `random` and `error`. You can define oen type for DNS fault injection.
 
-`--pattern` selects a domain template that matches faults. Placeholder `?` and wildcard `*` are supported.
+`--pattern` selects a domain template that matches faults and it is required. Placeholder `?` and wildcard `*` are supported.
+
+### DNS random
+
+Run the command below to inject DNS faults all Pods in the default namespace, which means an IP address will be returned when a DNS request is sent to the specified domains.
 
 ```bash
 kbcli fault network dns random --patterns=google.com --duration=1m
 ```
+
+### DNS error
+
+Run the command below to inject DNS faults all Pods in the default namespace, which means an error will be returned when a DNS request is sent to the specified domains.
 
 ```bash
 kbcli fault network dns error --patterns=google.com --duration=1m
@@ -45,4 +53,74 @@ kbcli fault network dns error --patterns=google.com --duration=1m
 
 ## Simulate fault injections by YAML file
 
-This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-network-chaos-on-kubernetes/#create-experiments-using-the-yaml-files) for details.
+This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-dns-chaos-on-kubernetes/#create-experiments-using-the-yaml-file) for details.
+
+### DNS-random example
+
+1. Write the experiment configuration to the `dns-random.yaml` file.
+
+    In the following example, Chaos Mesh injects DNS faults all Pods in the default namespace, which means an IP address will be returned when a DNS request is sent to the specified domains.
+
+    ```yaml
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: DNSChaos
+    metadata:
+      creationTimestamp: null
+      generateName: dns-chaos-
+      namespace: default
+    spec:
+      action: random
+      duration: 1m
+      mode: all
+      patterns:
+      - google.com
+      selector:
+        namespaces:
+        - default
+    ```
+
+2. Run `kubectl` to start an experiment.
+
+   ```bash
+   kubectl apply -f ./dns-random.yaml
+   ```
+
+### DNS-error example
+
+1. Write the experiment configuration to the `network-partition.yaml` file.
+
+    In the following example, Chaos Mesh injects DNS faults all Pods in the default namespace, which means an error will be returned when a DNS request is sent to the specified domains.
+
+    ```yaml
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: DNSChaos
+    metadata:
+      creationTimestamp: null
+      generateName: dns-chaos-
+      namespace: default
+    spec:
+      action: error
+      duration: 1m
+      mode: all
+      patterns:
+      - google.com
+      selector:
+        namespaces:
+        - default
+    ```
+
+2. Run `kubectl` to start an experiment.
+
+   ```bash
+   kubectl apply -f ./network-partition.yaml
+   ```
+
+### Field description
+
+| Parameter | Type | Description | Default value | Required | Example |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| `action` | string | Defines the behavior of DNS fault. Optional values: `random` or `error`. When the value is `random`, DNS service returns a random IP address; when the value is `error`, DNS service returns an error. | None | Yes | `random` or `error` |
+| `patterns` | String array | Selects a domain template that matches faults. Placeholder `?` and wildcard `*` are supported.  | [] | No | `google.com`, `chaos-mesh.org`, `github.com` |
+| `mode` | string | Specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes | `one` |
+| `value` | string | Provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No | `1` |
+| `selector` | struct | Specifies the target Pod. For details, refer to [Define the Scope of Chaos Experiments](./define-chaos-experiment-scope.md). | None | Yes |  |

@@ -1,6 +1,6 @@
 ---
 title: Prerequisite
-description: Fault injection prerequisite
+description: Prerequisite for fault injection
 sidebar_position: 2
 sidebar_label: Prerequisite
 ---
@@ -12,10 +12,10 @@ import TabItem from '@theme/TabItem';
 
 ## Check your permission
 
+Fault injection requires `local code` permission. Make sure your acount has been granted with `local code` permission.
+
 <Tabs>
 <TabItem value="EKS" label="EKS" default>
-
-Fault injection requires `local code` permission. 
 
 Go to [IAM](https://console.amazonaws.cn/iamv2/home?#/home) and click **Users** -> **User name** -> **Security credentials** -> **Create access key** and select **Local code**.
 
@@ -31,7 +31,7 @@ After a new access key is created, you need to set `aws configure` again.
 
 <TabItem value="GKE" label="GKE">
 
-Run the command below to verify whether your account has permission to create podchaos.
+Verify whether your account has permission to create Podchaos.
 
 ```bash
 kubectl auth can-i create podchaos.chaos-mesh.org -n default --as "useraccont"
@@ -47,7 +47,7 @@ kubectl delete validatingwebhookconfigurations.admissionregistration.k8s.io chao
 
 If the output is `reauth related error`, it may relate to your GKE account permission. Reset your permission and clear the environment by running the commands below.
 
-//TODO: 这里的重新设置权限需要说明吗？
+//TODO: 这里的“重新设置权限”，具体涉及的权限需要说明吗？
 
 ```bash
 rm -rf .config/gcloud
@@ -120,4 +120,5 @@ kbcli addon enable fault-chaos-mesh \
 --tolerations 'dashboard:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
 --tolerations 'dnsServer:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' 
 ```
+
 </details>

@@ -41,7 +41,7 @@ import (
 )
 
 var (
-	driverMap = map[string]string{
+	sysbenchDriverMap = map[string]string{
 		"mysql":      "mysql",
 		"postgresql": "pgsql",
 	}
@@ -51,14 +51,14 @@ var sysbenchExample = templates.Examples(`
 		# sysbench on a cluster
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with different threads
+		# sysbench on a cluster with threads count
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 
-		# sysbench on a cluster with different type
+		# sysbench on a cluster with type
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
 
 		# sysbench on a cluster with specified read/write ratio
-		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 20
 
 		# sysbench on a cluster with specified tables and size
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
@@ -92,10 +92,9 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:               "sysbench [ClusterName]",
-		Short:             "run a SysBench benchmark",
-		Example:           sysbenchExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Use:     "sysbench [BenchmarkName]",
+		Short:   "run a SysBench benchmark",
+		Example: sysbenchExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(args))
 			cmdutil.CheckErr(o.Validate())
@@ -112,11 +111,14 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd.Flags().IntVar(&o.WritePercent, "write-percent", 0, "the percent of write, only useful when type is oltp_read_write_pct")
 	o.BenchBaseOptions.AddFlags(cmd)
 
+	registerClusterCompletionFunc(cmd, f)
+
 	return cmd
 }
 
 func (o *SysBenchOptions) Complete(args []string) error {
 	var err error
+	var driver string
 	var host string
 	var port int
 
@@ -128,51 +130,48 @@ func (o *SysBenchOptions) Complete(args []string) error {
 		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
 	}
 
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster name should be specified")
+	if o.ClusterName != "" {
+		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+
+		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+			return err
+		}
+
+		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+			return err
+		}
+
+		clusterGetter := cluster.ObjectsGetter{
+			Client:    o.client,
+			Dynamic:   o.dynamic,
+			Name:      o.ClusterName,
+			Namespace: o.namespace,
+			GetOptions: cluster.GetOptions{
+				WithClusterDef:     true,
+				WithService:        true,
+				WithPod:            true,
+				WithEvent:          true,
+				WithPVC:            true,
+				WithDataProtection: true,
+			},
+		}
+		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+			return err
+		}
+		driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+		if err != nil {
+			return err
+		}
 	}
 
-	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
+	if v, ok := sysbenchDriverMap[driver]; ok && o.Driver == "" {
+		o.Driver = v
 	}
 
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-		return err
-	}
-
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-		return err
-	}
-
-	clusterGetter := cluster.ObjectsGetter{
-		Client:    o.client,
-		Dynamic:   o.dynamic,
-		Name:      o.ClusterName,
-		Namespace: o.namespace,
-		GetOptions: cluster.GetOptions{
-			WithClusterDef:     true,
-			WithService:        true,
-			WithPod:            true,
-			WithEvent:          true,
-			WithPVC:            true,
-			WithDataProtection: true,
-		},
-	}
-	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-	o.Driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-	if err != nil {
-		return err
-	}
-	if driver, ok := driverMap[o.Driver]; ok {
-		o.Driver = driver
-	} else {
-		return fmt.Errorf("unsupported driver %s", o.Driver)
-	}
-
-	if o.Host == "" || o.Port == 0 {
+	if o.Host == "" && o.Port == 0 {
 		o.Host = host
 		o.Port = port
 	}
@@ -190,6 +189,29 @@ func (o *SysBenchOptions) Complete(args []string) error {
 
 func (o *SysBenchOptions) Validate() error {
 	if err := o.BaseValidate(); err != nil {
+		return err
+	}
+
+	var supported bool
+	for _, v := range sysbenchDriverMap {
+		if v == o.Driver {
+			supported = true
+			break
+		}
+	}
+	if !supported {
+		return fmt.Errorf("driver %s is not supported", o.Driver)
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
+	}
+
+	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
 		return err
 	}
 

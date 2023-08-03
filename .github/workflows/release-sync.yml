@@ -70,3 +70,14 @@ jobs:
       VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
       APECD_REF: "v0.1.1"
     secrets: inherit
+
+  release-chocolatey-kbcli:
+    needs: update-release-kbcli
+    if: github.event.action== 'released'
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
+    with:
+      GITHUB_REPO: "apecloud/apecloud-cd"
+      WORKFLOW_ID: "publish-kbcli-choco.yml"
+      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+      APECD_REF: "v0.1.1"
+    secrets: inherit

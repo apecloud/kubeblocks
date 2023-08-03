@@ -609,6 +609,11 @@ spec:
               components:
                 additionalProperties:
                   properties:
+                    lastFailedTime:
+                      description: lastFailedTime is the last time the component phase
+                        transitioned to Failed or Abnormal.
+                      format: date-time
+                      type: string
                     message:
                       description: message is a human-readable message indicating
                         details about this operation.

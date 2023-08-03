@@ -105,8 +105,6 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.manager = manager
 	pgOps.DBPort = config.GetDBPort()
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
-	pgOps.BaseOperations.LockInstance = pgOps.LockInstance
-	pgOps.BaseOperations.UnlockInstance = pgOps.UnlockInstance
 	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
 	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
 	pgOps.RegisterOperationOnDBReady(CheckStatusOperation, pgOps.CheckStatusOps, manager)

@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-restart
+  generateName: pg-cluster-restart-
 spec:
   clusterRef: pg-cluster
   ttlSecondsAfterSucceed: 5432

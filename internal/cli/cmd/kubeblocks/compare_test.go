@@ -65,9 +65,9 @@ var _ = Describe("kubeblocks compare", func() {
 		}
 
 		It("validate compare version", func() {
-			Expect(o.compare([]string{kbVersion})).Should(HaveOccurred())
-			Expect(o.compare([]string{})).Should(HaveOccurred())
-			Expect(o.compare([]string{"0.5.0", "0.5.1"})).Should(HaveOccurred())
+			Expect(o.compare([]string{kbVersion}, true)).Should(HaveOccurred())
+			Expect(o.compare([]string{}, true)).Should(HaveOccurred())
+			Expect(o.compare([]string{"0.5.0", "0.5.1"}, true)).Should(HaveOccurred())
 		})
 	})
 })

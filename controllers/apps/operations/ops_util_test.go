@@ -20,13 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -53,7 +57,7 @@ var _ = Describe("OpsUtil functions", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -71,6 +75,35 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(patchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
 			Expect(isOpsRequestFailedPhase(appsv1alpha1.OpsFailedPhase)).Should(BeTrue())
 			Expect(PatchClusterNotFound(ctx, k8sClient, opsRes)).Should(Succeed())
+		})
+
+		It("Test opsRequest failed cases", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+
+			By("Test the functions in ops_util.go")
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+
+			By("mock component failed")
+			clusterComp := opsRes.Cluster.Status.Components[consensusComp]
+			clusterComp.Phase = appsv1alpha1.FailedClusterCompPhase
+			opsRes.Cluster.Status.SetComponentStatus(consensusComp, clusterComp)
+
+			By("expect for opsRequest is running")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsPhase, _, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
+			Expect(err).Should(BeNil())
+			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+			By("mock component failed time reaches the threshold, expect for opsRequest is Failed")
+			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
+			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
+			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
+			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentStatusProgress)
+			Expect(err).Should(BeNil())
+			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+
 		})
 
 	})

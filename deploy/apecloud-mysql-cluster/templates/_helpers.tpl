@@ -15,7 +15,9 @@ The minimum proxy cpu cores is 0.5 and the maximum cpu cores is 64.
 - name: vtcontroller
   componentDefRef: vtcontroller # ref clusterdefinition componentDefs.name
   enabledLogs:
-    - log
+    - error
+    - warning
+    - info
   volumeClaimTemplates:
     - name: data
       spec:

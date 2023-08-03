@@ -80,22 +80,6 @@ data:
     set -o errexit
     set -e
 
-    # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
-    attempt=1
-    max_attempts=10
-    while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
-      sleep 5
-      attempt=$((attempt + 1))
-    done
-
-    primary=$(cat /kb-podinfo/primary-pod)
-    echo "DownwardAPI get primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
-    echo "KB_POD_NAME=$KB_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
-    if [ -z "$primary" ]; then
-      echo "Primary pod information not available. Exiting..."
-      exit 1
-    fi
-
     # usage: retry <command>
     # e.g. retry pg_isready -U postgres -h $primary_fqdn -p 5432
     function retry {
@@ -111,7 +95,19 @@ data:
         exit 1
       fi
     }
-    if [ "$primary" != "$KB_POD_NAME" ]; then
+
+    # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
+    attempt=1
+    max_attempts=10
+    while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
+      sleep 3
+      attempt=$((attempt + 1))
+    done
+
+    primary=$(cat /kb-podinfo/primary-pod)
+    echo "DownwardAPI get primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
+    echo "KB_POD_NAME=$KB_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
+    if  [ ! -z "$primary" ] && [ "$primary" != "$KB_POD_NAME" ]; then
         primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
         echo "primary_fqdn=$primary_fqdn" >> /home/postgres/pgdata/.kb_set_up.log
         # waiting for the primary to be ready, if the wait time exceeds the maximum number of retries, then the script will fail and exit.

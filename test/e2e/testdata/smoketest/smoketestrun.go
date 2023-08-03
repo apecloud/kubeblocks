@@ -46,6 +46,8 @@ type Options struct {
 	Dynamic dynamic.Interface
 }
 
+var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv"}
+
 func SmokeTest() {
 	BeforeEach(func() {
 	})
@@ -81,8 +83,6 @@ func SmokeTest() {
 					if addon.Status.ObservedGeneration == 0 {
 						log.Printf("Addon %s is not observed yet", addon.Name)
 					}
-					log.Printf("Addon: %s, enabled: %v, status: %s",
-						addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase)
 					// addon is enabled, then check its status
 					if addon.Spec.InstallSpec.GetEnabled() {
 						if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
@@ -139,15 +139,9 @@ func getFiles(folder string) {
 func runTestCases(files []string) {
 	var clusterName string
 	for _, file := range files {
-		By("test " + file)
 		b := e2eutil.OpsYaml(file, "create")
 		if strings.Contains(file, "00") || strings.Contains(file, "restore") {
-			if strings.Contains(file, "---") {
-				clusterName = e2eutil.GetName(file)
-			} else {
-				name := e2eutil.ReadLine(file, "name:")
-				clusterName = e2eutil.StringSplit(name)
-			}
+			clusterName = e2eutil.GetName(file)
 			log.Println("clusterName is " + clusterName)
 		}
 		Expect(b).Should(BeTrue())
@@ -174,7 +168,16 @@ func runTestCases(files []string) {
 		}
 	}
 	if len(files) > 0 {
-		file := e2eutil.GetClusterCreateYaml(files)
-		e2eutil.OpsYaml(file, "delete")
+		for _, file := range files {
+			deleteResource(file)
+		}
+	}
+}
+
+func deleteResource(file string) {
+	for _, s := range arr {
+		if strings.Contains(file, s) {
+			e2eutil.OpsYaml(file, "delete")
+		}
 	}
 }

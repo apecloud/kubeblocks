@@ -106,6 +106,12 @@ type BalancerStatus struct {
 	OKResponse `bson:",inline"`
 }
 
+type LockResp struct {
+	Info       string `bson:"info" json:"info"`
+	LockCount  int64  `bson:"lockCount" json:"lockCount"`
+	OKResponse `bson:",inline"`
+}
+
 type DBList struct {
 	DBs []struct {
 		Name string `bson:"name" json:"name"`

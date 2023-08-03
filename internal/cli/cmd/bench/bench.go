@@ -35,11 +35,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -57,6 +59,8 @@ var (
 var benchGVRList = []schema.GroupVersionResource{
 	types.PgBenchGVR(),
 	types.SysbenchGVR(),
+	types.YcsbGVR(),
+	types.TpccGVR(),
 }
 
 type BenchBaseOptions struct {
@@ -69,13 +73,13 @@ type BenchBaseOptions struct {
 	ClusterName string
 }
 
+// BaseValidate validates the base options
+// In some cases, for example, in redis, the database is not required, the username is not required
+// and password can be empty for many databases,
+// so we don't validate them here
 func (o *BenchBaseOptions) BaseValidate() error {
 	if o.Driver == "" {
 		return fmt.Errorf("driver is required")
-	}
-
-	if o.Database == "" {
-		return fmt.Errorf("database name should be specified")
 	}
 
 	if o.Host == "" {
@@ -86,24 +90,17 @@ func (o *BenchBaseOptions) BaseValidate() error {
 		return fmt.Errorf("port is required")
 	}
 
-	if o.User == "" {
-		return fmt.Errorf("user is required")
-	}
-
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster is required")
-	}
-
 	return nil
 }
 
 func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&o.Database, "database", "", "database name")
-	cmd.PersistentFlags().StringVar(&o.Host, "host", "", "the host of database")
-	cmd.PersistentFlags().StringVar(&o.User, "user", "", "the user of database")
-	cmd.PersistentFlags().StringVar(&o.Password, "password", "", "the password of database")
-	cmd.PersistentFlags().IntVar(&o.Port, "port", 0, "the port of database")
-	cmd.PersistentFlags().StringVar(&o.ClusterName, "cluster", "", "the cluster of database")
+	cmd.Flags().StringVar(&o.Driver, "driver", "", "the driver of database")
+	cmd.Flags().StringVar(&o.Database, "database", "", "database name")
+	cmd.Flags().StringVar(&o.Host, "host", "", "the host of database")
+	cmd.Flags().StringVar(&o.User, "user", "", "the user of database")
+	cmd.Flags().StringVar(&o.Password, "password", "", "the password of database")
+	cmd.Flags().IntVar(&o.Port, "port", 0, "the port of database")
+	cmd.Flags().StringVar(&o.ClusterName, "cluster", "", "the cluster of database")
 }
 
 // NewBenchCmd creates the bench command
@@ -117,6 +114,8 @@ func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.AddCommand(
 		NewSysBenchCmd(f, streams),
 		NewPgBenchCmd(f, streams),
+		NewYcsbCmd(f, streams),
+		NewTpccCmd(f, streams),
 		newListCmd(f, streams),
 		newDeleteCmd(f, streams),
 	)
@@ -286,6 +285,41 @@ func (o *benchDeleteOption) run(args []string) error {
 	for _, benchName := range args {
 		if err := delete(benchName); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func registerClusterCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cluster",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+	))
+}
+
+func validateBenchmarkExist(factory cmdutil.Factory, streams genericclioptions.IOStreams, name string) error {
+	var infos []*resource.Info
+	for _, gvr := range benchGVRList {
+		bench := list.NewListOptions(factory, streams, gvr)
+
+		bench.Print = false
+		result, err := bench.Run()
+		if err != nil {
+			return err
+		}
+
+		benchInfos, err := result.Infos()
+		if err != nil {
+			return err
+		}
+		infos = append(infos, benchInfos...)
+	}
+
+	for _, info := range infos {
+		if info.Name == name {
+			return fmt.Errorf("benchmark %s already exists", name)
 		}
 	}
 	return nil

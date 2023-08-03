@@ -58,21 +58,38 @@ func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
 	}
 }
 
-// func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
-//	return client.MatchingLabels{
-//		constant.AppInstanceLabelKey:  cluster.Name,
-//		constant.AppManagedByLabelKey: constant.AppName,
-//	}
-// }
+func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppInstanceLabelKey:  cluster.Name,
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+}
 
-// getClusterOwningObjects reads objects owned by our cluster with kinds and label matching specifier.
-func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster,
-	matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterOwningObjects, error) {
+// getClusterOwningNamespacedObjects reads namespaced objects owned by our cluster with kinds.
+func getClusterOwningNamespacedObjects(transCtx *ClusterTransformContext,
+	cluster appsv1alpha1.Cluster,
+	labels client.MatchingLabels,
+	kinds []client.ObjectList) (clusterOwningObjects, error) {
+	inNS := client.InNamespace(cluster.Namespace)
+	return getClusterOwningObjectsWithOptions(transCtx, kinds, inNS, labels)
+}
+
+// getClusterOwningNonNamespacedObjects reads non-namespaced objects owned by our cluster with kinds.
+func getClusterOwningNonNamespacedObjects(transCtx *ClusterTransformContext,
+	_ appsv1alpha1.Cluster,
+	labels client.MatchingLabels,
+	kinds []client.ObjectList) (clusterOwningObjects, error) {
+	return getClusterOwningObjectsWithOptions(transCtx, kinds, labels)
+}
+
+// getClusterOwningObjectsWithOptions reads objects owned by our cluster with kinds and specified options.
+func getClusterOwningObjectsWithOptions(transCtx *ClusterTransformContext,
+	kinds []client.ObjectList,
+	opts ...client.ListOption) (clusterOwningObjects, error) {
 	// list what kinds of object cluster owns
 	objs := make(clusterOwningObjects)
-	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {
-		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
+		if err := transCtx.Client.List(transCtx.Context, list, opts...); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items

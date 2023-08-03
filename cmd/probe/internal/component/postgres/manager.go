@@ -507,19 +507,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	}
 
 	if !needRestart {
-		var stdout, stderr bytes.Buffer
-		cmd := exec.Command("su", "-c", "pg_ctl reload", "postgres")
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
-		err = cmd.Run()
-		if err != nil || stderr.String() != "" {
-			mgr.Logger.Errorf("postgresql reload failed, err:%v, stderr:%s", err, stderr.String())
-			return err
-		}
-
-		mgr.Logger.Infof("successfully follow new leader:%s", leaderMember.Name)
-		return nil
+		return mgr.pgReload(context.TODO())
 	}
 
 	return mgr.Start()
@@ -630,25 +618,32 @@ func (mgr *Manager) CreateRoot(ctx context.Context) error {
 
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 	mgr.Logger.Infof("Lock db: %s", reason)
-	sql := "alter system set default_transaction_read_only=on;" +
-		"select pg_reload_conf();"
+	sql := "alter system set default_transaction_read_only=on;"
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return mgr.pgReload(ctx)
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
-	sql := "alter system set default_transaction_read_only=off;" +
-		"select pg_reload_conf();"
+	mgr.Logger.Infof("UnLock db")
+	sql := "alter system set default_transaction_read_only=off;"
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return mgr.pgReload(ctx)
+}
+
+func (mgr *Manager) pgReload(ctx context.Context) error {
+	reload := "select pg_reload_conf();"
+
+	_, err := mgr.Exec(ctx, reload)
+
+	return err
 }

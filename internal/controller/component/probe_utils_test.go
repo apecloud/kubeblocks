@@ -101,7 +101,7 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build role changed probe container", func() {
-			buildRoleProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
+			buildRoleProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort, nil)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 

@@ -8110,6 +8110,22 @@ spec:
                         roleProbe:
                           description: Probe for DB role changed check.
                           properties:
+                            actions:
+                              items:
+                                properties:
+                                  command:
+                                    description: Command provided by user to perform
+                                      action in Image
+                                    items:
+                                      type: string
+                                    type: array
+                                  image:
+                                    description: Image specified by user
+                                    type: string
+                                required:
+                                - command
+                                type: object
+                              type: array
                             commands:
                               description: commands used to execute for probe.
                               properties:
@@ -8162,6 +8178,22 @@ spec:
                         runningProbe:
                           description: Probe for DB running check.
                           properties:
+                            actions:
+                              items:
+                                properties:
+                                  command:
+                                    description: Command provided by user to perform
+                                      action in Image
+                                    items:
+                                      type: string
+                                    type: array
+                                  image:
+                                    description: Image specified by user
+                                    type: string
+                                required:
+                                - command
+                                type: object
+                              type: array
                             commands:
                               description: commands used to execute for probe.
                               properties:
@@ -8202,6 +8234,22 @@ spec:
                         statusProbe:
                           description: Probe for DB status check.
                           properties:
+                            actions:
+                              items:
+                                properties:
+                                  command:
+                                    description: Command provided by user to perform
+                                      action in Image
+                                    items:
+                                      type: string
+                                    type: array
+                                  image:
+                                    description: Image specified by user
+                                    type: string
+                                required:
+                                - command
+                                type: object
+                              type: array
                             commands:
                               description: commands used to execute for probe.
                               properties:

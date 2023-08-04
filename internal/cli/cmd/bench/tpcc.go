@@ -37,7 +37,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -48,8 +47,17 @@ var (
 )
 
 var tpccExample = templates.Examples(`
-# tpcc on a cluster
+# tpcc on a cluster, that will exec all steps, cleanup, prepare and run
 kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+# tpcc on a cluster with cleanup, just exec cleanup that will delete the testdata
+kbcli bench tpcc cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+# tpcc on a cluster with prepare, just exec prepare that will create the testdata
+kbcli bench tpcc prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+# tpcc on a cluster with run, just exec run that will run the test
+kbcli bench tpcc run mytest --cluster mycluster --user xxx --password xxx --database mydb
 
 # tpcc on a cluster with warehouses count, which is the overall database size scaling parameter
 kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --warehouses 100
@@ -81,6 +89,7 @@ type TpccOptions struct {
 	OrderStatus   int      // specify the percentage of transactions that should be order status
 	Delivery      int      // specify the percentage of transactions that should be delivery
 	StockLevel    int      // specify the percentage of transactions that should be stock level
+	Step          string   // specify the benchmark step, exec all, cleanup, prepare or run
 	ExtraArgs     []string // specify the extra arguments
 
 	BenchBaseOptions
@@ -94,7 +103,7 @@ func NewTpccCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:     "tpcc",
+		Use:     "tpcc [Step] [BenchmarkName]",
 		Short:   "Run tpcc benchmark",
 		Example: tpccExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -128,13 +137,7 @@ func (o *TpccOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	// use the first argument as the name of the benchmark
-	if len(args) > 0 {
-		o.name = args[0]
-	}
-	if o.name == "" {
-		o.name = fmt.Sprintf("tpcc-%s", util.RandRFC1123String(6))
-	}
+	o.Step, o.name = parseStepAndName(args, "tpcc")
 
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
@@ -247,6 +250,7 @@ func (o *TpccOptions) Run() error {
 			OrderStatus:   o.OrderStatus,
 			Delivery:      o.Delivery,
 			StockLevel:    o.StockLevel,
+			Step:          o.Step,
 			ExtraArgs:     o.ExtraArgs,
 			Target: v1alpha1.TpccTarget{
 				Driver:   o.Driver,

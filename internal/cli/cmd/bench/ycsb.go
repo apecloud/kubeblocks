@@ -37,7 +37,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -50,8 +49,17 @@ var (
 )
 
 var ycsbExample = templates.Examples(`
-# ycsb on a cluster
+# ycsb on a cluster, that will exec all steps, cleanup, prepare and run
 kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+# ycsb on a cluster with cleanup, just exec cleanup that will delete the testdata
+kbcli bench ycsb cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+# ycsb on a cluster with prepare, just exec prepare that will create the testdata
+kbcli bench ycsb prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+# ycsb on a cluster with run, just exec run that will run the test
+kbcli bench ycsb run mytest --cluster mycluster --user xxx --password xxx --database mydb
 
 # ycsb on a cluster with threads count
 kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
@@ -78,6 +86,7 @@ type YcsbOptions struct {
 	InsertProportion          int      // the proportion of operations that are inserts
 	ScanProportion            int      // the proportion of operations that are scans
 	ReadModifyWriteProportion int      // the proportion of operations that are read then modify a record
+	Step                      string   // specify the benchmark step, exec all, cleanup, prepare or run
 	ExtraArgs                 []string // extra arguments for ycsb
 
 	BenchBaseOptions
@@ -92,7 +101,7 @@ func NewYcsbCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd := &cobra.Command{
-		Use:     "ycsb [BenchmarkName]",
+		Use:     "ycsb [Step] [BenchmarkName]",
 		Short:   "Run YCSB benchmark on a cluster",
 		Example: ycsbExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -123,13 +132,7 @@ func (o *YcsbOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	// use the first argument as the name of the benchmark
-	if len(args) > 0 {
-		o.name = args[0]
-	}
-	if o.name == "" {
-		o.name = fmt.Sprintf("ycsb-%s", util.RandRFC1123String(6))
-	}
+	o.Step, o.name = parseStepAndName(args, "ycsb")
 
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
@@ -249,6 +252,7 @@ func (o *YcsbOptions) Run() error {
 			InsertProportion:          o.InsertProportion,
 			ScanProportion:            o.ScanProportion,
 			ReadModifyWriteProportion: o.ReadModifyWriteProportion,
+			Step:                      o.Step,
 			ExtraArgs:                 o.ExtraArgs,
 			Target: v1alpha1.YcsbTarget{
 				Driver:   o.Driver,

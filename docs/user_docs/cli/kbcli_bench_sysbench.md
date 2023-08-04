@@ -5,14 +5,23 @@ title: kbcli bench sysbench
 run a SysBench benchmark
 
 ```
-kbcli bench sysbench [BenchmarkName] [flags]
+kbcli bench sysbench [Step] [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # sysbench on a cluster
+  # sysbench on a cluster, that will exec all steps, cleanup, prepare and run
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with cleanup, just exec cleanup that will delete the testdata
+  kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with prepare, just exec prepare that will create the testdata
+  kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with run, just exec run that will run the test
+  kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
   
   # sysbench on a cluster with threads count
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8

@@ -402,7 +402,8 @@ func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error
 	if err != nil {
 		return err
 	}
-	o.Annotations[constant.RestoreFromTimeAnnotationKey] = restoreTime.Format(time.RFC3339)
+	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
+	o.Annotations[constant.RestoreFromTimeAnnotationKey] = fmt.Sprintf(`{"%s":"%s"}`, components[0]["name"], restoreTime.Format(time.RFC3339))
 	o.Annotations[constant.RestoreFromSrcClusterAnnotationKey] = o.SourceCluster
 
 	return nil

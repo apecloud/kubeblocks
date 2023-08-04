@@ -42,3 +42,19 @@ data:
       "use_fast": False,
       "trust_remote_code": True
     }
+  requests_adapter.py: |
+    import ast
+    for idx, data in enumerate(requests):
+      input_text = data.get("data")
+      if input_text is None:
+        input_text = data.get("body")
+      if isinstance(input_text, (bytes, bytearray)):
+        input_text = input_text.decode("utf-8")
+      input_text_target = ast.literal_eval(input_text)
+      messages = []
+      print(input_text_target)
+      messages.append(input_text_target)
+      responses = []
+      response = model.chat(tokenizer, messages)
+      print(response)
+      responses.append(response)

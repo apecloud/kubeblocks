@@ -49,3 +49,5 @@ spec:
                 value: /llm/ts-handler-config/model_kwargs.py
               - name: TSH_TOKENIZER_KWARGS
                 value: /llm/ts-handler-config/tokenizer_kwargs.py
+              - name: TSH_REQUESTS_ADAPTER
+                value: /llm/ts-handler-config/requests_adapter.py

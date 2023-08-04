@@ -20,21 +20,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package postgres
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
@@ -133,6 +138,63 @@ func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
 	default: // default "on"
 		return synchronous, nil
 	}
+}
+
+func (mgr *Manager) getWalPositionWithPool(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
+	var (
+		lsn      int64
+		isLeader bool
+		err      error
+	)
+
+	if isLeader, err = mgr.IsLeaderWithPool(ctx, pool); isLeader && err == nil {
+		lsn, err = mgr.getLsnWithPool(ctx, "current", pool)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		replayLsn, errReplay := mgr.getLsnWithPool(ctx, "replay", pool)
+		receiveLsn, errReceive := mgr.getLsnWithPool(ctx, "receive", pool)
+		if errReplay != nil && errReceive != nil {
+			return 0, errors.Errorf("get replayLsn or receiveLsn failed, replayLsn err:%v, receiveLsn err:%v", errReplay, errReceive)
+		}
+		lsn = component.MaxInt64(replayLsn, receiveLsn)
+	}
+
+	return lsn, nil
+}
+
+func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxpool.Pool) (int64, error) {
+	var sql string
+	switch types {
+	case "current":
+		sql = "select pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), '0/0')::bigint;"
+	case "replay":
+		sql = "select pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_last_wal_replay_lsn(), '0/0')::bigint;"
+	case "receive":
+		sql = "select pg_catalog.pg_wal_lsn_diff(COALESCE(pg_catalog.pg_last_wal_receive_lsn(), '0/0'), '0/0')::bigint;"
+	}
+
+	resp, err := mgr.QueryWithPool(ctx, sql, pool)
+	if err != nil {
+		mgr.Logger.Errorf("get wal position failed, err:%v", err)
+		return 0, err
+	}
+	lsnStr := strings.TrimFunc(string(resp), func(r rune) bool {
+		return !unicode.IsDigit(r)
+	})
+
+	lsn, err := strconv.ParseInt(lsnStr, 10, 64)
+	if err != nil {
+		mgr.Logger.Errorf("convert lsnStr to lsn failed, err:%v", err)
+	}
+
+	return lsn, nil
+}
+
+func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
+	lag := cluster.GetOpTime() - walPosition
+	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
 // TODO: restore the sync state to cluster coz these values only exist in primary
@@ -399,8 +461,44 @@ func (mgr *Manager) PromoteReplication() error {
 	return nil
 }
 
+func (mgr *Manager) prePromote() error {
+	return nil
+}
+
+func (mgr *Manager) postPromote() error {
+	return nil
+}
+
 func (mgr *Manager) DemoteReplication() error {
 	return mgr.Stop()
+}
+
+func (mgr *Manager) Stop() error {
+	mgr.Logger.Infof("wait for send signal 1 to deactivate sql channel")
+	sqlChannelProc, err := component.GetSQLChannelProc()
+	if err != nil {
+		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		return errors.Errorf("can't find sql channel process, err:%v", err)
+	}
+
+	// deactivate sql channel restart db
+	err = sqlChannelProc.Signal(syscall.SIGUSR1)
+	if err != nil {
+		return errors.Errorf("send signal1 to sql channel failed, err:%v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	stopCmd := exec.Command("su", "-c", "pg_ctl stop -m fast", "postgres")
+	stopCmd.Stdout = &stdout
+	stopCmd.Stderr = &stderr
+
+	err = stopCmd.Run()
+	if err != nil || stderr.String() != "" {
+		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
+		return err
+	}
+
+	return nil
 }
 
 func (mgr *Manager) FollowReplication(cluster *dcs.Cluster) error {
@@ -422,5 +520,58 @@ func (mgr *Manager) FollowReplication(cluster *dcs.Cluster) error {
 	}
 
 	mgr.Logger.Infof("no action coz i still follow the leader:%s", cluster.Leader.Name)
+	return nil
+}
+
+func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
+	leaderMember := cluster.GetLeaderMember()
+	if mgr.CurrentMemberName == leaderMember.Name {
+		mgr.Logger.Infof("i get the leader key, don't need to follow")
+		return nil
+	}
+
+	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
+		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, viper.GetString("POSTGRES_PASSWORD"))
+
+	pgConf, err := os.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
+	if err != nil {
+		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
+		return err
+	}
+	defer pgConf.Close()
+
+	writer := bufio.NewWriter(pgConf)
+	_, err = writer.WriteString(primaryInfo)
+	if err != nil {
+		mgr.Logger.Errorf("write into postgresql.conf failed, err:%v", err)
+		return err
+	}
+
+	err = writer.Flush()
+	if err != nil {
+		mgr.Logger.Errorf("writer flush failed, err:%v", err)
+		return err
+	}
+
+	if !needRestart {
+		return mgr.pgReload(context.TODO())
+	}
+
+	return mgr.Start()
+}
+
+func (mgr *Manager) Start() error {
+	mgr.Logger.Infof("wait for send signal 2 to activate sql channel")
+	sqlChannelProc, err := component.GetSQLChannelProc()
+	if err != nil {
+		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		return errors.Errorf("can't find sql channel process, err:%v", err)
+	}
+
+	// activate sql channel restart db
+	err = sqlChannelProc.Signal(syscall.SIGUSR2)
+	if err != nil {
+		return errors.Errorf("send signal2 to sql channel failed, err:%v", err)
+	}
 	return nil
 }

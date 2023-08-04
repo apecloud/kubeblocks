@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // RBACTransformer puts the rbac at the beginning of the DAG
@@ -60,22 +59,24 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	if err != nil {
 		return err
 	}
-	componentSpecs := cluster.Spec.ComponentSpecs
-	if componentSpecs == nil {
-		componentSpecs = make([]appsv1alpha1.ClusterComponentSpec, 1)
-		// if componentSpecs is empty, it will be generated from the cluster template and cluster.
-		reqCtx := intctrlutil.RequestCtx{
-			Ctx: transCtx.Context,
-			Log: log.Log.WithName("rbac"),
-		}
-		for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
+
+	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
+	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		comps := compSpecMap[compDef.Name]
+		if len(comps) == 0 {
+			// if componentSpecs is empty, it may be generated from the cluster template and cluster.
+			reqCtx := ictrlutil.RequestCtx{
+				Ctx: transCtx.Context,
+				Log: log.Log.WithName("rbac"),
+			}
 			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterTemplate, transCtx.ClusterDef, &compDef, nil)
 			if err != nil || synthesizedComponent == nil {
 				continue
 			}
-
-			componentSpecs = append(componentSpecs, appsv1alpha1.ClusterComponentSpec{ServiceAccountName: synthesizedComponent.ServiceAccountName})
+			comps = []appsv1alpha1.ClusterComponentSpec{{ServiceAccountName: synthesizedComponent.ServiceAccountName}}
 		}
+		componentSpecs = append(componentSpecs, comps...)
 	}
 
 	for _, compSpec := range componentSpecs {

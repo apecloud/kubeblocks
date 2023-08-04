@@ -58,3 +58,45 @@ data:
       response = model.chat(tokenizer, messages)
       print(response)
       responses.append(response)
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-ts-handler-config-gpt2
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+  {{- include "llm.labels" . | nindent 4 }}
+
+data:
+  model_kwargs.py: |
+    kwargs = {
+      "low_cpu_mem_usage": True,
+      "device_map": "auto"
+    }
+  tokenizer_kwargs.py: |
+    kwargs = {
+    }
+  requests_adapter.py: |
+    import ast
+    responses = []
+    for idx, data in enumerate(requests):
+      input_text = data.get("data")
+      if input_text is None:
+        input_text = data.get("body")
+      if isinstance(input_text, (bytes, bytearray)):
+        input_text = input_text.decode("utf-8")
+      input_text_target = ast.literal_eval(input_text)
+      input_text = input_text_target["text"]
+      inputs = tokenizer.encode_plus(
+        input_text,
+        max_length=150,
+        add_special_tokens=True,
+        return_tensors="pt",
+      )
+      input_ids = inputs["input_ids"].to("cpu")
+      outputs = model.generate(input_ids, max_length=50)
+      for i, x in enumerate(outputs):
+        responses.append(
+          tokenizer.decode(outputs[i], skip_special_tokens=True)
+        )

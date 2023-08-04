@@ -8,6 +8,11 @@ spec:
   clusterDefinitionRef: llm
   componentVersions:
     - componentDefRef: llm
+      configSpecs:
+        - name: llm-ts-handler-config-gpt2
+          templateRef: llm-ts-handler-config-gpt2
+          volumeName: ts-handler-config
+          namespace: {{ .Release.Namespace }}
       versionsContext:
         initContainers:
           - name: model
@@ -18,6 +23,10 @@ spec:
             env:
               - name: MODEL_NAME
                 value: "gpt2"
+              - name: TSH_MODEL_KWARGS
+                value: /llm/ts-handler-config/model_kwargs.py
+              - name: TSH_REQUESTS_ADAPTER
+                value: /llm/ts-handler-config/requests_adapter.py
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1

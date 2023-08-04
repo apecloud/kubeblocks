@@ -186,7 +186,8 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				})
 			}
 
-			if hash.Object(comp.Resources) != hash.Object(lastUsedComp.Resources) {
+			if !CompareResourceList(comp.Resources.Requests, lastUsedComp.Resources.Requests) ||
+				!CompareResourceList(comp.Resources.Limits, lastUsedComp.Resources.Limits) {
 				objJSON, _ := json.Marshal(&lastUsedComp.Resources)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
@@ -195,6 +196,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
+
 			found = true
 			break
 		}
@@ -208,6 +210,18 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 		}
 	}
 	return nil
+}
+
+func CompareResourceList(a, b corev1.ResourceList) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if !v.Equal(b[k]) {
+			return false
+		}
+	}
+	return true
 }
 
 var _ graph.Transformer = &HaltRecoveryTransformer{}

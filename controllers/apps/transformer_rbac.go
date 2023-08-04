@@ -29,13 +29,16 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // RBACTransformer puts the rbac at the beginning of the DAG
@@ -57,8 +60,25 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	if err != nil {
 		return err
 	}
+	componentSpecs := cluster.Spec.ComponentSpecs
+	if componentSpecs == nil {
+		componentSpecs = make([]appsv1alpha1.ClusterComponentSpec, 1)
+		// if component spec may be empty, then it will be generated from cluster template and cluster
+		reqCtx := intctrlutil.RequestCtx{
+			Ctx: transCtx.Context,
+			Log: log.Log.WithName("rbac"),
+		}
+		for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
+			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterTemplate, transCtx.ClusterDef, &compDef, nil)
+			if err != nil || synthesizedComponent == nil {
+				continue
+			}
 
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
+			componentSpecs = append(componentSpecs, appsv1alpha1.ClusterComponentSpec{ServiceAccountName: synthesizedComponent.ServiceAccountName})
+		}
+	}
+
+	for _, compSpec := range componentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
 		if serviceAccountName == "" {
 			if !needToCreateRBAC(clusterDef) {
@@ -76,7 +96,8 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			return nil
 		}
 
-		if isClusterRoleBindingExist(transCtx, serviceAccountName) {
+		if isClusterRoleBindingExist(transCtx, serviceAccountName) &&
+			isServiceAccountExist(transCtx, serviceAccountName, false) {
 			continue
 		}
 

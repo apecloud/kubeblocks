@@ -22,7 +22,6 @@ package apps
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"github.com/authzed/controller-idioms/hash"
 	corev1 "k8s.io/api/core/v1"
@@ -210,45 +209,6 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 		}
 	}
 	return nil
-}
-
-func isResourceRequirementsEqual(a, b corev1.ResourceRequirements) bool {
-	return isResourceEqual(a.Requests, b.Requests) && isResourceEqual(a.Limits, b.Limits)
-}
-
-func isResourceEqual(a, b corev1.ResourceList) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if !v.Equal(b[k]) {
-			return false
-		}
-	}
-	return true
-}
-
-func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaimTemplate) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		// first check resource requirements
-		c := a[i].DeepCopy()
-		d := b[i].DeepCopy()
-		if !isResourceRequirementsEqual(c.Spec.Resources, d.Spec.Resources) {
-			return false
-		}
-
-		// then clear resource requirements and check other fields
-		c.Spec.Resources = corev1.ResourceRequirements{}
-		d.Spec.Resources = corev1.ResourceRequirements{}
-		if !reflect.DeepEqual(c, d) {
-			return false
-		}
-	}
-	return true
 }
 
 var _ graph.Transformer = &HaltRecoveryTransformer{}

@@ -12,7 +12,7 @@ dependencies:
     alias: extra
 
 # This is the version number of the MySQL being deployed.
-appVersion: "8.0.34"
+appVersion: "8.0.32"
 
 keywords:
   - mysql

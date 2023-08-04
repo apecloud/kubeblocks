@@ -8,7 +8,7 @@ type: application
 version: 0.6.0-alpha.21
 
 # This is the version number of the MySQL being deployed,
-appVersion: "8.0.34"
+appVersion: "8.0.32"
 
 home: https://kubeblocks.io/
 icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png

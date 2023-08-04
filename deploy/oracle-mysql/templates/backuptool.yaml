@@ -1,0 +1,41 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: oracle-mysql-xtrabackup
+  labels:
+    clusterdefinition.kubeblocks.io/name: oracle-mysql
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+spec:
+  image: docker.io/perconalab/percona-xtrabackup:8.0.32
+  deployKind: job
+  env:
+    - name: DATA_DIR
+      value: /var/lib/mysql
+  physical:
+    restoreCommands:
+      - sh
+      - -c
+      - |
+        set -e;
+        mkdir -p ${DATA_DIR}
+        res=`ls -A ${DATA_DIR}`
+        if [ ! -z ${res} ]; then
+          echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
+          exit 1
+        fi
+        TMP_DIR=/data/mysql/temp
+        mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
+        xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+        xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
+        xtrabackup --prepare --target-dir=${TMP_DIR}
+        xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/
+        rm -rf ${TMP_DIR}
+        chmod -R 0777 ${DATA_DIR}
+  backupCommands:
+    - sh
+    - -c
+    - |
+      set -e;
+      mkdir -p ${BACKUP_DIR};
+      xtrabackup --backup --safe-slave-backup --slave-info --stream=xbstream \
+      --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > ${BACKUP_DIR}/${BACKUP_NAME}.xbstream

@@ -42,8 +42,6 @@ spec:
             emptyDir: {}
         initContainers:
           - name: model
-            # TODO: CT move to cv
-            image: lynnleelhl/gpt2:latest
             imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
             command:
               - /bin/sh
@@ -57,7 +55,7 @@ spec:
               - mountPath: /llm/storage
                 name: model-store
         containers:
-          - name: llm
+          - name: torchserve
             imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
             securityContext:
               runAsUser: 0
@@ -80,7 +78,7 @@ spec:
               - name: ts-metrics
                 containerPort: 8082
             startupProbe:
-              failureThreshold: 18
+              failureThreshold: 180
               httpGet:
                 path: /ping
                 port: ts

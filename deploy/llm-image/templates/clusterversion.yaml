@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: gpt2
+  name: llm-gpt2
   labels:
     {{- include "llm.labels" . | nindent 4 }}
 spec:
@@ -9,8 +9,11 @@ spec:
   componentVersions:
     - componentDefRef: llm
       versionsContext:
+        initContainers:
+          - name: model
+            image: lynnleelhl/gpt2:latest
         containers:
-          - name: llm
+          - name: torchserve
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
             env:
               - name: MODEL_NAME
@@ -20,17 +23,32 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: baichuan
+  name: llm-baichuan
   labels:
     {{- include "llm.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: llm
   componentVersions:
     - componentDefRef: llm
+      configSpecs:
+        - name: llm-ts-handler-config-baichuan
+          templateRef: llm-ts-handler-config-baichuan
+          volumeName: ts-handler-config
+          namespace: {{ .Release.Namespace }}
       versionsContext:
+        initContainers:
+          - name: model
+            image: lynnleelhl/baichuan:latest
         containers:
-          - name: llm
+          - name: torchserve
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+            volumeMounts:
+              - name: llm-ts-handler-config-baichuan
+                mountPath: /llm/ts-handler-config/
             env:
               - name: MODEL_NAME
                 value: "baichuan"
+              - name: TSH_MODEL_KWARGS
+                value: /llm/ts-handler-config/model_kwargs.py
+              - name: TSH_TOKENIZER_KWARGS
+                value: /llm/ts-handler-config/tokenizer_kwargs.py

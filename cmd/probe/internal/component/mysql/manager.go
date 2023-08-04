@@ -235,16 +235,20 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	_, _ = mgr.EnsureServerID(ctx)
-	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
-	return mgr.IsMemberHealthy(ctx, cluster, member)
-}
-
-func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	mgr.DBState = nil
 	mgr.globalState = nil
 	mgr.masterStatus = nil
 	mgr.slaveStatus = nil
+	_, _ = mgr.EnsureServerID(ctx)
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	if !mgr.IsMemberHealthy(ctx, cluster, member) {
+		return false
+	}
+	cluster.Leader.DBState = *mgr.GetDBState(ctx, cluster, member)
+	return true
+}
+
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	var db *sql.DB
 	var err error
 	if member != nil && member.Name != mgr.CurrentMemberName {
@@ -270,49 +274,76 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		return false
 	}
 
-	mgr.globalState, err = mgr.GetGlobalState(ctx, db)
+	return true
+}
+
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
+	var db *sql.DB
+	var err error
+	var isCurrentMember bool
+	if member != nil && member.Name != mgr.CurrentMemberName {
+		addr := cluster.GetMemberAddrWithPort(*member)
+		db, err = config.GetDBConnWithAddr(addr)
+		if err != nil {
+			mgr.Logger.Infof("Get Member conn failed: %v", err)
+			return nil
+		}
+		if db != nil {
+			defer db.Close()
+		}
+	} else {
+		isCurrentMember = true
+		db = mgr.DB
+	}
+
+	globalState, err := mgr.GetGlobalState(ctx, db)
 	if err != nil {
 		mgr.Logger.Infof("select global failed: %v", err)
-		return false
+		return nil
 	}
 
-	mgr.masterStatus, err = mgr.GetMasterStatus(ctx, db)
+	masterStatus, err := mgr.GetMasterStatus(ctx, db)
 	if err != nil {
 		mgr.Logger.Infof("show master status failed: %v", err)
-		return false
+		return nil
 	}
 
-	mgr.slaveStatus, err = mgr.GetSlaveStatus(ctx, db)
+	slaveStatus, err := mgr.GetSlaveStatus(ctx, db)
 	if err != nil {
 		mgr.Logger.Infof("show slave status failed: %v", err)
-		return false
+		return nil
 	}
-	mgr.DBState = &dcs.DBState{
+	dbState := &dcs.DBState{
 		OpTimestamp: mgr.opTimestamp,
 		Extra:       map[string]string{},
 	}
-	for k, v := range mgr.globalState {
-		mgr.DBState.Extra[k] = v
+	for k, v := range globalState {
+		dbState.Extra[k] = v
 	}
 
 	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
-		mgr.DBState.Extra["Binlog_File"] = mgr.masterStatus.GetString("File")
-		mgr.DBState.Extra["Binlog_Pos"] = mgr.masterStatus.GetString("Pos")
+		dbState.Extra["Binlog_File"] = masterStatus.GetString("File")
+		dbState.Extra["Binlog_Pos"] = masterStatus.GetString("Pos")
 	} else {
-		mgr.DBState.Extra["Master_Host"] = mgr.masterStatus.GetString("Master_Host")
-		mgr.DBState.Extra["Master_UUID"] = mgr.masterStatus.GetString("Master_UUID")
-		mgr.DBState.Extra["Slave_IO_Running"] = mgr.masterStatus.GetString("Slave_IO_Running")
-		mgr.DBState.Extra["Slave_SQL_Running"] = mgr.masterStatus.GetString("Slave_SQL_Running")
-		mgr.DBState.Extra["Last_IO_Error"] = mgr.masterStatus.GetString("Last_IO_Error")
-		mgr.DBState.Extra["Last_SQL_Error"] = mgr.masterStatus.GetString("Last_SQL_Error")
-		mgr.DBState.Extra["Master_Log_File"] = mgr.masterStatus.GetString("Master_Log_File")
-		mgr.DBState.Extra["Read_Master_Log_Pos"] = mgr.masterStatus.GetString("Read_Master_Log_Pos")
-		mgr.DBState.Extra["Relay_Master_Log_File"] = mgr.masterStatus.GetString("Relay_Master_Log_File")
-		mgr.DBState.Extra["Exec_Master_Log_Pos"] = mgr.masterStatus.GetString("Exec_Master_Log_Pos")
+		dbState.Extra["Master_Host"] = slaveStatus.GetString("Master_Host")
+		dbState.Extra["Master_UUID"] = slaveStatus.GetString("Master_UUID")
+		dbState.Extra["Slave_IO_Running"] = slaveStatus.GetString("Slave_IO_Running")
+		dbState.Extra["Slave_SQL_Running"] = slaveStatus.GetString("Slave_SQL_Running")
+		dbState.Extra["Last_IO_Error"] = slaveStatus.GetString("Last_IO_Error")
+		dbState.Extra["Last_SQL_Error"] = slaveStatus.GetString("Last_SQL_Error")
+		dbState.Extra["Master_Log_File"] = slaveStatus.GetString("Master_Log_File")
+		dbState.Extra["Read_Master_Log_Pos"] = slaveStatus.GetString("Read_Master_Log_Pos")
+		dbState.Extra["Relay_Master_Log_File"] = slaveStatus.GetString("Relay_Master_Log_File")
+		dbState.Extra["Exec_Master_Log_Pos"] = slaveStatus.GetString("Exec_Master_Log_Pos")
 	}
-	cluster.Leader.DBState = *mgr.DBState
 
-	return true
+	if isCurrentMember {
+		mgr.globalState = globalState
+		mgr.masterStatus = masterStatus
+		mgr.slaveStatus = slaveStatus
+		mgr.DBState = dbState
+	}
+	return dbState
 }
 
 func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) bool {
@@ -337,8 +368,9 @@ func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
 		mgr.Logger.Infof("SQL %s query failed: %v", readSQL, err)
 		return false
 	}
-
-	mgr.opTimestamp = OpTimestamp
+	if db == mgr.DB {
+		mgr.opTimestamp = OpTimestamp
+	}
 	return true
 }
 

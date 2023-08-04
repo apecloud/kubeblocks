@@ -311,7 +311,6 @@ func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
 	if err != nil {
 		return err
-
 	}
 
 	var podsReady *bool
@@ -326,17 +325,16 @@ func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 	hasFailedPodTimedOut := false
 	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
 	var delayedRequeueError error
-	clusterGenerationFromWorkload := obj.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	isLatestWorkload := obj.GetAnnotations()[constant.KubeBlocksGenerationKey] == strconv.FormatInt(c.Cluster.Generation, 10)
 	// check if it is the latest obj after cluster does updates.
-	if !isRunning && !appsv1alpha1.ComponentPodsAreReady(podsReady) &&
-		clusterGenerationFromWorkload == strconv.FormatInt(c.Cluster.Generation, 10) {
+	if !isRunning && !appsv1alpha1.ComponentPodsAreReady(podsReady) && isLatestWorkload {
 		var requeueAfter time.Duration
 		if hasFailedPodTimedOut, timedOutPodStatusMessage, requeueAfter = hasFailedAndTimedOutPod(pods); requeueAfter != 0 {
 			delayedRequeueError = intctrlutil.NewDelayedRequeueError(requeueAfter, "requeue for workload status to reconcile.")
 		}
 	}
 
-	phase, statusMessage, err := c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage)
+	phase, statusMessage, err := c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, isLatestWorkload, hasFailedPodTimedOut, timedOutPodStatusMessage)
 	if err != nil {
 		if !intctrlutil.IsDelayedRequeueError(err) {
 			return err
@@ -382,13 +380,17 @@ func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *componentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
-	hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+	isLatestWorkload, hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	var (
 		err           error
 		phase         appsv1alpha1.ClusterComponentPhase
 		statusMessage appsv1alpha1.ComponentMessageMap
 	)
 	if isRunning {
+		// if the workload object is not the latest, wait for next reconcile.
+		if !isLatestWorkload {
+			return phase, statusMessage, nil
+		}
 		if c.Component.Replicas == 0 {
 			// if replicas number of component is zero, the component has stopped.
 			// 'Stopped' is a special 'Running' status for workload(StatefulSet/Deployment).

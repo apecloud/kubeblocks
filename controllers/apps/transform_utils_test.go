@@ -24,8 +24,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestReflect(t *testing.T) {
@@ -51,4 +56,37 @@ func TestReflect(t *testing.T) {
 	ptr := reflect.ValueOf(o)
 	v = ptr.Elem().FieldByName("Spec")
 	fmt.Println(v)
+}
+
+func TestIsVolumeClaimTemplatesEqual(t *testing.T) {
+	buildVCT := func(size string) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+		return []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+			{
+				Name: "data",
+				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse(size),
+						},
+					},
+				},
+			},
+		}
+	}
+
+	assert.True(t, isVolumeClaimTemplatesEqual(buildVCT("1Gi"), buildVCT("1024Mi")))
+}
+
+func TestIsResourceRequirementsEqual(t *testing.T) {
+	buildRR := func(cpu, memory string) corev1.ResourceRequirements {
+		return corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(cpu),
+				corev1.ResourceMemory: resource.MustParse(memory),
+			},
+		}
+	}
+	a := buildRR("1", "1Gi")
+	b := buildRR("1000m", "1024Mi")
+	assert.True(t, isResourceRequirementsEqual(a, b))
 }

@@ -157,7 +157,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				found = true
 				break
 			}
-			if hash.Object(comp.VolumeClaimTemplates) != hash.Object(lastUsedComp.VolumeClaimTemplates) {
+			if !isVolumeClaimTemplatesEqual(comp.VolumeClaimTemplates, lastUsedComp.VolumeClaimTemplates) {
 				objJSON, _ := json.Marshal(&lastUsedComp.VolumeClaimTemplates)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
@@ -186,7 +186,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				})
 			}
 
-			if hash.Object(comp.Resources) != hash.Object(lastUsedComp.Resources) {
+			if !isResourceRequirementsEqual(comp.Resources, lastUsedComp.Resources) {
 				objJSON, _ := json.Marshal(&lastUsedComp.Resources)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
@@ -195,6 +195,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
+
 			found = true
 			break
 		}

@@ -5,16 +5,9 @@ if [ -d ${DATA_DIR}.old ];
 fi
 
 mkdir -p ${PITR_DIR};
-start_wal_log=""
-if [ -f ${DATA_DIR}/backup_label ];then
-  # restore from pg base backup
-  start_wal_location=$(cat ${DATA_DIR}/backup_label | grep "START WAL LOCATION")
-  start_wal_log=${start_wal_location#*file } && start_wal_log=${start_wal_log/)/}
-else
-  # restore from volume snapshot
-  latest_wal=$(ls ${DATA_DIR}/pg_wal -l | grep ^- | awk '{print $9}' | sort | tail -n 1)
-  start_wal_log=`basename $latest_wal`
-fi
+
+latest_wal=$(ls ${DATA_DIR}/pg_wal -lI "*.history" | grep ^- | awk '{print $9}' | sort | tail -n 1)
+start_wal_log=`basename $latest_wal`
 
 echo "fetch-wal-log ${BACKUP_DIR} ${PITR_DIR} ${start_wal_log} \"${KB_RECOVERY_TIME}\" true"
 fetch-wal-log ${BACKUP_DIR} ${PITR_DIR} ${start_wal_log} "${KB_RECOVERY_TIME}" true

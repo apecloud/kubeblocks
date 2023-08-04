@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
@@ -181,6 +182,12 @@ func newDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func (o *benchListOption) run() error {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Fprintf(o.Out, "it seems that kubebench is not running, please run `kbcli addon enable kubebench` to install it or check the kubebench pod status.\n")
+		}
+	}()
+
 	var infos []*resource.Info
 	for _, gvr := range benchGVRList {
 		bench := list.NewListOptions(o.Factory, o.IOStreams, gvr)
@@ -189,6 +196,10 @@ func (o *benchListOption) run() error {
 		bench.LabelSelector = o.LabelSelector
 		result, err := bench.Run()
 		if err != nil {
+			if strings.Contains(err.Error(), "the server doesn't have a resource type") {
+				fmt.Fprintf(o.Out, "kubebench is not installed, please run `kbcli addon enable kubebench` to install it.\n")
+				return nil
+			}
 			return err
 		}
 

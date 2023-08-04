@@ -22,6 +22,7 @@ package apps
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"github.com/authzed/controller-idioms/hash"
 	corev1 "k8s.io/api/core/v1"
@@ -157,7 +158,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				found = true
 				break
 			}
-			if hash.Object(comp.VolumeClaimTemplates) != hash.Object(lastUsedComp.VolumeClaimTemplates) {
+			if !isVolumeClaimTemplatesEqual(comp.VolumeClaimTemplates, lastUsedComp.VolumeClaimTemplates) {
 				objJSON, _ := json.Marshal(&lastUsedComp.VolumeClaimTemplates)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
@@ -186,8 +187,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				})
 			}
 
-			if !isResourceEqual(comp.Resources.Requests, lastUsedComp.Resources.Requests) ||
-				!isResourceEqual(comp.Resources.Limits, lastUsedComp.Resources.Limits) {
+			if !isResourceRequirementsEqual(comp.Resources, lastUsedComp.Resources) {
 				objJSON, _ := json.Marshal(&lastUsedComp.Resources)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
@@ -212,12 +212,39 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
+func isResourceRequirementsEqual(a, b corev1.ResourceRequirements) bool {
+	return isResourceEqual(a.Requests, b.Requests) && isResourceEqual(a.Limits, b.Limits)
+}
+
 func isResourceEqual(a, b corev1.ResourceList) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for k, v := range a {
 		if !v.Equal(b[k]) {
+			return false
+		}
+	}
+	return true
+}
+
+func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaimTemplate) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		// first check resource requirements
+		c := a[i].DeepCopy()
+		d := b[i].DeepCopy()
+		if !isResourceRequirementsEqual(c.Spec.Resources, d.Spec.Resources) {
+			return false
+		}
+
+		// then clear resource requirements and check other fields
+		c.Spec.Resources = corev1.ResourceRequirements{}
+		d.Spec.Resources = corev1.ResourceRequirements{}
+		if !reflect.DeepEqual(c, d) {
 			return false
 		}
 	}

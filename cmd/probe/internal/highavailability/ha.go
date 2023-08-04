@@ -114,9 +114,12 @@ func (ha *Ha) RunCycle() {
 		if cluster.Switchover != nil {
 			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() ||
 				(cluster.Switchover.Candidate != "" && cluster.Switchover.Candidate != ha.dbManager.GetCurrentMemberName()) {
-				_ = ha.dbManager.Demote(ha.ctx)
-				_ = ha.dcs.ReleaseLock()
-				break
+				if ha.HasOtherHealthyMember(ha.ctx, cluster) {
+					_ = ha.dbManager.Demote(ha.ctx)
+					_ = ha.dcs.ReleaseLock()
+					break
+				}
+
 			} else if cluster.Switchover.Candidate == "" || cluster.Switchover.Candidate == ha.dbManager.GetCurrentMemberName() {
 				if !ha.dbManager.IsPromoted(ha.ctx) {
 					// wait and retry
@@ -262,5 +265,29 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 	return true
 }
 
+func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) bool {
+	var otherMembers = make([]*dcs.Member, 0, 1)
+	if cluster.Switchover != nil && cluster.Switchover.Candidate != "" {
+		candidate := cluster.Switchover.Candidate
+		if candidate != ha.dbManager.GetCurrentMemberName() {
+			otherMembers = append(otherMembers, cluster.GetMemberWithName(candidate))
+		}
+	} else {
+		for _, member := range cluster.Members {
+			if member.Name == ha.dbManager.GetCurrentMemberName() {
+				continue
+			}
+			otherMembers = append(otherMembers, &member)
+		}
+	}
+
+	for _, other := range otherMembers {
+		if ha.dbManager.IsMemberHealthy(ha.ctx, cluster, other) && !ha.dbManager.IsMemberLagging(ha.ctx, cluster, other) {
+			return true
+		}
+	}
+
+	return true
+}
 func (ha *Ha) ShutdownWithWait() {
 }

@@ -21,6 +21,7 @@ package dcs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -341,6 +342,8 @@ func (store *KubernetesStore) UpdateLock() error {
 	ttl := store.cluster.HaConfig.ttl
 	annotations["ttl"] = strconv.Itoa(ttl)
 	annotations["renew-time"] = strconv.FormatInt(time.Now().Unix(), 10)
+	str, _ := json.Marshal(store.cluster.Leader.DBState)
+	configMap.Annotations["dbstate"] = string(str)
 	configMap.SetAnnotations(annotations)
 
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
@@ -351,6 +354,8 @@ func (store *KubernetesStore) ReleaseLock() error {
 	store.logger.Info("release lock")
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
+	str, _ := json.Marshal(store.cluster.Leader.DBState)
+	configMap.Annotations["dbstate"] = string(str)
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		store.logger.Errorf("release lock failed: %v", err)

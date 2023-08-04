@@ -45,6 +45,10 @@ type Manager struct {
 	binlogFormat                 string
 	logbinEnabled                bool
 	logReplicationUpdatesEnabled bool
+	opTimestamp                  int64
+	globalState                  map[string]string
+	masterStatus                 RowMap
+	slaveStatus                  RowMap
 }
 
 var Mgr *Manager
@@ -232,11 +236,15 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 
 func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	_, _ = mgr.EnsureServerID(ctx)
-	return mgr.IsMemberHealthy(ctx, cluster, nil)
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	return mgr.IsMemberHealthy(ctx, cluster, member)
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	mgr.DBState = nil
+	mgr.globalState = nil
+	mgr.masterStatus = nil
+	mgr.slaveStatus = nil
 	var db *sql.DB
 	var err error
 	if member != nil && member.Name != mgr.CurrentMemberName {
@@ -253,12 +261,58 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		db = mgr.DB
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name == mgr.CurrentMemberName {
+	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
 		if !mgr.WriteCheck(ctx, db) {
 			return false
 		}
 	}
-	return mgr.ReadCheck(ctx, db)
+	if !mgr.ReadCheck(ctx, db) {
+		return false
+	}
+
+	mgr.globalState, err = mgr.GetGlobalState(ctx, db)
+	if err != nil {
+		mgr.Logger.Infof("select global failed: %v", err)
+		return false
+	}
+
+	mgr.masterStatus, err = mgr.GetMasterStatus(ctx, db)
+	if err != nil {
+		mgr.Logger.Infof("show master status failed: %v", err)
+		return false
+	}
+
+	mgr.slaveStatus, err = mgr.GetSlaveStatus(ctx, db)
+	if err != nil {
+		mgr.Logger.Infof("show slave status failed: %v", err)
+		return false
+	}
+	mgr.DBState = &dcs.DBState{
+		OpTimestamp: mgr.opTimestamp,
+		Extra:       map[string]string{},
+	}
+	for k, v := range mgr.globalState {
+		mgr.DBState.Extra[k] = v
+	}
+
+	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
+		mgr.DBState.Extra["Binlog_File"] = mgr.masterStatus.GetString("File")
+		mgr.DBState.Extra["Binlog_Pos"] = mgr.masterStatus.GetString("Pos")
+	} else {
+		mgr.DBState.Extra["Master_Host"] = mgr.masterStatus.GetString("Master_Host")
+		mgr.DBState.Extra["Master_UUID"] = mgr.masterStatus.GetString("Master_UUID")
+		mgr.DBState.Extra["Slave_IO_Running"] = mgr.masterStatus.GetString("Slave_IO_Running")
+		mgr.DBState.Extra["Slave_SQL_Running"] = mgr.masterStatus.GetString("Slave_SQL_Running")
+		mgr.DBState.Extra["Last_IO_Error"] = mgr.masterStatus.GetString("Last_IO_Error")
+		mgr.DBState.Extra["Last_SQL_Error"] = mgr.masterStatus.GetString("Last_SQL_Error")
+		mgr.DBState.Extra["Master_Log_File"] = mgr.masterStatus.GetString("Master_Log_File")
+		mgr.DBState.Extra["Read_Master_Log_Pos"] = mgr.masterStatus.GetString("Read_Master_Log_Pos")
+		mgr.DBState.Extra["Relay_Master_Log_File"] = mgr.masterStatus.GetString("Relay_Master_Log_File")
+		mgr.DBState.Extra["Exec_Master_Log_Pos"] = mgr.masterStatus.GetString("Exec_Master_Log_Pos")
+	}
+	cluster.Leader.DBState = *mgr.DBState
+
+	return true
 }
 
 func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) bool {
@@ -283,8 +337,56 @@ func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
 		mgr.Logger.Infof("SQL %s query failed: %v", readSQL, err)
 		return false
 	}
-	mgr.DBState = &dcs.DBState{OpTimestamp: OpTimestamp}
+
+	mgr.opTimestamp = OpTimestamp
 	return true
+}
+
+func (mgr *Manager) GetGlobalState(ctx context.Context, db *sql.DB) (map[string]string, error) {
+	var hostname, serverUUID, gtidExecuted, gtidPurged, isReadonly string
+	err := db.QueryRowContext(ctx, "select  @@global.hostname, @@global.server_uuid, @@global.gtid_executed, @@global.gtid_purged, @@global.read_only").
+		Scan(&hostname, &serverUUID, &gtidExecuted, &gtidPurged, &isReadonly)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]string{
+		"hostname":      hostname,
+		"server_uuid":   serverUUID,
+		"gtid_executed": gtidExecuted,
+		"gtid_purged":   gtidPurged,
+		"read_only":     isReadonly,
+	}, nil
+}
+
+func (mgr *Manager) GetSlaveStatus(ctx context.Context, db *sql.DB) (RowMap, error) {
+	sql := "show slave status"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		return nil, err
+	}
+	return rowMap, nil
+}
+
+func (mgr *Manager) GetMasterStatus(ctx context.Context, db *sql.DB) (RowMap, error) {
+	sql := "show master status"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		return nil, err
+	}
+	return rowMap, nil
 }
 
 func (mgr *Manager) Recover(context.Context) error {

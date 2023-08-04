@@ -1,0 +1,9 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: elasticsearch-config-constraint
+  labels:
+    {{- include "elasticsearch.labels" . | nindent 4 }}
+spec:
+  formatterConfig:
+    format: yaml

@@ -244,7 +244,23 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 	if !mgr.IsMemberHealthy(ctx, cluster, member) {
 		return false
 	}
-	cluster.Leader.DBState = *mgr.GetDBState(ctx, cluster, member)
+	cluster.Leader.DBState = mgr.GetDBState(ctx, cluster, member)
+	return true
+}
+
+func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	var leaderDBState *dcs.DBState
+	if cluster.Leader == nil || cluster.Leader.DBState == nil {
+		return true
+	}
+	leaderDBState = cluster.Leader.DBState
+	dbState := mgr.GetDBState(ctx, cluster, member)
+	if dbState == nil {
+		return true
+	}
+	if leaderDBState.OpTimestamp-dbState.OpTimestamp < cluster.HaConfig.GetMaxLagOnSwitchover() {
+		return false
+	}
 	return true
 }
 

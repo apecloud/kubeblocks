@@ -372,7 +372,7 @@ func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
 	if cluster == nil {
 		return false
 	}
-	lag := cluster.Leader.OpTimestamp - walPosition
+	lag := cluster.Leader.DBState.OpTimestamp - walPosition
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 

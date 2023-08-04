@@ -114,7 +114,7 @@ func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 }
 
 type Leader struct {
-	DBState
+	DBState     *DBState
 	Index       string
 	Name        string
 	AcquireTime int64

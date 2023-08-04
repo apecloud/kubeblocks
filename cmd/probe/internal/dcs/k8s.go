@@ -308,7 +308,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		RenewTime:   renewTime,
 		TTL:         ttl,
 		Resource:    configmap,
-		DBState:     dbState,
+		DBState:     &dbState,
 	}, nil
 }
 

@@ -50,6 +50,7 @@ type DBManager interface {
 	// Member healthy check
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
 	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
+	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) bool
 
 	// HasOtherHealthyLeader is applicable only to consensus cluster,
 	// where the db's internal role services as the source of truth.
@@ -133,6 +134,10 @@ func (mgr *DBManagerBase) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
 
 func (mgr *DBManagerBase) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	return nil
+}
+
+func (mgr *DBManagerBase) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	return false
 }
 
 func RegisterManager(characterType string, manager DBManager) {

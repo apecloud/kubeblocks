@@ -186,8 +186,8 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				})
 			}
 
-			if !CompareResourceList(comp.Resources.Requests, lastUsedComp.Resources.Requests) ||
-				!CompareResourceList(comp.Resources.Limits, lastUsedComp.Resources.Limits) {
+			if !isResourceEqual(comp.Resources.Requests, lastUsedComp.Resources.Requests) ||
+				!isResourceEqual(comp.Resources.Limits, lastUsedComp.Resources.Limits) {
 				objJSON, _ := json.Marshal(&lastUsedComp.Resources)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
@@ -212,7 +212,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func CompareResourceList(a, b corev1.ResourceList) bool {
+func isResourceEqual(a, b corev1.ResourceList) bool {
 	if len(a) != len(b) {
 		return false
 	}

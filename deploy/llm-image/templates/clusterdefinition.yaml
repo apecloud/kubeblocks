@@ -68,6 +68,8 @@ spec:
                 mountPath: /scripts
               - mountPath: /llm/storage
                 name: model-store
+              - name: ts-handler-config
+                mountPath: /llm/ts-handler-config/
             command:
               - /scripts/start.sh
             ports:

@@ -4,7 +4,7 @@
 
 ## @param version MySQL cluster version
 ##
-version: oracle-mysql-8.0.34
+version: oracle-mysql-8.0.32
 ## @param replicas specify cluster replicas
 ##
 replicas: 1

@@ -29,7 +29,6 @@ spec:
         xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
         xtrabackup --prepare --target-dir=${TMP_DIR}
         xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/
-        touch ${DATA_DIR}/.xtrabackup_restore_new_cluster
         rm -rf ${TMP_DIR}
         chmod -R 0777 ${DATA_DIR}
   backupCommands:

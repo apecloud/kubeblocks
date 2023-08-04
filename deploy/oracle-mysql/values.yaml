@@ -32,4 +32,4 @@ auth:
 nameOverride: ""
 fullnameOverride: ""
 ## MySQl ClusterVersion
-clusterVersionOverride: "8.0.34"
+clusterVersionOverride: "8.0.32"

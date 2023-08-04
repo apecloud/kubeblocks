@@ -99,7 +99,6 @@ spec:
       podSpec:
         containers:
           - name: mysql
-            imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /data/mysql
                 name: data
@@ -182,8 +181,6 @@ spec:
                 exec:
                   command: ["/scripts/pre-stop.sh"]
           - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -219,8 +216,6 @@ spec:
               - name: scripts
                 mountPath: /scripts
           - name: vttablet
-            image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
               - containerPort: 15100
                 name: vttabletport

@@ -63,7 +63,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	componentSpecs := cluster.Spec.ComponentSpecs
 	if componentSpecs == nil {
 		componentSpecs = make([]appsv1alpha1.ClusterComponentSpec, 1)
-		// if component spec may be empty, then it will be generated from cluster template and cluster
+		// if componentSpecs is empty, it will be generated from the cluster template and cluster.
 		reqCtx := intctrlutil.RequestCtx{
 			Ctx: transCtx.Context,
 			Log: log.Log.WithName("rbac"),

@@ -71,7 +71,10 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 				Log: log.Log.WithName("rbac"),
 			}
 			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterTemplate, transCtx.ClusterDef, &compDef, nil)
-			if err != nil || synthesizedComponent == nil {
+			if err != nil {
+				return err
+			}
+			if synthesizedComponent == nil {
 				continue
 			}
 			comps = []appsv1alpha1.ClusterComponentSpec{{ServiceAccountName: synthesizedComponent.ServiceAccountName}}

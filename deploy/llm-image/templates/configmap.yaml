@@ -44,6 +44,7 @@ data:
     }
   requests_adapter.py: |
     import ast
+    responses = []
     for idx, data in enumerate(requests):
       input_text = data.get("data")
       if input_text is None:
@@ -54,7 +55,6 @@ data:
       messages = []
       print(input_text_target)
       messages.append(input_text_target)
-      responses = []
       response = model.chat(tokenizer, messages)
       print(response)
       responses.append(response)

@@ -94,3 +94,14 @@ wesqlscale:
     repository: apecloud/apecloud-mysql-scale
     tag: "latest"
     pullPolicy: IfNotPresent
+
+getGlobalInfo: |-
+  #!/bin/bash
+  str="${v_KB_CONSENSUS_SET_LAST_STDOUT}"
+  IFS=$'\n'
+  arr=($str)
+  echo "hello" | sed 's/he../hi/'
+  echo "${#arr[@]}"
+  for line in "${arr[@]}"; do
+  echo "$line" | sed 's/\..*,/,/'
+  done

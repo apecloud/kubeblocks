@@ -1,0 +1,48 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: mariadb
+  labels:
+    {{- include "mariadb.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mariadb)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mariadb)"
+  componentDefs:
+    - name: mariadb
+      characterType: mariadb
+      workloadType: Stateful
+      service:
+        ports:
+          - name: mariadb
+            port: 3306
+            targetPort: mariadb
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: mariadb
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /var/lib/mariadb
+                name: data
+            ports:
+              - containerPort: 3306
+                name: mariadb
+            env:
+              - name: MARIADB_ROOT_HOST
+                value: {{ .Values.auth.rootHost | default "%" | quote }}
+              - name: MARIADB_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MARIADB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password

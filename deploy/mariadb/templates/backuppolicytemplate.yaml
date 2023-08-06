@@ -1,0 +1,17 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: mariadb-backup-policy-template
+spec:
+  clusterDefinitionRef: mariadb
+  backupPolicies:
+    - componentDefRef: mariadb
+      schedule:
+        snapshot:
+          enable: false
+          cronExpression: "0 18 * * *"
+        datafile:
+          enable: false
+          cronExpression: "0 18 * * *"
+      snapshot:
+        backupsHistoryLimit: 5

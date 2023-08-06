@@ -171,7 +171,7 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		return err
 	}
 	pitrJobs := make([]client.Object, 0)
-	if len(recoveryInfo.Physical.RestoreCommands) != 0 {
+	if len(recoveryInfo.Physical.GetPhysicalRestoreCommand()) != 0 {
 		pitrJobs, err = pitrMgr.buildPITRPhysicalRestoreJob(component, recoveryInfo, logfileBackup)
 		if err != nil {
 			return err
@@ -556,7 +556,7 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 
 		// build logfile volumes and volumeMounts
 		logFilePVCName := backup.Status.LogFilePersistentVolumeClaimName
-		if backupTool.Spec.Physical.RelyOnLogfile == nil || !*backupTool.Spec.Physical.RelyOnLogfile || logFilePVCName == backupPVCName {
+		if !backupTool.Spec.Physical.IsRelyOnLogfile() || logFilePVCName == backupPVCName {
 			return backupVolumes, backupVolumeMounts, backupMountPath, backupMountPath
 		}
 		logFileVolumeName := fmt.Sprintf("%s-%s", synthesizedComponent.Name, logFilePVCName)
@@ -616,7 +616,7 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 		}
 		jobName := p.GetDatafileRestoreJobName(pvcName)
 		job, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
-			backupTool.Spec.Physical.RestoreCommands, volumes, volumeMounts, env, backupTool.Spec.Resources)
+			backupTool.Spec.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, env, backupTool.Spec.Resources)
 		if err != nil {
 			return nil, err
 		}
@@ -672,7 +672,7 @@ func (p *RestoreManager) buildPITRPhysicalRestoreJob(synthesizedComponent *compo
 		}
 		pitrJobName := p.buildRestoreJobName(fmt.Sprintf("pitr-phy-%s", dataPVC.GetName()))
 		pitrJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, pitrJobName, image,
-			recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
+			recoveryInfo.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
 		if err != nil {
 			return objs, err
 		}

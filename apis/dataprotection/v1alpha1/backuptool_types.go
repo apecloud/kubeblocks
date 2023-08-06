@@ -69,8 +69,8 @@ type BackupToolSpec struct {
 	IncrementalBackupCommands []string `json:"incrementalBackupCommands,omitempty"`
 
 	// backup tool can support physical restore, in this case, restore must be RESTART database.
-	// +kubebuilder:validation:Required
-	Physical PhysicalConfig `json:"physical"`
+	// +optional
+	Physical *PhysicalConfig `json:"physical,omitempty"`
 
 	// backup tool can support logical restore, in this case, restore NOT RESTART database.
 	// +optional
@@ -93,7 +93,7 @@ type PhysicalConfig struct {
 
 	// relyOnLogfile defines whether the current recovery relies on log files
 	// +optional
-	RelyOnLogfile *bool `json:"relyOnLogfile,omitempty"`
+	RelyOnLogfile bool `json:"relyOnLogfile,omitempty"`
 }
 
 // BackupToolRestoreCommand defines the restore commands of BackupTool
@@ -140,4 +140,22 @@ type BackupToolList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupTool{}, &BackupToolList{})
+}
+
+func (physical *PhysicalConfig) GetPhysicalRestoreCommand() []string {
+	if physical == nil {
+		return nil
+	}
+	return physical.RestoreCommands
+}
+
+func (physical *PhysicalConfig) IsRelyOnLogfile() bool {
+	return physical != nil && physical.RelyOnLogfile
+}
+
+func (logical *LogicalConfig) GetLogicalRestoreCommand() []string {
+	if logical == nil {
+		return nil
+	}
+	return logical.RestoreCommands
 }

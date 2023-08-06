@@ -442,7 +442,7 @@ func (r *BackupReconciler) buildBackupStatusForBackupTool(reqCtx intctrlutil.Req
 	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
 	backup.Status.Manifests.BackupTool.FilePath = backupDestinationPath
 
-	if backupTool.Spec.Physical.RelyOnLogfile != nil && *backupTool.Spec.Physical.RelyOnLogfile {
+	if backupTool.Spec.Physical.IsRelyOnLogfile() {
 		if backupPolicy.Spec.Schedule.Logfile == nil || !backupPolicy.Spec.Schedule.Logfile.Enable {
 			return intctrlutil.NewBackupLogfileScheduleDisabled(backupTool.Name)
 		}

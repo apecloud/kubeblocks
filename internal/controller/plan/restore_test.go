@@ -170,8 +170,7 @@ var _ = Describe("PITR Functions", func() {
 				backupSelfDefineObj, testapps.RandomizedObjName())
 			// set datafile backup relies on logfile
 			Expect(testapps.ChangeObj(&testCtx, backupTool, func(tmpObj *dpv1alpha1.BackupTool) {
-				relyOnLogFile := true
-				tmpObj.Spec.Physical.RelyOnLogfile = &relyOnLogFile
+				tmpObj.Spec.Physical.RelyOnLogfile = true
 			})).Should(Succeed())
 			backupToolName = backupTool.Name
 

@@ -184,8 +184,7 @@ var _ = Describe("Backup Controller test", func() {
 			BeforeEach(func() {
 				// set datafile backup relies on logfile
 				Expect(testapps.ChangeObj(&testCtx, backupTool, func(tmpObj *dpv1alpha1.BackupTool) {
-					relyOnLogFile := true
-					tmpObj.Spec.Physical.RelyOnLogfile = &relyOnLogFile
+					tmpObj.Spec.Physical.RelyOnLogfile = true
 				})).Should(Succeed())
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)

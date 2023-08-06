@@ -311,7 +311,6 @@ spec:
             required:
             - backupCommands
             - image
-            - physical
             type: object
           status:
             description: BackupToolStatus defines the observed state of BackupTool

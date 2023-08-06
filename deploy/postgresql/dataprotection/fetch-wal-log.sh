@@ -36,6 +36,10 @@ function fetch-wal-log(){
             break
          fi
 
+         if [ ! -f $file ]; then
+            echo "ERROR: $file was deleted during fetching the wal log. Please try again!"
+            exit 1
+         fi
          wal_name=${file%.*}
          echo "INFO: copying $wal_name"
          gunzip -c $file > ${wal_destination_dir}/$wal_name

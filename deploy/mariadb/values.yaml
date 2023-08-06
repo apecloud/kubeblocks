@@ -6,7 +6,6 @@ image:
   repository: mariadb
   pullPolicy: IfNotPresent
   tag: 10.6
-
 ## MySQL Authentication parameters
 auth:
   ## MYSQL_ROOT_HOST

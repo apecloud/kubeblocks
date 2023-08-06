@@ -38,7 +38,7 @@ require (
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.3
-	github.com/go-redis/redismock/v9 v9.0.2
+	github.com/go-redis/redismock/v9 v9.0.3
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
 	github.com/golang/mock v1.6.0

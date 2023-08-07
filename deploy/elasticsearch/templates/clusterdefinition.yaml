@@ -9,9 +9,9 @@ spec:
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
-    endpoint: "https://$(SVC_FQDN):$(SVC_PORT_http)"
+    endpoint: "https://$(SVC_FQDN):$(SVC_PORT_rest-api)"
     host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_http)"
+    port: "$(SVC_PORT_rest-api)"
   
   componentDefs:
 
@@ -27,10 +27,10 @@ spec:
 
       service: # Source: elasticsearch/templates/service.yaml   -> coordinating-only
         ports:
-          - name: tcp-rest-api
+          - name: rest-api  # tcp
             port: 9200
             targetPort: rest-api
-          - name: tcp-transport
+          - name: transport  # tcp
             port: 9300
             targetPort: transport
       volumeTypes:
@@ -171,7 +171,7 @@ spec:
       workloadType: Stateful
       service:
         ports:
-        - name: http-metrics
+        - name: metrics
           port: 9114
           targetPort: metrics
 

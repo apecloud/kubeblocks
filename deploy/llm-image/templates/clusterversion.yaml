@@ -16,7 +16,7 @@ spec:
       versionsContext:
         initContainers:
           - name: model
-            image: lynnleelhl/gpt2:latest
+            image: apecloud/gpt2:0.0.1
         containers:
           - name: torchserve
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
@@ -47,7 +47,7 @@ spec:
       versionsContext:
         initContainers:
           - name: model
-            image: lynnleelhl/baichuan:latest
+            image: apecloud/baichuan:0.0.1
         containers:
           - name: torchserve
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}

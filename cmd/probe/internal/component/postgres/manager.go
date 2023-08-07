@@ -853,7 +853,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
-	mgr.Logger.Infof("Lock db success: %s, ", reason)
+	mgr.Logger.Infof("Lock db success: %s", reason)
 
 	return mgr.pgReload(ctx)
 }

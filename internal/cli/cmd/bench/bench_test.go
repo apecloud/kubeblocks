@@ -182,4 +182,16 @@ var _ = Describe("bench", func() {
 		Expect(host).Should(Equal(fmt.Sprintf("svc-1.%s.svc.cluster.local", testing.Namespace)))
 		Expect(port).Should(Equal(3306))
 	})
+
+	It("parse tolerations", func() {
+		o := &BenchBaseOptions{
+			TolerationsRaw: []string{"dev=true:NoSchedule,large:NoSchedule"},
+		}
+		err := o.BaseComplete()
+		Expect(err).Should(BeNil())
+		Expect(o.Tolerations).Should(Equal([]corev1.Toleration{
+			{Key: "dev", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoSchedule},
+			{Key: "large", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
+		}))
+	})
 })

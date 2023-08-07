@@ -37,7 +37,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -137,14 +136,6 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	}
 
 	o.Step, o.name = parseStepAndName(args, "sysbench")
-
-	// use the first argument as the name of the benchmark
-	if len(args) > 0 {
-		o.name = args[0]
-	}
-	if o.name == "" {
-		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
-	}
 
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()

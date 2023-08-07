@@ -494,7 +494,7 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
 		constant.AppInstanceLabelKey:    r.Spec.ClusterRef,
 		constant.KBAppComponentLabelKey: compName,
-	}, client.Limit(1)); err != nil {
+	}); err != nil {
 		return nil, err
 	}
 	if len(pvcList.Items) == 0 {

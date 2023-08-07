@@ -17,24 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package constant
+package component
 
-const (
-	KBEnvNamespace            = "KB_NAMESPACE"
-	KBEnvHostIP               = "KB_HOST_IP"
-	KBEnvNodeName             = "KB_NODENAME"
-	KBEnvPodName              = "KB_POD_NAME"
-	KBEnvPodUID               = "KB_POD_UID"
-	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
+import (
+	"os"
 )
 
-const (
-	// SQL Channel env names
-	KBEnvClusterName     = "KB_CLUSTER_NAME"
-	KBEnvComponentName   = "KB_COMP_NAME"
-	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
-	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
-	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
-	KBEnvServiceRoles    = "KB_SERVICE_ROLES"
-	KBEnvServicePort     = "KB_SERVICE_PORT"
-)
+func MaxInt64(x, y int64) int64 {
+	if x > y {
+		return x
+	}
+	return y
+}
+
+func GetSQLChannelProc() (*os.Process, error) {
+	// sqlChannel pid is usually 1
+	sqlChannelPid := os.Getppid()
+	sqlChannelProc, err := os.FindProcess(sqlChannelPid)
+	if err != nil {
+		return nil, err
+	}
+
+	return sqlChannelProc, nil
+}

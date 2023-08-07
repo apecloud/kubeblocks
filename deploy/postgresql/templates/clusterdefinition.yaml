@@ -49,30 +49,30 @@ spec:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
-          defaultMode: 0777
+          defaultMode: 0444
         - name: pgbouncer-configuration
           templateRef: pgbouncer-configuration
           keys:
             - pgbouncer.ini
           namespace: {{ .Release.Namespace }}
           volumeName: pgbouncer-config
-          defaultMode: 0777
+          defaultMode: 0444
         - name: postgresql-custom-metrics
           templateRef: postgresql14-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
-          defaultMode: 0777
+          defaultMode: 0444
         - name: agamotto-configuration
           templateRef: postgresql-agamotto-configuration
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-          defaultMode: 0777
+          defaultMode: 0444
       scriptSpecs:
         - name: postgresql-scripts
           templateRef: postgresql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 0777
+          defaultMode: 0555
       service:
         ports:
           - name: tcp-postgresql

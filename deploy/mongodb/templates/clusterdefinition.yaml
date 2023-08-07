@@ -23,7 +23,7 @@ spec:
           templateRef: mongodb-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
-          defaultMode: 493
+          defaultMode: 0555
       configSpecs:
         - name: mongodb-config
           templateRef: mongodb5.0-config-template
@@ -37,7 +37,7 @@ spec:
           templateRef: mongodb-metrics-config-new
           namespace: {{ .Release.Namespace }}
           volumeName: mongodb-metrics-config
-          defaultMode: 0777
+          defaultMode: 0444
       monitor:
         builtIn: false
         exporterConfig:

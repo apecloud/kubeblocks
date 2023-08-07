@@ -50,6 +50,7 @@ kbcli bench ycsb [Step] [BenchmarkName] [flags]
       --record-count int                   the number of records to use (default 1000)
       --scan-proportion int                the percentage of scan operations in benchmark
       --threads ints                       the number of threads to use (default [1])
+      --tolerations strings                Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
       --update-proportion int              the percentage of update operations in benchmark
       --user string                        the user of database
 ```

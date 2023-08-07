@@ -37,6 +37,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -126,7 +127,19 @@ func (o *PgBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
+	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
+
 	o.Step, o.name = parseStepAndName(args, "pgbench")
+
+	// use the first argument as the name of the benchmark
+	if len(args) > 0 {
+		o.name = args[0]
+	}
+	if o.name == "" {
+		o.name = fmt.Sprintf("pgbench-%s", util.RandRFC1123String(6))
+	}
 
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
@@ -222,13 +235,17 @@ func (o *PgBenchOptions) Run() error {
 			SelectOnly:   o.Select,
 			Transactions: o.Transactions,
 			Duration:     o.Duration,
-			Step:         o.Step,
-			Target: v1alpha1.PgbenchTarget{
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				Tolerations: o.Tolerations,
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Target: v1alpha1.Target{
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

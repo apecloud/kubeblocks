@@ -39,20 +39,21 @@ kbcli bench pgbench [Step] [BenchmarkName] [flags]
 ### Options
 
 ```
-      --clients ints       The number of clients to use for pgbench (default [1])
-      --cluster string     the cluster of database
-      --database string    database name
-      --driver string      the driver of database
-      --duration int       The seconds to run pgbench for (default 60)
-  -h, --help               help for pgbench
-      --host string        the host of database
-      --password string    the password of database
-      --port int           the port of database
-      --scale int          The scale factor to use for pgbench (default 1)
-      --select             Run pgbench with select only
-      --threads int        The number of threads to use for pgbench (default 1)
-      --transactions int   The number of transactions to run for pgbench
-      --user string        the user of database
+      --clients ints          The number of clients to use for pgbench (default [1])
+      --cluster string        the cluster of database
+      --database string       database name
+      --driver string         the driver of database
+      --duration int          The seconds to run pgbench for (default 60)
+  -h, --help                  help for pgbench
+      --host string           the host of database
+      --password string       the password of database
+      --port int              the port of database
+      --scale int             The scale factor to use for pgbench (default 1)
+      --select                Run pgbench with select only
+      --threads int           The number of threads to use for pgbench (default 1)
+      --tolerations strings   Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
+      --transactions int      The number of transactions to run for pgbench
+      --user string           the user of database
 ```
 
 ### Options inherited from parent commands

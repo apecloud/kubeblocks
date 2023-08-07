@@ -21,12 +21,14 @@ package bench
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -65,13 +67,31 @@ var benchGVRList = []schema.GroupVersionResource{
 }
 
 type BenchBaseOptions struct {
-	Driver      string
-	Database    string
-	Host        string
-	Port        int
-	User        string
-	Password    string
-	ClusterName string
+	Driver         string
+	Database       string
+	Host           string
+	Port           int
+	User           string
+	Password       string
+	ClusterName    string
+	TolerationsRaw []string
+	Tolerations    []corev1.Toleration
+}
+
+func (o *BenchBaseOptions) BaseComplete() error {
+	tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+	if err != nil {
+		return err
+	}
+	tolerationsJSON, err := json.Marshal(tolerations)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(tolerationsJSON, &o.Tolerations); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // BaseValidate validates the base options
@@ -102,6 +122,7 @@ func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.Password, "password", "", "the password of database")
 	cmd.Flags().IntVar(&o.Port, "port", 0, "the port of database")
 	cmd.Flags().StringVar(&o.ClusterName, "cluster", "", "the cluster of database")
+	cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'`)
 }
 
 // NewBenchCmd creates the bench command

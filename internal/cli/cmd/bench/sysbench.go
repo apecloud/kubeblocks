@@ -37,6 +37,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -131,7 +132,19 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
+	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
+
 	o.Step, o.name = parseStepAndName(args, "sysbench")
+
+	// use the first argument as the name of the benchmark
+	if len(args) > 0 {
+		o.name = args[0]
+	}
+	if o.name == "" {
+		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
+	}
 
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
@@ -258,20 +271,23 @@ func (o *SysBenchOptions) Run() error {
 			Namespace: o.namespace,
 		},
 		Spec: v1alpha1.SysbenchSpec{
-			Tables:    o.Tables,
-			Size:      o.Size,
-			Threads:   o.Threads,
-			Types:     o.Type,
-			Duration:  o.Duration,
-			Step:      o.Step,
-			ExtraArgs: o.ExtraArgs,
-			Target: v1alpha1.SysbenchTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			Tables:   o.Tables,
+			Size:     o.Size,
+			Threads:  o.Threads,
+			Types:    o.Type,
+			Duration: o.Duration,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

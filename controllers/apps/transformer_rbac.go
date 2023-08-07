@@ -29,10 +29,12 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -58,7 +60,29 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		return err
 	}
 
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
+	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
+	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		comps := compSpecMap[compDef.Name]
+		if len(comps) == 0 {
+			// if componentSpecs is empty, it may be generated from the cluster template and cluster.
+			reqCtx := ictrlutil.RequestCtx{
+				Ctx: transCtx.Context,
+				Log: log.Log.WithName("rbac"),
+			}
+			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterTemplate, transCtx.ClusterDef, &compDef, nil)
+			if err != nil {
+				return err
+			}
+			if synthesizedComponent == nil {
+				continue
+			}
+			comps = []appsv1alpha1.ClusterComponentSpec{{ServiceAccountName: synthesizedComponent.ServiceAccountName}}
+		}
+		componentSpecs = append(componentSpecs, comps...)
+	}
+
+	for _, compSpec := range componentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
 		if serviceAccountName == "" {
 			if !needToCreateRBAC(clusterDef) {
@@ -76,7 +100,8 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			return nil
 		}
 
-		if isClusterRoleBindingExist(transCtx, serviceAccountName) {
+		if isClusterRoleBindingExist(transCtx, serviceAccountName) &&
+			isServiceAccountExist(transCtx, serviceAccountName, false) {
 			continue
 		}
 

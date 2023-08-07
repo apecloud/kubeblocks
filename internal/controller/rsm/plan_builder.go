@@ -100,7 +100,7 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *Plan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc)
+	return p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 }
 
 // Do the real works

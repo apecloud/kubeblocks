@@ -132,7 +132,7 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		return nil
 	}
 	pitrMgr := NewRestoreManager(ctx, cli, cluster, schema)
-	if need, err := pitrMgr.checkPITRAndInit(); err != nil {
+	if need, err := pitrMgr.checkPITRAndInit(component.Name); err != nil {
 		return err
 	} else if !need {
 		return nil
@@ -269,19 +269,19 @@ func (p *RestoreManager) getLatestBaseBackup(componentName string) (*dpv1alpha1.
 }
 
 // checkPITRAndInit checks if cluster need to be restored
-func (p *RestoreManager) checkPITRAndInit() (need bool, err error) {
+func (p *RestoreManager) checkPITRAndInit(compName string) (bool, error) {
 	// checks args if pitr supported
 	cluster := p.Cluster
-	if cluster.Annotations[constant.RestoreFromTimeAnnotationKey] == "" {
-		return false, nil
+	restoreTimeStr, err := p.getComponentBackupInfoFromAnnotation(compName, constant.RestoreFromTimeAnnotationKey)
+	if err != nil || restoreTimeStr == nil {
+		return false, err
 	}
-	restoreTimeStr := cluster.Annotations[constant.RestoreFromTimeAnnotationKey]
 	sourceCuster := cluster.Annotations[constant.RestoreFromSrcClusterAnnotationKey]
 	if sourceCuster == "" {
 		return false, errors.New("need specify a source cluster name to recovery")
 	}
 	restoreTime := &metav1.Time{}
-	if err = restoreTime.UnmarshalQueryParameter(restoreTimeStr); err != nil {
+	if err = restoreTime.UnmarshalQueryParameter(*restoreTimeStr); err != nil {
 		return false, err
 	}
 	vctCount := 0
@@ -297,6 +297,23 @@ func (p *RestoreManager) checkPITRAndInit() (need bool, err error) {
 	p.sourceCluster = sourceCuster
 	p.namespace = cluster.Namespace
 	return true, nil
+}
+
+func (p *RestoreManager) getComponentBackupInfoFromAnnotation(compName, annotationKey string) (*string, error) {
+	valueString := p.Cluster.Annotations[annotationKey]
+	if len(valueString) == 0 {
+		return nil, nil
+	}
+	backupMap := map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return nil, err
+	}
+	targetValue, ok := backupMap[compName]
+	if !ok {
+		return nil, nil
+	}
+	return &targetValue, nil
 }
 
 func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) string {
@@ -503,22 +520,12 @@ func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.Synthesi
 }
 
 func (p *RestoreManager) getBackupObjectFromAnnotation(synthesizedComponent *component.SynthesizedComponent) (*dpv1alpha1.Backup, error) {
-	compBackupMapString := p.Cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
-	if len(compBackupMapString) == 0 {
-		return nil, nil
-	}
-	compBackupMap := map[string]string{}
-	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
-	if err != nil {
+	backupSourceName, err := p.getComponentBackupInfoFromAnnotation(synthesizedComponent.Name, constant.RestoreFromBackUpAnnotationKey)
+	if backupSourceName == nil || err != nil {
 		return nil, err
 	}
-	backupSourceName, ok := compBackupMap[synthesizedComponent.Name]
-	if !ok {
-		return nil, nil
-	}
-
 	backup := &dpv1alpha1.Backup{}
-	if err = p.Client.Get(p.Ctx, types.NamespacedName{Name: backupSourceName, Namespace: p.Cluster.Namespace}, backup); err != nil {
+	if err = p.Client.Get(p.Ctx, types.NamespacedName{Name: *backupSourceName, Namespace: p.Cluster.Namespace}, backup); err != nil {
 		return nil, err
 	}
 	return backup, nil

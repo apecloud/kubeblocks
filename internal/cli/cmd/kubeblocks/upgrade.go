@@ -20,12 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -119,6 +124,17 @@ func (o *InstallOptions) Upgrade() error {
 		return err
 	}
 	s.Success()
+
+	// stop the old version KubeBlocks, otherwise the old version KubeBlocks will reconcile the
+	// new version resources, which may not be compatible. helm will start the new version
+	// KubeBlocks after upgrade.
+	s = spinner.New(o.Out, spinnerMsg("Stop KubeBlocks "+kbVersion))
+	defer s.Fail()
+	if err = o.stopKubeBlocks(); err != nil {
+		return err
+	}
+	s.Success()
+
 	// it's time to upgrade
 	msg := ""
 	if o.Version != "" {
@@ -142,4 +158,39 @@ func (o *InstallOptions) Upgrade() error {
 
 func (o *InstallOptions) upgradeChart() error {
 	return o.buildChart().Upgrade(o.HelmCfg)
+}
+
+// stopKubeBlocks stops the old version KubeBlocks by setting the replicas of
+// KubeBlocks deployment to 0
+func (o *InstallOptions) stopKubeBlocks() error {
+	kbDeploy, err := util.GetKubeBlocksDeploy(o.Client)
+	if err != nil {
+		return err
+	}
+
+	// if KubeBlocks is not deployed, just return
+	if kbDeploy == nil {
+		klog.V(1).Info("KubeBlocks is not deployed, no need to stop")
+		return nil
+	}
+
+	if _, err = o.Client.AppsV1().Deployments(kbDeploy.Namespace).Patch(
+		context.TODO(), kbDeploy.Name, apitypes.JSONPatchType,
+		[]byte(`[{"op": "replace", "path": "/spec/replicas", "value": 0}]`),
+		metav1.PatchOptions{}); err != nil {
+		return err
+	}
+
+	// wait for KubeBlocks to be stopped
+	return wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
+		kbDeploy, err = util.GetKubeBlocksDeploy(o.Client)
+		if err != nil {
+			return false, err
+		}
+		if *kbDeploy.Spec.Replicas == 0 && kbDeploy.Status.Replicas == 0 &&
+			kbDeploy.Status.AvailableReplicas == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
 }

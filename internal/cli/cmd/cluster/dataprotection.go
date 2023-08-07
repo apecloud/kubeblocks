@@ -512,17 +512,22 @@ func (o *CreateRestoreOptions) runPITR() error {
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].Object, backup); err != nil {
 		return err
 	}
+	compName := backup.Labels[constant.KBAppComponentLabelKey]
+	if compName == "" {
+		return fmt.Errorf(`component name label %s is missing in backup "%s"`, constant.KBAppComponentLabelKey, backup.Name)
+	}
 	// TODO: use opsRequest to create cluster.
 	// get the cluster object and set the annotation for restore
 	clusterObj, err := o.getClusterObject(backup)
 	if err != nil {
 		return err
 	}
+	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
 	clusterObj.ObjectMeta = metav1.ObjectMeta{
 		Namespace: clusterObj.Namespace,
 		Name:      o.Name,
 		Annotations: map[string]string{
-			constant.RestoreFromTimeAnnotationKey:       o.RestoreTime.Format(time.RFC3339),
+			constant.RestoreFromTimeAnnotationKey:       fmt.Sprintf(`{"%s":"%s"}`, compName, o.RestoreTime.Format(time.RFC3339)),
 			constant.RestoreFromSrcClusterAnnotationKey: o.SourceCluster,
 		},
 	}

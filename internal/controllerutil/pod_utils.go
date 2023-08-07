@@ -214,6 +214,15 @@ func GetRequestMemorySize(container corev1.Container) int64 {
 	return 0
 }
 
+// GetStorageSizeFromPersistentVolume gets content of Resources.Requests.storage
+func GetStorageSizeFromPersistentVolume(pvc corev1.PersistentVolumeClaimTemplate) int64 {
+	requests := pvc.Spec.Resources.Requests
+	if val, ok := (requests)[corev1.ResourceStorage]; ok {
+		return val.Value()
+	}
+	return -1
+}
+
 // PodIsReady checks if pod is ready
 func PodIsReady(pod *corev1.Pod) bool {
 	if pod.Status.Conditions == nil {

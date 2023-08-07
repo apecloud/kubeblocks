@@ -5,14 +5,6 @@ metadata:
   labels:
     {{- include "neon.labels" . | nindent 4 }}
 spec:
-  connectionCredential:
-    username: root
-    password: "$(RANDOM_PASSWD)"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-neon)"
-    host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_tcp-neon)"
-    accesskey: ""
-    secretkey: ""
   componentDefs:
     - name: neon-storagebroker
       workloadType: Stateful
@@ -21,6 +13,9 @@ spec:
         containers:
           - name: neon-storagebroker
             imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /usr/local/neon/storagebroker
+                name: neon-storagebroker
             command:
               - "storage_broker"
               - "-l"
@@ -41,15 +36,21 @@ spec:
         containers:
           - name: neon-safekeeper
             imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /usr/local/neon/safekeeper
+                name: neon-safekeeper
+            env:
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
             command:
-              - "safekeeper"
-              - "--id=1"
-              - "-D"
-              - "/data"
-              - "--broker-endpoint=http://${NEON_BROKER_SVC}:50051"
-              - "-l"
-              - "${NEON_BROKER_SVC}:5454"
-              - "--listen-http=0.0.0.0:7676"
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                trap : TERM INT
+                exec safekeeper --id=1 -D /data --broker-endpoint=http://$NEON_BROKER_SVC:50051 -l ${POD_IP}:5454 --listen-http=0.0.0.0:7676
     - name: neon-pageserver
       workloadType: Stateful
       characterType: pageserver
@@ -59,21 +60,23 @@ spec:
         containers:
           - name: neon-pageserver
             imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /usr/local/neon/pageserver
+                name: neon-pageserver
             command:
-              - "pageserver"
-              - "-D"
-              - "/data"
-              - "-c"
-              - "id=1"
-              - "-c"
-              - "broker_endpoint=http://${NEON_BROKER_SVC}:50051"
-              - "-c"
-              - "listen_pg_addr=0.0.0.0:6400"
-              - "-c"
-              - "listen_http_addr=0.0.0.0:9898"
-              - "-c"
-              - "pg_distrib_dir=/opt/neondatabase-neon/pg_install"
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                trap : TERM INT
+                exec pageserver -D /data -c "id=1" -c "broker_endpoint='http://$NEON_BROKER_SVC:50051'" -c "listen_pg_addr='0.0.0.0:6400'" -c "listen_http_addr='0.0.0.0:9898'" -c "pg_distrib_dir='/opt/neondatabase-neon/pg_install'"
     - name: neon-compute
+      scriptSpecs:
+        - name: neon-compute-scripts
+          templateRef: neon-compute-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       workloadType: Stateful
       characterType: compute
       componentDefRef:
@@ -95,11 +98,21 @@ spec:
         containers:
           - name: neon-compute
             imagePullPolicy: IfNotPresent
-            command: ["/compute.sh"]
+            volumeMounts:
+              - mountPath: /usr/local/neon/compute
+                name: neon-compute
+              - mountPath: /scripts
+                name: scripts
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                trap : TERM INT
+                export PAGESERVER="${NEON_PAGESERVER_SVC}"
+                export SAFEKEEPERS="${NEON_SAFEKEEPER_SVC}:5454"
+                exec /compute.sh
             ports:
-              - "55432:55432"
-            environment:
-              - name: PAGESERVER
-                value: ${NEON_PAGESERVER_SVC}
-              - name: SAFEKEEPERS
-                value: ${NEON_SAFEKEEPER_SVC}:5454
+              - containerPort: 55432
+                name: http
+                protocol: TCP

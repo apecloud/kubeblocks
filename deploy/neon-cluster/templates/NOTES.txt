@@ -1,1 +1,1 @@
-Installed nebula-cluster!
+Installed neon-cluster!

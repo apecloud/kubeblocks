@@ -17,24 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package constant
+package internal
+
+import "strings"
 
 const (
-	KBEnvNamespace            = "KB_NAMESPACE"
-	KBEnvHostIP               = "KB_HOST_IP"
-	KBEnvNodeName             = "KB_NODENAME"
-	KBEnvPodName              = "KB_POD_NAME"
-	KBEnvPodUID               = "KB_POD_UID"
-	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
+	WorkloadTypeKey = "workloadType"
+	Replication     = "Replication"
+	Consensus       = "Consensus"
 )
 
-const (
-	// SQL Channel env names
-	KBEnvClusterName     = "KB_CLUSTER_NAME"
-	KBEnvComponentName   = "KB_COMP_NAME"
-	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
-	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
-	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
-	KBEnvServiceRoles    = "KB_SERVICE_ROLES"
-	KBEnvServicePort     = "KB_SERVICE_PORT"
-)
+func IsHAAvailable(characterType, workloadType string) bool {
+	switch strings.ToLower(characterType) {
+	case "mongodb":
+		return true
+	case "mysql":
+		if strings.EqualFold(workloadType, Replication) {
+			return true
+		}
+	}
+	return false
+}

@@ -174,13 +174,22 @@ max_standby_archive_delay = '300000ms'
 max_standby_streaming_delay = '300000ms'
 max_sync_workers_per_subscription = '2'
 max_wal_senders = '64'
-max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 ) }}'
 max_worker_processes = '{{ max $phy_cpu 8 }}'
 min_parallel_index_scan_size = '512kB'
 min_parallel_table_scan_size = '8MB'
-{{- if gt $phy_memory 0 }}
-min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 ) }}'
+
+{{- $max_wal_size := min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 }}
+{{- $min_wal_size := min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 }}
+{{- $data_disk_size := getComponentPVCSizeByName $.component "data" }}
+{{/* if data disk lt 5G , set max_wal_size to 256MB */}}
+{{- $disk_min_limit := mul 5 1024 1024 1024 }}
+{{- if and ( gt $data_disk_size 0 ) ( lt $data_disk_size $disk_min_limit ) }}
+{{- $max_wal_size = 256 }}
+{{- $min_wal_size = 64 }}
 {{- end }}
+max_wal_size = '{{- printf "%dMB" $max_wal_size }}'
+min_wal_size = '{{- printf "%dMB" $min_wal_size }}'
+
 old_snapshot_threshold = '-1'
 parallel_leader_participation = 'True'
 password_encryption = 'md5'

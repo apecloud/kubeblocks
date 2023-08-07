@@ -125,7 +125,30 @@ innodb_log_buffer_size=8388608
 #innodb_log_file_size and innodb_log_files_in_group are deprecated in MySQL 8.0.30. These variables are superseded by innodb_redo_log_capacity.
 #innodb_log_file_size=134217728
 #innodb_log_files_in_group=2
-innodb_redo_log_capacity=268435456
+
+{{- /* dynamic render innodb_redo_log_capacity */}}
+{{- /* reference url: https://dev.mysql.com/doc/refman/8.0/en/innodb-dedicated-server.html */}}
+{{- if gt $phy_memory 0 }}
+  {{- $redo_log_capacity := 104857600 }}
+  {{- $phy_memory_gb := div $phy_memory 1073741824 | int }}
+  {{- if lt $phy_memory_gb  2 }}
+    {{- /* < 2GB: 100MB */}}
+    {{- $redo_log_capacity = 104857600 }}
+  {{- else if lt $phy_memory_gb 4 }}
+    {{- /* [2GB: 4GB):  round(0.5 * detected server memory in GB) * 0.5 GB */}}
+    {{- $redo_log_capacity = ( mulf ( round ( mulf $phy_memory_gb 0.5 ) 0 )  512 1024 1024 ) | int }}
+  {{- else if lt $phy_memory_gb 11 }}
+    {{- /* [4GB: 11GB):  round(0.75 * detected server memory in GB) * 0.5 GB */}}
+    {{- $redo_log_capacity = ( mulf ( round ( mulf $phy_memory_gb 0.75 ) 0 ) 512 1024 1024 ) | int }}
+  {{- else if lt $phy_memory_gb 170 }}
+    {{- /* [11GB: 170GBH):  round(0.6525 * detected server memory in GB) * 0.5 GB */}}
+    {{- $redo_log_capacity = ( mulf ( round ( mulf $phy_memory_gb 0.6525 ) 0 ) 512 1024 1024 ) | int }}
+  {{- else }}
+    {{- /* >= 17GB: 128GB */}}
+    {{- $redo_log_capacity = ( mul 128 1024 1024 1024 ) | int }}
+  {{- end }}
+innodb_redo_log_capacity={{- $redo_log_capacity }}
+{{- end }}
 innodb_open_files=4000
 innodb_purge_threads=1
 innodb_read_io_threads=4

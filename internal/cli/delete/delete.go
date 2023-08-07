@@ -242,7 +242,7 @@ func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {
 }
 
 // Confirm let user double-check for the cluster ops
-// if ops is not DEFAULT, it will output the details information for confirmation
+// if isLabelSelector is true, it will output the details information for confirmation
 func Confirm(names []string, in io.Reader, isLabelSelector bool) error {
 	if len(names) == 0 {
 		return nil

@@ -157,7 +157,7 @@ func (o *DeleteOptions) complete() error {
 		if len(names) == 0 {
 			names = o.Names
 		}
-		if err = Confirm(names, o.In); err != nil {
+		if err = Confirm(names, o.In, len(o.LabelSelector) != 0); err != nil {
 			return err
 		}
 	}
@@ -241,12 +241,17 @@ func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {
 	return nil
 }
 
-// Confirm let user double-check what to delete
-func Confirm(names []string, in io.Reader) error {
+// Confirm let user double-check for the cluster ops
+// if ops is not DEFAULT, it will output the details information for confirmation
+func Confirm(names []string, in io.Reader, isLabelSelector bool) error {
 	if len(names) == 0 {
 		return nil
 	}
-	fmt.Printf("These clusters will be deleted:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
+	// if the resources were selected by label, user don't know their names we should give a prompt
+	// and only delete for cluster may use it
+	if isLabelSelector {
+		fmt.Printf("These clusters will be deleted:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
+	}
 	// '\n' in NewPrompt will break the output
 	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
 		func(entered string) error {

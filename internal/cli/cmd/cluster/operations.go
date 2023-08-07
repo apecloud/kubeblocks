@@ -338,7 +338,7 @@ func (o *OperationsOptions) Validate() error {
 		}
 	}
 	if !o.autoApprove && o.DryRun == "none" {
-		return delete.Confirm([]string{o.Name}, o.In)
+		return delete.Confirm([]string{o.Name}, o.In, false)
 	}
 	return nil
 }
@@ -776,7 +776,7 @@ func cancelOps(o *OperationsOptions) error {
 		return fmt.Errorf("opsRequest type: %s not support cancel action", opsRequest.Spec.Type)
 	}
 	if !o.autoApprove {
-		if err := delete.Confirm([]string{o.Name}, o.In); err != nil {
+		if err := delete.Confirm([]string{o.Name}, o.In, false); err != nil {
 			return err
 		}
 	}

@@ -736,7 +736,11 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	}
 
 	if !needRestart {
-		return mgr.pgReload(context.TODO())
+		if err = mgr.pgReload(context.TODO()); err != nil {
+			mgr.Logger.Errorf("reload conf failed, err:%v", err)
+			return err
+		}
+		return nil
 	}
 
 	return mgr.Start()
@@ -853,9 +857,14 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
-	mgr.Logger.Infof("Lock db success: %s", reason)
 
-	return mgr.pgReload(ctx)
+	if err = mgr.pgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("Lock db success: %s", reason)
+	return nil
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
@@ -866,9 +875,14 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
-	mgr.Logger.Infof("UnLock db success")
 
-	return mgr.pgReload(ctx)
+	if err = mgr.pgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("UnLock db success")
+	return nil
 }
 
 func (mgr *Manager) pgReload(ctx context.Context) error {

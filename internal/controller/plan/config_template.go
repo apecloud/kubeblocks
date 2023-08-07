@@ -55,6 +55,8 @@ const (
 	builtInGetPortFunctionName                   = "getPortByName"
 	builtInGetContainerFunctionName              = "getContainerByName"
 	builtInGetContainerCPUFunctionName           = "getContainerCPU"
+	builtInGetPVCSizeByNameFunctionName          = "getComponentPVCSizeByName"
+	builtInGetPVCSizeFunctionName                = "getPVCSize"
 	builtInGetContainerMemoryFunctionName        = "getContainerMemory"
 	builtInGetContainerRequestMemoryFunctionName = "getContainerRequestMemory"
 

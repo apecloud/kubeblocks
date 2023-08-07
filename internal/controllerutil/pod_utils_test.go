@@ -41,9 +41,11 @@ import (
 )
 
 type TestResourceUnit struct {
-	container        corev1.Container
-	expectMemorySize int64
-	expectCPU        int
+	pvc               corev1.PersistentVolumeClaimSpec
+	container         corev1.Container
+	expectMemorySize  int64
+	expectCPU         int
+	expectStorageSize int64
 }
 
 func TestPodIsReady(t *testing.T) {
@@ -388,6 +390,57 @@ var _ = Describe("pod utils", func() {
 			container := corev1.Container{}
 			Expect(GetMemorySize(container)).To(BeEquivalentTo(0))
 			Expect(GetCoreNum(container)).To(BeEquivalentTo(0))
+		})
+	})
+
+	// for test MemorySize or CoreNum
+	Context("Get pvc test", func() {
+		It("Resource exists request", func() {
+			testResources := []TestResourceUnit{
+				// memory unit: Gi
+				{
+					pvc: corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("100Gi"),
+							},
+						},
+					},
+					expectStorageSize: 100 * 1024 * 1024 * 1024,
+				},
+				// memory unit: G
+				{
+					pvc: corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("100G"),
+							},
+						},
+					},
+					expectStorageSize: 100 * 1000 * 1000 * 1000,
+				},
+				// memory unit: no
+				{
+					pvc: corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("10000"),
+							},
+						},
+					},
+					expectStorageSize: 10000,
+				},
+			}
+
+			for i := range testResources {
+				Expect(GetStorageSizeFromPersistentVolume(corev1.PersistentVolumeClaimTemplate{
+					Spec: testResources[i].pvc,
+				})).To(BeEquivalentTo(testResources[i].expectStorageSize))
+			}
+		})
+		It("Resource not request", func() {
+			pvcTpl := corev1.PersistentVolumeClaimTemplate{}
+			Expect(GetStorageSizeFromPersistentVolume(pvcTpl)).To(BeEquivalentTo(-1))
 		})
 	})
 

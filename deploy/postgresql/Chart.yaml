@@ -16,7 +16,7 @@ annotations:
   kubeblocks.io/multiCV: "true"
 
 home: https://kubeblocks.io/
-icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+icon: https://kubeblocks.io/img/logo.png
 
 
 maintainers:

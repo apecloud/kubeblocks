@@ -465,27 +465,39 @@ func (mgr *Manager) CreateRoot(ctx context.Context) error {
 }
 
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
-	mgr.Logger.Infof("Lock db: %s", reason)
 	sql := "alter system set default_transaction_read_only=on;"
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
 
-	return mgr.pgReload(ctx)
+	if err = mgr.pgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("Lock db success: %s", reason)
+	return nil
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
-	mgr.Logger.Infof("UnLock db")
 	sql := "alter system set default_transaction_read_only=off;"
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
 	}
 
-	return mgr.pgReload(ctx)
+	if err = mgr.pgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("UnLock db success")
+	return nil
 }
 
 func (mgr *Manager) pgReload(ctx context.Context) error {

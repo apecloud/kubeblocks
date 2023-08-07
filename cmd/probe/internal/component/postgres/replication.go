@@ -554,7 +554,11 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	}
 
 	if !needRestart {
-		return mgr.pgReload(context.TODO())
+		if err = mgr.pgReload(context.TODO()); err != nil {
+			mgr.Logger.Errorf("reload conf failed, err:%v", err)
+			return err
+		}
+		return nil
 	}
 
 	return mgr.Start()

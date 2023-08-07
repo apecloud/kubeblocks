@@ -1,0 +1,24 @@
+apiVersion: v2
+name: risingwave
+description: A RisingWave Helm chart for KubeBlocks.
+
+annotations:
+  category: Database
+
+type: application
+
+version: 0.1.0
+
+appVersion: v1.0.0
+
+home: https://www.risingwave.com
+
+keywords:
+- risingwave
+- streaming-processing
+- cloud-native
+- real-time
+
+maintainers:
+- name: RisingWave Labs
+  url: https://www.risingwave-labs.com

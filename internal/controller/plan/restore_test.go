@@ -138,7 +138,7 @@ var _ = Describe("PITR Functions", func() {
 					},
 				}).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddRestorePointInTime(metav1.Time{Time: stopTime.Time}, sourceCluster).
+				AddRestorePointInTime(metav1.Time{Time: stopTime.Time}, mysqlCompName, sourceCluster).
 				Create(&testCtx).GetObject()
 
 			By("By mocking a pvc")

@@ -12,7 +12,7 @@ dependencies:
     alias: extra
 
 # This is the version number of the MySQL being deployed.
-appVersion: "8.0.34"
+appVersion: "8.0.32"
 
 keywords:
   - mysql
@@ -22,7 +22,7 @@ keywords:
   - raft
 
 home: https://github.com/apecloud/kubeblocks/deploy/mysql-cluster
-icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+icon: https://kubeblocks.io/img/logo.png
 
 maintainers:
   - name: ApeCloud

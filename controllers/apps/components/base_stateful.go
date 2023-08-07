@@ -552,7 +552,11 @@ func (c *statefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli clien
 			if err := cli.Get(reqCtx.Ctx, pvcKey, &pvc); err != nil {
 				return err
 			}
-			c.DeleteResource(&pvc, nil)
+			// Since there are no order guarantee between updating STS and deleting PVCs, if there is any error occurred
+			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
+			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
+			// will be deleted or the scaling-in operation will be failed.
+			c.DeleteResource(&pvc, c.WorkloadVertex)
 		}
 	}
 	return nil

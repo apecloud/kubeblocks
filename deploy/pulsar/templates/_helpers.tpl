@@ -60,7 +60,7 @@ Generate scripts configmap
 */}}
 {{- define "pulsar.extend.scripts" -}}
 {{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
-{{- $path | base }}: |-
+{{ $path | base }}: |-
 {{- $.Files.Get $path | nindent 2 }}
 {{- end }}
 {{- end }}

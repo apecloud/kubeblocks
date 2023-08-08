@@ -102,7 +102,7 @@ Generate scripts configmap
 */}}
 {{- define "postgresql.extend.scripts" -}}
 {{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
-{{- $path | base }}: |-
+{{ $path | base }}: |-
 {{- $.Files.Get $path | nindent 2 }}
 {{- end }}
 {{- end }}

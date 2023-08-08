@@ -5,7 +5,4 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
-  {{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
-    {{- $path | base | nindent 2 }}: |-
-    {{- $.Files.Get $path | nindent 4 }}
-  {{- end }}
+  {{- include "apecloud-mysql.extend.scripts" . | nindent 2 }}

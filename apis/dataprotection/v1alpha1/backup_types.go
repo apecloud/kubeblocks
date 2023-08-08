@@ -80,6 +80,10 @@ type BackupStatus struct {
 	// +optional
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
 
+	// logFilePersistentVolumeClaimName saves the logfile backup data.
+	// +optional
+	LogFilePersistentVolumeClaimName string `json:"logFilePersistentVolumeClaimName,omitempty"`
+
 	// backupToolName references the backup tool name.
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
@@ -145,6 +149,10 @@ type BackupToolManifestsStatus struct {
 	// filePath records the file path of backup.
 	// +optional
 	FilePath string `json:"filePath,omitempty"`
+
+	// logFilePath records the log file path of backup.
+	// +optional
+	LogFilePath string `json:"logFilePath,omitempty"`
 
 	// volumeName records volume name of backup data pvc.
 	// +optional

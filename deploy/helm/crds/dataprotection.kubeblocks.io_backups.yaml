@@ -107,6 +107,10 @@ spec:
               failureReason:
                 description: The reason for a backup failure.
                 type: string
+              logFilePersistentVolumeClaimName:
+                description: logFilePersistentVolumeClaimName saves the logfile backup
+                  data.
+                type: string
               manifests:
                 description: manifests determines the backup metadata info.
                 properties:
@@ -151,6 +155,9 @@ spec:
                         type: string
                       filePath:
                         description: filePath records the file path of backup.
+                        type: string
+                      logFilePath:
+                        description: logFilePath records the log file path of backup.
                         type: string
                       uploadTotalSize:
                         description: Backup upload total size. A string with capacity

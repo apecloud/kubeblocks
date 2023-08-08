@@ -5,7 +5,7 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.2
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
   env:
     - name: DATA_DIR
@@ -19,16 +19,31 @@ spec:
     - name: WALG_UPLOAD_DISK_CONCURRENCY
       value: "8"
   physical:
+    relyOnLogfile: true
     restoreCommands:
       - bash
       - -c
       - |
         #!/bin/bash
-        # NOTE: this basebackup only support for pitr.
+        # NOTE: this basebackup is only supported when pitr is enabled and rely on archive logs.
+        # if archive logs are deleted, it will cause the recovery failed from this backup.
         set -e;
+
+        {{- .Files.Get "dataprotection/fetch-wal-log.sh" | nindent 8 }}
+
+        # fetch base backup
         mkdir -p ${DATA_DIR};
-        # TODO check KB_RECOVERY_TIME, if not exits, do wal-log restore.
         WALG_FILE_PREFIX=${BACKUP_DIR} wal-g backup-fetch ${DATA_DIR} LATEST
+
+        if [[ ! -z ${BACKUP_LOGFILE_DIR} ]]; then
+          # get start wal log
+          start_wal_location=$(cat ${DATA_DIR}/backup_label | grep "START WAL LOCATION")
+          start_wal_log=${start_wal_location#*file } && start_wal_log=${start_wal_log/)/}
+
+          # fetch wal logs from archive dir
+          echo "fetch-wal-log ${BACKUP_LOGFILE_DIR} ${WAL_DIR} ${start_wal_log} \"${BACKUP_STOP_TIME}\" false"
+          fetch-wal-log ${BACKUP_LOGFILE_DIR} ${WAL_DIR} ${start_wal_log} "${BACKUP_STOP_TIME}" false
+        fi
         echo "done!";
     incrementalRestoreCommands: []
   logical:
@@ -39,11 +54,23 @@ spec:
     - -c
     - |-
       set -e;
-      # TODO check if pitr is enabled
       if [ -d ${BACKUP_DIR} ]; then
         rm -rf ${BACKUP_DIR}
       fi
       mkdir -p ${BACKUP_DIR}
-      WALG_FILE_PREFIX=${BACKUP_DIR} PGHOST=${DB_HOST} PGUSER=postgres PGPASSWORD=${DB_PASSWORD} PGPORT=5432 wal-g backup-push ${DATA_DIR}
-      echo "TOTAL SIZE: $(du -shx ${BACKUP_DIR}|awk '{print $1}')" > ${DATA_DIR}/basebackup.info;
+      export PGPASSWORD=${DB_PASSWORD}
+      {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 6 }}
+
+      START_TIME=`get_current_time`
+      WALG_FILE_PREFIX=${BACKUP_DIR} PGHOST=${DB_HOST} PGUSER=${DB_USER} PGPASSWORD=${DB_PASSWORD} PGPORT=5432 wal-g backup-push ${DATA_DIR}
+
+      STOP_TIME=""
+      stop_sentinel_file=$(find ${BACKUP_DIR}/basebackups_005 -name "*backup_stop_sentinel.json")
+      if [ -f $stop_sentinel_file ];then
+         result_json=$(cat $stop_sentinel_file)
+         STOP_TIME=$(echo $result_json | jq -r ".FinishTime")
+         START_TIME=$(echo $result_json | jq -r ".StartTime")
+      fi
+      # stat and save the backup information
+      stat_and_save_backup_info $START_TIME $STOP_TIME
   incrementalBackupCommands: []

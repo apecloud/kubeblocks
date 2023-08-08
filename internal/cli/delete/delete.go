@@ -21,12 +21,9 @@ package delete
 
 import (
 	"fmt"
-	"io"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -157,7 +154,7 @@ func (o *DeleteOptions) complete() error {
 		if len(names) == 0 {
 			names = o.Names
 		}
-		if err = Confirm(names, o.In); err != nil {
+		if err = prompt.Confirm(names, o.In, fmt.Sprintf("%s to be deleted:[%s]", o.GVR.Resource, printer.BoldRed(strings.Join(names, " ")))); err != nil {
 			return err
 		}
 	}
@@ -239,24 +236,4 @@ func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {
 		return o.PostDeleteHook(o, object)
 	}
 	return nil
-}
-
-// Confirm let user double-check what to delete
-func Confirm(names []string, in io.Reader) error {
-	if len(names) == 0 {
-		return nil
-	}
-	fmt.Printf("These clusters will be deleted:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
-	// '\n' in NewPrompt will break the output
-	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
-		func(entered string) error {
-			enteredNames := strings.Split(entered, " ")
-			sort.Strings(names)
-			sort.Strings(enteredNames)
-			if !slices.Equal(names, enteredNames) {
-				return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
-			}
-			return nil
-		}, in).Run()
-	return err
 }

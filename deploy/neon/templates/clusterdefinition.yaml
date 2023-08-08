@@ -76,7 +76,7 @@ spec:
           templateRef: neon-compute-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0755
       workloadType: Stateful
       characterType: compute
       componentDefRef:

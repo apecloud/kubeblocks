@@ -49,8 +49,7 @@ var Mgr *Manager
 var _ component.DBManager = &Manager{}
 
 func NewManager(logger logger.Logger) (*Manager, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	opts := options.Client().
 		SetHosts(config.hosts).

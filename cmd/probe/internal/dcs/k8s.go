@@ -289,11 +289,14 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		ttl = viper.GetInt("KB_TTL")
 	}
 	leader := annotations["leader"]
-	stateStr := annotations["dbstate"]
-	var dbState DBState
-	err = json.Unmarshal([]byte(stateStr), &dbState)
-	if err != nil {
-		store.logger.Infof("get leader dbstate failed: %v, annotations: %v", err, annotations)
+	stateStr, ok := annotations["dbstate"]
+	var dbState *DBState
+	if ok {
+		dbState = new(DBState)
+		err = json.Unmarshal([]byte(stateStr), &dbState)
+		if err != nil {
+			store.logger.Infof("get leader dbstate failed: %v, annotations: %v", err, annotations)
+		}
 	}
 
 	if ttl > 0 && time.Now().Unix()-renewTime > int64(ttl) {
@@ -308,7 +311,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		RenewTime:   renewTime,
 		TTL:         ttl,
 		Resource:    configmap,
-		DBState:     &dbState,
+		DBState:     dbState,
 	}, nil
 }
 
@@ -325,8 +328,10 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.SetAnnotations(annotation)
-	str, _ := json.Marshal(store.cluster.Leader.DBState)
-	configMap.Annotations["dbstate"] = string(str)
+	if store.cluster.Leader.DBState != nil {
+		str, _ := json.Marshal(store.cluster.Leader.DBState)
+		configMap.Annotations["dbstate"] = string(str)
+	}
 	cm, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		store.logger.Errorf("Acquire lock failed: %v", err)
@@ -351,8 +356,11 @@ func (store *KubernetesStore) UpdateLock() error {
 	ttl := store.cluster.HaConfig.ttl
 	annotations["ttl"] = strconv.Itoa(ttl)
 	annotations["renew-time"] = strconv.FormatInt(time.Now().Unix(), 10)
-	str, _ := json.Marshal(store.cluster.Leader.DBState)
-	configMap.Annotations["dbstate"] = string(str)
+
+	if store.cluster.Leader.DBState != nil {
+		str, _ := json.Marshal(store.cluster.Leader.DBState)
+		configMap.Annotations["dbstate"] = string(str)
+	}
 	configMap.SetAnnotations(annotations)
 
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
@@ -363,8 +371,11 @@ func (store *KubernetesStore) ReleaseLock() error {
 	store.logger.Info("release lock")
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
-	str, _ := json.Marshal(store.cluster.Leader.DBState)
-	configMap.Annotations["dbstate"] = string(str)
+
+	if store.cluster.Leader.DBState != nil {
+		str, _ := json.Marshal(store.cluster.Leader.DBState)
+		configMap.Annotations["dbstate"] = string(str)
+	}
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		store.logger.Errorf("release lock failed: %v", err)

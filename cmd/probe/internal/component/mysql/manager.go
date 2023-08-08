@@ -404,19 +404,20 @@ func (mgr *Manager) GetOpTimestamp(ctx context.Context, db *sql.DB) (int64, erro
 }
 
 func (mgr *Manager) GetGlobalState(ctx context.Context, db *sql.DB) (map[string]string, error) {
-	var hostname, serverUUID, gtidExecuted, gtidPurged, isReadonly string
-	err := db.QueryRowContext(ctx, "select  @@global.hostname, @@global.server_uuid, @@global.gtid_executed, @@global.gtid_purged, @@global.read_only").
-		Scan(&hostname, &serverUUID, &gtidExecuted, &gtidPurged, &isReadonly)
+	var hostname, serverUUID, gtidExecuted, gtidPurged, isReadonly, superReadonly string
+	err := db.QueryRowContext(ctx, "select  @@global.hostname, @@global.server_uuid, @@global.gtid_executed, @@global.gtid_purged, @@global.read_only, @@global.super_read_only").
+		Scan(&hostname, &serverUUID, &gtidExecuted, &gtidPurged, &isReadonly, &superReadonly)
 	if err != nil {
 		return nil, err
 	}
 
 	return map[string]string{
-		"hostname":      hostname,
-		"server_uuid":   serverUUID,
-		"gtid_executed": gtidExecuted,
-		"gtid_purged":   gtidPurged,
-		"read_only":     isReadonly,
+		"hostname":        hostname,
+		"server_uuid":     serverUUID,
+		"gtid_executed":   gtidExecuted,
+		"gtid_purged":     gtidPurged,
+		"read_only":       isReadonly,
+		"super_read_only": superReadonly,
 	}, nil
 }
 
@@ -501,6 +502,11 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 }
 
 func (mgr *Manager) Promote(ctx context.Context) error {
+	if (mgr.globalState["super_read_only"] == "0" && mgr.globalState["read_only"] == "0") &&
+		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "NO" &&
+			mgr.slaveStatus.GetString("Slave_SQL_Running") == "NO")) {
+		return nil
+	}
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)

@@ -1,21 +1,18 @@
 ---
-title: kbcli login
+title: kbcli context describe
 ---
 
-Authenticate with the KubeBlocks Cloud
+Get the description information of a context.
 
 ```
-kbcli login [flags]
+kbcli context describe [flags]
 ```
 
 ### Options
 
 ```
-  -c, --context string   Context name.
-  -h, --help             help for login
-      --no-browser       Do not open the browser for authentication.
-  -o, --org string       Organization name.
-  -r, --region string    Specify the region [jp] to log in. (default "jp")
+  -h, --help            help for describe
+  -o, --output string   Output format (table|yaml|json) (default "human")
 ```
 
 ### Options inherited from parent commands
@@ -29,6 +26,7 @@ kbcli login [flags]
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
+      --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
@@ -43,7 +41,7 @@ kbcli login [flags]
 
 ### SEE ALSO
 
-
+* [kbcli context](kbcli_context.md)	 - kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

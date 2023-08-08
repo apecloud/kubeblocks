@@ -48,6 +48,6 @@ type IssuedTokenProvider interface {
 }
 
 type Provider interface {
-	Login(ctx context.Context) (*authenticator.UserInfoResponse, error)
+	Login(ctx context.Context) (*authenticator.UserInfoResponse, string, error)
 	Logout(ctx context.Context) error
 }

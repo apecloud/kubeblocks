@@ -1,21 +1,26 @@
 ---
-title: kbcli login
+title: kbcli context
 ---
 
-Authenticate with the KubeBlocks Cloud
+kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
+
+### Examples
 
 ```
-kbcli login [flags]
+  // Get the context name currently used by the user.
+  kbcli context current
+  // List all contexts created by the current user.
+  kbcli context list
+  // Get the description information of context context1.
+  kbcli context describe context1
+  // Switch to context context2.
+  kbcli context use context2
 ```
 
 ### Options
 
 ```
-  -c, --context string   Context name.
-  -h, --help             help for login
-      --no-browser       Do not open the browser for authentication.
-  -o, --org string       Organization name.
-  -r, --region string    Specify the region [jp] to log in. (default "jp")
+  -h, --help   help for context
 ```
 
 ### Options inherited from parent commands
@@ -29,6 +34,7 @@ kbcli login [flags]
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
+      --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
@@ -44,6 +50,10 @@ kbcli login [flags]
 ### SEE ALSO
 
 
+* [kbcli context current](kbcli_context_current.md)	 - Get the currently used context.
+* [kbcli context describe](kbcli_context_describe.md)	 - Get the description information of a context.
+* [kbcli context list](kbcli_context_list.md)	 - List all created contexts.
+* [kbcli context use](kbcli_context_use.md)	 - Use another context that you have already created.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

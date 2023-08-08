@@ -1,21 +1,26 @@
 ---
-title: kbcli login
+title: kbcli org
 ---
 
-Authenticate with the KubeBlocks Cloud
+kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
+
+### Examples
 
 ```
-kbcli login [flags]
+  // Get the organization name currently used by the user.
+  kbcli org current
+  // List all organizations the current user has joined.
+  kbcli org list
+  // Get the description information of organization org1.
+  kbcli org describe org1
+  // Switch to organization org2.
+  kbcli org switch org2
 ```
 
 ### Options
 
 ```
-  -c, --context string   Context name.
-  -h, --help             help for login
-      --no-browser       Do not open the browser for authentication.
-  -o, --org string       Organization name.
-  -r, --region string    Specify the region [jp] to log in. (default "jp")
+  -h, --help   help for org
 ```
 
 ### Options inherited from parent commands
@@ -29,6 +34,7 @@ kbcli login [flags]
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
+      --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
@@ -44,6 +50,10 @@ kbcli login [flags]
 ### SEE ALSO
 
 
+* [kbcli org current](kbcli_org_current.md)	 - Get current organization.
+* [kbcli org describe](kbcli_org_describe.md)	 - Get the description information of an organization.
+* [kbcli org list](kbcli_org_list.md)	 - List all organizations you have joined.
+* [kbcli org switch](kbcli_org_switch.md)	 - Switch to another organization you are already a member of.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

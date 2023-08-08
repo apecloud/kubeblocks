@@ -55,17 +55,14 @@ func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *prom
 }
 
 // Confirm let user double-check for the cluster ops
-// if isLabelSelector is true, it will output the details information for confirmation
+// use customMessage to display more information
 func Confirm(names []string, in io.Reader, customMessage string) error {
 	if len(names) == 0 {
 		return nil
 	}
-	// if the resources were selected by label, user don't know their names we should give a prompt
-	// and only delete for cluster may use it
 	if len(customMessage) != 0 {
-		fmt.Printf("%s", customMessage)
+		fmt.Println(customMessage)
 	}
-	// '\n' in NewPrompt will break the output
 	_, err := NewPrompt("Please type the name again(separate with white space when more than one):",
 		func(entered string) error {
 			enteredNames := strings.Split(entered, " ")

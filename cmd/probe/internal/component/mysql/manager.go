@@ -260,7 +260,8 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	if dbState == nil {
 		return true
 	}
-	if leaderDBState.OpTimestamp-dbState.OpTimestamp < cluster.HaConfig.GetMaxLagOnSwitchover() {
+	if leaderDBState.OpTimestamp-dbState.OpTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
+		mgr.Logger.Warnf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-dbState.OpTimestamp)
 		return false
 	}
 	return true

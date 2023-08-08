@@ -251,10 +251,11 @@ func (store *KubernetesStore) CreateLock() error {
 		return err
 	}
 
-	store.logger.Infof("k8s store initializing, create leader ConfigMap: %s", leaderName)
+	leaderConfigMapName := store.clusterCompName + "-leader"
+	store.logger.Infof("K8S store initializing, create leader ConfigMap: %s", leaderConfigMapName)
 	if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      store.clusterCompName + "-leader",
+			Name:      leaderConfigMapName,
 			Namespace: store.namespace,
 			Annotations: map[string]string{
 				"leader":       leaderName,

@@ -137,6 +137,10 @@ func (o *TpccOptions) Complete(args []string) error {
 	var host string
 	var port int
 
+	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
+
 	o.Step, o.name = parseStepAndName(args, "tpcc")
 
 	if o.ClusterName != "" {
@@ -250,15 +254,18 @@ func (o *TpccOptions) Run() error {
 			OrderStatus:   o.OrderStatus,
 			Delivery:      o.Delivery,
 			StockLevel:    o.StockLevel,
-			Step:          o.Step,
-			ExtraArgs:     o.ExtraArgs,
-			Target: v1alpha1.TpccTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

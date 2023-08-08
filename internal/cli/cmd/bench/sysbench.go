@@ -131,6 +131,10 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
+	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
+
 	o.Step, o.name = parseStepAndName(args, "sysbench")
 
 	if o.ClusterName != "" {
@@ -258,20 +262,23 @@ func (o *SysBenchOptions) Run() error {
 			Namespace: o.namespace,
 		},
 		Spec: v1alpha1.SysbenchSpec{
-			Tables:    o.Tables,
-			Size:      o.Size,
-			Threads:   o.Threads,
-			Types:     o.Type,
-			Duration:  o.Duration,
-			Step:      o.Step,
-			ExtraArgs: o.ExtraArgs,
-			Target: v1alpha1.SysbenchTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			Tables:   o.Tables,
+			Size:     o.Size,
+			Threads:  o.Threads,
+			Types:    o.Type,
+			Duration: o.Duration,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

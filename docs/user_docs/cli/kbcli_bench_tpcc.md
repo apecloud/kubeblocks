@@ -55,6 +55,7 @@ kbcli bench tpcc [Step] [BenchmarkName] [flags]
       --port int                 the port of database
       --stock-level int          specify the percentage of transactions that should be stock level (default 4)
       --threads ints             specify the number of threads to use (default [1])
+      --tolerations strings      Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
       --transactions int         specify the number of transactions that each thread should run
       --user string              the user of database
       --warehouses int           specify the overall database size scaling parameter (default 1)

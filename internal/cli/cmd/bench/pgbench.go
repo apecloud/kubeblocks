@@ -126,6 +126,10 @@ func (o *PgBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
+	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
+
 	o.Step, o.name = parseStepAndName(args, "pgbench")
 
 	if o.ClusterName != "" {
@@ -222,13 +226,17 @@ func (o *PgBenchOptions) Run() error {
 			SelectOnly:   o.Select,
 			Transactions: o.Transactions,
 			Duration:     o.Duration,
-			Step:         o.Step,
-			Target: v1alpha1.PgbenchTarget{
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				Tolerations: o.Tolerations,
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Target: v1alpha1.Target{
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

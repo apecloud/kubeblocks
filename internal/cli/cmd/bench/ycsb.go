@@ -132,8 +132,11 @@ func (o *YcsbOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	o.Step, o.name = parseStepAndName(args, "ycsb")
+	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
 
+	o.Step, o.name = parseStepAndName(args, "ycsb")
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
 		if err != nil {
@@ -252,15 +255,18 @@ func (o *YcsbOptions) Run() error {
 			InsertProportion:          o.InsertProportion,
 			ScanProportion:            o.ScanProportion,
 			ReadModifyWriteProportion: o.ReadModifyWriteProportion,
-			Step:                      o.Step,
-			ExtraArgs:                 o.ExtraArgs,
-			Target: v1alpha1.YcsbTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

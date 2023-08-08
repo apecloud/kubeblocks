@@ -28,7 +28,6 @@ import (
 type BackupSpec struct {
 	// Which backupPolicy is applied to perform this backup
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
@@ -80,6 +79,10 @@ type BackupStatus struct {
 	// remoteVolume saves the backup data.
 	// +optional
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
+
+	// logFilePersistentVolumeClaimName saves the logfile backup data.
+	// +optional
+	LogFilePersistentVolumeClaimName string `json:"logFilePersistentVolumeClaimName,omitempty"`
 
 	// backupToolName references the backup tool name.
 	// +optional
@@ -146,6 +149,10 @@ type BackupToolManifestsStatus struct {
 	// filePath records the file path of backup.
 	// +optional
 	FilePath string `json:"filePath,omitempty"`
+
+	// logFilePath records the log file path of backup.
+	// +optional
+	LogFilePath string `json:"logFilePath,omitempty"`
 
 	// volumeName records volume name of backup data pvc.
 	// +optional

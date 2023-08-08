@@ -30,11 +30,13 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -769,9 +771,13 @@ var _ = Describe("Cluster Controller", func() {
 										Value: "test-value",
 									},
 								},
-								Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
-									RestoreCommands: []string{
-										"echo \"hello world\"",
+								Physical: &dataprotectionv1alpha1.PhysicalConfig{
+									BackupToolRestoreCommand: dataprotectionv1alpha1.BackupToolRestoreCommand{
+										RestoreCommands: []string{
+											"sh",
+											"-c",
+											"/backup_scripts.sh",
+										},
 									},
 								},
 							},
@@ -1146,14 +1152,29 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	}
 
-	testClusterServiceAccount := func(compName, compDefName string) {
-		By("Creating a cluster with target service account name")
+	checkClusterRBACResourcesExistence := func(cluster *appsv1alpha1.Cluster, serviceAccountName string, expectExisted bool) {
+		saObjKey := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      serviceAccountName,
+		}
+		rbObjKey := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      fmt.Sprintf("kb-%s", cluster.Name),
+		}
+		Eventually(testapps.CheckObjExists(&testCtx, saObjKey, &corev1.ServiceAccount{}, expectExisted)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, rbObjKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, rbObjKey, &rbacv1.ClusterRoleBinding{}, expectExisted)).Should(Succeed())
+	}
+
+	testClusterRBAC := func(compName, compDefName string) {
 		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
 
+		By("Creating a cluster with target service account name")
+		serviceAccountName := "test-service-account"
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(3).
-			SetServiceAccountName("test-service-account").
+			SetServiceAccountName(serviceAccountName).
 			WithRandomName().
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -1164,8 +1185,59 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the podSpec.serviceAccountName")
 		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
 			podSpec := getPodSpec(sts, deploy)
-			g.Expect(podSpec.ServiceAccountName).To(Equal("test-service-account"))
+			g.Expect(podSpec.ServiceAccountName).To(Equal(serviceAccountName))
 		})
+
+		By("check the RBAC resources created exist")
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true)
+	}
+
+	testReCreateClusterWithRBAC := func(compName, compDefName string) {
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
+
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		serviceAccountName := "test-sa-" + randomStr
+
+		By(fmt.Sprintf("Creating a cluster with random service account %s", serviceAccountName))
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(compName, compDefName).SetReplicas(3).
+			SetServiceAccountName(serviceAccountName).
+			WithRandomName().
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		By("check the RBAC resources created exist")
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true)
+
+		By("Delete the cluster")
+		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+		By("Wait for the cluster to terminate")
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+
+		By("check the RBAC resources deleted")
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, false)
+
+		By("re-create cluster with same name")
+		clusterObj = testapps.NewClusterFactory(clusterKey.Namespace, clusterKey.Name,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(compName, compDefName).SetReplicas(3).
+			SetServiceAccountName(serviceAccountName).
+			Create(&testCtx).GetObject()
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		By("check the RBAC resources re-created exist")
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true)
+
+		By("Delete the cluster")
+		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+		By("Wait for the cluster to terminate")
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 	}
 
 	testComponentAffinity := func(compName, compDefName string) {
@@ -1418,61 +1490,6 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting the component be running")
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).
 			Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-	}
-
-	testHScaleError := func(compName, compDefName string) {
-
-		viper.Set("VOLUMESNAPSHOT", false)
-		viper.Set(constant.CfgKeyBackupPVCName, "")
-		initialReplicas := int32(1)
-		updatedReplicas := int32(3)
-
-		By("Set HorizontalScalePolicy")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-			func(clusterDef *appsv1alpha1.ClusterDefinition) {
-				for i, def := range clusterDef.Spec.ComponentDefs {
-					if def.Name != compDefName {
-						continue
-					}
-					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
-						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume,
-							BackupPolicyTemplateName: backupPolicyTPLName}
-				}
-			})()).ShouldNot(HaveOccurred())
-
-		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(compName, compDefName).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			SetReplicas(initialReplicas).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-
-		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
-
-		By("Checking h-scale failed cluster status failed with backup error")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Conditions).ShouldNot(BeEmpty())
-			var err error
-			for _, cond := range cluster.Status.Conditions {
-				if strings.Contains(cond.Message, "h-scale policy is Backup but neither snapshot nor backup tool is enabled") {
-					err = errors.New("has h-scale error")
-					break
-				}
-			}
-			if err == nil {
-				// this expect is intended for print all cluster.Status.Conditions
-				g.Expect(cluster.Status.Conditions).Should(BeEmpty())
-			}
-			g.Expect(err).Should(HaveOccurred())
-		})).Should(Succeed())
 	}
 
 	testBackupError := func(compName, compDefName string) {
@@ -2121,8 +2138,12 @@ var _ = Describe("Cluster Controller", func() {
 				testChangeReplicas(compName, compDefName)
 			})
 
-			It(fmt.Sprintf("[comp: %s] should add serviceAccountName correctly", compName), func() {
-				testClusterServiceAccount(compName, compDefName)
+			It(fmt.Sprintf("[comp: %s] should create RBAC resources correctly", compName), func() {
+				testClusterRBAC(compName, compDefName)
+			})
+
+			It(fmt.Sprintf("[comp: %s] should re-create cluster and RBAC resources correctly", compName), func() {
+				testReCreateClusterWithRBAC(compName, compDefName)
 			})
 
 			Context(fmt.Sprintf("[comp: %s] and with cluster affinity set", compName), func() {
@@ -2186,10 +2207,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			It(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
 				testBackupError(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] should report h-scale error", compName), func() {
-				testHScaleError(compName, compDefName)
 			})
 
 			Context(fmt.Sprintf("[comp: %s] with horizontal scale after storage expansion", compName), func() {

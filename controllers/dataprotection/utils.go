@@ -82,8 +82,8 @@ func getBackupToolByName(reqCtx intctrlutil.RequestCtx, cli client.Client, backu
 }
 
 // getCreatedCRNameByBackupPolicy gets the CR name which is created by BackupPolicy, such as CronJob/logfile Backup.
-func getCreatedCRNameByBackupPolicy(backupPolicyName, backupPolicyNamespace string, backupType dataprotectionv1alpha1.BackupType) string {
-	name := fmt.Sprintf("%s-%s", backupPolicyName, backupPolicyNamespace)
+func getCreatedCRNameByBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy, backupType dataprotectionv1alpha1.BackupType) string {
+	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace)
 	if len(name) > 30 {
 		name = strings.TrimRight(name[:30], "-")
 	}
@@ -101,8 +101,8 @@ func buildAutoCreationAnnotations(backupPolicyName string) map[string]string {
 	}
 }
 
-// getBackupPathPrefix gets the backup path prefix.
-func getBackupPathPrefix(backup *dataprotectionv1alpha1.Backup, pathPrefix string) string {
+// getBackupDestinationPath gets the destination path to storage backup datas.
+func getBackupDestinationPath(backup *dataprotectionv1alpha1.Backup, pathPrefix string) string {
 	pathPrefix = strings.TrimRight(pathPrefix, "/")
 	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
 		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
@@ -236,8 +236,8 @@ func cropJobName(jobName string) string {
 	return jobName
 }
 
-func buildBackupInfoENV(pathPrefix string) string {
-	return backupPathBase + pathPrefix + "/backup.info"
+func buildBackupInfoENV(backupDestinationPath string) string {
+	return backupPathBase + backupDestinationPath + "/backup.info"
 }
 
 func generateUniqueNameWithBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy) string {

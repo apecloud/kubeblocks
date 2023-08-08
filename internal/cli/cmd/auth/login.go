@@ -32,6 +32,8 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
+	cloud_context "github.com/apecloud/kubeblocks/internal/cli/cmd/context"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 )
 
 const (
@@ -40,6 +42,9 @@ const (
 
 type LoginOptions struct {
 	authorize.Options
+	Region      string
+	OrgName     string
+	ContextName string
 
 	Provider authorize.Provider
 }
@@ -56,18 +61,22 @@ func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the KubeBlocks cloud application.")
-	cmd.Flags().StringVar(&o.AuthURL, "site", DefaultBaseURL, "The KubeBlocks Auth API Base URL.")
+	cmd.Flags().StringVarP(&o.Region, "region", "r", "jp", "Specify the region [jp] to log in.")
 	cmd.Flags().BoolVar(&o.NoBrowser, "no-browser", false, "Do not open the browser for authentication.")
+	cmd.Flags().StringVarP(&o.OrgName, "org", "o", "", "Organization name.")
+	cmd.Flags().StringVarP(&o.ContextName, "context", "c", "", "Context name.")
 	return cmd
 }
 
 func (o *LoginOptions) complete() error {
+	o.AuthURL = getAuthURL(o.Region)
+
 	var err error
 	o.Provider, err = authorize.NewTokenProvider(o.Options)
 	if err != nil {
 		return err
 	}
+
 	if o.ClientID == "" {
 		return o.loadConfig()
 	}
@@ -82,19 +91,34 @@ func (o *LoginOptions) validate() error {
 }
 
 func (o *LoginOptions) run(ctx context.Context) error {
-	if !utils.IsTTY() {
-		return fmt.Errorf("the 'login' command requires an interactive shell")
+	if o.OrgName != "" {
+		if o.ContextName != "" {
+			return o.loginWithOrgAndContext(ctx)
+		}
+		return o.loginWithOrg(ctx)
 	}
 
-	userInfo, err := o.Provider.Login(ctx)
+	if o.ContextName != "" {
+		return o.loginWithContext(ctx)
+	}
+
+	return o.loginWithDefault(ctx)
+}
+
+func (o *LoginOptions) login(ctx context.Context) (string, error) {
+	if !utils.IsTTY() {
+		return "", fmt.Errorf("the 'login' command requires an interactive shell")
+	}
+
+	userInfo, idToken, err := o.Provider.Login(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	msg := fmt.Sprintf("Successfully logged in as \"%s\" for organization \"%s\" (\"%s\") \"%s\".", userInfo.Email, userInfo.Subject, userInfo.Name, userInfo.Locale)
-	fmt.Fprint(o.Out, msg)
+	fmt.Fprintln(o.Out, msg)
 
-	return nil
+	return idToken, nil
 }
 
 func (o *LoginOptions) loadConfig() error {
@@ -113,6 +137,124 @@ func (o *LoginOptions) loadConfig() error {
 	}
 
 	return nil
+}
+
+func (o *LoginOptions) loginWithOrg(ctx context.Context) error {
+	token, err := o.login(ctx)
+	if err != nil {
+		return err
+	}
+
+	org := &organization.OrganizationOption{
+		Organization: &organization.CloudOrganization{
+			Token:   token,
+			APIURL:  organization.APIURL,
+			APIPath: organization.APIPath,
+		},
+	}
+	if ok, err := org.Organization.IsValidOrganization(o.OrgName); !ok {
+		return err
+	}
+
+	firstContextName := getFirstContext(token, o.OrgName)
+	if err != nil {
+		return err
+	}
+
+	return o.setCurrentConfig(o.OrgName, firstContextName)
+}
+
+func (o *LoginOptions) loginWithContext(ctx context.Context) error {
+	token, err := o.login(ctx)
+	if err != nil {
+		return err
+	}
+
+	firstOrgName := getFirstOrg(token)
+	if err != nil {
+		return err
+	}
+
+	return o.setCurrentConfig(firstOrgName, o.ContextName)
+}
+
+func (o *LoginOptions) loginWithOrgAndContext(ctx context.Context) error {
+	_, err := o.login(ctx)
+	if err != nil {
+		return err
+	}
+	return o.setCurrentConfig(o.OrgName, o.ContextName)
+}
+
+func (o *LoginOptions) loginWithDefault(ctx context.Context) error {
+	token, err := o.login(ctx)
+	if err != nil {
+		return err
+	}
+
+	firstOrgName := getFirstOrg(token)
+	if err != nil {
+		return err
+	}
+
+	firstContextName := getFirstContext(token, firstOrgName)
+	if err != nil {
+		return err
+	}
+
+	return o.setCurrentConfig(firstOrgName, firstContextName)
+}
+
+func (o *LoginOptions) setCurrentConfig(orgName, contextName string) error {
+	currentOrgAndContext := organization.CurrentOrgAndContext{
+		CurrentOrganization: orgName,
+		CurrentContext:      contextName,
+	}
+
+	err := organization.SetCurrentOrgAndContext(&currentOrgAndContext)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(o.Out, "You are now logged in to the organization: %s and the context: %s.\n", orgName, contextName)
+	return nil
+}
+
+func getFirstOrg(token string) string {
+	org := &organization.OrganizationOption{
+		Organization: &organization.CloudOrganization{
+			Token:   token,
+			APIURL:  organization.APIURL,
+			APIPath: organization.APIPath,
+		},
+	}
+	organizations, err := org.Organization.GetOrganizations()
+	if err != nil {
+		return ""
+	}
+
+	if organizations != nil && len(organizations.Items) > 0 {
+		return organizations.Items[0].Name
+	}
+	return ""
+}
+
+func getFirstContext(token string, orgName string) string {
+	c := &cloud_context.CloudContext{
+		OrgName: orgName,
+		Token:   token,
+		APIURL:  organization.APIURL,
+		APIPath: organization.APIPath,
+	}
+	contexts, err := c.GetContexts()
+	if err != nil {
+		return ""
+	}
+
+	if contexts != nil {
+		return contexts.Items[0].Metadata.Name
+	}
+	return ""
 }
 
 func IsLoggedIn() bool {
@@ -155,4 +297,15 @@ func checkTokenAvailable(token, domain string) bool {
 	_, err = io.ReadAll(resp.Body)
 
 	return err == nil
+}
+
+func getAuthURL(region string) string {
+	var authURL string
+	switch region {
+	case "jp":
+		authURL = DefaultBaseURL
+	default:
+		authURL = DefaultBaseURL
+	}
+	return authURL
 }

@@ -134,41 +134,10 @@ data:
     useradd pgbouncer
     chown -R pgbouncer:pgbouncer /opt/bitnami/pgbouncer/conf/ /opt/bitnami/pgbouncer/logs/ /opt/bitnami/pgbouncer/tmp/
     /opt/bitnami/scripts/pgbouncer/run.sh
-  backup-log-collector.sh: |
+  backup-info-collector.sh: |
     #!/bin/bash
-    set -o errexit
-    set -o nounset
-    SHOW_START_TIME=$1
-    LOG_START_TIME=""
-    LOG_STOP_TIME=""
-    if [ "$SHOW_START_TIME" == "false" ]; then
-      latest_done_wal=$(ls -t ${PGDATA}/pg_wal/archive_status/|grep ".done"|head -n 1)
-      if [ "${latest_done_wal}" != "" ]; then
-        LOG_STOP_TIME=$(pg_waldump ${latest_done_wal%.*} --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
-      fi
-      [[ "${LOG_STOP_TIME}" != "" ]] && printf "{\"stopTime\": \"$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')\"}" || printf "{}"
-    else
-      LOG_START_TIME=$(pg_waldump $(ls -Ftr $PGDATA/pg_wal/ | grep '[[:xdigit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
-      for i in $(ls -Ft $PGDATA/pg_wal/ | grep '[[:xdigit:]]$\|.partial$'); do LOG_STOP_TIME=$(pg_waldump $i --rmgr=Transaction 2>/dev/null|tail -n 1); [[ "$LOG_STOP_TIME" != "" ]] && break;  done
-      LOG_STOP_TIME=$(echo $LOG_STOP_TIME |awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
-      if [ "${LOG_START_TIME}" == "" ]; then LOG_START_TIME=${LOG_STOP_TIME}; fi
-      LOG_START_TIME=$(date -d "$LOG_START_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
-      LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
-      printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"
-    fi
-  filesize-collector.sh: |
-    #!/bin/bash
-    set -e;
-    function getProperty() {
-       file=$1; key=$2;
-       echo $(grep "${key}: " ${file} | awk -F ': ' '{print $2}')
-    }
-    filename=$1
-    fileinfo=${PGDATA}/${filename}
-    if [ -f ${fileinfo} ]; then
-      TOTAL_SIZE=$(getProperty ${fileinfo} "TOTAL SIZE")
-      rm -f ${fileinfo}
-      printf "{\"totalSize\":\"${TOTAL_SIZE}\",\"manifests\":{\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}"
-    else
-      printf "{}"
-    fi
+    {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 4 }}
+    export DB_USER=postgres
+    export DB_HOST=127.0.0.1
+    STOP_TIME=`get_current_time`
+    [[ "${STOP_TIME}" != "" ]] && printf "{\"stopTime\": \"$(date -d "$STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')\"}" || printf "{}"

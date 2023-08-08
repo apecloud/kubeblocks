@@ -26,7 +26,7 @@ import (
 
 var _ = Describe("Engine", func() {
 	It("new engine", func() {
-		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis, statePostgreSQL, stateNebula} {
+		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis, statePostgreSQL, stateNebula, stateFoxLake} {
 			engine, _ := New(typeName)
 			Expect(engine).ShouldNot(BeNil())
 

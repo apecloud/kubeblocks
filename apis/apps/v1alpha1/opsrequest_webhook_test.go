@@ -296,6 +296,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			}
 		}
 		defaultVCTName := "data"
+		logVCTName := "log"
 		targetStorage := "2Gi"
 		By("By testing volumeExpansion - target component not exist")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
@@ -307,7 +308,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
 				{
-					Name:    "log",
+					Name:    logVCTName,
 					Storage: resource.MustParse(targetStorage),
 				},
 				{
@@ -332,6 +333,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(storageClass).ShouldNot(BeNil())
 		// mock to create pvc
 		createPVC(clusterName, componentName, storageClassName, defaultVCTName, 0)
+
+		By("create a pvc and storageClass does not support volume expansion")
+		storageClassName1 := "standard1"
+		storageClass1 := createStorageClass(testCtx.Ctx, storageClassName1, "false", false)
+		Expect(storageClass1).ShouldNot(BeNil())
+		createPVC(clusterName, componentName, storageClassName1, logVCTName, 0)
 
 		By("testing volumeExpansion with smaller storage, expect an error occurs")
 		opsRequest.Spec.VolumeExpansionList = getSingleVolumeExpansionList(componentName, defaultVCTName, "500Mi")

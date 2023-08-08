@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
@@ -60,6 +61,7 @@ var benchGVRList = []schema.GroupVersionResource{
 	types.PgBenchGVR(),
 	types.SysbenchGVR(),
 	types.YcsbGVR(),
+	types.TpccGVR(),
 }
 
 type BenchBaseOptions struct {
@@ -114,6 +116,7 @@ func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewSysBenchCmd(f, streams),
 		NewPgBenchCmd(f, streams),
 		NewYcsbCmd(f, streams),
+		NewTpccCmd(f, streams),
 		newListCmd(f, streams),
 		newDeleteCmd(f, streams),
 	)
@@ -178,6 +181,12 @@ func newDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func (o *benchListOption) run() error {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Fprintf(o.Out, "it seems that kubebench is not running, please run `kbcli addon enable kubebench` to install it or check the kubebench pod status.\n")
+		}
+	}()
+
 	var infos []*resource.Info
 	for _, gvr := range benchGVRList {
 		bench := list.NewListOptions(o.Factory, o.IOStreams, gvr)
@@ -186,6 +195,10 @@ func (o *benchListOption) run() error {
 		bench.LabelSelector = o.LabelSelector
 		result, err := bench.Run()
 		if err != nil {
+			if strings.Contains(err.Error(), "the server doesn't have a resource type") {
+				fmt.Fprintf(o.Out, "kubebench is not installed, please run `kbcli addon enable kubebench` to install it.\n")
+				return nil
+			}
 			return err
 		}
 
@@ -321,4 +334,28 @@ func validateBenchmarkExist(factory cmdutil.Factory, streams genericclioptions.I
 		}
 	}
 	return nil
+}
+
+// parseStepAndName parses the step and name from the given arguments and name prefix.
+// If no arguments are provided, it sets the step to "all" and generates a random name with the given prefix.
+// If the first argument is "all", "cleanup", "prepare", or "run", it sets the step to the argument value.
+// If a second argument is provided, it sets the name to the argument value.
+// If the first argument is not a valid step value, it sets the name to the first argument value.
+// Returns the step and name as strings.
+func parseStepAndName(args []string, namePrefix string) (step, name string) {
+	step = "all"
+	name = fmt.Sprintf("%s-%s", namePrefix, util.RandRFC1123String(6))
+
+	if len(args) > 0 {
+		switch args[0] {
+		case "all", "cleanup", "prepare", "run":
+			step = args[0]
+			if len(args) > 1 {
+				name = args[1]
+			}
+		default:
+			name = args[0]
+		}
+	}
+	return
 }

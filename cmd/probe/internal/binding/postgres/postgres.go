@@ -130,20 +130,6 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 	return pgOps.manager.GetMemberStateWithPool(ctx, nil)
 }
 
-func (pgOps *PostgresOperations) LockInstance(ctx context.Context) error {
-	// sql := "alter system set default_transaction_read_only=on; select pg_reload_conf();"
-	// _, err := pgOps.exec(ctx, sql)
-	// return err
-	return fmt.Errorf("NotSupported")
-}
-
-func (pgOps *PostgresOperations) UnlockInstance(ctx context.Context) error {
-	// sql := "alter system set default_transaction_read_only=off; select pg_reload_conf();"
-	// _, err := pgOps.exec(ctx, sql)
-	// return err
-	return fmt.Errorf("NotSupported")
-}
-
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]

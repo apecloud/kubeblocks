@@ -11,10 +11,10 @@ spec:
     versionsContext:
       initContainers:
       - name: fsgroup-volume
-        image: {{ .Values.image.registry | default "docker.io" }}/busybox:latest
+        image: {{ .Values.image.registry | default "docker.io" }}/apecloud/alpine:3.16
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
       - name: sysctl
-        image: {{ .Values.image.registry | default "docker.io" }}/busybox:latest
+        image: {{ .Values.image.registry | default "docker.io" }}/apecloud/alpine:3.16
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
       containers:
       - name: opensearch

@@ -418,7 +418,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					})).Should(Succeed())
 					backup := &dpv1alpha1.Backup{}
 					sts := &appsv1.StatefulSet{}
-					backupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), testCtx.DefaultNamespace, dpv1alpha1.BackupTypeLogFile)
+					backupName := getCreatedCRNameByBackupPolicy(backupPolicy, dpv1alpha1.BackupTypeLogFile)
 					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
 						Name:      backupName,
 						Namespace: testCtx.DefaultNamespace,

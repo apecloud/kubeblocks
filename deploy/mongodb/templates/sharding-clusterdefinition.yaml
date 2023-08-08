@@ -22,7 +22,7 @@ spec:
           templateRef: mongodb-sharding-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
-          defaultMode: 493
+          defaultMode: 0555
       workloadType: Stateless
       service:
         ports:
@@ -47,7 +47,7 @@ spec:
           templateRef: mongodb-sharding-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
-          defaultMode: 493
+          defaultMode: 0555
       characterType: mongodb
       workloadType: Consensus
       consensusSpec:
@@ -97,7 +97,7 @@ spec:
           templateRef: mongodb-sharding-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
-          defaultMode: 493
+          defaultMode: 0555
       characterType: mongodb
       workloadType: Consensus
       consensusSpec:

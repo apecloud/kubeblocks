@@ -104,7 +104,6 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
-                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -202,7 +201,6 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
-                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:

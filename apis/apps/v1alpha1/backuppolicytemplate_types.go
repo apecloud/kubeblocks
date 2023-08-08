@@ -127,7 +127,6 @@ type CommonBackupPolicy struct {
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupToolName string `json:"backupToolName,omitempty"`
 }

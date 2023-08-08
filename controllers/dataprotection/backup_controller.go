@@ -307,7 +307,7 @@ func (r *BackupReconciler) validateLogfileBackupLegitimacy(backup *dataprotectio
 	if backupType != dataprotectionv1alpha1.BackupTypeLogFile {
 		return nil
 	}
-	if backup.Name != getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backupType) {
+	if backup.Name != getCreatedCRNameByBackupPolicy(backupPolicy, backupType) {
 		return intctrlutil.NewInvalidLogfileBackupName(backupPolicy.Name)
 	}
 	if backupPolicy.Spec.Schedule.Logfile == nil {
@@ -355,35 +355,17 @@ func (r *BackupReconciler) doNewPhaseAction(
 		if commonPolicy == nil {
 			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewBackupNotSupported(string(backup.Spec.BackupType), backupPolicy.Name))
 		}
-		if backup.Status.Manifests == nil {
-			backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{}
-		}
-		if backup.Status.Manifests.BackupTool == nil {
-			backup.Status.Manifests.BackupTool = &dataprotectionv1alpha1.BackupToolManifestsStatus{}
-		}
-		// handle the PVC used in this backup
-		if backup.Status.PersistentVolumeClaimName == "" {
-			pvcName, pvName, err := r.handlePersistentVolumeClaim(reqCtx, backup, backupPolicy.Name, commonPolicy, updateLabels)
-			if err != nil {
-				if errors.Is(err, errBreakReconcile) {
-					// wait for the PVC to be created
-					return intctrlutil.Reconciled()
-				}
-				return r.updateStatusIfFailed(reqCtx, backup, err)
-			}
-			// record volume name
-			backup.Status.PersistentVolumeClaimName = pvcName
-			backup.Status.Manifests.BackupTool.VolumeName = pvName
-		}
-		// save the backup message for restore
-		backupToolName := commonPolicy.BackupToolName
-		backup.Status.BackupToolName = backupToolName
-		pathPrefix := getBackupPathPrefix(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
-		backup.Status.Manifests.BackupTool.FilePath = pathPrefix
 		targetCluster = commonPolicy.Target
-		backupTool, err := getBackupToolByName(reqCtx, r.Client, backupToolName)
+		backupTool, err := getBackupToolByName(reqCtx, r.Client, commonPolicy.BackupToolName)
 		if err != nil {
-			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewNotFound("backupTool: %s not found", backupToolName))
+			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewNotFound("backupTool: %s not found", commonPolicy.BackupToolName))
+		}
+		if err = r.buildBackupStatusForBackupTool(reqCtx, backup, backupPolicy, commonPolicy, backupTool, updateLabels); err != nil {
+			if errors.Is(err, errBreakReconcile) {
+				// wait for the PVC to be created
+				return intctrlutil.Reconciled()
+			}
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		isStatefulSetKind = backupTool.Spec.DeployKind == dataprotectionv1alpha1.DeployKindStatefulSet
 	}
@@ -431,6 +413,51 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupReconciler) buildBackupStatusForBackupTool(reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
+	backupTool *dataprotectionv1alpha1.BackupTool,
+	updateLabels map[string]string) error {
+	if backup.Status.Manifests == nil {
+		backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{}
+	}
+	if backup.Status.Manifests.BackupTool == nil {
+		backup.Status.Manifests.BackupTool = &dataprotectionv1alpha1.BackupToolManifestsStatus{}
+	}
+	// handle the PVC used in this backup
+	if backup.Status.PersistentVolumeClaimName == "" {
+		pvcName, pvName, err := r.handlePersistentVolumeClaim(reqCtx, backup, backupPolicy.Name, commonPolicy, updateLabels)
+		if err != nil {
+			return err
+		}
+		// record volume name
+		backup.Status.PersistentVolumeClaimName = pvcName
+		backup.Status.Manifests.BackupTool.VolumeName = pvName
+	}
+	// save the backup message for restore
+	backup.Status.BackupToolName = backupTool.Name
+	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+	backup.Status.Manifests.BackupTool.FilePath = backupDestinationPath
+
+	if backupTool.Spec.Physical.IsRelyOnLogfile() {
+		if backupPolicy.Spec.Schedule.Logfile == nil || !backupPolicy.Spec.Schedule.Logfile.Enable {
+			return intctrlutil.NewBackupLogfileScheduleDisabled(backupTool.Name)
+		}
+		logfileBackupName := getCreatedCRNameByBackupPolicy(backupPolicy, dataprotectionv1alpha1.BackupTypeLogFile)
+		backup.Status.Manifests.BackupTool.LogFilePath = getBackupDestinationPath(&dataprotectionv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{Namespace: backup.Namespace, Name: logfileBackupName},
+		}, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+
+		logFilePvcName, _, err := r.handlePersistentVolumeClaim(reqCtx, backup, backupPolicy.Name, backupPolicy.Spec.Logfile, updateLabels)
+		if err != nil {
+			return err
+		}
+		backup.Status.LogFilePersistentVolumeClaimName = logFilePvcName
+	}
+	return nil
 }
 
 func (r *BackupReconciler) cleanupFailedJob(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
@@ -646,14 +673,14 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
-	pathPrefix := getBackupPathPrefix(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
 	patch := client.MergeFrom(backup.DeepCopy())
 	var res *ctrl.Result
 	switch backup.Spec.BackupType {
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
-		res, err = r.doSnapshotInProgressPhaseAction(reqCtx, backup, backupPolicy, pathPrefix)
+		res, err = r.doSnapshotInProgressPhaseAction(reqCtx, backup, backupPolicy, backupDestinationPath)
 	default:
-		res, err = r.doBaseBackupInProgressPhaseAction(reqCtx, backup, backupPolicy, pathPrefix)
+		res, err = r.doBaseBackupInProgressPhaseAction(reqCtx, backup, backupPolicy, backupDestinationPath)
 	}
 
 	if res != nil {
@@ -679,7 +706,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
-	pathPrefix string) (*ctrl.Result, error) {
+	backupDestinationPath string) (*ctrl.Result, error) {
 	// 1. create and ensure pre-command job completed
 	// 2. create and ensure volume snapshot ready
 	// 3. create and ensure post-command job completed
@@ -691,7 +718,7 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 	if !isOK {
 		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, ""))
 	}
-	if err = r.createUpdatesJobs(reqCtx, backup, nil, &snapshotSpec.BasePolicy, pathPrefix, dataprotectionv1alpha1.PRE); err != nil {
+	if err = r.createUpdatesJobs(reqCtx, backup, nil, &snapshotSpec.BasePolicy, backupDestinationPath, dataprotectionv1alpha1.PRE); err != nil {
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
 	}
 	if err = r.createVolumeSnapshot(reqCtx, backup, backupPolicy.Spec.Snapshot); err != nil {
@@ -718,7 +745,7 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 	}
 
 	// Failure MetadataCollectionJob does not affect the backup status.
-	if err = r.createUpdatesJobs(reqCtx, backup, nil, &snapshotSpec.BasePolicy, pathPrefix, dataprotectionv1alpha1.POST); err != nil {
+	if err = r.createUpdatesJobs(reqCtx, backup, nil, &snapshotSpec.BasePolicy, backupDestinationPath, dataprotectionv1alpha1.POST); err != nil {
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 	}
 
@@ -736,7 +763,7 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 func (r *BackupReconciler) doBaseBackupInProgressPhaseAction(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
-	pathPrefix string) (*ctrl.Result, error) {
+	backupDestinationPath string) (*ctrl.Result, error) {
 	// 1. create and ensure backup tool job finished
 	// 2. get job phase and update
 	commonPolicy := backupPolicy.Spec.GetCommonPolicy(backup.Spec.BackupType)
@@ -745,10 +772,10 @@ func (r *BackupReconciler) doBaseBackupInProgressPhaseAction(reqCtx intctrlutil.
 		return intctrlutil.ResultToP(r.updateStatusIfFailed(reqCtx, backup, fmt.Errorf("not found the %s policy", backup.Spec.BackupType)))
 	}
 	// createUpdatesJobs should not affect the backup status, just need to record events when the run fails
-	if err := r.createUpdatesJobs(reqCtx, backup, commonPolicy, &commonPolicy.BasePolicy, pathPrefix, dataprotectionv1alpha1.PRE); err != nil {
+	if err := r.createUpdatesJobs(reqCtx, backup, commonPolicy, &commonPolicy.BasePolicy, backupDestinationPath, dataprotectionv1alpha1.PRE); err != nil {
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
 	}
-	if err := r.createBackupToolJob(reqCtx, backup, backupPolicy, commonPolicy, pathPrefix); err != nil {
+	if err := r.createBackupToolJob(reqCtx, backup, backupPolicy, commonPolicy, backupDestinationPath); err != nil {
 		return intctrlutil.ResultToP(r.updateStatusIfFailed(reqCtx, backup, err))
 	}
 	key := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
@@ -760,7 +787,7 @@ func (r *BackupReconciler) doBaseBackupInProgressPhaseAction(reqCtx intctrlutil.
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 	// createUpdatesJobs should not affect the backup status, just need to record events when the run fails
-	if err = r.createUpdatesJobs(reqCtx, backup, commonPolicy, &commonPolicy.BasePolicy, pathPrefix, dataprotectionv1alpha1.POST); err != nil {
+	if err = r.createUpdatesJobs(reqCtx, backup, commonPolicy, &commonPolicy.BasePolicy, backupDestinationPath, dataprotectionv1alpha1.POST); err != nil {
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 	}
 	// updates Phase directly to Completed because `ensureBatchV1JobCompleted` has checked job failed
@@ -884,7 +911,7 @@ func (r *BackupReconciler) createBackupStatefulSet(reqCtx intctrlutil.RequestCtx
 
 func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dataprotectionv1alpha1.Backup,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
-	pathPrefix string) (corev1.Container, error) {
+	backupDestinationPath string) (corev1.Container, error) {
 	container := corev1.Container{}
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("manifests_updater.cue"))
@@ -916,7 +943,7 @@ func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dataprotection
 		{Name: fmt.Sprintf("backup-%s", backup.Status.PersistentVolumeClaimName), MountPath: backupPathBase},
 	}
 	container.Env = []corev1.EnvVar{
-		{Name: constant.DPBackupInfoFile, Value: buildBackupInfoENV(pathPrefix)},
+		{Name: constant.DPBackupInfoFile, Value: buildBackupInfoENV(backupDestinationPath)},
 	}
 	return container, nil
 }
@@ -925,14 +952,14 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) (*appsv1.StatefulSetSpec, error) {
-	pathPrefix := getBackupPathPrefix(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
-	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, backupPolicy, commonPolicy, pathPrefix)
+	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, backupPolicy, commonPolicy, backupDestinationPath)
 	toolPodSpec.RestartPolicy = corev1.RestartPolicyAlways
 	if err != nil {
 		return nil, err
 	}
 	// build the manifests updater container for backup.status.manifests
-	manifestsUpdaterContainer, err := r.buildManifestsUpdaterContainer(backup, commonPolicy, pathPrefix)
+	manifestsUpdaterContainer, err := r.buildManifestsUpdaterContainer(backup, commonPolicy, backupDestinationPath)
 	if err != nil {
 		return nil, err
 	}
@@ -1253,7 +1280,7 @@ func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
 	basePolicy *dataprotectionv1alpha1.BasePolicy,
-	pathPrefix string,
+	backupDestinationPath string,
 	stage dataprotectionv1alpha1.BackupStatusUpdateStage) error {
 	// get backup policy
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
@@ -1269,7 +1296,7 @@ func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
 		if update.UpdateStage != stage {
 			continue
 		}
-		if err := r.createMetadataCollectionJob(reqCtx, backup, commonPolicy, basePolicy, pathPrefix, update, index); err != nil {
+		if err := r.createMetadataCollectionJob(reqCtx, backup, commonPolicy, basePolicy, backupDestinationPath, update, index); err != nil {
 			return err
 		}
 	}
@@ -1280,7 +1307,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	backup *dataprotectionv1alpha1.Backup,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
 	basePolicy *dataprotectionv1alpha1.BasePolicy,
-	pathPrefix string,
+	backupDestinationPath string,
 	updateInfo dataprotectionv1alpha1.BackupStatusUpdate,
 	index int) error {
 	jobNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
@@ -1298,7 +1325,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	}
 
 	// build job and create
-	jobPodSpec, err := r.buildMetadataCollectionPodSpec(reqCtx, backup, commonPolicy, basePolicy, pathPrefix, updateInfo)
+	jobPodSpec, err := r.buildMetadataCollectionPodSpec(reqCtx, backup, commonPolicy, basePolicy, backupDestinationPath, updateInfo)
 	if err != nil {
 		return err
 	}
@@ -1408,7 +1435,7 @@ func (r *BackupReconciler) createBackupToolJob(
 	backup *dataprotectionv1alpha1.Backup,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
-	pathPrefix string) error {
+	backupDestinationPath string) error {
 
 	key := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
 	job := batchv1.Job{}
@@ -1421,7 +1448,7 @@ func (r *BackupReconciler) createBackupToolJob(
 		return nil
 	}
 
-	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, backupPolicy, commonPolicy, pathPrefix)
+	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, backupPolicy, commonPolicy, backupDestinationPath)
 	if err != nil {
 		return err
 	}
@@ -1847,8 +1874,10 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	r.appendBackupVolumeMount(pvcName, &podSpec, &podSpec.Containers[0])
 
 	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
-	podSpec.NodeSelector = map[string]string{
-		hostNameLabelKey: clusterPod.Spec.NodeName,
+	if clusterPod.Spec.NodeName != "" {
+		podSpec.NodeSelector = map[string]string{
+			hostNameLabelKey: clusterPod.Spec.NodeName,
+		}
 	}
 	// ignore taints
 	podSpec.Tolerations = []corev1.Toleration{
@@ -1907,7 +1936,7 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	backup *dataprotectionv1alpha1.Backup,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy,
 	basePolicy *dataprotectionv1alpha1.BasePolicy,
-	pathPrefix string,
+	backupDestinationPath string,
 	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) (corev1.PodSpec, error) {
 	podSpec := corev1.PodSpec{}
 	targetPod, err := r.getTargetPod(reqCtx, backup, basePolicy.Target.LabelsSelector.MatchLabels)
@@ -1926,7 +1955,7 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 			"eval kubectl -n %s patch backup %s --subresource=status --type=merge --patch '{\\\"status\\\":${backupInfo}}';"
 		args = fmt.Sprintf(args, backup.Namespace, backup.Name)
 		container.Env = []corev1.EnvVar{
-			{Name: "BACKUP_INFO_FILE", Value: buildBackupInfoENV(pathPrefix)},
+			{Name: "BACKUP_INFO_FILE", Value: buildBackupInfoENV(backupDestinationPath)},
 		}
 		r.appendBackupVolumeMount(backup.Status.PersistentVolumeClaimName, &podSpec, &container)
 	} else {

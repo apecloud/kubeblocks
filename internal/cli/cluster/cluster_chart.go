@@ -23,7 +23,6 @@ import (
 	"compress/gzip"
 	"embed"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -201,7 +200,10 @@ func (c *ChartInfo) buildClusterSchema() error {
 
 func (c *ChartInfo) buildClusterDef() error {
 	cht := c.Chart
-	clusterFilePath := filepath.Join(templatesDir, clusterFile)
+	// We use embed FS to read chart's tgz files. In embed FS, the file path format is compatible with Linux and does not change with the operating system.
+	// Therefore, we cannot use filepath.Join to generate different path formats for different systems,
+	// instead, we need to use a path format that is the same as Linux.
+	clusterFilePath := templatesDir + "/" + clusterFile
 	for _, tpl := range cht.Templates {
 		if tpl.Name != clusterFilePath {
 			continue

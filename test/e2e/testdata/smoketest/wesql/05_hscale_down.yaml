@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-hscale-down
+  generateName: mysql-cluster-hscale-down-
 spec:
   clusterRef: mysql-cluster
   type: HorizontalScaling

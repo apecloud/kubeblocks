@@ -312,7 +312,7 @@ func sendEvent(ctx context.Context, log logger.Logger, event *corev1.Event) erro
 	return err
 }
 
-func StartupCheckWraper(manager component.DBManager, operation LegacyOperation) LegacyOperation {
+func StartupCheckWraper(manager component.DBManager, operation Operation) Operation {
 	return func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
 		if !manager.IsDBStartupReady() {
 			opsRes := OpsResult{"event": OperationFailed, "message": "db not ready"}

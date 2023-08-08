@@ -159,6 +159,20 @@ single_thread_memory = 294912
 			Name:           "replicasets",
 			CompDefName:    "replicasets",
 			Replicas:       5,
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "data",
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("10Gi"),
+							},
+						},
+					},
+				},
+			},
 		}
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -234,6 +248,8 @@ single_thread_memory = 294912
 				"invalid_pvc":       "{{ getPVCByName $.podSpec.volumes \"invalid\" }}",
 				"invalid_memory":    "{{ getContainerMemory ( index $.podSpec.containers 1 ) }}",
 				"cluster_domain":    "{{- $.clusterDomain }}",
+				"pvc_size":          "{{- getComponentPVCSizeByName $.component \"data\" }}",
+				"pvc_size2":         "{{- getPVCSize ( index $.component.volumeClaimTemplates 0 ) }}",
 			})
 
 			Expect(err).Should(BeNil())
@@ -262,6 +278,8 @@ single_thread_memory = 294912
 			Expect(rendered["invalid_resource"]).Should(BeEquivalentTo(""))
 			Expect(rendered["invalid_memory"]).Should(BeEquivalentTo("0"))
 			Expect(rendered["cluster_domain"]).Should(BeEquivalentTo("test-domain"))
+			Expect(rendered["pvc_size"]).Should(BeEquivalentTo("10737418240"))
+			Expect(rendered["pvc_size2"]).Should(BeEquivalentTo("10737418240"))
 		})
 
 		It("test array null check", func() {

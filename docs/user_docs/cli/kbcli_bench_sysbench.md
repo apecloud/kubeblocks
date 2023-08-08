@@ -5,23 +5,32 @@ title: kbcli bench sysbench
 run a SysBench benchmark
 
 ```
-kbcli bench sysbench [ClusterName] [flags]
+kbcli bench sysbench [Step] [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # sysbench on a cluster
+  # sysbench on a cluster, that will exec all steps, cleanup, prepare and run
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # sysbench on a cluster with different threads
+  # sysbench on a cluster with cleanup, just exec cleanup that will delete the testdata
+  kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with prepare, just exec prepare that will create the testdata
+  kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with run, just exec run that will run the test
+  kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with threads count
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
   
-  # sysbench on a cluster with different type
+  # sysbench on a cluster with type
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
   
   # sysbench on a cluster with specified read/write ratio
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 20
   
   # sysbench on a cluster with specified tables and size
   kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
@@ -32,6 +41,7 @@ kbcli bench sysbench [ClusterName] [flags]
 ```
       --cluster string      the cluster of database
       --database string     database name
+      --driver string       the driver of database
       --duration int        the seconds of running sysbench (default 60)
   -h, --help                help for sysbench
       --host string         the host of database

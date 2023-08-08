@@ -227,8 +227,6 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
-	// add required
-	_ = cmd.MarkFlagRequired("cluster-definition")
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
 
@@ -354,6 +352,9 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 			" please check", backupCluster.Spec.ClusterVersionRef, o.ClusterVersionRef)
 	}
 
+	o.ClusterDefRef = curCluster.Spec.ClusterDefRef
+	o.ClusterVersionRef = curCluster.Spec.ClusterVersionRef
+
 	*cls = curCluster
 	return nil
 }
@@ -402,7 +403,8 @@ func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error
 	if err != nil {
 		return err
 	}
-	o.Annotations[constant.RestoreFromTimeAnnotationKey] = restoreTime.Format(time.RFC3339)
+	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
+	o.Annotations[constant.RestoreFromTimeAnnotationKey] = fmt.Sprintf(`{"%s":"%s"}`, components[0]["name"], restoreTime.Format(time.RFC3339))
 	o.Annotations[constant.RestoreFromSrcClusterAnnotationKey] = o.SourceCluster
 
 	return nil
@@ -614,9 +616,18 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 }
 
 const (
-	saNamePrefix          = "kb-"
-	roleNamePrefix        = "kb-"
-	roleBindingNamePrefix = "kb-"
+	saNamePrefix             = "kb-"
+	roleNamePrefix           = "kb-"
+	roleBindingNamePrefix    = "kb-"
+	clusterRolePrefix        = "kb-"
+	clusterRoleBindingPrefix = "kb-"
+)
+
+var (
+	rbacAPIGroup    = "rbac.authorization.k8s.io"
+	saKind          = "ServiceAccount"
+	roleKind        = "Role"
+	clusterRoleKind = "ClusterRole"
 )
 
 // buildDependenciesFn creates dependencies function for components, e.g. postgresql depends on
@@ -629,28 +640,45 @@ func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 }
 
 func (o *CreateOptions) CreateDependencies(dryRun []string) error {
+	if !o.RBACEnabled {
+		return nil
+	}
+
+	var (
+		ctx          = context.TODO()
+		labels       = buildResourceLabels(o.Name)
+		applyOptions = metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
+	)
+
+	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
+
+	if err := o.createServiceAccount(ctx, labels, applyOptions); err != nil {
+		return err
+	}
+	if err := o.createRoleAndBinding(ctx, labels, applyOptions); err != nil {
+		return err
+	}
+	if err := o.createClusterRoleAndBinding(ctx, labels, applyOptions); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *CreateOptions) createServiceAccount(ctx context.Context, labels map[string]string, opts metav1.ApplyOptions) error {
+	saName := saNamePrefix + o.Name
+	klog.V(1).Infof("create service account %s", saName)
+	sa := corev1ac.ServiceAccount(saName, o.Namespace).WithLabels(labels)
+	_, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(ctx, sa, opts)
+	return err
+}
+
+func (o *CreateOptions) createRoleAndBinding(ctx context.Context, labels map[string]string, opts metav1.ApplyOptions) error {
 	var (
 		saName          = saNamePrefix + o.Name
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
 
-	if !o.RBACEnabled {
-		return nil
-	}
-
-	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
-	// create service account
-	labels := buildResourceLabels(o.Name)
-	applyOptions := metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
-	sa := corev1ac.ServiceAccount(saName, o.Namespace).WithLabels(labels)
-
-	klog.V(1).Infof("create service account %s", saName)
-	if _, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(context.TODO(), sa, applyOptions); err != nil {
-		return err
-	}
-
-	// create role
 	klog.V(1).Infof("create role %s", roleName)
 	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
 		{
@@ -693,15 +721,11 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		}
 		role.Rules = append(role.Rules, rules...)
 	}
-
-	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, applyOptions); err != nil {
+	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(ctx, role, opts); err != nil {
 		return err
 	}
 
-	// create role binding
-	rbacAPIGroup := "rbac.authorization.k8s.io"
-	rbacKind := "Role"
-	saKind := "ServiceAccount"
+	klog.V(1).Infof("create role binding %s", roleBindingName)
 	roleBinding := rbacv1ac.RoleBinding(roleBindingName, o.Namespace).WithLabels(labels).
 		WithSubjects([]*rbacv1ac.SubjectApplyConfiguration{
 			{
@@ -712,11 +736,47 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		}...).
 		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
 			APIGroup: &rbacAPIGroup,
-			Kind:     &rbacKind,
+			Kind:     &roleKind,
 			Name:     &roleName,
 		})
-	klog.V(1).Infof("create role binding %s", roleBindingName)
-	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(context.TODO(), roleBinding, applyOptions)
+	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(ctx, roleBinding, opts)
+	return err
+}
+
+func (o *CreateOptions) createClusterRoleAndBinding(ctx context.Context, labels map[string]string, opts metav1.ApplyOptions) error {
+	var (
+		saName                 = saNamePrefix + o.Name
+		clusterRoleName        = clusterRolePrefix + o.Name
+		clusterRoleBindingName = clusterRoleBindingPrefix + o.Name
+	)
+
+	klog.V(1).Infof("create cluster role %s", clusterRoleName)
+	clusterRole := rbacv1ac.ClusterRole(clusterRoleName).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"nodes", "nodes/stats"},
+			Verbs:     []string{"get", "list"},
+		},
+	}...).WithLabels(labels)
+	if _, err := o.Client.RbacV1().ClusterRoles().Apply(ctx, clusterRole, opts); err != nil {
+		return err
+	}
+
+	klog.V(1).Infof("create cluster role binding %s", clusterRoleBindingName)
+	clusterRoleBinding := rbacv1ac.ClusterRoleBinding(clusterRoleBindingName).WithLabels(labels).
+		WithSubjects([]*rbacv1ac.SubjectApplyConfiguration{
+			{
+				Kind:      &saKind,
+				Name:      &saName,
+				Namespace: &o.Namespace,
+			},
+		}...).
+		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
+			APIGroup: &rbacAPIGroup,
+			Kind:     &clusterRoleKind,
+			Name:     &clusterRoleName,
+		})
+	_, err := o.Client.RbacV1().ClusterRoleBindings().Apply(ctx, clusterRoleBinding, opts)
 	return err
 }
 

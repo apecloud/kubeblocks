@@ -492,16 +492,26 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	requestStorage resource.Quantity) (*string, error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey:             r.Spec.ClusterRef,
-		constant.KBAppComponentLabelKey:          compName,
-		constant.VolumeClaimTemplateNameLabelKey: vctName,
-	}, client.Limit(1)); err != nil {
+		constant.AppInstanceLabelKey:    r.Spec.ClusterRef,
+		constant.KBAppComponentLabelKey: compName,
+	}); err != nil {
 		return nil, err
 	}
 	if len(pvcList.Items) == 0 {
 		return nil, nil
 	}
-	pvc := pvcList.Items[0]
+	var pvc *corev1.PersistentVolumeClaim
+	for _, v := range pvcList.Items {
+		// VolumeClaimTemplateNameLabelKeyForLegacy is deprecated: only compatible with version 0.5, will be removed in 0.7?
+		if v.Labels[constant.VolumeClaimTemplateNameLabelKey] == vctName ||
+			v.Labels[constant.VolumeClaimTemplateNameLabelKeyForLegacy] == vctName {
+			pvc = &v
+			break
+		}
+	}
+	if pvc == nil {
+		return nil, nil
+	}
 	previousValue := *pvc.Status.Capacity.Storage()
 	if requestStorage.Cmp(previousValue) < 0 {
 		return nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,

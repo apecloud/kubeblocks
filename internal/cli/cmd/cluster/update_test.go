@@ -232,10 +232,12 @@ general_log_file=/data/mysql/log/mysqld.log
 				confData    map[string]string
 				keyName     string
 				expectedErr bool
+				expectedNil bool
 			}{{
 				confData:    nil,
 				keyName:     "",
-				expectedErr: true,
+				expectedErr: false,
+				expectedNil: true,
 			}, {
 				confData: map[string]string{
 					"test.cnf": "test",
@@ -257,7 +259,9 @@ general_log_file=/data/mysql/log/mysqld.log
 					Expect(err).Should(HaveOccurred())
 				} else {
 					Expect(key).Should(Equal(test.keyName))
-					Expect(tpl).ShouldNot(BeNil())
+					if !test.expectedNil {
+						Expect(tpl).ShouldNot(BeNil())
+					}
 					Expect(err).ShouldNot(HaveOccurred())
 				}
 			}

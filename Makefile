@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.5.0-alpha.0
+VERSION ?= 0.6.0-alpha.0
 GITHUB_PROXY ?=
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
@@ -589,11 +589,12 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
 	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
 	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
+	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
 	$(HELM) template mysql-cluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template pg-cluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template redis-cluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-
+	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.

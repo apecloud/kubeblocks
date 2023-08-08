@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-stop
+  generateName: mongodb-cluster-stop-
 spec:
   clusterRef: mongodb-cluster
   ttlSecondsAfterSucceed: 27017

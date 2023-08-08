@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-reconfigure
+  generateName: mysql-cluster-reconfiguring-
 spec:
   clusterRef: mysql-cluster
   reconfigure:

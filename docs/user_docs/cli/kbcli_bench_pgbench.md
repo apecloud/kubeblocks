@@ -5,16 +5,25 @@ title: kbcli bench pgbench
 Run pgbench against a PostgreSQL cluster
 
 ```
-kbcli bench pgbench [flags]
+kbcli bench pgbench [Step] [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # pgbench run on a cluster
+  # pgbench run on a cluster, that will exec all steps, cleanup, prepare and run
   kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
   
-  # pgbench run on a cluster with different threads and different client
+  # pgbench run on a cluster with cleanup, just exec cleanup that will delete the testdata
+  kbcli bench pgbench cleanup mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with prepare, just exec prepare that will create the testdata
+  kbcli bench pgbench prepare mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with run, just exec run that will run the test
+  kbcli bench pgbench run mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with  threads and  client count
   kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
   
   # pgbench run on a cluster with specified transactions
@@ -33,6 +42,7 @@ kbcli bench pgbench [flags]
       --clients ints       The number of clients to use for pgbench (default [1])
       --cluster string     the cluster of database
       --database string    database name
+      --driver string      the driver of database
       --duration int       The seconds to run pgbench for (default 60)
   -h, --help               help for pgbench
       --host string        the host of database

@@ -791,6 +791,24 @@ Kubernetes meta/v1.Time
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod
+(<code>string</code> alias)</h3>
+<div>
+<p>BackupMethod the backup method</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;backupTool&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;snapshot&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPhase">BackupPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -1264,7 +1282,7 @@ BackupRepoPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Storage provider reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.</p><br />
+<p>Backup repo reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.</p><br />
 </td>
 </tr>
 <tr>
@@ -1278,7 +1296,7 @@ BackupRepoPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the current state of the repo.</p><br />
+<p>conditions describes the current state of the repo.</p><br />
 </td>
 </tr>
 <tr>
@@ -1290,7 +1308,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>ObservedGeneration is the latest generation observed by the controller.</p><br />
+<p>observedGeneration is the latest generation observed by the controller.</p><br />
 </td>
 </tr>
 <tr>
@@ -1304,7 +1322,7 @@ Kubernetes core/v1.SecretReference
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratedCSIDriverSecret references the generated secret used by the CSI driver.</p><br />
+<p>generatedCSIDriverSecret references the generated secret used by the CSI driver.</p><br />
 </td>
 </tr>
 <tr>
@@ -1316,7 +1334,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratedStorageClassName indicates the generated storage class name.</p><br />
+<p>generatedStorageClassName indicates the generated storage class name.</p><br />
 </td>
 </tr>
 <tr>
@@ -1328,7 +1346,19 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>BackupPVCName is the name of the PVC used to store backup data.</p><br />
+<p>backupPVCName is the name of the PVC used to store backup data.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>isDefault</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>isDefault indicates whether this backup repo is the default one.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2687,14 +2717,14 @@ string
 <tbody>
 <tr>
 <td>
-<code>retryWindowMinutes</code><br/>
+<code>startingDeadlineMinutes</code><br/>
 <em>
 int64
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>retryWindowMinutes defines the time window for starting the job if it misses scheduled<br />time for any reason. the unit of time is minute.</p><br />
+<p>startingDeadlineMinutes defines the deadline in minutes for starting the backup job<br />if it misses scheduled time for any reason.</p><br />
 </td>
 </tr>
 <tr>

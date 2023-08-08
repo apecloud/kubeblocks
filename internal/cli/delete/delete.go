@@ -34,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
@@ -125,17 +126,6 @@ func (o *DeleteOptions) complete() error {
 		return err
 	}
 
-	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
-	if !o.AutoApprove {
-		names := o.ConfirmedNames
-		if len(names) == 0 {
-			names = o.Names
-		}
-		if err = Confirm(names, o.In); err != nil {
-			return err
-		}
-	}
-
 	// get the resources to delete
 	r := o.Factory.NewBuilder().
 		Unstructured().
@@ -150,6 +140,26 @@ func (o *DeleteOptions) complete() error {
 	err = r.Err()
 	if err != nil {
 		return err
+	}
+	// confirm names to delete, use ConfirmedNames first or the names selected by labels, if it is empty, use Names
+	// if it uses the label-selector, confirm the resources‘ names that meet the label requirements
+	if !o.AutoApprove {
+		names := o.ConfirmedNames
+		if len(o.LabelSelector) != 0 {
+			var infos []*resource.Info
+			if infos, err = r.Infos(); err != nil {
+				return err
+			}
+			for i := range infos {
+				names = append(names, infos[i].Name)
+			}
+		}
+		if len(names) == 0 {
+			names = o.Names
+		}
+		if err = Confirm(names, o.In); err != nil {
+			return err
+		}
 	}
 	o.Result = r
 	return err
@@ -236,6 +246,8 @@ func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}
+	fmt.Printf("These clusters will be deleted:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
+	// '\n' in NewPrompt will break the output
 	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
 		func(entered string) error {
 			enteredNames := strings.Split(entered, " ")

@@ -232,9 +232,8 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	)
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err = cli.List(reqCtx.Ctx, pvcList, client.MatchingLabels{
-		constant.AppInstanceLabelKey:             opsRes.Cluster.Name,
-		constant.KBAppComponentLabelKey:          componentName,
-		constant.VolumeClaimTemplateNameLabelKey: vctName,
+		constant.AppInstanceLabelKey:    opsRes.Cluster.Name,
+		constant.KBAppComponentLabelKey: componentName,
 	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return 0, 0, 0, err
 	}
@@ -248,6 +247,11 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	requestStorage := storageMap[vctKey]
 	var ordinal int
 	for _, v := range pvcList.Items {
+		// VolumeClaimTemplateNameLabelKeyForLegacy is deprecated: only compatible with version 0.5, will be removed in 0.7?
+		if v.Labels[constant.VolumeClaimTemplateNameLabelKey] != vctName &&
+			v.Labels[constant.VolumeClaimTemplateNameLabelKeyForLegacy] != vctName {
+			continue
+		}
 		// filter PVC(s) with ordinal no larger than comp.Replicas - 1, which left by scale-in
 		ordinal, err = getPVCOrdinal(v.Name)
 		if err != nil {

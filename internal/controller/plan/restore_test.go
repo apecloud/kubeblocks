@@ -99,6 +99,9 @@ var _ = Describe("PITR Functions", func() {
 			mysqlCompType      = "replicasets"
 			mysqlCompName      = "mysql"
 			nginxCompType      = "proxy"
+			topologyKey        = "testTopologyKey"
+			labelKey           = "testNodeLabelKey"
+			labelValue         = "testLabelValue"
 		)
 
 		var (
@@ -127,8 +130,15 @@ var _ = Describe("PITR Functions", func() {
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
+				SetClusterAffinity(&appsv1alpha1.Affinity{
+					PodAntiAffinity: appsv1alpha1.Required,
+					TopologyKeys:    []string{topologyKey},
+					NodeLabels: map[string]string{
+						labelKey: labelValue,
+					},
+				}).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddRestorePointInTime(metav1.Time{Time: stopTime.Time}, sourceCluster).
+				AddRestorePointInTime(metav1.Time{Time: stopTime.Time}, mysqlCompName, sourceCluster).
 				Create(&testCtx).GetObject()
 
 			By("By mocking a pvc")
@@ -158,6 +168,10 @@ var _ = Describe("PITR Functions", func() {
 			})
 			backupTool = testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
 				backupSelfDefineObj, testapps.RandomizedObjName())
+			// set datafile backup relies on logfile
+			Expect(testapps.ChangeObj(&testCtx, backupTool, func(tmpObj *dpv1alpha1.BackupTool) {
+				tmpObj.Spec.Physical.RelyOnLogfile = true
+			})).Should(Succeed())
 			backupToolName = backupTool.Name
 
 			backupObj := dpv1alpha1.BackupToolList{}
@@ -171,10 +185,13 @@ var _ = Describe("PITR Functions", func() {
 				WithRandomName().SetLabels(backupTplLabels).
 				AddBackupPolicy(mysqlCompName).
 				SetClusterDefRef(clusterDefName).
+				SetTTL(defaultTTL).
+				AddDatafilePolicy().
 				SetBackupToolName(backupToolName).
 				SetSchedule("0 * * * *", true).
-				AddDatafilePolicy().
-				SetTTL(defaultTTL).
+				AddIncrementalPolicy().
+				SetBackupToolName(backupToolName).
+				SetSchedule("0 * * * *", true).
 				Create(&testCtx).GetObject()
 
 			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
@@ -194,6 +211,11 @@ var _ = Describe("PITR Functions", func() {
 				SetStorage("1Gi").
 				Create(&testCtx).GetObject()
 
+			logfileRemotePVC := testapps.NewPersistentVolumeClaimFactory(
+				testCtx.DefaultNamespace, "remote-pvc-logfile", clusterName, mysqlCompName, "log").
+				SetStorage("1Gi").
+				Create(&testCtx).GetObject()
+
 			By("By creating base backup: ")
 			backupLabels := map[string]string{
 				constant.AppInstanceLabelKey:              sourceCluster,
@@ -209,13 +231,18 @@ var _ = Describe("PITR Functions", func() {
 			baseStartTime := &startTime
 			baseStopTime := &now
 			backupStatus := dpv1alpha1.BackupStatus{
-				Phase:                     dpv1alpha1.BackupCompleted,
-				StartTimestamp:            baseStartTime,
-				CompletionTimestamp:       baseStopTime,
-				BackupToolName:            backupToolName,
-				SourceCluster:             clusterName,
-				PersistentVolumeClaimName: remotePVC.Name,
+				Phase:                            dpv1alpha1.BackupCompleted,
+				StartTimestamp:                   baseStartTime,
+				CompletionTimestamp:              baseStopTime,
+				BackupToolName:                   backupToolName,
+				SourceCluster:                    clusterName,
+				PersistentVolumeClaimName:        remotePVC.Name,
+				LogFilePersistentVolumeClaimName: logfileRemotePVC.Name,
 				Manifests: &dpv1alpha1.ManifestsStatus{
+					BackupTool: &dpv1alpha1.BackupToolManifestsStatus{
+						FilePath:    fmt.Sprintf("/%s/%s", backup.Namespace, backup.Name),
+						LogFilePath: fmt.Sprintf("/%s/%s", backup.Namespace, backup.Name+"-logfile"),
+					},
 					BackupLog: &dpv1alpha1.BackupLogStatus{
 						StartTime: baseStartTime,
 						StopTime:  baseStopTime,
@@ -243,7 +270,7 @@ var _ = Describe("PITR Functions", func() {
 				StartTimestamp:            incrStartTime,
 				CompletionTimestamp:       incrStopTime,
 				SourceCluster:             clusterName,
-				PersistentVolumeClaimName: remotePVC.Name,
+				PersistentVolumeClaimName: logfileRemotePVC.Name,
 				BackupToolName:            backupToolName,
 				Manifests: &dpv1alpha1.ManifestsStatus{
 					BackupLog: &dpv1alpha1.BackupLogStatus{

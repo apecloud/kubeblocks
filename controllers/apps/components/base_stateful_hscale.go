@@ -88,7 +88,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 		if snapshot.enabled() {
 			return snapshot, nil
 		}
-		backupTool := &backupDataClone{
+		return &backupDataClone{
 			baseDataClone{
 				reqCtx:    reqCtx,
 				cli:       cli,
@@ -98,11 +98,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				stsProto:  stsProto,
 				key:       key,
 			},
-		}
-		if backupTool.enabled() {
-			return backupTool, nil
-		}
-		return nil, fmt.Errorf("h-scale policy is Backup but neither snapshot nor backup tool is enabled")
+		}, nil
 	}
 	return nil, nil
 }

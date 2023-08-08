@@ -93,12 +93,10 @@ func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		component := b.Comp.GetSynthesizedComponent()
-		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}
-
 		b.Workload = sts
 
 		return nil, nil // don't return sts here
@@ -240,6 +238,11 @@ func (b *componentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Obj
 	if err != nil {
 		b.Error = err
 	} else {
+		cluster := b.Comp.GetCluster()
+		component := b.Comp.GetSynthesizedComponent()
+		if err = updateCustomLabelToObjs(cluster.Name, string(cluster.UID), component.Name, component.CustomLabelSpecs, objs); err != nil {
+			b.Error = err
+		}
 		for _, obj := range objs {
 			b.Comp.AddResource(obj, b.DefaultAction, nil)
 		}

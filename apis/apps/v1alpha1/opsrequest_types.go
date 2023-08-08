@@ -487,6 +487,10 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
+	// lastFailedTime is the last time the component phase transitioned to Failed or Abnormal.
+	// +optional
+	LastFailedTime metav1.Time `json:"lastFailedTime,omitempty"`
+
 	// progressDetails describes the progress details of the component for this operation.
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`

@@ -298,34 +298,35 @@ const defaultSectionName = "default"
 // reconfigureLogVariables reconfigures the log variables of cluster
 func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) error {
 	var (
-		err             error
-		keyName         string
-		configSpec      *appsv1alpha1.ComponentConfigSpec
-		configTemplate  *corev1.ConfigMap
-		formatter       *appsv1alpha1.FormatterConfig
-		logTPL          *template.Template
-		logValue        *gotemplate.TplValues
-		buf             bytes.Buffer
-		logVariables    map[string]string
-		unstructuredObj *unstructured.Unstructured
+		err        error
+		configSpec *appsv1alpha1.ComponentConfigSpec
+		logValue   *gotemplate.TplValues
 	)
-	for _, compSpec := range c.Spec.ComponentSpecs {
-		if configSpec, err = findFirstConfigSpec(c.Spec.ComponentSpecs, cd.Spec.ComponentDefs, compSpec.Name); err != nil {
-			return err
-		}
+
+	createReconfigureOps := func(compSpec appsv1alpha1.ClusterComponentSpec, configSpec *appsv1alpha1.ComponentConfigSpec, logValue *gotemplate.TplValues) error {
+		var (
+			buf             bytes.Buffer
+			keyName         string
+			configTemplate  *corev1.ConfigMap
+			formatter       *appsv1alpha1.FormatterConfig
+			logTPL          *template.Template
+			logVariables    map[string]string
+			unstructuredObj *unstructured.Unstructured
+		)
+
 		if configTemplate, formatter, err = findConfigTemplateInfo(o.dynamic, configSpec); err != nil {
 			return err
 		}
 		if keyName, logTPL, err = findLogsBlockTPL(configTemplate.Data); err != nil {
 			return err
 		}
-		if logValue, err = buildLogsTPLValues(&compSpec); err != nil {
-			return err
+		if logTPL == nil {
+			return nil
 		}
-		buf.Reset()
 		if err = logTPL.Execute(&buf, logValue); err != nil {
 			return err
 		}
+		// TODO: very hack logic for ini config file
 		formatter.FormatterOptions = appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{SectionName: defaultSectionName}}
 		if logVariables, err = cfgcore.TransformConfigFileToKeyValueMap(keyName, formatter, buf.Bytes()); err != nil {
 			return err
@@ -335,7 +336,17 @@ func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *app
 		if unstructuredObj, err = util.ConvertObjToUnstructured(opsRequest); err != nil {
 			return err
 		}
-		if err = util.CreateResourceIfAbsent(o.dynamic, types.OpsGVR(), c.Namespace, unstructuredObj); err != nil {
+		return util.CreateResourceIfAbsent(o.dynamic, types.OpsGVR(), c.Namespace, unstructuredObj)
+	}
+
+	for _, compSpec := range c.Spec.ComponentSpecs {
+		if configSpec, err = findFirstConfigSpec(c.Spec.ComponentSpecs, cd.Spec.ComponentDefs, compSpec.Name); err != nil {
+			return err
+		}
+		if logValue, err = buildLogsTPLValues(&compSpec); err != nil {
+			return err
+		}
+		if err = createReconfigureOps(compSpec, configSpec, logValue); err != nil {
 			return err
 		}
 	}
@@ -392,8 +403,9 @@ func findLogsBlockTPL(confData map[string]string) (string, *template.Template, e
 		if logTPL != nil {
 			return key, logTPL, nil
 		}
+		return "", nil, errors.New("no logs config template found")
 	}
-	return "", nil, errors.New("no logs config template found")
+	return "", nil, nil
 }
 
 func buildLogsTPLValues(compSpec *appsv1alpha1.ClusterComponentSpec) (*gotemplate.TplValues, error) {

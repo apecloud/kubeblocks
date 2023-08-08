@@ -299,7 +299,9 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 	var db *sql.DB
 	var err error
 	var isCurrentMember bool
+	var memberName string
 	if member != nil && member.Name != mgr.CurrentMemberName {
+		memberName = member.Name
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
@@ -310,6 +312,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 			defer db.Close()
 		}
 	} else {
+		memberName = mgr.CurrentMemberName
 		isCurrentMember = true
 		db = mgr.DB
 	}
@@ -346,7 +349,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 		dbState.Extra[k] = v
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
+	if cluster.Leader != nil && cluster.Leader.Name == memberName {
 		dbState.Extra["Binlog_File"] = masterStatus.GetString("File")
 		dbState.Extra["Binlog_Pos"] = masterStatus.GetString("Pos")
 	} else {

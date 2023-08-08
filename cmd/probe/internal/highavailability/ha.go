@@ -98,6 +98,7 @@ func (ha *Ha) RunCycle() {
 	case !cluster.IsLocked():
 		ha.logger.Infof("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
+			cluster.Leader = &dcs.Leader{DBState: ha.dbManager.GetDBState(ha.ctx, cluster, nil)}
 			if ha.dcs.AttempAcquireLock() == nil {
 				err := ha.dbManager.Promote(ha.ctx)
 				if err != nil {
@@ -237,22 +238,24 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 }
 
 func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool {
+	currentMemberName := ha.dbManager.GetCurrentMemberName()
 	if cluster.Switchover != nil {
 		switchover := cluster.Switchover
 		leader := switchover.Leader
 		candidate := switchover.Candidate
-		if candidate == ha.dbManager.GetCurrentMemberName() {
-			return true
-		}
 
-		if candidate != "" && ha.dbManager.IsMemberHealthy(ctx, cluster, cluster.GetMemberWithName(candidate)) {
-			ha.logger.Infof("manual switchover to new leader: %s", candidate)
+		if leader == currentMemberName {
+			ha.logger.Infof("manual switchover to other member")
 			return false
 		}
 
-		if leader == ha.dbManager.GetCurrentMemberName() &&
-			len(ha.dbManager.HasOtherHealthyMembers(ctx, cluster, leader)) > 0 {
-			ha.logger.Infof("manual switchover to other member")
+		if candidate == currentMemberName {
+			ha.logger.Infof("manual switchover to current member: %s", candidate)
+			return true
+		}
+
+		if candidate != "" {
+			ha.logger.Infof("manual switchover to new leader: %s", candidate)
 			return false
 		}
 	}
@@ -262,7 +265,8 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 		return false
 	}
 
-	return true
+	currentMember := cluster.GetMemberWithName(currentMemberName)
+	return !ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)
 }
 
 func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) bool {
@@ -289,5 +293,6 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 
 	return true
 }
+
 func (ha *Ha) ShutdownWithWait() {
 }

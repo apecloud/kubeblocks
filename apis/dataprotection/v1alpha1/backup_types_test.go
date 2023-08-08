@@ -122,3 +122,49 @@ func TestGetRecoverableTimeRange(t *testing.T) {
 	backups = []Backup{backupLogfile, stopTimeGTLogFileStopTimeBaseBackup}
 	g.Expect(GetRecoverableTimeRange(backups)).Should(BeEmpty())
 }
+
+func TestGetStartTime(t *testing.T) {
+	startTimestamp := metav1.Now()
+	backTimeRangeStartTime := metav1.Time{Time: time.Now().Add(10 * time.Second)}
+	backup := Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup1"},
+		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
+		Status: BackupStatus{
+			Phase:          BackupCompleted,
+			StartTimestamp: &startTimestamp,
+			Manifests: &ManifestsStatus{
+				BackupLog: &BackupLogStatus{
+					StartTime: &backTimeRangeStartTime,
+				},
+			},
+		},
+	}
+	g := NewGomegaWithT(t)
+	g.Expect(backup.Status.GetStartTime().Second()).Should(Equal(backTimeRangeStartTime.Second()))
+
+	backup.Status.Manifests.BackupLog.StartTime = nil
+	g.Expect(backup.Status.GetStartTime().Second()).Should(Equal(startTimestamp.Second()))
+}
+
+func TestGetStopTime(t *testing.T) {
+	stopTimestamp := metav1.Now()
+	backTimeRangeStopTime := metav1.Time{Time: time.Now().Add(10 * time.Second)}
+	backup := Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup1"},
+		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
+		Status: BackupStatus{
+			Phase:               BackupCompleted,
+			CompletionTimestamp: &stopTimestamp,
+			Manifests: &ManifestsStatus{
+				BackupLog: &BackupLogStatus{
+					StopTime: &backTimeRangeStopTime,
+				},
+			},
+		},
+	}
+	g := NewGomegaWithT(t)
+	g.Expect(backup.Status.GetStopTime().Second()).Should(Equal(backTimeRangeStopTime.Second()))
+
+	backup.Status.Manifests.BackupLog.StopTime = nil
+	g.Expect(backup.Status.GetStopTime().Second()).Should(Equal(stopTimestamp.Second()))
+}

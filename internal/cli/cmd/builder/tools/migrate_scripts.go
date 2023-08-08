@@ -129,13 +129,14 @@ func dumpHelmScripts(data map[string]string, outputPath string, out io.Writer, o
 		return
 	}
 	for k, v := range data {
-		if ok, _ := cfgutil.CheckPathExists(outputPath); ok {
+		f := filepath.Join(outputPath, k)
+		if ok, _ := cfgutil.CheckPathExists(f); ok {
 			fmt.Fprintf(out, "file [%s] is exists\n", printer.BoldRed(k))
 			if !overwrite {
 				os.Exit(-1)
 			}
 		}
-		util.CheckErr(os.WriteFile(filepath.Join(outputPath, k), []byte(v), os.ModePerm))
+		util.CheckErr(os.WriteFile(f, []byte(v), os.ModePerm))
 	}
 }
 

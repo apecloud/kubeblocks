@@ -11,23 +11,14 @@ metadata:
   {{- end }}
 spec:
   description: 'Bytebase is Database DevOps and CI/CD for Developer, DBA and Platform Engineering team.'
-
   type: Helm
 
   helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "qdrant" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
-    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
-
-    installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
-      {{- end }}
+    chartLocationURL: https://url-to-your-chart-version.tgz
 
   installable:
     autoInstall: false
 
   defaultInstallValues:
-    - enabled: false
-      {{- with .Values.tolerations }}
-      tolerations: {{ toJson . | quote }}
-      {{- end }}
+    - enabled: true
+

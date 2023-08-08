@@ -390,16 +390,16 @@ COMMIT;`, component.CheckStatusType)
 
 func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
 	_, err := mgr.GetOpTimestamp(ctx, db)
-	return err == nil
+	if err != nil && err != sql.ErrNoRows {
+		return false
+	}
+	return true
 }
 
 func (mgr *Manager) GetOpTimestamp(ctx context.Context, db *sql.DB) (int64, error) {
 	readSQL := fmt.Sprintf(`select check_ts from kubeblocks.kb_health_check where type=%d limit 1;`, component.CheckStatusType)
 	var opTimestamp int64
 	err := db.QueryRowContext(ctx, readSQL).Scan(&opTimestamp)
-	if err != nil {
-		mgr.Logger.Infof("SQL %s query failed: %v", readSQL, err)
-	}
 	return opTimestamp, err
 }
 

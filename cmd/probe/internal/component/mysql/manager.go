@@ -236,21 +236,23 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 
 func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	mgr.DBState = nil
-	mgr.globalState = nil
-	mgr.masterStatus = nil
-	mgr.slaveStatus = nil
 	_, _ = mgr.EnsureServerID(ctx)
 	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
 	if !mgr.IsMemberHealthy(ctx, cluster, member) {
 		return false
 	}
-	cluster.Leader.DBState = mgr.GetDBState(ctx, cluster, member)
+
+	mgr.DBState = mgr.GetDBState(ctx, cluster, member)
+	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
+		cluster.Leader.DBState = mgr.DBState
+	}
 	return true
 }
 
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
+		mgr.Logger.Warnf("No leader DBstate info")
 		return true
 	}
 	leaderDBState = cluster.Leader.DBState
@@ -329,8 +331,15 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 		mgr.Logger.Infof("show slave status failed: %v", err)
 		return nil
 	}
+
+	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
+	if err != nil {
+		mgr.Logger.Infof("get op timestamp failed: %v", err)
+		return nil
+	}
+
 	dbState := &dcs.DBState{
-		OpTimestamp: mgr.opTimestamp,
+		OpTimestamp: opTimestamp,
 		Extra:       map[string]string{},
 	}
 	for k, v := range globalState {
@@ -357,7 +366,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 		mgr.globalState = globalState
 		mgr.masterStatus = masterStatus
 		mgr.slaveStatus = slaveStatus
-		mgr.DBState = dbState
+		mgr.opTimestamp = opTimestamp
 	}
 	return dbState
 }
@@ -377,17 +386,18 @@ COMMIT;`, component.CheckStatusType)
 }
 
 func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
+	_, err := mgr.GetOpTimestamp(ctx, db)
+	return err == nil
+}
+
+func (mgr *Manager) GetOpTimestamp(ctx context.Context, db *sql.DB) (int64, error) {
 	readSQL := fmt.Sprintf(`select check_ts from kubeblocks.kb_health_check where type=%d limit 1;`, component.CheckStatusType)
-	var OpTimestamp int64
-	err := db.QueryRowContext(ctx, readSQL).Scan(&OpTimestamp)
+	var opTimestamp int64
+	err := db.QueryRowContext(ctx, readSQL).Scan(&opTimestamp)
 	if err != nil {
 		mgr.Logger.Infof("SQL %s query failed: %v", readSQL, err)
-		return false
 	}
-	if db == mgr.DB {
-		mgr.opTimestamp = OpTimestamp
-	}
-	return true
+	return opTimestamp, err
 }
 
 func (mgr *Manager) GetGlobalState(ctx context.Context, db *sql.DB) (map[string]string, error) {

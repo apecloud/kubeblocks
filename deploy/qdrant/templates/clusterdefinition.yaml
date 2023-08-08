@@ -47,10 +47,6 @@ spec:
         - name: data
           type: data
       podSpec:
-        # [FIXME]
-        # It's a large value to give the pod enough time to run the pre-stop script, this is just a workaround
-        # It would be more advisable to relocate the data migration logic to the SQL channel.
-        terminationGracePeriodSeconds: 86400
         securityContext:
           fsGroup: 1001
         initContainers:

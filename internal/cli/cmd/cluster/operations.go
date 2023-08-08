@@ -338,7 +338,7 @@ func (o *OperationsOptions) Validate() error {
 		}
 	}
 	if !o.autoApprove && o.DryRun == "none" {
-		return prompt.Confirm([]string{o.Name}, o.In, false)
+		return prompt.Confirm([]string{o.Name}, o.In, "")
 	}
 	return nil
 }
@@ -776,7 +776,7 @@ func cancelOps(o *OperationsOptions) error {
 		return fmt.Errorf("opsRequest type: %s not support cancel action", opsRequest.Spec.Type)
 	}
 	if !o.autoApprove {
-		if err := prompt.Confirm([]string{o.Name}, o.In, false); err != nil {
+		if err := prompt.Confirm([]string{o.Name}, o.In, ""); err != nil {
 			return err
 		}
 	}

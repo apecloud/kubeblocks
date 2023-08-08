@@ -21,6 +21,7 @@ package delete
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
@@ -152,7 +154,7 @@ func (o *DeleteOptions) complete() error {
 		if len(names) == 0 {
 			names = o.Names
 		}
-		if err = prompt.Confirm(names, o.In, len(o.LabelSelector) != 0); err != nil {
+		if err = prompt.Confirm(names, o.In, fmt.Sprintf("These clusters will be deleted:[%s]\n", printer.BoldRed(strings.Join(names, " ")))); err != nil {
 			return err
 		}
 	}

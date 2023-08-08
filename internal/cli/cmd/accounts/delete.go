@@ -56,7 +56,7 @@ func (o *DeleteUserOptions) Validate(args []string) error {
 	if o.AutoApprove {
 		return nil
 	}
-	if err := prompt.Confirm([]string{o.info.UserName}, o.In, false); err != nil {
+	if err := prompt.Confirm([]string{o.info.UserName}, o.In, ""); err != nil {
 		return err
 	}
 	return nil

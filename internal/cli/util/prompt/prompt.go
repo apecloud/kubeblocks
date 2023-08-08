@@ -27,8 +27,6 @@ import (
 
 	"github.com/manifoldco/promptui"
 	"golang.org/x/exp/slices"
-
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
 
 func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *promptui.Prompt {
@@ -58,14 +56,14 @@ func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *prom
 
 // Confirm let user double-check for the cluster ops
 // if isLabelSelector is true, it will output the details information for confirmation
-func Confirm(names []string, in io.Reader, isLabelSelector bool) error {
+func Confirm(names []string, in io.Reader, customMessage string) error {
 	if len(names) == 0 {
 		return nil
 	}
 	// if the resources were selected by label, user don't know their names we should give a prompt
 	// and only delete for cluster may use it
-	if isLabelSelector {
-		fmt.Printf("These clusters will be deleted:[%s]\n", printer.BoldRed(strings.Join(names, " ")))
+	if len(customMessage) != 0 {
+		fmt.Printf("%s", customMessage)
 	}
 	// '\n' in NewPrompt will break the output
 	_, err := NewPrompt("Please type the name again(separate with white space when more than one):",

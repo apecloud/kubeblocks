@@ -98,7 +98,7 @@ func (ha *Ha) RunCycle() {
 	case !cluster.IsLocked():
 		ha.logger.Infof("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
-			cluster.Leader = &dcs.Leader{DBState: ha.dbManager.GetDBState(ha.ctx, cluster, nil)}
+			cluster.Leader.DBState = ha.dbManager.GetDBState(ha.ctx, cluster, nil)
 			if ha.dcs.AttempAcquireLock() == nil {
 				err := ha.dbManager.Promote(ha.ctx)
 				if err != nil {

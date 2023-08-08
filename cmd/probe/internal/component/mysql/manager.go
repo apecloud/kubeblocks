@@ -253,7 +253,7 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
 		mgr.Logger.Warnf("No leader DBstate info")
-		return true
+		return false
 	}
 	leaderDBState = cluster.Leader.DBState
 	dbState := mgr.GetDBState(ctx, cluster, member)
@@ -390,9 +390,19 @@ COMMIT;`, component.CheckStatusType)
 
 func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
 	_, err := mgr.GetOpTimestamp(ctx, db)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// no healthy check records, return true
+			return true
+		}
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1049 {
+			// no healthy database, return true
+			return true
+		}
+		mgr.Logger.Infof("Read check failed: %v", err)
 		return false
 	}
+
 	return true
 }
 

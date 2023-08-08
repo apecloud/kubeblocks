@@ -1,13 +1,25 @@
 ---
-title: kbcli bench
+title: kbcli bench tpch
 ---
 
-Run a benchmark.
+Run tpch benchmark
+
+```
+kbcli bench tpch [Step] [BenchmarkName] [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for bench
+      --cluster string        the cluster of database
+      --database string       database name
+      --driver string         the driver of database
+  -h, --help                  help for tpch
+      --host string           the host of database
+      --password string       the password of database
+      --port int              the port of database
+      --tolerations strings   Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
+      --user string           the user of database
 ```
 
 ### Options inherited from parent commands
@@ -20,7 +32,6 @@ Run a benchmark.
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -31,19 +42,11 @@ Run a benchmark.
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-
-* [kbcli bench delete](kbcli_bench_delete.md)	 - Delete a benchmark.
-* [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
-* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
-* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run tpcc benchmark
-* [kbcli bench tpch](kbcli_bench_tpch.md)	 - Run tpch benchmark
-* [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
+* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

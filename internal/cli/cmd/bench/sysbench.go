@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -73,31 +71,23 @@ var sysbenchExample = templates.Examples(`
 `)
 
 type SysBenchOptions struct {
-	factory   cmdutil.Factory
-	client    clientset.Interface
-	dynamic   dynamic.Interface
-	name      string
-	namespace string
-
 	Threads      []int // the number of threads
 	Tables       int   // the number of tables
 	Size         int   // the data size of per table
 	Duration     int
 	Type         []string
-	ExtraArgs    []string
 	ReadPercent  int
 	WritePercent int
-	Step         string
 
 	BenchBaseOptions
-	*cluster.ClusterObjects     `json:"-"`
-	genericclioptions.IOStreams `json:"-"`
 }
 
 func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &SysBenchOptions{
-		factory:   f,
-		IOStreams: streams,
+		BenchBaseOptions: BenchBaseOptions{
+			IOStreams: streams,
+			factory:   f,
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -120,8 +110,6 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd.Flags().IntVar(&o.WritePercent, "write-percent", 0, "the percent of write, only useful when type is oltp_read_write_pct")
 	o.BenchBaseOptions.AddFlags(cmd)
 
-	registerClusterCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -131,7 +119,7 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+	if err = o.BenchBaseOptions.BaseComplete(); err != nil {
 		return err
 	}
 

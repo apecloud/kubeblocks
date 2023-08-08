@@ -171,6 +171,7 @@ const (
 	ResourceSysBench    = "sysbenches"
 	ResourceYcsb        = "ycsbs"
 	ResourceTpcc        = "tpccs"
+	ResourceTpch        = "tpches"
 )
 
 const (
@@ -411,4 +412,8 @@ func YcsbGVR() schema.GroupVersionResource {
 
 func TpccGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourceTpcc}
+}
+
+func TpchGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourceTpch}
 }

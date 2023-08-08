@@ -232,6 +232,12 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 
 func (store *KubernetesStore) IsLockExist() (bool, error) {
 	leaderConfigMap, err := store.GetLeaderConfigMap()
+	appCluster, ok := store.cluster.resource.(*appsv1alpha1.Cluster)
+	if leaderConfigMap != nil && ok && leaderConfigMap.CreationTimestamp.Before(&appCluster.CreationTimestamp) {
+		store.logger.Infof("A previous leader configmap resource exists, delete it %s", leaderConfigMap.Name)
+		_ = store.DeleteLeader()
+		return false, nil
+	}
 	return leaderConfigMap != nil, err
 }
 
@@ -313,6 +319,15 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		Resource:    configmap,
 		DBState:     dbState,
 	}, nil
+}
+
+func (store *KubernetesStore) DeleteLeader() error {
+	leaderName := store.clusterCompName + "-leader"
+	err := store.clientset.CoreV1().ConfigMaps(store.namespace).Delete(store.ctx, leaderName, metav1.DeleteOptions{})
+	if err != nil {
+		store.logger.Errorf("Delete leader configmap failed: %v", err)
+	}
+	return err
 }
 
 func (store *KubernetesStore) AttempAcquireLock() error {

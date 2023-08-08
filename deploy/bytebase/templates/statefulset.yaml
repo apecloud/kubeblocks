@@ -28,13 +28,8 @@ spec:
     spec:
       containers:
         - name: bytebase
-          {{ if $registryMirrorHost }}
-          # If user specifies a registry mirror host, we should use that instead of the default.
-          image: {{ trimSuffix "/" $registryMirrorHost }}/bytebase/bytebase:{{ $version }}
-          {{ else }}
-          image: bytebase/bytebase:{{ $version }}
-          {{ end }}
-          imagePullPolicy: Always
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          imagePullPolicy: {{.Values.image.pullPolicy}}
           env:
             - name: PG_URL
             {{ if $existingPgURLSecret }}

@@ -1,17 +1,22 @@
 # Default values for bytebase.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
+image:
+  registry: docker.io
+  repository: 941102297/bytebase
+  tag: beta1
+  pullPolicy: IfNotPresent
 
 bytebase:
   option:
-    port: 8080
+    port: 9090
     existingPgURLSecret: ""
     existingPgURLSecretKey: ""
-    pg: postgresql://user:secret@host:port/dbname
+    pg:
     data: /var/opt/bytebase
     external-url: "https://www.bytebase.com/docs/get-started/install/external-url"
     disable-sample: false
-  version: 2.4.1
+  version: 2.5.0
   registryMirrorHost: ""
   persistence:
     storage: 2Gi

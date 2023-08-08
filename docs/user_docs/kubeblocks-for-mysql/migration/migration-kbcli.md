@@ -1,20 +1,12 @@
 ---
-title: Migrate data in PostgreSQL to KubeBlocks
-description: How to migrate data in PostgreSQL v14 to KubeBlocks by kbcli migration
-keywords: [postgresql, migration, kbcli migration, migrate data in PostgreSQL to KubeBlocks]
+title: Migrate data in MySQL to KubeBlocks
+description: How to migrate data in MySQL v8.* to KubeBlocks by kbcli migration
+keywords: [mysql, migration, kbcli migration, migrate data in MySQL to KubeBlocks]
 sidebar_position: 2
-sidebar_label: Migration
+sidebar_label: Migration by kbcli
 ---
 
-# Migrate data in PostgreSQL to KubeBlocks
-
-## Environment and aim
-
-* Source: PostgreSQL version 14 installed by Pigsty on Alibaba Cloud ECS. PostGIS plugin is also installed and the open-source map data is imported by osm2pgsql.
-
-* Sink: PostgreSQL version 14.7.0 installed by KubeBlocks on AWS EKS. No plugin is installed.
-
-* Aim: Migrate db_test.public.table_test_1 and db_test.public.table_test2 in the source to the sink.
+# Migrate data in MySQL to KubeBlocks
 
 ## Before you start
 
@@ -33,14 +25,14 @@ sidebar_label: Migration
 
 Modify the configuration of the source to support CDC.
 
-1. Set 'wal_level' configuration to 'logical'.
-2. Make sure that the number of 'max_replication_slots' configured is sufficient.
-3. Make sure that the number of 'max_wal_senders' configured is sufficient.
+1. Open 'log_bin' configuration.
+2. Set 'binlog_format' configuration to 'row'.
+3. Set 'binlog_row_image' configuration to 'full'.
 
 :::note
 
-* If you install PostgreSQL by Pigsty, you can modify the configuration by executing the `pg edit-config` command.
-* Modifying WAL (Write Ahead Log) configuration restarts the database. Make sure the modification is performed during off-peak hours.
+1. Modifying 'log_bin' configuration restarts the database. Make sure the modification is performed during off-peak hours.
+2. Modifying 'binlog_format' and 'binlog_row_image' configurations does not affect the existing binlog format. Make sure the log timestampe of pulling CDC (usually the time CDC starts) occurs after the modifications is completed.
 
 :::
 
@@ -49,34 +41,25 @@ Modify the configuration of the source to support CDC.
 Make sure both the source and sink account meet the following permissions.
 
 * The source account
-  * LOGIN permission
-  * The read permission of the source migration objects
-  * REPLICATION permission
+  * REPLICATION SLAVE
+  * REPLICATION CLIENT
+  * SELECT
 * The sink account
-  * LOGIN permission
-  * The read/write permission of the sink
+  * SELECT
+  * INSERT
+  * UPDATE
+  * DELETE
+  * CREATE
+  * ALTER
+  * DROP
 
 ### Initialize the sink
 
-1. Create a database named `db_test`.
+Create a database named `db_test`.
 
-   ```bash
-   create database db_test;
-   ```
-
-2. Install PostGIS and import osm data.
-
-   * [Install PostGIS](https://postgis.net/install/). If you install PostgreSQL by Pigsty, PostGIS is built-in and you can execute `CREATE EXTENSION` according to your need.
-   * [Import osm data](https://github.com/openstreetmap/osm2pgsql).
-  
-  :::note
-
-  For the migration function in KubeBlocks version 5.0, there are limits for the structure initialization.
-
-   1. User-defined types are not supported.
-   2. A field filled with an Array data type (such as text[], text[3][3], and integer[]) is not supported for migration.
-
-  :::
+```bash
+create database if not exists db_test
+```
 
 ### Prepare data sampling
 
@@ -89,18 +72,20 @@ It is recommended to prepare data sampling for verification after the migration 
 1. Create a migration task.
 
    ```bash
-   kbcli migration create mytask --template apecloud-pg2pg \
+   kbcli migration create mytask --template apecloud-mysql2mysql \
    --source user:123456@127.0.0.1:5432/db_test \
    --sink user:123456@127.0.0.2:5432/db_test \
    --migration-object '"public.table_test_1","public.table_test_2"'
    ```
+
+   //TODO: --template apecloud-mysql2mysql 不同内核的模板名称是否有固定名字？
 
    :paperclip: Table 1. Options explanation
 
    | Option     | Descriprion |
    | :--------- | :---------- |
    | mystask    | The name of the migration task. You can customize it. |
-   | `--template` | It specifies the migration template. `--template apecloud-pg2pg` stands for this migration task uses the template of migrating from PostgreSQL to PostgreSQL created by KubeBlocks. Run `kbcli migration templates` to view all available templates and the supported database information.   |
+   | `--template` | It specifies the migration template. `--template apecloud-mysql2mysql` stands for this migration task uses the template of migrating from MySQL to MySQL created by KubeBlocks. Run `kbcli migration templates` to view all available templates and the supported database information.   |
    | `--source`  | It specifies the source. `user:123456@127.0.0.1:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connect URL uses the public network address. |
    | `--sink`     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
    | `--migration-object`  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the sink.    |
@@ -115,10 +100,10 @@ It is recommended to prepare data sampling for verification after the migration 
 
 2. (Optional) Specify migration steps by the option `--steps`.
 
-   The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck, full initialization, and incremental migration.
+   The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck -> structure initialization -> data initialization -> incremental migration.
 
    ```bash
-   kbcli migration create mytask --template apecloud-pg2pg \
+   kbcli migration create mytask --template apecloud-mysql2mysql \
    --source user:123456@127.0.0.1:5432/db_test \
    --sink user:123456@127.0.0.2:5432/db_test \
    --migration-object '"public.table_test_1","public.table_test_2"'
@@ -171,66 +156,6 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
 * To differentiate the dialogue information and to improve data security, it is recommended to create and authorize another account dedicated to data migration.
 * For safety concerns, it is necessary to stop the business write and switch the application during off-peak hours.
 * Before switching the application, it is recommended to prepare data sampling for verification after switching to ensure correctness.
-* Pay attention to serial, sequence, and slot.
-* Serial and sequence
-
-   Search and record the max. value of Sequence before switching applications and set it as the initial value of Sequence in the sink.
-
-   After the business is switched to the sink, the new written Sequence does not take the max. value in the source as the initial value to continue in an increment order by default. You need to set it manually.
-
-    ```bash
-    # PostgreSQL Function Sample:
-
-    CREATE FUNCTION build_setvals() returns void
-    AS $$
-    declare
-      nsp name;
-      rel name;
-      val int8;
-    begin
-      for nsp,rel in select nspname,relname from pg_class t2 , pg_namespace t3 where t2.relnamespace=t3.oid and t2.relkind='S'
-      loop
-        execute format($_$select last_value from %I.%I$_$, nsp, rel) into val;
-        raise notice '%',
-        format($_$select setval('%I.%I'::regclass, %s);$_$, nsp, rel, val+1);
-      end loop;
-    end;
-    $$ 
-    LANGUAGE plpgsql;
-
-    # Execute:
-    psql -hxx -p xx -U xx -d xx -c "set client_min_messages = notice; select build_setvals();" | grep setval
-
-    # Output like:
-    NOTICE:  select setval('public.seq_test_1'::regclass, 2);
-    NOTICE:  select setval('public.seq_test_2'::regclass, 1001);
-    NOTICE:  select setval('public.seq_test_3'::regclass, 203);
-    NOTICE:  select setval('public.seq_test_4'::regclass, 476);
-
-    # Execute the above script in the sink
-    ```
-
-* Slot lifecycle
-
-  The CDC phase (the incremental migration) relies on the slot. A replication slot and publication are created during the CDC phase and these metadata should be deleted first before deleting the migration task metadata.
-
-  If the incremental migration is performed, the migration task creates a replication slot named after the task name during the initialization phase of the init-data step (hyphens, "-", in the task name are replaced with underlines, "_"). When the incremental migration starts, the migration task creates a publication with the previous replication slot name and "_publication_for_all_tables" in the name to perform WAL consumption.
-
-  When the migration task is deleted (running `kbcli migration terminate`), this task changes to the Terminating status. The termination operation first stops the CDC process, then tries to clear the above replication slot and publication. Only when the above metadata are cleared, is the metadata of the migration task deleted.
-
-  :::note
-
-  If the slot is not cleaned up, it affects the log-cleaning logic in PostgreSQL. When the PostgreSQL disk is insufficient and a redundant slot prevents the log from being cleaned up, a serious failure may occur.
-
-  Therefore, the migration task can be deleted only when the slot cleanup is completed. If there is a PostgreSQL task that keeps the Terminating status for a long time, you need to pay attention to the status of the slot and disk water level and intervene manually when necessary.
-
-  Cleanup operations adopt the idempotent logic, and the reasons for general cleanup failures include but are not limited to the following:
-
-  * While the migration task is running, the connection string of the source library changes, which causes the migration task cannot connect to the source.
-  * While the migration task is running, the account and password of the source change, which causes the migration task cannot connect to the source.
-  * While the migration task is running, the permissions of the source library account change, which causes the migration task cannot be deleted.
-
-  :::
 
 ### Steps
 

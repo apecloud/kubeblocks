@@ -3,6 +3,7 @@ title: Migrate data to ApeCloud MySQL by AWS DMS
 description: How to migrate data to ApeCloud MySQL by AWS DMS
 keywords: [mysql, migration, aws dms]
 sidebar_position: 1
+sidebar_label: Migration by AWS DMS
 ---
 
 # Migrate data to ApeCloud MySQL by AWS DMS

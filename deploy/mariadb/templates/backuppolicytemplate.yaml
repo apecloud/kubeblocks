@@ -2,6 +2,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
   name: mariadb-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: mariadb
 spec:
   clusterDefinitionRef: mariadb
   backupPolicies:

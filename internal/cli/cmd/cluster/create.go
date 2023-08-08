@@ -583,7 +583,8 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		for _, setComp := range setsCompSpecs {
 			setsCompSpecsMap[setComp.Name] = setComp
 		}
-		for _, comp := range clusterCompSpecs {
+		for index := range clusterCompSpecs {
+			comp := clusterCompSpecs[index]
 			overrideComponentBySets(&comp, setsCompSpecsMap[comp.Name], compSets[comp.Name])
 			compSpecs = append(compSpecs, &comp)
 		}

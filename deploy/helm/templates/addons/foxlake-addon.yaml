@@ -1,0 +1,35 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: foxlake
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: ApeCloud FoxLake is an open-source cloud-native data warehouse.
+
+  type: Helm
+
+  helm:
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/foxlake
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/foxlake-{{ default .Chart.Version .Values.versionOverride }}/foxlake-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- else }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/foxlake-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+     {{- end }}
+  
+  installable:
+    autoInstall: false
+  
+  defaultInstallValues:
+    - enabled: true

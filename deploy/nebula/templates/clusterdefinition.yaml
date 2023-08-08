@@ -164,7 +164,7 @@ spec:
           templateRef: nebula-storaged-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       workloadType: Stateful
       characterType: nebula-storaged
       componentDefRef:

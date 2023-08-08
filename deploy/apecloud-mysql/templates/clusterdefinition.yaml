@@ -41,7 +41,8 @@ spec:
           templateRef: apecloud-mysql8-agamotto-configuration
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-          defaultMode: 0777
+          # for only read, mysql container switched user account.
+          defaultMode: 0444
         - name: vttablet-config
           templateRef: vttablet-config-template
           constraintRef: mysql-scale-vttablet-config-constraints
@@ -52,7 +53,8 @@ spec:
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          # for read and execute, mysql container switched user account.
+          defaultMode: 0555
       workloadType: Consensus
       consensusSpec:
         leader:
@@ -339,7 +341,7 @@ spec:
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       configSpecs:
         - name: vtconsensus-config
           templateRef: vtconsensus-config-template
@@ -462,7 +464,7 @@ spec:
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       logConfigs:
         {{- range $name,$pattern := .Values.vtgateLogConfigs }}
         - name: {{ $name }}

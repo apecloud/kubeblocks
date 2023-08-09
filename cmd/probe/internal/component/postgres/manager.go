@@ -141,6 +141,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	err := mgr.Pool.Ping(context.TODO())
 	if err != nil {
 		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
+		return false
 	}
 
 	mgr.DBStartupReady = true

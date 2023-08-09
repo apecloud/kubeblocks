@@ -112,6 +112,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 			},
 		}, nil
 	}
+	// TODO: how about policy None and Snapshot?
 	return nil, nil
 }
 
@@ -310,19 +311,19 @@ func (d *dummyDataClone) clearTmpResources() ([]client.Object, error) {
 }
 
 func (d *dummyDataClone) checkBackupStatus() (backupStatus, error) {
-	return backupStatusReadyToUse, nil
+	panic("runtime error: dummyDataClone.checkBackupStatus called")
 }
 
 func (d *dummyDataClone) backup() ([]client.Object, error) {
-	return nil, nil
+	panic("runtime error: dummyDataClone.backup called")
 }
 
 func (d *dummyDataClone) checkRestoreStatus(types.NamespacedName) (backupStatus, error) {
-	return backupStatusReadyToUse, nil
+	panic("runtime error: dummyDataClone.checkRestoreStatus called")
 }
 
 func (d *dummyDataClone) restore(name types.NamespacedName) ([]client.Object, error) {
-	return nil, nil
+	panic("runtime error: dummyDataClone.restore called")
 }
 
 type snapshotDataClone struct {

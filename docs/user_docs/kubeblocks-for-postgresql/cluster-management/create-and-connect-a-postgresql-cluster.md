@@ -6,166 +6,351 @@ sidebar_position: 1
 sidebar_label: Create and connect
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Create and connect to a PostgreSQL cluster
 
-This document shows how to create and connect to a PostgreSQL cluster.
+This tutorial shows how to create and connect to a PostgreSQL cluster.
 
 ## Create a PostgreSQL cluster
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-kbcli.md).
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the PostgreSQL add-on is installed and enabled with `kbcli addon list`.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a MySQL cluster by kbcli.
+* [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* Make sure the PostgreSQL add-on is enabled.
+  
+  <Tabs>
+
+  <TabItem value="kbcli" label="kbcli" default>
   
   ```bash
   kbcli addon list
   >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  NAME                       TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
   ...
-  postgresql                     Helm   Enabled                   true
+  postgresql                 Helm   Enabled                   true
   ...
   ```
+
+  </TabItem>
+
+  <TabItem value="kubectl" label="kubectl">
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io postgresql
+  >
+  NAME         TYPE   STATUS    AGE
+  postgresql   Helm   Enabled   23m
+  ```
+
+  </TabItem>
+  </Tabs>
 
 * View all the database types and versions available for creating a cluster.
 
+  <Tabs>
+
+  <TabItem value="kbcli" label="kbcli" default>
+
   ```bash
+  kbcli clusterdefinition list
+
   kbcli clusterversion list
   ```
 
-### (Recommended) Create a cluster on a tainted node
+  </TabItem>
 
-In actual scenarios, you are recommended to create a cluster on nodes with taints and customized specifications.
+  <TabItem value="kubectl" label="kubectl">
+  
+  Make sure the `postgresql` cluster definition is installed with `kubectl get clusterdefinitions postgresql`.
 
-1. Taint your node.
+  ```bash
+  kubectl get clusterdefinition postgresql
+  >
+  NAME         MAIN-COMPONENT-NAME   STATUS      AGE
+  postgresql   postgresql            Available   25m
+  ```
 
-   :::note
+  View all available versions for creating a cluster
 
-   If you have already some tainted nodes, you can skip this step.
+  ```bash
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=postgresql
+  ```
 
-   :::
+  </TabItem>
 
-   1. Get Kubernetes nodes.
+  </Tabs>
 
-      ```bash
-      kubectl get node
-      ```
+* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
-   2. Place taints on the selected nodes.
+  ```bash
+  kubectl create namespace demo
+  ```
 
-      ```bash
-      kubectl taint nodes <nodename> <taint1name>=true:NoSchedule
-      kubectl taint nodes <nodename> <taint2name>=true:NoSchedule
-      ```
+### Create a cluster
 
-2. Create a PostgreSQL cluster.
+KubeBlocks supports creating two types of MySQL clusters: Standalone and Replication. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication, which creates a cluster with a PrimarySecondary to support automatic failover. And to ensure high availability, PrimarySecondary are distributed on different nodes by default.
 
-   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you can customize your cluster resources as demanded.
+<Tabs>
 
-   The following example shows how to use `--set` to create a cluster with customized resources and add all taints on the current node in the `--toleration` flag to tolerate them.
+<TabItem value="kbcli" label="kbcli" default>
 
-   ```bash
-   kbcli cluster create pg-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=postgresql --set cpu=2,memory=2Gi,replicas=2,storage=20Gi,storageClass=<storageclassname> --namespace <name>
-   ```
-
-  Or change the corresponding parameters in the YAML file.
-
-   ```bash
-   kbcli cluster create pg-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=postgresql --namespace <name> --set-file -<<EOF
-   - name: pg-cluster
-     replicas: 3
-     componentDefRef: postgresql
-     volumeClaimTemplates:
-     - name: data
-       spec:
-         storageClassName: <storageclassname>
-         accessModes:
-         - ReadWriteOnce
-         resources:
-           requests:
-             cpu: 2000m
-             memory: 2Gi
-             storage: 10Gi
-   EOF
-   ```
-
-See the table below for the detailed descriptions for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
-
-📎 Table 1. kbcli cluster create flags description
-
-| Option                 | Description             |
-|:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition. You can choose a database type. Run `kbcli cd list` to show all available cluster definitions.   |
-| `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
-| `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
-| `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
-| `--monitor`            | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want to set node labels, you can follow the example format: <br />`kbcli cluster create pg-cluster --cluster-definition=postgresql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
-| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, ang each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
-| `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
-| `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
-
-If no flags are used and no information specified, you create a PostgreSQL cluster with default settings.
+Create a Standalone.
 
 ```bash
-kbcli cluster create pg-cluster --cluster-definition=postgresql --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' 
+kbcli cluster create postgresql <clustername>
 ```
 
-### Create a cluster on a node without taints
-
-The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
+Create a Replication.
 
 ```bash
-kbcli cluster create pg-cluster --cluster-definition=postgresql --namespace <name> --set cpu=2,memory=2Gi,replicas=2,storage=20Gi,storageClass=<storageclassname>
+kbcli cluster create postgresql --mode replication <clustername>
 ```
 
-Or you can directly change the corresponding parameters in the YAML file.
+If you only have one node for deploying a Replication, set the `availability-policy` as `true` when creating a Replication.
 
 ```bash
-kbcli cluster create pg-cluster  --cluster-definition=postgresql --namespace <name> --set-file -<<EOF
-- name: pg-cluster
-  replicas: 3
-  componentDefRef: postgresql
-  volumeClaimTemplates:
-  - name: data
-    spec:
-      storageClassName: <storageclassname>
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-          storage: 10Gi
-EOF
+kbcli cluster create postgresql --mode replication --availability-policy none <clustername>
 ```
 
-See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
+:::note
 
-📎 Table 2. kbcli cluster create flags description
+* In the production environment, it is not recommended to deploy all replicas on one node, which may decrease cluster availability.
+* Run the command below to view the flags for creating a MySQL cluster and the default values.
+  
+  ```bash
+  kbcli cluster create postgresql -h
+  ```
 
-| Option                 | Description             |
-|:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition, choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
-| `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
-| `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
-| `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
-| `--monitor`            | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />`kbcli cluster create pg-cluster --cluster-definition=postgresql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
-| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
-| `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
-| `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
+:::
 
-If no flags are used and no information is specified, you create a PostgreSQL cluster with default settings.
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+KubeBlocks implements a `Cluster` CRD to define a cluster. Below is the command to create a PostgreSQL cluster.
+
+  ```bash
+  $ cat <<EOF | kubectl apply -f -
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: Cluster
+  metadata:
+    name: pg-cluster
+    namespace: demo
+    labels: 
+      helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
+      app.kubernetes.io/version: "14.8.0"
+      app.kubernetes.io/instance: pg
+  spec:
+    clusterVersionRef: postgresql-14.8.0
+    terminationPolicy: Delete  
+    affinity:
+      podAntiAffinity: Preferred
+      topologyKeys:
+        - kubernetes.io/hostname
+      tenancy: SharedNode
+    clusterDefinitionRef: postgresql
+    componentSpecs:
+      - name: postgresql
+        componentDefRef: postgresql      
+        monitor: false      
+        replicas: 1
+        enabledLogs:
+          - running
+        serviceAccountName: kb-pg
+        switchPolicy:
+          type: Noop      
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: "0.5Gi"
+          requests:
+            cpu: "0.5"
+            memory: "0.5Gi"      
+        volumeClaimTemplates:
+          - name: data # ref clusterDefinition components.containers.volumeMounts.name
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 20Gi      
+        services:
+  EOF
+  ```
+
+* `spec.clusterDefinitionRef` is the name of the cluster definition CRD that defines the cluster components.
+* `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
+* `spec.componentSpecs` is the list of components that define the cluster components.
+* `spec.componnetSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition, you can get the component definition names with `kubectl get clusterdefinition postgresql -o json | jq '.spec.componentDefs[].name'`
+* `spec.componentSpecs.name` is the name of the component.
+* `spec.componentSpecs.replicas` is the number of replicas of the component.
+* `spec.componentSpecs.resources` is the resource requirements of the component.
+* `spec.componentSpecs.volumeClaimTemplates` is the list of volume claim templates that define the volume claim templates for the component.
+* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block delete operation. `Halt` will delete workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from the backup storage location.
+
+KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=pg-cluster -n demo`.
 
 ```bash
-kbcli cluster create pg-cluster --cluster-definition=postgresql
+kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=pg-cluster -n demo
 ```
+
+Run the following command to see the modified PostgreSQL cluster object:
+
+```bash
+kubectl get cluster pg-cluster -n demo -o yaml
+>
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"pg","app.kubernetes.io/version":"14.8.0","helm.sh/chart":"postgresql-cluster-0.6.0-alpha.36"},"name":"pg-cluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-14.8.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-pg","services":null,"switchPolicy":{"type":"Noop"},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+  creationTimestamp: "2023-07-19T07:53:07Z"
+  finalizers:
+  - cluster.kubeblocks.io/finalizer
+  generation: 1
+  labels:
+    app.kubernetes.io/instance: pg
+    app.kubernetes.io/version: 14.8.0
+    clusterdefinition.kubeblocks.io/name: postgresql
+    clusterversion.kubeblocks.io/name: postgresql-14.8.0
+    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
+  name: pg-cluster
+  namespace: demo
+  resourceVersion: "8618"
+  uid: c9f73d21-b79b-4956-aad0-a4e677cb8ba1
+spec:
+  affinity:
+    podAntiAffinity: Preferred
+    tenancy: SharedNode
+    topologyKeys:
+    - kubernetes.io/hostname
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.8.0
+  componentSpecs:
+  - componentDefRef: postgresql
+    enabledLogs:
+    - running
+    monitor: false
+    name: postgresql
+    noCreatePDB: false
+    replicas: 1
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 0.5Gi
+      requests:
+        cpu: "0.5"
+        memory: 0.5Gi
+    serviceAccountName: kb-pg
+    switchPolicy:
+      type: Noop
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  terminationPolicy: Delete
+status:
+  clusterDefGeneration: 2
+  components:
+    postgresql:
+      phase: Running
+      podsReady: true
+      podsReadyTime: "2023-07-19T07:53:43Z"
+      replicationSetStatus:
+        primary:
+          pod: pg-cluster-postgresql-0
+  conditions:
+  - lastTransitionTime: "2023-07-19T07:53:07Z"
+    message: 'The operator has started the provisioning of Cluster: pg-cluster'
+    observedGeneration: 1
+    reason: PreCheckSucceed
+    status: "True"
+    type: ProvisioningStarted
+  - lastTransitionTime: "2023-07-19T07:53:07Z"
+    message: Successfully applied for resources
+    observedGeneration: 1
+    reason: ApplyResourcesSucceed
+    status: "True"
+    type: ApplyResources
+  - lastTransitionTime: "2023-07-19T07:53:43Z"
+    message: all pods of components are ready, waiting for the probe detection successful
+    reason: AllReplicasReady
+    status: "True"
+    type: ReplicasReady
+  - lastTransitionTime: "2023-07-19T07:53:43Z"
+    message: 'Cluster: pg-cluster is ready, current phase is Running'
+    reason: ClusterReady
+    status: "True"
+    type: Ready
+  observedGeneration: 1
+  phase: Running
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Connect to a PostgreSQL Cluster
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
 kbcli cluster connect <clustername>  --namespace <name>
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+KubeBlocks operator has created a new Secret called `pg-cluster-conn-credential` to store the connection credential of the `pg-cluster` cluster. This secret contains following keys:
+
+* `username`: the root username of the PostgreSQL cluster.
+* `password`: the password of root user.
+* `port`: the port of the PostgreSQL cluster.
+* `host`: the host of the PostgreSQL cluster.
+* `endpoint`: the endpoint of the PostgreSQL cluster and it is the same as `host:port`.
+
+1. We need `username` and `password` to connect to this PostgreSQL cluster from `kubectl exec` command.
+
+   ```bash
+   kubectl get secrets -n demo pg-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d postgres
+
+   kubectl get secrets -n demo pg-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d h62rg2kl
+   ```
+
+2. Now, we can exec into the pod `pg-cluster-postgresql-0` and connect to the database using username and password.
+
+   ```bash
+   kubectl exec -ti -n demo pg-cluster-postgresql-0 -- bash
+
+   root@pg-cluster-postgresql-0:/home/postgres# psql -U postgres -W
+   Password: h62rg2kl
+   ```
+
+</TabItem>
+
+<TabItem value="port-forward" label="prot-forward">
+
+You can also port forward the service to connect to the database from your local machine. 
+
+Running the following command to port forward the service:
+
+```bash
+kubectl port-forward -n demo svc/pg-cluster-postgresql 5432:5432 
+```
+
+</TabItem>
+
+</Tabs>
 
 For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).

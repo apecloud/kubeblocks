@@ -260,7 +260,7 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	if dbState == nil {
 		return true
 	}
-	if leaderDBState.OpTimestamp-dbState.OpTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
+	if leaderDBState.OpTimestamp-dbState.OpTimestamp < cluster.HaConfig.GetMaxLagOnSwitchover() {
 		mgr.Logger.Warnf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-dbState.OpTimestamp)
 		return false
 	}
@@ -514,8 +514,8 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 
 func (mgr *Manager) Promote(ctx context.Context) error {
 	if (mgr.globalState["super_read_only"] == "0" && mgr.globalState["read_only"] == "0") &&
-		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "NO" &&
-			mgr.slaveStatus.GetString("Slave_SQL_Running") == "NO")) {
+		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "No" &&
+			mgr.slaveStatus.GetString("Slave_SQL_Running") == "No")) {
 		return nil
 	}
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`

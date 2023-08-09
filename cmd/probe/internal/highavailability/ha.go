@@ -291,7 +291,7 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 		}
 	}
 
-	return true
+	return false
 }
 
 func (ha *Ha) ShutdownWithWait() {

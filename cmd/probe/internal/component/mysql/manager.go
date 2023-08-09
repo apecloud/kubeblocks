@@ -571,17 +571,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bool {
-	sql := "show slave status"
-	var rowMap RowMap
-
-	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-		rowMap = rMap
-		return nil
-	})
-	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
-		return true
-	}
+	var rowMap = mgr.slaveStatus
 
 	if len(rowMap) == 0 {
 		return true
@@ -599,17 +589,7 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 }
 
 func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
-	sql := "show slave status"
-	var rowMap RowMap
-
-	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-		rowMap = rMap
-		return nil
-	})
-	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
-		return false, err
-	}
+	var rowMap = mgr.slaveStatus
 
 	if len(rowMap) == 0 {
 		return false, nil

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vllm-scripts
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+data:
+  start.sh: |
+    #!/bin/sh
+    echo "model=\${MODEL_NAME}"
+    python -m vllm.entrypoints.api_server --host 127.0.0.1 --port 8080 --model \${MODEL_NAME} \${EXTRA_ARGS}

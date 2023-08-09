@@ -8,6 +8,16 @@ Run tpch benchmark
 kbcli bench tpch [Step] [BenchmarkName] [flags]
 ```
 
+### Examples
+
+```
+  # tpch on a cluster, that will exec for all steps, cleanup, prepare and run
+  kbcli bench tpch mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # tpch on a cluster with run, just run by running the test
+  kbcli bench tpch run mytest --cluster mycluster --user xxx --password xxx --database mydb
+```
+
 ### Options
 
 ```

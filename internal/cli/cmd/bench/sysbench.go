@@ -45,19 +45,19 @@ var (
 )
 
 var sysbenchExample = templates.Examples(`
-		# sysbench on a cluster, that will exec all steps, cleanup, prepare and run
+		# sysbench on a cluster, that will exec for all steps, cleanup, prepare and run
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with cleanup, just exec cleanup that will delete the testdata
+		# sysbench run on a cluster with cleanup, only cleanup by deleting the testdata
 		kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with prepare, just exec prepare that will create the testdata
+		# sysbench run on a cluster with prepare, just prepare by creating the testdata
 		kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with run, just exec run that will run the test
+		# sysbench run on a cluster with run, just run by running the test
 		kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with threads count
+		# sysbench on a cluster with thread counts
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 
 		# sysbench on a cluster with type

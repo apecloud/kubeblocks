@@ -44,10 +44,10 @@ var (
 )
 
 var tpchExample = templates.Examples(`
-	# tpch on a cluster, that will exec all steps, cleanup, prepare and run
+	# tpch on a cluster, that will exec for all steps, cleanup, prepare and run
 	kbcli bench tpch mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-	# tpch on a cluster with run, just exec run that will run the test
+	# tpch on a cluster with run, just run by running the test
 	kbcli bench tpch run mytest --cluster mycluster --user xxx --password xxx --database mydb
 `)
 
@@ -63,8 +63,9 @@ func NewTpchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	cmd := &cobra.Command{
-		Use:   "tpch [Step] [BenchmarkName]",
-		Short: "Run tpch benchmark",
+		Use:     "tpch [Step] [BenchmarkName]",
+		Short:   "Run tpch benchmark",
+		Example: tpchExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(args))
 			cmdutil.CheckErr(o.Validate())

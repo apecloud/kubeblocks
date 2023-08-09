@@ -42,19 +42,19 @@ const (
 )
 
 var pgbenchExample = templates.Examples(`
-	# pgbench run on a cluster, that will exec all steps, cleanup, prepare and run
+	# pgbench run on a cluster, that will exec for all steps, cleanup, prepare and run
 	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
 	
-	# pgbench run on a cluster with cleanup, just exec cleanup that will delete the testdata
+	# pgbench run on a cluster with cleanup, only cleanup by deleting the testdata
 	kbcli bench pgbench cleanup mytest --cluster pgcluster --database postgres --user xxx --password xxx
 	
-	# pgbench run on a cluster with prepare, just exec prepare that will create the testdata
+	# pgbench run on a cluster with prepare, just prepare by creating the testdata
 	kbcli bench pgbench prepare mytest --cluster pgcluster --database postgres --user xxx --password xxx
 	
-	# pgbench run on a cluster with run, just exec run that will run the test
+	# pgbench run on a cluster with run, just run by running the test
 	kbcli bench pgbench run mytest --cluster pgcluster --database postgres --user xxx --password xxx
 	
-	# pgbench run on a cluster with  threads and  client count
+	# pgbench run on a cluster with  thread and  client counts
 	kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
 	
 	# pgbench run on a cluster with specified transactions
@@ -63,7 +63,7 @@ var pgbenchExample = templates.Examples(`
 	# pgbench run on a cluster with specified seconds
 	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
 	
-	# pgbench run on a cluster with select only
+	# pgbench run on a cluster with 'select' only
 	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
 `)
 

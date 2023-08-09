@@ -47,19 +47,19 @@ var (
 )
 
 var ycsbExample = templates.Examples(`
-	# ycsb on a cluster, that will exec all steps, cleanup, prepare and run
+	# ycsb on a cluster,  that will exec for all steps, cleanup, prepare and run
 	kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
 	
-	# ycsb on a cluster with cleanup, just exec cleanup that will delete the testdata
+	# ycsb on a cluster with cleanup, only cleanup by deleting the testdata
 	kbcli bench ycsb cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
 	
-	# ycsb on a cluster with prepare, just exec prepare that will create the testdata
+	# ycsb on a cluster with prepare, just prepare by creating the testdata
 	kbcli bench ycsb prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
 	
-	# ycsb on a cluster with run, just exec run that will run the test
+	# ycsb on a cluster with run, just run by running the test
 	kbcli bench ycsb run mytest --cluster mycluster --user xxx --password xxx --database mydb
 	
-	# ycsb on a cluster with threads count
+	# ycsb on a cluster with thread counts
 	kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 	
 	# ycsb on a cluster with record number and operation number

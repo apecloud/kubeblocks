@@ -11,25 +11,25 @@ kbcli bench tpcc [Step] [BenchmarkName] [flags]
 ### Examples
 
 ```
-  # tpcc on a cluster, that will exec all steps, cleanup, prepare and run
+  # tpcc on a cluster, that will exec for all steps, cleanup, prepare and run
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with cleanup, just exec cleanup that will delete the testdata
+  # tpcc on a cluster with cleanup, only cleanup by deleting the testdata
   kbcli bench tpcc cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with prepare, just exec prepare that will create the testdata
+  # tpcc on a cluster with prepare, just prepare by creating the testdata
   kbcli bench tpcc prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with run, just exec run that will run the test
+  # tpcc on a cluster with run, just run by running the test
   kbcli bench tpcc run mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with warehouses count, which is the overall database size scaling parameter
+  # tpcc on a cluster with warehouse counts, which is the overall database size scaling parameter
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --warehouses 100
   
-  # tpcc on a cluster with threads count
+  # tpcc on a cluster with thread counts
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
   
-  # tpcc on a cluster with transactions count
+  # tpcc on a cluster with transactions counts
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --transactions 1000
   
   # tpcc on a cluster with duration 10 minutes

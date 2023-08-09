@@ -47,17 +47,17 @@ spec:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
-          defaultMode: 0777
+          defaultMode: 0444
         - name: postgresql-custom-metrics
           templateRef: postgresql12-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
-          defaultMode: 0777
+          defaultMode: 0444
         - name: agamotto-configuration
           templateRef: postgresql-agamotto-configuration
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-          defaultMode: 0777
+          defaultMode: 0444
       versionsContext:
         initContainers:
           - name: pg-init-container
@@ -96,12 +96,12 @@ spec:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
-          defaultMode: 0777
+          defaultMode: 0444
         - name: postgresql-custom-metrics
           templateRef: postgresql12-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
-          defaultMode: 0777
+          defaultMode: 0444
       versionsContext:
         initContainers:
           - name: pg-init-container

@@ -128,7 +128,7 @@ var _ = Describe("token provider", func() {
 			tokenProvider := newTokenProvider(mockCached, mockIssued)
 
 			ExpectWithOffset(1, func() error {
-				userInfo, err := tokenProvider.Login(context.Background())
+				userInfo, _, err := tokenProvider.Login(context.Background())
 				Expect(userInfo.Name).To(Equal("test_name"))
 				return err
 			}()).To(BeNil())

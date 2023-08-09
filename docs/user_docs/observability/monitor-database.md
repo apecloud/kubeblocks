@@ -41,7 +41,7 @@ With the built-in database observability, you can observe the database health st
     kbcli addon enable prometheus
 
     # Enable granfana add-on
-    kbcli addon enable granfana
+    kbcli addon enable grafana
 
     # Enable alertmanager-webhook-adaptor add-on
     kbcli addon enable alertmanager-webhook-adaptor

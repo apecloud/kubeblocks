@@ -36,13 +36,13 @@ spec:
           templateRef: redis-metrics-config
           namespace: {{ .Release.Namespace }}
           volumeName: redis-metrics-config
-          defaultMode: 0777
+          defaultMode: 0444
       scriptSpecs:
         - name: redis-scripts
           templateRef: redis-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       monitor:
         builtIn: false
         exporterConfig:
@@ -221,7 +221,7 @@ spec:
           templateRef: redis-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       volumeTypes:
         - name: data
           type: data

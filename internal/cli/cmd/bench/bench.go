@@ -21,12 +21,14 @@ package bench
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -65,13 +67,31 @@ var benchGVRList = []schema.GroupVersionResource{
 }
 
 type BenchBaseOptions struct {
-	Driver      string
-	Database    string
-	Host        string
-	Port        int
-	User        string
-	Password    string
-	ClusterName string
+	Driver         string
+	Database       string
+	Host           string
+	Port           int
+	User           string
+	Password       string
+	ClusterName    string
+	TolerationsRaw []string
+	Tolerations    []corev1.Toleration
+}
+
+func (o *BenchBaseOptions) BaseComplete() error {
+	tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+	if err != nil {
+		return err
+	}
+	tolerationsJSON, err := json.Marshal(tolerations)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(tolerationsJSON, &o.Tolerations); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // BaseValidate validates the base options
@@ -102,6 +122,7 @@ func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.Password, "password", "", "the password of database")
 	cmd.Flags().IntVar(&o.Port, "port", 0, "the port of database")
 	cmd.Flags().StringVar(&o.ClusterName, "cluster", "", "the cluster of database")
+	cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'`)
 }
 
 // NewBenchCmd creates the bench command
@@ -334,4 +355,28 @@ func validateBenchmarkExist(factory cmdutil.Factory, streams genericclioptions.I
 		}
 	}
 	return nil
+}
+
+// parseStepAndName parses the step and name from the given arguments and name prefix.
+// If no arguments are provided, it sets the step to "all" and generates a random name with the given prefix.
+// If the first argument is "all", "cleanup", "prepare", or "run", it sets the step to the argument value.
+// If a second argument is provided, it sets the name to the argument value.
+// If the first argument is not a valid step value, it sets the name to the first argument value.
+// Returns the step and name as strings.
+func parseStepAndName(args []string, namePrefix string) (step, name string) {
+	step = "all"
+	name = fmt.Sprintf("%s-%s", namePrefix, util.RandRFC1123String(6))
+
+	if len(args) > 0 {
+		switch args[0] {
+		case "all", "cleanup", "prepare", "run":
+			step = args[0]
+			if len(args) > 1 {
+				name = args[1]
+			}
+		default:
+			name = args[0]
+		}
+	}
+	return
 }

@@ -242,6 +242,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  relyOnLogfile:
+                    description: relyOnLogfile defines whether the current recovery
+                      relies on log files
+                    type: boolean
                   restoreCommands:
                     description: Array of command that apps can perform database restore.
                       like xtrabackup, that can performs restore mysql from files.
@@ -307,7 +311,6 @@ spec:
             required:
             - backupCommands
             - image
-            - physical
             type: object
           status:
             description: BackupToolStatus defines the observed state of BackupTool

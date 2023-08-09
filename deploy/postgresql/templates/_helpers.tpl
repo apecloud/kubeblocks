@@ -96,3 +96,15 @@ Get the password key.
 {{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "postgresql").spec.connectionCredential "password"}}
 {{- end }}
 {{- end }}
+
+{{/*
+Generate scripts configmap
+*/}}
+{{- define "postgresql.extend.scripts" -}}
+{{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
+{{ $path | base }}: |-
+{{- $.Files.Get $path | nindent 2 }}
+{{- end }}
+{{- end }}
+
+

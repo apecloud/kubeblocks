@@ -41,13 +41,13 @@ import (
 )
 
 type dataClone interface {
-	enabled() bool
 	// succeed check if data clone succeeded
 	succeed() (bool, error)
 	// cloneData do clone data, return objects that need to be created
 	cloneData(dataClone) ([]client.Object, error)
 	// clearTmpResources clear all the temporary resources created during data clone, return objects that need to be deleted
 	clearTmpResources() ([]client.Object, error)
+
 	checkBackupStatus() (backupStatus, error)
 	backup() ([]client.Object, error)
 	checkRestoreStatus(types.NamespacedName) (backupStatus, error)
@@ -70,11 +70,11 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	stsObj *appsv1.StatefulSet,
 	stsProto *appsv1.StatefulSet,
 	key types.NamespacedName) (dataClone, error) {
-	if component == nil || component.HorizontalScalePolicy == nil {
+	if component == nil {
 		return nil, nil
 	}
-	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
-		snapshot := &snapshotDataClone{
+	if component.HorizontalScalePolicy == nil {
+		return &dummyDataClone{
 			baseDataClone{
 				reqCtx:    reqCtx,
 				cli:       cli,
@@ -84,26 +84,35 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				stsProto:  stsProto,
 				key:       key,
 			},
-		}
-		if snapshot.enabled() {
-			return snapshot, nil
-		}
-		backupTool := &backupDataClone{
-			baseDataClone{
-				reqCtx:    reqCtx,
-				cli:       cli,
-				cluster:   cluster,
-				component: component,
-				stsObj:    stsObj,
-				stsProto:  stsProto,
-				key:       key,
-			},
-		}
-		if backupTool.enabled() {
-			return backupTool, nil
-		}
-		return nil, fmt.Errorf("h-scale policy is Backup but neither snapshot nor backup tool is enabled")
+		}, nil
 	}
+	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
+		if viper.GetBool("VOLUMESNAPSHOT") {
+			return &snapshotDataClone{
+				baseDataClone{
+					reqCtx:    reqCtx,
+					cli:       cli,
+					cluster:   cluster,
+					component: component,
+					stsObj:    stsObj,
+					stsProto:  stsProto,
+					key:       key,
+				},
+			}, nil
+		}
+		return &backupDataClone{
+			baseDataClone{
+				reqCtx:    reqCtx,
+				cli:       cli,
+				cluster:   cluster,
+				component: component,
+				stsObj:    stsObj,
+				stsProto:  stsProto,
+				key:       key,
+			},
+		}, nil
+	}
+	// TODO: how about policy None and Snapshot?
 	return nil, nil
 }
 
@@ -118,7 +127,6 @@ type baseDataClone struct {
 }
 
 func (d *baseDataClone) cloneData(realDataClone dataClone) ([]client.Object, error) {
-
 	objs := make([]client.Object, 0)
 
 	// check backup ready
@@ -140,10 +148,13 @@ func (d *baseDataClone) cloneData(realDataClone dataClone) ([]client.Object, err
 		return objs, nil
 	case backupStatusReadyToUse:
 		break
+	default:
+		panic(fmt.Sprintf("unexpected backup status: %s, clustre: %s, component: %s",
+			status, d.cluster.Name, d.component.Name))
 	}
+
 	// backup's ready, then start to check restore
-	pvcKeys := d.toCreatePVCKeys()
-	for _, pvcKey := range pvcKeys {
+	for _, pvcKey := range d.pvcKeysToRestore() {
 		restoreStatus, err := realDataClone.checkRestoreStatus(pvcKey)
 		if err != nil {
 			return nil, err
@@ -159,12 +170,19 @@ func (d *baseDataClone) cloneData(realDataClone dataClone) ([]client.Object, err
 		case backupStatusProcessing:
 		case backupStatusReadyToUse:
 			continue
-		case backupStatusFailed:
-			return nil, fmt.Errorf("restore failed")
+		default:
+			panic(fmt.Sprintf("unexpected restore status: %s, clustre: %s, component: %s",
+				status, d.cluster.Name, d.component.Name))
 		}
 	}
 
-	// restore to pvcs all ready
+	// create PVCs that do not need to restore
+	pvcObjs, err := d.createPVCs(d.excludeBackupVCTs())
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, pvcObjs...)
+
 	return objs, nil
 }
 
@@ -178,7 +196,7 @@ func (d *baseDataClone) isPVCExists(pvcKey types.NamespacedName) (bool, error) {
 
 func (d *baseDataClone) checkAllPVCsExist() (bool, error) {
 	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
-		for _, vct := range d.stsObj.Spec.VolumeClaimTemplates {
+		for _, vct := range d.component.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
 				Namespace: d.stsObj.Namespace,
 				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.stsObj.Name, i),
@@ -196,10 +214,18 @@ func (d *baseDataClone) checkAllPVCsExist() (bool, error) {
 	return true, nil
 }
 
+func (d *baseDataClone) allVCTs() []*corev1.PersistentVolumeClaimTemplate {
+	vcts := make([]*corev1.PersistentVolumeClaimTemplate, 0)
+	for i := range d.component.VolumeClaimTemplates {
+		vcts = append(vcts, &d.component.VolumeClaimTemplates[i])
+	}
+	return vcts
+}
+
 func (d *baseDataClone) backupVCT() *corev1.PersistentVolumeClaimTemplate {
-	vcts := d.component.VolumeClaimTemplates
-	vct := vcts[0]
-	for _, tmpVct := range vcts {
+	// TODO: is it possible that component.VolumeClaimTemplates may be empty?
+	vct := d.component.VolumeClaimTemplates[0]
+	for _, tmpVct := range d.component.VolumeClaimTemplates {
 		for _, volumeType := range d.component.VolumeTypes {
 			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
 				vct = tmpVct
@@ -210,20 +236,52 @@ func (d *baseDataClone) backupVCT() *corev1.PersistentVolumeClaimTemplate {
 	return &vct
 }
 
-func (d *baseDataClone) toCreatePVCKeys() []types.NamespacedName {
+func (d *baseDataClone) excludeBackupVCTs() []*corev1.PersistentVolumeClaimTemplate {
+	vcts := make([]*corev1.PersistentVolumeClaimTemplate, 0)
+	backupVCT := d.backupVCT()
+	for i := range d.component.VolumeClaimTemplates {
+		vct := &d.component.VolumeClaimTemplates[i]
+		if vct.Name != backupVCT.Name {
+			vcts = append(vcts, vct)
+		}
+	}
+	return vcts
+}
+
+func (d *baseDataClone) pvcKeysToRestore() []types.NamespacedName {
 	var pvcKeys []types.NamespacedName
-	vct := d.backupVCT()
-	for i := *d.stsObj.Spec.Replicas; i < *d.stsProto.Spec.Replicas; i++ {
+	backupVct := d.backupVCT()
+	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
 		pvcKey := types.NamespacedName{
 			Namespace: d.stsObj.Namespace,
-			Name: fmt.Sprintf("%s-%s-%d",
-				vct.Name,
-				d.stsObj.Name,
-				i),
+			Name:      fmt.Sprintf("%s-%s-%d", backupVct.Name, d.stsObj.Name, i),
 		}
 		pvcKeys = append(pvcKeys, pvcKey)
 	}
 	return pvcKeys
+}
+
+func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate) ([]client.Object, error) {
+	objs := make([]client.Object, 0)
+	for i := *d.stsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+		for _, vct := range vcts {
+			pvcKey := types.NamespacedName{
+				Namespace: d.stsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.stsObj.Name, i),
+			}
+			if exist, err := d.isPVCExists(pvcKey); err != nil {
+				return nil, err
+			} else if exist {
+				continue
+			}
+			pvc, err := builder.BuildPVC(d.cluster, d.component, vct, pvcKey, "")
+			if err != nil {
+				return nil, err
+			}
+			objs = append(objs, pvc)
+		}
+	}
+	return objs, nil
 }
 
 func (d *baseDataClone) getBackupMatchingLabels() client.MatchingLabels {
@@ -234,12 +292,42 @@ func (d *baseDataClone) getBackupMatchingLabels() client.MatchingLabels {
 	}
 }
 
-type snapshotDataClone struct {
+type dummyDataClone struct {
 	baseDataClone
 }
 
-func (d *snapshotDataClone) enabled() bool {
-	return viper.GetBool("VOLUMESNAPSHOT")
+var _ dataClone = &dummyDataClone{}
+
+func (d *dummyDataClone) succeed() (bool, error) {
+	return d.checkAllPVCsExist()
+}
+
+func (d *dummyDataClone) cloneData(dataClone) ([]client.Object, error) {
+	return d.createPVCs(d.allVCTs())
+}
+
+func (d *dummyDataClone) clearTmpResources() ([]client.Object, error) {
+	return nil, nil
+}
+
+func (d *dummyDataClone) checkBackupStatus() (backupStatus, error) {
+	panic("runtime error: dummyDataClone.checkBackupStatus called")
+}
+
+func (d *dummyDataClone) backup() ([]client.Object, error) {
+	panic("runtime error: dummyDataClone.backup called")
+}
+
+func (d *dummyDataClone) checkRestoreStatus(types.NamespacedName) (backupStatus, error) {
+	panic("runtime error: dummyDataClone.checkRestoreStatus called")
+}
+
+func (d *dummyDataClone) restore(name types.NamespacedName) ([]client.Object, error) {
+	panic("runtime error: dummyDataClone.restore called")
+}
+
+type snapshotDataClone struct {
+	baseDataClone
 }
 
 var _ dataClone = &snapshotDataClone{}
@@ -451,10 +539,6 @@ type backupDataClone struct {
 	baseDataClone
 }
 
-func (d *backupDataClone) enabled() bool {
-	return len(viper.GetString(constant.CfgKeyBackupPVCName)) > 0
-}
-
 var _ dataClone = &backupDataClone{}
 
 func (d *backupDataClone) succeed() (bool, error) {
@@ -462,8 +546,7 @@ func (d *backupDataClone) succeed() (bool, error) {
 	if err != nil || !allPVCsExist {
 		return allPVCsExist, err
 	}
-	pvcKeys := d.toCreatePVCKeys()
-	for _, pvcKey := range pvcKeys {
+	for _, pvcKey := range d.pvcKeysToRestore() {
 		restoreStatus, err := d.checkRestoreStatus(pvcKey)
 		if err != nil {
 			return false, err

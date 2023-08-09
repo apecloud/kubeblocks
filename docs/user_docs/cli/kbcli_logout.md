@@ -11,9 +11,8 @@ kbcli logout [flags]
 ### Options
 
 ```
-      --api-url string     The KubeBlocks Auth Base URL. (default "https://tenent2.jp.auth0.com")
-      --client-id string   The client ID for the KubeBlocks Cloud.
-  -h, --help               help for logout
+  -h, --help            help for logout
+  -r, --region string   Specify the region [jp] to log in. (default "jp")
 ```
 
 ### Options inherited from parent commands

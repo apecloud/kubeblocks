@@ -58,6 +58,7 @@ const (
 	ErrorTypeReconfigureFailed        ErrorType = "ErrorTypeReconfigureFailed"
 	ErrorTypeInvalidLogfileBackupName ErrorType = "InvalidLogfileBackupName"
 	ErrorTypeBackupScheduleDisabled   ErrorType = "BackupScheduleDisabled"
+	ErrorTypeLogfileScheduleDisabled  ErrorType = "LogfileScheduleDisabled"
 
 	// ErrorType for cluster controller
 	ErrorTypeBackupFailed ErrorType = "BackupFailed"
@@ -141,4 +142,9 @@ func NewInvalidLogfileBackupName(backupPolicyName string) *Error {
 // NewBackupScheduleDisabled returns a new Error with ErrorTypeBackupScheduleDisabled.
 func NewBackupScheduleDisabled(backupType, backupPolicyName string) *Error {
 	return NewErrorf(ErrorTypeBackupScheduleDisabled, `%s schedule is disabled, you can enable spec.schedule.%s in BackupPolicy "%s"`, backupType, backupType, backupPolicyName)
+}
+
+// NewBackupLogfileScheduleDisabled returns a new Error with ErrorTypeLogfileScheduleDisabled.
+func NewBackupLogfileScheduleDisabled(backupToolName string) *Error {
+	return NewErrorf(ErrorTypeLogfileScheduleDisabled, `BackupTool "%s" of the backup relies on logfile. Please enable the logfile scheduling firstly`, backupToolName)
 }

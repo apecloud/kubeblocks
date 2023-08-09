@@ -34,6 +34,7 @@ import (
 
 type LogOutOptions struct {
 	authorize.Options
+	Region string
 
 	Provider authorize.Provider
 }
@@ -50,12 +51,13 @@ func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the KubeBlocks Cloud.")
-	cmd.Flags().StringVar(&o.AuthURL, "api-url", DefaultBaseURL, "The KubeBlocks Auth Base URL.")
+	cmd.Flags().StringVarP(&o.Region, "region", "r", "jp", "Specify the region [jp] to log in.")
 	return cmd
 }
 
 func (o *LogOutOptions) complete() error {
+	o.AuthURL = getAuthURL(o.Region)
+
 	var err error
 	o.Provider, err = authorize.NewTokenProvider(o.Options)
 	if err != nil {

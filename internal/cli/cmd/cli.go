@@ -48,11 +48,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/report"
@@ -67,7 +69,9 @@ const (
 
 // TODO: add more commands
 var cloudCmds = map[string]bool{
-	"logout": true,
+	"org":     true,
+	"logout":  true,
+	"context": true,
 }
 
 func init() {
@@ -152,7 +156,11 @@ A Command Line Interface for KubeBlocks`,
 			if cmd.Name() == cobra.ShellCompRequestCmd {
 				kcplugin.SetupPluginCompletion(cmd, args)
 			}
-			if cloudCmds[cmd.Name()] && !auth.IsLoggedIn() {
+
+			commandPath := cmd.CommandPath()
+			parts := strings.Split(commandPath, " ")
+			subCommand := parts[1]
+			if cloudCmds[subCommand] && !auth.IsLoggedIn() {
 				return fmt.Errorf("use 'kbcli login' to login first")
 			}
 			return nil
@@ -181,6 +189,8 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		auth.NewLogin(ioStreams),
 		auth.NewLogout(ioStreams),
+		organization.NewOrganizationCmd(ioStreams),
+		context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),

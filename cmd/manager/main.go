@@ -57,6 +57,9 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
 
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	monitorcontrollers "github.com/apecloud/kubeblocks/controllers/monitor"
+
 	// +kubebuilder:scaffold:imports
 
 	discoverycli "k8s.io/client-go/discovery"
@@ -89,6 +92,7 @@ func init() {
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(monitorv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -468,6 +472,13 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
 			os.Exit(1)
 		}
+	}
+	if err = (&monitorcontrollers.AgamottoCollectorReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AgamottoCollector")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

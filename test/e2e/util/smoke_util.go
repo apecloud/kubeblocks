@@ -370,3 +370,17 @@ func CheckCommand(command string, path string) bool {
 
 	return false
 }
+
+func Difference(a, b []string) []string {
+	m := make(map[string]bool)
+	for _, v := range a {
+		m[v] = true
+	}
+	diff := make([]string, 0)
+	for _, v := range b {
+		if !m[v] {
+			diff = append(diff, v)
+		}
+	}
+	return diff
+}

@@ -34,3 +34,18 @@ var SecretID string
 var SecretKey string
 var InitEnv bool
 var TestType string
+var TestResults []Result
+
+type Result struct {
+	CaseName        string
+	ExecuteResult   bool
+	TroubleShooting string
+}
+
+func NewResult(name string, result bool, troubleShooting string) Result {
+	return Result{
+		CaseName:        name,
+		ExecuteResult:   result,
+		TroubleShooting: troubleShooting,
+	}
+}

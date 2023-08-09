@@ -4,6 +4,6 @@ description: A Qdrant cluster Helm chart for KubeBlocks.
 
 type: application
 
-version: 0.6.0-beta.21
+version: 0.6.0-beta.42
 
 appVersion: "1.1.0"

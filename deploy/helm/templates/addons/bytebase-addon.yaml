@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: bytebase
+  name: {{ include "addon.bytebase.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     "kubeblocks.io/provider": community
@@ -14,8 +14,9 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://url-to-your-chart-version.tgz
-
+    # use the ApeCloud's chart repository since Bytebase's image doesn't currently support ARM64
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/bytebase-0.2.0.tgz
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/bytebase-0.1.0/bytebase-0.1.0.tgz
   installable:
     autoInstall: false
 

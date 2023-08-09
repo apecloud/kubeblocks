@@ -5,6 +5,7 @@ metadata:
   name: bytebase-entrypoint
   namespace: {{ template "bytebase.namespace" . }}
   labels:
+    app.kubernetes.io/instance: bytebase
     app.kubernetes.io/managed-by: helm
 spec:
   type: LoadBalancer

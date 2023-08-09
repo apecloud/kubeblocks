@@ -86,6 +86,7 @@ func (r *ReplicatedStateMachine) validate() error {
 		for _, role := range r.Spec.Roles {
 			if role.IsLeader && len(role.Name) > 0 {
 				hasHeader = true
+				break
 			}
 		}
 		if !hasHeader {
@@ -95,13 +96,11 @@ func (r *ReplicatedStateMachine) validate() error {
 		}
 	}
 
-	if r.Spec.Service != nil {
-		// servicePort must provide
-		if len(r.Spec.Service.Ports) == 0 {
-			allErrs = append(allErrs,
-				field.Required(field.NewPath("spec.service.ports"),
-					"servicePort must provide"))
-		}
+	// servicePort must provide if spec.service is not nil
+	if r.Spec.Service != nil && len(r.Spec.Service.Ports) == 0 {
+		allErrs = append(allErrs,
+			field.Required(field.NewPath("spec.service.ports"),
+				"servicePort must provide"))
 	}
 
 	if len(allErrs) > 0 {

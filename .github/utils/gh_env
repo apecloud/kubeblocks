@@ -1,9 +1,9 @@
 DEBUG=${DEBUG:-}
 
-export MILESTONE_ID=${MILESTONE_ID:-5}
+export MILESTONE_ID=${MILESTONE_ID:-7}
 
-export BASE_BRANCH=${BASE_BRANCH:-'release-0.5'}
-export HEAD_BRANCH=${HEAD_BRANCH:-'releasing-0.5'}
+export BASE_BRANCH=${BASE_BRANCH:-'release-0.6'}
+export HEAD_BRANCH=${HEAD_BRANCH:-'releasing-0.6'}
 export PR_TITLE=${PR_TITLE:-"chore(releasing): ${BASE_BRANCH} tracker PR (no-need-to-review)"}
 
 

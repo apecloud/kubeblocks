@@ -323,7 +323,6 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,

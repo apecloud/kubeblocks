@@ -51,9 +51,6 @@ spec:
           spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
-              clusterFamilyRef:
-                description: reference name of clusterfamily
-                type: string
               componentDefs:
                 description: componentDefs provides cluster components definitions.
                 items:

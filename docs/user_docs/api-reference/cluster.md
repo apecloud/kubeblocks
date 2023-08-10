@@ -23,8 +23,6 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>
 </li><li>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily</a>
-</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersion">ClusterVersion</a>
@@ -522,17 +520,6 @@ map[string]string
 <p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object.</p><br /><br /><p>Built-in objects are:<br />- <code>$(RANDOM_PASSWD)</code> - random 8 characters.<br />- <code>$(UUID)</code> - generate a random UUID v4 string.<br />- <code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br />- <code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br />- <code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br />- <code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
 </td>
 </tr>
-<tr>
-<td>
-<code>clusterFamilyRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>reference name of clusterfamily</p><br />
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -546,93 +533,6 @@ ClusterDefinitionStatus
 </em>
 </td>
 <td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily
-</h3>
-<div>
-<p>ClusterFamily is the Schema for the clusterfamilies API</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ClusterFamily</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilySpec">
-ClusterFamilySpec
-</a>
-</em>
-</td>
-<td>
-<p>spec of clusterfamily which defines what kind of clustertemplate to use in some conditions</p><br />
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>clusterTemplateRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">
-[]ClusterFamilyTemplateRef
-</a>
-</em>
-</td>
-<td>
-<p>list of clustertemplates</p><br />
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyStatus">
-ClusterFamilyStatus
-</a>
-</em>
-</td>
-<td>
-<p>status of clusterfamily</p><br />
 </td>
 </tr>
 </tbody>
@@ -3433,17 +3333,6 @@ map[string]string
 <p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object.</p><br /><br /><p>Built-in objects are:<br />- <code>$(RANDOM_PASSWD)</code> - random 8 characters.<br />- <code>$(UUID)</code> - generate a random UUID v4 string.<br />- <code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br />- <code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br />- <code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br />- <code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
 </td>
 </tr>
-<tr>
-<td>
-<code>clusterFamilyRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>reference name of clusterfamily</p><br />
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus
@@ -3497,165 +3386,6 @@ int64
 <td>
 <em>(Optional)</em>
 <p>observedGeneration is the most recent generation observed for this<br />ClusterDefinition. It corresponds to the ClusterDefinition&rsquo;s generation, which is<br />updated on mutation by the API Server.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilySpec">ClusterFamilySpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily</a>)
-</p>
-<div>
-<p>ClusterFamilySpec defines the desired state of ClusterFamily</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>clusterTemplateRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">
-[]ClusterFamilyTemplateRef
-</a>
-</em>
-</td>
-<td>
-<p>list of clustertemplates</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilyStatus">ClusterFamilyStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily</a>)
-</p>
-<div>
-<p>ClusterFamilyStatus defines the observed state of ClusterFamily</p><br />
-</div>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">ClusterFamilyTemplateRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilySpec">ClusterFamilySpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>key defines which parameters in cluster should be checked, if key equals to value, the clustertemplate defined in templateRef will be chosen</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>expression</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>if the evaluated result equals to value, the clustertemplate defined in templateRef will be chosen, when this field is set, key will be ignored</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>the value of the key or the expression</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>templateRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>clustertemplate name referenced to, when value is match</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRefSelector">
-[]ClusterFamilyTemplateRefSelector
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRefSelector">ClusterFamilyTemplateRefSelector
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">ClusterFamilyTemplateRef</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>expression</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>template</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
 </td>
 </tr>
 </tbody>
@@ -4159,7 +3889,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.ClusterComponentStatus
+map[string]..ClusterComponentStatus
 </a>
 </em>
 </td>
@@ -6701,7 +6431,7 @@ ClassDefRef
 <td>
 <code>targetResources</code><br/>
 <em>
-map[apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]string
+map[..ComponentResourceKey][]string
 </em>
 </td>
 <td>
@@ -6743,7 +6473,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfiguration
+map[string]..LastComponentConfiguration
 </a>
 </em>
 </td>
@@ -7499,7 +7229,7 @@ LastConfiguration
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponentStatus
+map[string]..OpsRequestComponentStatus
 </a>
 </em>
 </td>

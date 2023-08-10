@@ -21,7 +21,6 @@ package components
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -209,7 +208,7 @@ func (r *RSM) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.
 				needUpdate = handlePrimaryNotExistPod(pod)
 			default:
 				if len(primaryPods) != 1 {
-					return nil, errors.New(fmt.Sprintf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods))
+					return nil, fmt.Errorf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods)
 				}
 				needUpdate = handlePrimaryExistPod(pod, primaryPods[0])
 			}

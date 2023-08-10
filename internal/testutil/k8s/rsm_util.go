@@ -36,10 +36,6 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-const (
-	rsmTestFinalizer = "test.kubeblocks.io/finalizer"
-)
-
 // NewFakeRSM creates a fake RSM workload object for testing.
 func NewFakeRSM(name string, replicas int) *workloads.ReplicatedStateMachine {
 	template := corev1.PodTemplateSpec{

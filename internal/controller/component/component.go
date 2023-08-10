@@ -74,7 +74,9 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			!cluster.Spec.Resources.Memory.IsZero() ||
 			!cluster.Spec.Storage.Size.IsZero() ||
 			cluster.Spec.Monitor.MonitoringInterval != nil ||
-			cluster.Spec.Network != nil
+			cluster.Spec.Network != nil ||
+			len(cluster.Spec.Tenancy) > 0 ||
+			len(cluster.Spec.AvailabilityPolicy) > 0
 	}
 
 	fillSimplifiedAPI := func() {

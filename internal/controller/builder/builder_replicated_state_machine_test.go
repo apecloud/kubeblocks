@@ -115,7 +115,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		}
 		strategyType := apps.OnDeleteStatefulSetStrategyType
 		delay := int32(10)
-		observation := workloads.RoleObservation{InitialDelaySeconds: delay}
+		roleProbe := workloads.RoleProbe{InitialDelaySeconds: delay}
 		actions := []workloads.Action{
 			{
 				Image:   "foo-1",
@@ -170,9 +170,9 @@ var _ = Describe("replicated_state_machine builder", func() {
 			SetPodManagementPolicy(policy).
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
-			SetRoleObservation(&observation).
-			SetObservationActions(actions).
-			AddObservationAction(action).
+			SetRoleProbe(&roleProbe).
+			SetProbeActions(actions).
+			AddProbeAction(action).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetService(service).
 			SetAlternativeServices(alternativeServices).
@@ -205,11 +205,11 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(*rsm.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
 		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
 		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
-		Expect(rsm.Spec.RoleObservation).ShouldNot(BeNil())
-		Expect(rsm.Spec.RoleObservation.InitialDelaySeconds).Should(Equal(delay))
-		Expect(rsm.Spec.RoleObservation.ObservationActions).Should(HaveLen(2))
-		Expect(rsm.Spec.RoleObservation.ObservationActions[0]).Should(Equal(actions[0]))
-		Expect(rsm.Spec.RoleObservation.ObservationActions[1]).Should(Equal(action))
+		Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())
+		Expect(rsm.Spec.RoleProbe.InitialDelaySeconds).Should(Equal(delay))
+		Expect(rsm.Spec.RoleProbe.ProbeActions).Should(HaveLen(2))
+		Expect(rsm.Spec.RoleProbe.ProbeActions[0]).Should(Equal(actions[0]))
+		Expect(rsm.Spec.RoleProbe.ProbeActions[1]).Should(Equal(action))
 		Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*rsm.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(rsm.Spec.Service).ShouldNot(BeNil())

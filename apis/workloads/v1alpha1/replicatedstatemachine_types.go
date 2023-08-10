@@ -95,9 +95,9 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// RoleObservation provides method to observe role.
+	// RoleProbe provides method to probe role.
 	// +optional
-	RoleObservation *RoleObservation `json:"roleObservation,omitempty"`
+	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
 	// MembershipReconfiguration provides actions to do membership dynamic reconfiguration.
 	// +optional
@@ -206,9 +206,9 @@ const (
 	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
 )
 
-// RoleObservation defines how to observe role
-type RoleObservation struct {
-	// ObservationActions define Actions to be taken in serial.
+// RoleProbe defines how to observe role
+type RoleProbe struct {
+	// ProbeActions define Actions to be taken in serial.
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// Environment variables can be used in Command:
@@ -216,37 +216,36 @@ type RoleObservation struct {
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
 	// +kubebuilder:validation:Required
-	ObservationActions []Action `json:"observationActions"`
+	ProbeActions []Action `json:"probeActions"`
 
-	// Number of seconds after the container has started before role observation has started.
+	// Number of seconds after the container has started before role probe has started.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
 
-	// Number of seconds after which the observation times out.
+	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 
-	// How often (in seconds) to perform the observation.
+	// How often (in seconds) to perform the probe.
 	// Default to 2 seconds. Minimum value is 1.
 	// +kubebuilder:default=2
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
 
-	// Minimum consecutive successes for the observation to be considered successful after having failed.
-	// Minimum consecutive successes for the observation to be considered successful after having failed.
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Defaults to 1. Minimum value is 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	SuccessThreshold int32 `json:"successThreshold,omitempty"`
 
-	// Minimum consecutive failures for the observation to be considered failed after having succeeded.
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// Defaults to 3. Minimum value is 1.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=1

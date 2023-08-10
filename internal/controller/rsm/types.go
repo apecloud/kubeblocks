@@ -66,26 +66,26 @@ const (
 	jobScenarioMembership       = "membership-reconfiguration"
 	jobScenarioUpdate           = "pod-update"
 
-	roleObservationName              = "role-observe"
-	roleAgentVolumeName              = "role-agent"
-	roleAgentInstallerName           = "role-agent-installer"
-	roleAgentVolumeMountPath         = "/role-observation"
-	roleAgentName                    = "agent"
-	shell2httpImage                  = "msoap/shell2http:1.16.0"
-	shell2httpBinaryPath             = "/app/shell2http"
-	shell2httpServePath              = "/role"
-	defaultRoleObservationImage      = "apecloud/kubeblocks-role-agent:latest"
-	defaultRoleObservationDaemonPort = 7373
-	roleObservationURIFormat         = "-addr=localhost:%s"
-	defaultActionImage               = "busybox:latest"
-	usernameCredentialVarName        = "KB_RSM_USERNAME"
-	passwordCredentialVarName        = "KB_RSM_PASSWORD"
-	servicePortVarName               = "KB_RSM_SERVICE_PORT"
-	actionSvcListVarName             = "KB_RSM_ACTION_SVC_LIST"
-	leaderHostVarName                = "KB_RSM_LEADER_HOST"
-	targetHostVarName                = "KB_RSM_TARGET_HOST"
-	roleObservationEventFieldPath    = "spec.containers{" + roleObservationName + "}"
-	actionSvcPortBase                = int32(36500)
+	roleProbeName              = "role-observe"
+	roleAgentVolumeName        = "role-agent"
+	roleAgentInstallerName     = "role-agent-installer"
+	roleAgentVolumeMountPath   = "/role-probe"
+	roleAgentName              = "agent"
+	shell2httpImage            = "msoap/shell2http:1.16.0"
+	shell2httpBinaryPath       = "/app/shell2http"
+	shell2httpServePath        = "/role"
+	defaultRoleProbeAgentImage = "apecloud/kubeblocks-role-agent:latest"
+	defaultRoleProbeDaemonPort = 7373
+	roleProbeURIFormat         = "-addr=localhost:%s"
+	defaultActionImage         = "busybox:latest"
+	usernameCredentialVarName  = "KB_RSM_USERNAME"
+	passwordCredentialVarName  = "KB_RSM_PASSWORD"
+	servicePortVarName         = "KB_RSM_SERVICE_PORT"
+	actionSvcListVarName       = "KB_RSM_ACTION_SVC_LIST"
+	leaderHostVarName          = "KB_RSM_LEADER_HOST"
+	targetHostVarName          = "KB_RSM_TARGET_HOST"
+	roleProbeEventFieldPath    = "spec.containers{" + roleProbeName + "}"
+	actionSvcPortBase          = int32(36500)
 )
 
 type rsmTransformContext struct {

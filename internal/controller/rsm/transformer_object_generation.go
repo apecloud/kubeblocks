@@ -246,14 +246,14 @@ func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.
 				}})
 	}
 
-	injectRoleObservationContainer(rsm, &template)
+	injectRoleProbeContainer(rsm, &template)
 
 	return &template
 }
 
-func injectRoleObservationContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
-	roleObservation := rsm.Spec.RoleObservation
-	if roleObservation == nil {
+func injectRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
+	roleProbe := rsm.Spec.RoleProbe
+	if roleProbe == nil {
 		return
 	}
 	credential := rsm.Spec.Credential
@@ -274,13 +274,13 @@ func injectRoleObservationContainer(rsm workloads.ReplicatedStateMachine, templa
 	allUsedPorts := findAllUsedPorts(template)
 	svcPort := actionSvcPortBase
 	var actionSvcPorts []int32
-	for range roleObservation.ObservationActions {
+	for range roleProbe.ProbeActions {
 		svcPort = findNextAvailablePort(svcPort, allUsedPorts)
 		actionSvcPorts = append(actionSvcPorts, svcPort)
 	}
-	injectObservationActionContainer(rsm, template, actionSvcPorts, credentialEnv)
+	injectProbeActionContainer(rsm, template, actionSvcPorts, credentialEnv)
 	actionSvcList, _ := json.Marshal(actionSvcPorts)
-	injectRoleObserveContainer(rsm, template, string(actionSvcList), credentialEnv)
+	injectRoleProbeAgentContainer(rsm, template, string(actionSvcList), credentialEnv)
 }
 
 func findNextAvailablePort(base int32, allUsedPorts []int32) int32 {
@@ -310,22 +310,22 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 	return allUsedPorts
 }
 
-func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
-	// compute parameters for role observation container
-	roleObservation := rsm.Spec.RoleObservation
-	if roleObservation == nil {
+func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+	// compute parameters for role probe agent container
+	roleProbe := rsm.Spec.RoleProbe
+	if roleProbe == nil {
 		return
 	}
 	credential := rsm.Spec.Credential
-	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
+	image := viper.GetString("ROLE_PROBE_AGENT_IMAGE")
 	if len(image) == 0 {
-		image = defaultRoleObservationImage
+		image = defaultRoleProbeAgentImage
 	}
-	observationDaemonPort := viper.GetInt("ROLE_OBSERVATION_SERVICE_PORT")
-	if observationDaemonPort == 0 {
-		observationDaemonPort = defaultRoleObservationDaemonPort
+	probeDaemonPort := viper.GetInt("ROLE_PROBE_SERVICE_PORT")
+	if probeDaemonPort == 0 {
+		probeDaemonPort = defaultRoleProbeDaemonPort
 	}
-	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort))
+	roleProbeURI := fmt.Sprintf(roleProbeURIFormat, strconv.Itoa(probeDaemonPort))
 	env := credentialEnv
 	env = append(env,
 		corev1.EnvVar{
@@ -363,16 +363,16 @@ func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *
 
 	// build container
 	container := corev1.Container{
-		Name:            roleObservationName,
+		Name:            roleProbeName,
 		Image:           image,
 		ImagePullPolicy: "IfNotPresent",
 		Command: []string{
 			"role-agent",
-			"--port", strconv.Itoa(observationDaemonPort),
+			"--port", strconv.Itoa(probeDaemonPort),
 		},
 		Ports: []corev1.ContainerPort{{
-			ContainerPort: int32(observationDaemonPort),
-			Name:          roleObservationName,
+			ContainerPort: int32(probeDaemonPort),
+			Name:          roleProbeName,
 			Protocol:      "TCP",
 		}},
 		ReadinessProbe: &corev1.Probe{
@@ -380,25 +380,25 @@ func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *
 				Exec: &corev1.ExecAction{
 					Command: []string{
 						"/bin/grpc_health_probe",
-						roleObserveURI,
+						roleProbeURI,
 					},
 				},
 			},
-			InitialDelaySeconds: roleObservation.InitialDelaySeconds,
-			TimeoutSeconds:      roleObservation.TimeoutSeconds,
-			PeriodSeconds:       roleObservation.PeriodSeconds,
-			SuccessThreshold:    roleObservation.SuccessThreshold,
-			FailureThreshold:    roleObservation.FailureThreshold,
+			InitialDelaySeconds: roleProbe.InitialDelaySeconds,
+			TimeoutSeconds:      roleProbe.TimeoutSeconds,
+			PeriodSeconds:       roleProbe.PeriodSeconds,
+			SuccessThreshold:    roleProbe.SuccessThreshold,
+			FailureThreshold:    roleProbe.FailureThreshold,
 		},
 		Env: env,
 	}
 
-	// inject role observation container
+	// inject role probe container
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectObservationActionContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
-	if rsm.Spec.RoleObservation == nil {
+func injectProbeActionContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+	if rsm.Spec.RoleProbe == nil {
 		return
 	}
 
@@ -431,7 +431,7 @@ func injectObservationActionContainer(rsm workloads.ReplicatedStateMachine, temp
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
 
 	// inject action containers based on utility images
-	for i, action := range rsm.Spec.RoleObservation.ObservationActions {
+	for i, action := range rsm.Spec.RoleProbe.ProbeActions {
 		image := action.Image
 		if len(image) == 0 {
 			image = defaultActionImage

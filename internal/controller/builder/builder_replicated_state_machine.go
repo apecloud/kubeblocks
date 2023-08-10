@@ -117,30 +117,30 @@ func (builder *ReplicatedStateMachineBuilder) SetUpdateStrategyType(strategyType
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetObservationActions(actions []workloads.Action) *ReplicatedStateMachineBuilder {
-	roleObservation := builder.get().Spec.RoleObservation
-	if roleObservation == nil {
-		roleObservation = &workloads.RoleObservation{}
+func (builder *ReplicatedStateMachineBuilder) SetProbeActions(actions []workloads.Action) *ReplicatedStateMachineBuilder {
+	roleProbe := builder.get().Spec.RoleProbe
+	if roleProbe == nil {
+		roleProbe = &workloads.RoleProbe{}
 	}
-	roleObservation.ObservationActions = actions
-	builder.get().Spec.RoleObservation = roleObservation
+	roleProbe.ProbeActions = actions
+	builder.get().Spec.RoleProbe = roleProbe
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) AddObservationAction(action workloads.Action) *ReplicatedStateMachineBuilder {
-	roleObservation := builder.get().Spec.RoleObservation
-	if roleObservation == nil {
-		roleObservation = &workloads.RoleObservation{}
+func (builder *ReplicatedStateMachineBuilder) AddProbeAction(action workloads.Action) *ReplicatedStateMachineBuilder {
+	roleProbe := builder.get().Spec.RoleProbe
+	if roleProbe == nil {
+		roleProbe = &workloads.RoleProbe{}
 	}
-	actions := roleObservation.ObservationActions
+	actions := roleProbe.ProbeActions
 	actions = append(actions, action)
-	roleObservation.ObservationActions = actions
-	builder.get().Spec.RoleObservation = roleObservation
+	roleProbe.ProbeActions = actions
+	builder.get().Spec.RoleProbe = roleProbe
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetRoleObservation(observation *workloads.RoleObservation) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.RoleObservation = observation
+func (builder *ReplicatedStateMachineBuilder) SetRoleProbe(roleProbe *workloads.RoleProbe) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.RoleProbe = roleProbe
 	return builder
 }
 

@@ -54,8 +54,8 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 						MatchLabels: commonLabels,
 					},
 					Service: &corev1.ServiceSpec{},
-					RoleObservation: &RoleObservation{
-						ObservationActions: []Action{
+					RoleProbe: &RoleProbe{
+						ProbeActions: []Action{
 							{
 								Image:   "foo",
 								Command: []string{"bar"},

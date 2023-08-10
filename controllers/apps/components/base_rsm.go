@@ -671,7 +671,7 @@ func (c *rsmComponentBase) updateWorkload(rsmObj *workloads.ReplicatedStateMachi
 	rsmObjCopy.Spec.Service = rsmProto.Spec.Service
 	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
 	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
-	rsmObjCopy.Spec.RoleObservation = rsmProto.Spec.RoleObservation
+	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
 	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
 	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential

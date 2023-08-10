@@ -446,9 +446,9 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 	rsmBuilder.SetCredential(credential)
 
-	roles, roleObservation, membershipReconfiguration, memberUpdateStrategy := buildRoleInfo(component)
+	roles, roleProbe, membershipReconfiguration, memberUpdateStrategy := buildRoleInfo(component)
 	rsm := rsmBuilder.SetRoles(roles).
-		SetRoleObservation(roleObservation).
+		SetRoleProbe(roleProbe).
 		SetMembershipReconfiguration(membershipReconfiguration).
 		SetMemberUpdateStrategy(memberUpdateStrategy).
 		GetObject()
@@ -517,23 +517,23 @@ func separateServices(services []corev1.Service) (*corev1.Service, []corev1.Serv
 	return &services[0], services[1:]
 }
 
-func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleObservation, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
+func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleProbe, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
 	var (
 		roles           []workloads.ReplicaRole
-		observation     *workloads.RoleObservation
+		probe           *workloads.RoleProbe
 		reconfiguration *workloads.MembershipReconfiguration
 		strategy        *workloads.MemberUpdateStrategy
 	)
 
 	actions := buildActionFromCharacterType(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
 	if actions != nil && component.Probes != nil && component.Probes.RoleProbe != nil {
-		observation = &workloads.RoleObservation{ObservationActions: actions}
+		probe = &workloads.RoleProbe{ProbeActions: actions}
 		roleProbe := component.Probes.RoleProbe
-		observation.PeriodSeconds = roleProbe.PeriodSeconds
-		observation.TimeoutSeconds = roleProbe.TimeoutSeconds
-		observation.FailureThreshold = roleProbe.FailureThreshold
+		probe.PeriodSeconds = roleProbe.PeriodSeconds
+		probe.TimeoutSeconds = roleProbe.TimeoutSeconds
+		probe.FailureThreshold = roleProbe.FailureThreshold
 		// set to default value
-		observation.SuccessThreshold = 1
+		probe.SuccessThreshold = 1
 	}
 
 	// TODO(free6om): set default reconfiguration actions after relative addon refactored
@@ -549,7 +549,7 @@ func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.Repli
 		strategy = &strgy
 	}
 
-	return roles, observation, reconfiguration, strategy
+	return roles, probe, reconfiguration, strategy
 }
 
 func buildRoleInfoFromReplication() []workloads.ReplicaRole {

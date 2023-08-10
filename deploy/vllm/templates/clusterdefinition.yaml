@@ -7,7 +7,7 @@ metadata:
 spec:
   componentDefs:
     - name: vllm
-      workloadType: Stateless
+      workloadType: Stateful
       characterType: vllm
       scriptSpecs:
         - name: vllm-scripts
@@ -21,10 +21,6 @@ spec:
             port: 8080
             targetPort: model
       podSpec:
-        tolerations:
-          - key: "cttest"
-            operator: "Equal"
-            value: "true"
         volumes:
           - name: model-store
             emptyDir: {}
@@ -47,24 +43,6 @@ spec:
             ports:
               - name: model
                 containerPort: 8080
-            # startupProbe:
-            #   failureThreshold: 180
-            #   httpGet:
-            #     path: /generate
-            #     port: model
-            #     scheme: HTTP
-            #   periodSeconds: 10
-            #   successThreshold: 1
-            #   timeoutSeconds: 3
-            # readinessProbe:
-            #   failureThreshold: 18
-            #   httpGet:
-            #     path: /generate
-            #     port: model
-            #     scheme: HTTP
-            #   periodSeconds: 10
-            #   successThreshold: 1
-            #   timeoutSeconds: 3
   connectionCredential:
     username: root
     password: ""

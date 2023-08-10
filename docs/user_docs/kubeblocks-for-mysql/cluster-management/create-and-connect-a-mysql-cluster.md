@@ -181,7 +181,7 @@ KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and al
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mysql-cluster -n demo
 ```
 
-Run the following command to see the modified MySQL cluster object:
+Run the following command to see the created MySQL cluster object:
 
 ```bash
 kubectl get cluster mysql-cluster -n demo -o yaml
@@ -286,6 +286,8 @@ kbcli cluster connect <clustername>  --namespace <name>
 
 <TabItem value="kubectl" label="kubectl">
 
+You can use `kubectl exec` to exec into a Pod and connect to a database.
+
 KubeBlocks operator creates a new Secret called `mysql-cluster-conn-credential` to store the connection credential of the MySQL cluster. This secret contains the following keys:
 
 * `username`: the root username of the MySQL cluster.
@@ -294,15 +296,19 @@ KubeBlocks operator creates a new Secret called `mysql-cluster-conn-credential` 
 * `host`: the host of the MySQL cluster.
 * `endpoint`: the endpoint of the MySQL cluster and it is the same as `host:port`.
 
-1. We need `username` and `password` to connect to this MySQL cluster from `kubectl exec` command.
+1. Run the command below to get the `username` and `password` for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets -n demo mysql-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d root
+   kubectl get secrets -n demo mysql-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   root
 
-   kubectl get secrets -n demo mysql-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d 2gvztbvz
+   kubectl get secrets -n demo mysql-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   2gvztbvz
    ```
 
-2. Now, we can exec into the pod `mysql-cluster-mysql-0` and connect to the database using username and password.
+2. Exec into the Pod `mysql-cluster-mysql-0` and connect to the database using username and password.
 
    ```bash
    kubectl exec -ti -n demo mysql-cluster-mysql-0 -- bash
@@ -314,15 +320,15 @@ KubeBlocks operator creates a new Secret called `mysql-cluster-conn-credential` 
 
 <TabItem value="port-forward" label="port-forward">
 
-You can also port forward the service to connect to the database from your local machine. 
+You can also port forward the service to connect to a database from your local machine.
 
-1. Running the following command to port forward the service:
+1. Run the following command to port forward the service.
 
    ```bash
    kubectl port-forward svc/mysql-cluster-mysql 3306:3306 -n demo
    ```
 
-2. Open a new terminal and run the following command to connect to the database:
+2. Open a new terminal and run the following command to connect to the database.
 
    ```bash
    mysql -uroot -p2gvztbvz
@@ -332,4 +338,4 @@ You can also port forward the service to connect to the database from your local
 
 </Tabs>
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md). 

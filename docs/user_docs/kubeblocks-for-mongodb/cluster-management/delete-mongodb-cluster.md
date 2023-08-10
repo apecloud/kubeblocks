@@ -2,9 +2,12 @@
 title: Delete a MongoDB Cluster
 description: How to delete a MongoDB Cluster
 keywords: [mongodb, delete a cluster, delete protection]
-sidebar_position: 6
+sidebar_position: 7
 sidebar_label: Delete protection
 ---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Delete a MongoDB cluster
 
@@ -25,22 +28,53 @@ The termination policy determines how a cluster is deleted. Set the policy when 
 
 To check the termination policy, execute the following command.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
 kbcli cluster list mongodb-cluster
 ```
 
-## Option 1. Use kbcli
+</TabItem>
 
-Configure the cluster name and run the command below to delete the specified cluster.
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl -n demo get cluster mongodb-cluster 
+>
+NAME              CLUSTER-DEFINITION   VERSION          TERMINATION-POLICY   STATUS    AGE
+mongodb-cluster   mongodb              mongodb-5.0.14   Delete               Running   17m
+```
+
+</TabItem>
+
+</Tabs>
+
+## Steps
+
+Run the command below to delete a specified cluster.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
 kbcli cluster delete mongodb-cluster
 ```
 
-## Option 2. Use kubectl
+</TabItem>
 
-Configure the cluster name and run the command below to delete the specified cluster.
+<TabItem value="kubectl" label="kubectl">
+
+If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
 ```bash
-kubectl delete cluster mongodb-cluster
+kubectl patch -n demo cluster mongodb-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+
+kubectl delete -n demo cluster mongodb-cluster
 ```
+
+</TabItem>
+
+</Tabs>

@@ -2,7 +2,7 @@
 title: Switch over a MongoDB cluster
 description: How to switch over a MongoDB cluster
 keywords: [mongodb, switch over a cluster, switchover]
-sidebar_position: 7
+sidebar_position: 6
 sidebar_label: Switchover
 ---
 

@@ -17,9 +17,9 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a MySQL cluster by kbcli.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a cluster by kbcli.
 * [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-* Make sure the PostgreSQL add-on is enabled.
+* Make sure the Redis add-on is enabled.
   
   <Tabs>
 
@@ -91,7 +91,7 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of MySQL clusters: Standalone and Replication. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication, which creates a cluster with a PrimarySecondary to support automatic failover. And to ensure high availability, PrimarySecondary are distributed on different nodes by default.
+KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Replication. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication, which creates a cluster with a PrimarySecondary to support automatic failover. And to ensure high availability, Primary and Secondary are distributed on different nodes by default.
 
 <Tabs>
 
@@ -118,7 +118,7 @@ kbcli cluster create postgresql --mode replication --availability-policy none <c
 :::note
 
 * In the production environment, it is not recommended to deploy all replicas on one node, which may decrease cluster availability.
-* Run the command below to view the flags for creating a MySQL cluster and the default values.
+* Run the command below to view the flags for creating a PostgreSQL cluster and the default values.
   
   ```bash
   kbcli cluster create postgresql -h
@@ -130,10 +130,10 @@ kbcli cluster create postgresql --mode replication --availability-policy none <c
 
 <TabItem value="kubectl" label="kubectl">
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Below is the command to create a PostgreSQL cluster.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
 
   ```bash
-  $ cat <<EOF | kubectl apply -f -
+  cat <<EOF | kubectl apply -f -
   apiVersion: apps.kubeblocks.io/v1alpha1
   kind: Cluster
   metadata:
@@ -197,7 +197,7 @@ KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and al
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=pg-cluster -n demo
 ```
 
-Run the following command to see the modified PostgreSQL cluster object:
+Run the following command to see the created PostgreSQL cluster object:
 
 ```bash
 kubectl get cluster pg-cluster -n demo -o yaml
@@ -312,6 +312,8 @@ kbcli cluster connect <clustername>  --namespace <name>
 
 <TabItem value="kubectl" label="kubectl">
 
+You can use `kubectl exec` to exec into a Pod and connect to a database.
+
 KubeBlocks operator has created a new Secret called `pg-cluster-conn-credential` to store the connection credential of the `pg-cluster` cluster. This secret contains following keys:
 
 * `username`: the root username of the PostgreSQL cluster.
@@ -320,15 +322,19 @@ KubeBlocks operator has created a new Secret called `pg-cluster-conn-credential`
 * `host`: the host of the PostgreSQL cluster.
 * `endpoint`: the endpoint of the PostgreSQL cluster and it is the same as `host:port`.
 
-1. We need `username` and `password` to connect to this PostgreSQL cluster from `kubectl exec` command.
+1. Run the command below to get the `username` and `password` for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets -n demo pg-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d postgres
+   kubectl get secrets -n demo pg-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   postgres
 
-   kubectl get secrets -n demo pg-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d h62rg2kl
+   kubectl get secrets -n demo pg-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   h62rg2kl
    ```
 
-2. Now, we can exec into the pod `pg-cluster-postgresql-0` and connect to the database using username and password.
+2. Exec into the Pod `pg-cluster-postgresql-0` and connect to the database using username and password.
 
    ```bash
    kubectl exec -ti -n demo pg-cluster-postgresql-0 -- bash
@@ -341,13 +347,20 @@ KubeBlocks operator has created a new Secret called `pg-cluster-conn-credential`
 
 <TabItem value="port-forward" label="prot-forward">
 
-You can also port forward the service to connect to the database from your local machine. 
+You can also port forward the service to connect to the database from your local machine.
 
-Running the following command to port forward the service:
+1. Run the following command to port forward the service.
 
-```bash
-kubectl port-forward -n demo svc/pg-cluster-postgresql 5432:5432 
-```
+   ```bash
+   kubectl port-forward -n demo svc/pg-cluster-postgresql 5432:5432 
+   ```
+
+2. Open a new terminal and run the following command to connect to the database.
+
+   ```bash
+   root@pg-cluster-postgresql-0:/home/postgres# psql -U postgres -W
+   Password: h62rg2kl
+   ```
 
 </TabItem>
 

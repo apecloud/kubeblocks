@@ -1,0 +1,4 @@
+position: 4
+label: PostgreSQL connection pool
+collapsible: true 
+collapsed: true

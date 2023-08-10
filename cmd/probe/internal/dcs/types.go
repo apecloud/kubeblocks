@@ -89,11 +89,11 @@ func (c *Cluster) GetOpTime() int64 {
 }
 
 func (c *Cluster) GetMemberAddrWithPort(member Member) string {
-	return fmt.Sprintf("%s.%s-headless.%s.svc:%s", member.Name, c.ClusterCompName, c.Namespace, member.DBPort)
+	return fmt.Sprintf("%s.%s-headless.%s.svc.cluster.local:%s", member.Name, c.ClusterCompName, c.Namespace, member.DBPort)
 }
 
 func (c *Cluster) GetMemberAddr(member Member) string {
-	return fmt.Sprintf("%s.%s-headless.%s.svc", member.Name, c.ClusterCompName, c.Namespace)
+	return fmt.Sprintf("%s.%s-headless.%s.svc.cluster.local", member.Name, c.ClusterCompName, c.Namespace)
 }
 
 func (c *Cluster) GetMemberAddrs() []string {

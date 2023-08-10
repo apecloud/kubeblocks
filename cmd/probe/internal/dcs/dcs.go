@@ -51,8 +51,9 @@ type DCS interface {
 	ReleaseLock() error
 	UpdateLock() error
 
-	HasPreStopHook() bool
-	AddPreStopHook() error
+	HasPreDeleteHook() bool
+	AddPreDeleteHook() error
+	RemovePreDeleteHook() error
 
 	GetLeader() (*Leader, error)
 }

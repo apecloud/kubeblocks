@@ -170,8 +170,9 @@ func (ha *Ha) Start() {
 		ha.logger.Errorf("Get Cluster %s error: %v, so HA exists.", ha.dcs.GetClusterName(), err)
 		return
 	}
-
 	ha.logger.Debugf("cluster: %v", cluster)
+
+	ha.EnsurePreDeleteHook()
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	for err != nil || !isInitialized {
 		ha.logger.Infof("Waiting for the database cluster to be initialized.")
@@ -295,4 +296,15 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 }
 
 func (ha *Ha) ShutdownWithWait() {
+}
+
+func (ha *Ha) EnsurePreDeleteHook() {
+	ha.logger.Info("Ensure pre delete hook")
+	for !ha.dcs.HasPreDeleteHook() {
+		ha.logger.Info("Add pre delete hook for current member")
+		err := ha.dcs.AddPreDeleteHook()
+		if err != nil {
+			ha.logger.Errorf("Add pre delete hook failed: %v", err)
+		}
+	}
 }

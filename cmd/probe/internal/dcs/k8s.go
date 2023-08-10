@@ -212,7 +212,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.SQLChannelPort = getSQLChannelPort(&pod)
-		member.resource = &pod
+		member.resource = pod.DeepCopy()
 		if member.Name == store.currentMemberName {
 			store.currentMember = member
 		}
@@ -530,12 +530,30 @@ func getSQLChannelPort(pod *corev1.Pod) string {
 	return ""
 }
 
-func (store *KubernetesStore) HasPreStopHook() bool {
+func (store *KubernetesStore) HasPreDeleteHook() bool {
 	pod := store.currentMember.resource.(*corev1.Pod)
+
+	store.logger.Infof("pod: %v", pod)
+	store.logger.Infof("finalizers: %v", pod.GetFinalizers())
 	return controllerutil.ContainsFinalizer(pod, constant.LorryFinalizerName)
 }
 
-func (store *KubernetesStore) AddPreStopHook() bool {
+func (store *KubernetesStore) AddPreDeleteHook() error {
 	pod := store.currentMember.resource.(*corev1.Pod)
-	return controllerutil.AddFinalizer(pod, constant.LorryFinalizerName)
+	controllerutil.AddFinalizer(pod, constant.LorryFinalizerName)
+	_, err := store.clientset.CoreV1().Pods(store.namespace).Update(store.ctx, pod, metav1.UpdateOptions{})
+	if err != nil {
+		store.logger.Errorf("Pod finalizer update failed: %v", err)
+	}
+	return err
+}
+
+func (store *KubernetesStore) RemovePreDeleteHook() error {
+	pod := store.currentMember.resource.(*corev1.Pod)
+	controllerutil.RemoveFinalizer(pod, constant.LorryFinalizerName)
+	_, err := store.clientset.CoreV1().Pods(store.namespace).Update(store.ctx, pod, metav1.UpdateOptions{})
+	if err != nil {
+		store.logger.Errorf("Pod finalizer update failed: %v", err)
+	}
+	return err
 }

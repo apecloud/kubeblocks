@@ -60,12 +60,6 @@
       "default": 20,
       "minimum": 1,
       "maximum": 10000
-    },
-    "proxyEnabled": {
-      "title": "Proxy",
-      "description": "Enable proxy or not.",
-      "type": "boolean",
-      "default": false
     }
   }
 }

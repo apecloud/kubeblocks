@@ -79,9 +79,6 @@ var _ = Describe("cluster plan builder test", func() {
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefName, clusterVersionName).WithRandomName().GetObject()
 			clusterObj.Spec.Mode = mode
-			clusterObj.Spec.Parameters = map[string]string{
-				"proxyEnabled": "true",
-			}
 			Expect(testCtx.Cli.Create(testCtx.Ctx, clusterObj)).Should(Succeed())
 			clusterKey := client.ObjectKeyFromObject(clusterObj)
 			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())

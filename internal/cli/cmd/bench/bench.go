@@ -138,6 +138,7 @@ func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().IntVar(&o.Port, "port", 0, "the port of database")
 	cmd.Flags().StringVar(&o.ClusterName, "cluster", "", "the cluster of database")
 	cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'`)
+	cmd.Flags().StringSliceVar(&o.ExtraArgs, "extra-args", nil, "extra arguments for benchmark")
 
 	registerClusterCompletionFunc(cmd, o.factory)
 }

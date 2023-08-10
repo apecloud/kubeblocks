@@ -43,6 +43,7 @@ kbcli bench sysbench [Step] [BenchmarkName] [flags]
       --database string       database name
       --driver string         the driver of database
       --duration int          the seconds of running sysbench (default 60)
+      --extra-args strings    extra arguments for benchmark
   -h, --help                  help for sysbench
       --host string           the host of database
       --password string       the password of database

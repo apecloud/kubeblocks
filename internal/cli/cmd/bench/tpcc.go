@@ -114,7 +114,6 @@ func NewTpccCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().IntVar(&o.OrderStatus, "order-status", 4, "specify the percentage of transactions that should be order status")
 	cmd.Flags().IntVar(&o.Delivery, "delivery", 4, "specify the percentage of transactions that should be delivery")
 	cmd.Flags().IntVar(&o.StockLevel, "stock-level", 4, "specify the percentage of transactions that should be stock level")
-	cmd.Flags().StringArrayVar(&o.ExtraArgs, "extra-args", []string{}, "specify the extra arguments")
 
 	return cmd
 }

@@ -24,6 +24,7 @@ kbcli bench tpch [Step] [BenchmarkName] [flags]
       --cluster string        the cluster of database
       --database string       database name
       --driver string         the driver of database
+      --extra-args strings    extra arguments for benchmark
   -h, --help                  help for tpch
       --host string           the host of database
       --password string       the password of database

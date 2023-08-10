@@ -44,6 +44,7 @@ kbcli bench pgbench [Step] [BenchmarkName] [flags]
       --database string       database name
       --driver string         the driver of database
       --duration int          The seconds to run pgbench for (default 60)
+      --extra-args strings    extra arguments for benchmark
   -h, --help                  help for pgbench
       --host string           the host of database
       --password string       the password of database

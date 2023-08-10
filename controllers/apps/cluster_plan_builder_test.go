@@ -95,7 +95,6 @@ var _ = Describe("cluster plan builder test", func() {
 			}
 			planBuilder := NewClusterPlanBuilder(reqCtx, testCtx.Cli, req)
 			Expect(planBuilder.Init()).Should(Succeed())
-			// TODO: CT should test load clustertemplate
 		})
 	})
 })

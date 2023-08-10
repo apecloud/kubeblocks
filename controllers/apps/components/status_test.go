@@ -105,7 +105,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
 			dag = graph.NewDAG()
-			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, nil, compName, dag)
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
@@ -183,7 +183,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
 			dag = graph.NewDAG()
-			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, nil, compName, dag)
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
@@ -272,7 +272,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
 			dag = graph.NewDAG()
-			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, nil, compName, dag)
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
@@ -363,7 +363,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
 			dag = graph.NewDAG()
-			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, nil, compName, dag)
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})

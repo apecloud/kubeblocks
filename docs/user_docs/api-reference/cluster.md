@@ -23,8 +23,6 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>
 </li><li>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate</a>
-</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersion">ClusterVersion</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentClassDefinition">ComponentClassDefinition</a>
@@ -529,91 +527,6 @@ map[string]string
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">
 ClusterDefinitionStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate
-</h3>
-<div>
-<p>ClusterTemplate is the Schema for the clustertemplates API</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ClusterTemplate</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplateSpec">
-ClusterTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>componentSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">
-[]ClusterComponentSpec
-</a>
-</em>
-</td>
-<td>
-<p>default value of cluster.spec.componentSpecs</p><br />
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplateStatus">
-ClusterTemplateStatus
 </a>
 </em>
 </td>
@@ -2615,7 +2528,7 @@ map[string]string
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplateSpec">ClusterTemplateSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
 </p>
 <div>
 <p>ClusterComponentSpec defines the cluster component spec.</p><br />
@@ -3988,44 +3901,6 @@ SwitchPolicyType
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTemplateSpec">ClusterTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>componentSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">
-[]ClusterComponentSpec
-</a>
-</em>
-</td>
-<td>
-<p>default value of cluster.spec.componentSpecs</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTemplateStatus">ClusterTemplateStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate</a>)
-</p>
-<div>
-<p>ClusterTemplateStatus defines the observed state of ClusterTemplate</p><br />
-</div>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterVersionSpec">ClusterVersionSpec
 </h3>
 <p>

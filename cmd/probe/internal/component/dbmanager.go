@@ -38,7 +38,7 @@ type DBManager interface {
 	// Functions related to cluster initialization.
 	InitializeCluster(context.Context, *dcs.Cluster) error
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
-	// IsCurrentMemberInCluster check if current member is configured in cluster for consensus.
+	// IsCurrentMemberInCluster checks if current member is configured in cluster for consensus.
 	// it will always return true for replicationset.
 	IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool
 

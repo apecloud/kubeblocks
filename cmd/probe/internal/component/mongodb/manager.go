@@ -39,6 +39,11 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
+const (
+	PrimaryPriority   = 2
+	SecondaryPriority = 1
+)
+
 type Manager struct {
 	component.DBManagerBase
 	Client   *mongo.Client
@@ -104,9 +109,9 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 		configMembers[i].ID = i
 		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
 		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
-			configMembers[i].Priority = 2
+			configMembers[i].Priority = PrimaryPriority
 		} else {
-			configMembers[i].Priority = 1
+			configMembers[i].Priority = SecondaryPriority
 		}
 	}
 
@@ -472,7 +477,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	}
 	configMember.ID = lastID + 1
 	configMember.Host = currentHost
-	configMember.Priority = 1
+	configMember.Priority = SecondaryPriority
 	rsConfig.Members = append(rsConfig.Members, configMember)
 
 	rsConfig.Version++
@@ -524,6 +529,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 	isLeader, err := mgr.IsLeader(ctx, nil)
 	if err != nil || !isLeader {
+		mgr.Logger.Errorf("Is leader check failed: %v", err)
 		return false
 	}
 
@@ -534,7 +540,7 @@ func (mgr *Manager) IsPromoted(ctx context.Context) bool {
 	}
 	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
-			if rsConfig.Members[i].Priority == 2 {
+			if rsConfig.Members[i].Priority == PrimaryPriority {
 				return true
 			}
 		}
@@ -551,21 +557,21 @@ func (mgr *Manager) Promote(ctx context.Context) error {
 
 	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
-			if rsConfig.Members[i].Priority == 2 {
+			if rsConfig.Members[i].Priority == PrimaryPriority {
 				mgr.Logger.Debugf("Current member already has the highest priority!")
 				return nil
 			}
 
-			rsConfig.Members[i].Priority = 2
-		} else if rsConfig.Members[i].Priority == 2 {
-			rsConfig.Members[i].Priority = 1
+			rsConfig.Members[i].Priority = PrimaryPriority
+		} else if rsConfig.Members[i].Priority == PrimaryPriority {
+			rsConfig.Members[i].Priority = SecondaryPriority
 		}
 	}
 
 	rsConfig.Version++
 
 	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
-	client, err := NewReplSetClient(context.TODO(), hosts)
+	client, err := NewReplSetClient(ctx, hosts)
 	if err != nil {
 		return err
 	}

@@ -70,7 +70,8 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	hasSimplifiedAPI := func() bool {
-		return !cluster.Spec.Resources.CPU.IsZero() ||
+		return cluster.Spec.Replicas != nil ||
+			!cluster.Spec.Resources.CPU.IsZero() ||
 			!cluster.Spec.Resources.Memory.IsZero() ||
 			!cluster.Spec.Storage.Size.IsZero() ||
 			cluster.Spec.Monitor.MonitoringInterval != nil ||

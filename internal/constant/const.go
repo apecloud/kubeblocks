@@ -149,6 +149,7 @@ const (
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+	LorryFinalizerName                 = "lorry.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"

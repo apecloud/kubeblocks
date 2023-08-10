@@ -134,6 +134,7 @@ type Member struct {
 	PodIP          string
 	DBPort         string
 	SQLChannelPort string
+	resource       any
 }
 
 func (m *Member) GetName() string {

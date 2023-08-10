@@ -35,6 +35,7 @@ type DCS interface {
 
 	// member manager funtions
 	GetMembers() ([]Member, error)
+	GetCurrentMember() *Member
 	AddCurrentMember() error
 
 	// manual switchover
@@ -49,6 +50,9 @@ type DCS interface {
 	HasLock() bool
 	ReleaseLock() error
 	UpdateLock() error
+
+	HasPreStopHook() bool
+	AddPreStopHook() error
 
 	GetLeader() (*Leader, error)
 }

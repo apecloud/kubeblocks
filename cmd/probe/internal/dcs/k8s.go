@@ -37,9 +37,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	k8scomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/kubernetes"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type KubernetesStore struct {
@@ -50,6 +52,7 @@ type KubernetesStore struct {
 	currentMemberName  string
 	namespace          string
 	cluster            *Cluster
+	currentMember      *Member
 	client             *rest.RESTClient
 	clientset          *kubernetes.Clientset
 	LeaderObservedTime int64
@@ -209,6 +212,10 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.SQLChannelPort = getSQLChannelPort(&pod)
+		member.resource = &pod
+		if member.Name == store.currentMemberName {
+			store.currentMember = member
+		}
 	}
 
 	return members, nil
@@ -496,6 +503,10 @@ func (store *KubernetesStore) DeleteSwitchover() error {
 	return err
 }
 
+func (store *KubernetesStore) GetCurrentMember() *Member {
+	return store.currentMember
+}
+
 func (store *KubernetesStore) AddCurrentMember() error {
 	return nil
 }
@@ -517,4 +528,14 @@ func getSQLChannelPort(pod *corev1.Pod) string {
 		}
 	}
 	return ""
+}
+
+func (store *KubernetesStore) HasPreStopHook() bool {
+	pod := store.currentMember.resource.(*corev1.Pod)
+	return controllerutil.ContainsFinalizer(pod, constant.LorryFinalizerName)
+}
+
+func (store *KubernetesStore) AddPreStopHook() bool {
+	pod := store.currentMember.resource.(*corev1.Pod)
+	return controllerutil.AddFinalizer(pod, constant.LorryFinalizerName)
 }

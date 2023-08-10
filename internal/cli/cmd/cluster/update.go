@@ -320,6 +320,9 @@ func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *app
 		if keyName, logTPL, err = findLogsBlockTPL(configTemplate.Data); err != nil {
 			return err
 		}
+		if logTPL == nil {
+			return nil
+		}
 		if err = logTPL.Execute(&buf, logValue); err != nil {
 			return err
 		}
@@ -400,8 +403,9 @@ func findLogsBlockTPL(confData map[string]string) (string, *template.Template, e
 		if logTPL != nil {
 			return key, logTPL, nil
 		}
+		return "", nil, errors.New("no logs config template found")
 	}
-	return "", nil, errors.New("no logs config template found")
+	return "", nil, nil
 }
 
 func buildLogsTPLValues(compSpec *appsv1alpha1.ClusterComponentSpec) (*gotemplate.TplValues, error) {

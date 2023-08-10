@@ -61,7 +61,7 @@ func fromJSONObject[T any](args interface{}) (*T, error) {
 	return &container, nil
 }
 
-func fromJSONArray[T corev1.Container | corev1.Volume](args interface{}) ([]T, error) {
+func fromJSONArray[T corev1.Container | corev1.Volume | corev1.PersistentVolumeClaimTemplate](args interface{}) ([]T, error) {
 	b, err := json.Marshal(args)
 	if err != nil {
 		return nil, err
@@ -254,6 +254,29 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	return nil, nil
 }
 
+// getComponentPVCSizeByName gets pvc size by name
+func getComponentPVCSizeByName(args interface{}, pvcName string) (int64, error) {
+	component, err := fromJSONObject[component.SynthesizedComponent](args)
+	if err != nil {
+		return -1, err
+	}
+	for _, v := range component.VolumeClaimTemplates {
+		if v.Name == pvcName {
+			return intctrlutil.GetStorageSizeFromPersistentVolume(v), nil
+		}
+	}
+	return -1, nil
+}
+
+// getPVCSize gets pvc size by name
+func getPVCSize(args interface{}) (int64, error) {
+	pvcTemp, err := fromJSONObject[corev1.PersistentVolumeClaimTemplate](args)
+	if err != nil {
+		return -1, err
+	}
+	return intctrlutil.GetStorageSizeFromPersistentVolume(*pvcTemp), nil
+}
+
 // getCAFile gets CA file
 func getCAFile() string {
 	return builder.MountPath + "/" + builder.CAName
@@ -280,6 +303,8 @@ func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.Synth
 		builtInGetArgFunctionName:                    getArgByName,
 		builtInGetContainerFunctionName:              getPodContainerByName,
 		builtInGetContainerCPUFunctionName:           getContainerCPU,
+		builtInGetPVCSizeByNameFunctionName:          getComponentPVCSizeByName,
+		builtInGetPVCSizeFunctionName:                getPVCSize,
 		builtInGetContainerMemoryFunctionName:        getContainerMemory,
 		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
 		builtInGetCAFile:                             getCAFile,

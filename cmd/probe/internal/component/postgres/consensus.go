@@ -224,7 +224,7 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 
 func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) error {
 	// Test whether the host can be resolved into an ip address
-	if !mgr.IsPgReady(cluster.GetMemberAddrWithName(mgr.GetCurrentMemberName())) {
+	if !mgr.IsPgReady() {
 		mgr.Logger.Warnf("wait for pg startup ready")
 		return nil
 	}

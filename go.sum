@@ -326,8 +326,8 @@ github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be/go.mod h1:ySMOLuW
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 h1:yL7+Jz0jTC6yykIK/Wh74gnTJnrGr5AyrNMXuA0gves=
 github.com/antlr/antlr4/runtime/Go/antlr v1.4.10/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
-github.com/apecloud/kubebench v0.0.0-20230731014958-be57f3087497 h1:zob/yGtcRPMcqHWM43oXOpbYn3bbg+bXf3f9iHcKHLI=
-github.com/apecloud/kubebench v0.0.0-20230731014958-be57f3087497/go.mod h1:pk7XhTJO9+AVE0mGUGb0WfU8ME9o4s3nClyuWATMQAQ=
+github.com/apecloud/kubebench v0.0.0-20230807061913-16124b86637f h1:cQz3dMsNSlEBPl9WFxxAhPP+VAOmaWruQlEdaWwZeZY=
+github.com/apecloud/kubebench v0.0.0-20230807061913-16124b86637f/go.mod h1:pk7XhTJO9+AVE0mGUGb0WfU8ME9o4s3nClyuWATMQAQ=
 github.com/apparentlymart/go-textseg v1.0.0/go.mod h1:z96Txxhf3xSFMPmb5X/1W05FF/Nj9VFpLOpjS5yuumk=
 github.com/apparentlymart/go-textseg/v13 v13.0.0/go.mod h1:ZK2fH7c4NqDTLtiYLvIkEghdlcqw7yxLeM89kiTRPUo=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=

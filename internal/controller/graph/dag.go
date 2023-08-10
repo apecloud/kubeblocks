@@ -145,11 +145,11 @@ func (d *DAG) AddConnectRoot(v Vertex) bool {
 }
 
 // WalkTopoOrder walks the DAG 'd' in topology order
-func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
+func (d *DAG) WalkTopoOrder(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) error {
 	if err := d.validate(); err != nil {
 		return err
 	}
-	orders := d.topologicalOrder(false, nil)
+	orders := d.topologicalOrder(false, less)
 	for _, v := range orders {
 		if err := walkFunc(v); err != nil {
 			return err
@@ -159,11 +159,11 @@ func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 }
 
 // WalkReverseTopoOrder walks the DAG 'd' in reverse topology order
-func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
+func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) error {
 	if err := d.validate(); err != nil {
 		return err
 	}
-	orders := d.topologicalOrder(true, nil)
+	orders := d.topologicalOrder(true, less)
 	for _, v := range orders {
 		if err := walkFunc(v); err != nil {
 			return err
@@ -267,13 +267,13 @@ func (d *DAG) Merge(subDag *DAG) {
 }
 
 // String returns a string representation of the DAG in topology order
-func (d *DAG) String() string {
+func (d *DAG) String(less func(v1, v2 Vertex) bool) string {
 	str := "|"
 	walkFunc := func(v Vertex) error {
 		str += fmt.Sprintf("->%v", v)
 		return nil
 	}
-	if err := d.WalkReverseTopoOrder(walkFunc); err != nil {
+	if err := d.WalkReverseTopoOrder(walkFunc, less); err != nil {
 		return "->err"
 	}
 	return str

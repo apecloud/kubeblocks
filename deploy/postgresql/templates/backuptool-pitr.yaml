@@ -34,69 +34,16 @@ spec:
         rm -rf ${PITR_DIR};
   physical:
     restoreCommands:
-      - sh
+      - bash
       - -c
       - |
+        #!/bin/bash
         set -e;
-        if [ -d ${DATA_DIR}.old ]; then echo "${DATA_DIR}.old directory already exists, skip restore."; exit 0; fi
-        mkdir -p ${PITR_DIR};
-        cd ${PITR_DIR}
-        # TODO Obtain logs directly from WAL archive。
-        for i in $(find ${BACKUP_DIR} -name "*.gz"); do
-          echo "copying ${i}";
-          cp ${i} $(basename $i);
-          gzip -df $(basename $i);
-        done
-        chmod 777 -R ${PITR_DIR};
-        touch ${DATA_DIR}/recovery.signal;
-        mkdir -p ${CONF_DIR};
-        chmod 777 -R ${CONF_DIR};
-        mkdir -p ${RESTORE_SCRIPT_DIR};
-        echo "#!/bin/bash" > ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
-        echo "[[ -d '${DATA_DIR}.old' ]] && mv -f ${DATA_DIR}.old/* ${DATA_DIR}/;" >> ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
-        echo "sync;" >> ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
-        chmod +x ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
-        echo "restore_command='case "%f" in *history) cp ${PITR_DIR}/%f %p ;; *) mv ${PITR_DIR}/%f %p ;; esac'" > ${CONF_DIR}/recovery.conf;
-        echo "recovery_target_time='${KB_RECOVERY_TIME}'" >> ${CONF_DIR}/recovery.conf;
-        echo "recovery_target_action='promote'" >> ${CONF_DIR}/recovery.conf;
-        echo "recovery_target_timeline='latest'" >> ${CONF_DIR}/recovery.conf;
-        mv ${DATA_DIR} ${DATA_DIR}.old;
-        echo "done.";
-        sync;
+        {{- .Files.Get "dataprotection/fetch-wal-log.sh" | nindent 8 }}
+        {{- .Files.Get "dataprotection/pitr-restore.sh" | nindent 8 }}
   backupCommands:
-    - sh
+    - bash
     - -c
     - |
-      set -e;
-      if [ ! -z ${LOGFILE_TTL_SECOND} ];then
-        retention_day=$((${LOGFILE_TTL_SECOND}/86400))
-        EXPIRED_INCR_LOG=${BACKUP_DIR}/$(date -d"${retention_day} day ago" +%Y%m%d);
-        if [ -d ${EXPIRED_INCR_LOG} ]; then rm -rf ${EXPIRED_INCR_LOG}; fi
-      fi
-      export PGPASSWORD=${DB_PASSWORD}
-      PSQL="psql -h ${DB_HOST} -U ${DB_USER}"
-      LAST_TRANS=$(pg_waldump $(${PSQL} -Atc "select pg_walfile_name(pg_current_wal_lsn())") --rmgr=Transaction |tail -n 1)
-      if [ "${LAST_TRANS}" != "" ] && [ "$(find ${LOG_DIR}/archive_status/ -name '*.ready')" = "" ]; then
-        echo "switch wal file"
-        ${PSQL} -c "select pg_switch_wal()"
-        for i in $(seq 1 60); do
-          echo "waiting wal ready ..."
-          if [ "$(find ${LOG_DIR}/archive_status/ -name '*.ready')" != "" ]; then break; fi
-          sleep 1
-        done
-      fi
-      TODAY_INCR_LOG=${BACKUP_DIR}/$(date +%Y%m%d);
-      mkdir -p ${TODAY_INCR_LOG};
-      cd ${LOG_DIR}
-      for i in $(ls -tr ./archive_status/*.ready); do
-        wal_ready_name="${i##*/}"
-        wal_name=${wal_ready_name%.*}
-        echo "uploading ${wal_name}";
-        gzip -kqc ${wal_name} > ${TODAY_INCR_LOG}/${wal_name}.gz;
-        mv -f ${i} ./archive_status/${wal_name}.done;
-      done
-      echo "done."
-      sync;
-      echo "TOTAL SIZE: $(du -shx ${BACKUP_DIR}|awk '{print $1}')" > ${DATA_DIR}/logfile.info;
-
+      {{- .Files.Get "dataprotection/pitr-backup.sh" | nindent 6 }}
   type: pitr

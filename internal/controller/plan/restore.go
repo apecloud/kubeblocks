@@ -171,7 +171,7 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		return err
 	}
 	pitrJobs := make([]client.Object, 0)
-	if len(recoveryInfo.Physical.RestoreCommands) != 0 {
+	if len(recoveryInfo.Physical.GetPhysicalRestoreCommand()) != 0 {
 		pitrJobs, err = pitrMgr.buildPITRPhysicalRestoreJob(component, recoveryInfo, logfileBackup)
 		if err != nil {
 			return err
@@ -360,8 +360,8 @@ func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.B
 			startTime = backupLog.StartTime
 		}
 		if startTime != nil {
-			startTimeEnv := corev1.EnvVar{Name: constant.DPBackupStartTime, Value: startTime.UTC().Format(timeFormat)}
-			startTimeTimestampEnv := corev1.EnvVar{Name: constant.DPBackupStartTimestamp, Value: strconv.FormatInt(startTime.Unix(), 10)}
+			startTimeEnv := corev1.EnvVar{Name: constant.DPBaseBackupStartTime, Value: startTime.UTC().Format(timeFormat)}
+			startTimeTimestampEnv := corev1.EnvVar{Name: constant.DPBaseBackupStartTimestamp, Value: strconv.FormatInt(startTime.Unix(), 10)}
 			headEnv = append(headEnv, startTimeEnv, startTimeTimestampEnv)
 		}
 		// inject env for user contexts
@@ -547,55 +547,73 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 		return nil, err
 	}
 
-	// builds backup volumes
-	backupVolumeName := fmt.Sprintf("%s-%s", synthesizedComponent.Name, backup.Status.PersistentVolumeClaimName)
-	remoteVolume := corev1.Volume{
-		Name: backupVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: backup.Status.PersistentVolumeClaimName,
+	// build volumes and volumeMounts of backup
+	buildBackupVolumesAndMounts := func() ([]corev1.Volume, []corev1.VolumeMount, string, string) {
+		backupPVCName := backup.Status.PersistentVolumeClaimName
+		// builds datafile volumes and volumeMounts
+		backupVolumeName := fmt.Sprintf("%s-%s", synthesizedComponent.Name, backupPVCName)
+		backupVolumes := []corev1.Volume{
+			{
+				Name:         backupVolumeName,
+				VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: backupPVCName}},
 			},
-		},
+		}
+		backupMountPath := "/" + backup.Name
+		backupVolumeMounts := []corev1.VolumeMount{{Name: backupVolumeName, MountPath: backupMountPath}}
+
+		// build logfile volumes and volumeMounts
+		logFilePVCName := backup.Status.LogFilePersistentVolumeClaimName
+		if !backupTool.Spec.Physical.IsRelyOnLogfile() || logFilePVCName == backupPVCName {
+			return backupVolumes, backupVolumeMounts, backupMountPath, backupMountPath
+		}
+		logFileVolumeName := fmt.Sprintf("%s-%s", synthesizedComponent.Name, logFilePVCName)
+		backupVolumes = append(backupVolumes, corev1.Volume{
+			Name:         logFileVolumeName,
+			VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: logFilePVCName}},
+		})
+		logfileMountPath := "/" + backup.Name + "-logfile"
+		backupVolumeMounts = append(backupVolumeMounts, corev1.VolumeMount{Name: logFileVolumeName, MountPath: logfileMountPath})
+		return backupVolumes, backupVolumeMounts, backupMountPath, logfileMountPath
 	}
 
-	// builds volumeMounts
-	remoteVolumeMount := corev1.VolumeMount{}
-	remoteVolumeMount.Name = backupVolumeName
-	remoteVolumeMount.MountPath = "/" + backup.Name
-	allVolumeMounts := make([]corev1.VolumeMount, 0)
-	allVolumeMounts = append(allVolumeMounts, remoteVolumeMount)
-	allVolumeMounts = append(allVolumeMounts, synthesizedComponent.PodSpec.Containers[0].VolumeMounts...)
+	backupVolumes, backupVolumeMounts, backupMountPath, logfileMountPath := buildBackupVolumesAndMounts()
+	backupVolumeMounts = append(backupVolumeMounts, synthesizedComponent.PodSpec.Containers[0].VolumeMounts...)
 	volumeMountMap := map[string]corev1.VolumeMount{}
-	for _, mount := range allVolumeMounts {
+	for _, mount := range backupVolumeMounts {
 		volumeMountMap[mount.Name] = mount
 	}
 
 	// builds env
-	env := []corev1.EnvVar{
-		{
-			Name:  constant.DPBackupName,
-			Value: backup.Name,
-		},
+	buildEnv := func() []corev1.EnvVar {
+		env := []corev1.EnvVar{{Name: constant.DPBackupName, Value: backup.Name}}
+		manifests := backup.Status.Manifests
+		if manifests != nil && manifests.BackupTool != nil {
+			env = append(env, corev1.EnvVar{Name: constant.DPBackupDIR, Value: fmt.Sprintf("%s%s", backupMountPath, manifests.BackupTool.FilePath)})
+			if manifests.BackupTool.LogFilePath != "" {
+				env = append(env, corev1.EnvVar{Name: constant.DPLogFileDIR, Value: fmt.Sprintf("%s%s", logfileMountPath, manifests.BackupTool.LogFilePath)})
+			}
+		}
+		timeFormat := p.getTimeFormat(backupTool.Spec.Env)
+		if backup.Status.Manifests != nil && backup.Status.Manifests.BackupLog.StopTime != nil {
+			env = append(env, corev1.EnvVar{Name: constant.DPBackupStopTime, Value: backup.Status.Manifests.BackupLog.StopTime.Format(timeFormat)})
+		} else if backup.Status.CompletionTimestamp != nil {
+			env = append(env, corev1.EnvVar{Name: constant.DPBackupStopTime, Value: backup.Status.CompletionTimestamp.Format(timeFormat)})
+		}
+		// merges env from backup tool.
+		env = append(env, backupTool.Spec.Env...)
+		return env
 	}
-	manifests := backup.Status.Manifests
-	if manifests != nil && manifests.BackupTool != nil {
-		env = append(env, corev1.EnvVar{Name: constant.DPBackupDIR, Value: fmt.Sprintf("/%s%s", backup.Name, manifests.BackupTool.FilePath)})
-	}
-	// merges env from backup tool.
-	env = append(env, backupTool.Spec.Env...)
+	env := buildEnv()
+
 	objs = make([]client.Object, 0)
 	vct := p.getDataVCT(synthesizedComponent)
 	for _, pvcName := range pvcNames {
 		dataVolume := corev1.Volume{
-			Name: vct.Name,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
-				},
-			},
+			Name:         vct.Name,
+			VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName}},
 		}
-		volumes := make([]corev1.Volume, 0)
-		volumes = append(volumes, remoteVolume, dataVolume)
+		volumes := []corev1.Volume{dataVolume}
+		volumes = append(volumes, backupVolumes...)
 		volumes = append(volumes, synthesizedComponent.PodSpec.Volumes...)
 		volumeMounts := make([]corev1.VolumeMount, 0)
 		for _, volume := range volumes {
@@ -605,7 +623,7 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 		}
 		jobName := p.GetDatafileRestoreJobName(pvcName)
 		job, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
-			backupTool.Spec.Physical.RestoreCommands, volumes, volumeMounts, env, backupTool.Spec.Resources)
+			backupTool.Spec.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, env, backupTool.Spec.Resources)
 		if err != nil {
 			return nil, err
 		}
@@ -661,7 +679,7 @@ func (p *RestoreManager) buildPITRPhysicalRestoreJob(synthesizedComponent *compo
 		}
 		pitrJobName := p.buildRestoreJobName(fmt.Sprintf("pitr-phy-%s", dataPVC.GetName()))
 		pitrJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, pitrJobName, image,
-			recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
+			recoveryInfo.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
 		if err != nil {
 			return objs, err
 		}

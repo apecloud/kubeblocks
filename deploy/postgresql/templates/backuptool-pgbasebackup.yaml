@@ -37,7 +37,7 @@ spec:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
-    - sh
+    - bash
     - -c
     - |
       set -e;
@@ -45,6 +45,12 @@ spec:
         rm -rf ${BACKUP_DIR}
       fi
       mkdir -p ${BACKUP_DIR};
-      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -c fast -Xs -D ${BACKUP_DIR} -h ${DB_HOST} -U standby -W;
-      echo "TOTAL SIZE: $(du -shx ${BACKUP_DIR}|awk '{print $1}')" > ${DATA_DIR}/basebackup.info;
+      export PGPASSWORD=${DB_PASSWORD}
+      {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 6 }}
+
+      START_TIME=`get_current_time`
+      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -c fast -Xs -D ${BACKUP_DIR} -h ${DB_HOST} -U ${DB_USER} -W;
+
+      # stat and save the backup information
+      stat_and_save_backup_info $START_TIME
   incrementalBackupCommands: []

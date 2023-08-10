@@ -25,6 +25,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder/template"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder/tools"
 )
 
 // NewBuilderCmd for builder functions
@@ -35,6 +36,7 @@ func NewBuilderCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	cmd.AddCommand(
 		template.NewComponentTemplateRenderCmd(f, streams),
+		tools.NewMigrateHelmScriptsCmd(f, streams),
 	)
 	return cmd
 }

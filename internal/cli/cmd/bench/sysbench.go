@@ -37,7 +37,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -48,8 +47,17 @@ var (
 )
 
 var sysbenchExample = templates.Examples(`
-		# sysbench on a cluster
+		# sysbench on a cluster, that will exec all steps, cleanup, prepare and run
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+		# sysbench on a cluster with cleanup, just exec cleanup that will delete the testdata
+		kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+		# sysbench on a cluster with prepare, just exec prepare that will create the testdata
+		kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+		# sysbench on a cluster with run, just exec run that will run the test
+		kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
 
 		# sysbench on a cluster with threads count
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
@@ -79,6 +87,7 @@ type SysBenchOptions struct {
 	ExtraArgs    []string
 	ReadPercent  int
 	WritePercent int
+	Step         string
 
 	BenchBaseOptions
 	*cluster.ClusterObjects     `json:"-"`
@@ -92,7 +101,7 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:     "sysbench [BenchmarkName]",
+		Use:     "sysbench [Step] [BenchmarkName]",
 		Short:   "run a SysBench benchmark",
 		Example: sysbenchExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -122,13 +131,11 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	// use the first argument as the name of the benchmark
-	if len(args) > 0 {
-		o.name = args[0]
+	if err := o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
 	}
-	if o.name == "" {
-		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
-	}
+
+	o.Step, o.name = parseStepAndName(args, "sysbench")
 
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
@@ -255,19 +262,23 @@ func (o *SysBenchOptions) Run() error {
 			Namespace: o.namespace,
 		},
 		Spec: v1alpha1.SysbenchSpec{
-			Tables:    o.Tables,
-			Size:      o.Size,
-			Threads:   o.Threads,
-			Types:     o.Type,
-			Duration:  o.Duration,
-			ExtraArgs: o.ExtraArgs,
-			Target: v1alpha1.SysbenchTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			Tables:   o.Tables,
+			Size:     o.Size,
+			Threads:  o.Threads,
+			Types:    o.Type,
+			Duration: o.Duration,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

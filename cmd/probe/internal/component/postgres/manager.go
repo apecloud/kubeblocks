@@ -23,8 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strconv"
 
 	"github.com/dapr/kit/logger"
 	"github.com/jackc/pgx/v5"
@@ -166,19 +164,10 @@ func (mgr *Manager) ExecOthers(sql string, member *dcs.Member) {
 
 }
 
-func (mgr *Manager) IsPgReady(host string) bool {
-	cmd := exec.Command("pg_isready")
-	cmd.Args = append(cmd.Args, "-h", host)
-
-	if config.username != "" {
-		cmd.Args = append(cmd.Args, "-U", config.username)
-	}
-	if config.port != 0 {
-		cmd.Args = append(cmd.Args, "-p", strconv.FormatUint(uint64(config.port), 10))
-	}
-	err := cmd.Run()
+func (mgr *Manager) IsPgReady() bool {
+	err := mgr.Pool.Ping(context.TODO())
 	if err != nil {
-		mgr.Logger.Infof("DB is not ready: %v", err)
+		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
 		return false
 	}
 
@@ -190,7 +179,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 		return true
 	}
 
-	if !mgr.IsPgReady(config.host) {
+	if !mgr.IsPgReady() {
 		return false
 	}
 

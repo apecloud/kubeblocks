@@ -160,7 +160,7 @@ func TestWalkTopoOrder(t *testing.T) {
 		walkOrder = append(walkOrder, v.(int))
 		return nil
 	}
-	if err := dag.WalkReverseTopoOrder(walkFunc); err != nil {
+	if err := dag.WalkReverseTopoOrder(walkFunc, nil); err != nil {
 		t.Error(err)
 	}
 	for i := range expected {
@@ -171,7 +171,7 @@ func TestWalkTopoOrder(t *testing.T) {
 
 	expected = []int{8, 7, 2, 3, 0, 6, 9, 11, 12, 10, 1, 5, 4}
 	walkOrder = make([]int, 0, len(expected))
-	if err := dag.WalkTopoOrder(walkFunc); err != nil {
+	if err := dag.WalkTopoOrder(walkFunc, nil); err != nil {
 		t.Error(err)
 	}
 	for i := range expected {
@@ -329,7 +329,7 @@ func TestMerge(t *testing.T) {
 
 func TestString(t *testing.T) {
 	dag := newTestDAG()
-	str := dag.String()
+	str := dag.String(nil)
 	expectedOrder := []string{"|", "4", "5", "1", "10", "12", "11", "9", "6", "0", "3", "2", "7", "8"}
 	expectedStr := strings.Join(expectedOrder, "->")
 	if str != expectedStr {

@@ -5,14 +5,23 @@ title: kbcli bench tpcc
 Run tpcc benchmark
 
 ```
-kbcli bench tpcc [flags]
+kbcli bench tpcc [Step] [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # tpcc on a cluster
+  # tpcc on a cluster, that will exec all steps, cleanup, prepare and run
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # tpcc on a cluster with cleanup, just exec cleanup that will delete the testdata
+  kbcli bench tpcc cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # tpcc on a cluster with prepare, just exec prepare that will create the testdata
+  kbcli bench tpcc prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+  
+  # tpcc on a cluster with run, just exec run that will run the test
+  kbcli bench tpcc run mytest --cluster mycluster --user xxx --password xxx --database mydb
   
   # tpcc on a cluster with warehouses count, which is the overall database size scaling parameter
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --warehouses 100
@@ -46,6 +55,7 @@ kbcli bench tpcc [flags]
       --port int                 the port of database
       --stock-level int          specify the percentage of transactions that should be stock level (default 4)
       --threads ints             specify the number of threads to use (default [1])
+      --tolerations strings      Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
       --transactions int         specify the number of transactions that each thread should run
       --user string              the user of database
       --warehouses int           specify the overall database size scaling parameter (default 1)

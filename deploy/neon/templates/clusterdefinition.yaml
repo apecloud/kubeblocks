@@ -12,7 +12,6 @@ spec:
       podSpec:
         containers:
           - name: neon-storagebroker
-            imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /usr/local/neon/storagebroker
                 name: neon-storagebroker
@@ -35,7 +34,6 @@ spec:
       podSpec:
         containers:
           - name: neon-safekeeper
-            imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /usr/local/neon/safekeeper
                 name: neon-safekeeper
@@ -59,7 +57,6 @@ spec:
       podSpec:
         containers:
           - name: neon-pageserver
-            imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /usr/local/neon/pageserver
                 name: neon-pageserver
@@ -97,7 +94,6 @@ spec:
       podSpec:
         containers:
           - name: neon-compute
-            imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /usr/local/neon/compute
                 name: neon-compute

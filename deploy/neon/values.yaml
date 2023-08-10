@@ -3,26 +3,13 @@ version: latest
 image:
   # -- Neondatabase image repository
   repository: perconalab/neon
-
-  # -- image pull policy
-  pullPolicy: IfNotPresent
   # -- Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
-
-# -- Specify docker-registry secret names as an array
-imagePullSecrets: []
+  tag: "pg14-1.0.0"
 
 # -- String to partially override neon-storage-broker.fullname template (will maintain the release name)
 nameOverride: ""
 # -- String to fully override neon-storage-broker.fullname template
 fullnameOverride: ""
-
-# Neon broker settings
-settings:
-  # settings.sentryUrl -- url (will be converted into `SENTRY_DSN` environment variable) used by sentry to collect error/panic events in storage-broker
-  sentryUrl: ""
-  # settings.sentryEnvironment -- "development" or "production". It will be visible in sentry in order to filter issues
-  sentryEnvironment: "development"
 
 serviceAccount:
   # serviceAccount.create - Specifies whether a service account should be created
@@ -32,98 +19,5 @@ serviceAccount:
   # serviceAccount.name - The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
-
-# -- Annotations for neon-storage-broker pods
-podAnnotations: {}
-
-# -- Additional labels for neon-storage-broker pods
-podLabels: {}
-  # neon_service: broker
-  # neon_env: staging
-  # neon_region: us-west-1
-# neon_region_slug: virginia
-
-# -- neon-storage-broker's pods Security Context
-podSecurityContext: {}
-# fsGroup: 2000
-
-# -- neon-storage-broker's containers Security Context
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-# runAsUser: 1000
-
-service:
-  # service.annotations -- Annotations to add to the service
-  annotations: {}
-  type: ClusterIP
-  # service.port -- broker listen port
-  port: 50051
-
-resources: {}
-
-# -- Node labels for pod assignment.
-nodeSelector: {}
-
-# -- Tolerations for pod assignment.
-tolerations: []
-
-# -- Affinity for pod assignment
-affinity: {}
-
-metrics:
-  # metrics.enabled -- Enable prometheus metrcis autodiscovery
-  enabled: false
-  ## Prometheus Operator ServiceMonitor configuration
-  ##
-  serviceMonitor:
-    # metrics.serviceMonitor.enabled -- Create ServiceMonitor resource
-    enabled: false
-
-    # metrics.serviceMonitor.namespace -- The namespace in which the ServiceMonitor will be created, if empty then Release.Namespace used
-    namespace: ""
-
-    ## Interval at which metrics should be scraped.
-    ## ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#endpoint
-    ##
-    # metrics.serviceMonitor.interval -- Interval in which prometheus scrapes
-    interval: 10s
-
-    ## Timeout after which the scrape is ended
-    ## ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#endpoint
-    ##
-    # metrics.serviceMonitor.scrapeTimeout -- Scrape Timeout duration for prometheus
-    scrapeTimeout: 10s
-
-    ## ServiceMonitor selector labels
-    ## ref: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#prometheusioscrape
-    ##
-    # metrics.serviceMonitor.selector -- Additional labels to attach (used by Prometheus operator)
-    selector: {}
-    # selector:
-    #   prometheus: neon
-
-
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-  # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-  #
-# -- Additional manifests that are created with the chart
-extraManifests: []
 
 clusterDomain: ".cluster.local"

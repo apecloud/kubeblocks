@@ -7,12 +7,12 @@ metadata:
 spec:
   clusterDefinitionRef: neon
   clusterVersionRef: neon-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
-  terminationPolicy: {{ .Values.neon.terminationPolicy }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
   componentSpecs:
     - name: neon-storagebroker
       componentDefRef: neon-storagebroker
       replicas: 1
-      {{- with  .Values.neon.storagebroker.resources }}
+      {{- with  .Values.storagebroker.resources }}
       resources:
         {{- with .limits }}
         limits:
@@ -28,16 +28,16 @@ spec:
       volumeClaimTemplates:
         - name: neon-storagebroker # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.neon.storageClassName }}
+            storageClassName: {{ .Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .Values.neon.storagebroker.dataStorage }}
+                storage: {{ .Values.storagebroker.dataStorage }}
     - name: neon-safekeeper
       componentDefRef: neon-safekeeper
-      replicas: {{ .Values.neon.safekeeper.replicas }}
-      {{- with  .Values.neon.safekeeper.resources }}
+      replicas: {{ .Values.safekeeper.replicas }}
+      {{- with  .Values.safekeeper.resources }}
       resources:
         {{- with .limits }}
         limits:
@@ -53,28 +53,28 @@ spec:
       volumeClaimTemplates:
         - name: neon-safekeeper # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.neon.storageClassName }}
+            storageClassName: {{ .Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .Values.neon.safekeeper.dataStorage }}
+                storage: {{ .Values.safekeeper.dataStorage }}
     - name: neon-pageserver
       componentDefRef: neon-pageserver
-      replicas: {{ .Values.neon.pageserver.replicas }}
+      replicas: {{ .Values.pageserver.replicas }}
       volumeClaimTemplates:
         - name: neon-pageserver # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.neon.storageClassName }}
+            storageClassName: {{ .Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .Values.neon.pageserver.dataStorage }}
+                storage: {{ .Values.pageserver.dataStorage }}
     - name: neon-compute
       componentDefRef: neon-compute
-      replicas: {{ .Values.neon.compute.replicas }}
-      {{- with  .Values.neon.compute.resources }}
+      replicas: {{ .Values.compute.replicas }}
+      {{- with  .Values.compute.resources }}
       resources:
         {{- with .limits }}
         limits:
@@ -90,9 +90,9 @@ spec:
       volumeClaimTemplates:
         - name: neon-compute # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.neon.storageClassName }}
+            storageClassName: {{ .Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .Values.neon.compute.dataStorage }}
+                storage: {{ .Values.compute.dataStorage }}

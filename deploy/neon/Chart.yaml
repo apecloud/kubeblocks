@@ -3,4 +3,13 @@ name: neon
 description: Neon Helm Chart for KubeBlocks.
 type: application
 version: 0.6.0-alpha.21
-appVersion: "latest"
+appVersion: "pg14-1.0.0"
+home: https://kubeblocks.io/
+icon: https://kubeblocks.io/img/logo.png
+
+maintainers:
+  - name: ApeCloud
+    url: https://github.com/apecloud/kubeblocks/
+
+sources:
+  - https://github.com/apecloud/kubeblocks/

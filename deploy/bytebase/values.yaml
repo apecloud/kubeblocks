@@ -1,0 +1,25 @@
+# Default values for bytebase.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+image:
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/bytebase
+  tag: beta1
+  pullPolicy: IfNotPresent
+
+bytebase:
+  option:
+    port: 8080
+    existingPgURLSecret: ""
+    existingPgURLSecretKey: ""
+    pg:
+    data: /var/opt/bytebase
+    external-url: "https://www.bytebase.com/docs/get-started/install/external-url"
+    disable-sample: false
+  version: 2.5.0
+  registryMirrorHost: ""
+  persistence:
+    storage: 2Gi
+    enabled: false
+    storageClass: ""
+    existingClaim: ""

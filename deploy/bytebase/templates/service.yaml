@@ -1,0 +1,16 @@
+{{- $port := .Values.bytebase.option.port -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: bytebase-entrypoint
+  namespace: {{ template "bytebase.namespace" . }}
+  labels:
+    {{- include "bytebase.labels" . | nindent 4}}
+spec:
+  type: LoadBalancer
+  selector:
+    app: bytebase
+  ports:
+    - protocol: TCP
+      port: {{ $port }}
+      targetPort: {{ $port }}

@@ -311,10 +311,3 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- "" }}
 {{- end }}
 {{- end }}
-
-{{/*
-Define addon bytebase name
-*/}}
-{{- define "addon.bytebase.name" -}}
-{{- print "bytebase" }}
-{{- end }}

@@ -134,8 +134,8 @@ var (
 		}, {
 			Name:       bytebaseAddonName,
 			AddonName:  "bytebase-entrypoint",
-			Label:      "app.kubernetes.io/instance=bytebase",
-			TargetPort: "9090",
+			Label:      "app=bytebase",
+			TargetPort: "18080",
 		},
 	}
 )

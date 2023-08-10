@@ -78,21 +78,21 @@ func (c *rsmComponentBase) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, cl
 		return nil, err
 	}
 	cnt := len(rsmList)
-	if cnt == 1 {
-		return rsmList[0], nil
-	}
-	if cnt == 0 {
+	switch {
+	case cnt == 0:
 		return nil, nil
-	} else {
+	case cnt == 1:
+		return rsmList[0], nil
+	default:
 		return nil, fmt.Errorf("more than one workloads found for the component, cluster: %s, component: %s, cnt: %d",
 			c.GetClusterName(), c.GetName(), cnt)
 	}
 }
 
 func (c *rsmComponentBase) GetBuiltObjects(builder componentWorkloadBuilder) ([]client.Object, error) {
-	dag := c.Dag
+	dagSnapshot := c.Dag
 	defer func() {
-		c.Dag = dag
+		c.Dag = dagSnapshot
 	}()
 
 	c.Dag = graph.NewDAG()

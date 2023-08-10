@@ -21,6 +21,8 @@ package components
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -181,34 +183,40 @@ func (r *RSM) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.
 		if len(podList) == 0 {
 			return nil, nil
 		}
-		primary := ""
+		primaryPods := make([]string, 0)
+		emptyRolePods := make([]string, 0)
 		vertexes := make([]graph.Vertex, 0)
 		for _, pod := range podList {
 			role, ok := pod.Labels[constant.RoleLabelKey]
 			if !ok || role == "" {
+				emptyRolePods = append(emptyRolePods, pod.Name)
 				continue
 			}
 			if role == constant.Primary {
-				primary = pod.Name
+				primaryPods = append(primaryPods, pod.Name)
 			}
 		}
 
-		for _, pod := range podList {
+		for i := range podList {
+			pod := &podList[i]
 			needUpdate := false
 			if pod.Annotations == nil {
 				pod.Annotations = map[string]string{}
 			}
 			switch {
-			case primary == "":
-				// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
-				needUpdate = handlePrimaryNotExistPod(&pod)
+			case len(emptyRolePods) == len(podList):
+				// if the workload is newly created, and the role label is not set, we set the pod with index=0 as the primary by default.
+				needUpdate = handlePrimaryNotExistPod(pod)
 			default:
-				needUpdate = handlePrimaryExistPod(&pod, primary)
+				if len(primaryPods) != 1 {
+					return nil, errors.New(fmt.Sprintf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods))
+				}
+				needUpdate = handlePrimaryExistPod(pod, primaryPods[0])
 			}
 			if needUpdate {
 				vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-					Obj:    &pod,
-					Action: ictrltypes.ActionUpdatePtr(),
+					Obj:    pod,
+					Action: ictrltypes.ActionPatchPtr(),
 				})
 			}
 		}

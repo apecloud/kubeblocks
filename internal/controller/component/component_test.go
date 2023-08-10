@@ -146,9 +146,11 @@ var _ = Describe("component module", func() {
 			cluster.Spec.Resources.CPU = resource.MustParse("1000m")
 			cluster.Spec.Resources.Memory = resource.MustParse("2Gi")
 			cluster.Spec.Storage.Size = resource.MustParse("20Gi")
+
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
-			By("call build")
+
+			By("build first component from simplified fields")
 			component, err := buildComponent(
 				reqCtx,
 				nil,
@@ -161,6 +163,8 @@ var _ = Describe("component module", func() {
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.Replicas).Should(Equal(*cluster.Spec.Replicas))
 			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
+
+			By("build second component will be nil")
 			component, err = buildComponent(
 				reqCtx,
 				nil,
@@ -170,8 +174,7 @@ var _ = Describe("component module", func() {
 				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
-			Expect(component.Name).Should(Equal("vtgate"))
-			Expect(component.ComponentDef).Should(Equal("proxy"))
+			Expect(component).Should(BeNil())
 		})
 
 		It("build affinity correctly", func() {

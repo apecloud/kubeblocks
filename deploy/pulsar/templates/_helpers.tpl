@@ -54,3 +54,13 @@ Create image pull policy
 {{- define "pulsar.imagePullPolicy" -}}
 {{- printf "%s" ( .image.pullPolicy | default .root.Values.defaultPulsarImage.pullPolicy | default "IfNotPresent" ) -}}
 {{- end -}}
+
+{{/*
+Generate scripts configmap
+*/}}
+{{- define "pulsar.extend.scripts" -}}
+{{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
+{{ $path | base }}: |-
+{{- $.Files.Get $path | nindent 2 }}
+{{- end }}
+{{- end }}

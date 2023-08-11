@@ -859,6 +859,7 @@ string
 (<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
 </p>
 <div>
+<p>HelmTypeInstallSpec defines the Helm installation spec.</p><br />
 </div>
 <table>
 <thead>
@@ -919,6 +920,30 @@ HelmValuesMapping
 <td>
 <em>(Optional)</em>
 <p>valuesMapping defines add-on normalized resources parameters mapped to Helm values&rsquo; keys.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>chartsImage</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>chartsImage defines the image of Helm charts.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>chartsPathInImage</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>chartsPathInImage defines the path of Helm charts in the image. It&rsquo;s used to copy<br />Helm charts from the image to the shared volume.</p><br />
 </td>
 </tr>
 </tbody>

@@ -140,13 +140,17 @@ var _ = Describe("Backup Controller test", func() {
 	})
 
 	When("with default settings", func() {
+		var (
+			backupTool   *dpv1alpha1.BackupTool
+			backupPolicy *dpv1alpha1.BackupPolicy
+		)
 		BeforeEach(func() {
 			By("By creating a backupTool")
-			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+			backupTool = testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+			backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 				SetTTL(defaultTTL).
 				AddSnapshotPolicy().
 				SetSchedule(defaultSchedule, true).
@@ -166,13 +170,23 @@ var _ = Describe("Backup Controller test", func() {
 				AddMatchLabels(constant.RoleLabelKey, "leader").
 				SetTargetSecretName(clusterName).
 				SetPVC(backupRemotePVCName).
+				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+				AddLogfilePolicy().
+				SetSchedule(defaultSchedule, true).
+				SetPVC(backupRemotePVCName).
+				SetBackupToolName(backupTool.Name).
+				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				Create(&testCtx).GetObject()
 		})
 
 		Context("creates a datafile backup", func() {
 			var backupKey types.NamespacedName
-
 			BeforeEach(func() {
+				// set datafile backup relies on logfile
+				Expect(testapps.ChangeObj(&testCtx, backupTool, func(tmpObj *dpv1alpha1.BackupTool) {
+					tmpObj.Spec.Physical.RelyOnLogfile = true
+				})).Should(Succeed())
+
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
@@ -182,6 +196,12 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("should succeed after job completes", func() {
+				By("check backup status")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.LogFilePersistentVolumeClaimName).Should(Equal(backupRemotePVCName))
+					g.Expect(fetched.Status.Manifests.BackupTool.LogFilePath).Should(ContainSubstring(getCreatedCRNameByBackupPolicy(backupPolicy, dpv1alpha1.BackupTypeLogFile)))
+				})).Should(Succeed())
+
 				By("Check backup job's nodeName equals pod's nodeName")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
 					g.Expect(fetched.Spec.Template.Spec.NodeSelector[hostNameLabelKey]).To(Equal(nodeName))
@@ -345,13 +365,16 @@ var _ = Describe("Backup Controller test", func() {
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 
-				logJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-post"), Namespace: backupKey.Namespace}
+				logJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-0-pre"), Namespace: backupKey.Namespace}
 				patchK8sJobStatus(logJobKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
 				})).Should(Succeed())
+
+				sizeJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-1-post"), Namespace: backupKey.Namespace}
+				patchK8sJobStatus(sizeJobKey, batchv1.JobComplete)
 
 				By("Check pre job cleaned")
 				Eventually(testapps.CheckObjExists(&testCtx, preJobKey, &batchv1.Job{}, false)).Should(Succeed())
@@ -457,7 +480,7 @@ var _ = Describe("Backup Controller test", func() {
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					Create(&testCtx).GetObject()
 				By("By creating a backup from backupPolicy: " + backupPolicy.Name)
-				logFileBackupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, dpv1alpha1.BackupTypeLogFile)
+				logFileBackupName := getCreatedCRNameByBackupPolicy(backupPolicy, dpv1alpha1.BackupTypeLogFile)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, logFileBackupName).
 					SetBackupPolicyName(backupPolicy.Name).
 					SetBackupType(dpv1alpha1.BackupTypeLogFile).
@@ -688,7 +711,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 
 				By("update logfile backup with valid name, but the schedule is disabled, expect error")
-				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, getCreatedCRNameByBackupPolicy(backupPolicyName, backupPolicy.Namespace, dpv1alpha1.BackupTypeLogFile)).
+				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, getCreatedCRNameByBackupPolicy(backupPolicy, dpv1alpha1.BackupTypeLogFile)).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeLogFile).
 					Create(&testCtx).GetObject()

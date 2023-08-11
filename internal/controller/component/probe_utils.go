@@ -38,7 +38,7 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole"
+	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
 	getGlobalInfoFormat       = "/v1.0/bindings/%s?operation=getGlobalInfo"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
@@ -83,7 +83,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort), component.PodSpec)
+		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort), component.PodSpec)
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -145,7 +145,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		port := mainContainer.Ports[0]
 		dbPort := port.ContainerPort
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      constant.KBPrefix + "_SERVICE_PORT",
+			Name:      constant.KBEnvServicePort,
 			Value:     strconv.Itoa(int(dbPort)),
 			ValueFrom: nil,
 		})
@@ -154,21 +154,20 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_SERVICE_ROLES",
+		Name:      constant.KBEnvServiceRoles,
 		Value:     string(rolesJSON),
 		ValueFrom: nil,
 	})
 
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
+		Name:      constant.KBEnvCharacterType,
 		Value:     component.CharacterType,
 		ValueFrom: nil,
 	})
 
-	// todo: only support consensus now, to enable ReplicationSet in the future
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_CONSENSUS_SET_ACTION_SVC_LIST",
-		Value:     viper.GetString(constant.KBPrefix + "_CONSENSUS_SET_ACTION_SVC_LIST"),
+		Name:      constant.KBEnvWorkloadType,
+		Value:     string(component.WorkloadType),
 		ValueFrom: nil,
 	})
 
@@ -207,11 +206,12 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 	return roles
 }
 
-func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.Container,
+func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int, pod *corev1.PodSpec) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
-	bindingType := strings.ToLower(characterType)
+	bindingType := strings.ToLower(component.CharacterType)
+	workloadType := component.WorkloadType
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(getGlobalInfoFormat, bindingType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
@@ -275,7 +275,7 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
-	return component.VolumeProtection != nil && viper.GetBool(constant.EnableRBACManager)
+	return component.VolumeProtection != nil
 }
 
 func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {

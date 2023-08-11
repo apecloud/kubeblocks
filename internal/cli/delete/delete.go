@@ -21,12 +21,9 @@ package delete
 
 import (
 	"fmt"
-	"io"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,6 +31,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
@@ -125,17 +123,6 @@ func (o *DeleteOptions) complete() error {
 		return err
 	}
 
-	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
-	if !o.AutoApprove {
-		names := o.ConfirmedNames
-		if len(names) == 0 {
-			names = o.Names
-		}
-		if err = Confirm(names, o.In); err != nil {
-			return err
-		}
-	}
-
 	// get the resources to delete
 	r := o.Factory.NewBuilder().
 		Unstructured().
@@ -150,6 +137,26 @@ func (o *DeleteOptions) complete() error {
 	err = r.Err()
 	if err != nil {
 		return err
+	}
+	// confirm names to delete, use ConfirmedNames first or the names selected by labels, if it is empty, use Names
+	// if it uses the label-selector, confirm the resources‘ names that meet the label requirements
+	if !o.AutoApprove {
+		names := o.ConfirmedNames
+		if len(o.LabelSelector) != 0 {
+			var infos []*resource.Info
+			if infos, err = r.Infos(); err != nil {
+				return err
+			}
+			for i := range infos {
+				names = append(names, infos[i].Name)
+			}
+		}
+		if len(names) == 0 {
+			names = o.Names
+		}
+		if err = prompt.Confirm(names, o.In, fmt.Sprintf("%s to be deleted:[%s]", o.GVR.Resource, printer.BoldRed(strings.Join(names, " ")))); err != nil {
+			return err
+		}
 	}
 	o.Result = r
 	return err
@@ -229,22 +236,4 @@ func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {
 		return o.PostDeleteHook(o, object)
 	}
 	return nil
-}
-
-// Confirm let user double-check what to delete
-func Confirm(names []string, in io.Reader) error {
-	if len(names) == 0 {
-		return nil
-	}
-	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
-		func(entered string) error {
-			enteredNames := strings.Split(entered, " ")
-			sort.Strings(names)
-			sort.Strings(enteredNames)
-			if !slices.Equal(names, enteredNames) {
-				return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
-			}
-			return nil
-		}, in).Run()
-	return err
 }

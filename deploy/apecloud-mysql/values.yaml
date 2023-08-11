@@ -7,7 +7,7 @@ image:
   repository: apecloud/apecloud-mysql-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 8.0.30-5.alpha9.20230606.gf80d546.9
+  tag: 8.0.30-5.beta1.20230802.g5b589f1.11
 
 ## MySQL Cluster parameters
 cluster:
@@ -69,8 +69,10 @@ vtgateLogConfigs:
   info: /vtdataroot/vtgate.INFO
   queryLog: /vtdataroot/vtgate_querylog.txt
 
-etcdLogConfigs:
-  log: /vtdataroot/etcd.log
+vtconsensusLogConfigs:
+  error: /vtdataroot/vtconsensus/vtconsensus.ERROR
+  warning: /vtdataroot/vtconsensus/vtconsensus.WARNING
+  info: /vtdataroot/vtconsensus/vtconsensus.INFO
 
 roleProbe:
   failureThreshold: 2
@@ -92,16 +94,5 @@ wesqlscale:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/apecloud-mysql-scale
-    tag: "latest"
+    tag: "0.1.1"
     pullPolicy: IfNotPresent
-
-getGlobalInfo: |-
-  #!/bin/bash
-  str="${v_KB_CONSENSUS_SET_LAST_STDOUT}"
-  IFS=$'\n'
-  arr=($str)
-  echo "hello" | sed 's/he../hi/'
-  echo "${#arr[@]}"
-  for line in "${arr[@]}"; do
-  echo "$line" | sed 's/\..*,/,/'
-  done

@@ -195,7 +195,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	for _, v := range []dataprotectionv1alpha1.BackupType{dataprotectionv1alpha1.BackupTypeDataFile,
 		dataprotectionv1alpha1.BackupTypeLogFile, dataprotectionv1alpha1.BackupTypeSnapshot} {
 		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupPolicy.Namespace,
-			Name: getCreatedCRNameByBackupPolicy(backupPolicy.Name, backupPolicy.Namespace, v),
+			Name: getCreatedCRNameByBackupPolicy(backupPolicy, v),
 		}, backup); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
@@ -324,7 +324,7 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	backType dataprotectionv1alpha1.BackupType,
 	cronExpression string) error {
-	backupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
+	backupName := getCreatedCRNameByBackupPolicy(backupPolicy, backType)
 	backup := &dataprotectionv1alpha1.Backup{}
 	exists, err := intctrlutil.CheckResourceExists(ctx, r.Client, types.NamespacedName{Name: backupName, Namespace: backupPolicy.Namespace}, backup)
 	if err != nil {
@@ -388,7 +388,7 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	if cronJobName == "" {
-		cronJobName = getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
+		cronJobName = getCreatedCRNameByBackupPolicy(backupPolicy, backType)
 	}
 	options := backupPolicyOptions{
 		Name:             cronJobName,
@@ -481,8 +481,8 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	if backupPolicy.Spec.Schedule.StartWindowMinutes != nil {
-		startingDeadlineSeconds := *backupPolicy.Spec.Schedule.StartWindowMinutes * 60
+	if backupPolicy.Spec.Schedule.StartingDeadlineMinutes != nil {
+		startingDeadlineSeconds := *backupPolicy.Spec.Schedule.StartingDeadlineMinutes * 60
 		cronjobProto.Spec.StartingDeadlineSeconds = &startingDeadlineSeconds
 	}
 	if len(cronJob.Name) == 0 {

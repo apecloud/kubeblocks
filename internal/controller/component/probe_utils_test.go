@@ -139,7 +139,7 @@ var _ = Describe("probe_utils", func() {
 				},
 			}
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
 		})
 
 		It("build volume protection probe container with RBAC", func() {

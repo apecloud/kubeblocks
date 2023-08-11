@@ -36,13 +36,13 @@ spec:
           templateRef: redis-metrics-config
           namespace: {{ .Release.Namespace }}
           volumeName: redis-metrics-config
-          defaultMode: 0777
+          defaultMode: 0444
       scriptSpecs:
         - name: redis-scripts
           templateRef: redis-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       monitor:
         builtIn: false
         exporterConfig:
@@ -99,10 +99,24 @@ spec:
               - name: REDIS_ARGS
                 value: "--requirepass $(REDIS_PASSWORD)"
             command: ["/scripts/redis-start.sh"]
+            readinessProbe:
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              timeoutSeconds: 1
+              successThreshold: 1
+              failureThreshold: 5
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - /scripts/redis-ping.sh 1
             lifecycle:
-              postStart:
+              preStop:
                 exec:
-                  command: ["/scripts/redis-post-start.sh"]
+                  command:
+                    - /bin/bash
+                    - -c
+                    - /scripts/redis-preStop.sh
           - name: metrics
             image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
@@ -163,7 +177,7 @@ spec:
           - sh
           - -c
           args:
-          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD acl save "
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD $(KB_ACCOUNT_STATEMENT) && redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD acl save "
         passwordConfig:
           length: 10
           numDigits: 5
@@ -207,7 +221,7 @@ spec:
           templateRef: redis-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       volumeTypes:
         - name: data
           type: data

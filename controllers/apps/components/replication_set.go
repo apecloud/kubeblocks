@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -177,15 +178,17 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	if len(podList) == 0 {
 		return nil, nil
 	}
-	primary := ""
+	primaryPods := make([]string, 0)
+	emptyRolePods := make([]string, 0)
 	vertexes := make([]graph.Vertex, 0)
 	for _, pod := range podList {
 		role, ok := pod.Labels[constant.RoleLabelKey]
 		if !ok || role == "" {
+			emptyRolePods = append(emptyRolePods, pod.Name)
 			continue
 		}
 		if role == constant.Primary {
-			primary = pod.Name
+			primaryPods = append(primaryPods, pod.Name)
 		}
 	}
 
@@ -196,16 +199,19 @@ func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 			pod.Annotations = map[string]string{}
 		}
 		switch {
-		case primary == "":
-			// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+		case len(emptyRolePods) == len(podList):
+			// if the workload is newly created, and the role label is not set, we set the pod with index=0 as the primary by default.
 			needUpdate = handlePrimaryNotExistPod(pod)
 		default:
-			needUpdate = handlePrimaryExistPod(pod, primary)
+			if len(primaryPods) != 1 {
+				return nil, errors.New(fmt.Sprintf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods))
+			}
+			needUpdate = handlePrimaryExistPod(pod, primaryPods[0])
 		}
 		if needUpdate {
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
 				Obj:    pod,
-				Action: ictrltypes.ActionUpdatePtr(),
+				Action: ictrltypes.ActionPatchPtr(),
 			})
 		}
 	}
@@ -230,7 +236,7 @@ func handlePrimaryExistPod(pod *corev1.Pod, primary string) bool {
 	needPatch := false
 	if pod.Name != primary {
 		role, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok || role != constant.Secondary {
+		if !ok || role == "" {
 			pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
 			needPatch = true
 		}

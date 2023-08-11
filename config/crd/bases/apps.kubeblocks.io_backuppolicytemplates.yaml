@@ -104,7 +104,6 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
-                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -202,7 +201,6 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
-                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -312,10 +310,10 @@ spec:
                           - cronExpression
                           - enable
                           type: object
-                        startWindowMinutes:
-                          description: startWindowMinutes defines the time window
-                            for starting the job if it misses scheduled time for any
-                            reason. the unit of time is minute.
+                        startingDeadlineMinutes:
+                          description: startingDeadlineMinutes defines the deadline
+                            in minutes for starting the backup job if it misses scheduled
+                            time for any reason.
                           format: int64
                           maximum: 1440
                           minimum: 0

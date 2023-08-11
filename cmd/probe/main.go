@@ -79,15 +79,15 @@ func main() {
 	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
-	//development, err := zap.NewDevelopment()
-	//if err != nil {
-	//	panic(fmt.Errorf("fatal error new logger for development: %v", err))
-	//}
-	//ha := highavailability.NewHa(zapr.NewLogger(development))
-	//if ha != nil {
-	//	defer ha.ShutdownWithWait()
-	//	go ha.Start()
-	//}
+	characterType := viper.GetString(constant.KBEnvCharacterType)
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if IsHAAvailable(characterType, workloadType) {
+		ha := highavailability.NewHa(logHa)
+		if ha != nil {
+			defer ha.ShutdownWithWait()
+			go ha.Start()
+		}
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

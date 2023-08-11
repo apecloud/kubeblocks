@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package mysql
 
 import (
@@ -213,16 +232,16 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 	return config.GetDBConnWithAddr(addr)
 }
 
-func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
+func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	_, _ = mgr.EnsureServerID(context.TODO())
-	return mgr.IsMemberHealthy(nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context) bool {
+	_, _ = mgr.EnsureServerID(ctx)
+	return mgr.IsMemberHealthy(ctx, nil, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	var db *sql.DB
 	var err error
 	if member != nil {
@@ -300,7 +319,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		return true
 	}
 
-	return mgr.IsMemberHealthy(cluster, leaderMember)
+	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
 }
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
@@ -404,11 +423,12 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	ioError := rowMap.GetString("Last_IO_Error")
 	sqlError := rowMap.GetString("Last_SQL_Error")
 	if ioError != "" || sqlError != "" {
+		mgr.Logger.Infof("slave status error, sqlError: %s, ioError: %s", sqlError, ioError)
 		return true
 	}
 
 	masterHost := rowMap.GetString("Master_Host")
-	return strings.HasPrefix(masterHost, leader)
+	return !strings.HasPrefix(masterHost, leader)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
@@ -419,8 +439,8 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
-	isLeader, err := mgr.IsLeader(context.TODO(), cluster)
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err == nil && isLeader {
 		// if current member is leader, just return
 		return nil
@@ -431,7 +451,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 			continue
 		}
 
-		isLeader, err := mgr.IsLeaderMember(context.TODO(), cluster, &member)
+		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
 		if err == nil && isLeader {
 			return &member
 		}
@@ -441,13 +461,13 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 }
 
 // HasOtherHealthyMembers checks if there are any healthy members, excluding the leader
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 	for _, member := range cluster.Members {
 		if member.Name == leader {
 			continue
 		}
-		if !mgr.IsMemberHealthy(cluster, &member) {
+		if !mgr.IsMemberHealthy(ctx, cluster, &member) {
 			continue
 		}
 		members = append(members, &member)
@@ -461,5 +481,27 @@ func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
 }
 
 func (mgr *Manager) CreateRoot(ctx context.Context) error {
+	return nil
+}
+
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	setReadOnly := `set global read_only=on;`
+
+	_, err := mgr.DB.Exec(setReadOnly)
+	if err != nil {
+		mgr.Logger.Errorf("Lock err: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (mgr *Manager) Unlock(ctx context.Context) error {
+	setReadOnlyOff := `set global read_only=off;`
+
+	_, err := mgr.DB.Exec(setReadOnlyOff)
+	if err != nil {
+		mgr.Logger.Errorf("Unlock err: %v", err)
+		return err
+	}
 	return nil
 }

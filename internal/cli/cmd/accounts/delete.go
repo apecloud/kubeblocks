@@ -24,7 +24,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -56,7 +56,7 @@ func (o *DeleteUserOptions) Validate(args []string) error {
 	if o.AutoApprove {
 		return nil
 	}
-	if err := delete.Confirm([]string{o.info.UserName}, o.In); err != nil {
+	if err := prompt.Confirm([]string{o.info.UserName}, o.In, ""); err != nil {
 		return err
 	}
 	return nil

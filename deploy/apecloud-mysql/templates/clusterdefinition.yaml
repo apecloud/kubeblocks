@@ -55,7 +55,8 @@ spec:
           templateRef: apecloud-mysql8-agamotto-configuration
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
-          defaultMode: 0777
+          # for only read, mysql container switched user account.
+          defaultMode: 0444
         - name: vttablet-config
           templateRef: vttablet-config-template
           constraintRef: mysql-scale-vttablet-config-constraints
@@ -66,7 +67,8 @@ spec:
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          # for read and execute, mysql container switched user account.
+          defaultMode: 0555
       workloadType: Consensus
       consensusSpec:
         leader:
@@ -91,13 +93,7 @@ spec:
           cmdExecutorConfig:
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
             command:
-              - mysql
-            args:
-              - -h$(KB_CONSENSUS_LEADER_POD_FQDN)
-              - -u$(MYSQL_ROOT_USER)
-              - -p$(MYSQL_ROOT_PASSWORD)
-              - -e
-              - "call dbms_consensus.change_leader('$(KB_SWITCHOVER_CANDIDATE_FQDN):13306');"
+              - /scripts/switchover-with-candidate.sh
           scriptSpecSelectors:
             - name: apecloud-mysql-scripts
         withoutCandidate:
@@ -113,7 +109,6 @@ spec:
       podSpec:
         containers:
           - name: mysql
-            imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /data/mysql
                 name: data
@@ -196,8 +191,6 @@ spec:
                 exec:
                   command: ["/scripts/pre-stop.sh"]
           - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: false
               runAsUser: 0
@@ -233,8 +226,6 @@ spec:
               - name: scripts
                 mountPath: /scripts
           - name: vttablet
-            image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
               - containerPort: 15100
                 name: vttabletport
@@ -277,6 +268,8 @@ spec:
                 mountPath: /scripts
               - name: mysql-scale-config
                 mountPath: /conf
+              - name: data
+                mountPath: /vtdataroot
         volumes:
           - name: log-data
             hostPath:
@@ -362,7 +355,7 @@ spec:
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       configSpecs:
         - name: vtconsensus-config
           templateRef: vtconsensus-config-template
@@ -370,7 +363,7 @@ spec:
           volumeName: mysql-scale-config
           namespace: {{ .Release.Namespace }}
       logConfigs:
-        {{- range $name,$pattern := .Values.etcdLogConfigs }}
+        {{- range $name,$pattern := .Values.vtconsensusLogConfigs }}
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
@@ -387,58 +380,6 @@ spec:
             targetPort: vtctld-grpcport
       podSpec:
         containers:
-          - name: etcd
-            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
-            ports:
-              - containerPort: 2379
-                name: etcd-client
-            env:
-              - name: CELL
-                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
-              - name: ETCDCTL_API
-                value: "2"
-              - name: ETCD_SERVER
-                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
-              - name: ETCD_PORT
-                value: "2379"
-              - name: TOPOLOGY_FLAGS
-                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
-            command: ["/scripts/etcd.sh"]
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts
-              - name: data
-                mountPath: /vtdataroot/etcd
-            lifecycle:
-              postStart:
-                exec:
-                  command: ["/scripts/etcd-post-start.sh"]
-          - name: vtctld
-            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
-            ports:
-              - containerPort: 15000
-                name: vtctld-webport
-              - containerPort: 15999
-                name: vtctld-grpcport
-            env:
-              - name: CELL
-                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
-              - name: VTCTLD_SERVER
-                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
-              - name: VTCTLD_WEB_PORT
-                value: "15000"
-              - name: VTCTLD_GRPC_PORT
-                value: "15999"
-              - name: ETCD_SERVER
-                value: "localhost"
-              - name: ETCD_PORT
-                value: "2379"
-              - name: TOPOLOGY_FLAGS
-                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
-            command: ["/scripts/vtctld.sh"]
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts
           - name: vtconsensus
             imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
@@ -473,6 +414,62 @@ spec:
                 mountPath: /scripts
               - name: mysql-scale-config
                 mountPath: /conf
+              - name: data
+                mountPath: /vtdataroot
+          - name: etcd
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
+            ports:
+              - containerPort: 2379
+                name: etcd-client
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: ETCDCTL_API
+                value: "2"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command: ["/scripts/etcd.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: data
+                mountPath: /vtdataroot
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/scripts/etcd-post-start.sh"]
+          - name: vtctld
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
+            ports:
+              - containerPort: 15000
+                name: vtctld-webport
+              - containerPort: 15999
+                name: vtctld-grpcport
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: VTCTLD_SERVER
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
+              - name: VTCTLD_WEB_PORT
+                value: "15000"
+              - name: VTCTLD_GRPC_PORT
+                value: "15999"
+              - name: ETCD_SERVER
+                value: "localhost"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command: ["/scripts/vtctld.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: data
+                mountPath: /vtdataroot
     - name: vtgate
       characterType: mysql
       workloadType: Stateless
@@ -481,7 +478,7 @@ spec:
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       logConfigs:
         {{- range $name,$pattern := .Values.vtgateLogConfigs }}
         - name: {{ $name }}

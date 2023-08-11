@@ -53,7 +53,7 @@ kind: Cluster
 metadata:
   name: mysql-cluster-snapshot
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-sbapshot-mycluster\"}"
+    kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-snapshot-mysql\"}"
 spec:
   clusterDefinitionRef:  apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
@@ -71,4 +71,4 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 2Gi
+                storage: 20Gi

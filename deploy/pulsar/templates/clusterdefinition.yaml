@@ -60,7 +60,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 0777
+          defaultMode: 0555
       service:
         ports:
         - name: pulsar
@@ -291,7 +291,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 0777
+          defaultMode: 0555
       service:
         ports:
         - name: pulsar
@@ -457,7 +457,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 0777
+          defaultMode: 0555
       podSpec:
         initContainers:
           - name: init-bookies
@@ -608,7 +608,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 0777
+          defaultMode: 0555
       podSpec:
         securityContext:
           runAsNonRoot: true
@@ -732,7 +732,7 @@ spec:
           templateRef: {{ include "pulsar.name" . }}-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 0777
+          defaultMode: 0555
       service:
         ports:
           - name: client

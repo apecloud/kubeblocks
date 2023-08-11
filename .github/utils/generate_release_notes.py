@@ -7,6 +7,13 @@
 # 3. fetch the issues and PRs belonging current milestone
 # 4. generate entries to render the release note template
 
+# Usage:
+# 1. preparation for 1st time run, check your python version, require at least python3.8+, and install dependencies
+#    -> python3 --version
+#    -> pip3 install -r ./.github/utils/requirements.txt
+# 2. set GITHUB_TOKEN env variable, you can generate a token from https://github.com/settings/tokens.
+#    -> GITHUB_TOKEN=xxxxxx ./.github/utils/generate_release_notes.py
+
 import os
 import re
 import sys
@@ -63,7 +70,7 @@ def main(argv: list[str]) -> None:
             f.write(f"REL_VERSION={release_version}\n")
             f.write(f"REL_BRANCH=release-{re.search(MAJOR_RELEASE_REGEX, release_version).group(1)}\n")
 
-    release_note_path = f"docs/release_notes/v{release_version}.md"
+    release_note_path = f"docs/release_notes/v{release_version}/v{release_version}.md"
 
     # get milestone
     repo_milestones = re.findall(MILESTONE_REGEX, issue.body)

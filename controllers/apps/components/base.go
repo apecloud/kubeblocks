@@ -311,7 +311,6 @@ func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
 	if err != nil {
 		return err
-
 	}
 
 	var podsReady *bool
@@ -326,10 +325,9 @@ func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 	hasFailedPodTimedOut := false
 	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
 	var delayedRequeueError error
-	clusterGenerationFromWorkload := obj.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	isLatestWorkload := obj.GetAnnotations()[constant.KubeBlocksGenerationKey] == strconv.FormatInt(c.Cluster.Generation, 10)
 	// check if it is the latest obj after cluster does updates.
-	if !isRunning && !appsv1alpha1.ComponentPodsAreReady(podsReady) &&
-		clusterGenerationFromWorkload == strconv.FormatInt(c.Cluster.Generation, 10) {
+	if !isRunning && !appsv1alpha1.ComponentPodsAreReady(podsReady) && isLatestWorkload {
 		var requeueAfter time.Duration
 		if hasFailedPodTimedOut, timedOutPodStatusMessage, requeueAfter = hasFailedAndTimedOutPod(pods); requeueAfter != 0 {
 			delayedRequeueError = intctrlutil.NewDelayedRequeueError(requeueAfter, "requeue for workload status to reconcile.")

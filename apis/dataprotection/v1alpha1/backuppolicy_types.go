@@ -58,12 +58,12 @@ type RetentionSpec struct {
 }
 
 type Schedule struct {
-	// startWindowMinutes defines the time window for starting the job if it misses scheduled
-	// time for any reason. the unit of time is minute.
+	// startingDeadlineMinutes defines the deadline in minutes for starting the backup job
+	// if it misses scheduled time for any reason.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1440
-	StartWindowMinutes *int64 `json:"startWindowMinutes,omitempty"`
+	StartingDeadlineMinutes *int64 `json:"startingDeadlineMinutes,omitempty"`
 
 	// schedule policy for snapshot backup.
 	// +optional
@@ -104,26 +104,22 @@ type CommonBackupPolicy struct {
 	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
 
 	// refer to BackupRepo and the backup data will be stored in the corresponding repo.
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	BackupRepoName *string `json:"backupRepoName,omitempty"`
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupToolName string `json:"backupToolName,omitempty"`
 }
 
 type PersistentVolumeClaim struct {
 	// the name of PersistentVolumeClaim to store backup data.
-	// +kubebuilder:validation:MaxLength=63
 	// +optional
 	Name *string `json:"name,omitempty"`
 
 	// storageClassName is the name of the StorageClass required by the claim.
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty"`
@@ -153,13 +149,11 @@ type PersistentVolumeClaim struct {
 type PersistentVolumeConfigMap struct {
 	// the name of the persistentVolume ConfigMap.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// the namespace of the persistentVolume ConfigMap.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	Namespace string `json:"namespace"`
 }
@@ -204,7 +198,6 @@ type TargetCluster struct {
 type BackupPolicySecret struct {
 	// the secret name
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 

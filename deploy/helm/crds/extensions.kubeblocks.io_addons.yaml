@@ -221,6 +221,14 @@ spec:
                   chartLocationURL:
                     description: A Helm Chart location URL.
                     type: string
+                  chartsImage:
+                    description: chartsImage defines the image of Helm charts.
+                    type: string
+                  chartsPathInImage:
+                    description: chartsPathInImage defines the path of Helm charts
+                      in the image. It's used to copy Helm charts from the image to
+                      the shared volume.
+                    type: string
                   installOptions:
                     additionalProperties:
                       type: string
@@ -243,7 +251,6 @@ spec:
                               type: string
                             name:
                               description: Object name of the referent.
-                              maxLength: 63
                               pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
                           required:
@@ -263,7 +270,6 @@ spec:
                               type: string
                             name:
                               description: Object name of the referent.
-                              maxLength: 63
                               pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
                           required:
@@ -432,6 +438,11 @@ spec:
                 required:
                 - chartLocationURL
                 type: object
+                x-kubernetes-validations:
+                - message: chartsImage is required when chartLocationURL starts with
+                    'file://'
+                  rule: 'self.chartLocationURL.startsWith(''file://'') ? has(self.chartsImage)
+                    : true'
               install:
                 description: Installation parameters.
                 properties:

@@ -87,10 +87,8 @@ func (h *HTTPCustom) Init(metadata component.Properties) error {
 	h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
 	h.BaseOperations.GetGlobalInfo = h.GetGlobalInfo
-	h.BaseOperations.LockInstance = h.LockInstance
-	h.BaseOperations.UnlockInstance = h.UnlockInstance
-	h.LegacyOperations[CheckRoleOperation] = h.CheckRoleOps
-	h.LegacyOperations[GetGlobalInfoOperation] = h.GetGlobalInfoOps
+	h.OperationsMap[CheckRoleOperation] = h.CheckRoleOps
+	h.OperationsMap[GetGlobalInfoOperation] = h.GetGlobalInfoOps
 
 	return nil
 }
@@ -171,16 +169,6 @@ func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp 
 	h.Logger.Info("GetGlobalInfo get result", "result", res)
 
 	return res, nil
-}
-
-func (h *HTTPCustom) LockInstance(ctx context.Context) error {
-	// TODO: impl
-	return fmt.Errorf("NotSupported")
-}
-
-func (h *HTTPCustom) UnlockInstance(ctx context.Context) error {
-	// TODO: impl
-	return fmt.Errorf("NotSupported")
 }
 
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort

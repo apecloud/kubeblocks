@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-vexpand
+  generateName: mysql-cluster-vexpand-
 spec:
   clusterRef: mysql-cluster
   type: VolumeExpansion
@@ -9,4 +9,4 @@ spec:
     - componentName: mysql
       volumeClaimTemplates:
         - name: data
-          storage: "2Gi"
+          storage: "20Gi"

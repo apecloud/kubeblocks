@@ -85,7 +85,7 @@ var _ = Describe("template", func() {
 			_, err := os.ReadDir(componentPath)
 			Expect(err).Should(Succeed())
 			helmOutput := filepath.Join(helmOutputRoot, component)
-			Expect(helmTemplate(componentPath, helmOutput)).Should(Succeed())
+			Expect(HelmTemplate(componentPath, helmOutput)).Should(Succeed())
 			testComponentTemplate(componentPath, helmOutput)
 		}
 	})

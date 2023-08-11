@@ -1,0 +1,56 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: postgres-basebackup
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+  deployKind: job
+  env:
+    - name: DATA_DIR
+      value: /home/postgres/pgdata/pgroot/data
+  physical:
+    restoreCommands:
+      - sh
+      - -c
+      - |
+        #!/bin/sh
+        set -e;
+        cd ${BACKUP_DIR};
+        mkdir -p ${DATA_DIR};
+        # compatible with gzip compression for version 0.5.0
+        if [ -f base.tar.gz ];then
+          tar -xvf base.tar.gz -C ${DATA_DIR}/;
+        else
+          tar -xvf base.tar -C ${DATA_DIR}/;
+        fi
+        if [ -f pg_wal.tar.gz ];then
+          tar -xvf pg_wal.tar.gz -C ${DATA_DIR}/pg_wal/;
+        else
+          tar -xvf pg_wal.tar -C ${DATA_DIR}/pg_wal/;
+        fi
+        echo "done!";
+    incrementalRestoreCommands: []
+  logical:
+    restoreCommands: []
+    incrementalRestoreCommands: []
+  backupCommands:
+    - bash
+    - -c
+    - |
+      set -e;
+      if [ -d ${BACKUP_DIR} ]; then
+        rm -rf ${BACKUP_DIR}
+      fi
+      mkdir -p ${BACKUP_DIR};
+      export PGPASSWORD=${DB_PASSWORD}
+      {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 6 }}
+
+      START_TIME=`get_current_time`
+      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -c fast -Xs -D ${BACKUP_DIR} -h ${DB_HOST} -U ${DB_USER} -W;
+
+      # stat and save the backup information
+      stat_and_save_backup_info $START_TIME
+  incrementalBackupCommands: []

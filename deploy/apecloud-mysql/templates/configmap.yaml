@@ -47,7 +47,7 @@ metadata:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
   reload.tpl: |-
-    {{- .Files.Get "scripts/mysql-reload.tpl" | nindent 4 }}
+    {{- .Files.Get "config/mysql-reload.tpl" | nindent 4 }}
   reload.yaml: |-
     scripts: reload.tpl
     fileRegex: my.cnf

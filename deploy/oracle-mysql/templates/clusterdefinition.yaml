@@ -1,0 +1,48 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: oracle-mysql
+  labels:
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mysql)"
+  componentDefs:
+    - name: mysql-compdef
+      characterType: mysql
+      workloadType: Stateful
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: mysql-container
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /var/lib/mysql
+                name: data
+            ports:
+              - containerPort: 3306
+                name: mysql
+            env:
+              - name: MYSQL_ROOT_HOST
+                value: {{ .Values.auth.rootHost | default "%" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password

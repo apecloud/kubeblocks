@@ -35,6 +35,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
@@ -51,17 +52,6 @@ type MysqlOperations struct {
 type QueryRes []map[string]interface{}
 
 var _ BaseInternalOps = &MysqlOperations{}
-
-const (
-	// other general settings for DB connections.
-	maxIdleConnsKey    = "maxIdleConns"
-	maxOpenConnsKey    = "maxOpenConns"
-	connMaxLifetimeKey = "connMaxLifetime"
-	connMaxIdleTimeKey = "connMaxIdleTime"
-	workloadTypeKey    = "workloadType"
-	Replication        = "Replication"
-	Consensus          = "Consensus"
-)
 
 const (
 	superUserPriv = "SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.*"
@@ -112,8 +102,6 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
 	mysqlOps.BaseOperations.GetGlobalInfo = mysqlOps.GetGlobalInfo
-	mysqlOps.BaseOperations.LockInstance = mysqlOps.LockInstance
-	mysqlOps.BaseOperations.UnlockInstance = mysqlOps.UnlockInstance
 	mysqlOps.DBPort = config.GetDBPort()
 
 	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
@@ -136,7 +124,7 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
-	workloadType := request.Metadata[workloadTypeKey]
+	workloadType := request.Metadata[WorkloadTypeKey]
 	if strings.EqualFold(workloadType, Replication) {
 		return mysqlOps.GetRoleForReplication(ctx, request, response)
 	}

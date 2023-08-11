@@ -37,7 +37,7 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
-type LegacyOperation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
+type Operation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
 
@@ -46,12 +46,6 @@ type GlobalInfo struct {
 	Term         int               `json:"term,omitempty"`
 	PodName2Role map[string]string `json:"map,omitempty"`
 	Message      string            `json:"message,omitempty"`
-}
-
-type Operation interface {
-	Kind() OperationKind
-	Init(metadata component.Properties) error
-	Invoke(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) error
 }
 
 // AccessMode defines SVC access mode enums.
@@ -87,13 +81,10 @@ type BaseOperations struct {
 	Logger                 logr.Logger
 	Metadata               map[string]string
 	InitIfNeed             func() bool
-	GetRole                func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error)
+	GetRole                func(context.Context, *ProbeRequest, *ProbeResponse) (string, error)
 	GetGlobalInfo          func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error)
-	// TODO: need a better way to support the extension for engines.
-	LockInstance     func(ctx context.Context) error
-	UnlockInstance   func(ctx context.Context) error
-	LegacyOperations map[OperationKind]LegacyOperation
-	Ops              map[OperationKind]Operation
+
+	OperationsMap map[OperationKind]Operation
 }
 
 func init() {
@@ -122,46 +113,36 @@ func (ops *BaseOperations) Init(properties component.Properties) {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}
 	}
-
 	ops.Metadata = properties
-	ops.LegacyOperations = map[OperationKind]LegacyOperation{
-		CheckRunningOperation:  ops.CheckRunningOps,
-		CheckRoleOperation:     ops.CheckRoleOps,
-		GetRoleOperation:       ops.GetRoleOps,
-		VolumeProtection:       ops.volumeProtection,
-		SwitchoverOperation:    ops.SwitchoverOps,
-		GetGlobalInfoOperation: ops.GetGlobalInfoOps,
+	ops.OperationsMap = map[OperationKind]Operation{
+		CheckRunningOperation: ops.CheckRunningOps,
+		CheckRoleOperation:    ops.CheckRoleOps,
+		GetRoleOperation:      ops.GetRoleOps,
+		VolumeProtection:      ops.VolumeProtectionOps,
+		SwitchoverOperation:   ops.SwitchoverOps,
+		LockOperation:         ops.LockOps,
+		UnlockOperation:       ops.UnlockOps,
 	}
 
-	// ops.Ops = map[OperationKind]Operation{
-	//	VolumeProtection: newVolumeProtectionOperation(ops.Logger, ops),
-	//}
 	ops.DBAddress = ops.getAddress()
-
-	// for kind, op := range ops.Ops {
-	//	if err := op.Init(properties); err != nil {
-	//		ops.Logger.Error(err, fmt.Sprintf("init operation %s error", kind))
-	//		// panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
-	//	}
-	//}
 }
 
-func (ops *BaseOperations) RegisterOperation(opsKind OperationKind, operation LegacyOperation) {
-	if ops.LegacyOperations == nil {
-		ops.LegacyOperations = map[OperationKind]LegacyOperation{}
+func (ops *BaseOperations) RegisterOperation(opsKind OperationKind, operation Operation) {
+	if ops.OperationsMap == nil {
+		ops.OperationsMap = map[OperationKind]Operation{}
 	}
-	ops.LegacyOperations[opsKind] = operation
+	ops.OperationsMap[opsKind] = operation
 }
 
-func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind OperationKind, operation LegacyOperation, manager component.DBManager) {
+func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind OperationKind, operation Operation, manager component.DBManager) {
 	ops.RegisterOperation(opsKind, StartupCheckWraper(manager, operation))
 }
 
 // Operations returns list of operations supported by the binding.
 func (ops *BaseOperations) Operations() []OperationKind {
-	opsKinds := make([]OperationKind, len(ops.LegacyOperations))
+	opsKinds := make([]OperationKind, len(ops.OperationsMap))
 	i := 0
-	for opsKind := range ops.LegacyOperations {
+	for opsKind := range ops.OperationsMap {
 		opsKinds[i] = opsKind
 		i++
 	}
@@ -190,7 +171,7 @@ func (ops *BaseOperations) Dispatch(ctx context.Context, req *ProbeRequest) (*Pr
 		return resp, nil
 	}
 
-	operation, ok := ops.LegacyOperations[req.Operation]
+	operation, ok := ops.OperationsMap[req.Operation]
 	opsRes := OpsResult{}
 	if !ok {
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
@@ -259,6 +240,8 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 		return opsRes, nil
 	}
 
+	opsRes["event"] = OperationSuccess
+	opsRes["role"] = role
 	if ops.OriRole != role {
 		ops.OriRole = role
 		SentProbeEvent(ctx, opsRes, ops.Logger)
@@ -346,21 +329,6 @@ func (ops *BaseOperations) GetGlobalInfoOps(ctx context.Context, req *ProbeReque
 	}
 
 	return opsRes, nil
-}
-
-func (ops *BaseOperations) volumeProtection(ctx context.Context, req *ProbeRequest,
-	rsp *ProbeResponse) (OpsResult, error) {
-	return ops.fwdLegacyOperationCall(VolumeProtection, ctx, req, rsp)
-}
-
-func (ops *BaseOperations) fwdLegacyOperationCall(kind OperationKind, ctx context.Context,
-	req *ProbeRequest, rsp *ProbeResponse) (OpsResult, error) {
-	op, ok := ops.Ops[kind]
-	if !ok {
-		panic(fmt.Sprintf("unknown operation kind: %s", kind))
-	}
-	// since the rsp.Data has been set properly, it doesn't need to return a OpsResult here.
-	return nil, op.Invoke(ctx, req, rsp)
 }
 
 // Component may have some internal roles that needn't be exposed to end user,
@@ -479,12 +447,12 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 			opsRes["message"] = fmt.Sprintf("candidate %s not exists", candidate)
 			return opsRes, nil
 		}
-		if !manager.IsMemberHealthy(cluster, candidateMember) {
+		if !manager.IsMemberHealthy(ctx, cluster, candidateMember) {
 			opsRes["event"] = OperationFailed
 			opsRes["message"] = fmt.Sprintf("candidate %s is unhealthy", candidate)
 			return opsRes, nil
 		}
-	} else if len(manager.HasOtherHealthyMembers(cluster, leader)) == 0 {
+	} else if len(manager.HasOtherHealthyMembers(ctx, cluster, leader)) == 0 {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = "candidate is not set and has no other healthy members"
 		return opsRes, nil

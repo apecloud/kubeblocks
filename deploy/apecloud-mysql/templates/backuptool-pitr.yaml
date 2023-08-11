@@ -17,8 +17,6 @@ spec:
       value: "$(VOLUME_DATA_DIR)/data"
     - name: CONF_DIR
       value: "$(VOLUME_DATA_DIR)/conf"
-    - name: RECOVERY_TIME
-      value: $KB_RECOVERY_TIME
     - name: TIME_FORMAT
       value: 2006-01-02T15:04:05Z
     - name: LOG_DIR
@@ -55,8 +53,8 @@ spec:
           BASE_BACKUP_TIME=$(cat $DATA_DIR/xtrabackup_info | grep start_time | awk -F ' = ' '{print $2}');
           BASE_BACKUP_TIME=$(date -d"${BASE_BACKUP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
         fi
-        BINLOG_LATEST_TIME=$(date -d"${RECOVERY_TIME} +1 day" -u '+%Y-%m-%dT%H:%M:%SZ')
-        wal-g binlog-replay --since-time "${BASE_BACKUP_TIME}" --until "${RECOVERY_TIME}" --until-binlog-last-modified-time "${BINLOG_LATEST_TIME}";
+        BINLOG_LATEST_TIME=$(date -d"${KB_RECOVERY_TIME} +1 day" -u '+%Y-%m-%dT%H:%M:%SZ')
+        wal-g binlog-replay --since-time "${BASE_BACKUP_TIME}" --until "${KB_RECOVERY_TIME}" --until-binlog-last-modified-time "${BINLOG_LATEST_TIME}";
         echo "done.";
         sync;
   backupCommands:

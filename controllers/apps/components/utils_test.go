@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -35,6 +36,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -162,7 +167,7 @@ var _ = Describe("Consensus Component", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		// testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -214,57 +219,6 @@ var _ = Describe("Consensus Component", func() {
 			By("test getClusterComponentSpecByName function")
 			clusterComp := getClusterComponentSpecByName(*cluster, consensusCompName)
 			Expect(clusterComp).ShouldNot(BeNil())
-
-			By("test updateObjLabel function")
-			stsObj := stsList.Items[0]
-			err = updateObjLabel(ctx, k8sClient, stsObj, "test", "test")
-			Expect(err).Should(Succeed())
-
-			By("test patchGVRCustomLabels of clusterDefinition")
-			resource := &appsv1alpha1.GVKResource{
-				Selector: getComponentMatchLabels(cluster.Name, consensusCompName),
-			}
-			customLabelSpec := &appsv1alpha1.CustomLabelSpec{
-				Key:       "custom-label-key",
-				Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
-				Resources: []appsv1alpha1.GVKResource{*resource},
-			}
-			By("test statefulSet resource patchGVRCustomLabels")
-			resource.GVK = "apps/v1/StatefulSet"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Pod resource patchGVRCustomLabels")
-			resource.GVK = "v1/Pod"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Deployment resource patchGVRCustomLabels")
-			resource.GVK = "apps/v1/Deployment"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Service resource patchGVRCustomLabels")
-			resource.GVK = "/v1/Service"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test ConfigMap resource patchGVRCustomLabels")
-			resource.GVK = "/v1/ConfigMap"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test CronJob resource patchGVRCustomLabels")
-			resource.GVK = "batch/v1/CronJob"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err).Should(Succeed())
-			By("test Invalid resource patchGVRCustomLabels")
-			resource.GVK = "Invalid"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err.Error()).Should(ContainSubstring("invalid pattern"))
-			By("test Invalid resource patchGVRCustomLabels")
-			resource.GVK = "apps/v1/Invalid"
-			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
-			Expect(err.Error()).Should(ContainSubstring("kind is not supported for custom labels"))
-
-			By("test getCustomLabelWorkloadKind")
-			workloadList := getCustomLabelWorkloadKind()
-			Expect(len(workloadList)).Should(Equal(5))
 
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
@@ -342,6 +296,71 @@ var _ = Describe("Consensus Component", func() {
 			Expect(err).Should(Succeed())
 			Expect(componentName).Should(Equal(consensusCompName))
 			Expect(componentDef).ShouldNot(BeNil())
+		})
+	})
+
+	Context("Custom Label test", func() {
+		Context("parseCustomLabelPattern func", func() {
+			It("should parse pattern well", func() {
+				pattern := "v1/Pod"
+				gvk, err := parseCustomLabelPattern(pattern)
+				Expect(err).Should(BeNil())
+				Expect(gvk.Group).Should(BeEmpty())
+				Expect(gvk.Version).Should(Equal("v1"))
+				Expect(gvk.Kind).Should(Equal("Pod"))
+				pattern = "apps/v1/StatefulSet"
+				gvk, err = parseCustomLabelPattern(pattern)
+				Expect(err).Should(BeNil())
+				Expect(gvk.Group).Should(Equal("apps"))
+				Expect(gvk.Version).Should(Equal("v1"))
+				Expect(gvk.Kind).Should(Equal("StatefulSet"))
+			})
+		})
+
+		Context("updateCustomLabelToObjs func", func() {
+			It("should update label well", func() {
+				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
+				customLabelSpec := appsv1alpha1.CustomLabelSpec{
+					Key:       "custom-label-key",
+					Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
+					Resources: []appsv1alpha1.GVKResource{*resource},
+				}
+				pod := builder.NewPodBuilder("foo", "bar").GetObject()
+				clusterName, uid, componentName := "foo", "1234-5678", "workload"
+				err := updateCustomLabelToObjs(clusterName, uid, componentName, []appsv1alpha1.CustomLabelSpec{customLabelSpec}, []client.Object{pod})
+				Expect(err).Should(BeNil())
+				Expect(pod.Labels).ShouldNot(BeNil())
+				Expect(pod.Labels[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, componentName)))
+			})
+		})
+
+		Context("updateCustomLabelToPods func", func() {
+			It("should work well", func() {
+				_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+					clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
+				sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+				pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
+				customLabelSpec := appsv1alpha1.CustomLabelSpec{
+					Key:       "custom-label-key",
+					Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
+					Resources: []appsv1alpha1.GVKResource{*resource},
+				}
+				comp := &component.SynthesizedComponent{
+					Name:             consensusCompName,
+					CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{customLabelSpec},
+				}
+				dag := graph.NewDAG()
+				dag.AddVertex(&types.LifecycleVertex{Obj: pods[0], Action: types.ActionUpdatePtr()})
+				Expect(updateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
+				podVertices := types.FindAll[*corev1.Pod](dag)
+				Expect(podVertices).Should(HaveLen(3))
+				for _, vertex := range podVertices {
+					v, _ := vertex.(*types.LifecycleVertex)
+					Expect(v.Obj.GetLabels()).ShouldNot(BeNil())
+					Expect(v.Obj.GetLabels()[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
+				}
+			})
 		})
 	})
 })

@@ -79,14 +79,14 @@ func (ha *Ha) RunCycle() {
 		}
 		_ = ha.dbManager.Follow(cluster)
 
-	case !ha.dbManager.IsClusterHealthy(context.TODO(), cluster):
+	case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
 		ha.logger.Error(nil, "The cluster is not healthy, wait...")
 
-	case !ha.dbManager.IsCurrentMemberInCluster(cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(cluster)):
+	case !ha.dbManager.IsCurrentMemberInCluster(ha.ctx, cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(cluster)):
 		ha.logger.Info("Current member is not in cluster, add it to cluster")
 		_ = ha.dbManager.AddCurrentMemberToCluster(cluster)
 
-	case !ha.dbManager.IsCurrentMemberHealthy():
+	case !ha.dbManager.IsCurrentMemberHealthy(ha.ctx):
 		ha.logger.Info("DB Service is not healthy,  do some recover")
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
@@ -95,7 +95,7 @@ func (ha *Ha) RunCycle() {
 
 	case !cluster.IsLocked():
 		ha.logger.Info("Cluster has no leader, attempt to take the leader")
-		if ha.IsHealthiestMember(cluster) {
+		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			if ha.dcs.AttempAcquireLock() == nil {
 				err := ha.dbManager.Promote()
 				if err != nil {
@@ -127,7 +127,7 @@ func (ha *Ha) RunCycle() {
 				ha.DecreaseClusterReplicas(cluster)
 			}
 
-		} else if ha.dbManager.HasOtherHealthyLeader(cluster) != nil {
+		} else if ha.dbManager.HasOtherHealthyLeader(ha.ctx, cluster) != nil {
 			ha.logger.Info("Release leader")
 			_ = ha.dcs.ReleaseLock()
 		} else {
@@ -227,7 +227,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 	_ = ha.dbManager.DeleteMemberFromCluster(cluster, deleteHost)
 }
 
-func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
+func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool {
 	if cluster.Switchover != nil {
 		switchover := cluster.Switchover
 		leader := switchover.Leader
@@ -236,19 +236,19 @@ func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
 			return true
 		}
 
-		if candidate != "" && ha.dbManager.IsMemberHealthy(cluster, cluster.GetMemberWithName(candidate)) {
+		if candidate != "" && ha.dbManager.IsMemberHealthy(ctx, cluster, cluster.GetMemberWithName(candidate)) {
 			ha.logger.Info("manual switchover to new leader", "new leader", candidate)
 			return false
 		}
 
 		if leader == ha.dbManager.GetCurrentMemberName() &&
-			len(ha.dbManager.HasOtherHealthyMembers(cluster, leader)) > 0 {
+			len(ha.dbManager.HasOtherHealthyMembers(ctx, cluster, leader)) > 0 {
 			ha.logger.Info("manual switchover to other member")
 			return false
 		}
 	}
 
-	if member := ha.dbManager.HasOtherHealthyLeader(cluster); member != nil {
+	if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {
 		ha.logger.Info("there is a healthy leader exists", "leader", member.Name)
 		return false
 	}

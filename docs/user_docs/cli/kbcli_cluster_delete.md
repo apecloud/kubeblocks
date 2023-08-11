@@ -13,6 +13,8 @@ kbcli cluster delete NAME [flags]
 ```
   # delete a cluster named mycluster
   kbcli cluster delete mycluster
+  # delete a cluster by label selector
+  kbcli cluster delete --selector clusterdefinition.kubeblocks.io/name=apecloud-mysql
 ```
 
 ### Options

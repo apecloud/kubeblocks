@@ -1,0 +1,77 @@
+# Default values for foxlake-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+clusterVersionOverride: ""
+
+terminationPolicy: Delete
+
+## @param tolerations define global Tolerations for the cluster all pod's assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
+
+
+## @param topologySpreadConstraints Topology Spread Constraints for pod assignment spread across your cluster among failure-domains. Evaluated as a template
+## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
+##
+topologyKeys:
+  - kubernetes.io/hostname
+
+## @param cpu
+##
+cpu: 1
+
+## @param memory, the unit is Gi
+##
+memory: 2
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
+## @param storage FoxLake metadb storage size, the unit is Gi
+##
+storage: 20
+
+## @param storageCreate If it is true, the default storage will be created automatically.
+##
+storageCreate: false
+
+## @param storageAccessKey Access key for the object storage service.
+## For AWS S3 storage, this is the same as AWS_ACCESS_KEY_ID
+##
+storageAccessKey: ""
+
+## @param storageSecretKey Secret key for the object storage service.
+## For AWS S3 storage, this is the same as AWS_SECRET_ACCESS_KEY
+##
+storageSecretKey: ""
+
+## @param storageEndpoint Endpoint for the object storage service.
+## For AWS S3 storage, you can use the following link to query the endpoint of the region where the object is located:
+## https://docs.aws.amazon.com/general/latest/gr/s3.html
+##
+storageEndpoint: ""
+
+## @param storageUri Object Storage URI Format.
+## The format of the Object Storage URI is as follows:
+## <StorageProvider>://<bucket>/<prefix>
+## Example:
+## s3://my-bucket/my-folder/my-object
+## minio://my-bucket/my-object
+## In this format:
+## - <StorageProvider> represents the type of storage provider, such as "s3" for AWS S3, "minio" for MinIO, etc.
+## - <bucket> represents the name of the bucket where the object is stored.
+## - <prefix> represents the optional prefix or folder structure within the bucket where the object is located.
+storageUri: ""
+
+mppWorkerTolerations: ""

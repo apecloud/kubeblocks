@@ -27,3 +27,14 @@ const (
 	KBEnvPodUID               = "KB_POD_UID"
 	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 )
+
+const (
+	// SQL Channel env names
+	KBEnvClusterName     = "KB_CLUSTER_NAME"
+	KBEnvComponentName   = "KB_COMP_NAME"
+	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
+	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
+	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
+	KBEnvServiceRoles    = "KB_SERVICE_ROLES"
+	KBEnvServicePort     = "KB_SERVICE_PORT"
+)

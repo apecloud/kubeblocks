@@ -153,3 +153,14 @@ service:
     metrics:
       receivers: [ apecloudmysql, prometheus ]
 {{- end }}
+
+
+{{/*
+Generate scripts configmap
+*/}}
+{{- define "apecloud-mysql.extend.scripts" -}}
+{{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
+{{ $path | base }}: |-
+{{- $.Files.Get $path | nindent 2 }}
+{{- end }}
+{{- end }}

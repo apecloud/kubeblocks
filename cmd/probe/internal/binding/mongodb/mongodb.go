@@ -24,7 +24,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
@@ -100,8 +99,6 @@ func (mongoOps *MongoDBOperations) Init(properties component.Properties) error {
 	// mongoOps.InitIfNeed = mongoOps.initIfNeed
 	mongoOps.DBPort = config.GetDBPort()
 	mongoOps.BaseOperations.GetRole = mongoOps.GetRole
-	mongoOps.BaseOperations.LockInstance = mongoOps.LockInstance
-	mongoOps.BaseOperations.UnlockInstance = mongoOps.UnlockInstance
 	mongoOps.RegisterOperationOnDBReady(GetRoleOperation, mongoOps.GetRoleOps, manager)
 	mongoOps.RegisterOperationOnDBReady(CheckRoleOperation, mongoOps.CheckRoleOps, manager)
 
@@ -160,16 +157,6 @@ func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *ProbeRe
 func (mongoOps *MongoDBOperations) LockInstance(ctx context.Context) error {
 	// TODO: impl
 	return fmt.Errorf("NotSupported")
-}
-
-func (mongoOps *MongoDBOperations) UnlockInstance(ctx context.Context) error {
-	// TODO: impl
-	return fmt.Errorf("NotSupported")
-}
-
-func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *ProbeResponse) (OpsResult, error) {
-	// TODO implement me when proposal is passed
-	return nil, nil
 }
 
 func (mongoOps *MongoDBOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {

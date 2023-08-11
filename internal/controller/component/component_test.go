@@ -355,5 +355,26 @@ spec:
 				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(fmt.Sprintf("%s-conn-credential", cluster.Name)))
 			}
 		})
+
+		It("should not fill component if none of simplified api is present", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			By("clear cluster's component spec")
+			cluster.Spec.ComponentSpecs = nil
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).Should(BeNil())
+		})
 	})
 })

@@ -137,8 +137,8 @@ func (factory *MockBackupPolicyFactory) SetSchedule(schedule string, enable bool
 	return factory
 }
 
-func (factory *MockBackupPolicyFactory) SetScheduleStartWindowMinutes(startWindowMinutes *int64) *MockBackupPolicyFactory {
-	factory.get().Spec.Schedule.StartWindowMinutes = startWindowMinutes
+func (factory *MockBackupPolicyFactory) SetScheduleStartingDeadlineMinutes(startingDeadlineMinutes *int64) *MockBackupPolicyFactory {
+	factory.get().Spec.Schedule.StartingDeadlineMinutes = startingDeadlineMinutes
 	return factory
 }
 

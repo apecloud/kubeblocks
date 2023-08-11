@@ -100,7 +100,7 @@ func TestDispatch(t *testing.T) {
 		}
 		t.Run("Failed", func(t *testing.T) {
 			p.CheckRunningFailedCount = 1
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRunning failed: %s", err)
 			}
@@ -116,7 +116,7 @@ func TestDispatch(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			server := p.startFooServer(t)
 			defer stopFooServer(server)
-			resp, _ := p.Dispatch(context.Background(), req)
+			resp, _ := p.Invoke(context.Background(), req)
 			err := json.Unmarshal(resp.Data, &opsRes)
 			if err != nil {
 				t.Errorf("CheckRunning failed: %s", err)
@@ -139,7 +139,7 @@ func TestDispatch(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRole
 			p.BaseOperations.OriRole = testRole
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRole error: %s", err)
 			}
@@ -157,7 +157,7 @@ func TestDispatch(t *testing.T) {
 
 		t.Run("roleInvalid", func(t *testing.T) {
 			testRole = "leader1"
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRole error: %s", err)
 			}
@@ -172,7 +172,7 @@ func TestDispatch(t *testing.T) {
 
 		t.Run("NotImplemented", func(t *testing.T) {
 			p.BaseOperations.GetRole = nil
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -188,7 +188,7 @@ func TestDispatch(t *testing.T) {
 		t.Run("Failed", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRoleFailed
 			p.CheckRoleFailedCount = 1
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -213,7 +213,7 @@ func TestDispatch(t *testing.T) {
 
 		t.Run("Success", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRole
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -228,7 +228,7 @@ func TestDispatch(t *testing.T) {
 
 		t.Run("NotImplemented", func(t *testing.T) {
 			p.BaseOperations.GetRole = nil
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}
@@ -243,7 +243,7 @@ func TestDispatch(t *testing.T) {
 
 		t.Run("Failed", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRoleFailed
-			resp, err := p.Dispatch(context.Background(), req)
+			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)
 			}

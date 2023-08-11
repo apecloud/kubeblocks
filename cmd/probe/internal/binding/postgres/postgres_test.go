@@ -105,93 +105,93 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 	ctx := context.TODO()
 	t.Run("Prepare Data", func(t *testing.T) {
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Dispatch checkRole", func(t *testing.T) {
+	t.Run("Invoke checkRole", func(t *testing.T) {
 		req.Operation = "checkRole"
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Dispatch getRole", func(t *testing.T) {
+	t.Run("Invoke getRole", func(t *testing.T) {
 		req.Operation = "getRole"
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Dispatch checkStatus", func(t *testing.T) {
+	t.Run("Invoke checkStatus", func(t *testing.T) {
 		req.Operation = "checkStatus"
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Dispatch create table", func(t *testing.T) {
-		res, err := b.Dispatch(ctx, req)
+	t.Run("Invoke create table", func(t *testing.T) {
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Dispatch delete", func(t *testing.T) {
+	t.Run("Invoke delete", func(t *testing.T) {
 		req.Metadata[commandSQLKey] = testDelete
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Dispatch exec with no sql", func(t *testing.T) {
+	t.Run("Invoke exec with no sql", func(t *testing.T) {
 		req.Operation = ExecOperation
 		req.Metadata[commandSQLKey] = ""
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Dispatch exec with invalid sql", func(t *testing.T) {
+	t.Run("Invoke exec with invalid sql", func(t *testing.T) {
 		req.Operation = ExecOperation
 		req.Metadata[commandSQLKey] = "invalid sql"
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Dispatch insert", func(t *testing.T) {
+	t.Run("Invoke insert", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			req.Metadata[commandSQLKey] = fmt.Sprintf(testInsert, i, i, time.Now().Format(time.RFC3339))
-			res, err := b.Dispatch(ctx, req)
+			res, err := b.Invoke(ctx, req)
 			assertResponse(t, res, err, "Success")
 		}
 	})
 
-	t.Run("Dispatch update", func(t *testing.T) {
+	t.Run("Invoke update", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			req.Metadata[commandSQLKey] = fmt.Sprintf(testUpdate, time.Now().Format(time.RFC3339), i)
-			res, err := b.Dispatch(ctx, req)
+			res, err := b.Invoke(ctx, req)
 			assertResponse(t, res, err, "Success")
 		}
 	})
 
-	t.Run("Dispatch select", func(t *testing.T) {
+	t.Run("Invoke select", func(t *testing.T) {
 		req.Operation = QueryOperation
 		req.Metadata[commandSQLKey] = testSelect
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 
-	t.Run("Dispatch query with no sql", func(t *testing.T) {
+	t.Run("Invoke query with no sql", func(t *testing.T) {
 		req.Metadata[commandSQLKey] = ""
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Dispatch query with invalid sql", func(t *testing.T) {
+	t.Run("Invoke query with invalid sql", func(t *testing.T) {
 		req.Metadata[commandSQLKey] = "invalid sql"
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Failed")
 	})
 
-	t.Run("Dispatch delete", func(t *testing.T) {
+	t.Run("Invoke delete", func(t *testing.T) {
 		req.Operation = ExecOperation
 		req.Metadata[commandSQLKey] = testDelete
 		req.Data = nil
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, "Success")
 	})
 }
@@ -233,10 +233,10 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Operation: DeleteUserOp,
 			Metadata:  map[string]string{},
 		}
-		res, err := b.Dispatch(ctx, req)
+		res, err := b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["userName"] = userName
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// create user
@@ -245,10 +245,10 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Metadata:  map[string]string{},
 		}
 		req.Metadata["userName"] = userName
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["password"] = password
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// describe user
@@ -256,10 +256,10 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Operation: DescribeUserOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["userName"] = userName
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// list users
@@ -267,7 +267,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Operation: ListUsersOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// list system users
@@ -275,7 +275,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Operation: ListSystemAccountsOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 
 		// grant role
@@ -283,25 +283,25 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Operation: GrantUserRoleOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["userName"] = userName
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["roleName"] = "fakerole"
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		for _, roleType := range []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole} {
 			roleStr := (string)(roleType)
 			req.Metadata["roleName"] = roleStr
-			res, err = b.Dispatch(ctx, req)
+			res, err = b.Invoke(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 
 			req.Metadata["roleName"] = strings.ToUpper(roleStr)
-			res, err = b.Dispatch(ctx, req)
+			res, err = b.Invoke(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 		}
 
@@ -310,25 +310,25 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Operation: RevokeUserRoleOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["userName"] = userName
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		req.Metadata["roleName"] = "fakerole"
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 
 		for _, roleType := range []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole} {
 			roleStr := (string)(roleType)
 			req.Metadata["roleName"] = roleStr
-			res, err = b.Dispatch(ctx, req)
+			res, err = b.Invoke(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 
 			req.Metadata["roleName"] = strings.ToUpper(roleStr)
-			res, err = b.Dispatch(ctx, req)
+			res, err = b.Invoke(ctx, req)
 			assertResponse(t, res, err, RespEveSucc)
 		}
 		// delete user
@@ -336,10 +336,10 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			Operation: DeleteUserOp,
 			Metadata:  map[string]string{},
 		}
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveFail)
 		req.Metadata["userName"] = userName
-		res, err = b.Dispatch(ctx, req)
+		res, err = b.Invoke(ctx, req)
 		assertResponse(t, res, err, RespEveSucc)
 	})
 }

@@ -180,7 +180,7 @@ func route(character string, ctx context.Context, request *ProbeRequest) (*Probe
 	// if there is no builtin type, use the custom
 	if !ok {
 		Logger.Info("No correspond builtin type, use the custom...")
-		return customOp.Dispatch(ctx, request)
+		return customOp.Invoke(ctx, request)
 	}
-	return ops.Dispatch(ctx, request)
+	return ops.Invoke(ctx, request)
 }

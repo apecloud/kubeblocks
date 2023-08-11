@@ -57,7 +57,7 @@ type BaseInternalOps interface {
 	InternalExec(ctx context.Context, sql string) (int64, error)
 	GetLogger() logr.Logger
 	GetRunningPort() int
-	Dispatch(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error)
+	Invoke(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error)
 }
 
 type BaseOperations struct {
@@ -155,8 +155,8 @@ func (ops *BaseOperations) getAddress() string {
 	return "127.0.0.1"
 }
 
-// Dispatch handles all invoke operations.
-func (ops *BaseOperations) Dispatch(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error) {
+// Invoke handles all invoke operations.
+func (ops *BaseOperations) Invoke(ctx context.Context, req *ProbeRequest) (*ProbeResponse, error) {
 	if req == nil {
 		return nil, errors.Errorf("invoke request required")
 	}

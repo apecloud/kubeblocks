@@ -79,7 +79,7 @@ func TestRedisInvokeCreate(t *testing.T) {
 	mock.ExpectDo("SET", testKey, testData).SetVal("ok")
 
 	// invoke
-	bindingRes, err := r.Dispatch(context.TODO(), request)
+	bindingRes, err := r.Invoke(context.TODO(), request)
 	assert.Equal(t, nil, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -103,7 +103,7 @@ func TestRedisInvokeGet(t *testing.T) {
 	mock.ExpectDo("GET", testKey).SetVal(testData)
 
 	// invoke create
-	bindingRes, err := r.Dispatch(context.TODO(), request)
+	bindingRes, err := r.Invoke(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -112,7 +112,7 @@ func TestRedisInvokeGet(t *testing.T) {
 	assert.Equal(t, RespEveFail, opsResult[RespTypEve])
 
 	// invoke one more time
-	bindingRes, err = r.Dispatch(context.TODO(), request)
+	bindingRes, err = r.Invoke(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
@@ -136,7 +136,7 @@ func TestRedisInvokeDelete(t *testing.T) {
 	mock.ExpectDo("DEL", testKey).SetVal("ok")
 
 	// invoke delete
-	bindingRes, err := r.Dispatch(context.TODO(), request)
+	bindingRes, err := r.Invoke(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -158,7 +158,7 @@ func TestRedisGetRoles(t *testing.T) {
 	mock.ExpectInfo("Replication").SetVal("role:master\r\nconnected_slaves:1")
 	mock.ExpectInfo("Replication").SetVal("role:slave\r\nmaster_port:6379")
 	// invoke request
-	bindingRes, err := r.Dispatch(context.TODO(), request)
+	bindingRes, err := r.Invoke(context.TODO(), request)
 	assert.Nil(t, err)
 	assert.NotNil(t, bindingRes)
 	assert.NotNil(t, bindingRes.Data)
@@ -168,7 +168,7 @@ func TestRedisGetRoles(t *testing.T) {
 	assert.Equal(t, PRIMARY, opsResult["role"])
 
 	// invoke one more time
-	bindingRes, err = r.Dispatch(context.TODO(), request)
+	bindingRes, err = r.Invoke(context.TODO(), request)
 	assert.Nil(t, err)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
@@ -186,7 +186,7 @@ func TestRedisAccounts(t *testing.T) {
 	t.Run("List Accounts", func(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
-		response, err := r.Dispatch(ctx, &ProbeRequest{
+		response, err := r.Invoke(ctx, &ProbeRequest{
 			Operation: ListUsersOp,
 		})
 
@@ -253,7 +253,7 @@ func TestRedisAccounts(t *testing.T) {
 
 		for _, accTest := range testCases {
 			request.Metadata = accTest.testMetaData
-			response, err = r.Dispatch(ctx, request)
+			response, err = r.Invoke(ctx, request)
 			assert.Nil(t, err)
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
@@ -317,7 +317,7 @@ func TestRedisAccounts(t *testing.T) {
 			}
 			for _, accTest := range testCases {
 				request.Metadata = accTest.testMetaData
-				response, err = r.Dispatch(ctx, request)
+				response, err = r.Invoke(ctx, request)
 				assert.Nil(t, err)
 				assert.NotNil(t, response.Data)
 				err = json.Unmarshal(response.Data, &opsResult)
@@ -409,7 +409,7 @@ func TestRedisAccounts(t *testing.T) {
 
 		for _, accTest := range testCases {
 			request.Metadata = accTest.testMetaData
-			response, err = r.Dispatch(ctx, request)
+			response, err = r.Invoke(ctx, request)
 			assert.Nil(t, err)
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
@@ -470,7 +470,7 @@ func TestRedisAccounts(t *testing.T) {
 
 		for _, accTest := range testCases {
 			request.Metadata = accTest.testMetaData
-			response, err = r.Dispatch(ctx, request)
+			response, err = r.Invoke(ctx, request)
 			assert.Nil(t, err)
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
@@ -533,7 +533,7 @@ func TestRedisAccounts(t *testing.T) {
 	t.Run("List System Accounts", func(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
-		response, err := r.Dispatch(ctx, &ProbeRequest{
+		response, err := r.Invoke(ctx, &ProbeRequest{
 			Operation: ListSystemAccountsOp,
 		})
 

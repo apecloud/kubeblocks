@@ -70,7 +70,7 @@ func TestInit(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			response, err := hs.Dispatch(context.TODO(), &binding.ProbeRequest{
+			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
 				Data:      []byte(tc.input),
 				Metadata:  tc.metadata,
 				Operation: util.OperationKind(tc.operation),

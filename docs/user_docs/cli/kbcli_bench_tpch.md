@@ -1,39 +1,21 @@
 ---
-title: kbcli bench sysbench
+title: kbcli bench tpch
 ---
 
-run a SysBench benchmark
+Run tpch benchmark
 
 ```
-kbcli bench sysbench [Step] [BenchmarkName] [flags]
+kbcli bench tpch [Step] [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # sysbench on a cluster, that will exec for all steps, cleanup, prepare and run
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
+  # tpch on a cluster, that will exec for all steps, cleanup, prepare and run
+  kbcli bench tpch mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # sysbench run on a cluster with cleanup, only cleanup by deleting the testdata
-  kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
-  
-  # sysbench run on a cluster with prepare, just prepare by creating the testdata
-  kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
-  
-  # sysbench run on a cluster with run, just run by running the test
-  kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
-  
-  # sysbench on a cluster with thread counts
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
-  
-  # sysbench on a cluster with type
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
-  
-  # sysbench on a cluster with specified read/write ratio
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 20
-  
-  # sysbench on a cluster with specified tables and size
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+  # tpch on a cluster with run, just run by running the test
+  kbcli bench tpch run mytest --cluster mycluster --user xxx --password xxx --database mydb
 ```
 
 ### Options
@@ -42,20 +24,13 @@ kbcli bench sysbench [Step] [BenchmarkName] [flags]
       --cluster string        the cluster of database
       --database string       database name
       --driver string         the driver of database
-      --duration int          the seconds of running sysbench (default 60)
       --extra-args strings    extra arguments for benchmark
-  -h, --help                  help for sysbench
+  -h, --help                  help for tpch
       --host string           the host of database
       --password string       the password of database
       --port int              the port of database
-      --read-percent int      the percent of read, only useful when type is oltp_read_write_pct
-      --size int              the data size of per table (default 25000)
-      --tables int            the number of tables (default 10)
-      --threads ints          the number of threads, you can set multiple values, like 4,8 (default [4])
       --tolerations strings   Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
-      --type strings          sysbench type, you can set multiple values (default [oltp_read_write])
       --user string           the user of database
-      --write-percent int     the percent of write, only useful when type is oltp_read_write_pct
 ```
 
 ### Options inherited from parent commands

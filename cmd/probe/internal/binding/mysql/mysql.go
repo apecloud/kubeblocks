@@ -230,7 +230,7 @@ func (mysqlOps *MysqlOperations) getTermAndRole(ctx context.Context) (int, strin
 }
 
 func (mysqlOps *MysqlOperations) GetGlobalInfo(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error) {
-	workloadType := request.Metadata[workloadTypeKey]
+	workloadType := request.Metadata[WorkloadTypeKey]
 	if strings.EqualFold(workloadType, Replication) {
 		// todo implement Replication
 		return GlobalInfo{}, nil

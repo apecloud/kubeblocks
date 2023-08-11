@@ -25,14 +25,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/rand"
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
@@ -187,8 +183,6 @@ var _ = Describe("Volume Protection Operation", func() {
 	Context("Volume Protection", func() {
 		It("init - succeed", func() {
 			obj := optVolProt
-			obj := newVolumeProtectionObj()
-			Expect(obj.Init(component.Properties{})).Should(Succeed())
 			Expect(obj.Pod).Should(Equal(podName))
 			Expect(obj.HighWatermark).Should(Equal(volumeProtectionSpec.HighWatermark))
 			Expect(len(obj.Volumes)).Should(Equal(len(volumeProtectionSpec.Volumes)))

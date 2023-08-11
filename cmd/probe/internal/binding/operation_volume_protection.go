@@ -30,11 +30,9 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
-
-	"github.com/go-logr/logr"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,7 +43,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
@@ -98,26 +95,26 @@ func init() {
 	}
 
 	if err := optVolProt.Requester.init(context.Background()); err != nil {
-		optVolProt.Logger.Warnf("init requester error: %s", err.Error())
+		optVolProt.Logger.Error(err, "init requester error")
 		return
 	}
 
 	optVolProt.Pod = os.Getenv(constant.KBEnvPodName)
 	if err := optVolProt.initVolumes(); err != nil {
-		optVolProt.Logger.Warnf("init volumes to monitor error: %s", err.Error())
+		optVolProt.Logger.Error(err, "init volumes to monitor error")
 	}
-	optVolProt.Logger.Infof("succeed to init volume protection, pod: %s, spec: %s", optVolProt.Pod, optVolProt.buildVolumesMsg())
+	optVolProt.Logger.Info(fmt.Sprintf("succeed to init volume protection, pod: %s, spec: %s", optVolProt.Pod, optVolProt.buildVolumesMsg()))
 }
 
-func (ops *BaseOperations) VolumeProtectionOps(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) VolumeProtectionOps(ctx context.Context, req *ProbeRequest, rsp *ProbeResponse) (OpsResult, error) {
 	if optVolProt.disabled() {
-		ops.Logger.Infof("The volume protection operation is disabled")
+		ops.Logger.Info("The volume protection operation is disabled")
 		return nil, nil
 	}
 
 	summary, err := optVolProt.Requester.request(ctx)
 	if err != nil {
-		ops.Logger.Warnf("request stats summary from kubelet error: %s", err.Error())
+		ops.Logger.Error(err, "request stats summary from kubelet error")
 		return nil, err
 	}
 
@@ -132,12 +129,12 @@ func (ops *BaseOperations) VolumeProtectionOps(ctx context.Context, req *binding
 	return nil, err
 }
 
-func (ops *BaseOperations) LockOps(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) LockOps(ctx context.Context, req *ProbeRequest, rsp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
 	if err != nil || manager == nil {
 		msg := fmt.Sprintf("Get DB manager failed: %v", err)
-		ops.Logger.Warnf(msg)
+		ops.Logger.Info(msg)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = msg
 		return opsRes, nil
@@ -146,7 +143,7 @@ func (ops *BaseOperations) LockOps(ctx context.Context, req *bindings.InvokeRequ
 	err = manager.Lock(ctx, "disk full")
 	if err != nil {
 		msg := fmt.Sprintf("Lock DB failed: %v", err)
-		ops.Logger.Warnf(msg)
+		ops.Logger.Info(msg)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = msg
 		return opsRes, nil
@@ -155,12 +152,12 @@ func (ops *BaseOperations) LockOps(ctx context.Context, req *bindings.InvokeRequ
 	return opsRes, nil
 }
 
-func (ops *BaseOperations) UnlockOps(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) UnlockOps(ctx context.Context, req *ProbeRequest, rsp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
 	if err != nil || manager == nil {
 		msg := fmt.Sprintf("Get DB manager failed: %v", err)
-		ops.Logger.Warnf(msg)
+		ops.Logger.Info(msg)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = msg
 		return opsRes, nil
@@ -169,7 +166,7 @@ func (ops *BaseOperations) UnlockOps(ctx context.Context, req *bindings.InvokeRe
 	err = manager.Unlock(ctx)
 	if err != nil {
 		msg := fmt.Sprintf("Unlock DB failed: %v", err)
-		ops.Logger.Warnf(msg)
+		ops.Logger.Info(msg)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = msg
 		return opsRes, nil
@@ -201,29 +198,6 @@ func (o *operationVolumeProtection) initVolumes() error {
 		}
 	}
 	return nil
-}
-
-func (o *operationVolumeProtection) Invoke(ctx context.Context, req *ProbeRequest, rsp *ProbeResponse) error {
-	if o.disabled() {
-		o.Logger.Info(fmt.Sprintf("The operation %s is disabled", o.Kind()))
-		return nil
-	}
-
-	summary, err := o.Requester.request(ctx)
-	if err != nil {
-		o.Logger.Error(err, "request stats summary from kubelet error")
-		return err
-	}
-
-	if err = o.updateVolumeStats(summary); err != nil {
-		return err
-	}
-
-	msg, err := o.checkUsage(ctx)
-	if err == nil {
-		rsp.Data = []byte(msg)
-	}
-	return err
 }
 
 func (o *operationVolumeProtection) disabled() bool {
@@ -350,7 +324,7 @@ func (o *operationVolumeProtection) lowWatermark(ctx context.Context, msg string
 func (o *operationVolumeProtection) lockInstance(ctx context.Context) error {
 	manager, err := component.GetDefaultManager()
 	if err != nil || manager == nil {
-		o.Logger.Warnf("Get DB manager failed: %v", err)
+		o.Logger.Error(err, "Get DB manager failed")
 	}
 	return manager.Lock(ctx, "disk full")
 }
@@ -358,7 +332,7 @@ func (o *operationVolumeProtection) lockInstance(ctx context.Context) error {
 func (o *operationVolumeProtection) unlockInstance(ctx context.Context) error {
 	manager, err := component.GetDefaultManager()
 	if err != nil || manager == nil {
-		o.Logger.Warnf("Get DB manager failed: %v", err)
+		o.Logger.Error(err, "Get DB manager failed")
 	}
 	return manager.Unlock(ctx)
 }

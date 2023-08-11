@@ -641,7 +641,7 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 }
 
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
-	mgr.Logger.Infof("Lock db: %s", reason)
+	mgr.Logger.Info(fmt.Sprintf("Lock db: %s", reason))
 	m := bson.D{
 		{Key: "fsync", Value: 1},
 		{Key: "lock", Value: true},
@@ -651,7 +651,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 
 	response := mgr.Client.Database("admin").RunCommand(ctx, m)
 	if response.Err() != nil {
-		mgr.Logger.Infof("Lock db (%s) failed: %v", reason, response.Err())
+		mgr.Logger.Error(response.Err(), fmt.Sprintf("Lock db (%s) failed", reason))
 		return response.Err()
 	}
 	if err := response.Decode(&lockResp); err != nil {
@@ -663,17 +663,17 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 		err := errors.Errorf("mongo says: %s", lockResp.Errmsg)
 		return err
 	}
-	mgr.Logger.Infof("Lock db success times: %d", lockResp.LockCount)
+	mgr.Logger.Info(fmt.Sprintf("Lock db success times: %d", lockResp.LockCount))
 	return nil
 }
 
 func (mgr *Manager) Unlock(ctx context.Context) error {
-	mgr.Logger.Infof("Unlock db")
+	mgr.Logger.Info("Unlock db")
 	m := bson.M{"fsyncUnlock": 1}
 	unlockResp := LockResp{}
 	response := mgr.Client.Database("admin").RunCommand(ctx, m)
 	if response.Err() != nil {
-		mgr.Logger.Infof("Unlock db failed: %v", response.Err())
+		mgr.Logger.Error(response.Err(), "Unlock db failed")
 		return response.Err()
 	}
 	if err := response.Decode(&unlockResp); err != nil {
@@ -688,7 +688,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 	for unlockResp.LockCount > 0 {
 		response = mgr.Client.Database("admin").RunCommand(ctx, m)
 		if response.Err() != nil {
-			mgr.Logger.Infof("Unlock db failed: %v", response)
+			mgr.Logger.Error(response.Err(), "Unlock db failed")
 			return response.Err()
 		}
 		if err := response.Decode(&unlockResp); err != nil {
@@ -696,6 +696,6 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 			return err
 		}
 	}
-	mgr.Logger.Infof("Unlock db success")
+	mgr.Logger.Info("Unlock db success")
 	return nil
 }

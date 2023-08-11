@@ -172,7 +172,7 @@ func (ha *Ha) Start() {
 	}
 	ha.logger.Debugf("cluster: %v", cluster)
 
-	ha.EnsurePreDeleteHook()
+	// ha.EnsurePreDeleteHook()
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	for err != nil || !isInitialized {
 		ha.logger.Infof("Waiting for the database cluster to be initialized.")

@@ -104,16 +104,16 @@ var _ = Describe("PITR Functions", func() {
 		)
 
 		var (
-			clusterDef              *appsv1alpha1.ClusterDefinition
-			clusterVersion          *appsv1alpha1.ClusterVersion
-			cluster                 *appsv1alpha1.Cluster
-			synthesizedComponent    *component.SynthesizedComponent
-			pvc                     *corev1.PersistentVolumeClaim
-			backup                  *dpv1alpha1.Backup
-			fullBackupTool          *dpv1alpha1.BackupTool
-			fullBackupToolName      string
-			continousBackupTool     *dpv1alpha1.BackupTool
-			continousBackupToolName string
+			clusterDef               *appsv1alpha1.ClusterDefinition
+			clusterVersion           *appsv1alpha1.ClusterVersion
+			cluster                  *appsv1alpha1.Cluster
+			synthesizedComponent     *component.SynthesizedComponent
+			pvc                      *corev1.PersistentVolumeClaim
+			backup                   *dpv1alpha1.Backup
+			fullBackupTool           *dpv1alpha1.BackupTool
+			fullBackupToolName       string
+			continuousBackupTool     *dpv1alpha1.BackupTool
+			continuousBackupToolName string
 		)
 
 		BeforeEach(func() {
@@ -172,13 +172,13 @@ var _ = Describe("PITR Functions", func() {
 				constant.BackupToolTypeLabelKey: "pitr",
 				constant.ClusterDefLabelKey:     clusterDefName,
 			})
-			continousBackupTool = testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
+			continuousBackupTool = testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
 				backupSelfDefineObj, testapps.RandomizedObjName())
 			// set datafile backup relies on logfile
-			Expect(testapps.ChangeObj(&testCtx, continousBackupTool, func(tmpObj *dpv1alpha1.BackupTool) {
+			Expect(testapps.ChangeObj(&testCtx, continuousBackupTool, func(tmpObj *dpv1alpha1.BackupTool) {
 				tmpObj.Spec.Physical.RelyOnLogfile = true
 			})).Should(Succeed())
-			continousBackupToolName = continousBackupTool.Name
+			continuousBackupToolName = continuousBackupTool.Name
 
 			backupObj := dpv1alpha1.BackupToolList{}
 			Expect(testCtx.Cli.List(testCtx.Ctx, &backupObj)).Should(Succeed())
@@ -196,7 +196,7 @@ var _ = Describe("PITR Functions", func() {
 				SetBackupToolName(fullBackupToolName).
 				SetSchedule("0 * * * *", true).
 				AddIncrementalPolicy().
-				SetBackupToolName(continousBackupToolName).
+				SetBackupToolName(continuousBackupToolName).
 				SetSchedule("0 * * * *", true).
 				Create(&testCtx).GetObject()
 
@@ -257,7 +257,7 @@ var _ = Describe("PITR Functions", func() {
 			}
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backup))
 
-			By("By creating continous backup: ")
+			By("By creating continuous backup: ")
 			logfileBackupLabels := map[string]string{
 				constant.AppInstanceLabelKey:              sourceCluster,
 				constant.KBAppComponentLabelKey:           mysqlCompName,
@@ -277,7 +277,7 @@ var _ = Describe("PITR Functions", func() {
 				CompletionTimestamp:       incrStopTime,
 				SourceCluster:             clusterName,
 				PersistentVolumeClaimName: logfileRemotePVC.Name,
-				BackupToolName:            continousBackupToolName,
+				BackupToolName:            continuousBackupToolName,
 				Manifests: &dpv1alpha1.ManifestsStatus{
 					BackupLog: &dpv1alpha1.BackupLogStatus{
 						StartTime: incrStartTime,
@@ -346,7 +346,7 @@ var _ = Describe("PITR Functions", func() {
 				return logicJobKey
 			}
 
-			continousPhysicalRestore := func() types.NamespacedName {
+			continuousPhysicalRestore := func() types.NamespacedName {
 				By("create and wait for pitr physical restore job is completed ")
 				err := DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)
 				Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
@@ -360,13 +360,13 @@ var _ = Describe("PITR Functions", func() {
 				return jobKey
 			}
 
-			continousLogicalRestore := func() types.NamespacedName {
+			continuousLogicalRestore := func() types.NamespacedName {
 				By("create and wait for pitr logical job is completed ")
 				err := DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)
 				Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 				By("mock the podScope is ReadWrite for logic restore")
-				Expect(testapps.ChangeObj(&testCtx, continousBackupTool, func(tool *dpv1alpha1.BackupTool) {
+				Expect(testapps.ChangeObj(&testCtx, continuousBackupTool, func(tool *dpv1alpha1.BackupTool) {
 					tool.Spec.Logical.PodScope = dpv1alpha1.PodRestoreScopeReadWrite
 				})).Should(Succeed())
 				err = DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)
@@ -387,9 +387,9 @@ var _ = Describe("PITR Functions", func() {
 				backupJobKeys = append(backupJobKeys, baseBackupPhysicalRestore())
 			}
 
-			// do continous backup physical restore
-			if continousBackupTool.Spec.Physical.GetPhysicalRestoreCommand() != nil {
-				backupJobKeys = append(backupJobKeys, continousPhysicalRestore())
+			// do continuous backup physical restore
+			if continuousBackupTool.Spec.Physical.GetPhysicalRestoreCommand() != nil {
+				backupJobKeys = append(backupJobKeys, continuousPhysicalRestore())
 			}
 			Expect(DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)).Should(Succeed())
 
@@ -404,9 +404,9 @@ var _ = Describe("PITR Functions", func() {
 				backupJobKeys = append(backupJobKeys, baseBackupLogicalRestore())
 			}
 
-			// do continous logical restore
-			if continousBackupTool.Spec.Logical.GetLogicalRestoreCommand() != nil {
-				backupJobKeys = append(backupJobKeys, continousLogicalRestore())
+			// do continuous logical restore
+			if continuousBackupTool.Spec.Logical.GetLogicalRestoreCommand() != nil {
+				backupJobKeys = append(backupJobKeys, continuousLogicalRestore())
 			}
 			Expect(DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)).Should(Succeed())
 

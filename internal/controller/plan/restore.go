@@ -148,7 +148,7 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		jobs = append(jobs, restoreJobs...)
 	}
 
-	continousJobs, err := pitrMgr.doLogfileBackupRestore(component, baseBackup)
+	continuousJobs, err := pitrMgr.doLogfileBackupRestore(component, baseBackup)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 	if err = pitrMgr.cleanupClusterAnnotations(); err != nil {
 		return err
 	}
-	jobs = append(jobs, continousJobs...)
+	jobs = append(jobs, continuousJobs...)
 	return pitrMgr.cleanupJobs(jobs)
 }
 
@@ -202,13 +202,13 @@ func (p *RestoreManager) doLogfileBackupRestore(component *component.Synthesized
 	if err != nil {
 		return nil, err
 	}
-	var continousJobs []client.Object
+	var continuousJobs []client.Object
 	if len(recoveryInfo.Physical.GetPhysicalRestoreCommand()) != 0 {
 		prepareDataJobs, err := p.buildPITRPhysicalRestoreJob(component, recoveryInfo, logfileBackup)
 		if err != nil {
 			return nil, err
 		}
-		continousJobs = append(continousJobs, prepareDataJobs...)
+		continuousJobs = append(continuousJobs, prepareDataJobs...)
 	}
 
 	if len(recoveryInfo.Logical.GetLogicalRestoreCommand()) != 0 {
@@ -216,14 +216,14 @@ func (p *RestoreManager) doLogfileBackupRestore(component *component.Synthesized
 		if err != nil {
 			return nil, err
 		}
-		continousJobs = append(continousJobs, postReadyJobs...)
+		continuousJobs = append(continuousJobs, postReadyJobs...)
 	}
 
 	// do create PITR job and check completed
-	if err = p.createJobsAndWaiting(continousJobs); err != nil {
+	if err = p.createJobsAndWaiting(continuousJobs); err != nil {
 		return nil, err
 	}
-	return continousJobs, nil
+	return continuousJobs, nil
 }
 
 func (p *RestoreManager) listCompletedBackups(componentName string) (backupItems []dpv1alpha1.Backup, err error) {

@@ -23,6 +23,13 @@ spec:
       volumeTypes:
         - name: data
           type: data
+      configSpecs:
+        - name: mysql-config
+          templateRef: oracle-mysql-config-template
+          constraintRef: oracle-mysql-config-constraints
+          volumeName: configs
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
       podSpec:
         containers:
           - name: mysql-container
@@ -30,6 +37,8 @@ spec:
             volumeMounts:
               - mountPath: /var/lib/mysql
                 name: data
+              - mountPath: /etc/mysql/conf.d
+                name: configs
             ports:
               - containerPort: 3306
                 name: mysql

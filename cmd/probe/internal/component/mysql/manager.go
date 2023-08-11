@@ -23,7 +23,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -74,7 +73,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		return nil, fmt.Errorf("KB_POD_NAME is not set")
 	}
 
-	serverID, err := getIndex(currentMemberName)
+	serverID, err := component.GetIndex(currentMemberName)
 	if err != nil {
 		return nil, err
 	}
@@ -92,14 +91,6 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 
 	component.RegisterManager("mysql", Mgr)
 	return Mgr, nil
-}
-
-func getIndex(memberName string) (int, error) {
-	i := strings.LastIndex(memberName, "-")
-	if i < 0 {
-		return 0, fmt.Errorf("the format of member name is wrong: %s", memberName)
-	}
-	return strconv.Atoi(memberName[i+1:])
 }
 
 func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
@@ -236,7 +227,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 
 func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	mgr.DBState = nil
-	_, _ = mgr.EnsureServerID(ctx)
+	// _, _ = mgr.EnsureServerID(ctx)
 	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
 	if !mgr.IsMemberHealthy(ctx, cluster, member) {
 		return false

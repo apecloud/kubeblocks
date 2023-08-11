@@ -149,29 +149,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 		return SECONDARY, nil
 	}
 
-	getReadOnlySQL := `show global variables like 'read_only';`
-	data, err := mysqlOps.query(ctx, getReadOnlySQL)
-	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySQL, err)
-		return "", errors.Wrapf(err, "error executing %s", getReadOnlySQL)
-	}
-
-	queryRes := &QueryRes{}
-	err = json.Unmarshal(data, queryRes)
-	if err != nil {
-		return "", errors.Errorf("parse query failed, err:%v", err)
-	}
-
-	for _, mapVal := range *queryRes {
-		if mapVal["Variable_name"] == "read_only" {
-			if mapVal["Value"].(string) == "OFF" {
-				return PRIMARY, nil
-			} else if mapVal["Value"].(string) == "ON" {
-				return SECONDARY, nil
-			}
-		}
-	}
-	return "", errors.Errorf("parse query failed, no records")
+	return PRIMARY, nil
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {

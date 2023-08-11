@@ -24,6 +24,13 @@ Define the rolebinding name
 {{- end }}
 
 {{/*
+Define the clusterrolebinding name
+*/}}
+{{- define "kblib.clusterRoleBindingName" -}}
+{{- printf "kb-%s" (include "kblib.clusterName" .) }}
+{{- end }}
+
+{{/*
 Define the service account
 */}}
 {{- define "kblib.serviceAccount" }}
@@ -34,26 +41,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kblib.clusterLabels" . | nindent 4 }}
-{{- end }}
-
-{{/*
-Define the role
-*/}}
-{{- define "kblib.role" }}
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ include "kblib.roleName" . }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "kblib.clusterLabels" . | nindent 4 }}
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
 {{- end }}
 
 {{/*
@@ -68,8 +55,28 @@ metadata:
     {{- include "kblib.clusterLabels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ include "kblib.roleName" . }}
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kblib.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+
+{{/*
+Define the rolebinding
+*/}}
+{{- define "kblib.clusterRoleBinding" }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kblib.roleBindingName" . }}
+  labels:
+    {{- include "kblib.clusterLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
 subjects:
   - kind: ServiceAccount
     name: {{ include "kblib.serviceAccountName" . }}
@@ -84,7 +91,7 @@ Define the whole rbac
 ---
 {{- include "kblib.serviceAccount" . }}
 ---
-{{- include "kblib.role" . }}
+{{- include "kblib.clusterRoleBinding" . }}
 ---
 {{- include "kblib.roleBinding" . }}
 {{- else }}

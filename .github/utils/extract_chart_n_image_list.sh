@@ -1,7 +1,7 @@
 #!/bin/bash
 
-KB_VERSION=${1:-0.5.2}
-KB_HELM_REPO_INDEX_URL_BASE=https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+KB_VERSION=${1:-0.6.0-beta.36}
+KB_HELM_REPO_INDEX_URL_BASE=https://apecloud.github.io/helm-charts
 KB_HELM_REPO_INDEX_URL=${KB_HELM_REPO_INDEX_URL_BASE}/index.yaml
 
 # set -o errexit
@@ -26,6 +26,8 @@ done
 # Regular expression to match http or https
 regex="^(http|https)://.*"
 
+# Get helm chart index
+echo "Processing helm chart index: ${KB_HELM_REPO_INDEX_URL}"
 kb_index_json=`curl ${KB_HELM_REPO_INDEX_URL} | yq eval -ojson`
 entries=`echo ${kb_index_json} | jq -r '.entries | keys | .[]'`
 
@@ -41,7 +43,22 @@ do
     # specialized processor
     case ${entry} in
         # ignored entries
-        "agamotto" | "apecloud-mysql-scale" | "apecloud-mysql-scale-cluster" | "chaos-mesh" | "chatgpt-retrieval-plugin" | "clickhouse" | "delphic" | "etcd" | "etcd-cluster" | "kafka" | "opensearch" | "opensearch-cluster" | "redis-demo" | "prometheus-kubeblocks" )
+        "agamotto" | \
+        "apecloud-mysql-cluster" | \
+        "postgresql-cluster" | \
+        "tdengine-cluster" | \
+        "chaos-mesh" | \
+        "chatgpt-retrieval-plugin" | \
+        "clickhouse" | \
+        "delphic" | \
+        "etcd" | \
+        "etcd-cluster" | \
+        "kafka" | \
+        "opensearch" | \
+        "opensearch-cluster" | \
+        "redis-demo" | \
+        "prometheus-kubeblocks" | \
+        "bytebase" )
             continue
             ;;
         "aws-load-balancer-controller")
@@ -62,7 +79,7 @@ do
         select_entry=`echo ${kb_index_json} | jq -r ".entries[\"${entry}\"][] | select(.version == \"${version}\")"`
         url=`echo ${select_entry} | jq -r '.urls[0]'`
         if [ -z "$url" ]; then
-            # choose lastest version instead
+            # choose latest version instead
             select_entry=`echo ${kb_index_json} | jq -r ".entries[\"${entry}\"][0]"`
             url=`echo ${select_entry} | jq -r '.urls[0]'`
             version=`echo ${select_entry} | jq -r '.version'`
@@ -74,7 +91,7 @@ do
 
     # extract images from helm templates
     if [ -z "${images}" ]; then
-        images=`helm template ${entry} ${url} ${helm_custom_args} | grep "image:" | awk '{print $2}'`
+        images=`helm template ${entry} ${url} ${helm_custom_args} | grep -e "image:" -e "chartsImage"| awk '{print $2}'`
     fi
 
     chart_url_array+=(${url})
@@ -96,3 +113,51 @@ chart_url_json_arr="[$(printf '"%s",' "${chart_url_array[@]}" | sed 's/,$//')]"
 images_json_arr="[$(printf '"%s",' "${image_set[@]}" | sed 's/,$//')]"
 json_out="{\"chartURLs\":${chart_url_json_arr},\"images\":${images_json_arr}}"
 echo $json_out | jq -r '.'
+
+# Generata a daemonSet yaml to pre pull images on all nodes
+whiteList=(kubeblocks mysql spilo mongo pgbouncer redis wal-g)
+cat <<EOF > prepuller.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kubeblocks-image-prepuller
+spec:
+  selector:
+    matchLabels:
+      name: kubeblocks-image-prepuller
+  template:
+    metadata:
+      labels:
+        name: kubeblocks-image-prepuller
+    spec:
+      initContainers:
+EOF
+
+count=1
+for image in "${image_set[@]}"; do
+    match=false
+    for j in "${whiteList[@]}"; do
+        if [[ "$image" =~ "$j" ]]; then
+            match=true
+        fi
+    done
+
+    if ! $match; then
+        echo "skip image=${image}"
+        continue
+    fi
+
+   cat <<EOF >> prepuller.yaml
+        - name: pull-${count}
+          image: ${image}
+          imagePullPolicy: IfNotPresent
+          command: ["echo", "pull ${image}"]
+EOF
+   count=$((count+1))
+done
+
+cat <<EOF >> prepuller.yaml
+      containers:
+        - name: pause
+          image: k8s.gcr.io/pause:3.2
+EOF

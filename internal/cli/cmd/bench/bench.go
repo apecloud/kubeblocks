@@ -26,7 +26,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -190,7 +189,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Use:     "list",
 		Short:   "List all benchmarks.",
 		Aliases: []string{"ls"},
-		Args:    cli.NoArgs,
+		Args:    cobra.NoArgs,
 		Example: benchListExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.run())

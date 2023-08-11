@@ -572,12 +572,13 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>physical</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
-BackupToolRestoreCommand
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">
+PhysicalConfig
 </a>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>backup tool can support physical restore, in this case, restore must be RESTART database.</p><br />
 </td>
 </tr>
@@ -1593,6 +1594,18 @@ string
 </tr>
 <tr>
 <td>
+<code>logFilePersistentVolumeClaimName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>logFilePersistentVolumeClaimName saves the logfile backup data.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>backupToolName</code><br/>
 <em>
 string
@@ -1770,6 +1783,18 @@ string
 </tr>
 <tr>
 <td>
+<code>logFilePath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>logFilePath records the log file path of backup.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeName</code><br/>
 <em>
 string
@@ -1821,7 +1846,7 @@ string
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">BackupToolRestoreCommand
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">LogicalConfig</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">LogicalConfig</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">PhysicalConfig</a>)
 </p>
 <div>
 <p>BackupToolRestoreCommand defines the restore commands of BackupTool</p><br />
@@ -1980,12 +2005,13 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>physical</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
-BackupToolRestoreCommand
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">
+PhysicalConfig
 </a>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>backup tool can support physical restore, in this case, restore must be RESTART database.</p><br />
 </td>
 </tr>
@@ -2467,6 +2493,50 @@ string
 </td>
 <td>
 <p>the namespace of the persistentVolume ConfigMap.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">PhysicalConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>BackupToolRestoreCommand</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
+BackupToolRestoreCommand
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>BackupToolRestoreCommand</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>relyOnLogfile</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>relyOnLogfile defines whether the current recovery relies on log files</p><br />
 </td>
 </tr>
 </tbody>

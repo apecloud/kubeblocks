@@ -138,7 +138,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Image = viper.GetString(constant.KBProbeImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"probe",
-		"--port", "3501"} // fixme: port shouldn't be const, it should be probeSvcHTTPPort
+		"--port", strconv.Itoa(probeSvcHTTPPort)}
 
 	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
 		mainContainer := component.PodSpec.Containers[0]
@@ -213,7 +213,11 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	bindingType := strings.ToLower(component.CharacterType)
 	workloadType := component.WorkloadType
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(getGlobalInfoFormat, bindingType)
+	if viper.GetBool("ENABLE_PROBE_SNAPSHOT") {
+		httpGet.Path = fmt.Sprintf(getGlobalInfoFormat, bindingType)
+	} else {
+		httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
+	}
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

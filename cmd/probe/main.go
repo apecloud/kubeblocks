@@ -27,11 +27,17 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
+	"github.com/go-logr/zapr"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.uber.org/automaxprocs/maxprocs"
+	"go.uber.org/zap"
+
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var port int
@@ -82,6 +88,11 @@ func main() {
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if IsHAAvailable(characterType, workloadType) {
+		production, err := zap.NewProduction()
+		if err != nil {
+			panic(fmt.Errorf("fatal error create ha logger:%v", err))
+		}
+		logHa := zapr.NewLogger(production)
 		ha := highavailability.NewHa(logHa)
 		if ha != nil {
 			defer ha.ShutdownWithWait()

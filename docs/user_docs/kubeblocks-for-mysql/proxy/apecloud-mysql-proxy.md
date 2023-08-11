@@ -1,22 +1,22 @@
 ---
-title: How to use KubeBlocks Proxy
-description: KubeBlocks proxy instructions
-keywords: [instructions, proxy]
+title: How to use ApeCloud MySQL Proxy
+description: ApeCloud MySQL Proxy tutorial
+keywords: [apecloud mysql proxy, proxy]
 sidebar_position: 2
-sidebar_label: How to use KubeBlocks Proxy
+sidebar_label: ApeCloud MySQL Proxy
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# How to use KubeBlocks Proxy
+# ApeCloud MySQL Proxy
 
 ## Before you start
 
 1. [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
 2. Install KubeBlocks.
 
-   You can run `kbcli playground init` to install a k3d cluster and KubeBlocks. For details,refer to [Try KubeBlocks on your laptop](./../../playground/try-kubeblocks-on-your-laptop.md) or [Try KubeBlocks on cloud](./../../playground/try-kubeblocks-on-cloud.md).
+   You can run `kbcli playground init` to install a k3d cluster and KubeBlocks. For details, refer to [Try KubeBlocks on your laptop](./../../playground/try-kubeblocks-on-your-laptop.md) or [Try KubeBlocks on cloud](./../../playground/try-kubeblocks-on-cloud.md).
 
    ```bash
    kbcli playground init
@@ -26,19 +26,23 @@ import TabItem from '@theme/TabItem';
    ```
 
    Or if you already have a Kubernetes cluster, you can choose install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm) or [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-3. Prepare an ApeCloud MySQL Raft Group named `mycluster` for demostrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
+3. Prepare an ApeCloud MySQL Raft Group named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
 
 ## Create a Proxy cluster
 
-### (Recommended) Option 1. By kbcli
+<Tabs>
 
-Run the command below to create an ApeCloud MySQL Proxy cluster.
+<TabItem value="kbcli" label="kbcli" default>
+
+It is recommended to use kbcli to create an ApeCloud MySQL Proxy cluster.
 
 ```bash
 kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none --proxy-enabled true
 ```
 
-### Option 2. By Helm
+</TabItem>
+
+<TabItem value="Helm" label="Helm">
 
 1. Add the KubeBlocks repository.
 
@@ -52,7 +56,7 @@ kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none -
    helm repo list
    ```
 
-3. Run the update command to make sure you have added the lateset version.
+3. Run the update command to make sure you have added the latest version.
 
    ```bash
    helm repo update
@@ -64,7 +68,7 @@ kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none -
    helm search repo kubeblocks/apecloud-mysql --devel --versions
    ```
 
-5. (Optional) If you disable the `apecloud-mysql` add-on when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL Proxy. Skip this step if you install KubeBlocks with the default settings.
+5. (Optional) If you disable the `apecloud-mysql` add-on when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
 
    ```bash
    helm install myproxy kubeblocks/apecloud-mysql --version=v0.6.0-beta.29
@@ -76,16 +80,19 @@ kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none -
    helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0-beta.29 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
    ```
 
-### Option 3. By source code
+</TabItem>
+
+<TabItem value="Source code" label="Source code">
 
 If the versions in the Helm repo do not meet your need, you can create a Proxy cluster from your local helm chart.
 
-The following instructions is based on the latest change directory which is under the main branch of KubeBlocks.
+The following instructions are based on the latest change directory of the main branch of KubeBlocks.
 
 1. Clone the KubeBlocks repository.
 
    ```bash
    git clone git@github.com:apecloud/kubeblocks.git
+
    cd kubeblocks
    ```
 
@@ -99,6 +106,7 @@ The following instructions is based on the latest change directory which is unde
 
    ```bash
    cd deploy/apecloud-mysql-cluster/
+
    helm dependency build
    ```
 
@@ -107,6 +115,10 @@ The following instructions is based on the latest change directory which is unde
    ```bash
    helm install myproxy deploy/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true
    ```
+
+</TabItem>
+
+</Tabs>
 
 ## Enable Proxy dynamically
 
@@ -195,7 +207,7 @@ kbcli cluster connect myproxy
 
 <TabItem value="port-forward" label="port-forward">
 
-1. Expose the port of MySQL client to the localhost so that the localhost can access the MySQL client.
+1. Expose the port of the MySQL client to the localhost so that the localhost can access the MySQL client.
 
    ```bash
    kubectl port-forward svc/vt-mysql 3306:3306
@@ -220,7 +232,7 @@ For VTGate,
 while true; do date; kubectl port-forward svc/vt-vtgate-headless 15306:15306; sleep 0.5; done
 ```
 
-For MySQL Client,
+For the MySQL Client,
 
 ```bash
 while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; done
@@ -329,7 +341,7 @@ You can view the log files of components, Pods, and containers by both kbcli and
 
 <TabItem value="kbcli" label="kbcli" default>
 
-View log of different components.
+View the log of different components.
 
 ```bash
 kbcli cluster list-logs myproxy
@@ -386,26 +398,47 @@ ls /vtdataroot
 
 ## Monitoring
 
-Run the command below to open the Grafana web console.
+:::note
 
-```bash
-kbcli cluster update myproxy --monitor=true
+In the production environment, all monitoring add-ons are disabled by default when installing KubeBlocks. You can enable these add-ons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service. For details, refer to [Monitoring](./../../observability/monitor-database.md).
 
-kbcli dashboard open kubeblocks-grafana
+:::
 
-# Address
-http://127.0.0.1:13000/?orgId=1
-```
+1. Enable the monitoring function.
 
-## Read write splitting
+   ```bash
+   kbcli cluster update myproxy --monitor=true
+   ```
 
-You can enable the read write spliiting function.
+2. View the add-on list and enable the Grafana add-on.
+
+   ```bash
+   kbcli addon list 
+   
+   kbcli addon enable grafana
+   ```
+
+3. View the dashboard list.
+
+   ```bash
+   kbcli dashboard list
+   ```
+
+4. Open the Grafana dashboard.
+
+   ```bash
+   kbcli dashboard open kubeblocks-grafana
+   ```
+
+## Read-write splitting
+
+You can enable the read-write splitting function.
 
 ```bash
 kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_policy=random
 ```
 
-You can also set the ratio for read write splitting and here is an example of directing 70% flow to the readonly node.
+You can also set the ratio for read-write splitting and here is an example of directing 70% flow to the read-only node.
 
 ```bash
 kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_ratio=70
@@ -419,7 +452,7 @@ show workload;
 
 ## Transparent failover
 
-Run the command below to perfom transparent failover.
+Run the command below to implement transparent failover.
 
 ```bash
 kbcli cluster configure myproxy --component vtgate --set=enable_buffer=true

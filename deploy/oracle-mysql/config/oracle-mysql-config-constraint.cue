@@ -17,6 +17,9 @@
 
 #MysqlParameter: {
 
+	// Sets the autocommit mode
+	autocommit?: string & "0" | "1" | "OFF" | "ON"
+
 	open_files_limit: int | *5000
 
 	// Enables or disables the Performance Schema

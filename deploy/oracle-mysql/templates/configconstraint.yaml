@@ -1,4 +1,3 @@
-{{- $cc := .Files.Get "config/oracle-mysql-config-effect-scope.yaml" | fromYaml }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
@@ -12,14 +11,7 @@ spec:
     iniConfig:
       sectionName: mysqld
 
-  # top level mysql configuration type
-  cfgSchemaTopLevelName: MysqlParameter
-
-  # ConfigurationSchema that impose restrictions on engine parameter's rule
-  configurationSchema:
-    cue: |-
-      {{- .Files.Get "config/oracle-mysql-config-constraint.cue" | nindent 6 }}
-
+  # mysql reload script for dynamic parameter
   reloadOptions:
     tplScriptTrigger:
       sync: true
@@ -27,28 +19,32 @@ spec:
       namespace: {{ .Release.Namespace }}
 
   ## define static parameter list
-  {{- if hasKey $cc "staticParameters" }}
   staticParameters:
-    {{- $params := get $cc "staticParameters" }}
-    {{- range $params }}
-    - {{ . }}
-    {{- end }}
-  {{- end}}
+    - open_files_limit
+    - performance_schema
+    - enforce_gtid_consistency
 
   ## define dynamic parameter list
-  {{- if hasKey $cc "dynamicParameters" }}
   dynamicParameters:
-   {{- $params := get $cc "dynamicParameters" }}
-   {{- range $params }}
-    - {{ . }}
-   {{- end }}
- {{- end}}
+    - innodb_buffer_pool_size
+    - max_connections
+    - gtid_mode
+    - read_buffer_size
+    - read_only
+    - read_rnd_buffer_size
+    - join_buffer_size
+    - sort_buffer_size
+    - innodb_flush_log_at_trx_commit
+    - sync_binlog
+    - autocommit
 
- ## define immutable parameter list, this feature is not currently supported.
- {{- if hasKey $cc "immutableParameters" }}
-  immutableParameters:
-   {{- $params := get $cc "immutableParameters" }}
-   {{- range $params }}
-    - {{ . }}
-   {{- end }}
- {{- end}}
+  # define parameter validation rules
+  # top level mysql configuration type
+  cfgSchemaTopLevelName: MysqlParameter
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/oracle-mysql-config-constraint.cue" | nindent 6 }}
+
+
+

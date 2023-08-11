@@ -638,16 +638,6 @@ type ClusterDefinitionProbeCMDs struct {
 	Queries []string `json:"queries,omitempty"`
 }
 
-type Action struct {
-	// Image specified by user
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// Command provided by user to perform action in Image
-	// +kubebuilder:validation:Required
-	Command []string `json:"command"`
-}
-
 type ClusterDefinitionProbe struct {
 	// How often (in seconds) to perform the probe.
 	// +kubebuilder:default=1
@@ -667,9 +657,6 @@ type ClusterDefinitionProbe struct {
 	// commands used to execute for probe.
 	// +optional
 	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
-
-	// +optional
-	Actions []Action `json:"actions,omitempty"`
 }
 
 type ClusterDefinitionProbes struct {

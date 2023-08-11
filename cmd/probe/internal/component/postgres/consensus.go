@@ -282,8 +282,7 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
 }
 
-func (mgr *Manager) PromoteConsensus() error {
-	ctx := context.TODO()
+func (mgr *Manager) PromoteConsensus(ctx context.Context) error {
 	if isLeader, err := mgr.IsLeader(context.TODO(), nil); isLeader && err == nil {
 		mgr.Logger.Infof("i am already the leader, don't need to promote")
 		return nil
@@ -322,6 +321,6 @@ func (mgr *Manager) DemoteConsensus() error {
 	return nil
 }
 
-func (mgr *Manager) FollowConsensus(cluster *dcs.Cluster) error {
+func (mgr *Manager) FollowConsensus() error {
 	return nil
 }

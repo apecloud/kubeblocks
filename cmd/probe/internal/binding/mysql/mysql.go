@@ -32,12 +32,14 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -115,11 +117,19 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	workloadType := request.Metadata[WorkloadTypeKey]
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if strings.EqualFold(workloadType, Replication) {
-		return mysqlOps.GetRoleForReplication(ctx, request, response)
+		dcsStore := dcs.GetStore()
+		if dcsStore == nil {
+			return "", nil
+		}
+		k8sStore := dcsStore.(*dcs.KubernetesStore)
+		cluster := k8sStore.GetClusterFromCache()
+		if cluster == nil || !cluster.IsLocked() {
+			return "", nil
+		}
 	}
-	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+	return mysqlOps.manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {

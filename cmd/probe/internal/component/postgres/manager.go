@@ -278,7 +278,9 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	}
 }
 
-func (mgr *Manager) Recover() {}
+func (mgr *Manager) Recover(context.Context) error {
+	return nil
+}
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	switch mgr.workLoadType {
@@ -331,18 +333,18 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	}
 }
 
-func (mgr *Manager) Promote() error {
+func (mgr *Manager) Promote(ctx context.Context) error {
 	switch mgr.workLoadType {
 	case Consensus:
-		return mgr.PromoteConsensus()
+		return mgr.PromoteConsensus(ctx)
 	case Replication:
-		return mgr.PromoteReplication()
+		return mgr.PromoteReplication(ctx)
 	default:
 		return InvalidWorkLoadType
 	}
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
 
 	switch mgr.workLoadType {
@@ -355,12 +357,12 @@ func (mgr *Manager) Demote() error {
 	}
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	switch mgr.workLoadType {
 	case Consensus:
-		return mgr.FollowConsensus(cluster)
+		return mgr.FollowConsensus()
 	case Replication:
-		return mgr.FollowReplication(cluster)
+		return mgr.FollowReplication(ctx, cluster)
 	default:
 		return InvalidWorkLoadType
 	}

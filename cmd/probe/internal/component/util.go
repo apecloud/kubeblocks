@@ -23,6 +23,13 @@ import (
 	"os"
 )
 
+const (
+	// types for probe
+	CheckRunningType int = iota
+	CheckStatusType
+	CheckRoleChangedType
+)
+
 func MaxInt64(x, y int64) int64 {
 	if x > y {
 		return x

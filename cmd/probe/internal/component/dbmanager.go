@@ -38,14 +38,24 @@ type DBManager interface {
 	// Functions related to cluster initialization.
 	InitializeCluster(context.Context, *dcs.Cluster) error
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
+	// IsCurrentMemberInCluster checks if current member is configured in cluster for consensus.
+	// it will always return true for replicationset.
 	IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool
 
-	// Functions related to cluster healthy check.
-	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
+	// IsClusterHealthy is only for consensus cluster healthy check.
+	// For Replication cluster IsClusterHealthy will always return true,
+	// and its cluster's healthty is equal to leader member's heathly.
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 
 	// Member healthy check
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
+	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
+	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) bool
+	GetDBState(context.Context, *dcs.Cluster, *dcs.Member) *dcs.DBState
+
+	// HasOtherHealthyLeader is applicable only to consensus cluster,
+	// where the db's internal role services as the source of truth.
+	// for replicationset cluster,  HasOtherHealthyLeader will always be nil.
 	HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member
 	HasOtherHealthyMembers(context.Context, *dcs.Cluster, string) []*dcs.Member
 
@@ -57,11 +67,17 @@ type DBManager interface {
 	AddCurrentMemberToCluster(*dcs.Cluster) error
 	DeleteMemberFromCluster(*dcs.Cluster, string) error
 
+	// IsPromoted is applicable only to consensus cluster, which is used to
+	// check if DB has complete switchover.
+	// for replicationset cluster,  it will always be true.
+	IsPromoted(context.Context) bool
 	// Functions related to HA
-	Promote() error
-	Demote() error
-	Follow(*dcs.Cluster) error
-	Recover()
+	// The functions should be idempotent, indicating that if they have been executed in one ha cycle,
+	// any subsequent calls during that cycle will have no effect.
+	Promote(context.Context) error
+	Demote(context.Context) error
+	Follow(context.Context, *dcs.Cluster) error
+	Recover(context.Context) error
 
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
 	// IsHealthiestMember(*dcs.Cluster) bool
@@ -89,6 +105,8 @@ type DBManagerBase struct {
 	DataDir           string
 	Logger            logger.Logger
 	DBStartupReady    bool
+	IsLocked          bool
+	DBState           *dcs.DBState
 }
 
 func (mgr *DBManagerBase) IsDBStartupReady() bool {
@@ -105,6 +123,26 @@ func (mgr *DBManagerBase) GetCurrentMemberName() string {
 
 func (mgr *DBManagerBase) IsFirstMember() bool {
 	return strings.HasSuffix(mgr.CurrentMemberName, "-0")
+}
+
+func (mgr *DBManagerBase) IsPromoted(context.Context) bool {
+	return true
+}
+
+func (mgr *DBManagerBase) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
+	return true
+}
+
+func (mgr *DBManagerBase) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	return nil
+}
+
+func (mgr *DBManagerBase) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	return false
+}
+
+func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
+	return nil
 }
 
 func RegisterManager(characterType string, manager DBManager) {
@@ -191,19 +229,24 @@ func (*FakeManager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
 	return fmt.Errorf("NotSuppported")
 }
 
-func (*FakeManager) Promote() error {
+func (*FakeManager) Promote(context.Context) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*FakeManager) Demote() error {
+func (*FakeManager) IsPromoted(context.Context) bool {
+	return true
+}
+
+func (*FakeManager) Demote(context.Context) error {
 	return fmt.Errorf("NotSuppported")
 }
 
-func (*FakeManager) Follow(*dcs.Cluster) error {
+func (*FakeManager) Follow(context.Context, *dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*FakeManager) Recover() {
+func (*FakeManager) Recover(context.Context) error {
+	return nil
 
 }
 

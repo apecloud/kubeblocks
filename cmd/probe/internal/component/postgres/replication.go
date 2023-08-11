@@ -431,8 +431,8 @@ func (mgr *Manager) getHistory() []*history {
 	return nil
 }
 
-func (mgr *Manager) PromoteReplication() error {
-	if isLeader, err := mgr.IsLeader(context.TODO(), nil); err == nil && isLeader {
+func (mgr *Manager) PromoteReplication(ctx context.Context) error {
+	if isLeader, err := mgr.IsLeader(ctx, nil); err == nil && isLeader {
 		mgr.Logger.Infof("i am already a leader, don't need to promote")
 		return nil
 	}
@@ -501,9 +501,7 @@ func (mgr *Manager) Stop() error {
 	return nil
 }
 
-func (mgr *Manager) FollowReplication(cluster *dcs.Cluster) error {
-	ctx := context.TODO()
-
+func (mgr *Manager) FollowReplication(ctx context.Context, cluster *dcs.Cluster) error {
 	if cluster.Leader == nil || cluster.Leader.Name == "" {
 		mgr.Logger.Warnf("no action coz cluster has no leader")
 		return mgr.Start()

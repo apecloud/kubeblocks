@@ -35,6 +35,7 @@ const (
 	stateNebula       = "nebula"
 	statePulsarBroker = "pulsar-broker"
 	statePulsarProxy  = "pulsar-proxy"
+	stateMariadb      = "mariadb"
 )
 
 const (
@@ -91,6 +92,8 @@ func New(typeName string) (ClusterCommands, error) {
 		return newPulsar("broker"), nil
 	case statePulsarProxy:
 		return newPulsar("proxy"), nil
+	case stateMariadb:
+		return newMariadb(), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}

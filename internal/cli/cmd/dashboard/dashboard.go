@@ -145,6 +145,12 @@ var (
 			Label:      "app=jupyterhub",
 			TargetPort: "18081",
 		},
+		{
+			Name:       jupyterNoteBookAddon,
+			AddonName:  "jupyter-notebook",
+			Label:      " app.kubernetes.io/instance=jupyter-notebook",
+			TargetPort: "18888",
+		},
 	}
 )
 

@@ -1,0 +1,23 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: jupyter-hub
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'JupyterHub is a multi-user platform for hosting Jupyter Notebooks.'
+  type: Helm
+
+  helm:
+    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/jupyterhub-3.0.1-0.dev.git.6287.hbfb05cd6/jupyterhub-0.1.0.tgz
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+    - enabled: true
+

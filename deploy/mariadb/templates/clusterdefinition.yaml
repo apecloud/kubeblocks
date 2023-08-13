@@ -23,6 +23,11 @@ spec:
       volumeTypes:
         - name: data
           type: data
+      configSpecs:
+        - name: mariadb-config
+          templateRef: mariadb-config-template
+          volumeName: configs
+          namespace: {{ .Release.Namespace }}
       podSpec:
         containers:
           - name: mariadb
@@ -30,6 +35,8 @@ spec:
             volumeMounts:
               - mountPath: /var/lib/mariadb
                 name: data
+              - mountPath: /etc/mariadb/conf.d
+                name: configs
             ports:
               - containerPort: 3306
                 name: mariadb

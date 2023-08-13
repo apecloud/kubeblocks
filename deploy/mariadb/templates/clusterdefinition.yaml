@@ -11,6 +11,7 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_mariadb)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_mariadb)"
+
   componentDefs:
     - name: mariadb
       characterType: mariadb

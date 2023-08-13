@@ -1,0 +1,31 @@
+---
+# Source: kubeblocks/templates/addons/kafka-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: kafka
+  labels:
+    helm.sh/chart: kubeblocks-0.6.0-beta.21
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/version: "0.6.0-beta.21"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": community
+spec:
+  description: 'Apache Kafka is a distributed streaming platform designed to build real-time pipelines and can be used as a message
+  broker or as a replacement for a log aggregation solution for big data applications.'
+
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///kafka-0.6.0-beta.21.tgz    
+    chartsImage: registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks-charts:0.6.0-beta.21
+    chartsPathInImage: /charts
+
+    installOptions:
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

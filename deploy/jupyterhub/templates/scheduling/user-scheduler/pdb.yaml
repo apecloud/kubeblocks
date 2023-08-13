@@ -1,0 +1,18 @@
+{{- if and .Values.scheduling.userScheduler.enabled .Values.scheduling.userScheduler.pdb.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "jupyterhub.user-scheduler-deploy.fullname" . }}
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+spec:
+  {{- if not (typeIs "<nil>" .Values.scheduling.userScheduler.pdb.maxUnavailable) }}
+  maxUnavailable: {{ .Values.scheduling.userScheduler.pdb.maxUnavailable }}
+  {{- end }}
+  {{- if not (typeIs "<nil>" .Values.scheduling.userScheduler.pdb.minAvailable) }}
+  minAvailable: {{ .Values.scheduling.userScheduler.pdb.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "jupyterhub.matchLabels" . | nindent 6 }}
+{{- end }}

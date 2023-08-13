@@ -1,0 +1,40 @@
+---
+# Source: kubeblocks/templates/rbac/clusterrole_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeblocks
+  labels:
+    helm.sh/chart: kubeblocks-0.6.0-beta.21
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/version: "0.6.0-beta.21"
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks
+subjects:
+- kind: ServiceAccount
+  name: kubeblocks
+  namespace: default
+---
+# Source: kubeblocks/templates/rbac/clusterrole_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeblocks-cluster-admin
+  labels:
+    helm.sh/chart: kubeblocks-0.6.0-beta.21
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/version: "0.6.0-beta.21"
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: kubeblocks-addon-installer
+    namespace: default

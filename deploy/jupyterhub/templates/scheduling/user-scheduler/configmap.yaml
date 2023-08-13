@@ -1,0 +1,45 @@
+{{- if .Values.scheduling.userScheduler.enabled -}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "jupyterhub.user-scheduler-deploy.fullname" . }}
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+data:
+  {{- /*
+    This is configuration of a k8s official kube-scheduler binary running in the
+    user-scheduler.
+
+    The config version and kube-scheduler binary version has a fallback for k8s
+    clusters versioned v1.23 or lower because:
+
+    - v1 / v1beta3 config requires kube-scheduler binary >=1.25 / >=1.23
+    - kube-scheduler binary >=1.25 requires storage.k8s.io/v1/CSIStorageCapacity
+      available first in k8s >=1.24
+
+    ref: https://kubernetes.io/docs/reference/scheduling/config/
+    ref: https://kubernetes.io/docs/reference/config-api/kube-scheduler-config.v1/
+    ref: https://kubernetes.io/docs/reference/config-api/kube-scheduler-config.v1beta3/
+  */}}
+  config.yaml: |
+    {{- if semverCompare ">=1.24.0-0" .Capabilities.KubeVersion.Version }}
+    apiVersion: kubescheduler.config.k8s.io/v1
+    {{- else }}
+    apiVersion: kubescheduler.config.k8s.io/v1beta3
+    {{- end }}
+    kind: KubeSchedulerConfiguration
+    leaderElection:
+      resourceLock: endpointsleases
+      resourceName: {{ include "jupyterhub.user-scheduler-lock.fullname" . }}
+      resourceNamespace: "{{ .Release.Namespace }}"
+    profiles:
+      - schedulerName: {{ include "jupyterhub.user-scheduler.fullname" . }}
+        {{- with .Values.scheduling.userScheduler.plugins }}
+        plugins:
+          {{- . | toYaml | nindent 10 }}
+        {{- end }}
+        {{- with .Values.scheduling.userScheduler.pluginConfig }}
+        pluginConfig:
+          {{- . | toYaml | nindent 10 }}
+        {{- end }}
+{{- end }}

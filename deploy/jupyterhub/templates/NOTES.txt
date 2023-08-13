@@ -1,0 +1,158 @@
+{{- $proxy_service := include "jupyterhub.proxy-public.fullname" . -}}
+
+{{- /* Generated with https://patorjk.com/software/taag/#p=display&h=0&f=Slant&t=JupyterHub */}}
+.      __                          __                  __  __          __
+      / / __  __  ____    __  __  / /_  ___    _____  / / / / __  __  / /_
+ __  / / / / / / / __ \  / / / / / __/ / _ \  / ___/ / /_/ / / / / / / __ \
+/ /_/ / / /_/ / / /_/ / / /_/ / / /_  /  __/ / /    / __  / / /_/ / / /_/ /
+\____/  \__,_/ / .___/  \__, /  \__/  \___/ /_/    /_/ /_/  \__,_/ /_.___/
+              /_/      /____/
+
+       You have successfully installed the official JupyterHub Helm chart!
+
+### Installation info
+
+  - Kubernetes namespace: {{ .Release.Namespace }}
+  - Helm release name:    {{ .Release.Name }}
+  - Helm chart version:   {{ .Chart.Version }}
+  - JupyterHub version:   {{ .Chart.AppVersion }}
+  - Hub pod packages:     See https://github.com/jupyterhub/zero-to-jupyterhub-k8s/blob/{{ include "jupyterhub.chart-version-to-git-ref" .Chart.Version }}/images/hub/requirements.txt
+
+### Followup links
+
+  - Documentation:  https://z2jh.jupyter.org
+  - Help forum:     https://discourse.jupyter.org
+  - Social chat:    https://gitter.im/jupyterhub/jupyterhub
+  - Issue tracking: https://github.com/jupyterhub/zero-to-jupyterhub-k8s/issues
+
+### Post-installation checklist
+
+  - Verify that created Pods enter a Running state:
+
+      kubectl --namespace={{ .Release.Namespace }} get pod
+
+    If a pod is stuck with a Pending or ContainerCreating status, diagnose with:
+
+      kubectl --namespace={{ .Release.Namespace }} describe pod <name of pod>
+
+    If a pod keeps restarting, diagnose with:
+
+      kubectl --namespace={{ .Release.Namespace }} logs --previous <name of pod>
+  {{- println }}
+
+  {{- if eq .Values.proxy.service.type "LoadBalancer" }}
+  - Verify an external IP is provided for the k8s Service {{ $proxy_service }}.
+
+      kubectl --namespace={{ .Release.Namespace }} get service {{ $proxy_service }}
+
+    If the external ip remains <pending>, diagnose with:
+
+      kubectl --namespace={{ .Release.Namespace }} describe service {{ $proxy_service }}
+  {{- end }}
+
+  - Verify web based access:
+  {{- println }}
+  {{- if .Values.ingress.enabled }}
+    {{- range $host := .Values.ingress.hosts }}
+    Try insecure HTTP access: http://{{ $host }}{{ $.Values.hub.baseUrl | trimSuffix "/" }}/
+    {{- end }}
+
+    {{- range $tls := .Values.ingress.tls }}
+    {{- range $host := $tls.hosts }}
+    Try secure HTTPS access: https://{{ $host }}{{ $.Values.hub.baseUrl | trimSuffix "/" }}/
+    {{- end }}
+    {{- end }}
+  {{- else }}
+    You have not configured a k8s Ingress resource so you need to access the k8s
+    Service {{ $proxy_service }} directly.
+    {{- println }}
+
+    {{- if eq .Values.proxy.service.type "NodePort" }}
+    The k8s Service {{ $proxy_service }} is exposed via NodePorts. That means
+    that all the k8s cluster's nodes are exposing the k8s Service via those
+    ports.
+
+    Try insecure HTTP access: http://<any k8s nodes ip>:{{ .Values.proxy.service.nodePorts.http | default "no-http-nodeport-set"}}
+    Try secure HTTPS access: https://<any k8s nodes address>:{{ .Values.proxy.service.nodePorts.https | default "no-https-nodeport-set" }}
+
+    {{- else }}
+    If your computer is outside the k8s cluster, you can port-forward traffic to
+    the k8s Service {{ $proxy_service }} with kubectl to access it from your
+    computer.
+
+      kubectl --namespace={{ .Release.Namespace }} port-forward service/{{ $proxy_service }} 8080:http
+
+    Try insecure HTTP access: http://localhost:8080
+    {{- end }}
+  {{- end }}
+  {{- println }}
+
+
+
+
+
+{{- /*
+  Warnings for likely misconfigurations
+*/}}
+
+{{- if and (not .Values.scheduling.podPriority.enabled) (and .Values.scheduling.userPlaceholder.enabled .Values.scheduling.userPlaceholder.replicas) }}
+#################################################################################
+######   WARNING: You are using user placeholders without pod priority      #####
+######            enabled*, either enable pod priority or stop using the    #####
+######            user placeholders** to avoid having placeholders that     #####
+######            refuse to make room for a real user.                      #####
+######                                                                      #####
+######            *scheduling.podPriority.enabled                           #####
+######            **scheduling.userPlaceholder.enabled                      #####
+######            **scheduling.userPlaceholder.replicas                     #####
+#################################################################################
+{{- println }}
+{{- end }}
+
+
+
+
+
+{{- /*
+  Breaking changes and failures for likely misconfigurations.
+*/}}
+
+{{- $breaking := "" }}
+{{- $breaking_title := "\n" }}
+{{- $breaking_title = print $breaking_title "\n#################################################################################" }}
+{{- $breaking_title = print $breaking_title "\n######   BREAKING: The config values passed contained no longer accepted    #####" }}
+{{- $breaking_title = print $breaking_title "\n######             options. See the messages below for more details.        #####" }}
+{{- $breaking_title = print $breaking_title "\n######                                                                      #####" }}
+{{- $breaking_title = print $breaking_title "\n######             To verify your updated config is accepted, you can use   #####" }}
+{{- $breaking_title = print $breaking_title "\n######             the `helm template` command.                             #####" }}
+{{- $breaking_title = print $breaking_title "\n#################################################################################" }}
+
+
+{{- /*
+  This is an example (in a helm template comment) on how to detect and
+  communicate with regards to a breaking chart config change.
+
+  {{- if hasKey .Values.singleuser.cloudMetadata "enabled" }}
+  {{- $breaking = print $breaking "\n\nCHANGED: singleuser.cloudMetadata.enabled must as of 1.0.0 be configured using singleuser.cloudMetadata.blockWithIptables with the opposite value." }}
+  {{- end }}
+*/}}
+
+
+{{- if hasKey .Values.rbac "enabled" }}
+{{- $breaking = print $breaking "\n\nCHANGED: rbac.enabled must as of version 2.0.0 be configured via rbac.create and <hub|proxy.traefik|scheduling.userScheduler|prePuller.hook>.serviceAccount.create." }}
+{{- end }}
+
+
+{{- if hasKey .Values.hub "fsGid" }}
+{{- $breaking = print $breaking "\n\nCHANGED: hub.fsGid must as of version 2.0.0 be configured via hub.podSecurityContext.fsGroup." }}
+{{- end }}
+
+
+{{- if and .Values.singleuser.cloudMetadata.blockWithIptables (and .Values.singleuser.networkPolicy.enabled .Values.singleuser.networkPolicy.egressAllowRules.cloudMetadataServer) }}
+{{- $breaking = print $breaking "\n\nCHANGED: singleuser.cloudMetadata.blockWithIptables must as of version 3.0.0 not be configured together with singleuser.networkPolicy.egressAllowRules.cloudMetadataServer as it leads to an ambiguous configuration." }}
+{{- end }}
+
+
+{{- if $breaking }}
+{{- fail (print $breaking_title $breaking "\n\n") }}
+{{- end }}

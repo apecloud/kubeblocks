@@ -1,0 +1,18 @@
+{{- if .Values.scheduling.podPriority.enabled }}
+{{- if or .Values.prePuller.hook.enabled .Values.prePuller.continuous.enabled -}}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "jupyterhub.image-puller-priority.fullname" . }}
+  annotations:
+    meta.helm.sh/release-name: "{{ .Release.Name }}"
+    meta.helm.sh/release-namespace: "{{ .Release.Namespace }}"
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+value: {{ .Values.scheduling.podPriority.imagePullerPriority }}
+globalDefault: false
+description: >-
+  Enables [hook|continuous]-image-puller pods to fit on nodes even though they
+  are clogged by user-placeholder pods, while not evicting normal user pods.
+{{- end }}
+{{- end }}

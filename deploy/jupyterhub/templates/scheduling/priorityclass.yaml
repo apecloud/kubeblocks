@@ -1,0 +1,15 @@
+{{- if .Values.scheduling.podPriority.enabled }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "jupyterhub.priority.fullname" . }}
+  annotations:
+    meta.helm.sh/release-name: "{{ .Release.Name }}"
+    meta.helm.sh/release-namespace: "{{ .Release.Namespace }}"
+  labels:
+    {{- $_ := merge (dict "componentLabel" "default-priority") . }}
+    {{- include "jupyterhub.labels" $_ | nindent 4 }}
+value: {{ .Values.scheduling.podPriority.defaultPriority }}
+globalDefault: {{ .Values.scheduling.podPriority.globalDefault }}
+description: "A default priority higher than user placeholders priority."
+{{- end }}

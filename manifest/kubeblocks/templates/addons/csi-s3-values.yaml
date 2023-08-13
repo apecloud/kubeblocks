@@ -1,0 +1,22 @@
+---
+# Source: kubeblocks/templates/addons/csi-s3-values.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: csi-s3-chart-kubeblocks-values
+  labels:
+    helm.sh/chart: kubeblocks-0.5.3
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/version: "0.5.3"
+    app.kubernetes.io/managed-by: Helm
+data:
+  values-kubeblocks-override.yaml: |-
+    enabled: false
+    secret:
+      accessKey: ""
+      secretKey: ""
+    storageClass:
+      create: true
+      mountOptions: ""
+      singleBucket: ""

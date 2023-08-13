@@ -1,0 +1,32 @@
+---
+# Source: kubeblocks/templates/rbac/apps_clusterversion_editor_role.yaml
+# permissions for end users to edit clusterversions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeblocks-clusterversion-editor-role
+  labels:
+    helm.sh/chart: kubeblocks-0.6.0-beta.21
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/version: "0.6.0-beta.21"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusterversions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusterversions/status
+  verbs:
+  - get

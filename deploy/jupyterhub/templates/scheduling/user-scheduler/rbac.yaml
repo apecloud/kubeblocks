@@ -1,0 +1,233 @@
+{{- if .Values.scheduling.userScheduler.enabled -}}
+{{- if .Values.rbac.create -}}
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "jupyterhub.user-scheduler.fullname" . }}
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+rules:
+  # Copied from the system:kube-scheduler ClusterRole of the k8s version
+  # matching the kube-scheduler binary we use. A modification has been made to
+  # resourceName fields to remain relevant for how we have named our resources
+  # in this Helm chart.
+  #
+  # NOTE: These rules have been:
+  #       - unchanged between 1.12 and 1.15
+  #       - changed in 1.16
+  #       - changed in 1.17
+  #       - unchanged between 1.18 and 1.20
+  #       - changed in 1.21: get/list/watch permission for namespace,
+  #                          csidrivers, csistoragecapacities was added.
+  #       - unchanged between 1.22 and 1.27
+  #
+  # ref: https://github.com/kubernetes/kubernetes/blob/v1.27.0/plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/cluster-roles.yaml#L736-L892
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+  - apiGroups:
+    - coordination.k8s.io
+    resourceNames:
+    - {{ include "jupyterhub.user-scheduler-lock.fullname" . }}
+    resources:
+    - leases
+    verbs:
+    - get
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - endpoints
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resourceNames:
+    - {{ include "jupyterhub.user-scheduler-lock.fullname" . }}
+    resources:
+    - endpoints
+    verbs:
+    - get
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - delete
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - bindings
+    - pods/binding
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
+    - pods/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - replicationcontrollers
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    - extensions
+    resources:
+    - replicasets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    resources:
+    - statefulsets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    - persistentvolumes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - tokenreviews
+    verbs:
+    - create
+  - apiGroups:
+    - authorization.k8s.io
+    resources:
+    - subjectaccessreviews
+    verbs:
+    - create
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csidrivers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csistoragecapacities
+    verbs:
+    - get
+    - list
+    - watch
+
+  # Copied from the system:volume-scheduler ClusterRole of the k8s version
+  # matching the kube-scheduler binary we use.
+  #
+  # NOTE: These rules have not changed between 1.12 and 1.27.
+  #
+  # ref: https://github.com/kubernetes/kubernetes/blob/v1.27.0/plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/cluster-roles.yaml#L1311-L1338
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumes
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - storageclasses
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "jupyterhub.user-scheduler.fullname" . }}
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "jupyterhub.user-scheduler-serviceaccount.fullname" . }}
+    namespace: "{{ .Release.Namespace }}"
+roleRef:
+  kind: ClusterRole
+  name: {{ include "jupyterhub.user-scheduler.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}

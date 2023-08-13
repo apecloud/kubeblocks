@@ -1,0 +1,17 @@
+---
+# Source: kubeblocks/templates/addons/apecloud-otel-collector-values.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apecloud-otel-collector-chart-kubeblocks-values
+  labels:
+    helm.sh/chart: kubeblocks-0.6.0-beta.21
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/version: "0.6.0-beta.21"
+    app.kubernetes.io/managed-by: Helm
+data:
+  values-kubeblocks-override.yaml: |-
+    enabled: false
+    image:
+      registry: registry.cn-hangzhou.aliyuncs.com

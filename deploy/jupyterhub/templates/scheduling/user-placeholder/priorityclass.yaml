@@ -1,0 +1,16 @@
+{{- if .Values.scheduling.podPriority.enabled }}
+{{- if .Values.scheduling.userPlaceholder.enabled -}}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "jupyterhub.user-placeholder-priority.fullname" . }}
+  annotations:
+    meta.helm.sh/release-name: "{{ .Release.Name }}"
+    meta.helm.sh/release-namespace: "{{ .Release.Namespace }}"
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+value: {{ .Values.scheduling.podPriority.userPlaceholderPriority }}
+globalDefault: false
+description: "With a priority higher or eqaul to a cluster autoscalers priority cutoff, a pod can trigger a cluster scale up. At the same time, placeholder pods priority should be lower than other pods to make them evictable."
+{{- end }}
+{{- end }}

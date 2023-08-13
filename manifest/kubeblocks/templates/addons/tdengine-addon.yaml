@@ -1,0 +1,30 @@
+---
+# Source: kubeblocks/templates/addons/tdengine-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: tdengine
+  labels:
+    helm.sh/chart: kubeblocks-0.6.0-beta.21
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: kubeblocks
+    app.kubernetes.io/version: "0.6.0-beta.21"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": community
+spec:
+  description: 'TDengine is an open source, high-performance, cloud native time-series database optimized for Internet of Things (IoT), Connected Cars, and Industrial IoT.'
+
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///tdengine-0.6.0-beta.21.tgz    
+    chartsImage: registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks-charts:0.6.0-beta.21
+    chartsPathInImage: /charts
+
+    installOptions:
+
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+    - enabled: true

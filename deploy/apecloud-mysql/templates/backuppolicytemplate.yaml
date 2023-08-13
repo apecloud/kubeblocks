@@ -36,19 +36,15 @@ spec:
       backupStatusUpdates:
         - path: manifests.backupLog
           containerName: mysql
-          script: /scripts/binlog-collector.sh
+          script: /scripts/snapshot-backup-collector.sh
           updateStage: post
     datafile:
       backupToolName: xtrabackup-for-apecloud-mysql
       backupStatusUpdates:
-      - path: manifests.backupLog
-        containerName: mysql
-        script: /scripts/binlog-collector.sh
-        updateStage: post
+      - updateStage: post
+        useTargetPodServiceAccount: true
     logfile:
       backupToolName: apecloud-mysql-pitr-tool
       backupStatusUpdates:
-      - path: manifests.backupLog
-        containerName: mysql
-        script: /scripts/binlog-collector.sh
-        updateStage: post
+      - updateStage: post
+        useTargetPodServiceAccount: true

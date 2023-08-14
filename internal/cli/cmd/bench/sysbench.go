@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -47,19 +45,19 @@ var (
 )
 
 var sysbenchExample = templates.Examples(`
-		# sysbench on a cluster, that will exec all steps, cleanup, prepare and run
+		# sysbench on a cluster, that will exec for all steps, cleanup, prepare and run
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with cleanup, just exec cleanup that will delete the testdata
+		# sysbench run on a cluster with cleanup, only cleanup by deleting the testdata
 		kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with prepare, just exec prepare that will create the testdata
+		# sysbench run on a cluster with prepare, just prepare by creating the testdata
 		kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with run, just exec run that will run the test
+		# sysbench run on a cluster with run, just run by running the test
 		kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with threads count
+		# sysbench on a cluster with thread counts
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 
 		# sysbench on a cluster with type
@@ -73,31 +71,23 @@ var sysbenchExample = templates.Examples(`
 `)
 
 type SysBenchOptions struct {
-	factory   cmdutil.Factory
-	client    clientset.Interface
-	dynamic   dynamic.Interface
-	name      string
-	namespace string
-
 	Threads      []int // the number of threads
 	Tables       int   // the number of tables
 	Size         int   // the data size of per table
 	Duration     int
 	Type         []string
-	ExtraArgs    []string
 	ReadPercent  int
 	WritePercent int
-	Step         string
 
 	BenchBaseOptions
-	*cluster.ClusterObjects     `json:"-"`
-	genericclioptions.IOStreams `json:"-"`
 }
 
 func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &SysBenchOptions{
-		factory:   f,
-		IOStreams: streams,
+		BenchBaseOptions: BenchBaseOptions{
+			IOStreams: streams,
+			factory:   f,
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -120,8 +110,6 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd.Flags().IntVar(&o.WritePercent, "write-percent", 0, "the percent of write, only useful when type is oltp_read_write_pct")
 	o.BenchBaseOptions.AddFlags(cmd)
 
-	registerClusterCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -130,6 +118,10 @@ func (o *SysBenchOptions) Complete(args []string) error {
 	var driver string
 	var host string
 	var port int
+
+	if err = o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
 
 	o.Step, o.name = parseStepAndName(args, "sysbench")
 
@@ -258,20 +250,23 @@ func (o *SysBenchOptions) Run() error {
 			Namespace: o.namespace,
 		},
 		Spec: v1alpha1.SysbenchSpec{
-			Tables:    o.Tables,
-			Size:      o.Size,
-			Threads:   o.Threads,
-			Types:     o.Type,
-			Duration:  o.Duration,
-			Step:      o.Step,
-			ExtraArgs: o.ExtraArgs,
-			Target: v1alpha1.SysbenchTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			Tables:   o.Tables,
+			Size:     o.Size,
+			Threads:  o.Threads,
+			Types:    o.Type,
+			Duration: o.Duration,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

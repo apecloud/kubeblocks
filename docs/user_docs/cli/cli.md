@@ -41,6 +41,7 @@ Run a benchmark.
 * [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 * [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run tpcc benchmark
+* [kbcli bench tpch](kbcli_bench_tpch.md)	 - Run tpch benchmark
 * [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
 
 
@@ -48,6 +49,7 @@ Run a benchmark.
 
 builder command.
 
+* [kbcli builder migrate-scripts](kbcli_builder_migrate-scripts.md)	 - migrate - a developer tool.
 * [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
 
 

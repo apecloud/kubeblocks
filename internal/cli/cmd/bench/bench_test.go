@@ -106,14 +106,14 @@ var _ = Describe("bench", func() {
 				User:        "test",
 				Password:    "test",
 				ClusterName: "test",
+				factory:     tf,
+				namespace:   namespace,
+				IOStreams:   streams,
 			},
-			Type:      []string{"oltp_read_only"},
-			Tables:    1,
-			Size:      100,
-			factory:   tf,
-			Duration:  60,
-			namespace: namespace,
-			IOStreams: streams,
+			Type:     []string{"oltp_read_only"},
+			Tables:   1,
+			Size:     100,
+			Duration: 60,
 		}
 		o.dynamic, _ = tf.DynamicClient()
 		o.client, _ = tf.KubernetesClientSet()
@@ -135,12 +135,12 @@ var _ = Describe("bench", func() {
 				User:        "test",
 				Password:    "test",
 				ClusterName: "test",
+				factory:     tf,
+				namespace:   namespace,
+				IOStreams:   streams,
 			},
-			Scale:     100,
-			factory:   tf,
-			namespace: namespace,
-			IOStreams: streams,
-			Clients:   []int{1},
+			Scale:   100,
+			Clients: []int{1},
 		}
 		o.dynamic, _ = tf.DynamicClient()
 		o.client, _ = tf.KubernetesClientSet()
@@ -162,13 +162,13 @@ var _ = Describe("bench", func() {
 				User:        "test",
 				Password:    "test",
 				ClusterName: "test",
+				factory:     tf,
+				namespace:   namespace,
+				IOStreams:   streams,
 			},
 			RecordCount:    1000,
 			OperationCount: 1000,
 			Threads:        []int{1},
-			factory:        tf,
-			namespace:      namespace,
-			IOStreams:      streams,
 		}
 		o.dynamic, _ = tf.DynamicClient()
 		o.client, _ = tf.KubernetesClientSet()
@@ -181,5 +181,17 @@ var _ = Describe("bench", func() {
 		Expect(driver).Should(Equal(testing.ComponentName))
 		Expect(host).Should(Equal(fmt.Sprintf("svc-1.%s.svc.cluster.local", testing.Namespace)))
 		Expect(port).Should(Equal(3306))
+	})
+
+	It("parse tolerations", func() {
+		o := &BenchBaseOptions{
+			TolerationsRaw: []string{"dev=true:NoSchedule,large:NoSchedule"},
+		}
+		err := o.BaseComplete()
+		Expect(err).Should(BeNil())
+		Expect(o.Tolerations).Should(Equal([]corev1.Toleration{
+			{Key: "dev", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoSchedule},
+			{Key: "large", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
+		}))
 	})
 })

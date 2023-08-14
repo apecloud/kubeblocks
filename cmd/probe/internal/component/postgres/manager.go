@@ -138,19 +138,9 @@ func (mgr *Manager) IsDBStartupReady() bool {
 		return true
 	}
 
-	cmd := exec.Command("pg_isready")
-	if config.username != "" {
-		cmd.Args = append(cmd.Args, "-U", config.username)
-	}
-	if config.host != "" {
-		cmd.Args = append(cmd.Args, "-h", config.host)
-	}
-	if config.port != 0 {
-		cmd.Args = append(cmd.Args, "-p", strconv.FormatUint(uint64(config.port), 10))
-	}
-	err := cmd.Run()
+	err := mgr.Pool.Ping(context.TODO())
 	if err != nil {
-		mgr.Logger.Infof("DB is not ready: %v", err)
+		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
 		return false
 	}
 

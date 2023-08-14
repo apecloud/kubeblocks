@@ -104,7 +104,7 @@ func RandomString(n int) string {
 	return s
 }
 
-func helmTemplate(helmPath string, helmOutput string) error {
+func HelmTemplate(helmPath string, helmOutput string) error {
 	o := helm.InstallOpts{
 		Name:      testing.KubeBlocksChartName,
 		Chart:     helmPath,

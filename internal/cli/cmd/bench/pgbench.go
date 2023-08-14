@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -44,56 +42,48 @@ const (
 )
 
 var pgbenchExample = templates.Examples(`
-# pgbench run on a cluster, that will exec all steps, cleanup, prepare and run
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
-
-# pgbench run on a cluster with cleanup, just exec cleanup that will delete the testdata
-kbcli bench pgbench cleanup mytest --cluster pgcluster --database postgres --user xxx --password xxx
-
-# pgbench run on a cluster with prepare, just exec prepare that will create the testdata
-kbcli bench pgbench prepare mytest --cluster pgcluster --database postgres --user xxx --password xxx
-
-# pgbench run on a cluster with run, just exec run that will run the test
-kbcli bench pgbench run mytest --cluster pgcluster --database postgres --user xxx --password xxx
-
-# pgbench run on a cluster with  threads and  client count
-kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
-
-# pgbench run on a cluster with specified transactions
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --transactions 1000
-
-# pgbench run on a cluster with specified seconds
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
-
-# pgbench run on a cluster with select only
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
+	# pgbench run on a cluster, that will exec for all steps, cleanup, prepare and run
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with cleanup, only cleanup by deleting the testdata
+	kbcli bench pgbench cleanup mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with prepare, just prepare by creating the testdata
+	kbcli bench pgbench prepare mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with run, just run by running the test
+	kbcli bench pgbench run mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with  thread and  client counts
+	kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
+	
+	# pgbench run on a cluster with specified transactions
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --transactions 1000
+	
+	# pgbench run on a cluster with specified seconds
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
+	
+	# pgbench run on a cluster with 'select' only
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
 `)
 
 type PgBenchOptions struct {
-	factory   cmdutil.Factory
-	client    clientset.Interface
-	dynamic   dynamic.Interface
-	name      string
-	namespace string
-
-	Scale        int      // specify the scale factor for the benchmark test
-	Clients      []int    // specify the number of clients to run
-	Threads      int      // specify the number of threads per client
-	Transactions int      // specify the number of transactions per client
-	Duration     int      // specify the duration of benchmark test in seconds
-	Select       bool     // specify to run SELECT-only transactions
-	Step         string   // specify the benchmark step, exec all, cleanup, prepare or run
-	ExtraArgs    []string // specify extra arguments for pgbench
+	Scale        int   // specify the scale factor for the benchmark test
+	Clients      []int // specify the number of clients to run
+	Threads      int   // specify the number of threads per client
+	Transactions int   // specify the number of transactions per client
+	Duration     int   // specify the duration of benchmark test in seconds
+	Select       bool  // specify to run SELECT-only transactions
 
 	BenchBaseOptions
-	*cluster.ClusterObjects
-	genericclioptions.IOStreams
 }
 
 func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PgBenchOptions{
-		factory:   f,
-		IOStreams: streams,
+		BenchBaseOptions: BenchBaseOptions{
+			IOStreams: streams,
+			factory:   f,
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -115,8 +105,6 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().IntVar(&o.Duration, "duration", 60, "The seconds to run pgbench for")
 	cmd.Flags().BoolVar(&o.Select, "select", false, "Run pgbench with select only")
 
-	registerClusterCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -125,6 +113,10 @@ func (o *PgBenchOptions) Complete(args []string) error {
 	var driver string
 	var host string
 	var port int
+
+	if err = o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
 
 	o.Step, o.name = parseStepAndName(args, "pgbench")
 
@@ -222,13 +214,17 @@ func (o *PgBenchOptions) Run() error {
 			SelectOnly:   o.Select,
 			Transactions: o.Transactions,
 			Duration:     o.Duration,
-			Step:         o.Step,
-			Target: v1alpha1.PgbenchTarget{
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				Tolerations: o.Tolerations,
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Target: v1alpha1.Target{
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

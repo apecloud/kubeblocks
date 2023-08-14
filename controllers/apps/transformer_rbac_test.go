@@ -68,6 +68,8 @@ var _ = Describe("object rbac transformer test.", func() {
 			clusterDefName, clusterVersionName).WithRandomName().
 			AddComponent(compName, compDefName).
 			SetServiceAccountName(serviceAccountName).GetObject()
+		r := int32(1)
+		cluster.Spec.Replicas = &r
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, "sts").
 			GetObject()

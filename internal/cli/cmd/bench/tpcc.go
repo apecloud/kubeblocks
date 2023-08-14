@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -47,60 +45,52 @@ var (
 )
 
 var tpccExample = templates.Examples(`
-# tpcc on a cluster, that will exec all steps, cleanup, prepare and run
-kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# tpcc on a cluster with cleanup, just exec cleanup that will delete the testdata
-kbcli bench tpcc cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# tpcc on a cluster with prepare, just exec prepare that will create the testdata
-kbcli bench tpcc prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# tpcc on a cluster with run, just exec run that will run the test
-kbcli bench tpcc run mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# tpcc on a cluster with warehouses count, which is the overall database size scaling parameter
-kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --warehouses 100
-
-# tpcc on a cluster with threads count
-kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
-
-# tpcc on a cluster with transactions count
-kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --transactions 1000
-
-# tpcc on a cluster with duration 10 minutes
-kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --duration 10
+	# tpcc on a cluster, that will exec for all steps, cleanup, prepare and run
+	kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# tpcc on a cluster with cleanup, only cleanup by deleting the testdata
+	kbcli bench tpcc cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# tpcc on a cluster with prepare, just prepare by creating the testdata
+	kbcli bench tpcc prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# tpcc on a cluster with run, just run by running the test
+	kbcli bench tpcc run mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# tpcc on a cluster with warehouse counts, which is the overall database size scaling parameter
+	kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --warehouses 100
+	
+	# tpcc on a cluster with thread counts
+	kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
+	
+	# tpcc on a cluster with transactions counts
+	kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --transactions 1000
+	
+	# tpcc on a cluster with duration 10 minutes
+	kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --duration 10
 `)
 
 type TpccOptions struct {
-	factory   cmdutil.Factory
-	client    clientset.Interface
-	dynamic   dynamic.Interface
-	name      string
-	namespace string
-
-	WareHouses    int      // specify the overall database size scaling parameter
-	Threads       []int    // specify the number of threads to use
-	Transactions  int      // specify the number of transactions that each thread should run
-	Duration      int      // specify the number of minutes to run
-	LimitTxPerMin int      // limit the number of transactions to run per minute, 0 means no limit
-	NewOrder      int      // specify the percentage of transactions that should be new orders
-	Payment       int      // specify the percentage of transactions that should be payments
-	OrderStatus   int      // specify the percentage of transactions that should be order status
-	Delivery      int      // specify the percentage of transactions that should be delivery
-	StockLevel    int      // specify the percentage of transactions that should be stock level
-	Step          string   // specify the benchmark step, exec all, cleanup, prepare or run
-	ExtraArgs     []string // specify the extra arguments
+	WareHouses    int   // specify the overall database size scaling parameter
+	Threads       []int // specify the number of threads to use
+	Transactions  int   // specify the number of transactions that each thread should run
+	Duration      int   // specify the number of minutes to run
+	LimitTxPerMin int   // limit the number of transactions to run per minute, 0 means no limit
+	NewOrder      int   // specify the percentage of transactions that should be new orders
+	Payment       int   // specify the percentage of transactions that should be payments
+	OrderStatus   int   // specify the percentage of transactions that should be order status
+	Delivery      int   // specify the percentage of transactions that should be delivery
+	StockLevel    int   // specify the percentage of transactions that should be stock level
 
 	BenchBaseOptions
-	*cluster.ClusterObjects
-	genericclioptions.IOStreams
 }
 
 func NewTpccCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &TpccOptions{
-		factory:   f,
-		IOStreams: streams,
+		BenchBaseOptions: BenchBaseOptions{
+			factory:   f,
+			IOStreams: streams,
+		},
 	}
 	cmd := &cobra.Command{
 		Use:     "tpcc [Step] [BenchmarkName]",
@@ -124,9 +114,6 @@ func NewTpccCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().IntVar(&o.OrderStatus, "order-status", 4, "specify the percentage of transactions that should be order status")
 	cmd.Flags().IntVar(&o.Delivery, "delivery", 4, "specify the percentage of transactions that should be delivery")
 	cmd.Flags().IntVar(&o.StockLevel, "stock-level", 4, "specify the percentage of transactions that should be stock level")
-	cmd.Flags().StringArrayVar(&o.ExtraArgs, "extra-args", []string{}, "specify the extra arguments")
-
-	registerClusterCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -136,6 +123,10 @@ func (o *TpccOptions) Complete(args []string) error {
 	var driver string
 	var host string
 	var port int
+
+	if err = o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
 
 	o.Step, o.name = parseStepAndName(args, "tpcc")
 
@@ -250,15 +241,18 @@ func (o *TpccOptions) Run() error {
 			OrderStatus:   o.OrderStatus,
 			Delivery:      o.Delivery,
 			StockLevel:    o.StockLevel,
-			Step:          o.Step,
-			ExtraArgs:     o.ExtraArgs,
-			Target: v1alpha1.TpccTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

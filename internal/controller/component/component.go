@@ -69,10 +69,25 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
+	hasSimplifiedAPI := func() bool {
+		return cluster.Spec.Replicas != nil ||
+			!cluster.Spec.Resources.CPU.IsZero() ||
+			!cluster.Spec.Resources.Memory.IsZero() ||
+			!cluster.Spec.Storage.Size.IsZero() ||
+			cluster.Spec.Monitor.MonitoringInterval != nil ||
+			cluster.Spec.Network != nil ||
+			len(cluster.Spec.Tenancy) > 0 ||
+			len(cluster.Spec.AvailabilityPolicy) > 0
+	}
+
 	fillSimplifiedAPI := func() {
 		// fill simplified api only to first defined component
 		if len(clusterDef.Spec.ComponentDefs) == 0 ||
 			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
+			return
+		}
+		// return if none of simplified api is defined
+		if !hasSimplifiedAPI() {
 			return
 		}
 		if clusterCompSpec == nil {

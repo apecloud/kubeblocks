@@ -143,7 +143,7 @@ func init() {
 }
 
 func (physical *PhysicalConfig) GetPhysicalRestoreCommand() []string {
-	if physical == nil {
+	if physical == nil || len(physical.RestoreCommands) == 0 {
 		return nil
 	}
 	return physical.RestoreCommands
@@ -154,7 +154,7 @@ func (physical *PhysicalConfig) IsRelyOnLogfile() bool {
 }
 
 func (logical *LogicalConfig) GetLogicalRestoreCommand() []string {
-	if logical == nil {
+	if logical == nil || len(logical.RestoreCommands) == 0 {
 		return nil
 	}
 	return logical.RestoreCommands

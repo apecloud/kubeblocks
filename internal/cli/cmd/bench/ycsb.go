@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -49,55 +47,47 @@ var (
 )
 
 var ycsbExample = templates.Examples(`
-# ycsb on a cluster, that will exec all steps, cleanup, prepare and run
-kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# ycsb on a cluster with cleanup, just exec cleanup that will delete the testdata
-kbcli bench ycsb cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# ycsb on a cluster with prepare, just exec prepare that will create the testdata
-kbcli bench ycsb prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# ycsb on a cluster with run, just exec run that will run the test
-kbcli bench ycsb run mytest --cluster mycluster --user xxx --password xxx --database mydb
-
-# ycsb on a cluster with threads count
-kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
-
-# ycsb on a cluster with record number and operation number
-kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --record-count 10000 --operation-count 10000
-
-# ycsb on a cluster mixed read/write
-kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --read-proportion 50 --update-proportion 50
+	# ycsb on a cluster,  that will exec for all steps, cleanup, prepare and run
+	kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# ycsb on a cluster with cleanup, only cleanup by deleting the testdata
+	kbcli bench ycsb cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# ycsb on a cluster with prepare, just prepare by creating the testdata
+	kbcli bench ycsb prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# ycsb on a cluster with run, just run by running the test
+	kbcli bench ycsb run mytest --cluster mycluster --user xxx --password xxx --database mydb
+	
+	# ycsb on a cluster with thread counts
+	kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
+	
+	# ycsb on a cluster with record number and operation number
+	kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --record-count 10000 --operation-count 10000
+	
+	# ycsb on a cluster mixed read/write
+	kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --read-proportion 50 --update-proportion 50
 `)
 
 type YcsbOptions struct {
-	factory   cmdutil.Factory
-	client    clientset.Interface
-	dynamic   dynamic.Interface
-	name      string
-	namespace string
-
-	Threads                   []int    // the number of threads to use
-	RecordCount               int      // the number of records to use
-	OperationCount            int      // the number of operations to use during the run phase
-	ReadProportion            int      // the proportion of operations that are reads
-	UpdateProportion          int      // the proportion of operations that are updates
-	InsertProportion          int      // the proportion of operations that are inserts
-	ScanProportion            int      // the proportion of operations that are scans
-	ReadModifyWriteProportion int      // the proportion of operations that are read then modify a record
-	Step                      string   // specify the benchmark step, exec all, cleanup, prepare or run
-	ExtraArgs                 []string // extra arguments for ycsb
+	Threads                   []int // the number of threads to use
+	RecordCount               int   // the number of records to use
+	OperationCount            int   // the number of operations to use during the run phase
+	ReadProportion            int   // the proportion of operations that are reads
+	UpdateProportion          int   // the proportion of operations that are updates
+	InsertProportion          int   // the proportion of operations that are inserts
+	ScanProportion            int   // the proportion of operations that are scans
+	ReadModifyWriteProportion int   // the proportion of operations that are read then modify a record
 
 	BenchBaseOptions
-	*cluster.ClusterObjects
-	genericclioptions.IOStreams
 }
 
 func NewYcsbCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &YcsbOptions{
-		factory:   f,
-		IOStreams: streams,
+		BenchBaseOptions: BenchBaseOptions{
+			IOStreams: streams,
+			factory:   f,
+		},
 	}
 
 	cmd := &cobra.Command{
@@ -121,8 +111,6 @@ func NewYcsbCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().IntVar(&o.ScanProportion, "scan-proportion", 0, "the percentage of scan operations in benchmark")
 	cmd.Flags().IntVar(&o.ReadModifyWriteProportion, "read-modify-write-proportion", 0, "the percentage of read-modify-write operations in benchmark, which read a record, modify it, and write it back")
 
-	registerClusterCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -132,8 +120,11 @@ func (o *YcsbOptions) Complete(args []string) error {
 	var host string
 	var port int
 
-	o.Step, o.name = parseStepAndName(args, "ycsb")
+	if err = o.BenchBaseOptions.BaseComplete(); err != nil {
+		return err
+	}
 
+	o.Step, o.name = parseStepAndName(args, "ycsb")
 	if o.ClusterName != "" {
 		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
 		if err != nil {
@@ -252,15 +243,18 @@ func (o *YcsbOptions) Run() error {
 			InsertProportion:          o.InsertProportion,
 			ScanProportion:            o.ScanProportion,
 			ReadModifyWriteProportion: o.ReadModifyWriteProportion,
-			Step:                      o.Step,
-			ExtraArgs:                 o.ExtraArgs,
-			Target: v1alpha1.YcsbTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

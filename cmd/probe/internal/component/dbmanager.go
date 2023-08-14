@@ -83,7 +83,7 @@ type DBManager interface {
 	// IsHealthiestMember(*dcs.Cluster) bool
 
 	GetCurrentMemberName() string
-	GetMemberAddrs(*dcs.Cluster) []string
+	GetMemberAddrs(*dcs.Cluster) ([]string, error)
 
 	// Functions related to account manage
 	IsRootCreated(context.Context) (bool, error)
@@ -254,8 +254,8 @@ func (*FakeManager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
 }
 
-func (*FakeManager) GetMemberAddrs(*dcs.Cluster) []string {
-	return nil
+func (*FakeManager) GetMemberAddrs(*dcs.Cluster) ([]string, error) {
+	return nil, nil
 }
 
 func (*FakeManager) IsRootCreated(context.Context) (bool, error) {

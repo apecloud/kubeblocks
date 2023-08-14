@@ -18,17 +18,21 @@ function retry {
   fi
 }
 
-# Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
-attempt=1
-max_attempts=10
-while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
-  sleep 3
-  attempt=$((attempt + 1))
-done
+if [ -f /kb-podinfo/primary-pod ]; then
+  # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
+  attempt=1
+  max_attempts=10
+  while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
+    sleep 3
+    attempt=$((attempt + 1))
+  done
+  primary=$(cat /kb-podinfo/primary-pod)
+  echo "DownwardAPI get primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
+  echo "KB_POD_NAME=$KB_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
+else
+   echo "DownwardAPI get /kb-podinfo/primary-pod is empty" >> /home/postgres/pgdata/.kb_set_up.log
+fi
 
-primary=$(cat /kb-podinfo/primary-pod)
-echo "DownwardAPI get primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
-echo "KB_POD_NAME=$KB_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
 if  [ ! -z "$primary" ] && [ "$primary" != "$KB_POD_NAME" ]; then
     primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
     echo "primary_fqdn=$primary_fqdn" >> /home/postgres/pgdata/.kb_set_up.log

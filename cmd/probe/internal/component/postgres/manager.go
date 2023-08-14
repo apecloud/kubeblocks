@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
@@ -52,7 +53,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Pool: pool,
 	}
 
-	component.RegisterManager("postgresql", Mgr)
+	component.RegisterManager("postgresql", internal.Replication, Mgr)
 	return Mgr, nil
 }
 
@@ -388,7 +389,7 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) Promote(ctx context.Context) error {
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if isLeader, err := mgr.IsLeader(ctx, nil); err == nil && isLeader {
 		mgr.Logger.Infof("i am already a leader, don't need to promote")
 		return nil

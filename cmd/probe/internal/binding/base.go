@@ -35,6 +35,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -364,14 +365,20 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 		return opsRes, nil
 	}
 
-	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
+	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = "KB_SERVICE_CHARACTER_TYPE not set"
 		return opsRes, nil
 	}
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if workloadType == "" {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("%s not set", constant.KBEnvWorkloadType)
+		return opsRes, nil
+	}
 
-	manager := component.GetManager(characterType)
+	manager := component.GetManager(characterType, workloadType)
 	if manager == nil {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = fmt.Sprintf("No DB Manager for character type %s", characterType)

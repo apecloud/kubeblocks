@@ -30,6 +30,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type Ha struct {
@@ -42,15 +43,20 @@ type Ha struct {
 func NewHa(logger logger.Logger) *Ha {
 
 	dcs, _ := dcs.NewKubernetesStore(logger)
-	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
+	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
-		logger.Errorf("KB_SERVICE_CHARACTER_TYPE not set")
+		logger.Errorf("%s not set", constant.KBEnvCharacterType)
+		return nil
+	}
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if workloadType == "" {
+		logger.Errorf("%s not set", constant.KBEnvWorkloadType)
 		return nil
 	}
 
-	manager := component.GetManager(characterType)
+	manager := component.GetManager(characterType, workloadType)
 	if manager == nil {
-		logger.Errorf("No DB Manager for character type %s", characterType)
+		logger.Errorf("No DB Manager for character type %s, workload type %s", characterType, workloadType)
 		return nil
 	}
 
@@ -100,7 +106,7 @@ func (ha *Ha) RunCycle() {
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			cluster.Leader.DBState = ha.dbManager.GetDBState(ha.ctx, cluster, nil)
 			if ha.dcs.AttempAcquireLock() == nil {
-				err := ha.dbManager.Promote(ha.ctx)
+				err := ha.dbManager.Promote(ha.ctx, cluster)
 				if err != nil {
 					ha.logger.Infof("Take the leader failed: %v", err)
 					_ = ha.dcs.ReleaseLock()
@@ -138,7 +144,12 @@ func (ha *Ha) RunCycle() {
 			_ = ha.dcs.ReleaseLock()
 			break
 		}
-		_ = ha.dbManager.Promote(ha.ctx)
+		err := ha.dbManager.Promote(ha.ctx, cluster)
+		if err != nil {
+			ha.logger.Infof("promote failed: %v", err)
+			break
+		}
+
 		ha.logger.Infof("Refresh leader ttl")
 		_ = ha.dcs.UpdateLock()
 

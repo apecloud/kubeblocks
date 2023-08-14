@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type DBManager interface {
@@ -74,7 +75,7 @@ type DBManager interface {
 	// Functions related to HA
 	// The functions should be idempotent, indicating that if they have been executed in one ha cycle,
 	// any subsequent calls during that cycle will have no effect.
-	Promote(context.Context) error
+	Promote(context.Context, *dcs.Cluster) error
 	Demote(context.Context) error
 	Follow(context.Context, *dcs.Cluster) error
 	Recover(context.Context) error
@@ -159,14 +160,22 @@ func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
-func RegisterManager(characterType string, manager DBManager) {
-	characterType = strings.ToLower(characterType)
-	managers[characterType] = manager
+func (mgr *DBManagerBase) IsRootCreated(ctx context.Context) (bool, error) {
+	return true, nil
 }
 
-func GetManager(characterType string) DBManager {
-	characterType = strings.ToLower(characterType)
-	return managers[characterType]
+func (mgr *DBManagerBase) CreateRoot(ctx context.Context) error {
+	return nil
+}
+
+func RegisterManager(characterType, workloadType string, manager DBManager) {
+	key := strings.ToLower(characterType + "_" + workloadType)
+	managers[key] = manager
+}
+
+func GetManager(characterType, workloadType string) DBManager {
+	key := strings.ToLower(characterType + "_" + workloadType)
+	return managers[key]
 }
 
 func GetDefaultManager() (DBManager, error) {
@@ -174,8 +183,11 @@ func GetDefaultManager() (DBManager, error) {
 	if characterType == "" {
 		return nil, fmt.Errorf("KB_SERVICE_CHARACTER_TYPE not set")
 	}
-
-	return GetManager(characterType), nil
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if workloadType == "" {
+		return nil, fmt.Errorf("%s not set", constant.KBEnvWorkloadType)
+	}
+	return GetManager(characterType, workloadType), nil
 }
 
 type FakeManager struct {
@@ -243,7 +255,7 @@ func (*FakeManager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
 	return fmt.Errorf("NotSuppported")
 }
 
-func (*FakeManager) Promote(context.Context) error {
+func (*FakeManager) Promote(context.Context, *dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 

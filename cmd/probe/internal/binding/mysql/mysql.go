@@ -38,6 +38,7 @@ import (
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/wesql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -45,7 +46,8 @@ import (
 
 // MysqlOperations represents MySQL output bindings.
 type MysqlOperations struct {
-	manager *mysql.Manager
+	manager      *mysql.Manager
+	wesqlManager *wesql.Manager
 	BaseOperations
 }
 
@@ -92,7 +94,18 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 		mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)
 		return err
 	}
+	_, err = wesql.NewConfig(metadata.Properties)
+	if err != nil {
+		mysqlOps.Logger.Errorf("WeSQL config initialize failed: %v", err)
+		return err
+	}
+	wesqlManager, err := wesql.NewManager(mysqlOps.Logger)
+	if err != nil {
+		mysqlOps.Logger.Errorf("WeSQL DB Manager initialize failed: %v", err)
+		return err
+	}
 	mysqlOps.manager = manager
+	mysqlOps.wesqlManager = wesqlManager
 	mysqlOps.DBType = "mysql"
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole

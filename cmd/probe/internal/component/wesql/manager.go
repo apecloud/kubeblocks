@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package mysql
+package wesql
 
 import (
 	"context"
@@ -47,8 +47,6 @@ type Manager struct {
 	logReplicationUpdatesEnabled bool
 	opTimestamp                  int64
 	globalState                  map[string]string
-	masterStatus                 RowMap
-	slaveStatus                  RowMap
 }
 
 var Mgr *Manager
@@ -90,7 +88,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		serverID: uint(serverID) + 1,
 	}
 
-	component.RegisterManager("mysql", internal.Replication, Mgr)
+	component.RegisterManager("mysql", internal.Consensus, Mgr)
 	return Mgr, nil
 }
 
@@ -168,31 +166,13 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 }
 
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	readonly, err := mgr.IsReadonly(ctx, nil, nil)
+	role, err := mgr.GetRole(ctx)
 
-	if err != nil || readonly {
-		return false, err
+	if err == nil && strings.EqualFold(role, "leader") {
+		return true, nil
 	}
 
-	// if cluster.Leader != nil && cluster.Leader.Name != "" {
-	// 	if cluster.Leader.Name == mgr.CurrentMemberName {
-	// 		return true, nil
-	// 	} else {
-	// 		return false, nil
-	// 	}
-	// }
-
-	// // During the initialization of cluster, there would be more than one leader,
-	// // in this case, the first member is chosen as the leader
-	// if mgr.CurrentMemberName == cluster.Members[0].Name {
-	// 	return true, nil
-	// }
-	// isFirstMemberLeader, err := mgr.IsLeaderMember(ctx, cluster, &cluster.Members[0])
-	// if err == nil && isFirstMemberLeader {
-	// 	return false, nil
-	// }
-
-	return true, err
+	return false, err
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
@@ -223,12 +203,12 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 }
 
 func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
-	return true
+	clusterInfo := mgr.GetClusterInfo(ctx, cluster)
+	return strings.Contains(clusterInfo, mgr.CurrentMemberName)
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	mgr.DBState = nil
-	// _, _ = mgr.EnsureServerID(ctx)
 	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
 	if !mgr.IsMemberHealthy(ctx, cluster, member) {
 		return false
@@ -263,8 +243,7 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	var db *sql.DB
 	var err error
 	if member != nil && member.Name != mgr.CurrentMemberName {
-		addr := cluster.GetMemberAddrWithPort(*member)
-		db, err = config.GetDBConnWithAddr(addr)
+		db, err = mgr.GetDBConnWithMember(cluster, member)
 		if err != nil {
 			mgr.Logger.Infof("Get Member conn failed: %v", err)
 			return false
@@ -292,9 +271,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 	var db *sql.DB
 	var err error
 	var isCurrentMember bool
-	var memberName string
 	if member != nil && member.Name != mgr.CurrentMemberName {
-		memberName = member.Name
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
@@ -305,7 +282,6 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 			defer db.Close()
 		}
 	} else {
-		memberName = mgr.CurrentMemberName
 		isCurrentMember = true
 		db = mgr.DB
 	}
@@ -313,18 +289,6 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 	globalState, err := mgr.GetGlobalState(ctx, db)
 	if err != nil {
 		mgr.Logger.Infof("select global failed: %v", err)
-		return nil
-	}
-
-	masterStatus, err := mgr.GetMasterStatus(ctx, db)
-	if err != nil {
-		mgr.Logger.Infof("show master status failed: %v", err)
-		return nil
-	}
-
-	slaveStatus, err := mgr.GetSlaveStatus(ctx, db)
-	if err != nil {
-		mgr.Logger.Infof("show slave status failed: %v", err)
 		return nil
 	}
 
@@ -338,30 +302,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 		OpTimestamp: opTimestamp,
 		Extra:       map[string]string{},
 	}
+
 	for k, v := range globalState {
 		dbState.Extra[k] = v
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name == memberName {
-		dbState.Extra["Binlog_File"] = masterStatus.GetString("File")
-		dbState.Extra["Binlog_Pos"] = masterStatus.GetString("Pos")
-	} else {
-		dbState.Extra["Master_Host"] = slaveStatus.GetString("Master_Host")
-		dbState.Extra["Master_UUID"] = slaveStatus.GetString("Master_UUID")
-		dbState.Extra["Slave_IO_Running"] = slaveStatus.GetString("Slave_IO_Running")
-		dbState.Extra["Slave_SQL_Running"] = slaveStatus.GetString("Slave_SQL_Running")
-		dbState.Extra["Last_IO_Error"] = slaveStatus.GetString("Last_IO_Error")
-		dbState.Extra["Last_SQL_Error"] = slaveStatus.GetString("Last_SQL_Error")
-		dbState.Extra["Master_Log_File"] = slaveStatus.GetString("Master_Log_File")
-		dbState.Extra["Read_Master_Log_Pos"] = slaveStatus.GetString("Read_Master_Log_Pos")
-		dbState.Extra["Relay_Master_Log_File"] = slaveStatus.GetString("Relay_Master_Log_File")
-		dbState.Extra["Exec_Master_Log_Pos"] = slaveStatus.GetString("Exec_Master_Log_Pos")
-	}
-
 	if isCurrentMember {
 		mgr.globalState = globalState
-		mgr.masterStatus = masterStatus
-		mgr.slaveStatus = slaveStatus
 		mgr.opTimestamp = opTimestamp
 	}
 	return dbState
@@ -424,36 +371,6 @@ func (mgr *Manager) GetGlobalState(ctx context.Context, db *sql.DB) (map[string]
 	}, nil
 }
 
-func (mgr *Manager) GetSlaveStatus(ctx context.Context, db *sql.DB) (RowMap, error) {
-	sql := "show slave status"
-	var rowMap RowMap
-
-	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-		rowMap = rMap
-		return nil
-	})
-	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
-		return nil, err
-	}
-	return rowMap, nil
-}
-
-func (mgr *Manager) GetMasterStatus(ctx context.Context, db *sql.DB) (RowMap, error) {
-	sql := "show master status"
-	var rowMap RowMap
-
-	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-		rowMap = rMap
-		return nil
-	})
-	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
-		return nil, err
-	}
-	return rowMap, nil
-}
-
 func (mgr *Manager) Recover(context.Context) error {
 	return nil
 }
@@ -466,53 +383,99 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 	return nil
 }
 
-// func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-// 	leaderMember := cluster.GetLeaderMember()
-// 	if leaderMember == nil {
-// 		mgr.Logger.Infof("IsClusterHealthy: has no leader.")
-// 		return true
-// 	}
+func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	var db *sql.DB
+	var err error
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		db, err = mgr.GetLeaderConn(cluster)
+	} else {
+		localInfo, _ := mgr.GetClusterLocalInfo(ctx)
+		if localInfo.GetString("CURRENT_LEADER") == "" {
+			return false
+		}
+		db, err = config.GetDBConnWithAddr(localInfo.GetString("CURRENT_LEADER"))
 
-// 	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
-// }
+	}
+
+	if err != nil {
+		mgr.Logger.Infof("Get leader conn failed: %v", err)
+		return false
+	}
+	if db != nil {
+		defer db.Close()
+	}
+
+	var leaderRecord RowMap
+	sql := "select * from information_schema.wesql_cluster_global;"
+	err = QueryRowsMap(db, sql, func(rMap RowMap) error {
+		if rMap.GetString("ROLE") == "Leader" {
+			leaderRecord = rMap
+		}
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		return false
+	}
+
+	if len(leaderRecord) > 0 {
+		return true
+	}
+	return false
+}
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	return mgr.EnsureServerID(ctx)
-}
-
-func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
-	var serverID uint
-	err := mgr.DB.QueryRowContext(ctx, "select @@global.server_id").Scan(&serverID)
-	if err != nil {
-		mgr.Logger.Infof("Get global server id failed: %v", err)
-		return false, err
-	}
-	if serverID == mgr.serverID {
+	clusterInfo := mgr.GetClusterInfo(ctx, nil)
+	if clusterInfo != "" {
 		return true, nil
 	}
-	mgr.Logger.Infof("Set global server id : %v")
 
-	setServerID := fmt.Sprintf(`set global server_id = %d`, mgr.serverID)
-	mgr.Logger.Infof("Set global server id : %v", setServerID)
-	_, err = mgr.DB.Exec(setServerID)
-	if err != nil {
-		mgr.Logger.Errorf("set server id err: %v", err)
-		return false, err
+	return false, nil
+}
+
+func (mgr *Manager) GetClusterInfo(ctx context.Context, cluster *dcs.Cluster) string {
+	var db *sql.DB
+	var err error
+	if cluster != nil {
+		db, err = mgr.GetLeaderConn(cluster)
+		if err != nil {
+			mgr.Logger.Infof("Get leader conn failed: %v", err)
+			return ""
+		}
+		if db != nil {
+			defer db.Close()
+		}
+	} else {
+		db = mgr.DB
+
 	}
-
-	return true, nil
+	var clusterID, clusterInfo string
+	err = db.QueryRowContext(ctx, "select cluster_id, cluster_info from mysql.consensus_info").
+		Scan(&clusterID, &clusterInfo)
+	if err != nil {
+		mgr.Logger.Error("Cluster info query failed: %v", err)
+	}
+	return clusterInfo
 }
 
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
-	if (mgr.globalState["super_read_only"] == "0" && mgr.globalState["read_only"] == "0") &&
-		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "No" &&
-			mgr.slaveStatus.GetString("Slave_SQL_Running") == "No")) {
+	isLeader, _ := mgr.IsLeader(ctx, cluster)
+	if isLeader {
 		return nil
 	}
-	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
-	stopSlave := `stop slave;`
-	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
+
+	db, err := mgr.GetLeaderConn(cluster)
+	if err != nil {
+		return errors.Wrap(err, "Get leader conn failed")
+	}
+	if db != nil {
+		defer db.Close()
+	}
+
+	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
+	addr := cluster.GetMemberAddr(*currentMember)
+	resp, err := db.Exec(fmt.Sprintf("call dbms_consensus.change_leader('%s:13306');", addr))
 	if err != nil {
 		mgr.Logger.Errorf("promote err: %v", err)
 		return err
@@ -522,123 +485,33 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) Demote(context.Context) error {
-	setReadOnly := `set global read_only=on;set global super_read_only=on;`
-
-	_, err := mgr.DB.Exec(setReadOnly)
-	if err != nil {
-		mgr.Logger.Errorf("demote err: %v", err)
-		return err
-	}
-	return nil
-}
-
-func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		return fmt.Errorf("cluster has no leader")
-	}
-
-	if mgr.CurrentMemberName == cluster.Leader.Name {
-		mgr.Logger.Infof("i get the leader key, don't need to follow")
-		return nil
-	}
-
-	if !mgr.isRecoveryConfOutdate(ctx, cluster.Leader.Name) {
-		return nil
-	}
-
-	stopSlave := `stop slave;`
-	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
-		cluster.GetMemberAddr(*leaderMember), config.username, config.password, leaderMember.DBPort)
-	startSlave := `start slave;`
-
-	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)
-	if err != nil {
-		mgr.Logger.Errorf("sql query failed, err:%v", err)
-	}
-
-	mgr.Logger.Infof("successfully follow new leader:%s", leaderMember.Name)
-	return nil
-}
-
-func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bool {
-	var rowMap = mgr.slaveStatus
-
-	if len(rowMap) == 0 {
-		return true
-	}
-
-	ioError := rowMap.GetString("Last_IO_Error")
-	sqlError := rowMap.GetString("Last_SQL_Error")
-	if ioError != "" || sqlError != "" {
-		mgr.Logger.Infof("slave status error, sqlError: %s, ioError: %s", sqlError, ioError)
-		return true
-	}
-
-	masterHost := rowMap.GetString("Master_Host")
-	return !strings.HasPrefix(masterHost, leader)
-}
-
-func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
-	var rowMap = mgr.slaveStatus
-
-	if len(rowMap) == 0 {
-		return false, nil
-	}
-	ioRunning := rowMap.GetString("Slave_IO_Running")
-	sqlRunning := rowMap.GetString("Slave_SQL_Running")
-	if ioRunning == "Yes" || sqlRunning == "Yes" {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
-	sql := "show slave hosts"
-	var rowMap RowMap
-
-	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-		rowMap = rMap
-		return nil
-	})
-	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
-		return false, err
-	}
-
-	if len(rowMap) == 0 {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
 	return nil
 }
 
-// func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-// 	return nil
-// 	isLeader, err := mgr.IsLeader(ctx, cluster)
-// 	if err == nil && isLeader {
-// 		// if current member is leader, just return
-// 		return nil
-// 	}
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
+	if err != nil || clusterLocalInfo == nil {
+		mgr.Logger.Errorf("Get cluster local info failed: %v", err)
+		return nil
+	}
 
-// 	for _, member := range cluster.Members {
-// 		if member.Name == mgr.CurrentMemberName {
-// 			continue
-// 		}
+	if clusterLocalInfo.GetString("ROLE") == "Leader" {
+		// I am the leader, just return nil
+		return nil
+	}
 
-// 		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
-// 		if err == nil && isLeader {
-// 			return &member
-// 		}
-// 	}
+	leaderAddr := clusterLocalInfo.GetString("CURRENT_LEADER")
+	if leaderAddr == "" {
+		return nil
+	}
+	leaderParts := strings.Split(leaderAddr, ".")
+	if len(leaderParts) > 0 {
+		return cluster.GetMemberWithName(leaderParts[0])
+	}
 
-// 	return nil
-// }
+	return nil
+}
 
 // HasOtherHealthyMembers checks if there are any healthy members, excluding the leader
 func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
@@ -654,14 +527,6 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 	}
 
 	return members
-}
-
-func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
-	return true, nil
-}
-
-func (mgr *Manager) CreateRoot(ctx context.Context) error {
-	return nil
 }
 
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {

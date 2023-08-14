@@ -17,24 +17,33 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package internal
+package wesql
 
-import "strings"
+import (
+	"database/sql"
 
-const (
-	WorkloadTypeKey = "workloadType"
-	Replication     = "Replication"
-	Consensus       = "Consensus"
+	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
-func IsHAAvailable(characterType, workloadType string) bool {
-	switch strings.ToLower(characterType) {
-	case "mongodb":
-		return true
-	case "mysql":
-		if strings.EqualFold(workloadType, Replication) || strings.EqualFold(workloadType, Consensus) {
-			return true
+func (mgr *Manager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member) (*sql.DB, error) {
+	var db *sql.DB
+	var err error
+	if member != nil {
+		addr := cluster.GetMemberAddrWithPort(*member)
+		db, err = config.GetDBConnWithAddr(addr)
+		if err != nil {
+			return nil, errors.Wrap(err, "new db connection failed")
 		}
 	}
-	return false
+	return db, nil
+}
+
+func (mgr *Manager) GetLeaderConn(cluster *dcs.Cluster) (*sql.DB, error) {
+	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		return nil, errors.New("the cluster has no leader")
+	}
+	return mgr.GetDBConnWithMember(cluster, leaderMember)
 }

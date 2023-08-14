@@ -27,6 +27,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -44,7 +46,7 @@ sqlctl switchover  --primary xxx --candidate xxx
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		var characterType string
-		if characterType = os.Getenv("KB_SERVICE_CHARACTER_TYPE"); characterType == "" {
+		if characterType = os.Getenv(constant.KBEnvCharacterType); characterType == "" {
 			fmt.Println("KB_SERVICE_CHARACTER_TYPE must be set")
 			return
 		}

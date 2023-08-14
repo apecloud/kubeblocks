@@ -30,6 +30,8 @@ spec:
           env:
             - name: JUPYTER_PORT
               value: "{{ .Values.service.port }}"
+            - name: NOTEBOOK_ARGS
+              value: "--NotebookApp.token='' "
       volumes:
         - name: data-volume
           persistentVolumeClaim:

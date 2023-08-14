@@ -18,17 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-Package rsm is a general component aims to hold role-based stateful workloads(such as databases).
-RSM stands for Replicated State Machine based on the truth that the workloads are solving state replication related problems.
-Treat RSM as an enhanced StatefulSet.
-
-The K8s native StatefulSet can handle stateful workloads well,
-but there are more works to do if the workload pods have roles(leader/follower in etcd, primary/secondary in PostgreSQL etc.).
-
-RSM adds an abstract layer above StatefulSet, and provides:
-1. role-based update strategy(Serial/Parallel/BestEffortParallel)
-2. role-based access modes(ReadWrite/Readonly/None)
-3. auto switchover
-4. membership reconfiguration
+Package handler is a more flexible EventHandler builder in a chain fashion.
 */
-package rsm
+package handler

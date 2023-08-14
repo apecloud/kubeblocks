@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type ObjectGenerationTransformer struct{}
@@ -56,19 +55,26 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// generate objects by current spec
 	svc := buildSvc(*rsm)
+	altSvs := buildAlternativeSvs(*rsm)
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
 	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-	objects := []client.Object{svc, headLessSvc, envConfig, sts}
+	objects := []client.Object{headLessSvc, envConfig, sts}
+	if svc != nil {
+		objects = append(objects, svc)
+	}
+	for _, s := range altSvs {
+		objects = append(objects, s)
+	}
 
 	for _, object := range objects {
-		if err := controllerutil.SetOwnership(rsm, object, model.GetScheme(), rsmFinalizerName); err != nil {
+		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer(object)); err != nil {
 			return err
 		}
 	}
 
 	// read cache snapshot
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: rsm.Name, constant.KBManagedByKey: kindReplicatedStateMachine}
+	ml := getLabels(rsm)
 	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
 	if err != nil {
 		return err
@@ -104,6 +110,12 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
+			if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+				// filter non-env configmaps
+				if _, ok := oldSnapshot[name].(*corev1.ConfigMap); ok {
+					continue
+				}
+			}
 			cli.Delete(dag, oldSnapshot[name])
 		}
 	}
@@ -124,26 +136,47 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 }
 
 func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
-	svcBuilder := builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
-		// AddAnnotationsInMap(rsm.Annotations).
-		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
-		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine).
-		AddPorts(rsm.Spec.Service.Ports...).
-		SetType(rsm.Spec.Service.Type)
-	for _, role := range rsm.Spec.Roles {
-		if role.IsLeader && len(role.Name) > 0 {
-			svcBuilder.AddSelectors(rsmAccessModeLabelKey, string(role.AccessMode))
-		}
+	if rsm.Spec.Service == nil {
+		return nil
 	}
-	return svcBuilder.GetObject()
+	labels := getLabels(&rsm)
+	selectors := getSvcSelector(&rsm)
+	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
+		AddLabelsInMap(labels).
+		AddSelectorsInMap(selectors).
+		AddPorts(rsm.Spec.Service.Ports...).
+		SetType(rsm.Spec.Service.Type).
+		GetObject()
+}
+
+func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service {
+	if rsm.Spec.Service == nil {
+		return nil
+	}
+	svcLabels := getLabels(&rsm)
+	var services []*corev1.Service
+	for i := range rsm.Spec.AlternativeServices {
+		service := rsm.Spec.AlternativeServices[i]
+		if len(service.Namespace) == 0 {
+			service.Namespace = rsm.Namespace
+		}
+		labels := service.Labels
+		if labels == nil {
+			labels = make(map[string]string, 0)
+		}
+		for k, v := range svcLabels {
+			labels[k] = v
+		}
+		service.Labels = labels
+		services = append(services, &service)
+	}
+	return services
 }
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+	labels := getLabels(&rsm)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabelsInMap(labels).
 		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
 		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine)
 	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
@@ -173,39 +206,34 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 }
 
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
-	stsBuilder := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name)
 	template := buildStsPodTemplate(rsm, envConfig)
-	stsBuilder.AddLabels(constant.AppInstanceLabelKey, rsm.Name).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
-		AddMatchLabel(constant.AppInstanceLabelKey, rsm.Name).
-		AddMatchLabel(constant.KBManagedByKey, kindReplicatedStateMachine).
+	labels := getLabels(&rsm)
+	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		AddLabelsInMap(labels).
+		AddAnnotationsInMap(rsm.Annotations).
+		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
-		SetReplicas(rsm.Spec.Replicas).
-		SetPodManagementPolicy(apps.OrderedReadyPodManagement).
+		SetReplicas(*rsm.Spec.Replicas).
+		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
 		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
-		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
-	return stsBuilder.GetObject()
+		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		GetObject()
 }
 
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
+	labels := getLabels(&rsm)
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
+	}
 	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-env").
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }
 
 func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := rsm.Spec.Template
-	labels := template.Labels
-	if labels == nil {
-		labels = make(map[string]string, 2)
-	}
-	labels[constant.AppInstanceLabelKey] = rsm.Name
-	labels[constant.KBManagedByKey] = kindReplicatedStateMachine
-	template.Labels = labels
-
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
 		template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
@@ -218,13 +246,16 @@ func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.
 				}})
 	}
 
-	injectRoleObservationContainer(rsm, &template)
+	injectRoleProbeContainer(rsm, &template)
 
 	return &template
 }
 
-func injectRoleObservationContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
-	roleObservation := rsm.Spec.RoleObservation
+func injectRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
+	roleProbe := rsm.Spec.RoleProbe
+	if roleProbe == nil {
+		return
+	}
 	credential := rsm.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
@@ -243,13 +274,13 @@ func injectRoleObservationContainer(rsm workloads.ReplicatedStateMachine, templa
 	allUsedPorts := findAllUsedPorts(template)
 	svcPort := actionSvcPortBase
 	var actionSvcPorts []int32
-	for range roleObservation.ObservationActions {
+	for range roleProbe.ProbeActions {
 		svcPort = findNextAvailablePort(svcPort, allUsedPorts)
 		actionSvcPorts = append(actionSvcPorts, svcPort)
 	}
-	injectObservationActionContainer(rsm, template, actionSvcPorts, credentialEnv)
+	injectProbeActionContainer(rsm, template, actionSvcPorts, credentialEnv)
 	actionSvcList, _ := json.Marshal(actionSvcPorts)
-	injectRoleObserveContainer(rsm, template, string(actionSvcList), credentialEnv)
+	injectRoleProbeAgentContainer(rsm, template, string(actionSvcList), credentialEnv)
 }
 
 func findNextAvailablePort(base int32, allUsedPorts []int32) int32 {
@@ -279,19 +310,22 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 	return allUsedPorts
 }
 
-func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
-	// compute parameters for role observation container
-	roleObservation := rsm.Spec.RoleObservation
+func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+	// compute parameters for role probe agent container
+	roleProbe := rsm.Spec.RoleProbe
+	if roleProbe == nil {
+		return
+	}
 	credential := rsm.Spec.Credential
-	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
+	image := viper.GetString("ROLE_PROBE_AGENT_IMAGE")
 	if len(image) == 0 {
-		image = defaultRoleObservationImage
+		image = defaultRoleProbeAgentImage
 	}
-	observationDaemonPort := viper.GetInt("ROLE_OBSERVATION_SERVICE_PORT")
-	if observationDaemonPort == 0 {
-		observationDaemonPort = defaultRoleObservationDaemonPort
+	probeDaemonPort := viper.GetInt("ROLE_PROBE_SERVICE_PORT")
+	if probeDaemonPort == 0 {
+		probeDaemonPort = defaultRoleProbeDaemonPort
 	}
-	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort))
+	roleProbeURI := fmt.Sprintf(roleProbeURIFormat, strconv.Itoa(probeDaemonPort))
 	env := credentialEnv
 	env = append(env,
 		corev1.EnvVar{
@@ -329,16 +363,16 @@ func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *
 
 	// build container
 	container := corev1.Container{
-		Name:            roleObservationName,
+		Name:            roleProbeName,
 		Image:           image,
 		ImagePullPolicy: "IfNotPresent",
 		Command: []string{
 			"role-agent",
-			"--port", strconv.Itoa(observationDaemonPort),
+			"--port", strconv.Itoa(probeDaemonPort),
 		},
 		Ports: []corev1.ContainerPort{{
-			ContainerPort: int32(observationDaemonPort),
-			Name:          roleObservationName,
+			ContainerPort: int32(probeDaemonPort),
+			Name:          roleProbeName,
 			Protocol:      "TCP",
 		}},
 		ReadinessProbe: &corev1.Probe{
@@ -346,24 +380,28 @@ func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *
 				Exec: &corev1.ExecAction{
 					Command: []string{
 						"/bin/grpc_health_probe",
-						roleObserveURI,
+						roleProbeURI,
 					},
 				},
 			},
-			InitialDelaySeconds: roleObservation.InitialDelaySeconds,
-			TimeoutSeconds:      roleObservation.TimeoutSeconds,
-			PeriodSeconds:       roleObservation.PeriodSeconds,
-			SuccessThreshold:    roleObservation.SuccessThreshold,
-			FailureThreshold:    roleObservation.FailureThreshold,
+			InitialDelaySeconds: roleProbe.InitialDelaySeconds,
+			TimeoutSeconds:      roleProbe.TimeoutSeconds,
+			PeriodSeconds:       roleProbe.PeriodSeconds,
+			SuccessThreshold:    roleProbe.SuccessThreshold,
+			FailureThreshold:    roleProbe.FailureThreshold,
 		},
 		Env: env,
 	}
 
-	// inject role observation container
+	// inject role probe container
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectObservationActionContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectProbeActionContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+	if rsm.Spec.RoleProbe == nil {
+		return
+	}
+
 	// inject shared volume
 	agentVolume := corev1.Volume{
 		Name: roleAgentVolumeName,
@@ -393,7 +431,7 @@ func injectObservationActionContainer(rsm workloads.ReplicatedStateMachine, temp
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
 
 	// inject action containers based on utility images
-	for i, action := range rsm.Spec.RoleObservation.ObservationActions {
+	for i, action := range rsm.Spec.RoleProbe.ProbeActions {
 		image := action.Image
 		if len(image) == 0 {
 			image = defaultActionImage
@@ -420,40 +458,61 @@ func injectObservationActionContainer(rsm workloads.ReplicatedStateMachine, temp
 
 func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string {
 	envData := map[string]string{}
+	svcName := getHeadlessSvcName(set)
+	uid := string(set.UID)
+	strReplicas := strconv.Itoa(int(*set.Spec.Replicas))
+	generateReplicaEnv := func(prefix string) {
+		for i := 0; i < int(*set.Spec.Replicas); i++ {
+			hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
+			hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+		}
+	}
+	// build member related envs from set.Status.MembersStatus
+	generateMemberEnv := func(prefix string) {
+		followers := ""
+		for _, memberStatus := range set.Status.MembersStatus {
+			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
+				continue
+			}
+			switch {
+			case memberStatus.IsLeader:
+				envData[prefix+"LEADER"] = memberStatus.PodName
+			case memberStatus.CanVote:
+				if len(followers) > 0 {
+					followers += ","
+				}
+				followers += memberStatus.PodName
+			}
+		}
+		if followers != "" {
+			envData[prefix+"FOLLOWERS"] = followers
+		}
+	}
 
 	prefix := constant.KBPrefix + "_RSM_"
-	svcName := getHeadlessSvcName(set)
-	envData[prefix+"N"] = strconv.Itoa(int(set.Spec.Replicas))
-	for i := 0; i < int(set.Spec.Replicas); i++ {
-		hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
-		hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
-		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-	}
-
-	// build member related envs from set.Status.MembersStatus
-	followers := ""
-	for _, memberStatus := range set.Status.MembersStatus {
-		if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
-			continue
-		}
-		switch {
-		case memberStatus.IsLeader:
-			envData[prefix+"LEADER"] = memberStatus.PodName
-		case memberStatus.CanVote:
-			if len(followers) > 0 {
-				followers += ","
-			}
-			followers += memberStatus.PodName
-		}
-	}
-	if followers != "" {
-		envData[prefix+"FOLLOWERS"] = followers
-	}
-
+	envData[prefix+"N"] = strReplicas
+	generateReplicaEnv(prefix)
+	generateMemberEnv(prefix)
 	// set owner uid to let pod know if the owner is recreated
-	uid := string(set.UID)
 	envData[prefix+"OWNER_UID"] = uid
 	envData[prefix+"OWNER_UID_SUFFIX8"] = uid[len(uid)-4:]
+
+	// have backward compatible handling for env generated in version prior 0.6.0
+	prefix = constant.KBPrefix + "_"
+	envData[prefix+"REPLICA_COUNT"] = strReplicas
+	generateReplicaEnv(prefix)
+	generateMemberEnv(prefix)
+	envData[prefix+"CLUSTER_UID"] = uid
+
+	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
+	// and introduce env/cm key naming reference complexity
+	componentDefName := set.Labels[constant.AppComponentLabelKey]
+	prefixWithCompDefName := prefix + strings.ToUpper(componentDefName) + "_"
+	envData[prefixWithCompDefName+"N"] = strReplicas
+	generateReplicaEnv(prefixWithCompDefName)
+	generateMemberEnv(prefixWithCompDefName)
+	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 
 	return envData
 }

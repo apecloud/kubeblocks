@@ -62,6 +62,11 @@ func (builder *StatefulSetBuilder) AddMatchLabelsInMap(labels map[string]string)
 	return builder
 }
 
+func (builder *StatefulSetBuilder) SetSelector(selector *metav1.LabelSelector) *StatefulSetBuilder {
+	builder.get().Spec.Selector = selector
+	return builder
+}
+
 func (builder *StatefulSetBuilder) SetServiceName(serviceName string) *StatefulSetBuilder {
 	builder.get().Spec.ServiceName = serviceName
 	return builder
@@ -96,6 +101,11 @@ func (builder *StatefulSetBuilder) AddVolumeClaimTemplates(templates ...corev1.P
 
 func (builder *StatefulSetBuilder) SetVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *StatefulSetBuilder {
 	builder.get().Spec.VolumeClaimTemplates = templates
+	return builder
+}
+
+func (builder *StatefulSetBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *StatefulSetBuilder {
+	builder.get().Spec.UpdateStrategy = strategy
 	return builder
 }
 

@@ -21,12 +21,12 @@ package highavailability
 
 import (
 	"context"
-	"net"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/dapr/kit/logger"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
@@ -172,11 +172,12 @@ func (ha *Ha) Start() {
 		return
 	}
 
-	isDnsReady, err := ha.IsDnsReady()
+	// check if pod is ready, it can successfully resolve domain
+	isDnsReady, err := ha.IsPodReady()
 	for err != nil || !isDnsReady {
 		ha.logger.Infof("Waiting for dns resolution to be ready")
 		time.Sleep(3 * time.Second)
-		isDnsReady, err = ha.IsDnsReady()
+		isDnsReady, err = ha.IsPodReady()
 	}
 	ha.logger.Infof("dns resolution is ready")
 
@@ -303,11 +304,19 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 	return false
 }
 
-func (ha *Ha) IsDnsReady() (bool, error) {
+func (ha *Ha) IsPodReady() (bool, error) {
 	domain := viper.GetString("KB_POD_FQDN")
-	_, err := net.LookupIP(domain)
+
+	pinger, err := probing.NewPinger(domain)
 	if err != nil {
-		ha.logger.Errorf("DNS lookup failed, err:%v", err)
+		ha.logger.Errorf("new pinger failed, err:%v", err)
+		return false, err
+	}
+
+	pinger.Count = 3
+	err = pinger.Run()
+	if err != nil {
+		ha.logger.Errorf("ping domain:%s failed, err:%v", domain, err)
 		return false, err
 	}
 

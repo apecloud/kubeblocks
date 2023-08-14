@@ -66,6 +66,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
+	github.com/prometheus-community/pro-bing v0.3.0
 	github.com/redis/go-redis/v9 v9.0.1
 	github.com/replicatedhq/termui/v3 v3.1.1-0.20200811145416-f40076d26851
 	github.com/replicatedhq/troubleshoot v0.57.0
@@ -90,12 +91,12 @@ require (
 	go.mongodb.org/mongo-driver v1.11.1
 	go.uber.org/automaxprocs v1.5.1
 	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.9.0
+	golang.org/x/crypto v0.12.0
 	golang.org/x/exp v0.0.0-20221028150844-83b7d23a625f
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.14.0
 	golang.org/x/oauth2 v0.4.0
-	golang.org/x/sync v0.1.0
-	golang.org/x/text v0.9.0
+	golang.org/x/sync v0.3.0
+	golang.org/x/text v0.12.0
 	google.golang.org/grpc v1.52.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/inf.v0 v0.9.1
@@ -408,8 +409,8 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230221090011-e4bae7ad2296 // indirect
 	golang.org/x/mod v0.9.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect

@@ -193,7 +193,7 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 }
 
 func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
-	lag := cluster.GetOpTime() - walPosition
+	lag := cluster.Leader.DBState.OpTimestamp - walPosition
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 

@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"

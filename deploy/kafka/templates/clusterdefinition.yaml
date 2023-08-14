@@ -96,8 +96,8 @@ spec:
               - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
                 value: "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT"
               - name: KAFKA_CFG_ADVERTISED_LISTENERS
-                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_CLUSTER_COMP_NAME):9092"
-                # value: "INTERNAL://$(KB_POD_FQDN):9094,CLIENT://$(KB_POD_FQDN):9092"
+                #value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9092"
+                value: "INTERNAL://$(KB_POD_IP):9094,CLIENT://$(KB_POD_IP):9092"
               - name: KAFKA_CFG_INITIAL_BROKER_REGISTRATION_TIMEOUT_MS
                 value: "240000"
               - name: ALLOW_PLAINTEXT_LISTENER
@@ -257,7 +257,8 @@ spec:
               - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
                 value: "INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT,CONTROLLER:PLAINTEXT"
               - name: KAFKA_CFG_ADVERTISED_LISTENERS
-                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_CLUSTER_COMP_NAME):9092"
+                # value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9092"
+                value: "INTERNAL://$(KB_POD_IP):9094,CLIENT://$(KB_POD_IP):9092"
               - name: KAFKA_CFG_INITIAL_BROKER_REGISTRATION_TIMEOUT_MS
                 value: "240000"
               - name: ALLOW_PLAINTEXT_LISTENER

@@ -8,6 +8,12 @@ version: 0.6.0-beta.21
 
 appVersion: 22.9.4
 
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
 
 home: https://clickhouse.com/
 icon: https://bitnami.com/assets/stacks/clickhouse/img/clickhouse-stack-220x234.png

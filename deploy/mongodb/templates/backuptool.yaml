@@ -29,17 +29,21 @@ spec:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
-    - sh
+    - bash
     - -c
     - |
+     if [ -d ${BACKUP_DIR} ]; then
+       rm -rf ${BACKUP_DIR}
+     fi
      mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR}
      touch mongodb.backup && sync
-     START_TIME=$(mongosh -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
-     START_TIME=$(date -d "@${START_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
+     {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 6 }}
+
+     START_TIME=`get_current_time`
+     # TODO: flush data and locked write, otherwise data maybe inconsistent
      tar -czvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz ./
      rm -rf mongodb.backup
-     STOP_TIME=$(mongosh -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
-     STOP_TIME=$(date -d "@${STOP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
-     TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
-     echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
+
+     # stat and save the backup information
+     stat_and_save_backup_info $START_TIME
   incrementalBackupCommands: []

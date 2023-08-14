@@ -4,7 +4,7 @@ metadata:
   name: {{ include "kblib.clusterName" . }}
   labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
   annotations:
-    "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"{{ $.Values.saslEnable }}","KB_KAFKA_BROKER_HEAP":"{{ $.Values.brokerHeap }}","KB_KAFKA_CONTROLLER_HEAP":"{{ $.Values.controllerHeap }}"}'
+    "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"{{ $.Values.saslEnable }}","KB_KAFKA_BROKER_HEAP":"{{ $.Values.brokerHeap }}","KB_KAFKA_CONTROLLER_HEAP":"{{ $.Values.controllerHeap }}","KB_KAFKA_PUBLIC_ACCESS":"{{ $.Values.extra.publiclyAccessible }}"}'
 spec:
   clusterDefinitionRef: kafka # ref clusterdefinition.name
   clusterVersionRef: {{ .Values.version }}

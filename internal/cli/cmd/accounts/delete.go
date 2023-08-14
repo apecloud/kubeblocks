@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package accounts
 
 import (
-	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 

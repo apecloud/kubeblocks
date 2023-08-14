@@ -146,3 +146,52 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0
+
+---
+# Adding backward compatibility for clusterVersion 12.14.0, which will be removed in subsequent iterative versions.
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-12.14.0
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "false"
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: postgresql
+  componentVersions:
+    - componentDefRef: postgresql
+      configSpecs:
+        - name: postgresql-configuration
+          templateRef: postgresql12-configuration
+          constraintRef: postgresql12-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+        - name: postgresql-custom-metrics
+          templateRef: postgresql12-custom-metrics
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-custom-metrics
+          defaultMode: 0777
+        - name: agamotto-configuration
+          templateRef: postgresql-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
+          defaultMode: 0777
+      versionsContext:
+        initContainers:
+          - name: pg-init-container
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
+        containers:
+          - name: postgresql
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
+          - name: pgbouncer
+            image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0

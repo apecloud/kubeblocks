@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oracle-mysql-reload-script
+  labels:
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+data:
+  reload.tpl: |-
+    {{- .Files.Get "scripts/oracle-mysql-reload.tpl" | nindent 4 }}
+  reload.yaml: |-
+    scripts: reload.tpl
+    fileRegex: my.cnf
+    formatterConfig:
+      format: ini
+      iniConfig:
+        sectionName: mysqld

@@ -29,7 +29,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/cli/cli"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -131,7 +130,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd := &cobra.Command{
 		Use:               "describe ADDON_NAME",
 		Short:             "Describe an addon specification.",
-		Args:              cli.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
 		Aliases:           []string{"desc"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -171,7 +170,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:               "enable ADDON_NAME",
 		Short:             "Enable an addon.",
-		Args:              cli.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Example: templates.Examples(`
     	# Enabled "prometheus" addon
@@ -247,7 +246,7 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:               "disable ADDON_NAME",
 		Short:             "Disable an addon.",
-		Args:              cli.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))

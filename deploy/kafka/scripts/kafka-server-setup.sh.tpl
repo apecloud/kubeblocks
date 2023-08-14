@@ -119,6 +119,11 @@ if [[ "broker,controller" = "$KAFKA_CFG_PROCESS_ROLES" ]] || [[ "broker" = "$KAF
       echo "[action]Removing quorum-state file when restart."
       rm -f "$KAFKA_CFG_METADATA_LOG_DIR/__cluster_metadata-0/quorum-state"
     fi
+
+    if [[ "true" = "$KB_KAFKA_PUBLIC_ACCESS" ]]; then
+      export KAFKA_CFG_ADVERTISED_LISTENERS="INTERNAL://${KB_POD_NAME}.${KB_CLUSTER_COMP_NAME}-headless.${KB_NAMESPACE}.svc:9094,CLIENT://${KB_POD_NAME}.${KB_CLUSTER_COMP_NAME}-headless.${KB_NAMESPACE}.svc:9092"
+      echo "[cfg]KAFKA_CFG_ADVERTISED_LISTENERS=$KAFKA_CFG_ADVERTISED_LISTENERS"
+    fi
 fi
 
 if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
@@ -136,7 +141,7 @@ if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
       {{- if eq "controller" $c.componentDefRef }}
         {{- $replicas := $c.replicas | int }}
         {{- range $n, $e := until $replicas }}
-          {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.%s" $clusterName $c.name $n $clusterName $c.name $namespace $.clusterDomain }} #
+          {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.%s" $clusterName $c.name $n $clusterName $c.name $namespace $.clusterDomain }}
           {{- $voter := printf "%d@%s:9093" ( $n | int ) $podFQDN }}
           {{- $voters = printf "%s,%s" $voters $voter }}
         {{- end }}

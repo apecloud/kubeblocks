@@ -332,21 +332,21 @@ func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {
 	return GetReplSetConfig(ctx, mgr.Client)
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) ([]string, error) {
+func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
 	if err != nil {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
-		return nil, err
+		return nil
 	}
 	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
 	rsConfig, err := GetReplSetConfig(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
-		return nil, err
+		return nil
 	}
 
-	return mgr.GetMemberAddrsFromRSConfig(rsConfig), nil
+	return mgr.GetMemberAddrsFromRSConfig(rsConfig)
 }
 
 func (mgr *Manager) GetMemberAddrsFromRSConfig(rsConfig *RSConfig) []string {

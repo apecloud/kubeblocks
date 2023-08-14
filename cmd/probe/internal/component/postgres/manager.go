@@ -160,10 +160,18 @@ func (mgr *Manager) ExecWithPool(ctx context.Context, sql string, pool *pgxpool.
 	return
 }
 
-func (mgr *Manager) QueryOthers(sql string, member *dcs.Member) {
+// QueryOthers execute query on other member's connection pool
+func (mgr *Manager) QueryOthers(ctx context.Context, sql string, memberHost string) (result []byte, err error) {
+	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{memberHost})
+	if err != nil || pools[0] == nil {
+		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
+		return nil, errors.Errorf("get member:%s's pool failed, err:%v", memberHost, err)
+	}
 
+	return mgr.QueryWithPool(ctx, sql, pools[0])
 }
 
+// ExecOthers execute command on other member's connection pool
 func (mgr *Manager) ExecOthers(sql string, member *dcs.Member) {
 
 }

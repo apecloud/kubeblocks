@@ -207,8 +207,8 @@ func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) ([]string, error) {
-	return cluster.GetMemberAddrs(), nil
+func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+	return cluster.GetMemberAddrs()
 }
 
 func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (*sql.DB, error) {

@@ -81,7 +81,7 @@ func (ha *Ha) RunCycle() {
 
 	// IsClusterHealthy is just for consensus cluster healthy check.
 	// For Replication cluster IsClusterHealthy will always return true,
-	// and its cluster's healthty is equal to leader member's heathly.
+	// and its cluster's healthy is equal to leader member's healthy.
 	case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
 		ha.logger.Errorf("The cluster is not healthy, wait...")
 

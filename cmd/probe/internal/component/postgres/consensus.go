@@ -125,36 +125,22 @@ func (mgr *Manager) GetMemberStateWithPoolConsensus(ctx context.Context, pool *p
 
 func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 	ctx := context.TODO()
-
 	sql := `select ip_port from consensus_cluster_status;`
-	var addrs []string
-	var err error
-	pools := []*pgxpool.Pool{nil}
 
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		return nil
-	}
-
-	if leaderMember.Name != mgr.CurrentMemberName {
-		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
-		if err != nil || pools[0] == nil {
-			mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
-			return nil
-		}
-	}
-
-	resp, err := mgr.QueryWithPool(ctx, sql, pools[0])
+	resp, err := mgr.QueryWithLeader(ctx, sql, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Errorf("query %s with leader failed, err:%v", sql, err)
 		return nil
 	}
 
 	result, err := parseQuery(string(resp))
-	if err != nil || len(*result) == 0 {
+	if err != nil {
 		mgr.Logger.Errorf("parse query failed, err:%v", sql, err)
+		return nil
 	}
-	for _, m := range *result {
+
+	var addrs []string
+	for _, m := range result {
 		addrs = append(addrs, strings.Split(m["ip_port"], ":")[0])
 	}
 
@@ -163,35 +149,16 @@ func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 
 func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, cluster *dcs.Cluster) bool {
 	memberAddrs := mgr.GetMemberAddrs(cluster)
-	if memberAddrs == nil {
-		mgr.Logger.Errorf("can't get addresses of members")
-		// TODO:check if logical is reasonable
-		// in order to execute subsequent code
-		return true
+	// AddCurrentMemberToCluster is executed only when memberAddrs are successfully obtained and memberAddrs not Contains CurrentMember
+	if memberAddrs != nil && !slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName)) {
+		return false
 	}
-
-	return slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName))
+	return true
 }
 
 // IsMemberHealthyConsensus firstly get the leader's connection pool,
 // because only leader can get the cluster healthy view
 func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	pools := []*pgxpool.Pool{nil}
-	var err error
-
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		return true
-	}
-
-	if leaderMember.Name != mgr.CurrentMemberName {
-		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
-		if err != nil || pools[0] == nil {
-			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
-			return false
-		}
-	}
-
 	var IPPort string
 	if member != nil {
 		IPPort = getConsensusIPPort(cluster, member.Name)
@@ -200,11 +167,8 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 	}
 
 	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
-	resp, err := mgr.QueryWithPool(ctx, sql, pools[0])
-	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
-		return false
-	}
+	resp, err := mgr.QueryWithLeader(ctx, sql, cluster)
+	if err
 
 	result, err := parseSingleQuery(string(resp))
 	if err != nil {
@@ -226,7 +190,6 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 
 func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) error {
 	ctx := context.TODO()
-
 	sql := fmt.Sprintf(`alter system consensus add follower '%s:%d';`,
 		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), config.port)
 
@@ -264,11 +227,13 @@ func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host 
 	return nil
 }
 
-// IsClusterHealthyConsensus considers the health status of the cluster equivalent to the health status of the leader.
+// IsClusterHealthyConsensus considers the health status of the cluster equivalent to the health status of the leader
 func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.Cluster) bool {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		mgr.Logger.Infof("cluster has no leader, wait for leader to take the lock")
+		// when cluster has no leader, the health status of the cluster is assumed to be true by default,
+		// in order to proceed with the logic of competing for the leader lock
 		return true
 	}
 
@@ -321,4 +286,17 @@ func (mgr *Manager) DemoteConsensus() error {
 
 func (mgr *Manager) FollowConsensus() error {
 	return nil
+}
+
+func (mgr *Manager) QueryWithLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result []byte, err error) {
+	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		return nil, ClusterHasNoLeader
+	}
+
+	if leaderMember.Name != mgr.CurrentMemberName {
+		return mgr.QueryOthers(ctx, sql, cluster.GetMemberAddr(*leaderMember))
+	} else {
+		return mgr.Query(ctx, sql)
+	}
 }

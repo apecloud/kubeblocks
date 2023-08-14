@@ -37,6 +37,7 @@ import (
 
 var (
 	InvalidWorkLoadType = errors.New("invalid workload type")
+	ClusterHasNoLeader  = errors.New("cluster has no leader now")
 )
 
 const (
@@ -288,8 +289,8 @@ func parsePrimaryConnInfo(str string) map[string]string {
 	return result
 }
 
-func parseQuery(str string) (*[]map[string]string, error) {
-	var result *[]map[string]string
+func parseQuery(str string) ([]map[string]string, error) {
+	var result []map[string]string
 
 	err := json.Unmarshal([]byte(str), &result)
 	if err != nil {

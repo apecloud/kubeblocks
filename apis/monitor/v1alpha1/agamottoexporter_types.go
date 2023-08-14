@@ -26,13 +26,52 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type Prometheus struct {
+}
+
+type MetricsExporter struct {
+	Prometheus *Prometheus `json:"prometheus"`
+}
+
+type S3Config struct {
+	// prefix = metric/logs
+	// filePrefix = slow/error/auditlog
+	// path metric/year=XXXX/month=XX/day=XX/hour=XX/minute=XX/filePrefix
+	Region     string `json:"region"`
+	Bucket     string `json:"bucket"`
+	Prefix     string `json:"prefix"`
+	Partition  string `json:"partition"`
+	FilePrefix string `json:"filePrefix"`
+}
+
+type S3Credentials struct {
+	Secret    string `json:"secret"`
+	Namespace string `json:"namespace"`
+}
+
+type AWSS3Config struct {
+	S3Config    `json:"inline"`
+	Credentials S3Credentials `json:"credentials"`
+}
+
+type LokiConfig struct {
+	Endpoint    string       `json:"endpoint"`
+	RetryConfig *RetryConfig `json:"retryConfig"`
+	QueueConfig QueueConfig  `json:"queueConfig"`
+}
+
+type LogsExporter struct {
+	S3Config   *AWSS3Config `json:"s3Config"`
+	LokiConfig *LokiConfig  `json:"lokiConfig"`
+}
+
 // AgamottoExporterSpec defines the desired state of AgamottoExporter
 type AgamottoExporterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of AgamottoExporter. Edit agamottoexporter_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	LogsExporter   *LogsExporter    `json:"logsExporter"`
+	MetricExporter *MetricsExporter `json:"metricsExporter"`
 }
 
 // AgamottoExporterStatus defines the observed state of AgamottoExporter

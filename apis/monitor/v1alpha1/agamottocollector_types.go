@@ -20,19 +20,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type ExporterConfig struct {
+	ExporterRef string
+}
+
+type MetricsCollector struct {
+	CollectionInterval time.Duration `json:"collectionInterval"`
+	ExporterRefs       []string      `json:"exporterRefs"`
+}
+
+type LogsCollector struct {
+	ComponentName string
+	// reference Clusterdefinition.Spec.[*].LogConfigs[]
+	LogFileType []string
+
+	ExporterRef string
+}
+
 // AgamottoCollectorSpec defines the desired state of AgamottoCollector
 type AgamottoCollectorSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of AgamottoCollector. Edit agamottocollector_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// clusterRef references clusterDefinition.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	ClusterRef string `json:"clusterRef"`
+
+	MetricsCollector *MetricsCollector `json:"metricsCollector"`
+	LogsCollector    []LogsCollector   `json:"logsCollector"`
 }
 
 // AgamottoCollectorStatus defines the observed state of AgamottoCollector

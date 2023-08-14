@@ -86,10 +86,12 @@ func (mgr *Manager) newProcessFromPidFile() error {
 	return nil
 }
 
+// Query is equivalent to QueryWithPool(ctx, sql, nil), query itself
 func (mgr *Manager) Query(ctx context.Context, sql string) (result []byte, err error) {
 	return mgr.QueryWithPool(ctx, sql, nil)
 }
 
+// QueryWithPool execute the query using the specified connection pool
 func (mgr *Manager) QueryWithPool(ctx context.Context, sql string, pool *pgxpool.Pool) (result []byte, err error) {
 	mgr.Logger.Debugf("query: %s", sql)
 
@@ -133,10 +135,12 @@ func (mgr *Manager) QueryWithPool(ctx context.Context, sql string, pool *pgxpool
 	return result, err
 }
 
+// Exec is equivalent to ExecWithPool(ctx, sql, nil), exec itself
 func (mgr *Manager) Exec(ctx context.Context, sql string) (result int64, err error) {
 	return mgr.ExecWithPool(ctx, sql, nil)
 }
 
+// ExecWithPool execute the exec using the specified connection pool
 func (mgr *Manager) ExecWithPool(ctx context.Context, sql string, pool *pgxpool.Pool) (result int64, err error) {
 	mgr.Logger.Debugf("exec: %s", sql)
 
@@ -164,8 +168,8 @@ func (mgr *Manager) ExecOthers(sql string, member *dcs.Member) {
 
 }
 
-func (mgr *Manager) IsPgReady() bool {
-	err := mgr.Pool.Ping(context.TODO())
+func (mgr *Manager) IsPgReady(ctx context.Context) bool {
+	err := mgr.Pool.Ping(ctx)
 	if err != nil {
 		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
 		return false
@@ -175,15 +179,17 @@ func (mgr *Manager) IsPgReady() bool {
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
+	ctx := context.TODO()
 	if mgr.DBStartupReady {
 		return true
 	}
 
-	if !mgr.IsPgReady() {
+	if !mgr.IsPgReady(ctx) {
 		return false
 	}
 
-	if mgr.workLoadType == Consensus && !mgr.IsConsensusReadyUp() {
+	// For Consensus, probe relies on the consensus_monitor view.
+	if mgr.workLoadType == Consensus && !mgr.IsConsensusReadyUp(ctx) {
 		return false
 	}
 
@@ -192,6 +198,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	return true
 }
 
+// GetMemberStateWithPool get specified member's role with its connection pool
 func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Pool) (string, error) {
 	switch mgr.workLoadType {
 	case Consensus:
@@ -203,10 +210,12 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 	}
 }
 
+// IsLeader is equivalent to IsLeaderWithPool(ctx, nil), using its connection pool
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	return mgr.IsLeaderWithPool(ctx, nil)
 }
 
+// IsLeaderWithPool determines whether a specific member is the leader, using its connection pool
 func (mgr *Manager) IsLeaderWithPool(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
 	role, err := mgr.GetMemberStateWithPool(ctx, pool)
 	if err != nil {
@@ -287,20 +296,17 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	case Consensus:
 		return mgr.AddCurrentMemberToClusterConsensus(cluster)
 	case Replication:
-		// replication postgresql don't need to add member
 		return nil
 	default:
 		return InvalidWorkLoadType
 	}
 }
 
-// DeleteMemberFromCluster postgresql don't need to delete member
 func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
 	switch mgr.workLoadType {
 	case Consensus:
 		return mgr.DeleteMemberFromClusterConsensus(cluster, host)
 	case Replication:
-		// replication postgresql don't need to add member
 		return nil
 	default:
 		return InvalidWorkLoadType
@@ -312,7 +318,6 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	case Consensus:
 		return mgr.IsClusterHealthyConsensus(ctx, cluster)
 	case Replication:
-		// replication postgresql don't need to check cluster
 		return true
 	default:
 		mgr.Logger.Errorf("check cluster healthy failed, err:%v", InvalidWorkLoadType)

@@ -34,9 +34,9 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
-func (mgr *Manager) IsConsensusReadyUp() bool {
+func (mgr *Manager) IsConsensusReadyUp(ctx context.Context) bool {
 	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus_monitor';`
-	resp, err := mgr.Query(context.TODO(), sql)
+	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
 		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
 		return false
@@ -53,7 +53,7 @@ func (mgr *Manager) IsConsensusReadyUp() bool {
 
 func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if !mgr.IsFirstMember() {
-		mgr.Logger.Infof("i am not the first member, wait for first member Initializing")
+		mgr.Logger.Infof("I am not the first member, just skip and wait for the first member to initialize the cluster.")
 		return true, nil
 	}
 
@@ -165,6 +165,7 @@ func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, clust
 	memberAddrs := mgr.GetMemberAddrs(cluster)
 	if memberAddrs == nil {
 		mgr.Logger.Errorf("can't get addresses of members")
+		// TODO:check if logical is reasonable
 		// in order to execute subsequent code
 		return true
 	}
@@ -172,6 +173,8 @@ func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, clust
 	return slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName))
 }
 
+// IsMemberHealthyConsensus firstly get the leader's connection pool,
+// because only leader can get the cluster healthy view
 func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	pools := []*pgxpool.Pool{nil}
 	var err error
@@ -181,7 +184,6 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 		return true
 	}
 
-	// only leader can get the cluster healthy view
 	if leaderMember.Name != mgr.CurrentMemberName {
 		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
 		if err != nil || pools[0] == nil {
@@ -223,13 +225,8 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 }
 
 func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) error {
-	// Test whether the host can be resolved into an ip address
-	if !mgr.IsPgReady() {
-		mgr.Logger.Warnf("wait for pg startup ready")
-		return nil
-	}
-
 	ctx := context.TODO()
+
 	sql := fmt.Sprintf(`alter system consensus add follower '%s:%d';`,
 		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), config.port)
 
@@ -254,12 +251,11 @@ func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) err
 }
 
 func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host string) error {
-	ctx := context.TODO()
 	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
-		cluster.GetMaxNumMemberAddr(), config.port)
+		host, config.port)
 
 	// only leader can delete member, so don't need to get pool
-	_, err := mgr.ExecWithPool(ctx, sql, nil)
+	_, err := mgr.ExecWithPool(context.TODO(), sql, nil)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
@@ -268,6 +264,7 @@ func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host 
 	return nil
 }
 
+// IsClusterHealthyConsensus considers the health status of the cluster equivalent to the health status of the leader.
 func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.Cluster) bool {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
@@ -276,9 +273,10 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 	}
 
 	if leaderMember.Name == mgr.CurrentMemberName {
-		// will check current member healthy soon
+		// if the member is leader, then its health status will check in IsMemberHealthy later
 		return true
 	}
+
 	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
 }
 

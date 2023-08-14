@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KB_VERSION=${1:-0.6.0-beta.36}
+KB_VERSION=${1:-0.6.0-beta.38}
 KB_HELM_REPO_INDEX_URL_BASE=https://apecloud.github.io/helm-charts
 KB_HELM_REPO_INDEX_URL=${KB_HELM_REPO_INDEX_URL_BASE}/index.yaml
 
@@ -115,6 +115,15 @@ json_out="{\"chartURLs\":${chart_url_json_arr},\"images\":${images_json_arr}}"
 echo $json_out | jq -r '.'
 
 # Generata a daemonSet yaml to pre pull images on all nodes
+
+# find kubeblocks-tools image
+KB_TOOLS_IMAGE=""
+for image in "${image_set[@]}"; do
+    if [[ "$image" =~ "kubeblocks-tools" ]]; then
+        KB_TOOLS_IMAGE=$image
+    fi
+done
+
 whiteList=(kubeblocks mysql spilo mongo pgbouncer redis wal-g)
 cat <<EOF > prepuller.yaml
 apiVersion: apps/v1
@@ -130,7 +139,17 @@ spec:
       labels:
         name: kubeblocks-image-prepuller
     spec:
+      volumes:
+        - name: shared-volume
+          emptyDir: {}
       initContainers:
+        - name: pull-kb-tools
+          image: ${KB_TOOLS_IMAGE}
+          imagePullPolicy: IfNotPresent
+          command: ["cp", "-r", "/bin/kbcli", "/kb-tools/kbcli"]
+          volumeMounts:
+            - name: shared-volume
+              mountPath: /kb-tools
 EOF
 
 count=1
@@ -151,7 +170,10 @@ for image in "${image_set[@]}"; do
         - name: pull-${count}
           image: ${image}
           imagePullPolicy: IfNotPresent
-          command: ["echo", "pull ${image}"]
+          command: ["/kb-tools/kbcli"]
+          volumeMounts:
+            - name: shared-volume
+              mountPath: /kb-tools
 EOF
    count=$((count+1))
 done

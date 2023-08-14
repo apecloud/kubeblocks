@@ -13,8 +13,8 @@ spec:
   description: 'JupyterHub is a multi-user platform for hosting Jupyter Notebooks.'
   type: Helm
 
-  helm:
-    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/jupyterhub-3.0.1-0.dev.git.6287.hbfb05cd6/jupyterhub-0.1.0.tgz
+  helm: #https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/jupyterhub-3.0.1-0.dev.git.6287.hbfb05cd6
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/jupyterhub-0.1.0.tgz
   installable:
     autoInstall: false
 

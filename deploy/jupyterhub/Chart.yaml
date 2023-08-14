@@ -38,4 +38,4 @@ maintainers:
 name: jupyterhub
 sources:
 - https://github.com/jupyterhub/zero-to-jupyterhub-k8s
-version: 3.0.1-0.dev.git.6287.hbfb05cd6
+version: 0.1.0

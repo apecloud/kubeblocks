@@ -148,7 +148,7 @@ var (
 		{
 			Name:       jupyterNoteBookAddon,
 			AddonName:  "jupyter-notebook",
-			Label:      " app.kubernetes.io/instance=jupyter-notebook",
+			Label:      " app.kubernetes.io/instance=kb-addon-jupyter-notebook",
 			TargetPort: "18888",
 		},
 	}

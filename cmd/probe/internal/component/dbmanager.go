@@ -93,6 +93,8 @@ type DBManager interface {
 	Lock(context.Context, string) error
 	Unlock(context.Context) error
 
+	PreDelete(context.Context) error
+
 	GetLogger() logger.Logger
 }
 
@@ -142,6 +144,18 @@ func (mgr *DBManagerBase) IsMemberLagging(ctx context.Context, cluster *dcs.Clus
 }
 
 func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
+	return nil
+}
+
+func (mgr *DBManagerBase) PreDelete(context.Context) error {
+	return nil
+}
+
+func (mgr *DBManagerBase) Demote(context.Context) error {
+	return nil
+}
+
+func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
 	return nil
 }
 

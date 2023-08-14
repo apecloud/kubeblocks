@@ -32,11 +32,10 @@ type Cluster struct {
 	Replicas        int32
 	HaConfig        *HaConfig
 	Leader          *Leader
-	OpTime          int64
 	Members         []Member
 	Switchover      *Switchover
 	Extra           map[string]string
-	resource        interface{}
+	resource        any
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -89,10 +88,6 @@ func (c *Cluster) IsLocked() bool {
 	return c.Leader != nil && c.Leader.Name != ""
 }
 
-func (c *Cluster) GetOpTime() int64 {
-	return c.OpTime
-}
-
 func (c *Cluster) GetMemberAddrWithPort(member Member) string {
 	addr := c.GetMemberAddr(member)
 	return fmt.Sprintf("%s:%s", addr, member.DBPort)
@@ -126,14 +121,19 @@ func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 }
 
 type Leader struct {
+	DBState     *DBState
 	Index       string
 	Name        string
 	AcquireTime int64
 	RenewTime   int64
 	TTL         int
-	Resource    interface{}
+	Resource    any
 }
 
+type DBState struct {
+	OpTimestamp int64
+	Extra       map[string]string
+}
 type Member struct {
 	Index          string
 	Name           string

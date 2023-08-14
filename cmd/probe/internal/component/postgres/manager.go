@@ -219,8 +219,8 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context) bool {
-	return mgr.IsMemberHealthy(ctx, nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	return mgr.IsMemberHealthy(ctx, cluster, nil)
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
@@ -362,11 +362,13 @@ func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
 	if cluster == nil {
 		return false
 	}
-	lag := cluster.GetOpTime() - walPosition
+	lag := cluster.Leader.DBState.OpTimestamp - walPosition
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
-func (mgr *Manager) Recover() {}
+func (mgr *Manager) Recover(context.Context) error {
+	return nil
+}
 
 // AddCurrentMemberToCluster postgresql don't need to add member
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
@@ -386,8 +388,8 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) Promote() error {
-	if isLeader, err := mgr.IsLeader(context.TODO(), nil); err == nil && isLeader {
+func (mgr *Manager) Promote(ctx context.Context) error {
+	if isLeader, err := mgr.IsLeader(ctx, nil); err == nil && isLeader {
 		mgr.Logger.Infof("i am already a leader, don't need to promote")
 		return nil
 	}
@@ -424,7 +426,7 @@ func (mgr *Manager) postPromote() error {
 	return nil
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
 
 	return mgr.Stop()
@@ -458,9 +460,7 @@ func (mgr *Manager) Stop() error {
 	return nil
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
-	ctx := context.TODO()
-
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	if cluster.Leader == nil || cluster.Leader.Name == "" {
 		mgr.Logger.Warnf("no action coz cluster has no leader")
 		return mgr.Start()

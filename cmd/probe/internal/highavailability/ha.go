@@ -21,6 +21,7 @@ package highavailability
 
 import (
 	"context"
+	"net"
 	"sort"
 	"strings"
 	"time"
@@ -171,6 +172,14 @@ func (ha *Ha) Start() {
 		return
 	}
 
+	isDnsReady, err := ha.IsDnsReady()
+	for err != nil || !isDnsReady {
+		ha.logger.Infof("Waiting for dns resolution to be ready")
+		time.Sleep(3 * time.Second)
+		isDnsReady, err = ha.IsDnsReady()
+	}
+	ha.logger.Infof("dns resolution is ready")
+
 	ha.logger.Debugf("cluster: %v", cluster)
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	for err != nil || !isInitialized {
@@ -292,6 +301,17 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 	}
 
 	return false
+}
+
+func (ha *Ha) IsDnsReady() (bool, error) {
+	domain := viper.GetString("KB_POD_FQDN")
+	_, err := net.LookupIP(domain)
+	if err != nil {
+		ha.logger.Errorf("DNS lookup failed, err:%v", err)
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (ha *Ha) ShutdownWithWait() {

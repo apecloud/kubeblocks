@@ -37,7 +37,7 @@ spec:
         script: /scripts/backup-log-collector.sh post
         updateStage: post
     datafile:
-      backupToolName: mongodb-physical-backup-tool
+      backupToolName: mongodb-dump-tool
       backupsHistoryLimit: 7
       target:
         role: primary

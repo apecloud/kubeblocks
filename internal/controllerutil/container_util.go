@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package controllerutil
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
 
 func GetContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
 	for i, container := range containers {
@@ -28,4 +31,21 @@ func GetContainerByName(containers []corev1.Container, name string) (int, *corev
 		}
 	}
 	return -1, nil
+}
+
+func InjectZeroResourcesLimitsIfEmpty(c *corev1.Container) {
+	zeroValue := resource.MustParse("0")
+	if c.Resources.Limits == nil {
+		c.Resources.Limits = corev1.ResourceList{}
+	}
+
+	safeSetLimitValue := func(name corev1.ResourceName) {
+		if _, ok := c.Resources.Requests[name]; !ok {
+			if _, ok = c.Resources.Limits[name]; !ok {
+				c.Resources.Limits[name] = zeroValue
+			}
+		}
+	}
+	safeSetLimitValue(corev1.ResourceCPU)
+	safeSetLimitValue(corev1.ResourceMemory)
 }

@@ -384,19 +384,7 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 }
 
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	var db *sql.DB
-	var err error
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		db, err = mgr.GetLeaderConn(cluster)
-	} else {
-		leaderMember := mgr.HasOtherHealthyLeader(ctx, cluster)
-		if leaderMember == nil {
-			mgr.Logger.Warnf("DB has no leader")
-			return false
-		}
-		db, err = config.GetDBConnWithAddr(cluster.GetMemberAddr(*leaderMember))
-	}
-
+	db, err := mgr.GetLeaderConn(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Infof("Get leader conn failed: %v", err)
 		return false
@@ -439,7 +427,7 @@ func (mgr *Manager) GetClusterInfo(ctx context.Context, cluster *dcs.Cluster) st
 	var db *sql.DB
 	var err error
 	if cluster != nil {
-		db, err = mgr.GetLeaderConn(cluster)
+		db, err = mgr.GetLeaderConn(ctx, cluster)
 		if err != nil {
 			mgr.Logger.Infof("Get leader conn failed: %v", err)
 			return ""
@@ -466,12 +454,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	leaderMember := mgr.HasOtherHealthyLeader(ctx, nil)
-	if leaderMember == nil {
-		mgr.Logger.Warnf("DB has no leader")
-		return errors.New("DB has no leader")
-	}
-	db, err := config.GetDBConnWithAddr(cluster.GetMemberAddr(*leaderMember))
+	db, err := mgr.GetLeaderConn(ctx, cluster)
 	if err != nil {
 		return errors.Wrap(err, "Get leader conn failed")
 	}

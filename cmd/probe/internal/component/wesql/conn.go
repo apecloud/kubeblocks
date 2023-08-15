@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package wesql
 
 import (
+	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -40,10 +42,34 @@ func (mgr *Manager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member
 	return db, nil
 }
 
-func (mgr *Manager) GetLeaderConn(cluster *dcs.Cluster) (*sql.DB, error) {
+func (mgr *Manager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster) (*sql.DB, error) {
+	mgr.Logger.Debugf("Get leaader from dcs cluster")
 	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		mgr.Logger.Debugf("Get leaader from db cluster local")
+		leaderMember = mgr.GetLeaderMember(ctx, cluster)
+	}
 	if leaderMember == nil {
 		return nil, errors.New("the cluster has no leader")
 	}
 	return mgr.GetDBConnWithMember(cluster, leaderMember)
+}
+
+func (mgr *Manager) GetLeaderMember(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
+	if err != nil || clusterLocalInfo == nil {
+		mgr.Logger.Errorf("Get cluster local info failed: %v", err)
+		return nil
+	}
+
+	leaderAddr := clusterLocalInfo.GetString("CURRENT_LEADER")
+	if leaderAddr == "" {
+		return nil
+	}
+	leaderParts := strings.Split(leaderAddr, ".")
+	if len(leaderParts) > 0 {
+		return cluster.GetMemberWithName(leaderParts[0])
+	}
+
+	return nil
 }

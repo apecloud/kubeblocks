@@ -74,6 +74,7 @@ type BaseOperations struct {
 	Logger                 logger.Logger
 	Metadata               bindings.Metadata
 	InitIfNeed             func() bool
+	Manager                component.DBManager
 	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
 
 	OperationsMap map[bindings.OperationKind]Operation

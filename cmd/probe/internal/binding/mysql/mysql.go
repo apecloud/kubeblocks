@@ -21,11 +21,8 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
-	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -37,8 +34,8 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/wesql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -46,8 +43,6 @@ import (
 
 // MysqlOperations represents MySQL output bindings.
 type MysqlOperations struct {
-	manager      *mysql.Manager
-	wesqlManager *wesql.Manager
 	BaseOperations
 }
 
@@ -89,23 +84,25 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 		mysqlOps.Logger.Errorf("MySQL config initialize failed: %v", err)
 		return err
 	}
-	manager, err := mysql.NewManager(mysqlOps.Logger)
-	if err != nil {
-		mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)
-		return err
+
+	var manager component.DBManager
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if strings.EqualFold(workloadType, Consensus) {
+		manager, err = mysql.NewWesqlManager(mysqlOps.Logger)
+		if err != nil {
+			mysqlOps.Logger.Errorf("WeSQL DB Manager initialize failed: %v", err)
+			return err
+		}
+	} else {
+		manager, err = mysql.NewManager(mysqlOps.Logger)
+		if err != nil {
+			mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)
+			return err
+		}
+
 	}
-	_, err = wesql.NewConfig(metadata.Properties)
-	if err != nil {
-		mysqlOps.Logger.Errorf("WeSQL config initialize failed: %v", err)
-		return err
-	}
-	wesqlManager, err := wesql.NewManager(mysqlOps.Logger)
-	if err != nil {
-		mysqlOps.Logger.Errorf("WeSQL DB Manager initialize failed: %v", err)
-		return err
-	}
-	mysqlOps.manager = manager
-	mysqlOps.wesqlManager = wesqlManager
+
+	mysqlOps.Manager = manager
 	mysqlOps.DBType = "mysql"
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
@@ -141,8 +138,12 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 		if cluster == nil || !cluster.IsLocked() {
 			return "", nil
 		}
+
+		manager := mysqlOps.Manager.(*mysql.Manager)
+		return manager.GetRole(ctx)
 	}
-	return mysqlOps.manager.GetRole(ctx)
+	manager := mysqlOps.Manager.(*mysql.WesqlManager)
+	return manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
@@ -167,8 +168,8 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 
 func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-
-	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
+	manager := mysqlOps.Manager.(*mysql.WesqlManager)
+	rows, err := manager.DB.QueryContext(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)
@@ -204,7 +205,12 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 		result["message"] = ErrNoSQL
 		return result, nil
 	}
-	count, err := mysqlOps.exec(ctx, sql)
+
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	count, err := manager.Exec(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("exec error: %v", err)
 		result["event"] = OperationFailed
@@ -237,7 +243,12 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.In
 	}
 
 	sql := "show slave status"
-	data, err := mysqlOps.query(ctx, sql)
+
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	data, err := manager.Query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("GetLagOps error: %v", err)
 		result["event"] = OperationFailed
@@ -263,7 +274,11 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *bindings.Inv
 		result["message"] = "no sql provided"
 		return result, nil
 	}
-	data, err := mysqlOps.query(ctx, sql)
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	data, err := manager.Query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("Query error: %v", err)
 		result["event"] = OperationFailed
@@ -284,13 +299,18 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 	roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
 	var err error
 	var data []byte
+
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
 	switch mysqlOps.DBRoles[strings.ToLower(mysqlOps.OriRole)] {
 	case ReadWrite:
 		var count int64
-		count, err = mysqlOps.exec(ctx, rwSQL)
+		count, err = manager.Exec(ctx, rwSQL)
 		data = []byte(strconv.FormatInt(count, 10))
 	case Readonly:
-		data, err = mysqlOps.query(ctx, roSQL)
+		data, err = manager.Query(ctx, roSQL)
 	default:
 		msg := fmt.Sprintf("unknown access mode for role %s: %v", mysqlOps.OriRole, mysqlOps.DBRoles)
 		mysqlOps.Logger.Info(msg)
@@ -315,110 +335,22 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 	return result, nil
 }
 
-func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte, error) {
-	mysqlOps.Logger.Debugf("query: %s", sql)
-	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
-	}
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-	result, err := mysqlOps.jsonify(rows)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
-	}
-	return result, nil
-}
-
-func (mysqlOps *MysqlOperations) exec(ctx context.Context, sql string) (int64, error) {
-	mysqlOps.Logger.Debugf("exec: %s", sql)
-	res, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error executing %s", sql)
-	}
-	return res.RowsAffected()
-}
-
-func (mysqlOps *MysqlOperations) jsonify(rows *sql.Rows) ([]byte, error) {
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-	var ret []interface{}
-	for rows.Next() {
-		values := prepareValues(columnTypes)
-		err := rows.Scan(values...)
-		if err != nil {
-			return nil, err
-		}
-		r := mysqlOps.convert(columnTypes, values)
-		ret = append(ret, r)
-	}
-	return json.Marshal(ret)
-}
-
-func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
-	types := make([]reflect.Type, len(columnTypes))
-	for i, tp := range columnTypes {
-		types[i] = tp.ScanType()
-	}
-	values := make([]interface{}, len(columnTypes))
-	for i := range values {
-		switch types[i].Kind() {
-		case reflect.String, reflect.Interface:
-			values[i] = &sql.NullString{}
-		case reflect.Bool:
-			values[i] = &sql.NullBool{}
-		case reflect.Float64:
-			values[i] = &sql.NullFloat64{}
-		case reflect.Int16, reflect.Uint16:
-			values[i] = &sql.NullInt16{}
-		case reflect.Int32, reflect.Uint32:
-			values[i] = &sql.NullInt32{}
-		case reflect.Int64, reflect.Uint64:
-			values[i] = &sql.NullInt64{}
-		default:
-			values[i] = reflect.New(types[i]).Interface()
-		}
-	}
-	return values
-}
-
-func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
-	r := map[string]interface{}{}
-	for i, ct := range columnTypes {
-		value := values[i]
-		switch v := values[i].(type) {
-		case driver.Valuer:
-			if vv, err := v.Value(); err == nil {
-				value = interface{}(vv)
-			} else {
-				mysqlOps.Logger.Warnf("error to convert value: %v", err)
-			}
-		case *sql.RawBytes:
-			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
-			switch ct.DatabaseTypeName() {
-			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
-				value = string(*v)
-			}
-		}
-		if value != nil {
-			r[ct.Name()] = value
-		}
-	}
-	return r
-}
-
 // InternalQuery is used for internal query, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
-	return mysqlOps.query(ctx, sql)
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	return manager.Query(ctx, sql)
 }
 
 // InternalExec is used for internal execution, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) InternalExec(ctx context.Context, sql string) (int64, error) {
-	return mysqlOps.exec(ctx, sql)
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	return manager.Exec(ctx, sql)
 }
 
 // GetLogger is used for getting logger, implements BaseInternalOps interface

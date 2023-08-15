@@ -452,6 +452,14 @@ func (mgr *WesqlManager) Promote(ctx context.Context, cluster *dcs.Cluster) erro
 	return nil
 }
 
+func (mgr *WesqlManager) Demote(context.Context) error {
+	return nil
+}
+
+func (mgr *WesqlManager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
+	return nil
+}
+
 func (mgr *WesqlManager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
 	return nil
 }

@@ -49,7 +49,6 @@ type Manager struct {
 	globalState                  map[string]string
 }
 
-var Mgr *Manager
 var _ component.DBManager = &Manager{}
 
 func NewManager(logger logger.Logger) (*Manager, error) {
@@ -77,7 +76,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		return nil, err
 	}
 
-	Mgr = &Manager{
+	mgr := &Manager{
 		DBManagerBase: component.DBManagerBase{
 			CurrentMemberName: currentMemberName,
 			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
@@ -88,8 +87,8 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		serverID: uint(serverID) + 1,
 	}
 
-	component.RegisterManager("mysql", internal.Consensus, Mgr)
-	return Mgr, nil
+	component.RegisterManager("mysql", internal.Consensus, mgr)
+	return mgr, nil
 }
 
 func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {

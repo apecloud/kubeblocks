@@ -9,8 +9,6 @@ export MONGODB_URI="mongodb://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:27017/?authSo
 export WALG_FILE_PREFIX=${BACKUP_DIR}
 export OPLOG_ARCHIVE_TIMEOUT_INTERVAL=${ARCHIVE_INTERVAL}
 export OPLOG_ARCHIVE_AFTER_SIZE=${ARCHIVE_AFTER_SIZE}
-# retention time
-export OPLOG_PITR_DISCOVERY_INTERVAL=168h
 retryTimes=0
 purgeCounter=0
 wal_g_pid=0
@@ -45,8 +43,7 @@ check_oplog_push_process(){
   fi
 }
 
-# write the startTime and stopTime to backup.info file
-dump_start_and_stop_time() {
+save_backup_status() {
    TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
    OLDEST_FILE=$(ls -t ${BACKUP_DIR}/oplog_005 | tail -n 1) && OLDEST_FILE=${OLDEST_FILE#*_} && LOG_START_TIME=${OLDEST_FILE%%.*}
    LATEST_FILE=$(ls -t ${BACKUP_DIR}/oplog_005 | head -n 1) && LATEST_FILE=${LATEST_FILE##*_} && LOG_STOP_TIME=${LATEST_FILE%%.*}
@@ -78,7 +75,7 @@ while true; do
   check_oplog_push_process
   sleep 1
   if [ -d ${BACKUP_DIR}/oplog_005 ];then
-    dump_start_and_stop_time
+    save_backup_status
     # purge the expired oplog
     purge_expired_files
   fi

@@ -3,4 +3,4 @@ image:
   pullPolicy: IfNotPresent
   registry: docker.io
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: latest-amd64

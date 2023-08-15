@@ -3,6 +3,7 @@ package apps
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -18,7 +19,6 @@ var _ = Describe("cluster plan builder test", func() {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterName        = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
-		mode               = "raftGroup"
 	)
 
 	// Cleanups
@@ -59,10 +59,6 @@ var _ = Describe("cluster plan builder test", func() {
 		It("should init successfully", func() {
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefName, clusterVersionName).WithRandomName().GetObject()
-			clusterObj.Spec.Mode = mode
-			clusterObj.Spec.Parameters = map[string]string{
-				"proxyEnabled": "true",
-			}
 			Expect(testCtx.Cli.Create(testCtx.Ctx, clusterObj)).Should(Succeed())
 			clusterKey := client.ObjectKeyFromObject(clusterObj)
 			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
@@ -76,7 +72,6 @@ var _ = Describe("cluster plan builder test", func() {
 			}
 			planBuilder := NewClusterPlanBuilder(reqCtx, testCtx.Cli, req)
 			Expect(planBuilder.Init()).Should(Succeed())
-			// TODO: CT should test load clustertemplate
 		})
 	})
 })

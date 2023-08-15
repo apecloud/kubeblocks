@@ -390,10 +390,13 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		db, err = mgr.GetLeaderConn(cluster)
 	} else {
 		localInfo, _ := mgr.GetClusterLocalInfo(ctx)
-		if localInfo.GetString("CURRENT_LEADER") == "" {
+		leaderAddr := localInfo.GetString("CURRENT_LEADER")
+		leaderParts := strings.Split(leaderAddr, ".")
+		if len(leaderParts) == 0 {
 			return false
 		}
-		db, err = config.GetDBConnWithAddr(localInfo.GetString("CURRENT_LEADER"))
+		leaderMember := cluster.GetMemberWithName(leaderParts[0])
+		db, err = config.GetDBConnWithAddr(cluster.GetMemberAddr(*leaderMember))
 
 	}
 
@@ -401,10 +404,11 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		mgr.Logger.Infof("Get leader conn failed: %v", err)
 		return false
 	}
-	if db != nil {
-		defer db.Close()
+	if db == nil {
+		return false
 	}
 
+	defer db.Close()
 	var leaderRecord RowMap
 	sql := "select * from information_schema.wesql_cluster_global;"
 	err = QueryRowsMap(db, sql, func(rMap RowMap) error {

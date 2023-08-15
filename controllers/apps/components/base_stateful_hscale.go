@@ -627,8 +627,12 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 		return nil, err
 	}
 	objs = append(objs, pvc)
+	backupTool := &dataprotectionv1alpha1.BackupTool{}
+	if err = d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+		return nil, err
+	}
 	restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
-	restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, []string{pvc.Name}, d.getBackupMatchingLabels())
+	restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, backupTool, []string{pvc.Name}, d.getBackupMatchingLabels())
 	if err != nil {
 		return nil, err
 	}

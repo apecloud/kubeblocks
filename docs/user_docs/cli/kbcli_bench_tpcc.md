@@ -11,25 +11,25 @@ kbcli bench tpcc [Step] [BenchmarkName] [flags]
 ### Examples
 
 ```
-  # tpcc on a cluster, that will exec all steps, cleanup, prepare and run
+  # tpcc on a cluster, that will exec for all steps, cleanup, prepare and run
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with cleanup, just exec cleanup that will delete the testdata
+  # tpcc on a cluster with cleanup, only cleanup by deleting the testdata
   kbcli bench tpcc cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with prepare, just exec prepare that will create the testdata
+  # tpcc on a cluster with prepare, just prepare by creating the testdata
   kbcli bench tpcc prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with run, just exec run that will run the test
+  # tpcc on a cluster with run, just run by running the test
   kbcli bench tpcc run mytest --cluster mycluster --user xxx --password xxx --database mydb
   
-  # tpcc on a cluster with warehouses count, which is the overall database size scaling parameter
+  # tpcc on a cluster with warehouse counts, which is the overall database size scaling parameter
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --warehouses 100
   
-  # tpcc on a cluster with threads count
+  # tpcc on a cluster with thread counts
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
   
-  # tpcc on a cluster with transactions count
+  # tpcc on a cluster with transactions counts
   kbcli bench tpcc mytest --cluster mycluster --user xxx --password xxx --database mydb --transactions 1000
   
   # tpcc on a cluster with duration 10 minutes
@@ -39,26 +39,26 @@ kbcli bench tpcc [Step] [BenchmarkName] [flags]
 ### Options
 
 ```
-      --cluster string           the cluster of database
-      --database string          database name
-      --delivery int             specify the percentage of transactions that should be delivery (default 4)
-      --driver string            the driver of database
-      --duration int             specify the number of minutes to run (default 1)
-      --extra-args stringArray   specify the extra arguments
-  -h, --help                     help for tpcc
-      --host string              the host of database
-      --limit-tx-per-min int     limit the number of transactions to run per minute, 0 means no limit
-      --new-order int            specify the percentage of transactions that should be new orders (default 45)
-      --order-status int         specify the percentage of transactions that should be order status (default 4)
-      --password string          the password of database
-      --payment int              specify the percentage of transactions that should be payments (default 43)
-      --port int                 the port of database
-      --stock-level int          specify the percentage of transactions that should be stock level (default 4)
-      --threads ints             specify the number of threads to use (default [1])
-      --tolerations strings      Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
-      --transactions int         specify the number of transactions that each thread should run
-      --user string              the user of database
-      --warehouses int           specify the overall database size scaling parameter (default 1)
+      --cluster string         the cluster of database
+      --database string        database name
+      --delivery int           specify the percentage of transactions that should be delivery (default 4)
+      --driver string          the driver of database
+      --duration int           specify the number of minutes to run (default 1)
+      --extra-args strings     extra arguments for benchmark
+  -h, --help                   help for tpcc
+      --host string            the host of database
+      --limit-tx-per-min int   limit the number of transactions to run per minute, 0 means no limit
+      --new-order int          specify the percentage of transactions that should be new orders (default 45)
+      --order-status int       specify the percentage of transactions that should be order status (default 4)
+      --password string        the password of database
+      --payment int            specify the percentage of transactions that should be payments (default 43)
+      --port int               the port of database
+      --stock-level int        specify the percentage of transactions that should be stock level (default 4)
+      --threads ints           specify the number of threads to use (default [1])
+      --tolerations strings    Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
+      --transactions int       specify the number of transactions that each thread should run
+      --user string            the user of database
+      --warehouses int         specify the overall database size scaling parameter (default 1)
 ```
 
 ### Options inherited from parent commands

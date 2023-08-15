@@ -31,13 +31,8 @@ spec:
         - "touch /data/mongodb/db/mongodb.backup; sync"
         postCommands:
         - "rm -f /data/mongodb/db/mongodb.backup; sync"
-      backupStatusUpdates:
-      - path: manifests.backupLog
-        containerName: mongodb
-        script: /scripts/backup-log-collector.sh post
-        updateStage: post
     datafile:
-      backupToolName: mongodb-physical-backup-tool
+      backupToolName: mongodb-dump-tool
       backupsHistoryLimit: 7
       target:
         role: primary

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -34,15 +35,27 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 		var rsm *ReplicatedStateMachine
 
 		BeforeEach(func() {
+			commonLabels := map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "ClusterDefName",
+				constant.AppComponentLabelKey:   "CompDefName",
+				constant.AppInstanceLabelKey:    "clusterName",
+				constant.KBAppComponentLabelKey: "componentName",
+			}
+			replicas := int32(1)
 			rsm = &ReplicatedStateMachine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: testCtx.DefaultNamespace,
 				},
 				Spec: ReplicatedStateMachineSpec{
-					Replicas: 1,
-					RoleObservation: RoleObservation{
-						ObservationActions: []Action{
+					Replicas: &replicas,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: commonLabels,
+					},
+					Service: &corev1.ServiceSpec{},
+					RoleProbe: &RoleProbe{
+						ProbeActions: []Action{
 							{
 								Image:   "foo",
 								Command: []string{"bar"},
@@ -50,6 +63,9 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 						},
 					},
 					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: commonLabels,
+						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{

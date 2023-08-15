@@ -35,6 +35,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // Object a generic representation of various resource object types
@@ -66,6 +67,7 @@ var EventSignature = func(_ corev1.Event, _ corev1.EventList) {}
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ corev1.ConfigMapList) {}
 var EndpointsSignature = func(_ corev1.Endpoints, _ corev1.EndpointsList) {}
 
+var RSMSignature = func(_ workloads.ReplicatedStateMachine, _ workloads.ReplicatedStateMachineList) {}
 var StatefulSetSignature = func(_ appsv1.StatefulSet, _ appsv1.StatefulSetList) {}
 var DeploymentSignature = func(_ appsv1.Deployment, _ appsv1.DeploymentList) {}
 var ReplicaSetSignature = func(_ appsv1.ReplicaSet, _ appsv1.ReplicaSetList) {}

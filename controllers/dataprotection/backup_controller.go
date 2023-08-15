@@ -726,7 +726,7 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 	}
 
 	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name}
-	isOK, err = r.ensureVolumeSnapshotReady(key)
+	isOK, snapshotTime, err := r.ensureVolumeSnapshotReady(key)
 	if err != nil {
 		return intctrlutil.ResultToP(r.updateStatusIfFailed(reqCtx, backup, err))
 	}
@@ -751,6 +751,12 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 
 	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{
+		BackupLog: &dataprotectionv1alpha1.BackupLogStatus{
+			StartTime: snapshotTime,
+			StopTime:  snapshotTime,
+		},
+	}
 	snap := &snapshotv1.VolumeSnapshot{}
 	exists, _ := r.snapshotCli.CheckResourceExists(key, snap)
 	if exists {
@@ -1255,25 +1261,23 @@ func (r *BackupReconciler) getVolumeSnapshotClassOrCreate(ctx context.Context, s
 }
 
 func (r *BackupReconciler) ensureVolumeSnapshotReady(
-	key types.NamespacedName) (bool, error) {
+	key types.NamespacedName) (bool, *metav1.Time, error) {
 	snap := &snapshotv1.VolumeSnapshot{}
 	// not found, continue the creation process
 	exists, err := r.snapshotCli.CheckResourceExists(key, snap)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	ready := false
 	if exists && snap.Status != nil {
 		// check if snapshot status throws an error, e.g. csi does not support volume snapshot
 		if isVolumeSnapshotConfigError(snap) {
-			return false, errors.New(*snap.Status.Error.Message)
+			return false, nil, errors.New(*snap.Status.Error.Message)
 		}
-		if snap.Status.ReadyToUse != nil {
-			ready = *(snap.Status.ReadyToUse)
+		if snap.Status.ReadyToUse != nil && *snap.Status.ReadyToUse {
+			return true, snap.Status.CreationTime, nil
 		}
 	}
-
-	return ready, nil
+	return false, nil, nil
 }
 
 func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,

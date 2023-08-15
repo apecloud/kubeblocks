@@ -5,10 +5,11 @@
 replicaCount: 1
 
 image:
-  repository: docker.io/jupyter/tensorflow-notebook
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/jupyter-notebook-llm
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: beta1
 
 fullnameOverride: ""
 

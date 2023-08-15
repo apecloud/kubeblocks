@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -418,7 +417,7 @@ func (o *benchDescribeOption) run() error {
 
 			found = true
 
-			if err := yaml.NewEncoder(o.Out).Encode(obj); err != nil {
+			if err := printer.PrettyPrintObj(obj); err != nil {
 				return err
 			}
 

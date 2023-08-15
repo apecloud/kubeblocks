@@ -168,7 +168,13 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 
 	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
 	resp, err := mgr.QueryWithLeader(ctx, sql, cluster)
-	if err
+	if errors.Is(err, ClusterHasNoLeader) {
+		mgr.Logger.Infof("cluster has no leader, will compete the leader lock")
+		return true
+	} else if err != nil {
+		mgr.Logger.Errorf("query %s with leader failed, err:%v", sql, err)
+		return false
+	}
 
 	result, err := parseSingleQuery(string(resp))
 	if err != nil {
@@ -189,22 +195,10 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 }
 
 func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) error {
-	ctx := context.TODO()
 	sql := fmt.Sprintf(`alter system consensus add follower '%s:%d';`,
 		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), config.port)
 
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		return errors.New("get leader member failed")
-	}
-
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*leaderMember)})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
-		return err
-	}
-
-	_, err = mgr.ExecWithPool(ctx, sql, pools[0])
+	_, err := mgr.ExecWithLeader(context.TODO(), sql, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
@@ -246,11 +240,7 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 }
 
 func (mgr *Manager) PromoteConsensus(ctx context.Context) error {
-	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
-		mgr.Logger.Infof("i am already the leader, don't need to promote")
-		return nil
-	}
-
+	// TODO:will get leader ip_port from consensus_member_status directly in the future
 	sql := `select ip_port from consensus_cluster_status where server_id = (select current_leader from consensus_member_status);`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
@@ -264,14 +254,8 @@ func (mgr *Manager) PromoteConsensus(ctx context.Context) error {
 	}
 
 	currentLeaderAddr := strings.Split(result["ip_port"].(string), ":")[0]
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{currentLeaderAddr})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("get current leader pool failed, err%v", err)
-		return err
-	}
-
 	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("KB_POD_FQDN"), config.port)
-	_, err = mgr.ExecWithPool(ctx, promoteSQL, pools[0])
+	_, err = mgr.ExecOthers(ctx, promoteSQL, currentLeaderAddr)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
@@ -298,5 +282,18 @@ func (mgr *Manager) QueryWithLeader(ctx context.Context, sql string, cluster *dc
 		return mgr.QueryOthers(ctx, sql, cluster.GetMemberAddr(*leaderMember))
 	} else {
 		return mgr.Query(ctx, sql)
+	}
+}
+
+func (mgr *Manager) ExecWithLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result int64, err error) {
+	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		return 0, ClusterHasNoLeader
+	}
+
+	if leaderMember.Name != mgr.CurrentMemberName {
+		return mgr.ExecOthers(ctx, sql, cluster.GetMemberAddr(*leaderMember))
+	} else {
+		return mgr.Exec(ctx, sql)
 	}
 }

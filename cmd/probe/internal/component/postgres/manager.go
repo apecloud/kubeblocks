@@ -172,8 +172,14 @@ func (mgr *Manager) QueryOthers(ctx context.Context, sql string, memberHost stri
 }
 
 // ExecOthers execute command on other member's connection pool
-func (mgr *Manager) ExecOthers(sql string, member *dcs.Member) {
+func (mgr *Manager) ExecOthers(ctx context.Context, sql string, memberHost string) (result int64, err error) {
+	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{memberHost})
+	if err != nil || pools[0] == nil {
+		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
+		return 0, errors.Errorf("get member:%s's pool failed, err:%v", memberHost, err)
+	}
 
+	return mgr.ExecWithPool(ctx, sql, pools[0])
 }
 
 func (mgr *Manager) IsPgReady(ctx context.Context) bool {
@@ -347,11 +353,20 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 }
 
 func (mgr *Manager) Promote(ctx context.Context) error {
+	isLeader, err := mgr.IsLeader(ctx, nil)
+	if isLeader && err == nil {
+		mgr.Logger.Infof("i am already the leader, don't need to promote")
+		return nil
+	} else if err != nil {
+		mgr.Logger.Errorf("check is leader failed, err:%v", err)
+		return err
+	}
+
 	switch mgr.workLoadType {
 	case Consensus:
 		return mgr.PromoteConsensus(ctx)
 	case Replication:
-		return mgr.PromoteReplication(ctx)
+		return mgr.PromoteReplication()
 	default:
 		return InvalidWorkLoadType
 	}

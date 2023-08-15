@@ -35,7 +35,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -431,12 +430,7 @@ func (mgr *Manager) getHistory() []*history {
 	return nil
 }
 
-func (mgr *Manager) PromoteReplication(ctx context.Context) error {
-	if isLeader, err := mgr.IsLeader(ctx, nil); err == nil && isLeader {
-		mgr.Logger.Infof("i am already a leader, don't need to promote")
-		return nil
-	}
-
+func (mgr *Manager) PromoteReplication() error {
 	err := mgr.prePromote()
 	if err != nil {
 		return err
@@ -470,6 +464,15 @@ func (mgr *Manager) postPromote() error {
 }
 
 func (mgr *Manager) DemoteReplication() error {
+	isLeader, err := mgr.IsLeader(context.TODO(), nil)
+	if !isLeader && err == nil {
+		mgr.Logger.Infof("i am not the leader, don't need to demote")
+		return nil
+	} else if err != nil {
+		mgr.Logger.Errorf("check is leader failed, err:%v", err)
+		return err
+	}
+
 	return mgr.Stop()
 }
 
@@ -502,11 +505,6 @@ func (mgr *Manager) Stop() error {
 }
 
 func (mgr *Manager) FollowReplication(ctx context.Context, cluster *dcs.Cluster) error {
-	if cluster.Leader == nil || cluster.Leader.Name == "" {
-		mgr.Logger.Warnf("no action coz cluster has no leader")
-		return mgr.Start()
-	}
-
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("handle rewind failed, err:%v", err)
@@ -529,7 +527,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	}
 
 	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
-		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, viper.GetString("POSTGRES_PASSWORD"))
+		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, config.password)
 
 	pgConf, err := os.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
@@ -563,7 +561,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) Start() error {
-	mgr.Logger.Infof("wait for send signal 2 to activate sql channel")
+	mgr.Logger.Infof("sending signal 2 to activate sql channel")
 	sqlChannelProc, err := component.GetSQLChannelProc()
 	if err != nil {
 		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)

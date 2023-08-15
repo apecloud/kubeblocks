@@ -25,11 +25,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/yaml"
-
-	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -90,7 +88,6 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
@@ -105,7 +102,6 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
@@ -118,7 +114,6 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
@@ -131,7 +126,6 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
@@ -145,57 +139,22 @@ var _ = Describe("component module", func() {
 				Ctx: ctx,
 				Log: tlog,
 			}
-			clusterTplStr := `
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name:
-spec:
-  componentSpecs:
-    - name: mysql # user-defined
-      componentDefRef: mysql # ref clusterdefinition componentDefs.name
-      monitor: false
-      replicas: 1
-      serviceAccountName: kb-release-name-apecloud-mysql-cluster
-      enabledLogs:     ["slow","error"]
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            storageClassName:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
-    - name: etcd
-      componentDefRef: etcd # ref clusterdefinition componentDefs.name
-      replicas: 1
-    - name: vtctld
-      componentDefRef: vtctld # ref clusterdefinition componentDefs.name
-      replicas: 1
-    - name: vtconsensus
-      componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
-      replicas: 1
-    - name: vtgate
-      componentDefRef: proxy # ref clusterdefinition componentDefs.name
-      replicas: 1
-`
-			clusterTpl := appsv1alpha1.ClusterTemplate{}
-			Expect(yaml.Unmarshal([]byte(clusterTplStr), &clusterTpl)).Should(Succeed())
+
 			By("fill simplified fields")
 			r := int32(3)
 			cluster.Spec.Replicas = &r
 			cluster.Spec.Resources.CPU = resource.MustParse("1000m")
 			cluster.Spec.Resources.Memory = resource.MustParse("2Gi")
 			cluster.Spec.Storage.Size = resource.MustParse("20Gi")
+
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
-			By("call build")
+
+			By("build first component from simplified fields")
 			component, err := buildComponent(
 				reqCtx,
 				nil,
 				cluster,
-				&clusterTpl,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
@@ -204,18 +163,18 @@ spec:
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.Replicas).Should(Equal(*cluster.Spec.Replicas))
 			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
+
+			By("build second component will be nil")
 			component, err = buildComponent(
 				reqCtx,
 				nil,
 				cluster,
-				&clusterTpl,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[1],
 				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
-			Expect(component.Name).Should(Equal("vtgate"))
-			Expect(component.ComponentDef).Should(Equal("proxy"))
+			Expect(component).Should(BeNil())
 		})
 
 		It("build affinity correctly", func() {
@@ -233,7 +192,6 @@ spec:
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
@@ -263,7 +221,6 @@ spec:
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
@@ -279,7 +236,6 @@ spec:
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
@@ -308,7 +264,6 @@ spec:
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
@@ -368,7 +323,6 @@ spec:
 				reqCtx,
 				nil,
 				cluster,
-				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,

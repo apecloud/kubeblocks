@@ -60,7 +60,6 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	definition *appsv1alpha1.ClusterDefinition,
 	version *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
-	clusterTpl *appsv1alpha1.ClusterTemplate,
 	compName string,
 	dag *graph.DAG) (Component, error) {
 	var compDef *appsv1alpha1.ClusterComponentDefinition
@@ -86,7 +85,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, nil
 	}
 
-	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, clusterTpl, definition, compDef, compSpec, compVer)
+	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, definition, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +114,6 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
@@ -124,7 +122,7 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, clusterTpl, clusterDef, compDef, compSpec, compVer)
+	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, clusterDef, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
 	}

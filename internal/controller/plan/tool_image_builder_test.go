@@ -112,7 +112,6 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			},
 			nil,
 			cluster,
-			nil,
 			clusterDef,
 			&clusterDef.Spec.ComponentDefs[0],
 			&cluster.Spec.ComponentSpecs[0],

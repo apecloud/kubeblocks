@@ -41,7 +41,6 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	origCluster := transCtx.OrigCluster
 	cluster := transCtx.Cluster
-	clusterTpl := transCtx.ClusterTemplate
 	if origCluster.IsDeleting() {
 		return nil
 	}
@@ -58,10 +57,10 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	dags4Component := make([]*graph.DAG, 0)
 	if cluster.IsStatusUpdating() {
 		// status existed components
-		err = c.transform4StatusUpdate(reqCtx, clusterDef, clusterVer, cluster, clusterTpl, &dags4Component)
+		err = c.transform4StatusUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
 	} else {
 		// create new components or update existed components
-		err = c.transform4SpecUpdate(reqCtx, clusterDef, clusterVer, cluster, clusterTpl, &dags4Component)
+		err = c.transform4SpecUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
 	}
 	if err != nil && !ictrlutil.IsDelayedRequeueError(err) {
 		return err
@@ -83,7 +82,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 }
 
 func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, clusterTpl *appsv1alpha1.ClusterTemplate, dags *[]*graph.DAG) error {
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	compDefMap := make(map[string]*appsv1alpha1.ClusterComponentDefinition)
 	for _, spec := range cluster.Spec.ComponentSpecs {
@@ -106,7 +105,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 
 	for compName := range createSet {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, clusterTpl, compName, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -121,7 +120,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 
 	for compName := range deleteSet {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, clusterTpl, compName, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -135,7 +134,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 
 	for compName := range updateSet {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, clusterTpl, compName, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
@@ -149,11 +148,11 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 }
 
 func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, clusterTpl *appsv1alpha1.ClusterTemplate, dags *[]*graph.DAG) error {
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	var delayedError error
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		dag := graph.NewDAG()
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, clusterTpl, compSpec.Name, dag)
+		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
 		}

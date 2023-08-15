@@ -72,7 +72,7 @@ func NewHa(logger logger.Logger) *Ha {
 func (ha *Ha) RunCycle() {
 	cluster, err := ha.dcs.GetCluster()
 	if err != nil {
-		ha.logger.Infof("Get Cluster err: %v.", err)
+		ha.logger.Warnf("Get Cluster err: %v.", err)
 		return
 	}
 

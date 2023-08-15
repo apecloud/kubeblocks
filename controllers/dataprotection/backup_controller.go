@@ -915,6 +915,7 @@ func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dataprotection
 	container.VolumeMounts = []corev1.VolumeMount{
 		{Name: fmt.Sprintf("backup-%s", backup.Status.PersistentVolumeClaimName), MountPath: backupPathBase},
 	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	container.Env = []corev1.EnvVar{
 		{Name: constant.DPBackupInfoFile, Value: buildBackupInfoENV(pathPrefix)},
 	}
@@ -1364,6 +1365,7 @@ func (r *BackupReconciler) createDeleteBackupFileJob(
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser,
 	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	// build pod
 	podSpec := corev1.PodSpec{
@@ -1778,6 +1780,8 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
 
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+
 	envBackupName := corev1.EnvVar{
 		Name:  constant.DPBackupName,
 		Value: backup.Name,
@@ -1890,7 +1894,7 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	container.SecurityContext = &corev1.SecurityContext{
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
-
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	podSpec.Containers = []corev1.Container{container}
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
@@ -1946,6 +1950,7 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	} else {
 		podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	container.Args = []string{args}
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))

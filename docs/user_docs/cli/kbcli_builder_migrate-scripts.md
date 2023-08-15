@@ -1,13 +1,28 @@
 ---
-title: kbcli bench
+title: kbcli builder migrate-scripts
 ---
 
-Run a benchmark.
+migrate - a developer tool.
+
+```
+kbcli builder migrate-scripts [flags]
+```
+
+### Examples
+
+```
+  
+```
 
 ### Options
 
 ```
-  -h, --help   help for bench
+      --configmap string   specify the configmap name
+      --force              whether overwrite the exists file
+      --helm string        specify the helm template dir
+  -h, --help               help for migrate-scripts
+      --output string      specify the scripts output path
+      --regex string       specify the regex for configmap
 ```
 
 ### Options inherited from parent commands
@@ -36,15 +51,7 @@ Run a benchmark.
 
 ### SEE ALSO
 
-
-* [kbcli bench delete](kbcli_bench_delete.md)	 - Delete a benchmark.
-* [kbcli bench describe](kbcli_bench_describe.md)	 - Describe a benchmark.
-* [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
-* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
-* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run tpcc benchmark
-* [kbcli bench tpch](kbcli_bench_tpch.md)	 - Run tpch benchmark
-* [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
+* [kbcli builder](kbcli_builder.md)	 - builder command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

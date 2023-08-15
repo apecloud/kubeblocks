@@ -983,13 +983,6 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	in.Storage.DeepCopyInto(&out.Storage)
-	if in.Parameters != nil {
-		in, out := &in.Parameters, &out.Parameters
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	in.Monitor.DeepCopyInto(&out.Monitor)
 	if in.Network != nil {
 		in, out := &in.Network, &out.Network

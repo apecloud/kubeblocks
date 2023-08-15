@@ -343,32 +343,6 @@ ClusterStorage
 </tr>
 <tr>
 <td>
-<code>mode</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterMode">
-ClusterMode
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>parameters</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>customized parameters that is used in different clusterdefinition</p><br />
-</td>
-</tr>
-<tr>
-<td>
 <code>monitor</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterMonitor">
@@ -3303,28 +3277,6 @@ int64
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterMode">ClusterMode
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;raftGroup&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;replication&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;standalone&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterMonitor">ClusterMonitor
 </h3>
 <p>
@@ -3675,32 +3627,6 @@ ClusterStorage
 </tr>
 <tr>
 <td>
-<code>mode</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterMode">
-ClusterMode
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>parameters</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>customized parameters that is used in different clusterdefinition</p><br />
-</td>
-</tr>
-<tr>
-<td>
 <code>monitor</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterMonitor">
@@ -3802,7 +3728,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ClusterComponentStatus
+map[string]..ClusterComponentStatus
 </a>
 </em>
 </td>
@@ -6306,7 +6232,7 @@ ClassDefRef
 <td>
 <code>targetResources</code><br/>
 <em>
-map[github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]string
+map[..ComponentResourceKey][]string
 </em>
 </td>
 <td>
@@ -6348,7 +6274,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfiguration
+map[string]..LastComponentConfiguration
 </a>
 </em>
 </td>
@@ -7104,7 +7030,7 @@ LastConfiguration
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponentStatus
+map[string]..OpsRequestComponentStatus
 </a>
 </em>
 </td>

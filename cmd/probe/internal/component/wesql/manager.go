@@ -222,21 +222,7 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 }
 
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	var leaderDBState *dcs.DBState
-	if cluster.Leader == nil || cluster.Leader.DBState == nil {
-		mgr.Logger.Warnf("No leader DBstate info")
-		return false
-	}
-	leaderDBState = cluster.Leader.DBState
-	dbState := mgr.GetDBState(ctx, cluster, member)
-	if dbState == nil {
-		return false
-	}
-	if leaderDBState.OpTimestamp-dbState.OpTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
-		return false
-	}
-	mgr.Logger.Warnf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-dbState.OpTimestamp)
-	return true
+	return false
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {

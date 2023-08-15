@@ -269,6 +269,7 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 			ha.logger.Infof("manual switchover to new leader: %s", candidate)
 			return false
 		}
+		return true
 	}
 
 	if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {

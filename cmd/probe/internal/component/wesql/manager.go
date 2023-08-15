@@ -469,7 +469,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	leaderMember := mgr.HasOtherHealthyLeader(ctx, nil)
 	if leaderMember == nil {
 		mgr.Logger.Warnf("DB has no leader")
-		return false
+		return errors.New("DB has no leader")
 	}
 	db, err := config.GetDBConnWithAddr(cluster.GetMemberAddr(*leaderMember))
 	if err != nil {

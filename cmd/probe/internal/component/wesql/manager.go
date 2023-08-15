@@ -389,15 +389,12 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	if cluster.Leader != nil && cluster.Leader.Name != "" {
 		db, err = mgr.GetLeaderConn(cluster)
 	} else {
-		localInfo, _ := mgr.GetClusterLocalInfo(ctx)
-		leaderAddr := localInfo.GetString("CURRENT_LEADER")
-		leaderParts := strings.Split(leaderAddr, ".")
-		if len(leaderParts) == 0 {
+		leaderMember := mgr.HasOtherHealthyLeader(ctx, cluster)
+		if leaderMember == nil {
+			mgr.Logger.Warnf("DB has no leader")
 			return false
 		}
-		leaderMember := cluster.GetMemberWithName(leaderParts[0])
 		db, err = config.GetDBConnWithAddr(cluster.GetMemberAddr(*leaderMember))
-
 	}
 
 	if err != nil {
@@ -469,7 +466,12 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	db, err := mgr.GetLeaderConn(cluster)
+	leaderMember := mgr.HasOtherHealthyLeader(ctx, nil)
+	if leaderMember == nil {
+		mgr.Logger.Warnf("DB has no leader")
+		return false
+	}
+	db, err := config.GetDBConnWithAddr(cluster.GetMemberAddr(*leaderMember))
 	if err != nil {
 		return errors.Wrap(err, "Get leader conn failed")
 	}

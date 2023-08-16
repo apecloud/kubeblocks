@@ -159,11 +159,7 @@ func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, clust
 // IsMemberHealthyConsensus firstly get the leader's connection pool,
 // because only leader can get the cluster healthy view
 func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	memberName := mgr.CurrentMemberName
-	if member != nil {
-		memberName = member.Name
-	}
-	IPPort := getConsensusIPPort(cluster, memberName)
+	IPPort := getConsensusIPPort(cluster, member.Name)
 
 	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
 	resp, err := mgr.QueryWithLeader(ctx, sql, cluster)

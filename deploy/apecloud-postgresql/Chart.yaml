@@ -7,10 +7,8 @@ type: application
 
 version: 0.6.0-beta.21
 
-# This is the version number of the ApeCloud MySQL being deployed,
-# rather than the version number of ApeCloud MySQL-Scale itself.
-# From a user's perspective, the version number of the frontend
-# proxy of the MySQL being used is not relevant.
+# This is the temporary version of the ApeCloud PostgreSQL being deployed,
+# TODO: Wait for ApeCloud PostgreSQL to determine the version number.
 appVersion: "latest"
 
 home: https://kubeblocks.io/

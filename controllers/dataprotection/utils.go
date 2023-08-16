@@ -94,6 +94,10 @@ func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 }
 
+func excludeLabelsForWorkload() []string {
+	return []string{constant.KBAppComponentLabelKey}
+}
+
 func buildAutoCreationAnnotations(backupPolicyName string) map[string]string {
 	return map[string]string{
 		dataProtectionAnnotationCreateByPolicyKey: "true",
@@ -116,7 +120,7 @@ func buildBackupWorkloadsLabels(backup *dataprotectionv1alpha1.Backup) map[strin
 	if labels == nil {
 		labels = map[string]string{}
 	} else {
-		for _, v := range getClusterLabelKeys() {
+		for _, v := range excludeLabelsForWorkload() {
 			delete(labels, v)
 		}
 	}

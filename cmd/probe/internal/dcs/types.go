@@ -106,6 +106,8 @@ type HaConfig struct {
 	index              string
 	ttl                int
 	maxLagOnSwitchover int64
+	DeleteMembers      string
+	resource           any
 }
 
 func (c *HaConfig) GetTTL() int {

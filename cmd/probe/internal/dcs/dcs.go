@@ -36,6 +36,7 @@ type DCS interface {
 
 	// cluster scole ha config
 	GetHaConfig() (*HaConfig, error)
+	UpdateHaConfig() error
 
 	// member manager funtions
 	GetMembers() ([]Member, error)

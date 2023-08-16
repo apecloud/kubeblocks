@@ -400,6 +400,39 @@ func (store *KubernetesStore) ReleaseLock() error {
 	return err
 }
 
+func (store *KubernetesStore) CreateHaConfig() error {
+	labelsMap := map[string]string{
+		"app.kubernetes.io/instance":        store.clusterName,
+		"app.kubernetes.io/managed-by":      "kubeblocks",
+		"apps.kubeblocks.io/component-name": store.componentName,
+	}
+
+	haName := store.clusterCompName + "-haconfig"
+	store.logger.Infof("k8s store initializing, create Ha ConfigMap: %s", haName)
+	haConfig, _ := store.GetHaConfig()
+	if haConfig.resource != nil {
+		return nil
+	}
+
+	ttl := viper.GetString("KB_TTL")
+	if _, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      haName,
+			Namespace: store.namespace,
+			Labels:    labelsMap,
+			Annotations: map[string]string{
+				"ttl":                ttl,
+				"MaxLagOnSwitchover": "0",
+			},
+			// OwnerReferences: ownerReference,
+		},
+	}, metav1.CreateOptions{}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	configmapName := store.clusterCompName + "-haconfig"
 	configmap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(context.TODO(), configmapName, metav1.GetOptions{})
@@ -425,12 +458,31 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	if err != nil {
 		maxLagOnSwitchover = 1048576
 	}
+	deleteMembers := annotations["delete-members"]
 
 	return &HaConfig{
 		index:              configmap.ResourceVersion,
 		ttl:                ttl,
 		maxLagOnSwitchover: int64(maxLagOnSwitchover),
+		DeleteMembers:      deleteMembers,
+		resource:           configmap,
 	}, err
+}
+
+func (store *KubernetesStore) UpdateHaConfig() error {
+	haConfig := store.cluster.HaConfig
+	if haConfig.resource == nil {
+		return errors.New("No HA configmap")
+	}
+
+	configMap := haConfig.resource.(*corev1.ConfigMap)
+	annotations := configMap.Annotations
+	annotations["ttl"] = strconv.Itoa(haConfig.ttl)
+	annotations["delete-members"] = haConfig.DeleteMembers
+	annotations["MaxLagOnSwitchover"] = strconv.Itoa(int(haConfig.maxLagOnSwitchover))
+
+	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	return err
 }
 
 func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error) {

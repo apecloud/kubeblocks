@@ -118,12 +118,17 @@ func (mgr *WesqlManager) InitiateCluster(cluster *dcs.Cluster) error {
 }
 
 func (mgr *WesqlManager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
+	addrs := make([]string, 0, 3)
 	clusterInfo := mgr.GetClusterInfo(ctx, cluster)
 	clusterInfo = strings.Split(clusterInfo, "@")[0]
-	if clusterInfo == "" {
-		return nil
+	for _, addr := range strings.Split(clusterInfo, ";") {
+		if !strings.Contains(addr, ":") {
+			continue
+		}
+		addrs = append(addrs, strings.Split(addr, "#")[0])
 	}
-	return strings.Split(clusterInfo, ";")
+
+	return addrs
 }
 
 func (mgr *WesqlManager) GetAddrWithMemberName(ctx context.Context, cluster *dcs.Cluster, memberName string) string {

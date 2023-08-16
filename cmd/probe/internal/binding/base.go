@@ -427,13 +427,14 @@ func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.Invok
 	// if current member is leader, take a switchover first
 	dcsStore := dcs.GetStore()
 	var cluster *dcs.Cluster
+	cluster, err = dcsStore.GetCluster()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
+		return opsRes, err
+	}
+
 	if dcsStore != nil && dcsStore.HasLock() {
-		cluster, err := dcsStore.GetCluster()
-		if err != nil {
-			opsRes["event"] = OperationFailed
-			opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
-			return opsRes, err
-		}
 
 		if cluster.Switchover != nil {
 			message := "cluster is doing switchover, wait for it to finish"

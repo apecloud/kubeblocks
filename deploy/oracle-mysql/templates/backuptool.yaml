@@ -19,10 +19,12 @@ spec:
         set -e;
         mkdir -p ${DATA_DIR}
         res=`ls -A ${DATA_DIR}`
-        if [ ! -z ${res} ]; then
+        data_protection_file=${DATA_DIR}/.kb-data-protection
+        if [ ! -z "${res}" ] && [ ! -f ${data_protection_file} ]; then
           echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
           exit 1
         fi
+        touch ${data_protection_file} && sync
         TMP_DIR=/data/mysql/temp
         mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
         xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
@@ -30,6 +32,7 @@ spec:
         xtrabackup --prepare --target-dir=${TMP_DIR}
         xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/
         rm -rf ${TMP_DIR}
+        rm -rf ${data_protection_file} && sync
         chmod -R 0777 ${DATA_DIR}
   backupCommands:
     - sh

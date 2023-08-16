@@ -19,11 +19,14 @@ spec:
         set -e
         mkdir -p ${DATA_DIR}
         res=`ls -A ${DATA_DIR}`
-        if [ ! -z "${res}" ]; then
+        data_protection_file=${DATA_DIR}/.kb-data-protection
+        if [ ! -z "${res}" ] && [ ! -f ${data_protection_file} ]; then
           echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
           exit 1
         fi
+        touch ${data_protection_file} && sync
         tar -xvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz -C ${DATA_DIR}
+        rm -rf ${data_protection_file} && sync
   logical:
     restoreCommands: []
   backupCommands:

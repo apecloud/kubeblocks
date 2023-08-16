@@ -148,7 +148,7 @@ func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 }
 
 func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, cluster *dcs.Cluster) bool {
-	memberAddrs := mgr.GetMemberAddrs(cluster)
+	memberAddrs := mgr.GetMemberAddrsConsensus(cluster)
 	// AddCurrentMemberToCluster is executed only when memberAddrs are successfully obtained and memberAddrs not Contains CurrentMember
 	if memberAddrs != nil && !slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName)) {
 		return false
@@ -159,12 +159,11 @@ func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, clust
 // IsMemberHealthyConsensus firstly get the leader's connection pool,
 // because only leader can get the cluster healthy view
 func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	var IPPort string
+	memberName := mgr.CurrentMemberName
 	if member != nil {
-		IPPort = getConsensusIPPort(cluster, member.Name)
-	} else {
-		IPPort = getConsensusIPPort(cluster, mgr.CurrentMemberName)
+		memberName = member.Name
 	}
+	IPPort := getConsensusIPPort(cluster, memberName)
 
 	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
 	resp, err := mgr.QueryWithLeader(ctx, sql, cluster)
@@ -236,7 +235,7 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 		return true
 	}
 
-	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
+	return mgr.IsMemberHealthyConsensus(ctx, cluster, leaderMember)
 }
 
 func (mgr *Manager) PromoteConsensus(ctx context.Context) error {

@@ -86,6 +86,8 @@ func (r *RequestCtx) WithValue(key, val any) context.Context {
 	return context.WithValue(r.Ctx, key, val)
 }
 
+// IsRSMEnabled enables rsm by default.
+// respect the feature gate if set, keep the ability to disable it.
 func IsRSMEnabled() bool {
 	if viper.IsSet(constant.FeatureGateReplicatedStateMachine) {
 		return viper.GetBool(constant.FeatureGateReplicatedStateMachine)

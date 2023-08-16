@@ -93,6 +93,9 @@ func updateObjRoleChangedInfo[T generics.Object, PT generics.PObject[T]](
 	pObj := PT(&obj)
 	patch := client.MergeFrom(PT(pObj.DeepCopy()))
 	pObj.GetLabels()[constant.RoleLabelKey] = role
+	if pObj.GetAnnotations() == nil {
+		pObj.SetAnnotations(map[string]string{})
+	}
 	pObj.GetAnnotations()[constant.LastRoleChangedEventTimestampAnnotationKey] = event.LastTimestamp.Time.Format(time.RFC3339)
 	if err := cli.Patch(ctx, pObj, patch); err != nil {
 		return err

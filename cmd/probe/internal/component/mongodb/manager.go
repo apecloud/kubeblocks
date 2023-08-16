@@ -333,15 +333,15 @@ func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {
 	return GetReplSetConfig(ctx, mgr.Client)
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
-	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return nil
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
+	defer client.Disconnect(ctx) //nolint:errcheck
 
-	rsConfig, err := GetReplSetConfig(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return nil
@@ -485,30 +485,30 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	return SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
-func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
-	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+func (mgr *Manager) DeleteMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
 		return err
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
+	defer client.Disconnect(ctx) //nolint:errcheck
 
-	rsConfig, err := GetReplSetConfig(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return err
 	}
 
-	mgr.Logger.Infof("Delete member: %s", host)
+	mgr.Logger.Infof("Delete member: %s", memberName)
 	configMembers := make([]ConfigMember, 0, len(rsConfig.Members)-1)
 	for _, configMember := range rsConfig.Members {
-		if configMember.Host != host {
+		if strings.HasPrefix(configMember.Host, memberName) {
 			configMembers = append(configMembers, configMember)
 		}
 	}
 
 	rsConfig.Members = configMembers
 	rsConfig.Version++
-	return SetReplSetConfig(context.TODO(), client, rsConfig)
+	return SetReplSetConfig(ctx, client, rsConfig)
 }
 
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {

@@ -197,7 +197,7 @@ func (mgr *Manager) IsLeaderWithPool(ctx context.Context, pool *pgxpool.Pool) (b
 	return role == binding.PRIMARY, nil
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
 	return cluster.GetMemberAddrs()
 }
 
@@ -377,7 +377,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 }
 
 // DeleteMemberFromCluster postgresql don't need to delete member
-func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+func (mgr *Manager) DeleteMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 

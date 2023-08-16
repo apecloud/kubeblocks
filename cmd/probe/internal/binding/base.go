@@ -35,7 +35,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -366,23 +365,10 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 		return opsRes, nil
 	}
 
-	characterType := viper.GetString(constant.KBEnvCharacterType)
-	if characterType == "" {
+	manager, err := component.GetDefaultManager()
+	if err != nil {
 		opsRes["event"] = OperationFailed
-		opsRes["message"] = "KB_SERVICE_CHARACTER_TYPE not set"
-		return opsRes, nil
-	}
-	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if workloadType == "" {
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = fmt.Sprintf("%s not set", constant.KBEnvWorkloadType)
-		return opsRes, nil
-	}
-
-	manager := component.GetManager(characterType, workloadType)
-	if manager == nil {
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = fmt.Sprintf("No DB Manager for character type %s", characterType)
+		opsRes["message"] = err.Error()
 		return opsRes, nil
 	}
 
@@ -426,4 +412,67 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 
 	opsRes["event"] = OperationSuccess
 	return opsRes, nil
+}
+
+func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	manager, err := component.GetDefaultManager()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = err.Error()
+		return opsRes, nil
+	}
+
+	// if current member is leader, take a switchover first
+	dcsStore := dcs.GetStore()
+	var cluster *dcs.Cluster
+	if dcsStore != nil && dcsStore.HasLock() {
+		cluster, err := dcsStore.GetCluster()
+		if err != nil {
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
+			return opsRes, err
+		}
+
+		if cluster.Switchover != nil {
+			message := "cluster is doing switchover, wait for it to finish"
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = message
+			return opsRes, errors.New(message)
+		}
+
+		leaderMember := cluster.GetLeaderMember()
+		if len(manager.HasOtherHealthyMembers(ctx, cluster, leaderMember.Name)) == 0 {
+			message := "cluster has no other healthy members"
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = message
+			return opsRes, errors.New(message)
+		}
+
+		err = dcsStore.CreateSwitchover(leaderMember.Name, "")
+		if err != nil {
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = fmt.Sprintf("switchover failed: %v", err)
+			return opsRes, err
+		}
+
+		message := "cluster is doing switchover, wait for it to finish"
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = message
+		return opsRes, errors.New(message)
+	}
+
+	// redistribute the data of the current member among other members if needed
+	manager.MoveData(ctx, cluster)
+
+	// remove current member from db cluster
+	err = manager.DeleteMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("switchover failed: %v", err)
+
+	} else {
+		opsRes["event"] = OperationSuccess
+	}
+	return opsRes, err
 }

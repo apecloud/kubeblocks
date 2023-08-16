@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/dapr/kit/logger"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
@@ -66,7 +67,7 @@ type DBManager interface {
 	IsFirstMember() bool
 
 	AddCurrentMemberToCluster(*dcs.Cluster) error
-	DeleteMemberFromCluster(*dcs.Cluster, string) error
+	DeleteMemberFromCluster(context.Context, *dcs.Cluster, string) error
 
 	// IsPromoted is applicable only to consensus cluster, which is used to
 	// check if DB has complete switchover.
@@ -84,7 +85,7 @@ type DBManager interface {
 	// IsHealthiestMember(*dcs.Cluster) bool
 
 	GetCurrentMemberName() string
-	GetMemberAddrs(*dcs.Cluster) []string
+	GetMemberAddrs(context.Context, *dcs.Cluster) []string
 
 	// Functions related to account manage
 	IsRootCreated(context.Context) (bool, error)
@@ -94,7 +95,7 @@ type DBManager interface {
 	Lock(context.Context, string) error
 	Unlock(context.Context) error
 
-	PreDelete(context.Context) error
+	MoveData(context.Context, *dcs.Cluster) error
 
 	GetLogger() logger.Logger
 }
@@ -148,7 +149,7 @@ func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, 
 	return nil
 }
 
-func (mgr *DBManagerBase) PreDelete(context.Context) error {
+func (mgr *DBManagerBase) MoveData(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
@@ -187,7 +188,11 @@ func GetDefaultManager() (DBManager, error) {
 	if workloadType == "" {
 		return nil, fmt.Errorf("%s not set", constant.KBEnvWorkloadType)
 	}
-	return GetManager(characterType, workloadType), nil
+	manager := GetManager(characterType, workloadType)
+	if manager == nil {
+		return nil, errors.Errorf("no db manager for characterType %s and workloadType %s", characterType, workloadType)
+	}
+	return manager, nil
 }
 
 type FakeManager struct {
@@ -251,7 +256,7 @@ func (*FakeManager) AddCurrentMemberToCluster(*dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*FakeManager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
+func (*FakeManager) DeleteMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return fmt.Errorf("NotSuppported")
 }
 
@@ -280,7 +285,7 @@ func (*FakeManager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
 }
 
-func (*FakeManager) GetMemberAddrs(*dcs.Cluster) []string {
+func (*FakeManager) GetMemberAddrs(context.Context, *dcs.Cluster) []string {
 	return nil
 }
 

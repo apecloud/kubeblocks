@@ -90,7 +90,7 @@ func (ha *Ha) RunCycle() {
 	case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
 		ha.logger.Errorf("The cluster is not healthy, wait...")
 
-	case !ha.dbManager.IsCurrentMemberInCluster(ha.ctx, cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(cluster)):
+	case !ha.dbManager.IsCurrentMemberInCluster(ha.ctx, cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)):
 		ha.logger.Infof("Current member is not in cluster, add it to cluster")
 		_ = ha.dbManager.AddCurrentMemberToCluster(cluster)
 
@@ -153,7 +153,7 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Infof("Refresh leader ttl")
 		_ = ha.dcs.UpdateLock()
 
-		if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(cluster)) {
+		if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)) && cluster.Replicas != 0 {
 			ha.DecreaseClusterReplicas(cluster)
 		}
 
@@ -231,7 +231,7 @@ func (ha *Ha) Start() {
 }
 
 func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
-	hosts := ha.dbManager.GetMemberAddrs(cluster)
+	hosts := ha.dbManager.GetMemberAddrs(ha.ctx, cluster)
 	sort.Strings(hosts)
 	deleteHost := hosts[len(hosts)-1]
 	ha.logger.Infof("Delete member: %s", deleteHost)
@@ -245,7 +245,13 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 		_ = ha.dcs.ReleaseLock()
 		return
 	}
-	_ = ha.dbManager.DeleteMemberFromCluster(cluster, deleteHost)
+	memberName := strings.Split(deleteHost, ".")[0]
+	member := cluster.GetMemberWithName(memberName)
+	if member != nil {
+		ha.logger.Infof("member %s exists, do not delete", memberName)
+		return
+	}
+	_ = ha.dbManager.DeleteMemberFromCluster(ha.ctx, cluster, memberName)
 }
 
 func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool {

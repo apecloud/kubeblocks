@@ -117,8 +117,23 @@ func (mgr *WesqlManager) InitiateCluster(cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *WesqlManager) GetMemberAddrs(cluster *dcs.Cluster) []string {
-	return cluster.GetMemberAddrs()
+func (mgr *WesqlManager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
+	clusterInfo := mgr.GetClusterInfo(ctx, cluster)
+	clusterInfo = strings.Split(clusterInfo, "@")[0]
+	if clusterInfo == "" {
+		return nil
+	}
+	return strings.Split(clusterInfo, ";")
+}
+
+func (mgr *WesqlManager) GetAddrWithMemberName(ctx context.Context, cluster *dcs.Cluster, memberName string) string {
+	addrs := mgr.GetMemberAddrs(ctx, cluster)
+	for _, addr := range addrs {
+		if strings.HasPrefix(addr, memberName) {
+			return addr
+		}
+	}
+	return ""
 }
 
 func (mgr *WesqlManager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
@@ -138,7 +153,25 @@ func (mgr *WesqlManager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *WesqlManager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+func (mgr *WesqlManager) DeleteMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+	db, err := mgr.GetLeaderConn(ctx, cluster)
+	if err != nil {
+		mgr.Logger.Infof("Get leader conn failed: %v", err)
+		return err
+	}
+	addr := mgr.GetAddrWithMemberName(ctx, cluster, memberName)
+	if addr == "" {
+		mgr.Logger.Infof("member %s already deleted", memberName)
+		return nil
+	}
+
+	sql := fmt.Sprintf("call dbms_consensus.downgrade_follower('%s');"+
+		"call dbms_consensus.drop_learner('%s');", addr, addr)
+	_, err = db.ExecContext(ctx, sql)
+	if err != nil {
+		mgr.Logger.Warnf("delete member from db cluster failed: %v", err)
+		return errors.Wrapf(err, "error executing %s", sql)
+	}
 	return nil
 }
 
@@ -208,7 +241,7 @@ func (mgr *WesqlManager) GetClusterInfo(ctx context.Context, cluster *dcs.Cluste
 }
 
 func (mgr *WesqlManager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
-	isLeader, _ := mgr.IsLeader(ctx, cluster)
+	isLeader, _ := mgr.IsLeader(ctx, nil)
 	if isLeader {
 		return nil
 	}
@@ -231,6 +264,11 @@ func (mgr *WesqlManager) Promote(ctx context.Context, cluster *dcs.Cluster) erro
 
 	mgr.Logger.Infof("promote success, resp:%v", resp)
 	return nil
+}
+
+func (mgr *WesqlManager) IsPromoted(ctx context.Context) bool {
+	isLeader, _ := mgr.IsLeader(ctx, nil)
+	return isLeader
 }
 
 func (mgr *WesqlManager) Demote(context.Context) error {

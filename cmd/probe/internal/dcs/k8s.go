@@ -157,7 +157,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	leader, err := store.GetLeader()
 	if err != nil {
-		store.logger.Errorf("get switchover error: %v", err)
+		store.logger.Errorf("get leader error: %v", err)
 	}
 
 	switchover, err := store.GetSwitchover()
@@ -359,7 +359,7 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 }
 
 func (store *KubernetesStore) HasLock() bool {
-	return store.cluster.Leader != nil && store.cluster.Leader.Name == store.currentMemberName
+	return store.cluster != nil && store.cluster.Leader != nil && store.cluster.Leader.Name == store.currentMemberName
 }
 
 func (store *KubernetesStore) UpdateLock() error {

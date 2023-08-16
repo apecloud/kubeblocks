@@ -22,8 +22,9 @@ package dcs
 import (
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type Cluster struct {

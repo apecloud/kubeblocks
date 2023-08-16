@@ -8,13 +8,19 @@ sidebar_label: Connection pool
 
 # PostgreSQL connection pool
 
-PostgreSQL adopts a multi-process architecture, which creates a separate backend process for each user connection. When there are many user connections, it occupies a large amount of memory, which reduces the throughput and stability of the database. To solve these problems caused by too many PostgreSQL connections, KubeBlocks introduces a connection pool, PgBouncer, for PostgreSQL database clusters.
+PostgreSQL adopts a multi-process architecture, which creates a separate backend process for each user connection. When there are too many user connections, it occupies a large amount of memory, which reduces the throughput and stability of the database. To solve these problems, KubeBlocks introduces a connection pool, PgBouncer, for PostgreSQL database clusters.
 
 When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by default.
 
 ## Steps
 
-1. Describe this cluster and there are two connection information in Endpoints.
+1. View the status of the created PostgreSQL cluster and ensure this cluster is `Running`.
+
+   ```bash
+   kbcli cluster list mycluster
+   ```
+
+2. Describe this cluster and there are two connection links in Endpoints.
 
     Port `5432` is used to connect to the primary pod of this database and port `6432` is used to connect to PgBouncer.
 
@@ -24,10 +30,10 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
     Endpoints:
     COMPONENT    MODE        INTERNAL                                              EXTERNAL   
     postgresql   ReadWrite   mycluster-postgresql.default.svc.cluster.local:5432   <none>     
-                            mycluster-postgresql.default.svc.cluster.local:6432         
+                             mycluster-postgresql.default.svc.cluster.local:6432         
     ```
 
-2. Connect the cluster with PgBouncer.
+3. Connect the cluster with PgBouncer.
 
    This command shows how to connect to a cluster with CLI. The default example uses port `5432` and you can replace it with port `6432`.
 
@@ -38,19 +44,19 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
     PGPASSWORD=***** psql -h127.0.0.1 -p 6432 -U postgres postgres
     ```
 
-3. Run `port-forward`.
+4. Run `port-forward`.
 
    ```bash
    kubectl port-forward service/mycluster-postgresql 6432:6432
    ```
 
-4. Open a new terminal window and run the `psql` command to connect to PgBouncer.
+5. Open a new terminal window and run the `psql` command to connect to PgBouncer.
 
    ```bash
    PGPASSWORD=***** psql -h127.0.0.1 -p 6432 -U postgres postgres
    ```
 
-5. Run the following command in `psgl` to verify the connection. 
+6. Run the following command in `psgl` to verify the connection.
 
    If you can connect to `pgbouncer` and execute `show help` with the expected results below, this cluster connects to PgBouncer successfully.
 

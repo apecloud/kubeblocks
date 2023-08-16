@@ -29,9 +29,9 @@ You can initiate a switchover for a PrimarySecondary MongoDB database by executi
 
 You can switch over a secondary of a MongoDB PrimarySecondary to the primary role, and the former primary instance to a secondary.
 
-<details open>
+<Tabs>
 
-<summary>kbcli</summary>
+<TabItem value="kbcli" label="kbcli" default>
 
 * Switchover with no primary instance specified
 
@@ -51,12 +51,11 @@ You can switch over a secondary of a MongoDB PrimarySecondary to the primary rol
     kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --component='mongodb'
     ```
 
-</details>
+</TabItem>
 
-<details>
-<summary>kubectl</summary>
+<TabItem value="kubectl" label="kubectl">
 
-Different instanceNames decide whether a new primary instance is specified for the switchover.
+The value of `instanceName` decides whether a new primary instance is specified for the switchover.
 
 * Switchover with no specified primary instance
 
@@ -92,7 +91,9 @@ Different instanceNames decide whether a new primary instance is specified for t
   >>
   ```
 
-</details>
+</TabItem>
+
+</Tabs>
 
 ## Verify the switchover
 
@@ -104,4 +105,4 @@ kbcli cluster list-instances
 
 ## Handle an exception
 
-If an error occurs, execute the command below to troubleshoot the operation.
+If an error occurs, refer to [Handle an exaception](./handle-an-exception.md) to troubleshoot the operation.

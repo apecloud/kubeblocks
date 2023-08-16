@@ -7,9 +7,9 @@ sidebar_label: Simulate pod faults
 
 # Simulate pod faults
 
-Pod faults supports pod failure, pod kill, and container kill.
+Pod faults support pod failure, pod kill, and container kill.
 
-* Pod failure: injects fault into a specified Pod to make the Pod unavailable for a period of time.
+* Pod failure: injects fault into a specified Pod to make the Pod unavailable for a while.
 * Pod kill: kills a specified Pod. To ensure that the Pod can be successfully restarted, you need to configure ReplicaSet or similar mechanisms.
 * Container kill: kills the specified container in the target Pod.
 
@@ -20,7 +20,7 @@ Chaos Mesh can inject PodChaos into any Pod, no matter whether the Pod is bound 
 ## Before you start
 
 * Make sure there is no Control Manager of Chaos Mesh running on the target Pod.
-* If the fault type is `pod-kill`, replicaSet or a similar mechanism is configured to ensure that Pod can restart automatically.
+* If the fault type is `pod-kill`, ReplicaSet or a similar mechanism is configured to ensure that Pod can restart automatically.
 
 ## Simulate fault injections by kbcli
 
@@ -30,19 +30,19 @@ Common flags for all types of Pod faults.
 
 | Option                  | Description              | Default value | Required |
 | :-----------------------| :------------------------| :------------ | :------- |
-| Pod name  | Add a Pod in the command to make this pod unavailable. For example, <br /> `kbcli fault pod kill mysql-cluster-mysql-0` | Default | No |
+| Pod name  | Add a Pod in the command to make this Pod unavailable. For example, <br /> `kbcli fault pod kill mysql-cluster-mysql-0` | Default | No |
 | `--namespace` | It specifies the namespace where the Chaos is created. | Current namespace | No |
-| `--ns-fault` | It specifies a namespace to make all pods in this namespace unavailable. For example, <br /> `kbcli fault pod kill --ns-fault=kb-system` | Default | No |
-| `--node`   | It specifies a node to make all pods on this node unavailable. For example, <br /> `kbcli fault pod kill --node=minikube-m02` | None | No |
-| `--label`  | It specifies a label to make the pod with this label in the default namespace unavailable. For example, <br /> `kbcli fault pod kill --label=app.kubernetes.io/component=mysql` | None | No |
-| `--node-label` | It specifies a node lable to make all pods on the node with this node lable unavailable. For example, <br /> `kbcli fault pod kill --node-label=kubernetes.io/arch=arm64` | None | No |
+| `--ns-fault` | It specifies a namespace to make all Pods in this namespace unavailable. For example, <br /> `kbcli fault pod kill --ns-fault=kb-system` | Default | No |
+| `--node`   | It specifies a node to make all Pods on this node unavailable. For example, <br /> `kbcli fault pod kill --node=minikube-m02` | None | No |
+| `--label`  | It specifies a label to make the Pod with this label in the default namespace unavailable. For example, <br /> `kbcli fault pod kill --label=app.kubernetes.io/component=mysql` | None | No |
+| `--node-label` | It specifies a node label to make all Pods on the node with this node lable unavailable. For example, <br /> `kbcli fault pod kill --node-label=kubernetes.io/arch=arm64` | None | No |
 | `--mode` | It specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | `all` | No |
 | `--value` | It provides parameters for the `mode` configuration, depending on `mode`. For example, when mode is set to `fixed-percent`, `--value` specifies the percentage of Pods. <br /> `kbcli fault pod kill --mode=fixed-percent --value=50` | None | No |
 | `--duration` | It specifies how long the experiment lasts. | 10 seconds | No |
 
 ### Pod kill
 
-Run the command below to inject `pod-kill` into all pods in the default namespace and make the Pods unavailable for 30 sceonds.
+Run the command below to inject `pod-kill` into all Pods in the default namespace and make the Pods unavailable for 30 seconds.
 
 ```bash
 kbcli fault pod kill
@@ -50,7 +50,7 @@ kbcli fault pod kill
 
 ### Pod failure
 
-Run the command below to inject `pod-failure` into all pods in the default namespace and make the Pods unavailable for 10 seconds.
+Run the command below to inject `pod-failure` into all Pods in the default namespace and make the Pods unavailable for 10 seconds.
 
 ```bash
 kbcli fault pod failure --duration=10s
@@ -58,7 +58,7 @@ kbcli fault pod failure --duration=10s
 
 ### Container kill
 
-Run the command below to inject `container-kill` into the containers of all pods in the default namespace once and make the containers unavailable for 10 seconds. `--container` is required.
+Run the command below to inject `container-kill` into the containers of all Pods in the default namespace once and make the containers unavailable for 10 seconds. `--container` is required.
 
 ```bash
 kbcli fault pod kill-container --container=mysql
@@ -72,7 +72,7 @@ kbcli fault pod kill-container --container=mysql --container=config-manager
 
 ## Simulate fault injections by YAML
 
-This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-pod-chaos-on-kubernetes/#create-experiments-using-yaml-configuration-files) for details.
+This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-pod-chaos-on-kubernetes/#create-experiments-using-yaml-configuration-files) for details.
 
 ### Pod-kill example
 
@@ -169,7 +169,7 @@ This section introduces the YAML configuration file examples. You can also refer
 
 ### Field description
 
-This table describes the fileds in the YAML file.
+This table describes the fields in the YAML file.
 
 | Parameter | Type  | Description | Default value | Required | Example |
 | :---      | :---  | :---        | :---          | :---     | :---    |

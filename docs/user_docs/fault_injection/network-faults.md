@@ -7,7 +7,7 @@ sidebar_label: Simulate network faults
 
 # Simulate network faults
 
-Network faults supports partition, net emulation (including loss, delay, duplicate, and corrupt), and bandwidth.
+Network faults support partition, net emulation (including loss, delay, duplicate, and corrupt), and bandwidth.
 
 * Partition: injects network disconnection and partition.
 * Net emulation: simulates poor network conditions, such as high delays, high packet loss rate, packet reordering, and so on.
@@ -28,8 +28,8 @@ Common flags for all types of network faults.
 | :----------------------- | :------------------------ | :------------ | :------- |
 | Pod name  | Add a pod name to make this pod in the default namespace unavailable. For example, <br /> `kbcli fault pod kill mysql-cluster-mysql-0` | Default | No |
 | `--direction` | It indicates the direction of target packets. Available vaules include `from` (the packets from target), `to` (the packets to target), and `both` ( the packets from or to target). | `to` | No |
-| `-e`,`--external-target` | It indicates the network targets outside Kubernetes, which can be IPv4 addresses or domains. This parameter only works with `direction: to`. | None | No |
-| `--target-mode` | It specifies the mode of the target. If a target is specified, the `target-mode` mode should be specified together. | None | No |
+| `-e`,`--external-target` | It indicates the network targets outside Kubernetes, which can be IPv4 addresses or domain names. This parameter only works with `direction: to`. | None | No |
+| `--target-mode` | It specifies the mode of the target. If a target is specified, the `target-mode` mode should be specified together. `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods) are selectable. | None | No |
 | `--target-value` | It specifies the value of the target. | None | No |
 | `--target-label` | It specifies the label of the target. | None | No |
 | `--duration` | It defines how long the partition lasts. | None | No |
@@ -76,6 +76,7 @@ kbcli fault network delay mycluster-mysql-1 --latency=15s -c=100 --jitter=0ms
 | :----------------------- | :------------------------ | :------------ | :------- |
 | `--latency` | It specifies the delay period.         | None          | Yes      |
 | `--jitter` | It specifies the latency change range.  | 0 ms          | No       |
+| `-c`, `--correlation` | It indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100]. | None | No |
 
 #### Duplicate
 
@@ -87,9 +88,16 @@ The command below injects duplicate chaos into the specified Pod and this experi
 kbcli fault network duplicate mysql-cluster-mysql-1 --duplicate=50
 ```
 
+📎 Table 4. kbcli fault network duplicate flags description
+
+| Option                   | Description               | Default value | Required |
+| :----------------------- | :------------------------ | :------------ | :------- |
+| `--duplicate`         | It indicateds the probability of a packet being duplicated. Value range: [0, 100]. | None | Yes |
+| `-c`, `--correlation` | It indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100]. | None | No |
+
 #### Corrupt
 
-The command below injects corrupt chaos into the specifies Pod and this experiment lasts for 1 minute and the packet corrupt rate is 50%.
+The command below injects corrupt chaos into the specified Pod and this experiment lasts for 1 minute and the packet corrupt rate is 50%.
 
 ```bash
 kbcli fault network corrupt mycluster-mysql-1 --corrupt=50 --correlation=100 --duration=1m
@@ -97,7 +105,7 @@ kbcli fault network corrupt mycluster-mysql-1 --corrupt=50 --correlation=100 --d
 
 ### Bandwidth
 
-The command below sets the bandwidth between the specified Pod and the outside as 1 Kbps and this experiment lasts for 1 minute.
+The command below sets the bandwidth between the specified Pod and the outside environment as 1 Kbps and this experiment lasts for 1 minute.
 
 ```bash
 kbcli fault network bandwidth mycluster-mysql-1 --rate=1kbps --duration=1m
@@ -110,12 +118,12 @@ kbcli fault network bandwidth mycluster-mysql-1 --rate=1kbps --duration=1m
 | `--rate` | It indicates the rate of bandwidth limit. | None | Yes |
 | `--limit` | It indicates the number of bytes waiting in the queue. | 1 | No |
 | `--buffer` | It indicates the maximum number of bytes that can be sent instantaneously. | 1 | No |
-| `--prakrate` | It indicates the maximum consumption of `bucket` (usually not set). | 0 | No |
-| `--minburst` | It indicates the size of `peakrate bucket` (usually not set). | 0 | No |
+| `--prakrate` | It indicates the maximum consumption rate of `bucket`. | 0 | No |
+| `--minburst` | It indicates the size of `peakrate bucket`. | 0 | No |
 
 ## Simulate fault injections by YAML file
 
-This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-network-chaos-on-kubernetes/#create-experiments-using-the-yaml-files) for details.
+This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-network-chaos-on-kubernetes/#create-experiments-using-the-yaml-files) for details.
 
 ### Network-partition example
 

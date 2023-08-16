@@ -48,7 +48,7 @@ After running the above command, the `node-stop` command creates resources, Secr
 
 :::caution
 
-When changing the cluster permissions, updating the key or changing the cluster context, the `cloud-key-secret-gcp` must be deleted, and then the `node-stop` injection creates  a new `cloud-key-secret-gcp` according to the new key.
+When changing the cluster permissions, updating the key, or changing the cluster context, the `cloud-key-secret-gcp` must be deleted, and then the `node-stop` injection creates a new `cloud-key-secret-gcp` according to the new key.
 
 :::
 
@@ -94,6 +94,10 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 2. Run `kubectl` to start an experiment.
 
+   ```bash
+   kubectl apply -f ./aws-detach-volume.yaml
+   ```
+
 ### GCP-restart example
 
 1. Write the experiment configuration to the `aws-detach-volume.yaml` file.
@@ -117,6 +121,10 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
    ```
 
 2. Run `kubectl` to start an experiment.
+
+   ```bash
+   kubectl apply -f ./aws-detach-volume.yaml
+   ```
 
 ### GCP-detach-volume example
 
@@ -144,18 +152,22 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 2. Run `kubectl` to start an experiment.
 
+   ```bash
+   kubectl apply -f ./aws-detach-volume.yaml
+   ```
+
 ### Field description
 
 The following table shows the fields in the YAML configuration file.
 
-| Parameter | Type | Descpription | Default value | Required | Example |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| action | string | Indicates the specific type of faults. The available fault types include node-stop, node-reset, and disk-loss. | node-stop | Yes | node-stop |
-| mode | string | Indicates the mode of the experiment. The mode options include `one` (selecting a Pod at random), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of the eligible Pods), and `random-max-percent` (selecting the maximum percentage of the eligible Pods). | None | Yes | `one` |
-| value | string | Provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of pods. | None | No | 1 |
-| secretName | string | Indicates the name of the Kubernetes secret that stores the GCP authentication information. | None | No | cloud-key-secret |
-| project | string | Indicates the ID of GCP project. | None | Yes | real-testing-project |
-| zone | string | Indicates the region of GCP instance. | None | Yes | us-central1-a |
-| instance | string | Indicates the name of GCP instance. | None | Yes | gke-xxx-cluster--default-pool-xxx-yyy |
-| deviceNames | []string | This is a required field when the `action` is `disk-loss`. This field specifies the machine disk ID. | None | no | ["your-disk-id"] |
-| duration | string | Indicates the duration of the experiment. | None | Yes | 30s |
+| Parameter | Type | Descpription | Default value | Required |
+| :--- | :--- | :--- | :--- | :--- |
+| action | string | It indicates the specific type of faults. The available fault types include `node-stop`, `node-reset`, and `disk-loss`. | `node-stop` | Yes |
+| mode | string | It indicates the mode of the experiment. The mode options include `one` (selecting a Pod at random), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of the eligible Pods), and `random-max-percent` (selecting the maximum percentage of the eligible Pods). | None | Yes |
+| value | string | It provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of pods. | None | No |
+| secretName | string | It indicates the name of the Kubernetes secret that stores the GCP authentication information. | None | No |
+| project | string | It indicates the ID of GCP project. | None | Yes | real-testing-project |
+| zone | string | Indicates the region of GCP instance. | None | Yes |
+| instance | string | It indicates the name of GCP instance. | None | Yes |
+| deviceNames | []string | This is a required field when the `action` is `disk-loss`. This field specifies the machine disk ID. | None | no |
+| duration | string | It indicates the duration of the experiment. | None | Yes |

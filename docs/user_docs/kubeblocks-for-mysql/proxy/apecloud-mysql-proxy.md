@@ -122,7 +122,7 @@ The following instructions are based on the latest change directory of the main 
 
 ## Enable Proxy dynamically
 
-As its name suggests, ApeCloud MySQL Proxy in essential is a database proxy. An ApeCloud MySQL Raft Group can be switched to an ApeCloud MySQL Proxy cluster by setting `proxyEnabled=true`.
+As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL Raft Group can be switched to an ApeCloud MySQL Proxy cluster by setting `proxyEnabled=true`.
 
 <Tabs>
 <TabItem value="kbcli" label="kbcli" default>

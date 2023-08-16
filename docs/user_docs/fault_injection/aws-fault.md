@@ -7,7 +7,7 @@ sidebar_label: Simulate AWS faults
 
 # Simulate AWS faults
 
-AWSChaos can help you simulate fault scenarios on the specified AWS instance. Currently, AWSChaos supports the following fault types:
+AWSChaos simulates fault scenarios on the specified AWS instance. Currently, AWSChaos supports the following fault types:
 
 * EC2 Stop: stops the specified instance.
 * EC2 Restart: restarts the specified instance.
@@ -24,7 +24,7 @@ AWSChaos can help you simulate fault scenarios on the specified AWS instance. Cu
     kind: Secret
     metadata:
       name: cloud-key-secret-aws
-      namespace: defailt
+      namespace: default
     type: Opaque
     stringData:
       aws_access_key_id: your-aws-access-key-id
@@ -175,14 +175,14 @@ This section introduces the YAML configuration file examples. You can also refer
 
 The fields in the YAML configuration file are described in the following table:
 
-| Parameter | Type | Description | Default value | Required | Example |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| action | string | Indicates the specific type of faults. Only ec2-stop, ec2-restore, and detain-volume are supported. | ec2-stop | Yes | ec2-stop |
-| mode | string | Specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes | `one` |
-| value | string | Provides parameters for the `mode` configuration, depending on `mode`.For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No | 1 |
-| secretName | string | Specifies the name of the Kubernetes Secret that stores the AWS authentication information. | None | No | cloud-key-secret |
-| awsRegion | string | Specifies the AWS region. | None | Yes | us-east-2 |
-| ec2Instance | string | Specifies the ID of the EC2 instance. | None | Yes | your-ec2-instance-id |
-| volumeID | string | This is a required field when the `action` is `detach-volume`. This field specifies the EBS volume ID. | None | No | your-volume-id |
+| Parameter | Type | Description | Default value | Required |
+| :--- | :--- | :--- | :--- | :--- |
+| action | string | It indicates the specific type of faults. Only `ec2-stop`, `ec2-restore`, and `detain-volume` are supported. | ec2-stop | Yes | `ec2-stop` |
+| mode | string | It specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes |
+| value | string | It provides parameters for the `mode` configuration, depending on `mode`.For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No |
+| secretName | string | It specifies the name of the Kubernetes Secret that stores the AWS authentication information. | None | No |
+| awsRegion | string | It specifies the AWS region. | None | Yes | us-east-2 |
+| ec2Instance | string | It specifies the ID of the EC2 instance. | None | Yes |
+| volumeID | string | This is a required field when the `action` is `detach-volume`. This field specifies the EBS volume ID. | None | No |
 | deviceName | string | This is a required field when the `action` is `detach-volume`. This field specifies the machine name. | None | No | /dev/sdf |
-| duration | string | Specifies the duration of the experiment. | None | Yes | 30s |
+| duration | string | It specifies the duration of the experiment. | None | Yes |

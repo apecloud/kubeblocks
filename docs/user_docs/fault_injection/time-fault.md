@@ -7,7 +7,7 @@ sidebar_label: Simulate time faults
 
 # Simulate time faults
 
-You can use this experiment type to simulate a time offset scenario. This document describes how to create a TimeChaos experiment and its associated configuration file.
+You can use this experiment type to simulate a time offset scenario. This document describes how to create a TimeChaos experiment.
 
 :::note
 
@@ -18,7 +18,7 @@ TimeChaos only affects the PID `1` process in the PID namespace of the container
 | Option                   | short | Description               | Default value | Required |
 | :----------------------- | :------- | :------------------------ | :------------ | :------- |
 | `--time-offset` | None | It specifies the length of time offset. | None | No |
-| `--clock-id` | None | It specifies the ID of clock that will be offset. See the [clock_gettime documentation](https://man7.org/linux/man-pages/man2/clock_gettime.2.html) for details. | 20 | No |
+| `--clock-id` | None | It specifies the ID of clock that will be offset. See the [clock_gettime documentation](https://man7.org/linux/man-pages/man2/clock_gettime.2.html) for details. | CLOCK_REALTIME | No |
 | `--container` | -c | It specifies a container name for fault injection. | None | No |
 
 ## Simulate fault injections by kbcli
@@ -63,11 +63,11 @@ This section introduces the YAML configuration file examples. You can also refer
 
 The fields in the YAML configuration file are described in the following table:
 
-| Parameter | Type | Note | Default value | Required | Example |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| timeOffset | string | Specifies the length of time offset. | None | Yes | `-5m` |
-| clockIds | []string | Specifies the ID of clock that will be offset. See the [<clock>clock_gettime</clock> documentation](https://man7.org/linux/man-pages/man2/clock_gettime.2.html) for details. | `["CLOCK_REALTIME"]` | No | `["CLOCK_REALTIME", "CLOCK_MONOTONIC"]` |
-| mode | string | Specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes | `one` |
-| value | string | Provides parameters for the `mode` configuration, depending on `mode`.For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No | 1 |
-| containerNames | []string | Specifies the name of the container into which the fault is injected. | None | No | `["nginx"]` |
-| selector | struct | Specifies the target Pod. For details, refer to [Define the experiment scope](./define-chaos-experiment-scope.md). | None | Yes |  |
+| Parameter | Type | Note | Default value | Required |
+| :--- | :--- | :--- | :--- | :--- |
+| timeOffset | string | It specifies the length of time offset. | None | Yes | 
+| clockIds | []string | It specifies the ID of clock that will be offset. See the [<clock>clock_gettime</clock> documentation](https://man7.org/linux/man-pages/man2/clock_gettime.2.html) for details. | `["CLOCK_REALTIME"]` | No |
+| mode | string | It specifies the mode of an experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes |
+| value | string | It provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No |
+| containerNames | []string | It specifies the name of the container into which the fault is injected. | None | No |
+| selector | struct | It specifies the target Pod. For details, refer to [Define the experiment scope](./define-chaos-experiment-scope.md). | None | Yes |

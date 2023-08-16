@@ -6,6 +6,9 @@ sidebar_position: 6
 sidebar_label: Switchover
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Switch over a MySQL cluster
 
 You can initiate a switchover for an ApeCloud MySQL Raft Group by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
@@ -29,17 +32,17 @@ You can initiate a switchover for an ApeCloud MySQL Raft Group by executing the 
 
 You can switch over a follower of an ApeCloud MySQL Raft Group to the leader role, and the former leader instance to a follower.
 
-<details open>
+<Tabs>
 
-<summary>kbcli</summary>
+<TabItem value="kbcli" label="kbcli" default>
 
-* Switchover with no leader instance specified
+* Initiate a switchover with no leader instance specified.
 
     ```bash
     kbcli cluster promote mycluster
     ```
 
-* Switchover with a specified new leader instance
+* Initiate a switchover with a specified new leader instance.
 
     ```bash
     kbcli cluster promote mycluster --instance='mycluster-mysql-2'
@@ -51,14 +54,13 @@ You can switch over a follower of an ApeCloud MySQL Raft Group to the leader rol
     kbcli cluster promote mycluster --instance='mycluster-mysql-2' --component='apecloud-mysql'
     ```
 
-</details>
+</TabItem>
 
-<details>
-<summary>kubectl</summary>
+<TabItem value="kubectl" label="kubectl">
 
-Different instanceNames decide whether a new leader instance is specified for the switchover.
+The value of `instanceName` decides whether a new leader instance is specified for the switchover.
 
-* Switchover with no specified leader instance
+* Initiate a switchover with no specified leader instance.
 
   ```yaml
   kubectl apply -f -<<EOF
@@ -75,7 +77,7 @@ Different instanceNames decide whether a new leader instance is specified for th
   >>
   ```
 
-* Switchover with a specified new leader instance
+* Initiate a switchover with a specified new leader instance.
 
   ```yaml
   kubectl apply -f -<<EOF
@@ -92,7 +94,9 @@ Different instanceNames decide whether a new leader instance is specified for th
   >>
   ```
 
-</details>
+</TabItem>
+
+</Tabs>
 
 ## Verify the switchover
 
@@ -102,6 +106,8 @@ Check the instance status to verify whether the switchover is performed successf
 kbcli cluster list-instances
 ```
 
+
+
 ## Handle an exception
 
-If an error occurs, execute the command below to troubleshoot the operation.
+If an error occurs, refer to [Handle an exception](./handle-an-exception.md) to troubleshoot the operation.

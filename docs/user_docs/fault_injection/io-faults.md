@@ -9,10 +9,10 @@ sidebar_label: Simulate I/O faults
 
 IOChaos experiment can simulate file system faults. I/O fault injection currently supports latency, fault, attribure override, and mistake.
 
-* latency: delays file system calls.
-* fault: returns an error for filesystem calls.
-* attrOverride: modifies file properties.
-* mistake: makes the file read or write a wrong value.
+* Latency: delays file system calls.
+* Fault: returns an error for filesystem calls.
+* AttrOverride: modifies file properties.
+* Mistake: makes the file read or write a wrong value.
 
 ## Before you start
 
@@ -26,17 +26,19 @@ This table below describes the general flags for I/O faults.
 
 📎 Table 1. kbcli fault io flags description
 
-| Option                   | Description               |
-| :----------------------- | :------------------------ |
-| `--volume-path` | The mount point of volume in the target container. Must be the root directory of the mount. |
-| `--path` | The valid range of fault injections, either a wildcard or a single file. |
-| `--percent` | Probability of failure per operation, in %. |
-| `--container`, `-c` | Specifies the name of the container into which the fault is injected. |
-| `--method` | Type of the file system call that requires injecting fault. `read` and `write` are supported. |
+| Option                   | Description               | Default value | Required |
+| :----------------------- | :------------------------ | :------------ | :------- |
+| `--volume-path` | It specifies the mount point of volume in the target container. It must be the root directory of the mount. | None | Yes |
+| `--path` | It specifies the valid range of fault injections. It can be either a wildcard or a single file. | * | None |
+| `--percent` | It specifies the probability of failure per operation and its unit is %. | 100 | No |
+| `--container`, `-c` | It specifies the name of the container into which the fault is injected. | None | No |
+| `--method` | It specifies the I/O operation. `read` and `write` are supported. | * | No |
 
 ### Latency
 
 The command below injects latency chaos into the directory `/data` to delay 10 seconds to display the file content, that is, delay the read operation.
+
+`--delay` specifies the delay time and it is required.
 
 ```bash
 kbcli fault io latency --delay=10s --volume-path=/data
@@ -63,6 +65,8 @@ You can find the full error number list [here](https://raw.githubusercontent.com
 The command below inject an error in `/data`.
 
 Chaos Mesh injects a file fault into the directory `/data`, which gives a 100% probability of failure in all file system operations under this directory and returns error code 22 (invalid argument).
+
+`--errno` specifies the error number that the system returens and it is required.
 
 ```bash
 kbcli fault io errno --volume-path=/data --errno=22
@@ -114,7 +118,7 @@ It is suggested that you only use mistake on READ and WRITE file system calls. U
 
 ## Simulate fault injections by YAML file
 
-This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-io-chaos-on-kubernetes/#create-experiments-using-the-yaml-files) for details.
+This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-io-chaos-on-kubernetes/#create-experiments-using-the-yaml-files) for details.
 
 ### Fault-latency example
 

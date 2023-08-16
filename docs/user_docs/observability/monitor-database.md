@@ -11,14 +11,14 @@ With the built-in database observability, you can observe the database health st
 
 ## For Playground
 
-KubeBlocks integrates open-source monitoing components, such as Prometheus, AlertManager, Grafana, by add-ons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. All monitoring add-ons are enabled when KubeBlocks Playground is deployed.
+KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by add-ons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. All monitoring add-ons are enabled when KubeBlocks Playground is deployed.
 
 KubeBlock Playground supports the following built-in monitoring add-ons:
 
-* `prometheus`: It includes Prometheus and AlertManager add-ons.
-* `grafana`: It includes Grafana monitoring add-ons.
-* `alertmanager-webhook-adaptor`: It includes the notification extension add-on and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
-* `apecloud-otel-collecotr`: It is used to collect the indicators of databases and the host machine.
+* `prometheus`: it includes Prometheus and AlertManager add-ons.
+* `grafana`: it includes Grafana monitoring add-ons.
+* `alertmanager-webhook-adaptor`: it includes the notification extension add-on and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
+* `apecloud-otel-collecotr`: it is used to collect the indicators of databases and the host machine.
 
 1. View all built-in add-ons and make sure the monitoring add-ons are enabled.
 

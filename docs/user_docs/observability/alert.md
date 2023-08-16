@@ -57,11 +57,11 @@ AlertManager integrates a set of notification channels, such as Email and Slack.
 
 This tutorial takes configuring Feishu as the notification channel as an example.
 
-***Steps:***
-
-Before you start
+**Before you start**
 
 To receive alerts, you need to deploy monitoring add-ons and enable cluster monitoring first. Refer to [Monitor database](monitor-database.md) for details.
+
+***Steps:***
 
 1. Configure alert channels.
 
@@ -74,7 +74,7 @@ To receive alerts, you need to deploy monitoring add-ons and enable cluster moni
 
   :::note
 
-  * Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts.
+  * Each notification channel has its interface call volume and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts.
   * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
 
   :::
@@ -181,13 +181,13 @@ KubeBlocks also supports email alert.
 
    KubeBlocks email alert now supports receiving emails from a specified cluster and of a certain severity. You can set this function by using `--cluster` and `--severity` flags.
 
-  * `--cluster`: Only receive emails from a specified cluster.
+  * `--cluster`: means only receiving emails from a specified cluster.
 
     ```bash
     kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
     ```
 
-  * `--severity`: Only receive emails from a specified cluster and the alert severity is warning.
+  * `--severity`: means only receiving emails from a specified cluster and the alert severity is `warning`.
 
     ```bash
     kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning

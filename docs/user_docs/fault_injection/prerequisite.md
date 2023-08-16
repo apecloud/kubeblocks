@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 
 ## Check your permission
 
-Fault injection requires `local code` permission. Make sure your acount has been granted with `local code` permission.
+Fault injection requires `local code` permission. Make sure your access key has been granted with `local code` permission.
 
 <Tabs>
 <TabItem value="EKS" label="EKS" default>
@@ -47,8 +47,6 @@ kubectl delete validatingwebhookconfigurations.admissionregistration.k8s.io chao
 
 If the output is `reauth related error`, it may relate to your GKE account permission. Reset your permission and clear the environment by running the commands below.
 
-//TODO: 这里的“重新设置权限”，具体涉及的权限需要说明吗？
-
 ```bash
 rm -rf .config/gcloud
 
@@ -69,8 +67,37 @@ Both Helm and kbcli are provided as options to deploy Chaos Mesh.
 
 Here we use ChaosMesh v2.5.2 and the DNS server is enabled for DNS fault injection.
 
-<details open>
-<summary>Helm</summary>
+<Tabs>
+<TabItem value="kbcli" label="kbcli" default
+
+For installing ChaosMesh in Containerd, run the command below.
+
+```bash
+kbcli addon enable fault-chaos-mesh
+```
+
+For installing ChaosMesh in k3d/k3s, run the command below.
+
+```bash
+kbcli addon enable fault-chaos-mesh --set dnsServer.create=true --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/k3s/containerd/containerd.sock
+```
+
+If you set taints, you can set tolerations following the commands below.
+
+```bash
+# Chaos-mesh follows the tolerations of kubeblocks by default
+# You can specify tolerations for four components of fault-chaos-mesh, controllerManager, chaosDaemon, dashboard, and dnsServer, according to your needs.
+# Once a component is specified with tolerations, the default toleration of all components fails. It is recommended to spcify tolerations for four components or none.
+kbcli addon enable fault-chaos-mesh \
+--tolerations '[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+--tolerations 'chaosDaemon:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"},{"key":"kb-data","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+--tolerations 'dashboard:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+--tolerations 'dnsServer:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' 
+```
+
+</TabItem>
+
+<TabItem value="Helm" label="Helm">
 
 ```bash
 helm repo add chaos-mesh https://charts.chaos-mesh.org
@@ -89,36 +116,6 @@ For installing ChaosMesh in k3d/k3s, run the commands below.
 helm install chaos-mesh chaos-mesh/chaos-mesh -n=chaos-mesh --version 2.5.2 --set chaosDaemon.privileged=true --set dnsServer.create=true --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/k3s/containerd/containerd.sock
 ```
 
-</details>
+</TabItem>
 
-<details>
-<summary>kbcli</summary>
-
-For installing ChaosMesh in Containerd, run the command below.
-
-```bash
-kbcli addon enable fault-chaos-mesh
-```
-
-For installing ChaosMesh in k3d/k3s, run the command below.
-
-```bash
-kbcli addon enable fault-chaos-mesh --set dnsServer.create=true --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/k3s/containerd/containerd.sock
-```
-
-//TODO: tolerations 目前集群创建不需要设置了，这里是否要调整？
-
-If you set taints, you can set tolerations following the commands below.
-
-```bash
-# Chaos-mesh follows the tolerations of kubeblocks by default
-# You can specify tolerations for four components of fault-chaos-mesh, controllerManager, chaosDaemon, dashboard, and dnsServer, according to your needs.
-# Once a component is specified with tolerations, the default toleration of all components fails. It is recommended to spcify tolerations for four components or none.
-kbcli addon enable fault-chaos-mesh \
---tolerations '[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
---tolerations 'chaosDaemon:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"},{"key":"kb-data","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
---tolerations 'dashboard:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
---tolerations 'dnsServer:[{"key":"kb-controller","operator":"Equal","effect":"NoSchedule","value":"true"}]' 
-```
-
-</details>
+</Tabs>

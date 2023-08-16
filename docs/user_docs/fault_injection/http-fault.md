@@ -9,21 +9,21 @@ sidebar_label: Simulate HTTP faults
 
 HTTPChaos experiments simulate the fault scenarios during the HTTP request and response processing. Currently, HTTPChaos supports simulating the following fault types:
 
-* abort: interrupts the connection
-* delay: injects latency into the request or response
-* replace: replaces part of content in HTTP request or response messages
-* patch: adds additional content to HTTP request or response messages
+* Abort: blocks requests and responses.
+* Delay: injects latency into the request or response.
+* Replace: replaces part of the content in HTTP request or response messages.
+* Patch: adds additional content to the HTTP request or response messages.
 
-HTTP faults support combinations of different fault types. If you have configured multiple HTTP fault types at the same time when creating HTTPChaos experiments, the order set to inject the faults when the experiments start running is abort -> delay -> replace -> patch. When the abort fault cause short circuits, the connection will be directly interrupted.
+HTTP faults support combining different fault types. If you have configured multiple HTTP fault types at the same time when creating HTTPChaos experiments, the order of injecting the faults follows abort -> delay -> replace -> patch. When the abort fault causes short circuits, the connection will be directly interrupted.
 
-## Notes
+## Before you start
 
-Before injecting the faults supported by HTTPChaos, note the followings:
+Before injecting the faults supported by HTTPChaos, make sure the following requirements are met:
 
 * There is no control manager of Chaos Mesh running on the target Pod.
-* The rules will affect both of clients and servers in the Pod, if you want to affect only one side, please refer to the specify side section.
-* HTTPS accesses should be disabled, because injecting HTTPS connections is not supported currently.
-* For HTTPChaos injection to take effect, the client should avoid reusing TCP socket. This is because HTTPChaos does not affect the HTTP requests that are sent via TCP socket before the fault injection.
+* The rules affect both clients and servers in the Pod. If you want to affect only one of them, refer to the [official specific side](https://chaos-mesh.org/docs/simulate-http-chaos-on-kubernetes/#specify-side) section.
+* HTTPS access should be disabled because injecting HTTPS connections is not supported currently.
+* To make HTTPChaos injection take effect, the client should avoid reusing TCP socket. This is because HTTPChaos does not affect the HTTP requests that are sent via TCP socket before the fault injection.
 * Use non-idempotent requests (such as most of the POST requests) with caution in production environments. If such requests are used, the target service may not return to normal status by repeating requests after the fault injection.
 
 ## Simulate fault injections by kbcli
@@ -36,13 +36,13 @@ This table below describes the general flags for network faults.
 | :----------------------- | :------------------------ | :------------ | :------- |
 | `--target` | It specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time. | Request | No |
 | `--port` | It specifies the TCP port that the target service listens. | 80 | No |
-| `--path` | The URI path of the target request. Supports [Matching wildcards](https://www.wikiwand.com/en/Matching_wildcards). | * | No |
+| `--path` | The URL path of the target request. Supports [Matching wildcards](https://www.wikiwand.com/en/Matching_wildcards). | * | No |
 | `--method` | It specifies the URL that the target requests. | `GET` | No |
 | `--code` | It specifies the status code responded by the target. It is effective only when `target=response`. | 0 | No |
 
 ### Abort
 
-The command below injects 1-minute abort chaos to the specified Pod.
+The command below injects one-minute abort chaos to the specified Pod.
 
 ```bash
 kbcli fault network http abort --duration=1m
@@ -74,7 +74,7 @@ kbcli fault network http patch --body='{"key":""}' --type=JSON --duration=30s
 
 ## Simulate fault injections by YAML file
 
-This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-http-chaos-on-kubernetes/#create-experiments-using-yaml-files) for details.
+This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-http-chaos-on-kubernetes/#create-experiments-using-yaml-files) for details.
 
 ### HTTP-abort example
 

@@ -79,12 +79,15 @@ func (mgr *Manager) GetMemberStateWithPoolReplication(ctx context.Context, pool 
 func (mgr *Manager) IsMemberHealthyReplication(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	pools := []*pgxpool.Pool{nil}
 	var err error
+
+	memberName := mgr.CurrentMemberName
 	if member != nil {
 		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
 		if err != nil || pools[0] == nil {
 			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
 			return false
 		}
+		memberName = member.Name
 	}
 
 	// Typically, the synchronous_commit parameter remains consistent between the primary and standby
@@ -94,9 +97,8 @@ func (mgr *Manager) IsMemberHealthyReplication(ctx context.Context, cluster *dcs
 		return false
 	}
 
-	// TODO: cache this info
-	if replicationMode == "synchronous" {
-		if !mgr.checkStandbySynchronizedToLeader(ctx, member.Name, true, cluster) {
+	if replicationMode == synchronous {
+		if !mgr.checkStandbySynchronizedToLeader(ctx, memberName, true, cluster) {
 			return false
 		}
 	}

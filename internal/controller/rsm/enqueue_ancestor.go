@@ -171,7 +171,6 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 	// get the object by the ownerRef
 	object, err := e.getSourceObject(obj)
 	if err != nil {
-		log.Info("could not find source object", "gvk", obj.GetObjectKind().GroupVersionKind(), "name", obj.GetName(), "error", err.Error())
 		return
 	}
 

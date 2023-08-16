@@ -7,7 +7,7 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
   name: postgres-pitr
 spec:
-  deployKind: job
+  deployKind: statefulSet
   env:
     - name: VOLUME_DATA_DIR
       value: /home/postgres/pgdata
@@ -23,6 +23,13 @@ spec:
       value: 2006-01-02 15:04:05 MST
     - name: LOG_DIR
       value: $(VOLUME_DATA_DIR)/pgroot/data/pg_wal
+    - name: DP_POD_ROLE
+      # TODO input by backup policy
+      value: primary
+    - name: DP_INTERVAL_SECONDS
+      value: "10"
+    - name: SWITCH_WAL_INTERVAL_SECONDS
+      value: "300"
   image: ""
   logical:
     restoreCommands:

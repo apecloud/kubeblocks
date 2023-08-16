@@ -24,7 +24,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +31,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
@@ -47,6 +47,7 @@ func init() {
 	utilruntime.Must(snapshotv1.AddToScheme(rscheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(rscheme))
 	utilruntime.Must(batchv1.AddToScheme(rscheme))
+	utilruntime.Must(workloads.AddToScheme(rscheme))
 }
 
 type gvkNObjKey struct {

@@ -12,7 +12,6 @@ spec:
     endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_mysql)"
-  clusterFamilyRef: apecloud-mysql-cluster-family
   componentDefs:
     - name: mysql
       characterType: mysql

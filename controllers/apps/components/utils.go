@@ -38,7 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -65,6 +67,10 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 		objs = append(objs, &items[i])
 	}
 	return objs, nil
+}
+
+func listRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
 }
 
 func listStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
@@ -569,6 +575,30 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	if pobj.PreemptionPolicy == nil {
 		pobj.PreemptionPolicy = obj.PreemptionPolicy
 	}
+}
+
+// ConvertRSMToSTS converts a rsm to sts
+// TODO(free6om): refactor this func out
+func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet {
+	if rsm == nil {
+		return nil
+	}
+	sts := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		SetUID(rsm.UID).
+		AddLabelsInMap(rsm.Labels).
+		AddAnnotationsInMap(rsm.Annotations).
+		SetReplicas(*rsm.Spec.Replicas).
+		SetSelector(rsm.Spec.Selector).
+		SetServiceName(rsm.Spec.ServiceName).
+		SetTemplate(rsm.Spec.Template).
+		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
+		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
+		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		GetObject()
+	sts.Generation = rsm.Generation
+	sts.Status = rsm.Status.StatefulSetStatus
+	sts.Status.ObservedGeneration = rsm.Status.ObservedGeneration
+	return sts
 }
 
 // delayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.

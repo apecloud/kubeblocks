@@ -56,7 +56,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		rsm.Status.InitReplicas = 3
 		rsm.Status.ReadyInitReplicas = rsm.Status.InitReplicas
 		rsm.Status.MembersStatus = membersStatus
-		rsm.Status.Replicas = rsm.Spec.Replicas
+		rsm.Status.Replicas = *rsm.Spec.Replicas
 		rsm.Status.ReadyReplicas = rsm.Status.Replicas
 		rsm.Status.AvailableReplicas = rsm.Status.Replicas
 	}
@@ -101,7 +101,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
-			SetMembershipReconfiguration(reconfiguration).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()
 
@@ -123,7 +123,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		It("should initialize well", func() {
 			By("initialReplicas=0")
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			Expect(rsm.Status.InitReplicas).Should(Equal(rsm.Spec.Replicas))
+			Expect(rsm.Status.InitReplicas).Should(Equal(*rsm.Spec.Replicas))
 
 			By("init one member")
 			membersStatus := buildMembersStatus(1)
@@ -132,7 +132,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(rsm.Status.ReadyInitReplicas).Should(BeEquivalentTo(1))
 
 			By("all members initialized")
-			membersStatus = buildMembersStatus(int(rsm.Spec.Replicas))
+			membersStatus = buildMembersStatus(int(*rsm.Spec.Replicas))
 			rsm.Status.MembersStatus = membersStatus
 			k8sMock.EXPECT().
 				List(gomock.Any(), &batchv1.JobList{}, gomock.Any()).
@@ -147,13 +147,14 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	Context("scale-out", func() {
 		It("should work well", func() {
 			By("make rsm ready for scale-out")
-			setRSMStatus(int(rsm.Spec.Replicas))
+			setRSMStatus(int(*rsm.Spec.Replicas))
 			rsm.Generation = 2
 			rsm.Status.ObservedGeneration = 2
 			stsOld := mockUnderlyingSts(*rsm, rsm.Generation)
 			// rsm spec updated
 			rsm.Generation = 3
-			rsm.Spec.Replicas = 5
+			replicas := int32(5)
+			rsm.Spec.Replicas = &replicas
 			sts := mockUnderlyingSts(*rsm, rsm.Generation)
 			graphCli.Update(dag, stsOld, sts)
 
@@ -191,7 +192,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("make member 4 joining successfully and cleanup")
-			setRSMStatus(int(rsm.Spec.Replicas))
+			setRSMStatus(int(*rsm.Spec.Replicas))
 			action = mockAction(4, jobTypeMemberJoinNotifying, true)
 			dag = mockDAG(sts, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
@@ -211,13 +212,14 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 				rsm.Status.MembersStatus = membersStatus
 			}
 			By("make rsm ready for scale-in")
-			setRSMStatus(int(rsm.Spec.Replicas))
+			setRSMStatus(int(*rsm.Spec.Replicas))
 			rsm.Generation = 2
 			rsm.Status.ObservedGeneration = 2
 			stsOld := mockUnderlyingSts(*rsm, rsm.Generation)
 			// rsm spec updated
 			rsm.Generation = 3
-			rsm.Spec.Replicas = 1
+			replicas := int32(1)
+			rsm.Spec.Replicas = &replicas
 			sts := mockUnderlyingSts(*rsm, rsm.Generation)
 			graphCli.Update(dag, stsOld, sts)
 

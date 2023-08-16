@@ -172,12 +172,11 @@ func (ha *Ha) Start() {
 		return
 	}
 
-	// check if pod is ready, it can successfully resolve domain
-	isDnsReady, err := ha.IsPodReady()
-	for err != nil || !isDnsReady {
+	isPodReady, err := ha.IsPodReady()
+	for err != nil || !isPodReady {
 		ha.logger.Infof("Waiting for dns resolution to be ready")
 		time.Sleep(3 * time.Second)
-		isDnsReady, err = ha.IsPodReady()
+		isPodReady, err = ha.IsPodReady()
 	}
 	ha.logger.Infof("dns resolution is ready")
 
@@ -304,6 +303,7 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 	return false
 }
 
+// IsPodReady checks if pod is ready, it can successfully resolve domain
 func (ha *Ha) IsPodReady() (bool, error) {
 	domain := viper.GetString("KB_POD_FQDN")
 

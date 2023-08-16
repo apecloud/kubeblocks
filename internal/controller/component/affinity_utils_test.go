@@ -91,7 +91,6 @@ var _ = Describe("affinity utils", func() {
 				reqCtx,
 				nil,
 				clusterObj,
-				nil,
 				clusterDefObj,
 				&clusterDefObj.Spec.ComponentDefs[0],
 				&clusterObj.Spec.ComponentSpecs[0],

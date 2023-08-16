@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"syscall"
 
 	"github.com/dapr/kit/logger"
 	"github.com/spf13/viper"
@@ -78,6 +79,10 @@ type DBManager interface {
 	Demote(context.Context) error
 	Follow(context.Context, *dcs.Cluster) error
 	Recover(context.Context) error
+
+	// Start and Stop just send signal to sqlChannel
+	Start() error
+	Stop() error
 
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
 	// IsHealthiestMember(*dcs.Cluster) bool
@@ -142,6 +147,42 @@ func (mgr *DBManagerBase) IsMemberLagging(ctx context.Context, cluster *dcs.Clus
 }
 
 func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
+	return nil
+}
+
+// Start does not directly mean to start a database instance,
+// but rather to sends signal2 to activate sql channel to start database
+func (mgr *DBManagerBase) Start() error {
+	mgr.Logger.Infof("send signal2 to activate sql channel")
+	sqlChannelProc, err := GetSQLChannelProc()
+	if err != nil {
+		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		return err
+	}
+
+	err = sqlChannelProc.Signal(syscall.SIGUSR2)
+	if err != nil {
+		mgr.Logger.Errorf("send signal2 to sql channel failed, err:%v", err)
+		return err
+	}
+	return nil
+}
+
+// Stop does not directly mean to stop a database instance,
+// but rather to sends signal1 to deactivate sql channel to stop starting database
+func (mgr *DBManagerBase) Stop() error {
+	mgr.Logger.Infof("send signal1 to deactivate sql channel")
+	sqlChannelProc, err := GetSQLChannelProc()
+	if err != nil {
+		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		return err
+	}
+
+	err = sqlChannelProc.Signal(syscall.SIGUSR1)
+	if err != nil {
+		mgr.Logger.Errorf("send signal1 to sql channel failed, err:%v", err)
+		return err
+	}
 	return nil
 }
 

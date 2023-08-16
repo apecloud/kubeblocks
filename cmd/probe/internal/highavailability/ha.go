@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/dapr/kit/logger"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
@@ -80,7 +81,7 @@ func (ha *Ha) RunCycle() {
 
 	// IsClusterHealthy is just for consensus cluster healthy check.
 	// For Replication cluster IsClusterHealthy will always return true,
-	// and its cluster's healthty is equal to leader member's heathly.
+	// and its cluster's healthy is equal to leader member's healthy.
 	case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
 		ha.logger.Errorf("The cluster is not healthy, wait...")
 
@@ -170,6 +171,14 @@ func (ha *Ha) Start() {
 		ha.logger.Errorf("Get Cluster %s error: %v, so HA exists.", ha.dcs.GetClusterName(), err)
 		return
 	}
+
+	isPodReady, err := ha.IsPodReady()
+	for err != nil || !isPodReady {
+		ha.logger.Infof("Waiting for dns resolution to be ready")
+		time.Sleep(3 * time.Second)
+		isPodReady, err = ha.IsPodReady()
+	}
+	ha.logger.Infof("dns resolution is ready")
 
 	ha.logger.Debugf("cluster: %v", cluster)
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
@@ -292,6 +301,26 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 	}
 
 	return false
+}
+
+// IsPodReady checks if pod is ready, it can successfully resolve domain
+func (ha *Ha) IsPodReady() (bool, error) {
+	domain := viper.GetString("KB_POD_FQDN")
+
+	pinger, err := probing.NewPinger(domain)
+	if err != nil {
+		ha.logger.Errorf("new pinger failed, err:%v", err)
+		return false, err
+	}
+
+	pinger.Count = 3
+	err = pinger.Run()
+	if err != nil {
+		ha.logger.Errorf("ping domain:%s failed, err:%v", domain, err)
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (ha *Ha) ShutdownWithWait() {

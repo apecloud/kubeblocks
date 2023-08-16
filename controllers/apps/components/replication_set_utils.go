@@ -22,6 +22,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/slices"
@@ -86,12 +87,13 @@ func genReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatu
 	return nil
 }
 
-// updateObjRoleLabel updates the value of the role label of the object.
-func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
-	ctx context.Context, cli client.Client, obj T, role string) error {
+// updateObjRoleChangedInfo updates the value of the role label of the object.
+func updateObjRoleChangedInfo[T generics.Object, PT generics.PObject[T]](
+	ctx context.Context, cli client.Client, event *corev1.Event, obj T, role string) error {
 	pObj := PT(&obj)
 	patch := client.MergeFrom(PT(pObj.DeepCopy()))
 	pObj.GetLabels()[constant.RoleLabelKey] = role
+	pObj.GetAnnotations()[constant.LastRoleChangedEventTimestampAnnotationKey] = event.FirstTimestamp.Time.Format(time.RFC3339)
 	if err := cli.Patch(ctx, pObj, patch); err != nil {
 		return err
 	}
@@ -101,6 +103,7 @@ func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 // HandleReplicationSetRoleChangeEvent handles the role change event of the replication workload when switchPolicy is Noop.
 func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
+	event *corev1.Event,
 	cluster *appsv1alpha1.Cluster,
 	compName string,
 	pod *corev1.Pod,
@@ -109,11 +112,6 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	// if newRole is not Primary or Secondary, ignore it.
 	if !slices.Contains([]string{constant.Primary, constant.Secondary}, newRole) {
 		reqCtx.Log.Info("replicationSet new role is invalid, please check", "new role", newRole)
-		return nil
-	}
-	// if pod current role label equals to newRole, return
-	if pod.Labels[constant.RoleLabelKey] == newRole {
-		reqCtx.Log.Info("pod current role label equals to new role, ignore it", "new role", newRole)
 		return nil
 	}
 
@@ -125,7 +123,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	}
 
 	// update pod role label with newRole
-	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole); err != nil {
+	if err := updateObjRoleChangedInfo(reqCtx.Ctx, cli, event, *pod, newRole); err != nil {
 		reqCtx.Log.Info("failed to update pod role label", "podName", pod.Name, "newRole", newRole, "err", err)
 		return err
 	}

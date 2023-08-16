@@ -54,7 +54,7 @@ data:
       done
 
       system_identifier=`psql -U postgres -h $KB_0_HOSTNAME -p 5432  -t -A  -c "select system_identifier from pg_control_system();"`
-      initdb -U postgres -D $PGDATA -i $system_identifier
+      initdb --username="$POSTGRES_USER" --pwfile=<(printf "%s\n" "$POSTGRES_PASSWORD") --pgdata="$PGDATA" -i $system_identifier
 
       echo "use_consensus = true" >> $PGDATA/consensus.conf
       postgres -D $PGDATA -p 5432 \

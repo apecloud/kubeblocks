@@ -31,7 +31,7 @@ data:
     postgres -D $PGDATA --hba_file=/var/lib/postgresql/conf/pg_hba.conf
   libsetup.sh: |
     postgresql_master_init() {
-      initdb -U postgres -D $PGDATA
+      initdb --username="$POSTGRES_USER" --pwfile=<(printf "%s\n" "$POSTGRES_PASSWORD") --pgdata="$PGDATA"
 
       echo "use_consensus = true" >> $PGDATA/consensus.conf
       postgres -D $PGDATA -p 5432 \

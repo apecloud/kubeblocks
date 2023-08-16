@@ -151,9 +151,9 @@ func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, 
 }
 
 // Start does not directly mean to start a database instance,
-// but rather to sends signal2 to activate sql channel to start database
+// but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start() error {
-	mgr.Logger.Infof("send signal2 to activate sql channel")
+	mgr.Logger.Infof("send SIGUSR2 to activate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {
 		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
@@ -162,16 +162,16 @@ func (mgr *DBManagerBase) Start() error {
 
 	err = sqlChannelProc.Signal(syscall.SIGUSR2)
 	if err != nil {
-		mgr.Logger.Errorf("send signal2 to sql channel failed, err:%v", err)
+		mgr.Logger.Errorf("send SIGUSR2 to sql channel failed, err:%v", err)
 		return err
 	}
 	return nil
 }
 
 // Stop does not directly mean to stop a database instance,
-// but rather to sends signal1 to deactivate sql channel to stop starting database
+// but rather to sends SIGUSR1 to deactivate sql channel to stop starting database
 func (mgr *DBManagerBase) Stop() error {
-	mgr.Logger.Infof("send signal1 to deactivate sql channel")
+	mgr.Logger.Infof("send SIGUSR1 to deactivate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {
 		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
@@ -180,7 +180,7 @@ func (mgr *DBManagerBase) Stop() error {
 
 	err = sqlChannelProc.Signal(syscall.SIGUSR1)
 	if err != nil {
-		mgr.Logger.Errorf("send signal1 to sql channel failed, err:%v", err)
+		mgr.Logger.Errorf("send SIGUSR1 to sql channel failed, err:%v", err)
 		return err
 	}
 	return nil

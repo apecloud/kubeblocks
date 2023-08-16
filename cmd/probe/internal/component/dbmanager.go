@@ -52,6 +52,9 @@ type DBManager interface {
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
 	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
 	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) bool
+
+	// GetDBState will get all the required database kernel states in one HA loop,
+	// and we believe that the state of the database kernel remains unchanged within a single HA loop.
 	GetDBState(context.Context, *dcs.Cluster, *dcs.Member) *dcs.DBState
 
 	// HasOtherHealthyLeader is applicable only to consensus cluster,
@@ -147,6 +150,7 @@ func (mgr *DBManagerBase) IsMemberLagging(ctx context.Context, cluster *dcs.Clus
 }
 
 func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
+	// mgr.DBState = mgr.GetDBState(ctx, cluster, member)
 	return nil
 }
 

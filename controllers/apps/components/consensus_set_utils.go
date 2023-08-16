@@ -191,7 +191,7 @@ func updateConsensusSetRoleLabel(cli client.Client,
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[constant.RoleLabelKey] = role
 	pod.Labels[constant.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
-	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = event.FirstTimestamp.Time.Format(time.RFC3339)
+	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = event.LastTimestamp.Time.Format(time.RFC3339)
 	return cli.Patch(ctx, pod, patch)
 }
 

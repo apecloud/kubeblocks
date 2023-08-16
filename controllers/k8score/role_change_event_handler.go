@@ -97,19 +97,19 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return role, nil
 	}
 
-	// compare the firstTimestamp of the current event object with the firstTimestamp of the last recorded in the pod annotation,
-	// if the current event's firstTimestamp is earlier than the recorded FirstTimestamp in the pod annotation,
+	// compare the lastTimestamp of the current event object with the lastTimestamp of the last recorded in the pod annotation,
+	// if the current event's lastTimestamp is earlier than the recorded lastTimestamp in the pod annotation,
 	// it indicates that the current event has arrived out of order and is expired, so it should not be processed.
 	lastTimestampStr, ok := pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]
 	if ok {
-		labelTimestamp, err := time.Parse(time.RFC3339, lastTimestampStr)
+		lastTimestamp, err := time.Parse(time.RFC3339, lastTimestampStr)
 		if err != nil {
 			reqCtx.Log.Info("failed to parse last role changed event timestamp from pod annotation", "pod", pod.Name, "error", err.Error())
 			return role, err
 		}
-		eventFirstTs := event.FirstTimestamp.Time
-		if !eventFirstTs.After(labelTimestamp) {
-			reqCtx.Log.Info("event's firstTimestamp is earlier than the recorded firstTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event firstTimeStamp", event.FirstTimestamp.Time.String(), "annotation firstTimeStamp", lastTimestampStr)
+		eventLastTs := event.LastTimestamp.Time
+		if !eventLastTs.After(lastTimestamp) {
+			reqCtx.Log.Info("event's lastTimestamp is earlier than the recorded lastTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event lastTimestamp", event.LastTimestamp.Time.String(), "annotation lastTimestamp", lastTimestampStr)
 			return role, nil
 		}
 	}

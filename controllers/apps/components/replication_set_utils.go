@@ -87,13 +87,13 @@ func genReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatu
 	return nil
 }
 
-// updateObjRoleChangedInfo updates the value of the role label of the object.
+// updateObjRoleChangedInfo updates the value of the role label and annotation of the object.
 func updateObjRoleChangedInfo[T generics.Object, PT generics.PObject[T]](
 	ctx context.Context, cli client.Client, event *corev1.Event, obj T, role string) error {
 	pObj := PT(&obj)
 	patch := client.MergeFrom(PT(pObj.DeepCopy()))
 	pObj.GetLabels()[constant.RoleLabelKey] = role
-	pObj.GetAnnotations()[constant.LastRoleChangedEventTimestampAnnotationKey] = event.FirstTimestamp.Time.Format(time.RFC3339)
+	pObj.GetAnnotations()[constant.LastRoleChangedEventTimestampAnnotationKey] = event.LastTimestamp.Time.Format(time.RFC3339)
 	if err := cli.Patch(ctx, pObj, patch); err != nil {
 		return err
 	}

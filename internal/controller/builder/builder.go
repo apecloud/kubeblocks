@@ -38,7 +38,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 
@@ -119,27 +118,10 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
 				return err
 			}
-			injectZeroResourcesLimitsIfEmpty(&(*cc)[i])
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&(*cc)[i])
 		}
 	}
 	return nil
-}
-
-func injectZeroResourcesLimitsIfEmpty(c *corev1.Container) {
-	zeroValue := resource.MustParse("0")
-	if c.Resources.Limits == nil {
-		c.Resources.Limits = corev1.ResourceList{}
-	}
-
-	safeSetLimitValue := func(name corev1.ResourceName) {
-		if _, ok := c.Resources.Requests[name]; !ok {
-			if _, ok = c.Resources.Limits[name]; !ok {
-				c.Resources.Limits[name] = zeroValue
-			}
-		}
-	}
-	safeSetLimitValue(corev1.ResourceCPU)
-	safeSetLimitValue(corev1.ResourceMemory)
 }
 
 func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
@@ -1007,7 +989,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
 		return nil, err
 	}
-	injectZeroResourcesLimitsIfEmpty(&container)
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	return &container, nil
 }
 
@@ -1052,6 +1034,7 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 		if err := injectEnvs(cluster, synthesizedComponent, "", &containers[0]); err != nil {
 			return nil, err
 		}
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&containers[0])
 	}
 	tolerations, err := component.BuildTolerations(cluster, cluster.Spec.GetComponentByName(synthesizedComponent.Name))
 	if err != nil {
@@ -1080,7 +1063,7 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, container); err != nil {
 			return nil, err
 		}
-		injectZeroResourcesLimitsIfEmpty(container)
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 		if meta, ok := toolsMap[container.Name]; ok {
 			setToolsScriptsPath(container, meta)
 		}

@@ -114,6 +114,7 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		SwitchoverOperation:   ops.SwitchoverOps,
 		LockOperation:         ops.LockOps,
 		UnlockOperation:       ops.UnlockOps,
+		PreDeleteOperation:    ops.PreDeleteOps,
 	}
 
 	ops.DBAddress = ops.getAddress()

@@ -11,6 +11,7 @@ delayedDeliveryEnabled=true
 dispatcherMaxReadBatchSize=1000
 enableReplicatedSubscriptions=false
 managedLedgerNumSchedulerThreads=2
+managedLedgerNumWorkerThreads=2
 maxConcurrentLookupRequest=1000
 maxConcurrentTopicLoadRequest=1000
 maxConsumersPerSubscription=5000
@@ -42,6 +43,7 @@ messagingProtocols=kafka
 #narExtractionDirectory=/tmp/pulsar-nar
 #kafkaListeners=kafka_external://0.0.0.0:9092
 #kafkaProtocolMap=kafka_external:PLAINTEXT
+allowAutoTopicCreationType=partitioned
 
 # Set offset management as below, since offset management for KoP depeocalnds on Pulsar "Broker Entry Metadata".
 # It’s required for KoP 2.8.0 or higher version.
@@ -54,4 +56,4 @@ brokerDeleteInactiveTopicsEnabled=false
 # KoP is compatible with Kafka clients 0.9 or higher. For Kafka clients 3.2.0 or higher, you have to add the following
 # configurations in KoP because of KIP-679.
 kafkaTransactionCoordinatorEnabled=true
-managedLedgerNumWorkerThreads=2
+brokerDeduplicationEnabled=true

@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,7 +82,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.DeploymentSignature, inNS, ml)
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			testapps.ClearResources(&testCtx, generics.RSMSignature, inNS, ml)
 		}
 
@@ -134,7 +133,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					SetReplicas(int32(1)).
 					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
 					Create(&testCtx).GetObject()
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(1)).
@@ -143,7 +142,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				}
 
 				podName := fmt.Sprintf("%s-%s-%s", clusterName, compName, testCtx.GetRandomStr())
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					podName = rsm.Name + "-0"
 				}
 				pod = testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
@@ -166,7 +165,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, deployment, func() {
 					testk8s.MockDeploymentReady(deployment, NewRSAvailableReason, deployment.Name)
 				})).Should(Succeed())
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 						testk8s.MockRSMReady(rsm)
 					})).Should(Succeed())
@@ -237,7 +236,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					})).Should(Succeed())
 					pods = append(pods, pod)
 				}
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(3)).
@@ -260,7 +259,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 						testk8s.MockRSMReady(rsm)
 					})).Should(Succeed())
@@ -330,7 +329,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					})).Should(Succeed())
 					pods = append(pods, pod)
 				}
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(3)).
@@ -351,7 +350,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 						testk8s.MockRSMReady(rsm)
 					})).Should(Succeed())
@@ -435,7 +434,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					Expect(testCtx.Cli.Status().Patch(testCtx.Ctx, pod, patch)).Should(Succeed())
 					pods = append(pods, pod)
 				}
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(replicas)).
@@ -456,7 +455,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 						testk8s.MockRSMReady(rsm)
 					})).Should(Succeed())

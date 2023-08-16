@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -180,7 +181,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 		var mysqlSts *appsv1.StatefulSet
 		var mysqlRSM *workloads.ReplicatedStateMachine
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if controllerutil.IsRSMEnabled() {
 			rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
 			mysqlRSM = &rsmList.Items[0]
 			Expect(testapps.ChangeObjStatus(&testCtx, mysqlRSM, func() {
@@ -233,7 +234,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		// })).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if controllerutil.IsRSMEnabled() {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlRSM), func(tmpRSM *workloads.ReplicatedStateMachine) {
 				testk8s.MockRSMReady(tmpRSM)
 			})()).ShouldNot(HaveOccurred())
@@ -268,7 +269,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			targetRequests = scalingCtx.target.resource.Requests
 		}
 
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if controllerutil.IsRSMEnabled() {
 			rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
 			mysqlRSM = &rsmList.Items[0]
 			Expect(reflect.DeepEqual(mysqlRSM.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
@@ -353,7 +354,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		componentWorkload := func() client.Object {
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if controllerutil.IsRSMEnabled() {
 				rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
 				return &rsmList.Items[0]
 			}
@@ -364,7 +365,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		mockCompRunning := func(replicas int32) {
 			var sts *appsv1.StatefulSet
 			wl := componentWorkload()
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if controllerutil.IsRSMEnabled() {
 				rsm, _ := wl.(*workloads.ReplicatedStateMachine)
 				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 					testk8s.MockRSMReady(rsm)
@@ -550,7 +551,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, backupKey, vs, true)).Should(Succeed())
 
 			By("check the underlying workload been updated")
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if controllerutil.IsRSMEnabled() {
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
 					func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
 						g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
@@ -625,7 +626,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			By("check the underlying workload been updated")
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if controllerutil.IsRSMEnabled() {
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
 					func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
 						g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))

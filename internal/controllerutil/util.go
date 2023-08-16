@@ -21,6 +21,8 @@ package controllerutil
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/spf13/viper"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,4 +84,11 @@ func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
 // val.
 func (r *RequestCtx) WithValue(key, val any) context.Context {
 	return context.WithValue(r.Ctx, key, val)
+}
+
+func IsRSMEnabled() bool {
+	if viper.IsSet(constant.FeatureGateReplicatedStateMachine) {
+		return viper.GetBool(constant.FeatureGateReplicatedStateMachine)
+	}
+	return true
 }

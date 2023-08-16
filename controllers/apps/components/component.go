@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
@@ -93,7 +92,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, nil
 	}
 
-	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+	if intctrlutil.IsRSMEnabled() {
 		return newRSMComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	}
 

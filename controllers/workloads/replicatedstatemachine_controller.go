@@ -22,7 +22,6 @@ package workloads
 import (
 	"context"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -141,7 +140,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Scheme:  *r.Scheme,
 	}
 
-	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+	if intctrlutil.IsRSMEnabled() {
 		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
 		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})

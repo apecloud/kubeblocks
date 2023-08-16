@@ -29,7 +29,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 	"unicode"
 
 	"github.com/jackc/pgx/v5"
@@ -479,17 +478,9 @@ func (mgr *Manager) DemoteReplication() error {
 }
 
 func (mgr *Manager) Stop() error {
-	mgr.Logger.Infof("wait for send signal 1 to deactivate sql channel")
-	sqlChannelProc, err := component.GetSQLChannelProc()
+	err := mgr.DBManagerBase.Stop()
 	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
-		return errors.Errorf("can't find sql channel process, err:%v", err)
-	}
-
-	// deactivate sql channel restart db
-	err = sqlChannelProc.Signal(syscall.SIGUSR1)
-	if err != nil {
-		return errors.Errorf("send signal1 to sql channel failed, err:%v", err)
+		return err
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -507,6 +498,12 @@ func (mgr *Manager) Stop() error {
 }
 
 func (mgr *Manager) FollowReplication(ctx context.Context, cluster *dcs.Cluster) error {
+	// only when db is not running, leader probably be nil
+	if cluster.Leader == nil {
+		mgr.Logger.Infof("cluster has no leader now, starts db firstly without following")
+		return nil
+	}
+
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("handle rewind failed, err:%v", err)
@@ -559,21 +556,16 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	return mgr.Start()
+	return nil
 }
 
-func (mgr *Manager) Start() error {
-	mgr.Logger.Infof("sending signal 2 to activate sql channel")
-	sqlChannelProc, err := component.GetSQLChannelProc()
+// Start for postgresql replication, not only means the start of a database instance
+// but also signifies its launch as a follower in the cluster, following the leader.
+func (mgr *Manager) Start(cluster *dcs.Cluster) error {
+	err := mgr.FollowReplication(context.TODO(), cluster)
 	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
-		return errors.Errorf("can't find sql channel process, err:%v", err)
+		return err
 	}
 
-	// activate sql channel restart db
-	err = sqlChannelProc.Signal(syscall.SIGUSR2)
-	if err != nil {
-		return errors.Errorf("send signal2 to sql channel failed, err:%v", err)
-	}
-	return nil
+	return mgr.DBManagerBase.Start(cluster)
 }

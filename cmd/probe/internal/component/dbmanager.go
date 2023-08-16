@@ -81,7 +81,7 @@ type DBManager interface {
 	Recover(context.Context) error
 
 	// Start and Stop just send signal to sqlChannel
-	Start() error
+	Start(*dcs.Cluster) error
 	Stop() error
 
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
@@ -152,7 +152,7 @@ func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, 
 
 // Start does not directly mean to start a database instance,
 // but rather to sends SIGUSR2 to activate sql channel to start database
-func (mgr *DBManagerBase) Start() error {
+func (mgr *DBManagerBase) Start(*dcs.Cluster) error {
 	mgr.Logger.Infof("send SIGUSR2 to activate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {

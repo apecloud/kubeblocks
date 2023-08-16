@@ -77,6 +77,7 @@ func (ha *Ha) RunCycle() {
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
 		}
+		_ = ha.dbManager.Start(cluster)
 		// _ = ha.dbManager.Follow(ha.ctx, cluster)
 
 	// IsClusterHealthy is just for consensus cluster healthy check.

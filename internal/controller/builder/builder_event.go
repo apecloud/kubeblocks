@@ -21,6 +21,7 @@ package builder
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type EventBuilder struct {
@@ -50,5 +51,15 @@ func (builder *EventBuilder) SetReason(reason string) *EventBuilder {
 
 func (builder *EventBuilder) SetType(tp string) *EventBuilder {
 	builder.get().Type = tp
+	return builder
+}
+
+func (builder *EventBuilder) SetFirstTimestamp(firstTimestamp metav1.Time) *EventBuilder {
+	builder.get().FirstTimestamp = firstTimestamp
+	return builder
+}
+
+func (builder *EventBuilder) SetLastTimestamp(lastTimestamp metav1.Time) *EventBuilder {
+	builder.get().LastTimestamp = lastTimestamp
 	return builder
 }

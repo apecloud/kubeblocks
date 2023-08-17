@@ -579,10 +579,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              mode:
-                description: 'mode specifies the mode of this cluster, the value of
-                  this can be one of the following: Standalone, Replication, RaftGroup.'
-                type: string
               monitor:
                 description: monitor specifies the configuration of monitor
                 properties:
@@ -607,11 +603,6 @@ spec:
                     description: publiclyAccessible specifies whether it is publicly
                       accessible. It defaults to false
                     type: boolean
-                type: object
-              parameters:
-                additionalProperties:
-                  type: string
-                description: customized parameters that is used in different clusterdefinition
                 type: object
               replicas:
                 description: replicas specifies the replicas of the first componentSpec,

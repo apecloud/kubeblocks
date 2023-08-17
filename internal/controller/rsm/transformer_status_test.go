@@ -43,7 +43,7 @@ var _ = Describe("object status transformer test.", func() {
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
-			SetMembershipReconfiguration(reconfiguration).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()
 
@@ -88,7 +88,7 @@ var _ = Describe("object status transformer test.", func() {
 			Expect(ok).Should(BeTrue())
 			Expect(rsmNew.Generation).Should(Equal(generation))
 			Expect(rsmNew.Status.ObservedGeneration).Should(Equal(generation))
-			Expect(rsmNew.Status.Replicas).Should(Equal(rsmNew.Spec.Replicas))
+			Expect(rsmNew.Status.Replicas).Should(Equal(*rsmNew.Spec.Replicas))
 		})
 	})
 

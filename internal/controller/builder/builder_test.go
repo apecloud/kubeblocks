@@ -170,7 +170,6 @@ var _ = Describe("builder", func() {
 			reqCtx,
 			nil,
 			cluster,
-			nil,
 			clusterDef,
 			&clusterDef.Spec.ComponentDefs[0],
 			&cluster.Spec.ComponentSpecs[0],

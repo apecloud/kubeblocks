@@ -70,7 +70,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 				Ctx: transCtx.Context,
 				Log: log.Log.WithName("rbac"),
 			}
-			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterTemplate, transCtx.ClusterDef, &compDef, nil)
+			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil)
 			if err != nil {
 				return err
 			}

@@ -12,10 +12,8 @@ WALG_MYSQL_BINLOG_DST: ${PITR_DIR}
 WALG_MYSQL_BINLOG_REPLAY_COMMAND: mysqlbinlog --stop-datetime="\$WALG_MYSQL_BINLOG_END_TS" "\$WALG_MYSQL_CURRENT_BINLOG" >> ${PITR_DIR}/replay.sql
 EOF
 sync;
-BASE_BACKUP_TIME=
-if [ -f /data/mysql/backup-datetime ]; then
-  BASE_BACKUP_TIME=$(cat /data/mysql/backup-datetime)
-elif [ -f $DATA_DIR/xtrabackup_info ]; then
+BASE_BACKUP_TIME=${BASE_BACKUP_START_TIME}
+if [ -f $DATA_DIR/xtrabackup_info ]; then
   BASE_BACKUP_TIME=$(cat $DATA_DIR/xtrabackup_info | grep start_time | awk -F ' = ' '{print $2}');
   BASE_BACKUP_TIME=$(date -d"${BASE_BACKUP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
 fi

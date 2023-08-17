@@ -41,7 +41,6 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/mock v1.6.0
-	github.com/google/cel-go v0.13.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -65,6 +64,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
+	github.com/prometheus-community/pro-bing v0.3.0
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/replicatedhq/termui/v3 v3.1.1-0.20200811145416-f40076d26851
 	github.com/replicatedhq/troubleshoot v0.57.0
@@ -229,6 +229,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/goodhosts/hostsfile v0.1.1 // indirect
 	github.com/google/btree v1.1.2 // indirect
+	github.com/google/cel-go v0.13.0 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-containerregistry v0.14.0 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect

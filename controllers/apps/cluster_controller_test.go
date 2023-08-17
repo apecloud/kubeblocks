@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +52,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	rsmpkg "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -203,6 +206,9 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	validateCompSvcList := func(g Gomega, compName string, compDefName string, expectServices map[string]ExpectService) {
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			return
+		}
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		svcList := &corev1.ServiceList{}
@@ -391,6 +397,15 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			Eventually(func(g Gomega) {
+				l := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				sts := components.ConvertRSMToSTS(&l.Items[0])
+				expects(g, sts, nil)
+			}).Should(Succeed())
+			return
+		}
+
 		isStsWorkload := true
 		switch compDefName {
 		case statelessCompDefName:
@@ -476,6 +491,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	mockPodsForTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+		clusterDefName := cluster.Spec.ClusterDefRef
 		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
@@ -487,6 +503,7 @@ var _ = Describe("Cluster Controller", func() {
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
 						constant.AppManagedByLabelKey:         constant.AppName,
+						constant.AppNameLabelKey:              clusterDefName,
 						constant.AppInstanceLabelKey:          clusterName,
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
@@ -508,9 +525,15 @@ var _ = Describe("Cluster Controller", func() {
 		By("Mocking component PVCs to bound")
 		mockComponentPVCsBound(comp, int(comp.Replicas), true)
 
-		By("Checking sts replicas right")
-		stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
-		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			By("Checking rsm replicas right")
+			rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
+			Expect(int(*rsmList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
+		} else {
+			By("Checking sts replicas right")
+			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
+			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
+		}
 
 		By("Creating mock pods in StatefulSet")
 		pods := mockPodsForTest(clusterObj, int(comp.Replicas))
@@ -534,7 +557,11 @@ var _ = Describe("Cluster Controller", func() {
 		checkUpdatedStsReplicas := func() {
 			By("Checking updated sts replicas")
 			Eventually(func() int32 {
-				stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
+				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
+					return *rsmList.Items[0].Spec.Replicas
+				}
+				stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
 				return *stsList.Items[0].Spec.Replicas
 			}).Should(BeEquivalentTo(updatedReplicas))
 		}
@@ -663,35 +690,37 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 
-			By("Checking pod env config updated")
-			cmKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      fmt.Sprintf("%s-%s-env", clusterKey.Name, comp.Name),
-			}
-			Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
-				match := func(key, prefix, suffix string) bool {
-					return strings.HasPrefix(key, prefix) && strings.HasSuffix(key, suffix)
+			if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				By("Checking pod env config updated")
+				cmKey := types.NamespacedName{
+					Namespace: clusterKey.Namespace,
+					Name:      fmt.Sprintf("%s-%s-env", clusterKey.Name, comp.Name),
 				}
-				foundN := ""
-				for k, v := range cm.Data {
-					if match(k, constant.KBPrefix, "_N") {
-						foundN = v
-						break
+				Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
+					match := func(key, prefix, suffix string) bool {
+						return strings.HasPrefix(key, prefix) && strings.HasSuffix(key, suffix)
 					}
-				}
-				g.Expect(foundN).Should(Equal(strconv.Itoa(updatedReplicas)))
-				for i := 0; i < updatedReplicas; i++ {
-					foundPodHostname := ""
-					suffix := fmt.Sprintf("_%d_HOSTNAME", i)
+					foundN := ""
 					for k, v := range cm.Data {
-						if match(k, constant.KBPrefix, suffix) {
-							foundPodHostname = v
+						if match(k, constant.KBPrefix, "_N") {
+							foundN = v
 							break
 						}
 					}
-					g.Expect(foundPodHostname != "").Should(BeTrue())
-				}
-			})).Should(Succeed())
+					g.Expect(foundN).Should(Equal(strconv.Itoa(updatedReplicas)))
+					for i := 0; i < updatedReplicas; i++ {
+						foundPodHostname := ""
+						suffix := fmt.Sprintf("_%d_HOSTNAME", i)
+						for k, v := range cm.Data {
+							if match(k, constant.KBPrefix, suffix) {
+								foundPodHostname = v
+								break
+							}
+						}
+						g.Expect(foundPodHostname != "").Should(BeTrue())
+					}
+				})).Should(Succeed())
+			}
 		}
 
 		scaleInCheck := func() {
@@ -903,8 +932,16 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Checking the replicas")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		sts := &stsList.Items[0]
+		var sts *appsv1.StatefulSet
+		var rsm *workloads.ReplicatedStateMachine
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+			rsm = &rsmList.Items[0]
+			sts = components.ConvertRSMToSTS(rsm)
+		} else {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			sts = &stsList.Items[0]
+		}
 		Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(replicas))
 
 		By("Mock PVCs in Bound Status")
@@ -940,9 +977,16 @@ var _ = Describe("Cluster Controller", func() {
 		case statefulCompDefName, consensusCompDefName:
 			testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		}
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			testk8s.MockStatefulSetReady(sts)
-		})).ShouldNot(HaveOccurred())
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+				testk8s.MockRSMReady(rsm)
+			})).ShouldNot(HaveOccurred())
+		} else {
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).ShouldNot(HaveOccurred())
+		}
+
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
@@ -1047,9 +1091,15 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Checking the replicas")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		sts := &stsList.Items[0]
-		Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(replicas))
+		var numbers int32
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+			numbers = *rsmList.Items[0].Spec.Replicas
+		} else {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			numbers = *stsList.Items[0].Spec.Replicas
+		}
+		Expect(numbers).Should(BeEquivalentTo(replicas))
 
 		By("Mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
@@ -1112,9 +1162,14 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		By("Checking PVCs are resized")
-		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		sts = &stsList.Items[0]
-		for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+			numbers = *rsmList.Items[0].Spec.Replicas
+		} else {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			numbers = *stsList.Items[0].Spec.Replicas
+		}
+		for i := numbers - 1; i >= 0; i-- {
 			pvc := &corev1.PersistentVolumeClaim{}
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
@@ -1136,9 +1191,14 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking PVCs are resized")
 		Eventually(func(g Gomega) {
-			stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			sts = &stsList.Items[0]
-			for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				numbers = *rsmList.Items[0].Spec.Replicas
+			} else {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				numbers = *stsList.Items[0].Spec.Replicas
+			}
+			for i := numbers - 1; i >= 0; i-- {
 				pvc := &corev1.PersistentVolumeClaim{}
 				pvcKey := types.NamespacedName{
 					Namespace: clusterKey.Namespace,
@@ -1435,13 +1495,22 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
-		var stsList *appsv1.StatefulSetList
 		var sts *appsv1.StatefulSet
-		Eventually(func(g Gomega) {
-			stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			g.Expect(stsList.Items).ShouldNot(BeEmpty())
-			sts = &stsList.Items[0]
-		}).Should(Succeed())
+		var rsm *workloads.ReplicatedStateMachine
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			Eventually(func(g Gomega) {
+				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				g.Expect(rsmList.Items).ShouldNot(BeEmpty())
+				rsm = &rsmList.Items[0]
+				sts = components.ConvertRSMToSTS(rsm)
+			}).Should(Succeed())
+		} else {
+			Eventually(func(g Gomega) {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				g.Expect(stsList.Items).ShouldNot(BeEmpty())
+				sts = &stsList.Items[0]
+			}).Should(Succeed())
+		}
 
 		By("Creating mock pods in StatefulSet, and set controller reference")
 		pods := mockPodsForTest(clusterObj, replicas)
@@ -1486,6 +1555,12 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(followerCount).Should(Equal(2))
 		}).Should(Succeed())
 
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			// trigger rsm to reconcile as the underlying sts is not created
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.ReplicatedStateMachine) {
+				rsm.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
+			})()).Should(Succeed())
+		}
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
 			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
@@ -1496,15 +1571,32 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
 			}
 		}).Should(Succeed())
-		stsPatch := client.MergeFrom(sts.DeepCopy())
-		By("Updating StatefulSet's status")
-		sts.Status.UpdateRevision = "mock-version"
-		sts.Status.Replicas = int32(replicas)
-		sts.Status.AvailableReplicas = int32(replicas)
-		sts.Status.CurrentReplicas = int32(replicas)
-		sts.Status.ReadyReplicas = int32(replicas)
-		sts.Status.ObservedGeneration = sts.Generation
-		Expect(k8sClient.Status().Patch(ctx, sts, stsPatch)).Should(Succeed())
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			rsmPatch := client.MergeFrom(rsm.DeepCopy())
+			By("Updating RSM's status")
+			rsm.Status.UpdateRevision = "mock-version"
+			rsm.Status.InitReplicas = int32(replicas)
+			rsm.Status.ReadyInitReplicas = int32(replicas)
+			rsm.Status.Replicas = int32(replicas)
+			rsm.Status.AvailableReplicas = int32(replicas)
+			rsm.Status.CurrentReplicas = int32(replicas)
+			rsm.Status.ReadyReplicas = int32(replicas)
+			rsm.Status.ObservedGeneration = rsm.Generation
+			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			Expect(err).Should(BeNil())
+			rsmpkg.SetMembersStatusForTest(rsm, pods)
+			Expect(k8sClient.Status().Patch(ctx, rsm, rsmPatch)).Should(Succeed())
+		} else {
+			stsPatch := client.MergeFrom(sts.DeepCopy())
+			By("Updating StatefulSet's status")
+			sts.Status.UpdateRevision = "mock-version"
+			sts.Status.Replicas = int32(replicas)
+			sts.Status.AvailableReplicas = int32(replicas)
+			sts.Status.CurrentReplicas = int32(replicas)
+			sts.Status.ReadyReplicas = int32(replicas)
+			sts.Status.ObservedGeneration = sts.Generation
+			Expect(k8sClient.Status().Patch(ctx, sts, stsPatch)).Should(Succeed())
+		}
 
 		By("Checking consensus set pods' role are updated in cluster status")
 		Eventually(func(g Gomega) {
@@ -1858,6 +1950,99 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
+		checkAllResourcesCreatedWithRSMEnabled := func(compNameNDef map[string]string) {
+			createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
+				factory.SetReplicas(3)
+			}, true)
+
+			By("Check stateless workload has been created")
+			Eventually(testapps.List(&testCtx, generics.RSMSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: statelessCompName,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
+
+			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+
+			By("Check stateful pod's volumes")
+			for _, sts := range rsmList.Items {
+				podSpec := sts.Spec.Template
+				volumeNames := map[string]struct{}{}
+				for _, v := range podSpec.Spec.Volumes {
+					volumeNames[v.Name] = struct{}{}
+				}
+
+				for _, cc := range [][]corev1.Container{
+					podSpec.Spec.Containers,
+					podSpec.Spec.InitContainers,
+				} {
+					for _, c := range cc {
+						for _, vm := range c.VolumeMounts {
+							_, ok := volumeNames[vm.Name]
+							Expect(ok).Should(BeTrue())
+						}
+					}
+				}
+			}
+
+			By("Check associated PDB has been created")
+			Eventually(testapps.List(&testCtx, generics.PodDisruptionBudgetSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
+
+			podSpec := rsmList.Items[0].Spec.Template.Spec
+			By("Checking created rsm pods template with built-in toleration")
+			Expect(podSpec.Tolerations).Should(HaveLen(1))
+			Expect(podSpec.Tolerations[0].Key).To(Equal(testDataPlaneTolerationKey))
+
+			By("Checking created rsm pods template with built-in Affinity")
+			Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
+			Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
+			Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
+				Equal(testDataPlaneNodeAffinityKey))
+
+			By("Checking created rsm pods template without TopologySpreadConstraints")
+			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
+
+			if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				By("Check should create env configmap")
+				Eventually(func(g Gomega) {
+					cmList := &corev1.ConfigMapList{}
+					g.Expect(k8sClient.List(testCtx.Ctx, cmList, client.MatchingLabels{
+						constant.AppInstanceLabelKey:   clusterKey.Name,
+						constant.AppConfigTypeLabelKey: "kubeblocks-env",
+					}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+					g.Expect(cmList.Items).ShouldNot(BeEmpty())
+					g.Expect(cmList.Items).Should(HaveLen(len(compNameNDef)))
+				}).Should(Succeed())
+			}
+
+			By("Checking stateless services")
+			statelessExpectServices := map[string]ExpectService{
+				// TODO: fix me later, proxy should not have internal headless service
+				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			}
+			Eventually(func(g Gomega) {
+				validateCompSvcList(g, statelessCompName, statelessCompDefName, statelessExpectServices)
+			}).Should(Succeed())
+
+			By("Checking stateful types services")
+			for compName, compNameNDef := range compNameNDef {
+				if compName == statelessCompName {
+					continue
+				}
+				consensusExpectServices := map[string]ExpectService{
+					testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+					testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+				}
+				Eventually(func(g Gomega) {
+					validateCompSvcList(g, compName, compNameNDef, consensusExpectServices)
+				}).Should(Succeed())
+			}
+		}
+
 		testMultiCompHScale := func(policyType appsv1alpha1.HScaleDataClonePolicyType) {
 			compNameNDef := map[string]string{
 				statefulCompName:    statefulCompDefName,
@@ -1890,14 +2075,30 @@ var _ = Describe("Cluster Controller", func() {
 				statefulCompName:    statefulCompDefName,
 				replicationCompName: replicationCompDefName,
 			}
-			checkAllResourcesCreated(compNameNDef)
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				checkAllResourcesCreatedWithRSMEnabled(compNameNDef)
+			} else {
+				checkAllResourcesCreated(compNameNDef)
+			}
 
 			By("Mocking components' PVCs to bound")
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			for _, sts := range stsList.Items {
-				compName, ok := sts.Labels[constant.KBAppComponentLabelKey]
+			var items []client.Object
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				for i := range rsmList.Items {
+					items = append(items, &rsmList.Items[i])
+				}
+			} else {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				for i := range stsList.Items {
+					items = append(items, &stsList.Items[i])
+				}
+			}
+			for _, item := range items {
+				compName, ok := item.GetLabels()[constant.KBAppComponentLabelKey]
 				Expect(ok).Should(BeTrue())
-				for i := int(*sts.Spec.Replicas); i >= 0; i-- {
+				replicas := reflect.ValueOf(item).Elem().FieldByName("Spec").FieldByName("Replicas").Elem().Int()
+				for i := int(replicas); i >= 0; i-- {
 					pvcKey := types.NamespacedName{
 						Namespace: clusterKey.Namespace,
 						Name:      getPVCName(testapps.DataVolumeName, compName, i),
@@ -1955,14 +2156,16 @@ var _ = Describe("Cluster Controller", func() {
 						checkObject(&pvc)
 					}
 					By("check secret resources preserved")
-					Expect(cmList.Items).ShouldNot(BeEmpty())
+					Expect(secretList.Items).ShouldNot(BeEmpty())
 					for _, secret := range secretList.Items {
 						checkObject(&secret)
 					}
-					By("check configmap resources preserved")
-					Expect(secretList.Items).ShouldNot(BeEmpty())
-					for _, cm := range cmList.Items {
-						checkObject(&cm)
+					if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+						By("check configmap resources preserved")
+						Expect(cmList.Items).ShouldNot(BeEmpty())
+						for _, cm := range cmList.Items {
+							checkObject(&cm)
+						}
 					}
 				}
 				return pvcList, secretList, cmList
@@ -1971,7 +2174,11 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("create recovering cluster")
 			lastClusterUID := clusterObj.UID
-			checkAllResourcesCreated(compNameNDef)
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				checkAllResourcesCreatedWithRSMEnabled(compNameNDef)
+			} else {
+				checkAllResourcesCreated(compNameNDef)
+			}
 			Expect(clusterObj.UID).ShouldNot(Equal(lastClusterUID))
 			lastPVCList, lastSecretList, lastCMList := checkPreservedObjects("")
 
@@ -1981,9 +2188,11 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(outOfOrderEqualFunc(initSecretList.Items, lastSecretList.Items, func(i corev1.Secret, j corev1.Secret) bool {
 				return i.UID == j.UID
 			})).Should(BeTrue())
-			Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, j corev1.ConfigMap) bool {
-				return i.UID == j.UID
-			})).Should(BeTrue())
+			if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, j corev1.ConfigMap) bool {
+					return i.UID == j.UID
+				})).Should(BeTrue())
+			}
 
 			By("delete the cluster and should preserved PVC,Secret,CM resources but result updated the new last applied cluster UID")
 			deleteCluster(appsv1alpha1.Halt)
@@ -2346,20 +2555,37 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, compName)
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			sts := stsList.Items[0]
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				rsm := rsmList.Items[0]
+				sts := components.ConvertRSMToSTS(&rsm)
+				By("mock pod/sts are available and wait for component enter running phase")
+				testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
+				Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
+					testk8s.MockRSMReady(&rsm)
+				})).ShouldNot(HaveOccurred())
+				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
-			By("mock pod/sts are available and wait for component enter running phase")
-			testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
-			Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
-				testk8s.MockStatefulSetReady(&sts)
-			})).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+				By("the restore container has been removed from init containers")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
+					g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+				})).Should(Succeed())
 
-			By("the restore container has been removed from init containers")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-				g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-			})).Should(Succeed())
+			} else {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				sts := stsList.Items[0]
+				By("mock pod/sts are available and wait for component enter running phase")
+				testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
+				Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
+					testk8s.MockStatefulSetReady(&sts)
+				})).ShouldNot(HaveOccurred())
+				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+
+				By("the restore container has been removed from init containers")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+					g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+				})).Should(Succeed())
+			}
 
 			By("clean up annotations after cluster running")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
@@ -2401,12 +2627,21 @@ var _ = Describe("Cluster Controller", func() {
 			waitForCreatingResourceCompletely(clusterKey, compDefName)
 
 			By("Checking statefulSet number")
-			stsList := testk8s.ListAndCheckStatefulSetItemsCount(&testCtx, clusterKey, 1)
-			sts := &stsList.Items[0]
-
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
-			})).ShouldNot(HaveOccurred())
+			var sts *appsv1.StatefulSet
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				rsmList := testk8s.ListAndCheckRSMItemsCount(&testCtx, clusterKey, 1)
+				rsm := &rsmList.Items[0]
+				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+					testk8s.MockRSMReady(rsm)
+				})).ShouldNot(HaveOccurred())
+				sts = components.ConvertRSMToSTS(rsm)
+			} else {
+				stsList := testk8s.ListAndCheckStatefulSetItemsCount(&testCtx, clusterKey, 1)
+				sts = &stsList.Items[0]
+				Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+					testk8s.MockStatefulSetReady(sts)
+				})).ShouldNot(HaveOccurred())
+			}
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
 				podName := fmt.Sprintf("%s-%d", sts.Name, i)
 				testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
@@ -2541,16 +2776,43 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
-			stsKey := types.NamespacedName{
+			workloadKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
 				Name:      clusterKey.Name + "-" + consensusCompName,
 			}
+
+			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				By("checking workload exists")
+				Eventually(testapps.CheckObjExists(&testCtx, workloadKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
+
+				finalizerName := "test/finalizer"
+				By("set finalizer for workload to prevent it from deletion")
+				Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(wl *workloads.ReplicatedStateMachine) {
+					wl.ObjectMeta.Finalizers = append(wl.ObjectMeta.Finalizers, finalizerName)
+				})()).ShouldNot(HaveOccurred())
+
+				By("Delete the cluster")
+				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+				By("checking cluster keep existing")
+				Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+				By("remove finalizer of sts to get it deleted")
+				Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(wl *workloads.ReplicatedStateMachine) {
+					wl.ObjectMeta.Finalizers = nil
+				})()).ShouldNot(HaveOccurred())
+
+				By("Wait for the cluster to terminate")
+				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+				return
+			}
+
 			By("checking sts exists")
-			Eventually(testapps.CheckObjExists(&testCtx, stsKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, workloadKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
 
 			finalizerName := "test/finalizer"
 			By("set finalizer for sts to prevent it from deletion")
-			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+			Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(sts *appsv1.StatefulSet) {
 				sts.ObjectMeta.Finalizers = append(sts.ObjectMeta.Finalizers, finalizerName)
 			})()).ShouldNot(HaveOccurred())
 
@@ -2561,7 +2823,7 @@ var _ = Describe("Cluster Controller", func() {
 			Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 			By("remove finalizer of sts to get it deleted")
-			Expect(testapps.GetAndChangeObj(&testCtx, stsKey, func(sts *appsv1.StatefulSet) {
+			Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(sts *appsv1.StatefulSet) {
 				sts.ObjectMeta.Finalizers = nil
 			})()).ShouldNot(HaveOccurred())
 

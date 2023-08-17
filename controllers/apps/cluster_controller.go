@@ -41,6 +41,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -220,6 +221,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1alpha1.Cluster{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&workloads.ReplicatedStateMachine{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).

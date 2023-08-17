@@ -38,12 +38,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -118,27 +118,10 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
 				return err
 			}
-			injectZeroResourcesLimitsIfEmpty(&(*cc)[i])
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&(*cc)[i])
 		}
 	}
 	return nil
-}
-
-func injectZeroResourcesLimitsIfEmpty(c *corev1.Container) {
-	zeroValue := resource.MustParse("0")
-	if c.Resources.Limits == nil {
-		c.Resources.Limits = corev1.ResourceList{}
-	}
-
-	safeSetLimitValue := func(name corev1.ResourceName) {
-		if _, ok := c.Resources.Requests[name]; !ok {
-			if _, ok = c.Resources.Limits[name]; !ok {
-				c.Resources.Limits[name] = zeroValue
-			}
-		}
-	}
-	safeSetLimitValue(corev1.ResourceCPU)
-	safeSetLimitValue(corev1.ResourceMemory)
 }
 
 func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
@@ -308,19 +291,50 @@ func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.Synthe
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, envConfigName string) (*appsv1.StatefulSet, error) {
-	const tplFile = "statefulset_template.cue"
-
-	sts := appsv1.StatefulSet{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   cluster,
-		"component": component,
-	}, "statefulset", &sts); err != nil {
-		return nil, err
+	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{
+			ObjectMeta: vct.ObjectMeta,
+			Spec:       vct.Spec,
+		}
 	}
+
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppNameLabelKey:        component.ClusterDefName,
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+	podBuilder := NewPodBuilder("", "").
+		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
+	}
+	template := corev1.PodTemplateSpec{
+		ObjectMeta: podBuilder.GetObject().ObjectMeta,
+		Spec:       *component.PodSpec,
+	}
+	stsBuilder := NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
+		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddMatchLabelsInMap(commonLabels).
+		SetServiceName(cluster.Name + "-" + component.Name + "-headless").
+		SetReplicas(component.Replicas).
+		SetTemplate(template)
+
+	var vcts []corev1.PersistentVolumeClaim
+	for _, vct := range component.VolumeClaimTemplates {
+		vcts = append(vcts, vctToPVC(vct))
+	}
+	stsBuilder.SetVolumeClaimTemplates(vcts...)
 
 	if component.StatefulSetWorkload != nil {
-		sts.Spec.PodManagementPolicy, sts.Spec.UpdateStrategy = component.StatefulSetWorkload.FinalStsUpdateStrategy()
+		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
+		stsBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
 	}
+
+	sts := stsBuilder.GetObject()
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
@@ -333,7 +347,305 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
-	return &sts, nil
+	return sts, nil
+}
+
+func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{
+			ObjectMeta: vct.ObjectMeta,
+			Spec:       vct.Spec,
+		}
+	}
+
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppNameLabelKey:        component.ClusterDefName,
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+	podBuilder := NewPodBuilder("", "").
+		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
+	}
+	template := corev1.PodTemplateSpec{
+		ObjectMeta: podBuilder.GetObject().ObjectMeta,
+		Spec:       *component.PodSpec,
+	}
+	rsmName := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
+	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
+		AddLabelsInMap(commonLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddMatchLabelsInMap(commonLabels).
+		SetServiceName(rsmName + "-headless").
+		SetReplicas(component.Replicas).
+		SetTemplate(template)
+
+	var vcts []corev1.PersistentVolumeClaim
+	for _, vct := range component.VolumeClaimTemplates {
+		vcts = append(vcts, vctToPVC(vct))
+	}
+	rsmBuilder.SetVolumeClaimTemplates(vcts...)
+
+	if component.StatefulSetWorkload != nil {
+		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
+		rsmBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
+	}
+
+	service, alternativeServices := separateServices(component.Services)
+	if len(alternativeServices) == 0 {
+		alternativeServices = nil
+	}
+	alternativeServices = fixService(cluster.Namespace, rsmName, component, alternativeServices...)
+	rsmBuilder.SetService(service.Spec).SetAlternativeServices(alternativeServices)
+
+	secretName := fmt.Sprintf("%s-conn-credential", cluster.Name)
+	credential := workloads.Credential{
+		Username: workloads.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			},
+		},
+		Password: workloads.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountPasswdForSecret,
+				},
+			},
+		},
+	}
+	rsmBuilder.SetCredential(credential)
+
+	roles, roleProbe, membershipReconfiguration, memberUpdateStrategy := buildRoleInfo(component)
+	rsm := rsmBuilder.SetRoles(roles).
+		SetRoleProbe(roleProbe).
+		SetMembershipReconfiguration(membershipReconfiguration).
+		SetMemberUpdateStrategy(memberUpdateStrategy).
+		GetObject()
+
+	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	if len(rsm.Spec.VolumeClaimTemplates) > 0 && len(rsm.GetLabels()) > 0 {
+		for index, vct := range rsm.Spec.VolumeClaimTemplates {
+			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
+			rsm.Spec.VolumeClaimTemplates[index] = vct
+		}
+	}
+
+	// TODO(free6om): refactor out rsm related envs
+	if err := processContainersInjection(reqCtx, cluster, component, "", &rsm.Spec.Template.Spec); err != nil {
+		return nil, err
+	}
+	return rsm, nil
+}
+
+func fixService(namespace, prefix string, component *component.SynthesizedComponent, alternativeServices ...corev1.Service) []corev1.Service {
+	leaderName := getLeaderName(component)
+	for i := range alternativeServices {
+		if len(alternativeServices[i].Name) > 0 {
+			alternativeServices[i].Name = prefix + "-" + alternativeServices[i].Name
+		}
+		if len(alternativeServices[i].Namespace) == 0 {
+			alternativeServices[i].Namespace = namespace
+		}
+		if alternativeServices[i].Spec.Type == corev1.ServiceTypeLoadBalancer {
+			alternativeServices[i].Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
+		}
+		if len(leaderName) > 0 {
+			selector := alternativeServices[i].Spec.Selector
+			if selector == nil {
+				selector = make(map[string]string, 0)
+			}
+			selector[constant.RoleLabelKey] = leaderName
+			alternativeServices[i].Spec.Selector = selector
+		}
+	}
+	return alternativeServices
+}
+
+func getLeaderName(component *component.SynthesizedComponent) string {
+	if component == nil {
+		return ""
+	}
+	switch component.WorkloadType {
+	case appsv1alpha1.Consensus:
+		if component.ConsensusSpec != nil {
+			return component.ConsensusSpec.Leader.Name
+		}
+	case appsv1alpha1.Replication:
+		return constant.Primary
+	}
+	return ""
+}
+
+// separateServices separates 'services' to a main service from cd and alternative services from cluster
+func separateServices(services []corev1.Service) (*corev1.Service, []corev1.Service) {
+	if len(services) == 0 {
+		return nil, nil
+	}
+	// from component.buildComponent (which contains component.Services' building process), the first item should be the main service
+	// TODO(free6om): make two fields in component(i.e. Service and AlternativeServices) after RSM passes all testes.
+	return &services[0], services[1:]
+}
+
+func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleProbe, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
+	var (
+		roles           []workloads.ReplicaRole
+		probe           *workloads.RoleProbe
+		reconfiguration *workloads.MembershipReconfiguration
+		strategy        *workloads.MemberUpdateStrategy
+	)
+
+	actions := buildActionFromCharacterType(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
+	if actions != nil && component.Probes != nil && component.Probes.RoleProbe != nil {
+		probe = &workloads.RoleProbe{ProbeActions: actions}
+		roleProbe := component.Probes.RoleProbe
+		probe.PeriodSeconds = roleProbe.PeriodSeconds
+		probe.TimeoutSeconds = roleProbe.TimeoutSeconds
+		probe.FailureThreshold = roleProbe.FailureThreshold
+		// set to default value
+		probe.SuccessThreshold = 1
+	}
+
+	// TODO(free6om): set default reconfiguration actions after relative addon refactored
+	reconfiguration = nil
+
+	switch component.WorkloadType {
+	case appsv1alpha1.Consensus:
+		roles, strategy = buildRoleInfoFromConsensus(component.ConsensusSpec)
+	case appsv1alpha1.Replication:
+		roles = buildRoleInfoFromReplication()
+		reconfiguration = nil
+		strgy := workloads.SerialUpdateStrategy
+		strategy = &strgy
+	}
+
+	return roles, probe, reconfiguration, strategy
+}
+
+func buildRoleInfoFromReplication() []workloads.ReplicaRole {
+	return []workloads.ReplicaRole{
+		{
+			Name:       constant.Primary,
+			IsLeader:   true,
+			CanVote:    true,
+			AccessMode: workloads.ReadWriteMode,
+		},
+		{
+			Name:       constant.Secondary,
+			IsLeader:   false,
+			CanVote:    true,
+			AccessMode: workloads.ReadonlyMode,
+		},
+	}
+}
+
+func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([]workloads.ReplicaRole, *workloads.MemberUpdateStrategy) {
+	if consensusSpec == nil {
+		return nil, nil
+	}
+
+	var (
+		roles    []workloads.ReplicaRole
+		strategy *workloads.MemberUpdateStrategy
+	)
+
+	roles = append(roles, workloads.ReplicaRole{
+		Name:       consensusSpec.Leader.Name,
+		IsLeader:   true,
+		CanVote:    true,
+		AccessMode: workloads.AccessMode(consensusSpec.Leader.AccessMode),
+	})
+	for _, follower := range consensusSpec.Followers {
+		roles = append(roles, workloads.ReplicaRole{
+			Name:       follower.Name,
+			IsLeader:   false,
+			CanVote:    true,
+			AccessMode: workloads.AccessMode(follower.AccessMode),
+		})
+	}
+	if consensusSpec.Learner != nil {
+		roles = append(roles, workloads.ReplicaRole{
+			Name:       consensusSpec.Learner.Name,
+			IsLeader:   false,
+			CanVote:    false,
+			AccessMode: workloads.AccessMode(consensusSpec.Learner.AccessMode),
+		})
+	}
+
+	strgy := workloads.MemberUpdateStrategy(consensusSpec.UpdateStrategy)
+	strategy = &strgy
+
+	return roles, strategy
+}
+
+func buildActionFromCharacterType(characterType string, isConsensus bool) []workloads.Action {
+	kind := strings.ToLower(characterType)
+	switch kind {
+	case "mysql":
+		if isConsensus {
+			return []workloads.Action{
+				{
+					Image: "arey/mysql-client:latest",
+					Command: []string{
+						"mysql",
+						"-h127.0.0.1",
+						"-P3306",
+						"-u$KB_RSM_USERNAME",
+						"-p$KB_RSM_PASSWORD",
+						"-N",
+						"-B",
+						"-e",
+						"\"select role from information_schema.wesql_cluster_local\"",
+						"|",
+						"xargs echo -n",
+					},
+				},
+				{
+					Command: []string{"echo $v_KB_RSM_LAST_STDOUT | tr '[:upper:]' '[:lower:]' | xargs echo -n"},
+				},
+			}
+		}
+		// TODO(free6om): mysql primary-secondary
+	case "postgres":
+		return []workloads.Action{
+			{
+				Image: "governmentpaas/psql:latest",
+				Command: []string{
+					"PGPASSWORD=$KB_RSM_PASSWORD psql",
+					"-h 127.0.0.1",
+					"-p 5432",
+					"-U $KB_RSM_USERNAME",
+					"-w",
+					"-t",
+					"-c",
+					"\"select pg_is_in_recovery();\"",
+					"|",
+					"xargs echo -n",
+				},
+			},
+			{
+				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"master\"; else echo -n \"replica\"; fi"},
+			},
+		}
+		// TODO(free6om): config the following actions
+	case "mongodb":
+	case "etcd":
+	case "redis":
+	case "kafka":
+	}
+	return nil
 }
 
 func randomString(length int) string {
@@ -677,7 +989,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
 		return nil, err
 	}
-	injectZeroResourcesLimitsIfEmpty(&container)
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	return &container, nil
 }
 
@@ -722,6 +1034,7 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 		if err := injectEnvs(cluster, synthesizedComponent, "", &containers[0]); err != nil {
 			return nil, err
 		}
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&containers[0])
 	}
 	tolerations, err := component.BuildTolerations(cluster, cluster.Spec.GetComponentByName(synthesizedComponent.Name))
 	if err != nil {
@@ -750,7 +1063,7 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, container); err != nil {
 			return nil, err
 		}
-		injectZeroResourcesLimitsIfEmpty(container)
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 		if meta, ok := toolsMap[container.Name]; ok {
 			setToolsScriptsPath(container, meta)
 		}

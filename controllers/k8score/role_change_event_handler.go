@@ -21,6 +21,7 @@ package k8score
 
 import (
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,6 +97,23 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return role, nil
 	}
 
+	// compare the lastTimestamp of the current event object with the lastTimestamp of the last recorded in the pod annotation,
+	// if the current event's lastTimestamp is earlier than the recorded lastTimestamp in the pod annotation,
+	// it indicates that the current event has arrived out of order and is expired, so it should not be processed.
+	lastTimestampStr, ok := pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]
+	if ok {
+		lastTimestamp, err := time.Parse(time.RFC3339, lastTimestampStr)
+		if err != nil {
+			reqCtx.Log.Info("failed to parse last role changed event timestamp from pod annotation", "pod", pod.Name, "error", err.Error())
+			return role, err
+		}
+		eventLastTS := event.LastTimestamp.Time
+		if !eventLastTS.After(lastTimestamp) {
+			reqCtx.Log.Info("event's lastTimestamp is earlier than the recorded lastTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event lastTimestamp", event.LastTimestamp.Time.String(), "annotation lastTimestamp", lastTimestampStr)
+			return role, nil
+		}
+	}
+
 	// get cluster obj of the pod
 	cluster := &appsv1alpha1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
@@ -111,9 +129,9 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return role, components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
+		return role, components.UpdateConsensusSetRoleLabel(cli, reqCtx, event, componentDef, pod, role)
 	case appsv1alpha1.Replication:
-		return role, components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
+		return role, components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, event, cluster, compName, pod, role)
 	}
 	return role, nil
 }

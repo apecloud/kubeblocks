@@ -106,6 +106,7 @@ var _ = BeforeSuite(func() {
 	Version = version
 	InitEnv = initEnv
 	TestType = testType
+	TestResults = make([]Result, 0)
 	if len(provider) > 0 && len(region) > 0 && len(secretID) > 0 && len(secretKey) > 0 {
 		Provider = provider
 		Region = region
@@ -196,6 +197,8 @@ var _ = Describe("e2e test", func() {
 		var _ = Describe("KubeBlocks playground destroy", PlaygroundDestroy)
 		var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
 	}
+
+	var _ = Describe("show test report", AnalyzeE2eReport)
 
 	var _ = Describe("save test report to s3", UploadReport)
 

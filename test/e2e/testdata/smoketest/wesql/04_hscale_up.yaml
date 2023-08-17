@@ -7,4 +7,4 @@ spec:
   type: HorizontalScaling
   horizontalScaling:
     - componentName: mysql
-      replicas: 5
+      replicas: 3

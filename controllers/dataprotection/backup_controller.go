@@ -1555,15 +1555,15 @@ func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.Requ
 		return err
 	}
 	for _, i := range snaps.Items {
+		if err := r.snapshotCli.Delete(&i); err != nil {
+			return err
+		}
 		if controllerutil.ContainsFinalizer(&i, dataProtectionFinalizerName) {
 			patch := i.DeepCopy()
-			controllerutil.RemoveFinalizer(&i, dataProtectionFinalizerName)
+			i.Finalizers = []string{}
 			if err := r.snapshotCli.Patch(&i, patch); err != nil {
 				return err
 			}
-		}
-		if err := r.snapshotCli.Delete(&i); err != nil {
-			return err
 		}
 	}
 	return nil

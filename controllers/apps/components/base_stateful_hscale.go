@@ -542,6 +542,13 @@ type backupDataClone struct {
 var _ dataClone = &backupDataClone{}
 
 func (d *backupDataClone) succeed() (bool, error) {
+	if len(d.component.VolumeClaimTemplates) == 0 {
+		d.reqCtx.Recorder.Eventf(d.cluster,
+			corev1.EventTypeNormal,
+			"HorizontalScale",
+			"no VolumeClaimTemplates, no need to do data clone.")
+		return true, nil
+	}
 	allPVCsExist, err := d.checkAllPVCsExist()
 	if err != nil || !allPVCsExist {
 		return allPVCsExist, err

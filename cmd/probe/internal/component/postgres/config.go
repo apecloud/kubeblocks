@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package postgres
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -95,4 +97,8 @@ func (config *Config) GetDBPort() int {
 func (config *Config) GetConnectURLWithHost(host string) string {
 	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s pool_min_conns=%d pool_max_conns=%d",
 		config.username, config.password, host, config.port, config.database, config.minConns, config.maxConns)
+}
+
+func (config *Config) GetOtherConnectionWithHost(ctx context.Context, host string) (*pgx.Conn, error) {
+	return pgx.Connect(ctx, config.GetConnectURLWithHost(host))
 }

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -251,13 +252,16 @@ func (b *componentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Obj
 }
 
 func (b *componentWorkloadBuilderBase) getRuntime() *corev1.PodSpec {
-	if sts, ok := b.Workload.(*appsv1.StatefulSet); ok {
-		return &sts.Spec.Template.Spec
+	switch w := b.Workload.(type) {
+	case *appsv1.StatefulSet:
+		return &w.Spec.Template.Spec
+	case *appsv1.Deployment:
+		return &w.Spec.Template.Spec
+	case *workloads.ReplicatedStateMachine:
+		return &w.Spec.Template.Spec
+	default:
+		return nil
 	}
-	if deploy, ok := b.Workload.(*appsv1.Deployment); ok {
-		return &deploy.Spec.Template.Spec
-	}
-	return nil
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component component.SynthesizedComponent) error {

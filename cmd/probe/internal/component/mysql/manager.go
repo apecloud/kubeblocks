@@ -23,7 +23,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -36,12 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
-const (
-	addFollowerFmt    = "call dbms_consensus.add_learner('%s');"
-	demoteFollowerFmt = "call dbms_consensus.downgrade_follower('%s');"
-	dropLearnerFmt    = "call dbms_consensus.drop_learner('%s');"
-)
-
 type Manager struct {
 	component.DBManagerBase
 	DB                           *sql.DB
@@ -51,6 +44,10 @@ type Manager struct {
 	binlogFormat                 string
 	logbinEnabled                bool
 	logReplicationUpdatesEnabled bool
+	opTimestamp                  int64
+	globalState                  map[string]string
+	masterStatus                 RowMap
+	slaveStatus                  RowMap
 }
 
 var Mgr *Manager
@@ -76,7 +73,7 @@ func NewManager(logger logr.Logger) (*Manager, error) {
 		return nil, fmt.Errorf("KB_POD_NAME is not set")
 	}
 
-	serverID, err := getIndex(currentMemberName)
+	serverID, err := component.GetIndex(currentMemberName)
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +91,6 @@ func NewManager(logger logr.Logger) (*Manager, error) {
 
 	component.RegisterManager("mysql", Mgr)
 	return Mgr, nil
-}
-
-func getIndex(memberName string) (int, error) {
-	i := strings.LastIndex(memberName, "-")
-	if i < 0 {
-		return 0, fmt.Errorf("the format of member name is wrong: %s", memberName)
-	}
-	return strconv.Atoi(memberName[i+1:])
 }
 
 func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
@@ -236,15 +225,43 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context) bool {
-	_, _ = mgr.EnsureServerID(ctx)
-	return mgr.IsMemberHealthy(ctx, nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	mgr.DBState = nil
+	// _, _ = mgr.EnsureServerID(ctx)
+	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
+	if !mgr.IsMemberHealthy(ctx, cluster, member) {
+		return false
+	}
+
+	mgr.DBState = mgr.GetDBState(ctx, cluster, member)
+	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
+		cluster.Leader.DBState = mgr.DBState
+	}
+	return true
+}
+
+func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	var leaderDBState *dcs.DBState
+	if cluster.Leader == nil || cluster.Leader.DBState == nil {
+		mgr.Logger.Info("No leader DBstate info")
+		return false
+	}
+	leaderDBState = cluster.Leader.DBState
+	dbState := mgr.GetDBState(ctx, cluster, member)
+	if dbState == nil {
+		return false
+	}
+	if leaderDBState.OpTimestamp-dbState.OpTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
+		return false
+	}
+	mgr.Logger.Info(fmt.Sprintf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-dbState.OpTimestamp))
+	return true
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	var db *sql.DB
 	var err error
-	if member != nil {
+	if member != nil && member.Name != mgr.CurrentMemberName {
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
@@ -258,69 +275,205 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		db = mgr.DB
 	}
 
-	roSQL := `select 1`
-	rows, err := db.Query(roSQL)
-	if rows != nil {
-		defer rows.Close()
+	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
+		if !mgr.WriteCheck(ctx, db) {
+			return false
+		}
 	}
+	if !mgr.ReadCheck(ctx, db) {
+		return false
+	}
+
+	return true
+}
+
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
+	var db *sql.DB
+	var err error
+	var isCurrentMember bool
+	var memberName string
+	if member != nil && member.Name != mgr.CurrentMemberName {
+		memberName = member.Name
+		addr := cluster.GetMemberAddrWithPort(*member)
+		db, err = config.GetDBConnWithAddr(addr)
+		if err != nil {
+			mgr.Logger.Error(err, "Get Member conn failed")
+			return nil
+		}
+		if db != nil {
+			defer db.Close()
+		}
+	} else {
+		memberName = mgr.CurrentMemberName
+		isCurrentMember = true
+		db = mgr.DB
+	}
+
+	globalState, err := mgr.GetGlobalState(ctx, db)
 	if err != nil {
-		mgr.Logger.Error(err, "Check Member failed")
+		mgr.Logger.Error(err, "select global failed")
+		return nil
+	}
+
+	masterStatus, err := mgr.GetMasterStatus(ctx, db)
+	if err != nil {
+		mgr.Logger.Error(err, "show master status failed")
+		return nil
+	}
+
+	slaveStatus, err := mgr.GetSlaveStatus(ctx, db)
+	if err != nil {
+		mgr.Logger.Error(err, "show slave status failed")
+		return nil
+	}
+
+	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
+	if err != nil {
+		mgr.Logger.Error(err, "get op timestamp failed")
+		return nil
+	}
+
+	dbState := &dcs.DBState{
+		OpTimestamp: opTimestamp,
+		Extra:       map[string]string{},
+	}
+	for k, v := range globalState {
+		dbState.Extra[k] = v
+	}
+
+	if cluster.Leader != nil && cluster.Leader.Name == memberName {
+		dbState.Extra["Binlog_File"] = masterStatus.GetString("File")
+		dbState.Extra["Binlog_Pos"] = masterStatus.GetString("Pos")
+	} else {
+		dbState.Extra["Master_Host"] = slaveStatus.GetString("Master_Host")
+		dbState.Extra["Master_UUID"] = slaveStatus.GetString("Master_UUID")
+		dbState.Extra["Slave_IO_Running"] = slaveStatus.GetString("Slave_IO_Running")
+		dbState.Extra["Slave_SQL_Running"] = slaveStatus.GetString("Slave_SQL_Running")
+		dbState.Extra["Last_IO_Error"] = slaveStatus.GetString("Last_IO_Error")
+		dbState.Extra["Last_SQL_Error"] = slaveStatus.GetString("Last_SQL_Error")
+		dbState.Extra["Master_Log_File"] = slaveStatus.GetString("Master_Log_File")
+		dbState.Extra["Read_Master_Log_Pos"] = slaveStatus.GetString("Read_Master_Log_Pos")
+		dbState.Extra["Relay_Master_Log_File"] = slaveStatus.GetString("Relay_Master_Log_File")
+		dbState.Extra["Exec_Master_Log_Pos"] = slaveStatus.GetString("Exec_Master_Log_Pos")
+	}
+
+	if isCurrentMember {
+		mgr.globalState = globalState
+		mgr.masterStatus = masterStatus
+		mgr.slaveStatus = slaveStatus
+		mgr.opTimestamp = opTimestamp
+	}
+	return dbState
+}
+
+func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) bool {
+	writeSQL := fmt.Sprintf(`BEGIN;
+CREATE DATABASE IF NOT EXISTS kubeblocks;
+CREATE TABLE IF NOT EXISTS kubeblocks.kb_health_check(type INT, check_ts BIGINT, PRIMARY KEY(type));
+INSERT INTO kubeblocks.kb_health_check VALUES(%d, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE check_ts = UNIX_TIMESTAMP();
+COMMIT;`, component.CheckStatusType)
+	_, err := db.ExecContext(ctx, writeSQL)
+	if err != nil {
+		mgr.Logger.Error(err, fmt.Sprintf("SQL %s executing failed", writeSQL))
 		return false
 	}
 	return true
 }
 
-func (mgr *Manager) Recover() {}
+func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
+	_, err := mgr.GetOpTimestamp(ctx, db)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// no healthy check records, return true
+			return true
+		}
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1049 {
+			// no healthy database, return true
+			return true
+		}
+		mgr.Logger.Error(err, "Read check failed")
+		return false
+	}
+
+	return true
+}
+
+func (mgr *Manager) GetOpTimestamp(ctx context.Context, db *sql.DB) (int64, error) {
+	readSQL := fmt.Sprintf(`select check_ts from kubeblocks.kb_health_check where type=%d limit 1;`, component.CheckStatusType)
+	var opTimestamp int64
+	err := db.QueryRowContext(ctx, readSQL).Scan(&opTimestamp)
+	return opTimestamp, err
+}
+
+func (mgr *Manager) GetGlobalState(ctx context.Context, db *sql.DB) (map[string]string, error) {
+	var hostname, serverUUID, gtidExecuted, gtidPurged, isReadonly, superReadonly string
+	err := db.QueryRowContext(ctx, "select  @@global.hostname, @@global.server_uuid, @@global.gtid_executed, @@global.gtid_purged, @@global.read_only, @@global.super_read_only").
+		Scan(&hostname, &serverUUID, &gtidExecuted, &gtidPurged, &isReadonly, &superReadonly)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]string{
+		"hostname":        hostname,
+		"server_uuid":     serverUUID,
+		"gtid_executed":   gtidExecuted,
+		"gtid_purged":     gtidPurged,
+		"read_only":       isReadonly,
+		"super_read_only": superReadonly,
+	}, nil
+}
+
+func (mgr *Manager) GetSlaveStatus(ctx context.Context, db *sql.DB) (RowMap, error) {
+	sql := "show slave status"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Error(err, "error executing %s")
+		return nil, err
+	}
+	return rowMap, nil
+}
+
+func (mgr *Manager) GetMasterStatus(ctx context.Context, db *sql.DB) (RowMap, error) {
+	sql := "show master status"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		return nil, err
+	}
+	return rowMap, nil
+}
+
+func (mgr *Manager) Recover(context.Context) error {
+	return nil
+}
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
-	// fixme what if there is no leader
-	client, err := mgr.GetLeaderClient(context.Background(), cluster)
-	if err != nil {
-		return err
-	}
-	defer client.Close() //nolint:errcheck
-
-	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
-	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
-	sql := fmt.Sprintf(addFollowerFmt, currentHost)
-	if _, err = client.Exec(sql); err != nil {
-		return err
-	}
-	// todo implement learner
-
 	return nil
 }
 
 func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
-	client, err := mgr.GetLeaderClient(context.Background(), cluster)
-	if err != nil {
-		return err
-	}
-	defer client.Close() //nolint:errcheck
-
-	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
-	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
-	sql := fmt.Sprintf(demoteFollowerFmt, currentHost)
-	if _, err = client.Exec(sql); err != nil {
-		return err
-	}
-	sql = fmt.Sprintf(dropLearnerFmt, currentHost)
-	if _, err = client.Exec(sql); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		mgr.Logger.Info("cluster has no leader, wait for leader to take the lock")
-		return true
-	}
+// func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+// 	leaderMember := cluster.GetLeaderMember()
+// 	if leaderMember == nil {
+// 		mgr.Logger.Infof("IsClusterHealthy: has no leader.")
+// 		return true
+// 	}
 
-	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
-}
+// 	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
+// }
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
@@ -350,7 +503,12 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *Manager) Promote() error {
+func (mgr *Manager) Promote(ctx context.Context) error {
+	if (mgr.globalState["super_read_only"] == "0" && mgr.globalState["read_only"] == "0") &&
+		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "No" &&
+			mgr.slaveStatus.GetString("Slave_SQL_Running") == "No")) {
+		return nil
+	}
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
@@ -363,7 +521,7 @@ func (mgr *Manager) Promote() error {
 	return nil
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	setReadOnly := `set global read_only=on;set global super_read_only=on;`
 
 	_, err := mgr.DB.Exec(setReadOnly)
@@ -374,7 +532,7 @@ func (mgr *Manager) Demote() error {
 	return nil
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return fmt.Errorf("cluster has no leader")
@@ -385,7 +543,7 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	if !mgr.isRecoveryConfOutdate(context.TODO(), cluster.Leader.Name) {
+	if !mgr.isRecoveryConfOutdate(ctx, cluster.Leader.Name) {
 		return nil
 	}
 
@@ -404,17 +562,7 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bool {
-	sql := "show slave status"
-	var rowMap RowMap
-
-	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-		rowMap = rMap
-		return nil
-	})
-	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
-		return true
-	}
+	var rowMap = mgr.slaveStatus
 
 	if len(rowMap) == 0 {
 		return true
@@ -431,34 +579,65 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	return !strings.HasPrefix(masterHost, leader)
 }
 
-func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
-	// 要是想拿到其他mysql的lag, 有三种方法:
-	// 1. k8s有没性能监控 ?
-	// 2. mysqlOps 获取
-	// 3. 另外有一个地方存着所有实例的lag
-	return nil
+func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
+	var rowMap = mgr.slaveStatus
+
+	if len(rowMap) == 0 {
+		return false, nil
+	}
+	ioRunning := rowMap.GetString("Slave_IO_Running")
+	sqlRunning := rowMap.GetString("Slave_SQL_Running")
+	if ioRunning == "Yes" || sqlRunning == "Yes" {
+		return true, nil
+	}
+	return false, nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-	isLeader, err := mgr.IsLeader(ctx, cluster)
-	if err == nil && isLeader {
-		// if current member is leader, just return
+func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
+	sql := "show slave hosts"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
 		return nil
+	})
+	if err != nil {
+		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		return false, err
 	}
 
-	for _, member := range cluster.Members {
-		if member.Name == mgr.CurrentMemberName {
-			continue
-		}
-
-		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
-		if err == nil && isLeader {
-			return &member
-		}
+	if len(rowMap) == 0 {
+		return false, nil
 	}
 
+	return true, nil
+}
+
+func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
 	return nil
 }
+
+// func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+// 	return nil
+// 	isLeader, err := mgr.IsLeader(ctx, cluster)
+// 	if err == nil && isLeader {
+// 		// if current member is leader, just return
+// 		return nil
+// 	}
+
+// 	for _, member := range cluster.Members {
+// 		if member.Name == mgr.CurrentMemberName {
+// 			continue
+// 		}
+
+// 		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
+// 		if err == nil && isLeader {
+// 			return &member
+// 		}
+// 	}
+
+// 	return nil
+// }
 
 // HasOtherHealthyMembers checks if there are any healthy members, excluding the leader
 func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
@@ -492,6 +671,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 		mgr.Logger.Error(err, "Lock err")
 		return err
 	}
+	mgr.IsLocked = true
 	return nil
 }
 
@@ -503,5 +683,6 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 		mgr.Logger.Error(err, "Unlock err")
 		return err
 	}
+	mgr.IsLocked = false
 	return nil
 }

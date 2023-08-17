@@ -220,7 +220,7 @@ func TestCheckStatusOps(t *testing.T) {
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).
 			AddRow(1, 1, time.Now())
 
-		roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
+		roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
 		mock.ExpectQuery(roSQL).WillReturnRows(rows)
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)
@@ -242,7 +242,7 @@ func TestCheckStatusOps(t *testing.T) {
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
+	select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType, component.CheckStatusType)
 		mock.ExpectExec(regexp.QuoteMeta(rwSQL)).WillReturnResult(sqlmock.NewResult(1, 1))
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)
@@ -281,7 +281,7 @@ func TestCheckStatusOps(t *testing.T) {
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
+	select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType, component.CheckStatusType)
 		mock.ExpectExec(regexp.QuoteMeta(rwSQL)).WillReturnError(errors.New("insert error"))
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)

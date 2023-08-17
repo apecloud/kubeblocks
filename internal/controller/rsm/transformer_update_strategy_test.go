@@ -123,7 +123,7 @@ var _ = Describe("update strategy transformer test.", func() {
 					obj.Name = objKey.Name
 					obj.Generation = 2
 					obj.Status.ObservedGeneration = obj.Generation
-					obj.Spec.Replicas = &rsm.Spec.Replicas
+					obj.Spec.Replicas = rsm.Spec.Replicas
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
@@ -142,7 +142,8 @@ var _ = Describe("update strategy transformer test.", func() {
 		It("should update all pods", func() {
 			transCtx.rsmOrig.Generation = 2
 			transCtx.rsmOrig.Status.ObservedGeneration = 2
-			rsm.Spec.UpdateStrategy = workloads.SerialUpdateStrategy
+			strategy := workloads.SerialUpdateStrategy
+			rsm.Spec.MemberUpdateStrategy = &strategy
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &apps.StatefulSet{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *apps.StatefulSet, _ ...client.GetOption) error {
@@ -151,7 +152,7 @@ var _ = Describe("update strategy transformer test.", func() {
 					obj.Name = objKey.Name
 					obj.Generation = 2
 					obj.Status.ObservedGeneration = obj.Generation
-					obj.Spec.Replicas = &rsm.Spec.Replicas
+					obj.Spec.Replicas = rsm.Spec.Replicas
 					return nil
 				}).Times(4)
 			pod0 := builder.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).

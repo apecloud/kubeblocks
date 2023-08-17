@@ -85,31 +85,6 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 		transCtx.ClusterVer = &appsv1alpha1.ClusterVersion{}
 	}
 
-	var cf *appsv1alpha1.ClusterFamily
-	if len(cd.Spec.ClusterFamilyRef) > 0 {
-		cf = &appsv1alpha1.ClusterFamily{}
-		if err = validateExistence(types.NamespacedName{Name: cd.Spec.ClusterFamilyRef}, cf); err != nil {
-			return err
-		}
-	}
-	if cf == nil {
-		return nil
-	}
-	tplNames, err := getTemplateNamesFromCF(transCtx.Context, cf, cluster)
-	if err != nil {
-		return err
-	}
-	var cts []appsv1alpha1.ClusterTemplate
-	for _, tplName := range tplNames {
-		ct := appsv1alpha1.ClusterTemplate{}
-		if err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: tplName}, &ct); err != nil {
-			return err
-		}
-		cts = append(cts, ct)
-	}
-	clusterTpl := mergeClusterTemplates(cts)
-	transCtx.ClusterTemplate = clusterTpl
-
 	return nil
 }
 

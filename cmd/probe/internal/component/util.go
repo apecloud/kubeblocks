@@ -20,9 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/viper"
+)
+
+const (
+	// types for probe
+	CheckRunningType int = iota
+	CheckStatusType
+	CheckRoleChangedType
 )
 
 func MaxInt64(x, y int64) int64 {
@@ -41,6 +51,14 @@ func GetSQLChannelProc() (*os.Process, error) {
 	}
 
 	return sqlChannelProc, nil
+}
+
+func GetIndex(memberName string) (int, error) {
+	i := strings.LastIndex(memberName, "-")
+	if i < 0 {
+		return 0, fmt.Errorf("the format of member name is wrong: %s", memberName)
+	}
+	return strconv.Atoi(memberName[i+1:])
 }
 
 type Properties map[string]string

@@ -23,7 +23,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
@@ -31,11 +35,18 @@ import (
 var _ = Describe("replicated_state_machine builder", func() {
 	It("should work well", func() {
 		const (
-			name     = "foo"
-			ns       = "default"
-			replicas = int32(5)
-			port     = int32(12345)
+			name                         = "foo"
+			ns                           = "default"
+			selectorKey1, selectorValue1 = "foo-1", "bar-1"
+			selectorKey2, selectorValue2 = "foo-2", "bar-2"
+			selectorKey3, selectorValue3 = "foo-3", "bar-3"
+			selectorKey4, selectorValue4 = "foo-4", "bar-4"
+			serviceName                  = "foo"
+			replicas                     = int32(5)
+			port                         = int32(12345)
+			policy                       = apps.OrderedReadyPodManagement
 		)
+		selectors := map[string]string{selectorKey4: selectorValue4}
 		role := workloads.ReplicaRole{
 			Name:       "foo",
 			AccessMode: workloads.ReadWriteMode,
@@ -64,6 +75,47 @@ var _ = Describe("replicated_state_machine builder", func() {
 			ObjectMeta: pod.ObjectMeta,
 			Spec:       pod.Spec,
 		}
+		vcs := []corev1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo-1",
+					Namespace: ns,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName: "foo-1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("500m"),
+						},
+					},
+				},
+			},
+		}
+		vc := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo-2",
+				Namespace: ns,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				VolumeName: "foo-2",
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("600m"),
+					},
+				},
+			},
+		}
+		partition, maxUnavailable := int32(3), intstr.FromInt(2)
+		strategy := apps.StatefulSetUpdateStrategy{
+			Type: apps.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+				Partition:      &partition,
+				MaxUnavailable: &maxUnavailable,
+			},
+		}
+		strategyType := apps.OnDeleteStatefulSetStrategyType
+		delay := int32(10)
+		roleProbe := workloads.RoleProbe{InitialDelaySeconds: delay}
 		actions := []workloads.Action{
 			{
 				Image:   "foo-1",
@@ -74,6 +126,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			Image:   "foo-2",
 			Command: []string{"bar-2"},
 		}
+		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		service := corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
@@ -83,33 +136,86 @@ var _ = Describe("replicated_state_machine builder", func() {
 				},
 			},
 		}
+		alternativeServices := []corev1.Service{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "bar",
+							Protocol: corev1.ProtocolTCP,
+							Port:     port,
+						},
+					},
+				},
+			},
+		}
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
 			Password: workloads.CredentialVar{Value: "bar"},
 		}
 		rsm := NewReplicatedStateMachineBuilder(ns, name).
 			SetReplicas(replicas).
+			AddMatchLabel(selectorKey1, selectorValue1).
+			AddMatchLabels(selectorKey2, selectorValue2, selectorKey3, selectorValue3).
+			AddMatchLabelsInMap(selectors).
+			SetServiceName(serviceName).
 			SetRoles([]workloads.ReplicaRole{role}).
-			SetMembershipReconfiguration(reconfiguration).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetTemplate(template).
-			SetObservationActions(actions).
-			AddObservationAction(action).
+			SetVolumeClaimTemplates(vcs...).
+			AddVolumeClaimTemplates(vc).
+			SetPodManagementPolicy(policy).
+			SetUpdateStrategy(strategy).
+			SetUpdateStrategyType(strategyType).
+			SetRoleProbe(&roleProbe).
+			SetProbeActions(actions).
+			AddProbeAction(action).
+			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetService(service).
+			SetAlternativeServices(alternativeServices).
 			SetCredential(credential).
 			GetObject()
 
 		Expect(rsm.Name).Should(Equal(name))
 		Expect(rsm.Namespace).Should(Equal(ns))
-		Expect(rsm.Spec.Replicas).Should(Equal(replicas))
-		Expect(len(rsm.Spec.Roles)).Should(Equal(1))
+		Expect(rsm.Spec.Replicas).ShouldNot(BeNil())
+		Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
+		Expect(rsm.Spec.Selector).ShouldNot(BeNil())
+		Expect(rsm.Spec.Selector.MatchLabels).Should(HaveLen(4))
+		Expect(rsm.Spec.Selector.MatchLabels[selectorKey1]).Should(Equal(selectorValue1))
+		Expect(rsm.Spec.Selector.MatchLabels[selectorKey2]).Should(Equal(selectorValue2))
+		Expect(rsm.Spec.Selector.MatchLabels[selectorKey3]).Should(Equal(selectorValue3))
+		Expect(rsm.Spec.Selector.MatchLabels[selectorKey4]).Should(Equal(selectorValue4))
+		Expect(rsm.Spec.ServiceName).Should(Equal(serviceName))
+		Expect(rsm.Spec.Roles).Should(HaveLen(1))
 		Expect(rsm.Spec.Roles[0]).Should(Equal(role))
 		Expect(rsm.Spec.MembershipReconfiguration).ShouldNot(BeNil())
 		Expect(*rsm.Spec.MembershipReconfiguration).Should(Equal(reconfiguration))
 		Expect(rsm.Spec.Template).Should(Equal(template))
-		Expect(len(rsm.Spec.RoleObservation.ObservationActions)).Should(Equal(2))
-		Expect(rsm.Spec.RoleObservation.ObservationActions[0]).Should(Equal(actions[0]))
-		Expect(rsm.Spec.RoleObservation.ObservationActions[1]).Should(Equal(action))
-		Expect(rsm.Spec.Service).Should(Equal(service))
+		Expect(rsm.Spec.VolumeClaimTemplates).Should(HaveLen(2))
+		Expect(rsm.Spec.VolumeClaimTemplates[0]).Should(Equal(vcs[0]))
+		Expect(rsm.Spec.VolumeClaimTemplates[1]).Should(Equal(vc))
+		Expect(rsm.Spec.PodManagementPolicy).Should(Equal(policy))
+		Expect(rsm.Spec.UpdateStrategy.Type).Should(Equal(strategyType))
+		Expect(rsm.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
+		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(BeNil())
+		Expect(*rsm.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
+		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
+		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
+		Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())
+		Expect(rsm.Spec.RoleProbe.InitialDelaySeconds).Should(Equal(delay))
+		Expect(rsm.Spec.RoleProbe.ProbeActions).Should(HaveLen(2))
+		Expect(rsm.Spec.RoleProbe.ProbeActions[0]).Should(Equal(actions[0]))
+		Expect(rsm.Spec.RoleProbe.ProbeActions[1]).Should(Equal(action))
+		Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
+		Expect(*rsm.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
+		Expect(rsm.Spec.Service).ShouldNot(BeNil())
+		Expect(*rsm.Spec.Service).Should(Equal(service))
+		Expect(rsm.Spec.AlternativeServices).ShouldNot(BeNil())
+		Expect(rsm.Spec.AlternativeServices).Should(Equal(alternativeServices))
 		Expect(rsm.Spec.Credential).ShouldNot(BeNil())
 		Expect(*rsm.Spec.Credential).Should(Equal(credential))
 	})

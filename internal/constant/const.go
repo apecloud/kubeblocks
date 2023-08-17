@@ -77,6 +77,8 @@ const (
 	// K8s recommonded well-known labels and annotation keys
 	AppInstanceLabelKey  = "app.kubernetes.io/instance"
 	AppNameLabelKey      = "app.kubernetes.io/name"
+	AppComponentLabelKey = "app.kubernetes.io/component"
+	AppVersionLabelKey   = "app.kubernetes.io/version"
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
 	RegionLabelKey       = "topology.kubernetes.io/region"
 	ZoneLabelKey         = "topology.kubernetes.io/zone"
@@ -185,6 +187,7 @@ const (
 const (
 	DeploymentKind            = "Deployment"
 	StatefulSetKind           = "StatefulSet"
+	RSMKind                   = "ReplicatedStateMachine"
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"
@@ -306,6 +309,10 @@ const (
 	DPBaseBackupStartTime      = "BASE_BACKUP_START_TIME"      // base backup start time for pitr
 	DPBaseBackupStartTimestamp = "BASE_BACKUP_START_TIMESTAMP" // base backup start timestamp for pitr
 	DPBackupStopTime           = "BACKUP_STOP_TIME"            // backup stop time
+)
+
+const (
+	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
 )
 
 const (

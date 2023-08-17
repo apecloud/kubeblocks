@@ -21,6 +21,7 @@ package dcs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -232,6 +233,12 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 
 func (store *KubernetesStore) IsLockExist() (bool, error) {
 	leaderConfigMap, err := store.GetLeaderConfigMap()
+	appCluster, ok := store.cluster.resource.(*appsv1alpha1.Cluster)
+	if leaderConfigMap != nil && ok && leaderConfigMap.CreationTimestamp.Before(&appCluster.CreationTimestamp) {
+		store.logger.Info("A previous leader configmap resource exists, delete it", "name", leaderConfigMap.Name)
+		_ = store.DeleteLeader()
+		return false, nil
+	}
 	return leaderConfigMap != nil, err
 }
 
@@ -245,10 +252,11 @@ func (store *KubernetesStore) CreateLock() error {
 		return err
 	}
 
-	store.logger.Info("k8s store initializing, create leader ConfigMap", "leadername", leaderName)
+	leaderConfigMapName := store.clusterCompName + "-leader"
+	store.logger.Info("K8S store initializing, create leader ConfigMap", "leadername", leaderConfigMapName)
 	if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      store.clusterCompName + "-leader",
+			Name:      leaderConfigMapName,
 			Namespace: store.namespace,
 			Annotations: map[string]string{
 				"leader":       leaderName,
@@ -289,6 +297,15 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		ttl = viper.GetInt("KB_TTL")
 	}
 	leader := annotations["leader"]
+	stateStr, ok := annotations["dbstate"]
+	var dbState *DBState
+	if ok {
+		dbState = new(DBState)
+		err = json.Unmarshal([]byte(stateStr), &dbState)
+		if err != nil {
+			store.logger.Error(err, fmt.Sprintf("get leader dbstate failed, annotations: %v", annotations))
+		}
+	}
 
 	if ttl > 0 && time.Now().Unix()-renewTime > int64(ttl) {
 		store.logger.Info(fmt.Sprintf("lock expired: %v, now: %d", annotations, time.Now().Unix()))
@@ -302,7 +319,17 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		RenewTime:   renewTime,
 		TTL:         ttl,
 		Resource:    configmap,
+		DBState:     dbState,
 	}, nil
+}
+
+func (store *KubernetesStore) DeleteLeader() error {
+	leaderName := store.clusterCompName + "-leader"
+	err := store.clientset.CoreV1().ConfigMaps(store.namespace).Delete(store.ctx, leaderName, metav1.DeleteOptions{})
+	if err != nil {
+		store.logger.Error(err, "Delete leader configmap failed")
+	}
+	return err
 }
 
 func (store *KubernetesStore) AttempAcquireLock() error {
@@ -318,6 +345,10 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.SetAnnotations(annotation)
+	if store.cluster.Leader.DBState != nil {
+		str, _ := json.Marshal(store.cluster.Leader.DBState)
+		configMap.Annotations["dbstate"] = string(str)
+	}
 	cm, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		store.logger.Error(err, "Acquire lock failed")
@@ -342,6 +373,11 @@ func (store *KubernetesStore) UpdateLock() error {
 	ttl := store.cluster.HaConfig.ttl
 	annotations["ttl"] = strconv.Itoa(ttl)
 	annotations["renew-time"] = strconv.FormatInt(time.Now().Unix(), 10)
+
+	if store.cluster.Leader.DBState != nil {
+		str, _ := json.Marshal(store.cluster.Leader.DBState)
+		configMap.Annotations["dbstate"] = string(str)
+	}
 	configMap.SetAnnotations(annotations)
 
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
@@ -352,6 +388,11 @@ func (store *KubernetesStore) ReleaseLock() error {
 	store.logger.Info("release lock")
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
+
+	if store.cluster.Leader.DBState != nil {
+		str, _ := json.Marshal(store.cluster.Leader.DBState)
+		configMap.Annotations["dbstate"] = string(str)
+	}
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		store.logger.Error(err, "release lock failed")

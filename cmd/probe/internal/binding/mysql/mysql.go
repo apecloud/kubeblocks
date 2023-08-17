@@ -32,6 +32,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
@@ -40,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -124,11 +126,19 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
-	workloadType := request.Metadata[WorkloadTypeKey]
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if strings.EqualFold(workloadType, Replication) {
-		return mysqlOps.GetRoleForReplication(ctx, request, response)
+		dcsStore := dcs.GetStore()
+		if dcsStore == nil {
+			return "", nil
+		}
+		k8sStore := dcsStore.(*dcs.KubernetesStore)
+		cluster := k8sStore.GetClusterFromCache()
+		if cluster == nil || !cluster.IsLocked() {
+			return "", nil
+		}
 	}
-	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+	return mysqlOps.manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
@@ -148,29 +158,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 		return SECONDARY, nil
 	}
 
-	getReadOnlySQL := `show global variables like 'read_only';`
-	data, err := mysqlOps.query(ctx, getReadOnlySQL)
-	if err != nil {
-		mysqlOps.Logger.Error(err, fmt.Sprintf("error executing %s", getReadOnlySQL))
-		return "", errors.Wrapf(err, "error executing %s", getReadOnlySQL)
-	}
-
-	queryRes := &QueryRes{}
-	err = json.Unmarshal(data, queryRes)
-	if err != nil {
-		return "", errors.Errorf("parse query failed, err:%v", err)
-	}
-
-	for _, mapVal := range *queryRes {
-		if mapVal["Variable_name"] == "read_only" {
-			if mapVal["Value"].(string) == "OFF" {
-				return PRIMARY, nil
-			} else if mapVal["Value"].(string) == "ON" {
-				return SECONDARY, nil
-			}
-		}
-	}
-	return "", errors.Errorf("parse query failed, no records")
+	return PRIMARY, nil
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
@@ -385,8 +373,8 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *ProbeR
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
-	roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
+	select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType, component.CheckStatusType)
+	roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
 	var err error
 	var data []byte
 	switch mysqlOps.DBRoles[strings.ToLower(mysqlOps.OriRole)] {
@@ -535,6 +523,7 @@ func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *ProbeReq
 	sqlTplRend := func(user UserInfo) string {
 		return listUserTpl
 	}
+
 	return QueryObject(ctx, mysqlOps, req, ListUsersOp, sqlTplRend, nil, UserInfo{})
 }
 

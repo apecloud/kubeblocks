@@ -33,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
@@ -44,7 +43,7 @@ var _ = Describe("object deletion transformer test.", func() {
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
-			SetMembershipReconfiguration(reconfiguration).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()
 
@@ -70,16 +69,7 @@ var _ = Describe("object deletion transformer test.", func() {
 			headLessSvc := buildHeadlessSvc(*rsm)
 			envConfig := buildEnvConfigMap(*rsm)
 			actionName := getActionName(rsm.Name, int(rsm.Generation), 1, jobTypeSwitchover)
-			action := builder.NewJobBuilder(name, actionName).
-				AddLabelsInMap(map[string]string{
-					constant.AppInstanceLabelKey: rsm.Name,
-					constant.KBManagedByKey:      kindReplicatedStateMachine,
-					jobScenarioLabel:             jobScenarioMembership,
-					jobTypeLabel:                 jobTypeSwitchover,
-					jobHandledLabel:              jobHandledFalse,
-				}).
-				SetSuspend(false).
-				GetObject()
+			action := buildAction(rsm, actionName, jobTypeSwitchover, jobScenarioMembership, "", "")
 			k8sMock.EXPECT().
 				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {
@@ -108,12 +98,6 @@ var _ = Describe("object deletion transformer test.", func() {
 					list.Items = []batchv1.Job{*action}
 					return nil
 				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, list client.ObjectList, _ ...client.ListOption) error {
-					Expect(list).ShouldNot(BeNil())
-					return nil
-				}).Times(3)
 
 			Expect(transformer.Transform(transCtx, dag)).Should(Equal(graph.ErrPrematureStop))
 			dagExpected := mockDAG()

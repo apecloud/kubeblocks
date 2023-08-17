@@ -52,13 +52,6 @@ const (
 )
 
 const (
-	// types for probe
-	CheckRunningType int = iota
-	CheckStatusType
-	CheckRoleChangedType
-)
-
-const (
 	PRIMARY   = "primary"
 	SECONDARY = "secondary"
 	MASTER    = "master"

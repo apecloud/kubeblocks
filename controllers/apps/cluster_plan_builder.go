@@ -59,11 +59,10 @@ type ClusterTransformContext struct {
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	Cluster         *appsv1alpha1.Cluster
-	OrigCluster     *appsv1alpha1.Cluster
-	ClusterDef      *appsv1alpha1.ClusterDefinition
-	ClusterVer      *appsv1alpha1.ClusterVersion
-	ClusterTemplate *appsv1alpha1.ClusterTemplate
+	Cluster     *appsv1alpha1.Cluster
+	OrigCluster *appsv1alpha1.Cluster
+	ClusterDef  *appsv1alpha1.ClusterDefinition
+	ClusterVer  *appsv1alpha1.ClusterVersion
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

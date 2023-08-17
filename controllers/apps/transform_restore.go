@@ -39,7 +39,6 @@ var _ graph.Transformer = &RestoreTransformer{}
 func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	clusterTpl := transCtx.ClusterTemplate
 	clusterDef := transCtx.ClusterDef
 	clusterVer := transCtx.ClusterVer
 	reqCtx := ictrlutil.RequestCtx{
@@ -55,7 +54,7 @@ func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return err
 	}
 	for _, spec := range cluster.Spec.ComponentSpecs {
-		comp, err := components.NewComponent(reqCtx, t.Client, clusterDef, clusterVer, cluster, clusterTpl, spec.Name, nil)
+		comp, err := components.NewComponent(reqCtx, t.Client, clusterDef, clusterVer, cluster, spec.Name, nil)
 		if err != nil {
 			return err
 		}

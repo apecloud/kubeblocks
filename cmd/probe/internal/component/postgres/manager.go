@@ -885,3 +885,7 @@ func (mgr *Manager) pgReload(ctx context.Context) error {
 
 	return err
 }
+
+func (mgr *Manager) ShutDownWithWait() {
+	mgr.Pool.Close()
+}

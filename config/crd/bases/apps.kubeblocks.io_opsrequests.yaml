@@ -193,7 +193,6 @@ spec:
                                       type: string
                                   required:
                                   - key
-                                  - value
                                   type: object
                                 minItems: 1
                                 type: array

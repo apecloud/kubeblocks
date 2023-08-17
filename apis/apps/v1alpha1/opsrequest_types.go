@@ -259,7 +259,7 @@ type ParameterPair struct {
 
 	// parameter values to be updated.
 	// if set nil, the parameter defined by the key field will be deleted from the configuration file.
-	// +kubebuilder:validation:Required
+	// +optional
 	Value *string `json:"value"`
 }
 

@@ -42,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -264,7 +265,7 @@ var _ = Describe("util", func() {
 		}}
 
 		for _, tt := range tests {
-			Expect(IsSupportReconfigureParams(tt.args.configSpec, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
+			Expect(IsSupportReconfigureParams(tt.args.configSpec, cfgcore.FromStringPointerMap(tt.args.updatedParams), mockClient)).Should(BeEquivalentTo(tt.expected))
 		}
 	})
 

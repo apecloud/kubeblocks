@@ -72,7 +72,7 @@ func (o *configOpsOptions) Complete() error {
 		if err != nil {
 			return err
 		}
-		o.KeyValues = kvs
+		o.KeyValues = cfgcore.FromStringPointerMap(kvs)
 	}
 
 	wrapper, err := newConfigWrapper(o.CreateOptions, o.Name, o.ComponentName, o.CfgTemplateName, o.CfgFile, o.KeyValues)

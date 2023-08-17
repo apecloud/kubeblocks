@@ -113,8 +113,8 @@ func newConfigContext(baseOptions create.CreateOptions, clusterName, componentNa
 	}
 }
 
-func fromKeyValuesToMap(params []cfgcore.VisualizedParam, file string) map[string]string {
-	result := make(map[string]string)
+func fromKeyValuesToMap(params []cfgcore.VisualizedParam, file string) map[string]*string {
+	result := make(map[string]*string)
 	for _, param := range params {
 		if param.Key != file {
 			continue

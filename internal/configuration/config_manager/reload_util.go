@@ -114,7 +114,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 			if err != nil {
 				return err
 			}
-			newConfig, err := cfgcore.ApplyConfigPatch(b, updatedParams, formatConfig)
+			newConfig, err := cfgcore.ApplyConfigPatch(b, cfgcore.FromStringPointerMap(updatedParams), formatConfig)
 			if err != nil {
 				return err
 			}
@@ -149,8 +149,8 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	for _, key := range params {
 		if key.UpdateType != cfgcore.DeletedType {
 			for _, p := range key.Parameters {
-				if p.Value != "" {
-					r[p.Key] = p.Value
+				if p.Value != nil {
+					r[p.Key] = *p.Value
 				}
 			}
 		}

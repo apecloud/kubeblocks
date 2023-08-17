@@ -34,7 +34,7 @@ options: {
 	replicas: int
 	storage:  string
 	vctNames: [...string]
-	keyValues: [string]: string
+	keyValues: [string]: {string | null}
 	cfgTemplateName: string
 	cfgFile:         string
 	services: [

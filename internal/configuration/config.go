@@ -390,9 +390,13 @@ func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 		case map[string]interface{}:
 			r = append(r, flattenMap(m2, fullKey)...)
 		default:
+			var v *string = nil
+			if val != nil {
+				v = util.ToPointer(cast.ToString(val))
+			}
 			r = append(r, ParameterPair{
 				Key:   fullKey,
-				Value: cast.ToString(val),
+				Value: v,
 			})
 		}
 	}

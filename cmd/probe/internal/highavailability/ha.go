@@ -362,10 +362,20 @@ func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs.Cluster) err
 	}
 
 	// redistribute the data of the current member among other members if needed
-	ha.dbManager.MoveData(ctx, cluster)
+	err := ha.dbManager.MoveData(ctx, cluster)
+	if err != nil {
+		ha.logger.Warnf("Move data failed: %v", err)
+		return err
+	}
 
 	// remove current member from db cluster
-	return ha.dbManager.DeleteMemberFromCluster(ctx, cluster, ha.dbManager.GetCurrentMemberName())
+	err = ha.dbManager.DeleteMemberFromCluster(ctx, cluster, ha.dbManager.GetCurrentMemberName())
+	if err != nil {
+		ha.logger.Warnf("Delete member form cluster failed: %v", err)
+		return err
+	}
+	cluster.HaConfig.FinishDeleted(currentMember)
+	return ha.dcs.UpdateHaConfig()
 }
 
 func (ha *Ha) ShutdownWithWait() {

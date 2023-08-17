@@ -435,7 +435,7 @@ func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.Invok
 		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
 		return opsRes, err
 	}
-	currentMember := cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName())
+	currentMember := cluster.GetMemberWithName(ops.Manager.GetCurrentMemberName())
 
 	if cluster.HaConfig.IsDeleted(currentMember) {
 		opsRes["event"] = OperationSuccess

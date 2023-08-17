@@ -130,7 +130,16 @@ func (c *HaConfig) IsDeleting(member *Member) bool {
 
 func (c *HaConfig) IsDeleted(member *Member) bool {
 	memberToDelete := c.GetMemberToDelete(member)
+	if memberToDelete == nil {
+		return false
+	}
 	return memberToDelete.IsFinished
+}
+
+func (c *HaConfig) FinishDeleted(member *Member) {
+	memberToDelete := c.GetMemberToDelete(member)
+	memberToDelete.IsFinished = true
+	c.DeleteMembers[member.Name] = *memberToDelete
 }
 
 func (c *HaConfig) GetMemberToDelete(member *Member) *MemberToDelete {
@@ -144,6 +153,7 @@ func (c *HaConfig) GetMemberToDelete(member *Member) *MemberToDelete {
 	}
 	return &memberToDelete
 }
+
 func (c *HaConfig) AddMemberToDelete(member *Member) {
 	memberToDelete := MemberToDelete{
 		UID:        member.UID,

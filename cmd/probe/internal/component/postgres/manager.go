@@ -482,7 +482,7 @@ func (mgr *Manager) Stop() error {
 func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	if cluster.Leader == nil || cluster.Leader.Name == "" {
 		mgr.Logger.Warnf("no action coz cluster has no leader")
-		return mgr.Start()
+		return mgr.Start(cluster)
 	}
 
 	err := mgr.handleRewind(ctx, cluster)
@@ -752,23 +752,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	return mgr.Start()
-}
-
-func (mgr *Manager) Start() error {
-	mgr.Logger.Infof("wait for send signal 2 to activate sql channel")
-	sqlChannelProc, err := component.GetSQLChannelProc()
-	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
-		return errors.Errorf("can't find sql channel process, err:%v", err)
-	}
-
-	// activate sql channel restart db
-	err = sqlChannelProc.Signal(syscall.SIGUSR2)
-	if err != nil {
-		return errors.Errorf("send signal2 to sql channel failed, err:%v", err)
-	}
-	return nil
+	return mgr.Start(cluster)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {

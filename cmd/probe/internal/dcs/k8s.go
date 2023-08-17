@@ -209,6 +209,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.SQLChannelPort = getSQLChannelPort(&pod)
+		member.UID = string(pod.UID)
 		member.resource = pod.DeepCopy()
 	}
 
@@ -459,7 +460,14 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	if err != nil {
 		maxLagOnSwitchover = 1048576
 	}
-	deleteMembers := annotations["delete-members"]
+	deleteMembers := make(map[string]MemberToDelete)
+	str := annotations["delete-members"]
+	if str != "" {
+		err := json.Unmarshal([]byte(str), &deleteMembers)
+		if err != nil {
+			store.logger.Errorf("Get delete members [%s] errors: %v", str, err)
+		}
+	}
 
 	return &HaConfig{
 		index:              configmap.ResourceVersion,
@@ -479,10 +487,14 @@ func (store *KubernetesStore) UpdateHaConfig() error {
 	configMap := haConfig.resource.(*corev1.ConfigMap)
 	annotations := configMap.Annotations
 	annotations["ttl"] = strconv.Itoa(haConfig.ttl)
-	annotations["delete-members"] = haConfig.DeleteMembers
+	deleteMembers, err := json.Marshal(haConfig.DeleteMembers)
+	if err != nil {
+		store.logger.Errorf("marsha delete members [%v] errors: %v", haConfig, err)
+	}
+	annotations["delete-members"] = string(deleteMembers)
 	annotations["MaxLagOnSwitchover"] = strconv.Itoa(int(haConfig.maxLagOnSwitchover))
 
-	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	_, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	return err
 }
 

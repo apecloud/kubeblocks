@@ -85,6 +85,13 @@ func (ha *Ha) RunCycle() {
 		return
 	}
 
+	currentMember := cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName())
+
+	if cluster.HaConfig.IsDeleting(currentMember) {
+		ha.DeleteCurrentMember(ha.ctx, cluster)
+		return
+	}
+
 	switch {
 	case !ha.dbManager.IsRunning():
 		ha.logger.Infof("DB Service is not running,  wait for sqlctl to start it")
@@ -322,9 +329,15 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 }
 
 func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs.Cluster) error {
+	currentMember := cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName())
+	if cluster.HaConfig.IsDeleted(currentMember) {
+		return nil
+	}
+
 	ha.deleteLock.Lock()
 	defer ha.deleteLock.Unlock()
 
+	// if current member is leader, take a switchover first
 	if ha.dcs.HasLock() {
 		for cluster.Switchover != nil {
 			ha.logger.Info("cluster is doing switchover, wait for it to finish")

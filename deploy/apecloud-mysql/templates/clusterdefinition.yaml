@@ -21,20 +21,6 @@ spec:
           failureThreshold: {{ .Values.roleProbe.failureThreshold }}
           periodSeconds: {{ .Values.roleProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
-          actions:
-            - image: "arey/mysql-client:latest"
-              command:
-                - mysql
-                - "-h127.0.0.1"
-                - "-u$KB_SERVICE_USER"
-                - "-p$KB_SERVICE_PASSWORD"
-                - "-N"
-                - "-B"
-                - "-e"
-                - "\"select CONCAT(CURRENT_TERM,',' ,IP_PORT, ',' ,global.ROLE) from information_schema.wesql_cluster_global global,information_schema.wesql_cluster_local;\""
-            - image: "bash:latest"
-              command:
-                - "echo $v_KB_CONSENSUS_SET_LAST_STDOUT |  xargs -n1 | sed 's/\\..*,/,/' "
       monitor:
         builtIn: false
         exporterConfig:

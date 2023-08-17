@@ -89,7 +89,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 	// Request sql channel via Dapr SDK
 	req := &dapr.InvokeBindingRequest{
 		Name:      cli.CharacterType,
-		Operation: "getRole",
+		Operation: string(GetRoleOperation),
 		Data:      []byte(""),
 		Metadata:  map[string]string{},
 	}
@@ -136,6 +136,31 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 		return nil, err
 	}
 	return result, err
+}
+
+func (cli *OperationClient) PreDelete() (string, error) {
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
+	defer cancel()
+
+	// Request sql channel via Dapr SDK
+	req := &dapr.InvokeBindingRequest{
+		Name:      cli.CharacterType,
+		Operation: string(PreDeleteOperation),
+		Data:      []byte(""),
+		Metadata:  map[string]string{},
+	}
+
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	if err != nil {
+		return "", err
+	}
+	result := map[string]string{}
+	err = json.Unmarshal(resp.Data, &result)
+	if err != nil {
+		return "", err
+	}
+
+	return result["role"], nil
 }
 
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {

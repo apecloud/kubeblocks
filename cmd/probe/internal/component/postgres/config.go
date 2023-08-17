@@ -25,6 +25,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
 const (
@@ -95,4 +97,8 @@ func (config *Config) GetDBPort() int {
 func (config *Config) GetConnectURLWithHost(host string) string {
 	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s pool_min_conns=%d pool_max_conns=%d",
 		config.username, config.password, host, config.port, config.database, config.minConns, config.maxConns)
+}
+
+func getConsensusIPPort(cluster *dcs.Cluster, name string) string {
+	return fmt.Sprintf("%s.%s-headless.%s.svc:1%d", name, cluster.ClusterCompName, cluster.Namespace, config.port)
 }

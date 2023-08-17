@@ -22,7 +22,6 @@ package postgres
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -31,8 +30,6 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
 var (
@@ -304,8 +301,4 @@ func parseQuery(str string) ([]map[string]string, error) {
 	}
 
 	return result, nil
-}
-
-func getConsensusIPPort(cluster *dcs.Cluster, name string) string {
-	return fmt.Sprintf("%s.%s-headless.%s.svc:1%d", name, cluster.ClusterCompName, cluster.Namespace, config.port)
 }

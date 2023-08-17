@@ -423,7 +423,7 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	ioError := rowMap.GetString("Last_IO_Error")
 	sqlError := rowMap.GetString("Last_SQL_Error")
 	if ioError != "" || sqlError != "" {
-		mgr.Logger.Infof("slave status error, sqlError: %s, ioError: %s", sqlError, ioError)
+		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, sqlError: %s, ioError: %s", sqlError, ioError))
 		return true
 	}
 
@@ -489,7 +489,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 
 	_, err := mgr.DB.Exec(setReadOnly)
 	if err != nil {
-		mgr.Logger.Errorf("Lock err: %v", err)
+		mgr.Logger.Error(err, "Lock err")
 		return err
 	}
 	return nil
@@ -500,7 +500,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 
 	_, err := mgr.DB.Exec(setReadOnlyOff)
 	if err != nil {
-		mgr.Logger.Errorf("Unlock err: %v", err)
+		mgr.Logger.Error(err, "Unlock err")
 		return err
 	}
 	return nil

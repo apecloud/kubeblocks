@@ -79,7 +79,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return err
 	}
 
-	injectHttp2Shell(component.PodSpec)
+	//injectHttp2Shell(component.PodSpec)
 
 	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
@@ -171,6 +171,12 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		ValueFrom: nil,
 	})
 
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      "KB_RSM_ACTION_SVC_LIST",
+		Value:     viper.GetString("KB_RSM_ACTION_SVC_LIST"),
+		ValueFrom: nil,
+	})
+
 	container.Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: int32(probeSvcHTTPPort),
@@ -213,11 +219,7 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	bindingType := strings.ToLower(component.CharacterType)
 	workloadType := component.WorkloadType
 	httpGet := &corev1.HTTPGetAction{}
-	if viper.GetBool("ENABLE_PROBE_SNAPSHOT") {
-		httpGet.Path = fmt.Sprintf(getGlobalInfoFormat, bindingType)
-	} else {
-		httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
-	}
+	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
@@ -226,24 +228,24 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 
-	base := probeSvcHTTPPort + 2
-	portNeeded := len(probeSetting.Actions)
-	activePorts := make([]int32, portNeeded)
-	for i := 0; i < portNeeded; i++ {
-		activePorts[i] = int32(base + i)
-	}
-	activePorts, err := getAvailableContainerPorts(pod.Containers, activePorts)
-	if err != nil {
-		return
-	}
-	marshal, err := json.Marshal(activePorts)
-	if err != nil {
-		return
-	}
-	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", string(marshal))
+	//base := probeSvcHTTPPort + 2
+	//portNeeded := len(probeSetting.Actions)
+	//activePorts := make([]int32, portNeeded)
+	//for i := 0; i < portNeeded; i++ {
+	//	activePorts[i] = int32(base + i)
+	//}
+	//activePorts, err := getAvailableContainerPorts(pod.Containers, activePorts)
+	//if err != nil {
+	//	return
+	//}
+	//marshal, err := json.Marshal(activePorts)
+	//if err != nil {
+	//	return
+	//}
+	//viper.Set("KB_RSM_ACTION_SVC_LIST", string(marshal))
 
 	addTokenEnv(roleChangedContainer)
-	injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkrole", roleChangedContainer.Env)
+	//injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkrole", roleChangedContainer.Env)
 }
 
 func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
@@ -347,40 +349,40 @@ func injectHttp2Shell(pod *corev1.PodSpec) {
 	pod.InitContainers = append(pod.InitContainers, initContainer)
 }
 
-func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
-	port []int32, path, usage string,
-	credentialEnv []corev1.EnvVar) {
-	actions := probeSetting.Actions
-	volumeMount := corev1.VolumeMount{
-		Name:      constant.ProbeAgentMountName,
-		MountPath: constant.ProbeAgentMountPath,
-	}
-	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
-
-	for i, action := range actions {
-		image := action.Image
-		if len(action.Image) == 0 {
-			image = constant.DefaultActionImage
-		}
-
-		command := []string{
-			binPath,
-			"-port", fmt.Sprintf("%d", port[i]),
-			"-export-all-vars",
-			"-form",
-			path,
-			strings.Join(action.Command, " "),
-		}
-
-		container := corev1.Container{
-			Name:            fmt.Sprintf("%s-action-%d", usage, i),
-			Image:           image,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			VolumeMounts:    []corev1.VolumeMount{volumeMount},
-			Env:             credentialEnv,
-			Command:         command,
-		}
-
-		pod.Containers = append(pod.Containers, container)
-	}
-}
+//func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
+//	port []int32, path, usage string,
+//	credentialEnv []corev1.EnvVar) {
+//	actions := probeSetting.Actions
+//	volumeMount := corev1.VolumeMount{
+//		Name:      constant.ProbeAgentMountName,
+//		MountPath: constant.ProbeAgentMountPath,
+//	}
+//	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
+//
+//	for i, action := range actions {
+//		image := action.Image
+//		if len(action.Image) == 0 {
+//			image = constant.DefaultActionImage
+//		}
+//
+//		command := []string{
+//			binPath,
+//			"-port", fmt.Sprintf("%d", port[i]),
+//			"-export-all-vars",
+//			"-form",
+//			path,
+//			strings.Join(action.Command, " "),
+//		}
+//
+//		container := corev1.Container{
+//			Name:            fmt.Sprintf("%s-action-%d", usage, i),
+//			Image:           image,
+//			ImagePullPolicy: corev1.PullIfNotPresent,
+//			VolumeMounts:    []corev1.VolumeMount{volumeMount},
+//			Env:             credentialEnv,
+//			Command:         command,
+//		}
+//
+//		pod.Containers = append(pod.Containers, container)
+//	}
+//}

@@ -62,7 +62,7 @@ func NewHTTPCustom() (*HTTPCustom, error) {
 
 // Init performs metadata parsing.
 func (h *HTTPCustom) Init(metadata component.Properties) error {
-	actionSvcList := viper.GetString("KB_CONSENSUS_SET_ACTION_SVC_LIST")
+	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
 	if len(actionSvcList) > 0 {
 		err := json.Unmarshal([]byte(actionSvcList), h.actionSvcPorts)
 		if err != nil {

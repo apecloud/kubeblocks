@@ -54,12 +54,12 @@ func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Re
 		return nil
 	}
 
-	//if _, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
-	//	return err
-	//}
-	if err = handleGlobalInfoEvent(cli, reqCtx, recorder, event); err != nil {
+	if _, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
 		return err
 	}
+	//if err = handleGlobalInfoEvent(cli, reqCtx, recorder, event); err != nil {
+	//	return err
+	//}
 
 	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be filtered
 	patch := client.MergeFrom(event.DeepCopy())
@@ -122,7 +122,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	return role, nil
 }
 
-// handleGlobalInfoEvent handles role changed event and return role.
+// handleGlobalInfoEvent handles cluster role changed event and return err if occurs.
 func handleGlobalInfoEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	// parse probe event message
 	global := ParseProbeEventMessage(reqCtx, event)

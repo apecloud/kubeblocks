@@ -1,4 +1,7 @@
 mkdir -p ${BACKUP_DIR};
+log_bin_basename=$(MYSQL_PWD=${DB_PASSWORD} mysql -u ${DB_USER} -h ${DB_HOST} -N -e "SHOW VARIABLES LIKE 'log_bin_basename';" | awk -F'\t' '{print $2}')
+LOG_DIR=$(dirname $log_bin_basename)
+LOG_PREFIX=$(basename $log_bin_basename)
 cd $LOG_DIR
 LATEST_TRANS=$(mysqlbinlog $(ls -Ft $LOG_DIR/|grep -e '^mysql-bin.*[[:digit:]]$' |head -n 1)|grep 'Xid =' |head -n 1)
 if [ -n "${LATEST_TRANS}" ]; then
@@ -39,9 +42,6 @@ function get_binlog_start_time() {
 }
 
 function get_backup_time_range() {
-    log_bin_basename=$(MYSQL_PWD=${DB_PASSWORD} mysql -u ${DB_USER} -h ${DB_HOST} -N -e "SHOW VARIABLES LIKE 'log_bin_basename';" | awk -F'\t' '{print $2}')
-    LOG_DIR=$(dirname $log_bin_basename)
-    LOG_PREFIX=$(basename $log_bin_basename)
     cd $LOG_DIR;
     first_bin_log=$(ls -Ftr $LOG_DIR/|grep -e "^${LOG_PREFIX}.*[[:digit:]]$"|head -n 1)
     START_TIME=$(get_binlog_start_time $first_bin_log)

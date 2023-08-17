@@ -19,8 +19,6 @@ spec:
       value: "$(VOLUME_DATA_DIR)/conf"
     - name: TIME_FORMAT
       value: 2006-01-02T15:04:05Z
-    - name: LOG_DIR
-      value: $(VOLUME_DATA_DIR)/data
   image: {{ .Values.image.registry | default "docker.io" }}/apecloud/wal-g:mysql-latest
   logical:
     restoreCommands:

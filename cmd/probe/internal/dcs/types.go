@@ -106,7 +106,7 @@ type HaConfig struct {
 	index              string
 	ttl                int
 	maxLagOnSwitchover int64
-	DeleteMembers      string
+	DeleteMembers      map[string]string
 	resource           any
 }
 
@@ -139,6 +139,7 @@ type Member struct {
 	PodIP          string
 	DBPort         string
 	SQLChannelPort string
+	resource       any
 }
 
 func (m *Member) GetName() string {

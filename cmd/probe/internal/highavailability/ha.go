@@ -21,8 +21,10 @@ package highavailability
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dapr/kit/logger"
@@ -34,11 +36,14 @@ import (
 )
 
 type Ha struct {
-	ctx       context.Context
-	dbManager component.DBManager
-	dcs       dcs.DCS
-	logger    logger.Logger
+	ctx        context.Context
+	dbManager  component.DBManager
+	dcs        dcs.DCS
+	logger     logger.Logger
+	deleteLock sync.Mutex
 }
+
+var ha *Ha
 
 func NewHa(logger logger.Logger) *Ha {
 
@@ -60,12 +65,16 @@ func NewHa(logger logger.Logger) *Ha {
 		return nil
 	}
 
-	ha := &Ha{
+	ha = &Ha{
 		ctx:       context.Background(),
 		dcs:       dcs,
 		logger:    logger,
 		dbManager: manager,
 	}
+	return ha
+}
+
+func GetHa() *Ha {
 	return ha
 }
 
@@ -310,6 +319,40 @@ func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) b
 	}
 
 	return false
+}
+
+func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs.Cluster) error {
+	ha.deleteLock.Lock()
+	defer ha.deleteLock.Unlock()
+
+	if ha.dcs.HasLock() {
+		for cluster.Switchover != nil {
+			ha.logger.Info("cluster is doing switchover, wait for it to finish")
+			return nil
+		}
+
+		leaderMember := cluster.GetLeaderMember()
+		if len(ha.dbManager.HasOtherHealthyMembers(ctx, cluster, leaderMember.Name)) == 0 {
+			message := "cluster has no other healthy members"
+			ha.logger.Info(message)
+			return errors.New(message)
+		}
+
+		err := ha.dcs.CreateSwitchover(leaderMember.Name, "")
+		if err != nil {
+			ha.logger.Infof("switchover failed: %v", err)
+			return err
+		}
+
+		ha.logger.Info("cluster is doing switchover, wait for it to finish")
+		return nil
+	}
+
+	// redistribute the data of the current member among other members if needed
+	ha.dbManager.MoveData(ctx, cluster)
+
+	// remove current member from db cluster
+	return ha.dbManager.DeleteMemberFromCluster(ctx, cluster, ha.dbManager.GetCurrentMemberName())
 }
 
 func (ha *Ha) ShutdownWithWait() {

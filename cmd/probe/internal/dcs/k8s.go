@@ -209,6 +209,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.SQLChannelPort = getSQLChannelPort(&pod)
+		member.resource = pod.DeepCopy()
 	}
 
 	return members, nil

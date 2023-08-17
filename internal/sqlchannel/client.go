@@ -76,7 +76,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		CharacterType:    characterType,
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
-		ReconcileTimeout: 100 * time.Millisecond,
+		ReconcileTimeout: 500 * time.Millisecond,
 		cache:            make(map[string]*OperationResult),
 	}
 	return operationClient, nil

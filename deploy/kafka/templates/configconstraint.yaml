@@ -16,9 +16,9 @@ spec:
 
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configurationSchema:
-    # schema: auto generate from mmmcue scripts
+    # schema: auto generate from cue scripts
     cue: |-
-       {{- .Files.Get "config/kafka-server-constraint.cue" | nindent 6 }}
+      {{- .Files.Get "configs/kafka-server-constraint.cue" | nindent 6 }}
 
   formatterConfig:
     format: properties

@@ -24,7 +24,7 @@ spec:
     retention:
       ttl: 7d
     schedule:
-      retryWindowMinutes: 120
+      startingDeadlineMinutes: 120
       snapshot:
         enable: false
         cronExpression: "0 18 * * *"
@@ -33,7 +33,7 @@ spec:
         cronExpression: "0 18 * * *"
       logfile:
         enable: false
-        cronExpression: "*/5 * * * *"
+        cronExpression: "*/2 * * * *"
     snapshot:
       target:
         connectionCredentialKey:
@@ -43,30 +43,15 @@ spec:
         containerName: postgresql
         preCommands:
           - psql -c "CHECKPOINT;"
-      backupStatusUpdates:
-        - path: manifests.backupLog
-          containerName: postgresql
-          script: /kb-scripts/backup-log-collector.sh true
-          updateStage: post
     datafile:
       backupToolName: postgres-basebackup
       backupStatusUpdates:
-        - path: manifests.backupLog
-          containerName: postgresql
-          script: /kb-scripts/backup-log-collector.sh true
-          updateStage: post
-        - containerName: postgresql
-          script: /kb-scripts/filesize-collector.sh basebackup.info
-          updateStage: post
+      - updateStage: post
+        useTargetPodServiceAccount: true
     logfile:
       backupToolName: postgres-pitr
       target:
         role: primary
       backupStatusUpdates:
-        - path: manifests.backupLog
-          containerName: postgresql
-          script: /kb-scripts/backup-log-collector.sh false
-          updateStage: post
-        - containerName: postgresql
-          script: /kb-scripts/filesize-collector.sh logfile.info
-          updateStage: post
+      - updateStage: post
+        useTargetPodServiceAccount: true

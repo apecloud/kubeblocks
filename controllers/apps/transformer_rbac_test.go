@@ -68,6 +68,8 @@ var _ = Describe("object rbac transformer test.", func() {
 			clusterDefName, clusterVersionName).WithRandomName().
 			AddComponent(compName, compDefName).
 			SetServiceAccountName(serviceAccountName).GetObject()
+		r := int32(1)
+		cluster.Spec.Replicas = &r
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, "sts").
 			GetObject()
@@ -101,7 +103,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 
 	Context("transformer rbac manager", func() {
-		It("create serviceaccount and rolebinding if not exist", func() {
+		It("create serviceaccount, rolebinding and clusterrolebinding if not exist", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, saKey,
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
@@ -114,9 +116,14 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(err).Should(BeNil())
 			roleBinding.Subjects[0].Name = serviceAccountName
 
+			clusterRoleBinding, err := builder.BuildRoleBinding(cluster)
+			Expect(err).Should(BeNil())
+			clusterRoleBinding.Subjects[0].Name = serviceAccountName
+
 			dagExpected := mockDAG(cluster)
 			ictrltypes.LifecycleObjectCreate(dagExpected, serviceAccount, nil)
 			ictrltypes.LifecycleObjectCreate(dagExpected, roleBinding, nil)
+			ictrltypes.LifecycleObjectCreate(dagExpected, clusterRoleBinding, nil)
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 	})

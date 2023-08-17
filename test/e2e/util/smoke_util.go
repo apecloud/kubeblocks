@@ -358,3 +358,15 @@ func ReadLine(fileName string, name string) string {
 	}
 	return ""
 }
+
+func CheckCommand(command string, path string) bool {
+	cmdPath := path + "/" + command
+	if fi, err := os.Stat(cmdPath); err == nil && fi.Mode()&0111 != 0 {
+		return true
+	}
+	if _, err := exec.New().LookPath(cmdPath); err == nil {
+		return true
+	}
+
+	return false
+}

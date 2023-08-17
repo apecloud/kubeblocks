@@ -29,7 +29,7 @@ spec:
         templateRef: qdrant-scripts
         namespace: {{ .Release.Namespace }}
         volumeName: scripts
-        defaultMode: 493
+        defaultMode: 0555
       configSpecs:
         - name: qdrant-config-template
           templateRef: qdrant-config-template

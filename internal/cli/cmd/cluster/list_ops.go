@@ -105,7 +105,9 @@ func (o *opsListOptions) printOpsList() error {
 		LabelSelector: o.LabelSelector,
 		FieldSelector: o.FieldSelector,
 	}
-
+	if o.AllNamespaces {
+		o.Namespace = ""
+	}
 	opsList, err := dynamic.Resource(types.OpsGVR()).Namespace(o.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return err
@@ -120,7 +122,7 @@ func (o *opsListOptions) printOpsList() error {
 	// check if specified with "all" keyword for status.
 	isAllStatus := o.isAllStatus()
 	tblPrinter := printer.NewTablePrinter(o.Out)
-	tblPrinter.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
+	tblPrinter.SetHeader("NAME", "NAMESPACE", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
 	for _, obj := range opsList.Items {
 		ops := &appsv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {
@@ -130,7 +132,7 @@ func (o *opsListOptions) printOpsList() error {
 		opsType := string(ops.Spec.Type)
 		if len(o.opsRequestName) != 0 {
 			if ops.Name == o.opsRequestName {
-				tblPrinter.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
+				tblPrinter.AddRow(ops.Name, ops.GetNamespace(), opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
 			}
 			continue
 		}
@@ -142,7 +144,7 @@ func (o *opsListOptions) printOpsList() error {
 		if len(o.opsType) != 0 && !o.containsIgnoreCase(o.opsType, opsType) {
 			continue
 		}
-		tblPrinter.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
+		tblPrinter.AddRow(ops.Name, ops.GetNamespace(), opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
 	}
 	if tblPrinter.Tbl.Length() != 0 {
 		tblPrinter.Print()

@@ -57,22 +57,28 @@ var connectExample = templates.Examples(`
 		# connect to a specified component
 		kbcli cluster connect mycluster --component mycomponent
 
-		# show cli connection example
+		# show cli connection example with password mask
 		kbcli cluster connect mycluster --show-example --client=cli
 
-		# show java connection example
+		# show java connection example with password mask
 		kbcli cluster connect mycluster --show-example --client=java
 
-		# show all connection examples
-		kbcli cluster connect mycluster --show-example`)
+		# show all connection examples with password mask
+		kbcli cluster connect mycluster --show-example 
+
+		# show cli connection examples with real password 
+		kbcli cluster connect mycluster --show-example --client=cli --show-password`)
+
+const passwordMask = "******"
 
 type ConnectOptions struct {
 	clusterName   string
 	componentName string
 
-	clientType  string
-	showExample bool
-	engine      engine.ClusterCommands
+	clientType   string
+	showExample  bool
+	showPassword bool
+	engine       engine.ClusterCommands
 
 	privateEndPoint bool
 	svc             *corev1.Service
@@ -109,6 +115,8 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
 	flags.AddComponentsFlag(f, cmd, false, &o.componentName, "The component to connect. If not specified, pick up the first one.")
 	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster/instance from different clients.")
+	cmd.Flags().BoolVar(&o.showPassword, "show-password", false, "Show password in example.")
+
 	cmd.Flags().StringVar(&o.clientType, "client", "", "Which client connection example should be output, only valid if --show-example is true.")
 
 	cmd.Flags().StringVar(&o.userName, "as-user", "", "Connect to cluster as user")
@@ -355,7 +363,9 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	if info.User, info.Password, err = getUserAndPassword(objs.ClusterDef, objs.Secrets); err != nil {
 		return nil, err
 	}
-
+	if !o.showPassword {
+		info.Password = passwordMask
+	}
 	// get host and port, use external endpoints first, if external endpoints are empty,
 	// use internal endpoints
 

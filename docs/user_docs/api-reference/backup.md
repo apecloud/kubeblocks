@@ -572,12 +572,13 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>physical</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
-BackupToolRestoreCommand
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">
+PhysicalConfig
 </a>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>backup tool can support physical restore, in this case, restore must be RESTART database.</p><br />
 </td>
 </tr>
@@ -790,6 +791,24 @@ Kubernetes meta/v1.Time
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod
+(<code>string</code> alias)</h3>
+<div>
+<p>BackupMethod the backup method</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;backupTool&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;snapshot&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPhase">BackupPhase
 (<code>string</code> alias)</h3>
@@ -1264,7 +1283,7 @@ BackupRepoPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Storage provider reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.</p><br />
+<p>Backup repo reconciliation phases. Valid values are PreChecking, Failed, Ready, Deleting.</p><br />
 </td>
 </tr>
 <tr>
@@ -1278,7 +1297,7 @@ BackupRepoPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describes the current state of the repo.</p><br />
+<p>conditions describes the current state of the repo.</p><br />
 </td>
 </tr>
 <tr>
@@ -1290,7 +1309,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>ObservedGeneration is the latest generation observed by the controller.</p><br />
+<p>observedGeneration is the latest generation observed by the controller.</p><br />
 </td>
 </tr>
 <tr>
@@ -1304,7 +1323,7 @@ Kubernetes core/v1.SecretReference
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratedCSIDriverSecret references the generated secret used by the CSI driver.</p><br />
+<p>generatedCSIDriverSecret references the generated secret used by the CSI driver.</p><br />
 </td>
 </tr>
 <tr>
@@ -1316,7 +1335,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>GeneratedStorageClassName indicates the generated storage class name.</p><br />
+<p>generatedStorageClassName indicates the generated storage class name.</p><br />
 </td>
 </tr>
 <tr>
@@ -1328,7 +1347,19 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>BackupPVCName is the name of the PVC used to store backup data.</p><br />
+<p>backupPVCName is the name of the PVC used to store backup data.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>isDefault</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>isDefault indicates whether this backup repo is the default one.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1563,6 +1594,18 @@ string
 </tr>
 <tr>
 <td>
+<code>logFilePersistentVolumeClaimName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>logFilePersistentVolumeClaimName saves the logfile backup data.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>backupToolName</code><br/>
 <em>
 string
@@ -1740,6 +1783,18 @@ string
 </tr>
 <tr>
 <td>
+<code>logFilePath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>logFilePath records the log file path of backup.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeName</code><br/>
 <em>
 string
@@ -1791,7 +1846,7 @@ string
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">BackupToolRestoreCommand
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">LogicalConfig</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.LogicalConfig">LogicalConfig</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">PhysicalConfig</a>)
 </p>
 <div>
 <p>BackupToolRestoreCommand defines the restore commands of BackupTool</p><br />
@@ -1950,12 +2005,13 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>physical</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
-BackupToolRestoreCommand
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">
+PhysicalConfig
 </a>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>backup tool can support physical restore, in this case, restore must be RESTART database.</p><br />
 </td>
 </tr>
@@ -2441,6 +2497,50 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.PhysicalConfig">PhysicalConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>BackupToolRestoreCommand</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolRestoreCommand">
+BackupToolRestoreCommand
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>BackupToolRestoreCommand</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>relyOnLogfile</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>relyOnLogfile defines whether the current recovery relies on log files</p><br />
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.PodRestoreScope">PodRestoreScope
 (<code>string</code> alias)</h3>
 <p>
@@ -2687,14 +2787,14 @@ string
 <tbody>
 <tr>
 <td>
-<code>retryWindowMinutes</code><br/>
+<code>startingDeadlineMinutes</code><br/>
 <em>
 int64
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>retryWindowMinutes defines the time window for starting the job if it misses scheduled<br />time for any reason. the unit of time is minute.</p><br />
+<p>startingDeadlineMinutes defines the deadline in minutes for starting the backup job<br />if it misses scheduled time for any reason.</p><br />
 </td>
 </tr>
 <tr>

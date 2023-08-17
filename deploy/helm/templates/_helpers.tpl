@@ -271,10 +271,10 @@ Define addon loki name
 {{- end }}
 
 {{/*
-Define addon agamotto name
+Define addon apecloud-otel-collector name
 */}}
-{{- define "addon.agamotto.name" -}}
-{{- print "agamotto" }}
+{{- define "addon.apecloud-otel-collector.name" -}}
+{{- print "apecloud-otel-collector" }}
 {{- end }}
 
 {{/*

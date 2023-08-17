@@ -59,6 +59,8 @@ type Middleware struct {
 	logger logger.Logger
 }
 
+var _ middleware.Middleware = &Middleware{}
+
 // type statusCodeWriter struct {
 // 	http.ResponseWriter
 // 	logger logger.Logger

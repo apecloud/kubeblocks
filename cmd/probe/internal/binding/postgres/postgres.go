@@ -105,8 +105,6 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.manager = manager
 	pgOps.DBPort = config.GetDBPort()
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
-	pgOps.BaseOperations.LockInstance = pgOps.LockInstance
-	pgOps.BaseOperations.UnlockInstance = pgOps.UnlockInstance
 	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
 	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
 	pgOps.RegisterOperationOnDBReady(CheckStatusOperation, pgOps.CheckStatusOps, manager)
@@ -130,20 +128,6 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	return pgOps.manager.GetMemberStateWithPool(ctx, nil)
-}
-
-func (pgOps *PostgresOperations) LockInstance(ctx context.Context) error {
-	// sql := "alter system set default_transaction_read_only=on; select pg_reload_conf();"
-	// _, err := pgOps.exec(ctx, sql)
-	// return err
-	return fmt.Errorf("NotSupported")
-}
-
-func (pgOps *PostgresOperations) UnlockInstance(ctx context.Context) error {
-	// sql := "alter system set default_transaction_read_only=off; select pg_reload_conf();"
-	// _, err := pgOps.exec(ctx, sql)
-	// return err
-	return fmt.Errorf("NotSupported")
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

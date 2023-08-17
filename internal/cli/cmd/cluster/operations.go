@@ -43,11 +43,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
-	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -338,7 +338,7 @@ func (o *OperationsOptions) Validate() error {
 		}
 	}
 	if !o.autoApprove && o.DryRun == "none" {
-		return delete.Confirm([]string{o.Name}, o.In)
+		return prompt.Confirm([]string{o.Name}, o.In, "")
 	}
 	return nil
 }
@@ -776,7 +776,7 @@ func cancelOps(o *OperationsOptions) error {
 		return fmt.Errorf("opsRequest type: %s not support cancel action", opsRequest.Spec.Type)
 	}
 	if !o.autoApprove {
-		if err := delete.Confirm([]string{o.Name}, o.In); err != nil {
+		if err := prompt.Confirm([]string{o.Name}, o.In, ""); err != nil {
 			return err
 		}
 	}

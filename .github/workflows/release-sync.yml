@@ -7,6 +7,7 @@ on:
 
 env:
   CLI_REPO: 'apecloud/kbcli'
+  HELM_CHART_REPO: 'apecloud/helm-charts'
   GITLAB_KBCLI_PROJECT_ID: 85948
   GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
 
@@ -29,6 +30,14 @@ jobs:
             --type 5 \
             --tag-name $LATEST_RELEASE_TAG \
             --github-repo ${{ env.CLI_REPO }} \
+            --github-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          
+          HELM_CHART_LATEST_RELEASE_TAG="kubeblocks-${LATEST_RELEASE_TAG/v/}"
+          
+          bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --type 5 \
+            --tag-name $HELM_CHART_LATEST_RELEASE_TAG \
+            --github-repo ${{ env.HELM_CHART_REPO }} \
             --github-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           
           bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
@@ -67,6 +76,17 @@ jobs:
     with:
       GITHUB_REPO: "apecloud/apecloud-cd"
       WORKFLOW_ID: "publish-kbcli-scoop.yml"
+      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+      APECD_REF: "v0.1.1"
+    secrets: inherit
+
+  release-chocolatey-kbcli:
+    needs: update-release-kbcli
+    if: github.event.action== 'released'
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
+    with:
+      GITHUB_REPO: "apecloud/apecloud-cd"
+      WORKFLOW_ID: "publish-kbcli-choco.yml"
       VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
       APECD_REF: "v0.1.1"
     secrets: inherit

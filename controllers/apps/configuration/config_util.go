@@ -25,14 +25,11 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/conversion"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -367,73 +364,11 @@ func validateConfigConstraintStatus(ccStatus appsv1alpha1.ConfigConstraintStatus
 	return ccStatus.Phase == appsv1alpha1.CCAvailablePhase
 }
 
-func usingComponentConfigSpec(annotations map[string]string, key, value string) bool {
-	return len(annotations) != 0 && annotations[key] == value
-}
-
 func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1alpha1.ConfigConstraint, phase appsv1alpha1.ConfigConstraintPhase) error {
 	patch := client.MergeFrom(configConstraint.DeepCopy())
 	configConstraint.Status.Phase = phase
 	configConstraint.Status.ObservedGeneration = configConstraint.Generation
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
-}
-
-func toObjects[T generics.Object, L generics.ObjList[T], PL generics.PObjList[T, L]](compList PL) []T {
-	return reflect.ValueOf(compList).Elem().FieldByName("Items").Interface().([]T)
-}
-
-func toResourceObject(obj any) client.Object {
-	return obj.(client.Object)
-}
-
-func getPodTemplate(obj client.Object) *corev1.PodTemplateSpec {
-	switch v := obj.(type) {
-	default:
-		return nil
-	case *appv1.StatefulSet:
-		return &v.Spec.Template
-	case *appv1.Deployment:
-		return &v.Spec.Template
-	}
-}
-
-func getRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, _ func(T, L), cfg client.ObjectKey, configSpecName string, opts ...client.ListOption) ([]T, []string, error) {
-	var objList L
-	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
-		return nil, nil, err
-	}
-
-	objs := make([]T, 0)
-	containers := cfgutil.NewSet()
-	configSpecKey := cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
-	items := toObjects[T, L, PL](&objList)
-	for i := range items {
-		obj := toResourceObject(&items[i])
-		if objs == nil {
-			return nil, nil, cfgcore.MakeError("failed to convert to resource object")
-		}
-		if !usingComponentConfigSpec(obj.GetAnnotations(), configSpecKey, cfg.Name) {
-			continue
-		}
-		podTemplate := getPodTemplate(obj)
-		if podTemplate == nil {
-			continue
-		}
-		volumeMounted := intctrlutil.GetVolumeMountName(podTemplate.Spec.Volumes, cfg.Name)
-		if volumeMounted == nil {
-			continue
-		}
-		// filter config manager sidecar container
-		contains := intctrlutil.GetContainersByConfigmap(podTemplate.Spec.Containers,
-			volumeMounted.Name, func(containerName string) bool {
-				return constant.ConfigSidecarName == containerName
-			})
-		if len(contains) > 0 {
-			objs = append(objs, items[i])
-			containers.Add(contains...)
-		}
-	}
-	return objs, containers.AsSlice(), nil
 }
 
 func createConfigPatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
@@ -463,22 +398,4 @@ func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ct
 	ccPatch := client.MergeFrom(cc.DeepCopy())
 	cc.Spec.ConfigurationSchema.Schema = openAPISchema
 	return cli.Patch(ctx, cc, ccPatch)
-}
-
-func getComponentFromClusterDefinition(
-	ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return nil, err
-	}
-	for i := range clusterDef.Spec.ComponentDefs {
-		component := &clusterDef.Spec.ComponentDefs[i]
-		if component.Name == compDefName {
-			return component, nil
-		}
-	}
-	return nil, nil
 }

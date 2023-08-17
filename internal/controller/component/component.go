@@ -37,13 +37,12 @@ import (
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clsMgr *class.Manager,
 	cluster *appsv1alpha1.Cluster,
-	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, clsMgr, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, clsMgr, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
@@ -51,28 +50,30 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 func buildComponent(reqCtx intctrlutil.RequestCtx,
 	clsMgr *class.Manager,
 	cluster *appsv1alpha1.Cluster,
-	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-
-	fillClusterTemplate := func() {
-		if clusterTpl == nil || len(clusterTpl.Spec.ComponentSpecs) == 0 {
-			return
-		}
-		for _, compSpecTpl := range clusterTpl.Spec.ComponentSpecs {
-			if compSpecTpl.ComponentDefRef == clusterCompDef.Name {
-				clusterCompSpec = compSpecTpl.DeepCopy()
-			}
-		}
+	hasSimplifiedAPI := func() bool {
+		return cluster.Spec.Replicas != nil ||
+			!cluster.Spec.Resources.CPU.IsZero() ||
+			!cluster.Spec.Resources.Memory.IsZero() ||
+			!cluster.Spec.Storage.Size.IsZero() ||
+			cluster.Spec.Monitor.MonitoringInterval != nil ||
+			cluster.Spec.Network != nil ||
+			len(cluster.Spec.Tenancy) > 0 ||
+			len(cluster.Spec.AvailabilityPolicy) > 0
 	}
 
 	fillSimplifiedAPI := func() {
 		// fill simplified api only to first defined component
 		if len(clusterDef.Spec.ComponentDefs) == 0 ||
 			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
+			return
+		}
+		// return if none of simplified api is defined
+		if !hasSimplifiedAPI() {
 			return
 		}
 		if clusterCompSpec == nil {
@@ -175,37 +176,8 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	affinityTopoKey := func(policyType appsv1alpha1.AvailabilityPolicyType) string {
-		switch policyType {
-		case appsv1alpha1.AvailabilityPolicyZone:
-			return "topology.kubernetes.io/zone"
-		case appsv1alpha1.AvailabilityPolicyNode:
-			return "kubernetes.io/hostname"
-		}
-		return ""
-	}
-
-	buildAffinity := func() *appsv1alpha1.Affinity {
-		var affinity *appsv1alpha1.Affinity
-		if len(cluster.Spec.Tenancy) > 0 || len(cluster.Spec.AvailabilityPolicy) > 0 {
-			affinity = &appsv1alpha1.Affinity{
-				PodAntiAffinity: appsv1alpha1.Preferred,
-				TopologyKeys:    []string{affinityTopoKey(cluster.Spec.AvailabilityPolicy)},
-				Tenancy:         cluster.Spec.Tenancy,
-			}
-		}
-		if cluster.Spec.Affinity != nil {
-			affinity = cluster.Spec.Affinity
-		}
-		if clusterCompSpec.Affinity != nil {
-			affinity = clusterCompSpec.Affinity
-		}
-		return affinity
-	}
-
 	// priority: cluster.spec.componentSpecs > simplified api (e.g. cluster.spec.storage etc.) > cluster template
 	if clusterCompSpec == nil {
-		fillClusterTemplate()
 		fillSimplifiedAPI()
 	}
 	if clusterCompSpec == nil {
@@ -264,8 +236,8 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 
 	// handle component.PodSpec extra settings
 	// set affinity and tolerations
-	affinity := buildAffinity()
-	if component.PodSpec.Affinity, err = buildPodAffinity(cluster, affinity, component); err != nil {
+	affinity := BuildAffinity(cluster, clusterCompSpec)
+	if component.PodSpec.Affinity, err = BuildPodAffinity(cluster, affinity, component); err != nil {
 		reqCtx.Log.Error(err, "build pod affinity failed.")
 		return nil, err
 	}

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "risingwave.name" . }}-connector-envs-tpl
+  labels:
+      {{- include "risingwave.labels" . | nindent 4 }}
+data:
+{{- .Files.Get "config/risingwave-connector-envs.tpl" | nindent 2 }}

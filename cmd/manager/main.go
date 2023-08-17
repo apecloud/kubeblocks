@@ -37,33 +37,28 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	// +kubebuilder:scaffold:imports
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
-	"github.com/apecloud/kubeblocks/internal/constant"
-
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
-
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
-
-	// +kubebuilder:scaffold:imports
-
-	discoverycli "k8s.io/client-go/discovery"
-
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
+	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
+	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/webhook"
 )
@@ -113,6 +108,7 @@ func init() {
 	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
+	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, false)
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
@@ -368,16 +364,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("pvc-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
-			os.Exit(1)
-		}
-
-		if err = components.NewStatefulSetReconciler(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
-			os.Exit(1)
-		}
-
-		if err = components.NewDeploymentReconciler(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 			os.Exit(1)
 		}
 

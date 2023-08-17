@@ -20,9 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package prompt
 
 import (
+	"fmt"
 	"io"
+	"sort"
+	"strings"
 
 	"github.com/manifoldco/promptui"
+	"golang.org/x/exp/slices"
 )
 
 func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *promptui.Prompt {
@@ -48,4 +52,26 @@ func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *prom
 		Validate:  validate,
 	}
 	return &p
+}
+
+// Confirm let user double-check for the cluster ops
+// use customMessage to display more information
+func Confirm(names []string, in io.Reader, customMessage string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	if len(customMessage) != 0 {
+		fmt.Println(customMessage)
+	}
+	_, err := NewPrompt("Please type the name again(separate with white space when more than one):",
+		func(entered string) error {
+			enteredNames := strings.Split(entered, " ")
+			sort.Strings(names)
+			sort.Strings(enteredNames)
+			if !slices.Equal(names, enteredNames) {
+				return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
+			}
+			return nil
+		}, in).Run()
+	return err
 }

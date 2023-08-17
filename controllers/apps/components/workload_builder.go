@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -93,12 +94,10 @@ func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		component := b.Comp.GetSynthesizedComponent()
-		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}
-
 		b.Workload = sts
 
 		return nil, nil // don't return sts here
@@ -240,6 +239,11 @@ func (b *componentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Obj
 	if err != nil {
 		b.Error = err
 	} else {
+		cluster := b.Comp.GetCluster()
+		component := b.Comp.GetSynthesizedComponent()
+		if err = updateCustomLabelToObjs(cluster.Name, string(cluster.UID), component.Name, component.CustomLabelSpecs, objs); err != nil {
+			b.Error = err
+		}
 		for _, obj := range objs {
 			b.Comp.AddResource(obj, b.DefaultAction, nil)
 		}
@@ -248,13 +252,16 @@ func (b *componentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Obj
 }
 
 func (b *componentWorkloadBuilderBase) getRuntime() *corev1.PodSpec {
-	if sts, ok := b.Workload.(*appsv1.StatefulSet); ok {
-		return &sts.Spec.Template.Spec
+	switch w := b.Workload.(type) {
+	case *appsv1.StatefulSet:
+		return &w.Spec.Template.Spec
+	case *appsv1.Deployment:
+		return &w.Spec.Template.Spec
+	case *workloads.ReplicatedStateMachine:
+		return &w.Spec.Template.Spec
+	default:
+		return nil
 	}
-	if deploy, ok := b.Workload.(*appsv1.Deployment); ok {
-		return &deploy.Spec.Template.Spec
-	}
-	return nil
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, component component.SynthesizedComponent) error {

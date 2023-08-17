@@ -91,7 +91,6 @@ var _ = Describe("affinity utils", func() {
 				reqCtx,
 				nil,
 				clusterObj,
-				nil,
 				clusterDefObj,
 				&clusterDefObj.Spec.ComponentDefs[0],
 				&clusterObj.Spec.ComponentSpecs[0],
@@ -107,7 +106,7 @@ var _ = Describe("affinity utils", func() {
 		})
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
-			affinity, err := buildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
+			affinity, err := BuildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(err).Should(Succeed())
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
@@ -124,7 +123,7 @@ var _ = Describe("affinity utils", func() {
 				fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", nodeKey))
 			defer viper.Set(constant.CfgKeyDataPlaneAffinity, "")
 
-			affinity, err := buildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
+			affinity, err := BuildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(err).Should(Succeed())
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
@@ -168,7 +167,7 @@ var _ = Describe("affinity utils", func() {
 		})
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
-			affinity, err := buildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
+			affinity, err := BuildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(err).Should(Succeed())
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())

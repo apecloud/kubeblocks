@@ -14,9 +14,10 @@ spec:
   type: kafka
   connectionCredential:
     superusers: "User:admin"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrlr)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-client)"
     kraftClusterID: "$(UUID_STR_B64)" 
-    sslCertPassword: "$(RANDOM_PASSWD)"
+    clientUser: "client"
+    clientPassword: "kubeblocks"
 
   componentDefs:
     # combined both controller(kraft) and broker. Ref: https://kafka.apache.org/documentation/#kraft_role
@@ -95,8 +96,8 @@ spec:
               - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
                 value: "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT"
               - name: KAFKA_CFG_ADVERTISED_LISTENERS
-                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_CLUSTER_COMP_NAME):9092"
-                # value: "INTERNAL://$(KB_POD_FQDN):9094,CLIENT://$(KB_POD_FQDN):9092"
+                #value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9092"
+                value: "INTERNAL://$(KB_POD_IP):9094,CLIENT://$(KB_POD_IP):9092"
               - name: KAFKA_CFG_INITIAL_BROKER_REGISTRATION_TIMEOUT_MS
                 value: "240000"
               - name: ALLOW_PLAINTEXT_LISTENER
@@ -171,6 +172,166 @@ spec:
                 mountPath: /tools/server-jaas.properties
                 subPath: server-jaas.properties
 
+          - name: jmx-exporter
+            command:
+              - java
+            args:
+              - -XX:MaxRAMPercentage=100
+              - -XshowSettings:vm
+              - -jar
+              - jmx_prometheus_httpserver.jar
+              - "5556"
+              - /etc/jmx-kafka/jmx-kafka-prometheus.yml
+            ports:
+              - name: metrics
+                containerPort: 5556
+            volumeMounts:
+              - name: jmx-config
+                mountPath: /etc/jmx-kafka
+
+    - name: kafka-broker
+      description: |-
+        Kafka broker.
+      workloadType: Stateful
+      characterType: kafka
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 5556
+      configSpecs:
+        - name: kafka-configuration-tpl
+          constraintRef: {{ include "kafka.name" . }}-cc
+          templateRef: {{ include "kafka.name" . }}-configuration-tpl
+          volumeName: kafka-config
+          namespace: {{ .Release.Namespace }}
+        - name: kafka-jmx-configuration-tpl
+          templateRef: {{ include "kafka.name" . }}-jmx-configuration-tpl
+          volumeName: jmx-config
+          namespace: {{ .Release.Namespace }}
+      scriptSpecs:
+        - name: kafka-scripts-tpl
+          templateRef: {{ include "kafka.name" . }}-scripts-tpl
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
+        - name: kafka-scripts-tools-tpl
+          templateRef: {{ include "kafka.name" . }}-scripts-tools-tpl
+          volumeName: tools
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
+      service:
+        ports:
+          - name: kafka-client
+            targetPort: kafka-client
+            port: 9092
+          - name: metrics
+            targetPort: metrics
+            port: 5556
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: kafka
+            command:
+              - /scripts/kafka-server-setup.sh
+            env:
+              - name: BITNAMI_DEBUG
+                value: {{ .Values.debugEnabled | quote }}
+              - name: MY_POD_IP
+                value: "$(KB_PODIP)"
+                # value: "$(KB_POD_IP)"
+              - name: MY_POD_NAME
+                value: "$(KB_POD_NAME)"
+              - name: KAFKA_ENABLE_KRAFT
+                value: "yes"
+              - name: KAFKA_CFG_PROCESS_ROLES
+                value: "broker"
+              - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES # required for KRaft
+                value: "CONTROLLER"
+              - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
+                value: "INTERNAL"
+              - name: KAFKA_CFG_LISTENERS # required for KRaft
+                value: "INTERNAL://:9094,CLIENT://:9092"
+              - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+                value: "INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+              - name: KAFKA_CFG_ADVERTISED_LISTENERS
+                # value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9092"
+                value: "INTERNAL://$(KB_POD_IP):9094,CLIENT://$(KB_POD_IP):9092"
+              - name: KAFKA_CFG_INITIAL_BROKER_REGISTRATION_TIMEOUT_MS
+                value: "240000"
+              - name: ALLOW_PLAINTEXT_LISTENER
+                value: "yes"
+              - name: JMX_PORT
+                value: "5555"
+              - name: KAFKA_VOLUME_DIR
+                value: "/bitnami/kafka"
+              - name: KAFKA_CFG_METADATA_LOG_DIR
+                value: "/bitnami/kafka/metadata"
+              - name: KAFKA_LOG_DIR
+                value: "/bitnami/kafka/data"
+              - name: KAFKA_HEAP_OPTS
+                #value: "-Xmx1024m -Xms1024m"
+                value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+              - name: SERVER_PROP_FILE
+                value: /scripts/server.properties
+              - name: KAFKA_CFG_SUPER_USERS
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: superusers
+                    optional: false
+              - name: KAFKA_KRAFT_CLUSTER_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: kraftClusterID
+                    optional: false
+{{/*              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode*/}}
+{{/*                value: "true"*/}}
+              - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
+                value: /tools/server-jaas.properties
+              - name: BROKER_MIN_NODE_ID
+                value: {{ .Values.kafkaBroker.minNodeId | quote }}
+            ports:
+              - name: kafka-client
+                containerPort: 9092
+              - name: kafka-internal
+                containerPort: 9094
+            livenessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: kafka-client
+            startupProbe:
+              failureThreshold: 30
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: kafka-client
+            volumeMounts:
+              - name: data
+                mountPath: /bitnami/kafka
+              - name: metadata
+                mountPath: /bitnami/kafka/metadata
+              - name: scripts
+                mountPath: /scripts/kafka-server-setup.sh
+                subPath: kafka-server-setup.sh
+              - name: kafka-config
+                mountPath: /scripts/server.properties
+                subPath: server.properties
+              - name: tools
+                mountPath: /tools/client-ssl.properties
+                subPath: client-ssl.properties
+              - name: tools
+                mountPath: /tools/server-jaas.properties
+                subPath: server-jaas.properties
           - name: jmx-exporter
             command:
               - java
@@ -307,165 +468,6 @@ spec:
               - name: scripts
                 mountPath: /opt/bitnami/scripts/kafka-env.sh
                 subPath: kafka-env.sh
-          - name: jmx-exporter
-            command:
-              - java
-            args:
-              - -XX:MaxRAMPercentage=100
-              - -XshowSettings:vm
-              - -jar
-              - jmx_prometheus_httpserver.jar
-              - "5556"
-              - /etc/jmx-kafka/jmx-kafka-prometheus.yml
-            ports:
-              - name: metrics
-                containerPort: 5556
-            volumeMounts:
-              - name: jmx-config
-                mountPath: /etc/jmx-kafka
-
-    - name: kafka-broker
-      description: |-
-        Kafka broker.
-      workloadType: Stateful
-      characterType: kafka
-      probes:
-      monitor:
-        builtIn: false
-        exporterConfig:
-          scrapePath: /metrics
-          scrapePort: 5556
-      configSpecs:
-        - name: kafka-configuration-tpl
-          constraintRef: {{ include "kafka.name" . }}-cc
-          templateRef: {{ include "kafka.name" . }}-configuration-tpl
-          volumeName: kafka-config
-          namespace: {{ .Release.Namespace }}
-        - name: kafka-jmx-configuration-tpl
-          templateRef: {{ include "kafka.name" . }}-jmx-configuration-tpl
-          volumeName: jmx-config
-          namespace: {{ .Release.Namespace }}
-      scriptSpecs:
-        - name: kafka-scripts-tpl
-          templateRef: {{ include "kafka.name" . }}-scripts-tpl
-          volumeName: scripts
-          namespace: {{ .Release.Namespace }}
-          defaultMode: 0755
-        - name: kafka-scripts-tools-tpl
-          templateRef: {{ include "kafka.name" . }}-scripts-tools-tpl
-          volumeName: tools
-          namespace: {{ .Release.Namespace }}
-          defaultMode: 0755
-      service:
-        ports:
-          - name: kafka-client
-            targetPort: kafka-client
-            port: 9092
-          - name: metrics
-            targetPort: metrics
-            port: 5556
-      podSpec:
-        securityContext:
-          fsGroup: 1001
-        containers:
-          - name: kafka
-            command:
-              - /scripts/kafka-server-setup.sh
-            env:
-              - name: BITNAMI_DEBUG
-                value: {{ .Values.debugEnabled | quote }}
-              - name: MY_POD_IP
-                value: "$(KB_PODIP)"
-                # value: "$(KB_POD_IP)"
-              - name: MY_POD_NAME
-                value: "$(KB_POD_NAME)"
-              - name: KAFKA_ENABLE_KRAFT
-                value: "yes"
-              - name: KAFKA_CFG_PROCESS_ROLES
-                value: "broker"
-              - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES # required for KRaft
-                value: "CONTROLLER"
-              - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
-                value: "INTERNAL"
-              - name: KAFKA_CFG_LISTENERS # required for KRaft
-                value: "INTERNAL://:9094,CLIENT://:9092"
-              - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
-                value: "INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT,CONTROLLER:PLAINTEXT"
-              - name: KAFKA_CFG_ADVERTISED_LISTENERS
-                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_CLUSTER_COMP_NAME):9092"
-              - name: KAFKA_CFG_INITIAL_BROKER_REGISTRATION_TIMEOUT_MS
-                value: "240000"
-              - name: ALLOW_PLAINTEXT_LISTENER
-                value: "yes"
-              - name: JMX_PORT
-                value: "5555"
-              - name: KAFKA_VOLUME_DIR
-                value: "/bitnami/kafka"
-              - name: KAFKA_CFG_METADATA_LOG_DIR
-                value: "/bitnami/kafka/metadata"
-              - name: KAFKA_LOG_DIR
-                value: "/bitnami/kafka/data"
-              - name: KAFKA_HEAP_OPTS
-                #value: "-Xmx1024m -Xms1024m"
-                value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
-              - name: SERVER_PROP_FILE
-                value: /scripts/server.properties
-              - name: KAFKA_CFG_SUPER_USERS
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: superusers
-                    optional: false
-              - name: KAFKA_KRAFT_CLUSTER_ID
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: kraftClusterID
-                    optional: false
-{{/*              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode*/}}
-{{/*                value: "true"*/}}
-              - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
-                value: /tools/server-jaas.properties
-              - name: BROKER_MIN_NODE_ID
-                value: {{ .Values.kafkaBroker.minNodeId | quote }}
-            ports:
-              - name: kafka-client
-                containerPort: 9092
-              - name: kafka-internal
-                containerPort: 9094
-            livenessProbe:
-              failureThreshold: 3
-              initialDelaySeconds: 10
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              tcpSocket:
-                port: kafka-client
-            startupProbe:
-              failureThreshold: 30
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              tcpSocket:
-                port: kafka-client
-            volumeMounts:
-              - name: data
-                mountPath: /bitnami/kafka
-              - name: metadata
-                mountPath: /bitnami/kafka/metadata
-              - name: scripts
-                mountPath: /scripts/kafka-server-setup.sh
-                subPath: kafka-server-setup.sh
-              - name: kafka-config
-                mountPath: /scripts/server.properties
-                subPath: server.properties
-              - name: tools
-                mountPath: /tools/client-ssl.properties
-                subPath: client-ssl.properties
-              - name: tools
-                mountPath: /tools/server-jaas.properties
-                subPath: server-jaas.properties
           - name: jmx-exporter
             command:
               - java

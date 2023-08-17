@@ -32,16 +32,20 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -63,6 +67,10 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 		objs = append(objs, &items[i])
 	}
 	return objs, nil
+}
+
+func listRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
 }
 
 func listStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
@@ -407,89 +415,6 @@ func getCompPhaseByConditions(existLatestRevisionFailedPod bool,
 	return ""
 }
 
-// updateObjLabel updates the value of the role label of the object.
-func updateObjLabel[T generics.Object, PT generics.PObject[T]](
-	ctx context.Context, cli client.Client, obj T, labelKey, labelValue string) error {
-	pObj := PT(&obj)
-	patch := client.MergeFrom(PT(pObj.DeepCopy()))
-	if v, ok := pObj.GetLabels()[labelKey]; ok && v == labelValue {
-		return nil
-	}
-	pObj.GetLabels()[labelKey] = labelValue
-	if err := cli.Patch(ctx, pObj, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-// patchGVRCustomLabels patches the custom labels to the object list of the specified GVK.
-func patchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster,
-	resource appsv1alpha1.GVKResource, componentName, labelKey, labelValue string) error {
-	gvk, err := parseCustomLabelPattern(resource.GVK)
-	if err != nil {
-		return err
-	}
-	if !slices.Contains(getCustomLabelSupportKind(), gvk.Kind) {
-		return errors.New("kind is not supported for custom labels")
-	}
-
-	objectList := getObjectListMapOfResourceKind()[gvk.Kind]
-	matchLabels := getComponentMatchLabels(cluster.Name, componentName)
-	for k, v := range resource.Selector {
-		matchLabels[k] = v
-	}
-	if err := getObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
-		return err
-	}
-	labelKey = replaceKBEnvPlaceholderTokens(cluster, componentName, labelKey)
-	labelValue = replaceKBEnvPlaceholderTokens(cluster, componentName, labelValue)
-	switch gvk.Kind {
-	case constant.StatefulSetKind:
-		stsList := objectList.(*appsv1.StatefulSetList)
-		for _, sts := range stsList.Items {
-			if err := updateObjLabel(ctx, cli, sts, labelKey, labelValue); err != nil {
-				return err
-			}
-		}
-	case constant.DeploymentKind:
-		deployList := objectList.(*appsv1.DeploymentList)
-		for _, deploy := range deployList.Items {
-			if err := updateObjLabel(ctx, cli, deploy, labelKey, labelValue); err != nil {
-				return err
-			}
-		}
-	case constant.PodKind:
-		podList := objectList.(*corev1.PodList)
-		for _, pod := range podList.Items {
-			if err := updateObjLabel(ctx, cli, pod, labelKey, labelValue); err != nil {
-				return err
-			}
-		}
-	case constant.ServiceKind:
-		svcList := objectList.(*corev1.ServiceList)
-		for _, svc := range svcList.Items {
-			if err := updateObjLabel(ctx, cli, svc, labelKey, labelValue); err != nil {
-				return err
-			}
-		}
-	case constant.ConfigMapKind:
-		cmList := objectList.(*corev1.ConfigMapList)
-		for _, cm := range cmList.Items {
-			if err := updateObjLabel(ctx, cli, cm, labelKey, labelValue); err != nil {
-				return err
-			}
-		}
-	case constant.CronJobKind:
-		cjList := objectList.(*batchv1.CronJobList)
-		for _, cj := range cjList.Items {
-			if err := updateObjLabel(ctx, cli, cj, labelKey, labelValue); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
 func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	patterns := strings.Split(pattern, "/")
@@ -510,30 +435,6 @@ func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
 }
 
-// getCustomLabelSupportKind returns the kinds that support custom label.
-func getCustomLabelSupportKind() []string {
-	return []string{
-		constant.CronJobKind,
-		constant.StatefulSetKind,
-		constant.DeploymentKind,
-		constant.ReplicaSetKind,
-		constant.ServiceKind,
-		constant.ConfigMapKind,
-		constant.PodKind,
-	}
-}
-
-// getCustomLabelWorkloadKind returns the kinds that support custom label.
-func getCustomLabelWorkloadKind() []string {
-	return []string{
-		constant.CronJobKind,
-		constant.StatefulSetKind,
-		constant.DeploymentKind,
-		constant.ReplicaSetKind,
-		constant.PodKind,
-	}
-}
-
 // SortPods sorts pods by their role priority
 func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) {
 	// make a Serial pod list,
@@ -550,22 +451,9 @@ func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) 
 	})
 }
 
-// getObjectListMapOfResourceKind returns the mapping of resource kind and its object list.
-func getObjectListMapOfResourceKind() map[string]client.ObjectList {
-	return map[string]client.ObjectList{
-		constant.CronJobKind:     &batchv1.CronJobList{},
-		constant.StatefulSetKind: &appsv1.StatefulSetList{},
-		constant.DeploymentKind:  &appsv1.DeploymentList{},
-		constant.ReplicaSetKind:  &appsv1.ReplicaSetList{},
-		constant.ServiceKind:     &corev1.ServiceList{},
-		constant.ConfigMapKind:   &corev1.ConfigMapList{},
-		constant.PodKind:         &corev1.PodList{},
-	}
-}
-
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
-func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName, strToReplace string) string {
-	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster.Name, string(cluster.UID), componentName)
+func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace string) string {
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
 
@@ -627,7 +515,9 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 				pp.FailureThreshold = p.FailureThreshold
 			}
 			if pp.HTTPGet != nil && len(pp.HTTPGet.Scheme) == 0 {
-				pp.HTTPGet.Scheme = p.HTTPGet.Scheme
+				if p.HTTPGet != nil {
+					pp.HTTPGet.Scheme = p.HTTPGet.Scheme
+				}
 			}
 		}
 		if cc.LivenessProbe != nil && c.LivenessProbe != nil {
@@ -687,6 +577,30 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	}
 }
 
+// ConvertRSMToSTS converts a rsm to sts
+// TODO(free6om): refactor this func out
+func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet {
+	if rsm == nil {
+		return nil
+	}
+	sts := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		SetUID(rsm.UID).
+		AddLabelsInMap(rsm.Labels).
+		AddAnnotationsInMap(rsm.Annotations).
+		SetReplicas(*rsm.Spec.Replicas).
+		SetSelector(rsm.Spec.Selector).
+		SetServiceName(rsm.Spec.ServiceName).
+		SetTemplate(rsm.Spec.Template).
+		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
+		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
+		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		GetObject()
+	sts.Generation = rsm.Generation
+	sts.Status = rsm.Status.StatefulSetStatus
+	sts.Status.ObservedGeneration = rsm.Status.ObservedGeneration
+	return sts
+}
+
 // delayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
 func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
@@ -727,4 +641,168 @@ func getImageName(image string) string {
 		return ""
 	}
 	return subs[0]
+}
+
+// getCustomLabelSupportKind returns the kinds that support custom label.
+func getCustomLabelSupportKind() []string {
+	return []string{
+		constant.CronJobKind,
+		constant.StatefulSetKind,
+		constant.DeploymentKind,
+		constant.ReplicaSetKind,
+		constant.ServiceKind,
+		constant.ConfigMapKind,
+		constant.PodKind,
+	}
+}
+
+// updateComponentInfoToPods patches current component's replicas to all belonging pods, as an annotation.
+func updateComponentInfoToPods(
+	ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *componentutil.SynthesizedComponent,
+	dag *graph.DAG) error {
+	if cluster == nil || component == nil {
+		return nil
+	}
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.GetName(),
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+	// list all pods in cache
+	podList := corev1.PodList{}
+	if err := cli.List(ctx, &podList, ml); err != nil {
+		return err
+	}
+	// list all pods in dag
+	podVertices := ictrltypes.FindAll[*corev1.Pod](dag)
+
+	replicasStr := strconv.Itoa(int(component.Replicas))
+	updateAnnotation := func(obj client.Object) {
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string, 0)
+		}
+		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
+		obj.SetAnnotations(annotations)
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.Annotations != nil &&
+			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
+			continue
+		}
+		idx := slices.IndexFunc(podVertices, func(vertex graph.Vertex) bool {
+			v, _ := vertex.(*ictrltypes.LifecycleVertex)
+			return v.Obj.GetName() == pod.Name
+		})
+		// pod already in dag, merge annotations
+		if idx >= 0 {
+			v, _ := podVertices[idx].(*ictrltypes.LifecycleVertex)
+			updateAnnotation(v.Obj)
+			continue
+		}
+		// pod not in dag, add a new vertex
+		updateAnnotation(pod)
+		dag.AddVertex(&ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
+	}
+	return nil
+}
+
+// updateCustomLabelToPods updates custom label to pods
+func updateCustomLabelToPods(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *componentutil.SynthesizedComponent,
+	dag *graph.DAG) error {
+	if cluster == nil || component == nil {
+		return nil
+	}
+	// list all pods in dag
+	podVertices := ictrltypes.FindAll[*corev1.Pod](dag)
+
+	for _, customLabelSpec := range component.CustomLabelSpecs {
+		for _, resource := range customLabelSpec.Resources {
+			gvk, err := parseCustomLabelPattern(resource.GVK)
+			if err != nil {
+				return err
+			}
+			if gvk.Kind != constant.PodKind {
+				continue
+			}
+
+			podList := &corev1.PodList{}
+			matchLabels := getComponentMatchLabels(cluster.Name, component.Name)
+			for k, v := range resource.Selector {
+				matchLabels[k] = v
+			}
+			if err = getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
+				return err
+			}
+
+			for i := range podList.Items {
+				idx := slices.IndexFunc(podVertices, func(vertex graph.Vertex) bool {
+					v, _ := vertex.(*ictrltypes.LifecycleVertex)
+					return v.Obj.GetName() == podList.Items[i].Name
+				})
+				// pod already in dag, merge labels
+				if idx >= 0 {
+					v, _ := podVertices[idx].(*ictrltypes.LifecycleVertex)
+					updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, v.Obj)
+					continue
+				}
+				pod := &podList.Items[i]
+				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pod)
+				dag.AddVertex(&ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
+			}
+		}
+	}
+	return nil
+}
+
+func updateObjLabel(clusterName, uid, componentName string, customLabelSpec appsv1alpha1.CustomLabelSpec,
+	obj client.Object) {
+	key := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, customLabelSpec.Key)
+	value := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, customLabelSpec.Value)
+
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string, 0)
+	}
+	labels[key] = value
+	obj.SetLabels(labels)
+}
+
+func updateCustomLabelToObjs(clusterName, uid, componentName string,
+	customLabelSpecs []appsv1alpha1.CustomLabelSpec,
+	objs []client.Object) error {
+	for _, obj := range objs {
+		kinds, _, err := model.GetScheme().ObjectKinds(obj)
+		if err != nil {
+			return err
+		}
+		if len(kinds) != 1 {
+			return fmt.Errorf("expected exactly 1 kind for object %T, but found %s kinds", obj, kinds)
+		}
+		kind := kinds[0].Kind
+		if !slices.Contains(getCustomLabelSupportKind(), kind) {
+			continue
+		}
+
+		for _, customLabelSpec := range customLabelSpecs {
+			for _, res := range customLabelSpec.Resources {
+				gvk, err := parseCustomLabelPattern(res.GVK)
+				if err != nil {
+					return err
+				}
+				if gvk.Kind != kind {
+					continue
+				}
+				updateObjLabel(clusterName, uid, componentName, customLabelSpec, obj)
+			}
+		}
+	}
+	return nil
 }

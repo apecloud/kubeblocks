@@ -116,7 +116,7 @@ func (o *renderTPLCmdOpts) checkAndHelmTemplate() error {
 		o.helmOutputDir = filepath.Join("./helm-output", RandomString(6))
 	}
 
-	return helmTemplate(o.helmTemplateDir, o.helmOutputDir)
+	return HelmTemplate(o.helmTemplateDir, o.helmOutputDir)
 }
 
 func NewComponentTemplateRenderCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

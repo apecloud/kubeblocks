@@ -1,0 +1,21 @@
+# Default values for mysql-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## @param version MySQL cluster version
+##
+version: oracle-mysql-8.0.32
+## @param replicas specify cluster replicas
+##
+replicas: 1
+
+## @param cpu
+##
+cpu: 1
+
+## @param memory, the unit is Gi
+##
+memory: 1
+## @param storage size, the unit is Gi
+##
+storage: 20

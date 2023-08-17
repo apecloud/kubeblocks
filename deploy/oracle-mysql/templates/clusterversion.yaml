@@ -1,0 +1,38 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: oracle-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: oracle-mysql
+  componentVersions:
+  - componentDefRef: mysql-compdef
+    versionsContext:
+      containers:
+        - name: mysql-container
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: oracle-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}-perf
+  labels:
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: oracle-mysql
+  componentVersions:
+  - componentDefRef: mysql-compdef
+    versionsContext:
+      containers:
+        - name: mysql-container
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+    # name needs to consistent with the name of the configmap defined in clusterDefinition
+    configSpecs:
+      - name: mysql-config
+        templateRef: oracle-mysql-perf-config-template
+        constraintRef: oracle-mysql-config-constraints
+        volumeName: configs
+        namespace: {{ .Release.Namespace }}

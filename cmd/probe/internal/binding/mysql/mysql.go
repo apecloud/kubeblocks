@@ -32,11 +32,14 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -49,17 +52,6 @@ type MysqlOperations struct {
 type QueryRes []map[string]interface{}
 
 var _ BaseInternalOps = &MysqlOperations{}
-
-const (
-	// other general settings for DB connections.
-	maxIdleConnsKey    = "maxIdleConns"
-	maxOpenConnsKey    = "maxOpenConns"
-	connMaxLifetimeKey = "connMaxLifetime"
-	connMaxIdleTimeKey = "connMaxIdleTime"
-	workloadTypeKey    = "workloadType"
-	Replication        = "Replication"
-	Consensus          = "Consensus"
-)
 
 const (
 	superUserPriv = "SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.*"
@@ -104,8 +96,6 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.DBType = "mysql"
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
-	mysqlOps.BaseOperations.LockInstance = mysqlOps.LockInstance
-	mysqlOps.BaseOperations.UnlockInstance = mysqlOps.UnlockInstance
 	mysqlOps.DBPort = config.GetDBPort()
 
 	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
@@ -127,11 +117,19 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	workloadType := request.Metadata[workloadTypeKey]
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if strings.EqualFold(workloadType, Replication) {
-		return mysqlOps.GetRoleForReplication(ctx, request, response)
+		dcsStore := dcs.GetStore()
+		if dcsStore == nil {
+			return "", nil
+		}
+		k8sStore := dcsStore.(*dcs.KubernetesStore)
+		cluster := k8sStore.GetClusterFromCache()
+		if cluster == nil || !cluster.IsLocked() {
+			return "", nil
+		}
 	}
-	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+	return mysqlOps.manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
@@ -151,29 +149,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 		return SECONDARY, nil
 	}
 
-	getReadOnlySQL := `show global variables like 'read_only';`
-	data, err := mysqlOps.query(ctx, getReadOnlySQL)
-	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySQL, err)
-		return "", errors.Wrapf(err, "error executing %s", getReadOnlySQL)
-	}
-
-	queryRes := &QueryRes{}
-	err = json.Unmarshal(data, queryRes)
-	if err != nil {
-		return "", errors.Errorf("parse query failed, err:%v", err)
-	}
-
-	for _, mapVal := range *queryRes {
-		if mapVal["Variable_name"] == "read_only" {
-			if mapVal["Value"].(string) == "OFF" {
-				return PRIMARY, nil
-			} else if mapVal["Value"].(string) == "ON" {
-				return SECONDARY, nil
-			}
-		}
-	}
-	return "", errors.Errorf("parse query failed, no records")
+	return PRIMARY, nil
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
@@ -205,18 +181,6 @@ func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, reques
 		return role, nil
 	}
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
-}
-
-func (mysqlOps *MysqlOperations) LockInstance(ctx context.Context) error {
-	sql := "set global read_only=1"
-	_, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
-	return err
-}
-
-func (mysqlOps *MysqlOperations) UnlockInstance(ctx context.Context) error {
-	sql := "set global read_only=0"
-	_, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
-	return err
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

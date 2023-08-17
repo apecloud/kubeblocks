@@ -138,19 +138,9 @@ func (mgr *Manager) IsDBStartupReady() bool {
 		return true
 	}
 
-	cmd := exec.Command("pg_isready")
-	if config.username != "" {
-		cmd.Args = append(cmd.Args, "-U", config.username)
-	}
-	if config.host != "" {
-		cmd.Args = append(cmd.Args, "-h", config.host)
-	}
-	if config.port != 0 {
-		cmd.Args = append(cmd.Args, "-p", strconv.FormatUint(uint64(config.port), 10))
-	}
-	err := cmd.Run()
+	err := mgr.Pool.Ping(context.TODO())
 	if err != nil {
-		mgr.Logger.Infof("DB is not ready: %v", err)
+		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
 		return false
 	}
 
@@ -225,17 +215,15 @@ func (mgr *Manager) IsRunning() bool {
 	return mgr.newProcessFromPidFile() == nil
 }
 
-func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
+func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	return mgr.IsMemberHealthy(nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	return mgr.IsMemberHealthy(ctx, cluster, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
-	ctx := context.TODO()
-
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	pools := []*pgxpool.Pool{nil}
 	var err error
 	if member != nil && cluster != nil {
@@ -374,11 +362,13 @@ func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
 	if cluster == nil {
 		return false
 	}
-	lag := cluster.GetOpTime() - walPosition
+	lag := cluster.Leader.DBState.OpTimestamp - walPosition
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
-func (mgr *Manager) Recover() {}
+func (mgr *Manager) Recover(context.Context) error {
+	return nil
+}
 
 // AddCurrentMemberToCluster postgresql don't need to add member
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
@@ -398,8 +388,8 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) Promote() error {
-	if isLeader, err := mgr.IsLeader(context.TODO(), nil); err == nil && isLeader {
+func (mgr *Manager) Promote(ctx context.Context) error {
+	if isLeader, err := mgr.IsLeader(ctx, nil); err == nil && isLeader {
 		mgr.Logger.Infof("i am already a leader, don't need to promote")
 		return nil
 	}
@@ -436,7 +426,7 @@ func (mgr *Manager) postPromote() error {
 	return nil
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
 
 	return mgr.Stop()
@@ -470,9 +460,7 @@ func (mgr *Manager) Stop() error {
 	return nil
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
-	ctx := context.TODO()
-
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	if cluster.Leader == nil || cluster.Leader.Name == "" {
 		mgr.Logger.Warnf("no action coz cluster has no leader")
 		return mgr.Start()
@@ -738,18 +726,10 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	}
 
 	if !needRestart {
-		var stdout, stderr bytes.Buffer
-		cmd := exec.Command("su", "-c", "pg_ctl reload", "postgres")
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
-		err = cmd.Run()
-		if err != nil || stderr.String() != "" {
-			mgr.Logger.Errorf("postgresql reload failed, err:%v, stderr:%s", err, stderr.String())
+		if err = mgr.pgReload(context.TODO()); err != nil {
+			mgr.Logger.Errorf("reload conf failed, err:%v", err)
 			return err
 		}
-
-		mgr.Logger.Infof("successfully follow new leader:%s", leaderMember.Name)
 		return nil
 	}
 
@@ -777,9 +757,7 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
-	ctx := context.TODO()
-
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err == nil && isLeader {
 		// if current member is leader, just return
@@ -809,11 +787,11 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 
 	for i, m := range cluster.Members {
-		if m.Name != leader && mgr.IsMemberHealthy(cluster, &m) {
+		if m.Name != leader && mgr.IsMemberHealthy(ctx, cluster, &m) {
 			members = append(members, &cluster.Members[i])
 		}
 	}
@@ -859,4 +837,48 @@ func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
 
 func (mgr *Manager) CreateRoot(ctx context.Context) error {
 	return nil
+}
+
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	sql := "alter system set default_transaction_read_only=on;"
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		return err
+	}
+
+	if err = mgr.pgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("Lock db success: %s", reason)
+	return nil
+}
+
+func (mgr *Manager) Unlock(ctx context.Context) error {
+	sql := "alter system set default_transaction_read_only=off;"
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		return err
+	}
+
+	if err = mgr.pgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("UnLock db success")
+	return nil
+}
+
+func (mgr *Manager) pgReload(ctx context.Context) error {
+	reload := "select pg_reload_conf();"
+
+	_, err := mgr.Exec(ctx, reload)
+
+	return err
 }

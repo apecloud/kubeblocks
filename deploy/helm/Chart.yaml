@@ -2,13 +2,13 @@ apiVersion: v2
 name: kubeblocks
 description: KubeBlocks Core Controller Operator.
 type: application
-version: 0.6.0-alpha.36
-appVersion: 0.6.0-alpha.36
+version: 0.6.0-beta.21
+appVersion: 0.6.0-beta.21
 
 kubeVersion: '>=1.22.0-0'
 
 home: https://www.kubeblocks.io/
-icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+icon: https://kubeblocks.io/img/logo.png
 keywords:
 - kubernetes
 - database

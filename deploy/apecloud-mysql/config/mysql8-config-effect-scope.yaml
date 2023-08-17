@@ -6,6 +6,8 @@
 ## if the above two conditions are not met, by default, parameter change operation follow the rule for using staticParameters.
 staticParameters:
   - xengine
+  - smartengine
+  - loose_smartengine
   - allow-suspicious-udfs
   - auto_generate_certs
   - back_log

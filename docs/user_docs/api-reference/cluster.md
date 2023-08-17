@@ -23,10 +23,6 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>
 </li><li>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily</a>
-</li><li>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate</a>
-</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersion">ClusterVersion</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentClassDefinition">ComponentClassDefinition</a>
@@ -251,6 +247,34 @@ TerminationPolicyType
 </tr>
 <tr>
 <td>
+<code>tenancy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TenancyType">
+TenancyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>tenancy describes how pods are distributed across node.<br />SharedNode means multiple pods may share the same node.<br />DedicatedNode means each pod runs on their own dedicated node.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>availabilityPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.AvailabilityPolicyType">
+AvailabilityPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>availabilityPolicy describes the availability policy, including zone, node, and none.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>affinity</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Affinity">
@@ -319,28 +343,44 @@ ClusterStorage
 </tr>
 <tr>
 <td>
-<code>mode</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterMode">
-ClusterMode
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterMonitor">
+ClusterMonitor
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.</p><br />
+<p>monitor specifies the configuration of monitor</p><br />
 </td>
 </tr>
 <tr>
 <td>
-<code>parameters</code><br/>
+<code>network</code><br/>
 <em>
-map[string]string
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterNetwork">
+ClusterNetwork
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>customized parameters that is used in different clusterdefinition</p><br />
+<p>network specifies the configuration of network</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
+ClusterBackup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>cluster backup configuration.</p><br />
 </td>
 </tr>
 </table>
@@ -452,17 +492,6 @@ map[string]string
 <p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object.</p><br /><br /><p>Built-in objects are:<br />- <code>$(RANDOM_PASSWD)</code> - random 8 characters.<br />- <code>$(UUID)</code> - generate a random UUID v4 string.<br />- <code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br />- <code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br />- <code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br />- <code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
 </td>
 </tr>
-<tr>
-<td>
-<code>clusterFamilyRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>reference name of clusterfamily</p><br />
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -472,178 +501,6 @@ string
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">
 ClusterDefinitionStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily
-</h3>
-<div>
-<p>ClusterFamily is the Schema for the clusterfamilies API</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ClusterFamily</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilySpec">
-ClusterFamilySpec
-</a>
-</em>
-</td>
-<td>
-<p>spec of clusterfamily which defines what kind of clustertemplate to use in some conditions</p><br />
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>clusterTemplateRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">
-[]ClusterFamilyTemplateRef
-</a>
-</em>
-</td>
-<td>
-<p>list of clustertemplates</p><br />
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyStatus">
-ClusterFamilyStatus
-</a>
-</em>
-</td>
-<td>
-<p>status of clusterfamily</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate
-</h3>
-<div>
-<p>ClusterTemplate is the Schema for the clustertemplates API</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ClusterTemplate</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplateSpec">
-ClusterTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>componentSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">
-[]ClusterComponentSpec
-</a>
-</em>
-</td>
-<td>
-<p>default value of cluster.spec.componentSpecs</p><br />
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplateStatus">
-ClusterTemplateStatus
 </a>
 </em>
 </td>
@@ -891,15 +748,29 @@ ComponentResourceConstraintSpec
 <table>
 <tr>
 <td>
-<code>constraints</code><br/>
+<code>rules</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraint">
-[]ResourceConstraint
+<a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">
+[]ResourceConstraintRule
 </a>
 </em>
 </td>
 <td>
-<p>Component resource constraints</p><br />
+<p>Component resource constraint rules.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterResourceConstraintSelector">
+[]ClusterResourceConstraintSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>selector is used to bind the resource constraint to cluster definitions.</p><br />
 </td>
 </tr>
 </table>
@@ -1514,6 +1385,29 @@ TenancyType
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.AvailabilityPolicyType">AvailabilityPolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
+</p>
+<div>
+<p>AvailabilityPolicyType for cluster affinity policy.</p><br />
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;node&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;none&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;zone&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy
 </h3>
 <p>
@@ -1934,7 +1828,7 @@ int32
 <h3 id="apps.kubeblocks.io/v1alpha1.CPUConstraint">CPUConstraint
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraint">ResourceConstraint</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">ResourceConstraintRule</a>)
 </p>
 <div>
 </div>
@@ -2029,6 +1923,8 @@ Kubernetes resource.Quantity
 <td></td>
 </tr><tr><td><p>&#34;properties&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;props-plus&#34;</p></td>
+<td></td>
 </tr><tr><td><p>&#34;redis&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;toml&#34;</p></td>
@@ -2099,6 +1995,106 @@ string
 </td>
 <td>
 <p>Class refers to the name of the class that is defined in the ComponentClassDefinition.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterBackup">ClusterBackup
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>enabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>enabled defines whether to enable automated backup.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>retentionPeriod</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>retentionPeriod is a time string ending with the &rsquo;d&rsquo;|&rsquo;D&rsquo;|&lsquo;h&rsquo;|&lsquo;H&rsquo; character to describe how long<br />the Backup should be retained. if not set, will be retained forever.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>method</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.BackupMethod
+</em>
+</td>
+<td>
+<p>backup method, support: snapshot, backupTool.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>cronExpression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>the cron expression for schedule, the timezone is in UTC. see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>startingDeadlineMinutes</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>startingDeadlineMinutes defines the deadline in minutes for starting the backup job<br />if it misses scheduled time for any reason.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>repoName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>repoName is the name of the backupRepo, if not set, will use the default backupRepo.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>pitrEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>pitrEnabled defines whether to enable point-in-time recovery.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2506,7 +2502,7 @@ map[string]string
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplateSpec">ClusterTemplateSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
 </p>
 <div>
 <p>ClusterComponentSpec defines the cluster component spec.</p><br />
@@ -3224,17 +3220,6 @@ map[string]string
 <p>Connection credential template used for creating a connection credential<br />secret for cluster.apps.kubeblocks.io object.</p><br /><br /><p>Built-in objects are:<br />- <code>$(RANDOM_PASSWD)</code> - random 8 characters.<br />- <code>$(UUID)</code> - generate a random UUID v4 string.<br />- <code>$(UUID_B64)</code> - generate a random UUID v4 BASE64 encoded string.<br />- <code>$(UUID_STR_B64)</code> - generate a random UUID v4 string then BASE64 encoded.<br />- <code>$(UUID_HEX)</code> - generate a random UUID v4 HEX representation.<br />- <code>$(HEADLESS_SVC_FQDN)</code> - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_FQDN)</code> - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,<br />   where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;<br />- <code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:<br />   <code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the<br />   connection credential value is 3306.</p><br />
 </td>
 </tr>
-<tr>
-<td>
-<code>clusterFamilyRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>reference name of clusterfamily</p><br />
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus
@@ -3292,167 +3277,8 @@ int64
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilySpec">ClusterFamilySpec
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterMonitor">ClusterMonitor
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily</a>)
-</p>
-<div>
-<p>ClusterFamilySpec defines the desired state of ClusterFamily</p><br />
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>clusterTemplateRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">
-[]ClusterFamilyTemplateRef
-</a>
-</em>
-</td>
-<td>
-<p>list of clustertemplates</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilyStatus">ClusterFamilyStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamily">ClusterFamily</a>)
-</p>
-<div>
-<p>ClusterFamilyStatus defines the observed state of ClusterFamily</p><br />
-</div>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">ClusterFamilyTemplateRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilySpec">ClusterFamilySpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>key defines which parameters in cluster should be checked, if key equals to value, the clustertemplate defined in templateRef will be chosen</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>expression</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>if the evaluated result equals to value, the clustertemplate defined in templateRef will be chosen, when this field is set, key will be ignored</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>the value of the key or the expression</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>templateRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>clustertemplate name referenced to, when value is match</p><br />
-</td>
-</tr>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRefSelector">
-[]ClusterFamilyTemplateRefSelector
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRefSelector">ClusterFamilyTemplateRefSelector
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterFamilyTemplateRef">ClusterFamilyTemplateRef</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>expression</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>template</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterMode">ClusterMode
-(<code>string</code> alias)</h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
 </p>
@@ -3461,17 +3287,67 @@ string
 <table>
 <thead>
 <tr>
-<th>Value</th>
+<th>Field</th>
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;raftGroup&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;replication&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;standalone&#34;</p></td>
-<td></td>
-</tr></tbody>
+<tbody>
+<tr>
+<td>
+<code>monitoringInterval</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>monitoringInterval specifies interval of monitoring, no monitor if set to 0</p><br />
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterNetwork">ClusterNetwork
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>hostNetworkAccessible</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>hostNetworkAccessible specifies whether host network is accessible. It defaults to false</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>publiclyAccessible</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>publiclyAccessible specifies whether it is publicly accessible. It defaults to false</p><br />
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterPhase">ClusterPhase
 (<code>string</code> alias)</h3>
@@ -3501,6 +3377,47 @@ string
 </tr><tr><td><p>&#34;Stopped&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterResourceConstraintSelector">ClusterResourceConstraintSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentResourceConstraintSpec">ComponentResourceConstraintSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>clusterDefRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>clusterDefRef is the name of the cluster definition.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentResourceConstraintSelector">
+[]ComponentResourceConstraintSelector
+</a>
+</em>
+</td>
+<td>
+<p>selector is used to bind the resource constraint to components.</p><br />
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterResources">ClusterResources
 </h3>
@@ -3614,6 +3531,34 @@ TerminationPolicyType
 </tr>
 <tr>
 <td>
+<code>tenancy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TenancyType">
+TenancyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>tenancy describes how pods are distributed across node.<br />SharedNode means multiple pods may share the same node.<br />DedicatedNode means each pod runs on their own dedicated node.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>availabilityPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.AvailabilityPolicyType">
+AvailabilityPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>availabilityPolicy describes the availability policy, including zone, node, and none.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>affinity</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Affinity">
@@ -3682,28 +3627,44 @@ ClusterStorage
 </tr>
 <tr>
 <td>
-<code>mode</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterMode">
-ClusterMode
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterMonitor">
+ClusterMonitor
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.</p><br />
+<p>monitor specifies the configuration of monitor</p><br />
 </td>
 </tr>
 <tr>
 <td>
-<code>parameters</code><br/>
+<code>network</code><br/>
 <em>
-map[string]string
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterNetwork">
+ClusterNetwork
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>customized parameters that is used in different clusterdefinition</p><br />
+<p>network specifies the configuration of network</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">
+ClusterBackup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>cluster backup configuration.</p><br />
 </td>
 </tr>
 </tbody>
@@ -3767,7 +3728,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.ClusterComponentStatus
+map[string]..ClusterComponentStatus
 </a>
 </em>
 </td>
@@ -3866,44 +3827,6 @@ SwitchPolicyType
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTemplateSpec">ClusterTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>componentSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">
-[]ClusterComponentSpec
-</a>
-</em>
-</td>
-<td>
-<p>default value of cluster.spec.componentSpecs</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTemplateStatus">ClusterTemplateStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTemplate">ClusterTemplate</a>)
-</p>
-<div>
-<p>ClusterTemplateStatus defines the observed state of ClusterTemplate</p><br />
-</div>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterVersionSpec">ClusterVersionSpec
 </h3>
 <p>
@@ -4190,7 +4113,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentClass">ComponentClass
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentClassInstance">ComponentClassInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentClassSeries">ComponentClassSeries</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentClassDefinitionStatus">ComponentClassDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentClassSeries">ComponentClassSeries</a>)
 </p>
 <div>
 </div>
@@ -4320,8 +4243,8 @@ int64
 <td>
 <code>classes</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentClassInstance">
-[]ComponentClassInstance
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentClass">
+[]ComponentClass
 </a>
 </em>
 </td>
@@ -4346,17 +4269,6 @@ int64
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>resourceConstraintRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>resourceConstraintRef reference to the resource constraint object name, indicates that the series<br />defined below all conform to the constraint.</p><br />
-</td>
-</tr>
 <tr>
 <td>
 <code>template</code><br/>
@@ -4393,49 +4305,6 @@ string
 <td>
 <em>(Optional)</em>
 <p>series is a series of class definitions.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentClassInstance">ComponentClassInstance
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentClassDefinitionStatus">ComponentClassDefinitionStatus</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ComponentClass</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentClass">
-ComponentClass
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ComponentClass</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>resourceConstraintRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>resourceConstraintRef reference to the resource constraint object name.</p><br />
 </td>
 </tr>
 </tbody>
@@ -4717,6 +4586,45 @@ ComponentValueFrom
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentResourceConstraintSelector">ComponentResourceConstraintSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterResourceConstraintSelector">ClusterResourceConstraintSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>componentDefRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>componentDefRef is the name of the component definition in the cluster definition.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>rules</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>rules are the constraint rules that will be applied to the component.</p><br />
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentResourceConstraintSpec">ComponentResourceConstraintSpec
 </h3>
 <p>
@@ -4735,15 +4643,29 @@ ComponentValueFrom
 <tbody>
 <tr>
 <td>
-<code>constraints</code><br/>
+<code>rules</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraint">
-[]ResourceConstraint
+<a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">
+[]ResourceConstraintRule
 </a>
 </em>
 </td>
 <td>
-<p>Component resource constraints</p><br />
+<p>Component resource constraint rules.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterResourceConstraintSelector">
+[]ClusterResourceConstraintSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>selector is used to bind the resource constraint to cluster definitions.</p><br />
 </td>
 </tr>
 </tbody>
@@ -5910,7 +5832,7 @@ CfgFileFormat
 </em>
 </td>
 <td>
-<p>The configuration file format. Valid values are ini, xml, yaml, json,<br />hcl, dotenv, properties and toml.</p><br /><br /><p>ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a><br />xml: reference wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a><br />yaml: a configuration file support for complex data types and structures.<br />json: reference wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a><br />hcl: : The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a><br />dotenv: this was a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a><br />properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a><br />toml: reference wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a></p><br />
+<p>The configuration file format. Valid values are ini, xml, yaml, json,<br />hcl, dotenv, properties and toml.</p><br /><br /><p>ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: <a href="https://en.wikipedia.org/wiki/INI_file">https://en.wikipedia.org/wiki/INI_file</a><br />xml: reference wiki: <a href="https://en.wikipedia.org/wiki/XML">https://en.wikipedia.org/wiki/XML</a><br />yaml: a configuration file support for complex data types and structures.<br />json: reference wiki: <a href="https://en.wikipedia.org/wiki/JSON">https://en.wikipedia.org/wiki/JSON</a><br />hcl: : The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: <a href="https://www.linode.com/docs/guides/introduction-to-hcl/">https://www.linode.com/docs/guides/introduction-to-hcl/</a><br />dotenv: this was a plain text file with simple key–value pairs, reference wiki: <a href="https://en.wikipedia.org/wiki/Configuration_file#MS-DOS">https://en.wikipedia.org/wiki/Configuration_file#MS-DOS</a><br />properties: a file extension mainly used in Java, reference wiki: <a href="https://en.wikipedia.org/wiki/.properties">https://en.wikipedia.org/wiki/.properties</a><br />toml: reference wiki: <a href="https://en.wikipedia.org/wiki/TOML">https://en.wikipedia.org/wiki/TOML</a><br />props-plus: a file extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)</p><br />
 </td>
 </tr>
 </tbody>
@@ -6310,7 +6232,7 @@ ClassDefRef
 <td>
 <code>targetResources</code><br/>
 <em>
-map[apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]string
+map[..ComponentResourceKey][]string
 </em>
 </td>
 <td>
@@ -6352,7 +6274,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfiguration
+map[string]..LastComponentConfiguration
 </a>
 </em>
 </td>
@@ -6482,7 +6404,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.MemoryConstraint">MemoryConstraint
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraint">ResourceConstraint</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">ResourceConstraintRule</a>)
 </p>
 <div>
 </div>
@@ -6750,6 +6672,20 @@ ClusterComponentPhase
 <td>
 <em>(Optional)</em>
 <p>phase describes the component phase, reference Cluster.status.component.phase.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>lastFailedTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>lastFailedTime is the last time the component phase transitioned to Failed or Abnormal.</p><br />
 </td>
 </tr>
 <tr>
@@ -7094,7 +7030,7 @@ LastConfiguration
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">
-map[string]apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponentStatus
+map[string]..OpsRequestComponentStatus
 </a>
 </em>
 </td>
@@ -7895,6 +7831,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>update specifies statement how to update account&rsquo;s password.</p><br />
 </td>
 </tr>
@@ -7907,7 +7844,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>deletion specifies statement how to delete this account.<br />Used in combination with <code>CreateionStatement</code> to delete the account before create it.<br />For instance, one usually uses <code>drop user if exists</code> statement followed by <code>create user</code> statement to create an account.</p><br />
+<p>deletion specifies statement how to delete this account.<br />Used in combination with <code>CreateionStatement</code> to delete the account before create it.<br />For instance, one usually uses <code>drop user if exists</code> statement followed by <code>create user</code> statement to create an account.<br />Deprecated: this field is deprecated, use <code>update</code> instead.</p><br />
 </td>
 </tr>
 </tbody>
@@ -8192,7 +8129,7 @@ ReplicationMemberStatus
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ResourceConstraint">ResourceConstraint
+<h3 id="apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">ResourceConstraintRule
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentResourceConstraintSpec">ComponentResourceConstraintSpec</a>)
@@ -8207,6 +8144,17 @@ ReplicationMemberStatus
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the constraint.</p><br />
+</td>
+</tr>
 <tr>
 <td>
 <code>cpu</code><br/>
@@ -8340,14 +8288,14 @@ string
 <tbody>
 <tr>
 <td>
-<code>retryWindowMinutes</code><br/>
+<code>startingDeadlineMinutes</code><br/>
 <em>
 int64
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>retryWindowMinutes defines the time window for starting the job if it misses scheduled<br />time for any reason. the unit of time is minute.</p><br />
+<p>startingDeadlineMinutes defines the deadline in minutes for starting the backup job<br />if it misses scheduled time for any reason.</p><br />
 </td>
 </tr>
 <tr>
@@ -8821,6 +8769,18 @@ Kubernetes api utils intstr.IntOrString
 <p>command used to execute for reload.</p><br />
 </td>
 </tr>
+<tr>
+<td>
+<code>sync</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specify synchronize updates parameters to the config manager.</p><br />
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SignalType">SignalType
@@ -9046,7 +9006,7 @@ Kubernetes apps/v1.DeploymentStrategy
 <h3 id="apps.kubeblocks.io/v1alpha1.StorageConstraint">StorageConstraint
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraint">ResourceConstraint</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceConstraintRule">ResourceConstraintRule</a>)
 </p>
 <div>
 </div>
@@ -9589,7 +9549,7 @@ ConnectionCredentialKey
 <h3 id="apps.kubeblocks.io/v1alpha1.TenancyType">TenancyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Affinity">Affinity</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Affinity">Affinity</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>)
 </p>
 <div>
 <p>TenancyType for cluster tenant resources.</p><br />

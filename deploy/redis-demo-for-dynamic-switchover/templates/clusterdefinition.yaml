@@ -80,7 +80,7 @@ spec:
           templateRef: redis-demo-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       monitor:
         builtIn: false
         exporterConfig:
@@ -208,7 +208,7 @@ spec:
           templateRef: redis-demo-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
-          defaultMode: 493
+          defaultMode: 0555
       volumeTypes:
         - name: data
           type: data

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +45,15 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 					},
 				},
 			}
+			commonLabels := map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "ClusterDefName",
+				constant.AppComponentLabelKey:   "CompDefName",
+				constant.AppInstanceLabelKey:    "clusterName",
+				constant.KBAppComponentLabelKey: "componentName",
+			}
 			pod := builder.NewPodBuilder(testCtx.DefaultNamespace, "foo").
+				AddLabelsInMap(commonLabels).
 				AddContainer(corev1.Container{
 					Name:  "foo",
 					Image: "bar",
@@ -65,9 +74,10 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				Command: []string{"bar"},
 			}
 			rsm := builder.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
+				AddMatchLabelsInMap(commonLabels).
 				SetService(service).
 				SetTemplate(template).
-				AddObservationAction(action).
+				AddProbeAction(action).
 				GetObject()
 			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm),

@@ -19,7 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package dcs
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/spf13/viper"
+)
 
 type Cluster struct {
 	ClusterCompName string
@@ -27,11 +32,10 @@ type Cluster struct {
 	Replicas        int32
 	HaConfig        *HaConfig
 	Leader          *Leader
-	OpTime          int64
 	Members         []Member
 	Switchover      *Switchover
 	Extra           map[string]string
-	resource        interface{}
+	resource        any
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -84,16 +88,14 @@ func (c *Cluster) IsLocked() bool {
 	return c.Leader != nil && c.Leader.Name != ""
 }
 
-func (c *Cluster) GetOpTime() int64 {
-	return c.OpTime
-}
-
 func (c *Cluster) GetMemberAddrWithPort(member Member) string {
-	return fmt.Sprintf("%s.%s-headless.%s.svc:%s", member.Name, c.ClusterCompName, c.Namespace, member.DBPort)
+	addr := c.GetMemberAddr(member)
+	return fmt.Sprintf("%s:%s", addr, member.DBPort)
 }
 
 func (c *Cluster) GetMemberAddr(member Member) string {
-	return fmt.Sprintf("%s.%s-headless.%s.svc", member.Name, c.ClusterCompName, c.Namespace)
+	clusterDomain := viper.GetString(constant.KubernetesClusterDomainEnv)
+	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, c.ClusterCompName, c.Namespace, clusterDomain)
 }
 
 func (c *Cluster) GetMemberAddrs() []string {
@@ -119,14 +121,19 @@ func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 }
 
 type Leader struct {
+	DBState     *DBState
 	Index       string
 	Name        string
 	AcquireTime int64
 	RenewTime   int64
 	TTL         int
-	Resource    interface{}
+	Resource    any
 }
 
+type DBState struct {
+	OpTimestamp int64
+	Extra       map[string]string
+}
 type Member struct {
 	Index          string
 	Name           string

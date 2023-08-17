@@ -100,7 +100,7 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *Plan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc)
+	return p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 }
 
 // Do the real works
@@ -133,7 +133,8 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.DELETE:
-		if controllerutil.RemoveFinalizer(vertex.Obj, rsmFinalizerName) {
+		finalizer := getFinalizer(vertex.Obj)
+		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 			err := b.cli.Update(b.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				b.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
@@ -147,8 +148,7 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 			}
 		}
 	case model.STATUS:
-		patch := client.MergeFrom(vertex.OriObj)
-		if err := b.cli.Status().Patch(b.transCtx.Context, vertex.Obj, patch); err != nil {
+		if err := b.cli.Status().Update(b.transCtx.Context, vertex.Obj); err != nil {
 			return err
 		}
 	}

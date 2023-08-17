@@ -6,7 +6,7 @@ metadata:
   name: kb-pg-cluster
   namespace: default
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
+    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 ---
@@ -16,7 +16,7 @@ kind: Role
 metadata:
   name: kb-pg-cluster
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
+    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 rules:
@@ -69,7 +69,7 @@ kind: RoleBinding
 metadata:
   name: kb-pg-cluster
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
+    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 roleRef:
@@ -88,7 +88,7 @@ metadata:
   name: pg-cluster
   namespace: default
   labels: 
-    helm.sh/chart: postgresql-cluster-0.6.0-alpha.36
+    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 spec:

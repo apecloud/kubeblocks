@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -37,7 +35,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -45,50 +42,52 @@ const (
 )
 
 var pgbenchExample = templates.Examples(`
-# pgbench run on a cluster
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
-
-# pgbench run on a cluster with different threads and different client
-kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
-
-# pgbench run on a cluster with specified transactions
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --transactions 1000
-
-# pgbench run on a cluster with specified seconds
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
-
-# pgbench run on a cluster with select only
-kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
+	# pgbench run on a cluster, that will exec for all steps, cleanup, prepare and run
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with cleanup, only cleanup by deleting the testdata
+	kbcli bench pgbench cleanup mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with prepare, just prepare by creating the testdata
+	kbcli bench pgbench prepare mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with run, just run by running the test
+	kbcli bench pgbench run mytest --cluster pgcluster --database postgres --user xxx --password xxx
+	
+	# pgbench run on a cluster with  thread and  client counts
+	kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
+	
+	# pgbench run on a cluster with specified transactions
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --transactions 1000
+	
+	# pgbench run on a cluster with specified seconds
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
+	
+	# pgbench run on a cluster with 'select' only
+	kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
 `)
 
 type PgBenchOptions struct {
-	factory   cmdutil.Factory
-	client    clientset.Interface
-	dynamic   dynamic.Interface
-	name      string
-	namespace string
-
-	Scale        int      // specify the scale factor for the benchmark test
-	Clients      []int    // specify the number of clients to run
-	Threads      int      // specify the number of threads per client
-	Transactions int      // specify the number of transactions per client
-	Duration     int      // specify the duration of benchmark test in seconds
-	Select       bool     // specify to run SELECT-only transactions
-	ExtraArgs    []string // specify extra arguments for pgbench
+	Scale        int   // specify the scale factor for the benchmark test
+	Clients      []int // specify the number of clients to run
+	Threads      int   // specify the number of threads per client
+	Transactions int   // specify the number of transactions per client
+	Duration     int   // specify the duration of benchmark test in seconds
+	Select       bool  // specify to run SELECT-only transactions
 
 	BenchBaseOptions
-	*cluster.ClusterObjects
-	genericclioptions.IOStreams
 }
 
 func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PgBenchOptions{
-		factory:   f,
-		IOStreams: streams,
+		BenchBaseOptions: BenchBaseOptions{
+			IOStreams: streams,
+			factory:   f,
+		},
 	}
 
 	cmd := &cobra.Command{
-		Use:     "pgbench",
+		Use:     "pgbench [Step] [BenchmarkName]",
 		Short:   "Run pgbench against a PostgreSQL cluster",
 		Example: pgbenchExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -105,66 +104,64 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().IntVar(&o.Transactions, "transactions", 0, "The number of transactions to run for pgbench")
 	cmd.Flags().IntVar(&o.Duration, "duration", 60, "The seconds to run pgbench for")
 	cmd.Flags().BoolVar(&o.Select, "select", false, "Run pgbench with select only")
+
 	return cmd
 }
 
 func (o *PgBenchOptions) Complete(args []string) error {
 	var err error
+	var driver string
 	var host string
 	var port int
 
-	// use the first argument as the name of the benchmark
-	if len(args) > 0 {
-		o.name = args[0]
-	}
-	if o.name == "" {
-		o.name = fmt.Sprintf("pgbench-%s", util.RandRFC1123String(6))
-	}
-
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster name should be specified")
-	}
-
-	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
+	if err = o.BenchBaseOptions.BaseComplete(); err != nil {
 		return err
 	}
 
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-		return err
+	o.Step, o.name = parseStepAndName(args, "pgbench")
+
+	if o.ClusterName != "" {
+		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+
+		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+			return err
+		}
+
+		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+			return err
+		}
+
+		clusterGetter := cluster.ObjectsGetter{
+			Client:    o.client,
+			Dynamic:   o.dynamic,
+			Name:      o.ClusterName,
+			Namespace: o.namespace,
+			GetOptions: cluster.GetOptions{
+				WithClusterDef:     true,
+				WithService:        true,
+				WithPod:            true,
+				WithEvent:          true,
+				WithPVC:            true,
+				WithDataProtection: true,
+			},
+		}
+		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+			return err
+		}
+		driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+		if err != nil {
+			return err
+		}
 	}
 
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-		return err
+	if o.Driver == "" {
+		o.Driver = driver
 	}
 
-	clusterGetter := cluster.ObjectsGetter{
-		Client:    o.client,
-		Dynamic:   o.dynamic,
-		Name:      o.ClusterName,
-		Namespace: o.namespace,
-		GetOptions: cluster.GetOptions{
-			WithClusterDef:     true,
-			WithService:        true,
-			WithPod:            true,
-			WithEvent:          true,
-			WithPVC:            true,
-			WithDataProtection: true,
-		},
-	}
-	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-	o.Driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-	if err != nil {
-		return err
-	}
-
-	if o.Driver != pgBenchDriver {
-		return fmt.Errorf("pgbench only support to run against PostgreSQL cluster, your cluster's driver is %s", o.Driver)
-	}
-
-	if o.Host == "" || o.Port == 0 {
+	if o.Host == "" && o.Port == 0 {
 		o.Host = host
 		o.Port = port
 	}
@@ -177,8 +174,24 @@ func (o *PgBenchOptions) Validate() error {
 		return err
 	}
 
+	if o.Driver != pgBenchDriver {
+		return fmt.Errorf("pgbench only supports to run against PostgreSQL cluster, your cluster's driver is %s", o.Driver)
+	}
+
 	if len(o.Clients) == 0 {
 		return fmt.Errorf("clients should be specified")
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
+	}
+
+	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
+		return err
 	}
 
 	return nil
@@ -201,12 +214,17 @@ func (o *PgBenchOptions) Run() error {
 			SelectOnly:   o.Select,
 			Transactions: o.Transactions,
 			Duration:     o.Duration,
-			Target: v1alpha1.PgbenchTarget{
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			BenchCommon: v1alpha1.BenchCommon{
+				Tolerations: o.Tolerations,
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Target: v1alpha1.Target{
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

@@ -65,7 +65,7 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
   | Database | Hidden Accounts                     |
   | :---     | :---                                |
   | MySQL    | root <br />kb* <br />Localhost = '' |
-  | postGre  | Postgres <br />kb*                  |
+  | PostgreSQL  | Postgres <br />kb*                  |
 
 - Delete a user account
 

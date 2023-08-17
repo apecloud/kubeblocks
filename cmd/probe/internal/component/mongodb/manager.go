@@ -39,6 +39,11 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
+const (
+	PrimaryPriority   = 2
+	SecondaryPriority = 1
+)
+
 type Manager struct {
 	component.DBManagerBase
 	Client   *mongo.Client
@@ -49,8 +54,7 @@ var Mgr *Manager
 var _ component.DBManager = &Manager{}
 
 func NewManager(logger logger.Logger) (*Manager, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	opts := options.Client().
 		SetHosts(config.hosts).
@@ -105,9 +109,9 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 		configMembers[i].ID = i
 		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
 		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
-			configMembers[i].Priority = 2
+			configMembers[i].Priority = PrimaryPriority
 		} else {
-			configMembers[i].Priority = 1
+			configMembers[i].Priority = SecondaryPriority
 		}
 	}
 
@@ -396,15 +400,15 @@ func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []strin
 	return client, err
 }
 
-func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
-	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return true
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
+	defer client.Disconnect(ctx) //nolint:errcheck
 
-	rsConfig, err := GetReplSetConfig(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		//
@@ -420,11 +424,11 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	return false
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	return mgr.IsMemberHealthy(nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	return mgr.IsMemberHealthy(ctx, cluster, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	var memberName string
 	if member != nil {
 		memberName = member.Name
@@ -432,7 +436,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 		memberName = mgr.CurrentMemberName
 	}
 
-	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	rsStatus, _ := mgr.GetReplSetStatus(ctx)
 	if rsStatus == nil {
 		return false
 	}
@@ -445,7 +449,9 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	return false
 }
 
-func (mgr *Manager) Recover() {}
+func (mgr *Manager) Recover(context.Context) error {
+	return nil
+}
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
@@ -471,7 +477,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	}
 	configMember.ID = lastID + 1
 	configMember.Host = currentHost
-	configMember.Priority = 1
+	configMember.Priority = SecondaryPriority
 	rsConfig.Members = append(rsConfig.Members, configMember)
 
 	rsConfig.Version++
@@ -510,7 +516,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 		mgr.Logger.Debugf("Get leader client failed: %v", err)
 		return false
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
+	defer client.Disconnect(ctx) //nolint:errcheck
 
 	status, err := GetReplSetStatus(ctx, client)
 	if err != nil {
@@ -520,34 +526,65 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	return status.OK != 0
 }
 
-func (mgr *Manager) Promote() error {
-	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
+func (mgr *Manager) IsPromoted(ctx context.Context) bool {
+	isLeader, err := mgr.IsLeader(ctx, nil)
+	if err != nil || !isLeader {
+		mgr.Logger.Errorf("Is leader check failed: %v", err)
+		return false
+	}
+
+	rsConfig, err := mgr.GetReplSetConfig(ctx)
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return false
+	}
+	for i := range rsConfig.Members {
+		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+			if rsConfig.Members[i].Priority == PrimaryPriority {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (mgr *Manager) Promote(ctx context.Context) error {
+	rsConfig, err := mgr.GetReplSetConfig(ctx)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return err
 	}
 
-	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
-	client, err := NewReplSetClient(context.TODO(), hosts)
-	if err != nil {
-		return err
-	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
-
 	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
-			rsConfig.Members[i].Priority = 2
-		} else if rsConfig.Members[i].Priority == 2 {
-			rsConfig.Members[i].Priority = 1
+			if rsConfig.Members[i].Priority == PrimaryPriority {
+				mgr.Logger.Debugf("Current member already has the highest priority!")
+				return nil
+			}
+
+			rsConfig.Members[i].Priority = PrimaryPriority
+		} else if rsConfig.Members[i].Priority == PrimaryPriority {
+			rsConfig.Members[i].Priority = SecondaryPriority
 		}
 	}
 
 	rsConfig.Version++
-	return SetReplSetConfig(context.TODO(), client, rsConfig)
+
+	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
+	client, err := NewReplSetClient(ctx, hosts)
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+	return SetReplSetConfig(ctx, client, rsConfig)
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	// mongodb do premote and demote in one action, here do nothing.
+	return nil
+}
+
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	return nil
 }
 
@@ -587,8 +624,8 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
-	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	rsStatus, _ := mgr.GetReplSetStatus(ctx)
 	if rsStatus == nil {
 		return nil
 	}
@@ -611,9 +648,9 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 }
 
 // HasOtherHealthyMembers Are there any healthy members other than the leader?
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
-	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	rsStatus, _ := mgr.GetReplSetStatus(ctx)
 	if rsStatus == nil {
 		return members
 	}
@@ -635,6 +672,64 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) 
 	return members
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	mgr.Logger.Infof("Lock db: %s", reason)
+	m := bson.D{
+		{Key: "fsync", Value: 1},
+		{Key: "lock", Value: true},
+		{Key: "comment", Value: reason},
+	}
+	lockResp := LockResp{}
+
+	response := mgr.Client.Database("admin").RunCommand(ctx, m)
+	if response.Err() != nil {
+		mgr.Logger.Infof("Lock db (%s) failed: %v", reason, response.Err())
+		return response.Err()
+	}
+	if err := response.Decode(&lockResp); err != nil {
+		err := errors.Wrap(err, "failed to decode lock response")
+		return err
+	}
+
+	if lockResp.OK != 1 {
+		err := errors.Errorf("mongo says: %s", lockResp.Errmsg)
+		return err
+	}
+	mgr.IsLocked = true
+	mgr.Logger.Infof("Lock db success times: %d", lockResp.LockCount)
+	return nil
+}
+
+func (mgr *Manager) Unlock(ctx context.Context) error {
+	mgr.Logger.Infof("Unlock db")
+	m := bson.M{"fsyncUnlock": 1}
+	unlockResp := LockResp{}
+	response := mgr.Client.Database("admin").RunCommand(ctx, m)
+	if response.Err() != nil {
+		mgr.Logger.Infof("Unlock db failed: %v", response.Err())
+		return response.Err()
+	}
+	if err := response.Decode(&unlockResp); err != nil {
+		err := errors.Wrap(err, "failed to decode unlock response")
+		return err
+	}
+
+	if unlockResp.OK != 1 {
+		err := errors.Errorf("mongo says: %s", unlockResp.Errmsg)
+		return err
+	}
+	for unlockResp.LockCount > 0 {
+		response = mgr.Client.Database("admin").RunCommand(ctx, m)
+		if response.Err() != nil {
+			mgr.Logger.Infof("Unlock db failed: %v", response)
+			return response.Err()
+		}
+		if err := response.Decode(&unlockResp); err != nil {
+			err := errors.Wrap(err, "failed to decode unlock response")
+			return err
+		}
+	}
+	mgr.IsLocked = false
+	mgr.Logger.Infof("Unlock db success")
 	return nil
 }

@@ -5,16 +5,25 @@ title: kbcli bench pgbench
 Run pgbench against a PostgreSQL cluster
 
 ```
-kbcli bench pgbench [flags]
+kbcli bench pgbench [Step] [BenchmarkName] [flags]
 ```
 
 ### Examples
 
 ```
-  # pgbench run on a cluster
+  # pgbench run on a cluster, that will exec for all steps, cleanup, prepare and run
   kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
   
-  # pgbench run on a cluster with different threads and different client
+  # pgbench run on a cluster with cleanup, only cleanup by deleting the testdata
+  kbcli bench pgbench cleanup mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with prepare, just prepare by creating the testdata
+  kbcli bench pgbench prepare mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with run, just run by running the test
+  kbcli bench pgbench run mytest --cluster pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with  thread and  client counts
   kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
   
   # pgbench run on a cluster with specified transactions
@@ -23,26 +32,29 @@ kbcli bench pgbench [flags]
   # pgbench run on a cluster with specified seconds
   kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
   
-  # pgbench run on a cluster with select only
+  # pgbench run on a cluster with 'select' only
   kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
 ```
 
 ### Options
 
 ```
-      --clients ints       The number of clients to use for pgbench (default [1])
-      --cluster string     the cluster of database
-      --database string    database name
-      --duration int       The seconds to run pgbench for (default 60)
-  -h, --help               help for pgbench
-      --host string        the host of database
-      --password string    the password of database
-      --port int           the port of database
-      --scale int          The scale factor to use for pgbench (default 1)
-      --select             Run pgbench with select only
-      --threads int        The number of threads to use for pgbench (default 1)
-      --transactions int   The number of transactions to run for pgbench
-      --user string        the user of database
+      --clients ints          The number of clients to use for pgbench (default [1])
+      --cluster string        the cluster of database
+      --database string       database name
+      --driver string         the driver of database
+      --duration int          The seconds to run pgbench for (default 60)
+      --extra-args strings    extra arguments for benchmark
+  -h, --help                  help for pgbench
+      --host string           the host of database
+      --password string       the password of database
+      --port int              the port of database
+      --scale int             The scale factor to use for pgbench (default 1)
+      --select                Run pgbench with select only
+      --threads int           The number of threads to use for pgbench (default 1)
+      --tolerations strings   Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
+      --transactions int      The number of transactions to run for pgbench
+      --user string           the user of database
 ```
 
 ### Options inherited from parent commands

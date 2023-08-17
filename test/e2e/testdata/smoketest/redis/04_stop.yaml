@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-stop
+  generateName: redis-cluster-stop-
 spec:
   clusterRef: redis-cluster
   ttlSecondsAfterSucceed: 3600

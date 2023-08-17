@@ -170,7 +170,6 @@ var _ = Describe("builder", func() {
 			reqCtx,
 			nil,
 			cluster,
-			nil,
 			clusterDef,
 			&clusterDef.Spec.ComponentDefs[0],
 			&cluster.Spec.ComponentSpecs[0],
@@ -472,9 +471,19 @@ var _ = Describe("builder", func() {
 			}
 			cluster := &appsv1alpha1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace},
+				Spec: appsv1alpha1.ClusterSpec{
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "testKey",
+							Value:    "testVaule",
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
 			}
 			job, err := BuildRestoreJob(cluster, component, key.Name, "", []string{"sh"}, volumes, volumeMounts, env, nil)
 			Expect(err).Should(BeNil())
+			Expect(job.Spec.Template.Spec.Tolerations[0].Key).Should(Equal("testKey"))
 			Expect(job).ShouldNot(BeNil())
 			Expect(job.Name).Should(Equal(key.Name))
 		})
@@ -520,20 +529,28 @@ var _ = Describe("builder", func() {
 		It("builds serviceaccount correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			serviceAccount, err := BuildServiceAccount(cluster)
+			sa, err := BuildServiceAccount(cluster)
 			Expect(err).Should(BeNil())
-			Expect(serviceAccount).ShouldNot(BeNil())
-			Expect(serviceAccount.Name).Should(Equal(expectName))
+			Expect(sa).ShouldNot(BeNil())
+			Expect(sa.Name).Should(Equal(expectName))
 		})
 
 		It("builds rolebinding correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			rb, err := BuildServiceAccount(cluster)
+			rb, err := BuildRoleBinding(cluster)
 			Expect(err).Should(BeNil())
 			Expect(rb).ShouldNot(BeNil())
 			Expect(rb.Name).Should(Equal(expectName))
 		})
-	})
 
+		It("builds clusterrolebinding correctly", func() {
+			_, cluster, _ := newClusterObjs(nil)
+			expectName := fmt.Sprintf("kb-%s", cluster.Name)
+			crb, err := BuildClusterRoleBinding(cluster)
+			Expect(err).Should(BeNil())
+			Expect(crb).ShouldNot(BeNil())
+			Expect(crb.Name).Should(Equal(expectName))
+		})
+	})
 })

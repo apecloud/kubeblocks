@@ -21,6 +21,7 @@ package analyzer
 
 import (
 	"encoding/json"
+	"path/filepath"
 
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/collect"
@@ -29,7 +30,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
 )
 
-const ClusterVersionPath = "cluster-info/cluster_version.json"
+func GetClusterVersionPath() string {
+	// hardcode ClusterVersionPath will make preflight fail in windows
+	// due to the correct path is "cluster-info\cluster_version.json" in windows
+	return filepath.Join("cluster-info", "cluster_version.json")
+}
 
 type AnalyzeClusterAccess struct {
 	analyzer *preflightv1beta2.ClusterAccessAnalyze
@@ -45,7 +50,7 @@ func (a *AnalyzeClusterAccess) IsExcluded() (bool, error) {
 
 func (a *AnalyzeClusterAccess) Analyze(getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) ([]*analyze.AnalyzeResult, error) {
 	isAccess := true
-	collected, err := getFile(ClusterVersionPath)
+	collected, err := getFile(GetClusterVersionPath())
 	if err != nil {
 		isAccess = false
 	} else {

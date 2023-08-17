@@ -62,7 +62,7 @@ var _ = Describe("pod builder", func() {
 
 		Expect(pod.Name).Should(Equal(name))
 		Expect(pod.Namespace).Should(Equal(ns))
-		Expect(len(pod.Spec.Containers)).Should(Equal(2))
+		Expect(pod.Spec.Containers).Should(HaveLen(2))
 		Expect(pod.Spec.Containers[0]).Should(Equal(containers[0]))
 		Expect(pod.Spec.Containers[1]).Should(Equal(container))
 	})

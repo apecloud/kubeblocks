@@ -1,94 +1,216 @@
-# Source: apecloud-mysql-cluster/templates/cluster.yaml
+---
+# Source: pulsar-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: pulsar-test
+  name: pulsar-cluster
+  namespace: default
+  labels: 
+    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    app.kubernetes.io/version: "2.11.2"
+    app.kubernetes.io/instance: pulsar-cluster
+  annotations:
+    resource.kubeblocks.io/ignore-constraint: "true"
 spec:
-    clusterDefinitionRef: pulsar
-    clusterVersionRef: pulsar-2.11.0
-    componentSpecs:
-    - componentDefRef: pulsar-proxy
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-2.11.2
+  terminationPolicy: WipeOut
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: broker
+      componentDefRef: pulsar-broker
       monitor: false
-      name: proxy
-      noCreatePDB: false
-      replicas: 1
-      resources:
-        limits:
-          cpu: 200m
-          memory: 512Mi
-        requests:
-          cpu: 200m
-          memory: 512Mi
-    - componentDefRef: pulsar-broker
-      monitor: false
-      name: broker
-      noCreatePDB: false
-      replicas: 1
-      resources:
-        limits:
-          cpu: 200m
-          memory: 512Mi
-        requests:
-          cpu: 200m
-          memory: 512Mi
-    - componentDefRef: bookies-recovery
-      monitor: false
-      name: bookies-recovery
-      noCreatePDB: false
-      replicas: 1
-      resources:
-        limits:
-          cpu: 200m
-          memory: 512Mi
-        requests:
-          cpu: 200m
-          memory: 512Mi
-    - componentDefRef: bookies
-      monitor: false
-      name: bookies
-      noCreatePDB: false
       replicas: 3
       resources:
         limits:
-          cpu: 200m
-          memory: 512Mi
+          cpu: 
+          memory: "512Mi"
         requests:
-          cpu: 200m
-          memory: 512Mi
-      serviceAccountName: kb-pulsar-pulsar-cluster
-      volumeClaimTemplates:
-      - name: ledgers
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
-      - name: journal
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
-    - componentDefRef: zookeeper
+          cpu: "200m"
+          memory: "512Mi"
+    - name: bookies
+      componentDefRef: bookies
       monitor: false
-      name: zookeeper
-      noCreatePDB: false
-      replicas: 1
+      replicas: 4
       resources:
         limits:
-          cpu: 200m
-          memory: 512Mi
+          cpu: 
+          memory: "512Mi"
         requests:
-          cpu: 100m
-          memory: 512Mi
+          cpu: "200m"
+          memory: "512Mi"
       volumeClaimTemplates:
-      - name: data
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
-    terminationPolicy: WipeOut
+        - name: ledgers
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+        - name: journal
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: zookeeper
+      componentDefRef: zookeeper
+      monitor: false
+      replicas: 3
+      resources:
+        limits:
+          cpu: 
+          memory: "512Mi"
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+---
+# Source: pulsar-cluster/templates/tests/benchmark.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-cluster-omb-driver-cfg
+  labels: 
+    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    app.kubernetes.io/version: "2.11.2"
+    app.kubernetes.io/instance: pulsar-cluster
+  annotations:
+    "helm.sh/hook": test
+data:
+  kafka_to_pulsar.yaml: |-
+    name: Kafka producer and Pulsar consumer
+    driverClass: io.openmessaging.benchmark.driver.kop.KopBenchmarkDriver
+  
+    producerType: kafka
+    consumerType: pulsar
+  
+    # Pulsar configs
+    pulsarConfig:
+      serviceUrl: pulsar://pulsar-cluster-broker.default.svc.cluster.local:6650
+      batchingMaxPublishDelayMs: 1
+      batchingMaxBytes: 1048576
+  
+    # Kafka configs
+    kafkaConfig: |
+      bootstrap.servers=pulsar-cluster-broker.default.svc.cluster.local:9092
+      linger.ms=1
+      batch.size=1048576
+
+
+  kafka_to_kafka.yaml: |-
+    name: Kafka producer and Pulsar consumer
+    driverClass: io.openmessaging.benchmark.driver.kop.KopBenchmarkDriver
+    
+    producerType: kafka
+    consumerType: kafka
+    
+    # Pulsar configs
+    pulsarConfig:
+      serviceUrl: pulsar://pulsar-cluster-broker.default.svc.cluster.local:6650
+      # producer configs
+      batchingEnabled: true
+      batchingMaxPublishDelayMs: 1
+      batchingMaxBytes: 1048576
+      blockIfQueueFull: true
+      pendingQueueSize: 1000
+      maxPendingMessagesAcrossPartitions: 50000
+      # consumer configs
+      maxTotalReceiverQueueSizeAcrossPartitions: 50000
+      receiverQueueSize: 1000
+    
+    # Kafka configs
+    kafkaConfig: |
+      bootstrap.servers=pulsar-cluster-broker.default.svc.cluster.local:9092
+      linger.ms=1
+      batch.size=1048576
+  
+  pulsar_to_kafka.yaml: |-
+    name: Pulsar producer and Kafka consumer
+    driverClass: io.openmessaging.benchmark.driver.kop.KopBenchmarkDriver
+    
+    producerType: pulsar
+    consumerType: kafka
+    
+    # Pulsar configs
+    pulsarConfig:
+      serviceUrl: pulsar://pulsar-cluster-broker.default.svc.cluster.local:6650
+      batchingMaxPublishDelayMs: 1
+      batchingMaxBytes: 1048576
+    
+    # Kafka configs
+    kafkaConfig: |
+      bootstrap.servers=pulsar-cluster-broker.default.svc.cluster.local:9092
+      linger.ms=1
+      batch.size=1048576
+---
+# Source: pulsar-cluster/templates/tests/benchmark.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pulsar-cluster-omb-k2k
+  labels: 
+    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    app.kubernetes.io/version: "2.11.2"
+    app.kubernetes.io/instance: pulsar-cluster
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: omb-k2k
+      image: docker.io/apecloud/omb:0.1
+      command: ['bin/benchmark']
+      args: 
+        - --drivers 
+        - driver-kop/kafka_to_kafka.yaml
+        - workloads/1-topic-16-partitions-1kb.yaml
+      env:
+        - name: BOOTSTRAP_SERVERS
+          value: "pulsar-cluster-broker.default.svc.cluster.local:9092" 
+      volumeMounts:
+        - name: out
+          mountPath: /out
+        - name: driver-cfg-k2k
+          mountPath: /benchmark/driver-kop/kafka_to_kafka.yaml
+          subPath: kafka_to_kafka.yaml
+          readOnly: true
+        - name: driver-cfg-k2p
+          mountPath: /benchmark/driver-kop/kafka_to_pulsar.yaml
+          subPath: kafka_to_pulsar.yaml
+          readOnly: true
+        - name: driver-cfg-p2k
+          mountPath: /benchmark/driver-kop/pulsar_to_kafka.yaml
+          subPath: pulsar_to_kafka.yaml
+          readOnly: true
+  restartPolicy: Never
+  volumes:
+    - name: out
+      emptyDir: {}
+    - name: driver-cfg-k2k
+      configMap:
+        name: pulsar-cluster-omb-driver-cfg
+        items:
+          - key: kafka_to_kafka.yaml
+            path: kafka_to_kafka.yaml
+    - name: driver-cfg-k2p
+      configMap:
+        name: pulsar-cluster-omb-driver-cfg
+        items:
+          - key: kafka_to_pulsar.yaml
+            path: kafka_to_pulsar.yaml
+    - name: driver-cfg-p2k
+      configMap:
+        name: pulsar-cluster-omb-driver-cfg
+        items:
+          - key: pulsar_to_kafka.yaml
+            path: pulsar_to_kafka.yaml

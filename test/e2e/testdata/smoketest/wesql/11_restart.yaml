@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-restart
+  generateName: mysql-cluster-restart-
 spec:
   clusterRef: mysql-cluster
   ttlSecondsAfterSucceed: 3600

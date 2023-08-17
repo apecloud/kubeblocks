@@ -191,7 +191,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 
 	for _, component := range r.Spec.ComponentDefs {
 		for _, compRef := range component.ComponentDefRef {
-			compRef.validate(allErrs)
+			compRef.validate(allErrs, r)
 		}
 
 		if err := r.validateConfigSpec(component); err != nil {
@@ -303,7 +303,7 @@ func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
 	return nil
 }
 
-func (r ComponentDefRef) validate(allErrs *field.ErrorList) {
+func (r ComponentDefRef) validate(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
 	if len(r.ComponentDefName) == 0 {
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentDefName"), r.ComponentDefName, "componentDefName cannot be empty"))
 	}
@@ -328,6 +328,14 @@ func (r ComponentDefRef) validate(allErrs *field.ErrorList) {
 			if len(valueFrom.FieldPath) > 0 {
 				*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].valueFrom"), valueFrom, "headlessServiceRef cannot set fieldPath"))
 			}
+		}
+		// get the componentDef by name
+		compDefName := r.ComponentDefName
+		compDef := clusterDef.GetComponentDefByName(compDefName)
+		if compDef == nil {
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].componentDefName"), valueFrom, "componentDefName is invalid"))
+		} else if env.ValueFrom.Type == FromHeadlessServiceRef && compDef.WorkloadType == Stateless {
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].valueFrom"), valueFrom, "headlessServiceRef is only valid for statefulset"))
 		}
 	}
 }

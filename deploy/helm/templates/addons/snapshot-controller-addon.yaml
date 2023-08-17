@@ -65,16 +65,6 @@ spec:
         - key: KubeGitVersion
           operator: Contains
           values:
-            - aliyun
-      storageClass: diskplugin.csi.alibabacloud.com
-      {{- with .Values.tolerations }}
-      tolerations: {{ toJson . | quote }}
-      {{- end }}
-
-    - selectors:
-        - key: KubeGitVersion
-          operator: Contains
-          values:
             - gke
       storageClass: pd.csi.storage.gke.io
       {{- with .Values.tolerations }}
@@ -98,3 +88,4 @@ spec:
         operator: DoesNotContain
         values:
           - tke
+          - aliyun

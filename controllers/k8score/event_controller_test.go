@@ -62,9 +62,9 @@ var _ = Describe("Event Controller", func() {
 	}
 
 	var (
-		beforeLastTs = time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)
-		initLastTs   = time.Date(2022, time.January, 1, 12, 0, 0, 0, time.UTC)
-		afterLastTs  = time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)
+		beforeLastTS = time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)
+		initLastTS   = time.Date(2022, time.January, 1, 12, 0, 0, 0, time.UTC)
+		afterLastTS  = time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)
 	)
 
 	createRoleChangedEvent := func(podName, role string, podUid types.UID) *corev1.Event {
@@ -82,8 +82,8 @@ var _ = Describe("Event Controller", func() {
 			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
 			SetReason(string(probeutil.CheckRoleOperation)).
 			SetType(corev1.EventTypeNormal).
-			SetFirstTimestamp(metav1.NewTime(initLastTs)).
-			SetLastTimestamp(metav1.NewTime(initLastTs)).
+			SetFirstTimestamp(metav1.NewTime(initLastTS)).
+			SetLastTimestamp(metav1.NewTime(initLastTS)).
 			GetObject()
 	}
 
@@ -167,10 +167,10 @@ var _ = Describe("Event Controller", func() {
 			By("check whether the duration and number of events reach the threshold")
 			Expect(IsOvertimeEvent(sndEvent, 5*time.Second)).Should(BeFalse())
 
-			By("send role changed event with beforeLastTs earlier than pod last role changes event timestamp annotation should not be update successfully")
+			By("send role changed event with beforeLastTS earlier than pod last role changes event timestamp annotation should not be update successfully")
 			role = "follower"
 			sndInvalidEvent := createRoleChangedEvent(podName, role, uid)
-			sndInvalidEvent.LastTimestamp = metav1.NewTime(beforeLastTs)
+			sndInvalidEvent.LastTimestamp = metav1.NewTime(beforeLastTS)
 			Expect(testCtx.CreateObj(ctx, sndInvalidEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}
@@ -189,10 +189,10 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]).ShouldNot(Equal(sndInvalidEvent.LastTimestamp.Time.Format(time.RFC3339)))
 			})).Should(Succeed())
 
-			By("send role changed event with afterLastTs later than pod last role changes event timestamp annotation should be update successfully")
+			By("send role changed event with afterLastTS later than pod last role changes event timestamp annotation should be update successfully")
 			role = "follower"
 			sndValidEvent := createRoleChangedEvent(podName, role, uid)
-			sndValidEvent.LastTimestamp = metav1.NewTime(afterLastTs)
+			sndValidEvent.LastTimestamp = metav1.NewTime(afterLastTS)
 			Expect(testCtx.CreateObj(ctx, sndValidEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}

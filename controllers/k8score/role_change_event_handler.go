@@ -107,8 +107,8 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 			reqCtx.Log.Info("failed to parse last role changed event timestamp from pod annotation", "pod", pod.Name, "error", err.Error())
 			return role, err
 		}
-		eventLastTs := event.LastTimestamp.Time
-		if !eventLastTs.After(lastTimestamp) {
+		eventLastTS := event.LastTimestamp.Time
+		if !eventLastTS.After(lastTimestamp) {
 			reqCtx.Log.Info("event's lastTimestamp is earlier than the recorded lastTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event lastTimestamp", event.LastTimestamp.Time.String(), "annotation lastTimestamp", lastTimestampStr)
 			return role, nil
 		}

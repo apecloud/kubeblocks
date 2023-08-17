@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/dlclark/regexp2"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
@@ -38,6 +38,12 @@ import (
 var (
 	InvalidWorkLoadType = errors.New("invalid workload type")
 	ClusterHasNoLeader  = errors.New("cluster has no leader now")
+)
+
+const (
+	ReplicationMode = "replication_mode"
+	SyncStandBys    = "sync_standbys"
+	WalPosition     = "wal_position"
 )
 
 const (
@@ -104,7 +110,7 @@ func readPidFile(dataDir string) (*PidFile, error) {
 type PGStandby struct {
 	Types   string
 	Amount  int
-	Members mapset.Set
+	Members mapset.Set[string]
 	HasStar bool
 }
 
@@ -135,7 +141,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	}
 	result := &PGStandby{
 		Types:   off,
-		Members: mapset.NewSet(),
+		Members: mapset.NewSet[string](),
 	}
 
 	rs := make([]*regexp2.Regexp, len(patterns))

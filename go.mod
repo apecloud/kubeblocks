@@ -25,7 +25,7 @@ require (
 	github.com/dapr/dapr v1.9.5
 	github.com/dapr/go-sdk v1.7.0
 	github.com/dapr/kit v0.11.3
-	github.com/deckarep/golang-set v1.8.0
+	github.com/deckarep/golang-set/v2 v2.3.1
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/docker/docker v24.0.2+incompatible
 	github.com/docker/go-connections v0.4.1-0.20190612165340-fd1b1942c4d5
@@ -172,6 +172,7 @@ require (
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/daviddengcn/go-colortext v1.0.0 // indirect
+	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/deislabs/oras v0.9.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect

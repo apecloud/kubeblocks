@@ -11,14 +11,14 @@ import TabItem from '@theme/TabItem';
 
 # Introduction
 
-BackupRepo is a storage warehouse for backup data, which uses CSI driver to upload backup data to various storage systems, such as object storage like S3 and GCS, or storage servers like FTP and NFS. Currently, BackupRepo of Kubeblocks only supports S3 and other S3-compatible storage, and more types of storage will be supported in the future.
+BackupRepo is the storage repository for backup data, which uses CSI driver to upload backup data to various storage systems, such as object storage systems like S3 and GCS, or storage servers like FTP and NFS. Currently, BackupRepo of Kubeblocks only supports S3 and other S3-compatible storage systems, and more types of storage will be supported in the future.
 
-Users can create multiple BackupRepos to suit different usage scenarios. For example, on the one hand, it can be divided by actual businesses, the data of business A is stored in warehouse A, and the data of business B is stored in warehouse B. Or on the other hand, multiple warehouses can be divided by region to ensure that data can be disaster-tolerant in different places. However, it is required to specify which backup warehouse to store when creating a backup. You can also create a default backup warehouse. If no specific warehouse is specified when creating a backup, KubeBlocks uses the default warehouse to store backup data.
+Users can create multiple BackupRepos to suit different scenarios. For example, based on different businesses, the data of business A is stored in repository A, and the data of business B is stored in repository B. Or you can configure multiple repositories by region to realize geo-disaster recovery. But it is required to specify backup repositories when creating a backup. You can also create a default backup repository and KubeBlocks uses this default repository to store backup data if no specific repository is specified when creating a backup.
 
-The following takes AWS S3 as an example to demonstrate how to configure BackupRepo. There are two options for configuring BackupRepo.
+The following instructions take AWS S3 as an example to demonstrate how to configure BackupRepo. There are two options for configuring BackupRepo.
 
-* Manual BackupRepo configuration: you can install S3 CSI driver and then create BackupRepo manually.
 * Automatic BackupRepo configuration: you can provide the necessary configuration information (for example, the AccessKey of object storage, etc.) when installing KubeBlocks, and the installer automatically creates a default BackupRepo and the CSI driver add-on required for automatic installation.
+* Manual BackupRepo configuration: you can install S3 CSI driver and then create BackupRepo manually.
 
 ## Automatic BackupRepo configuration
 
@@ -28,26 +28,26 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
     ```yaml
     backupRepo:
-    create: true
-    storageProvider: s3
-    config:
+      create: true
+      storageProvider: s3
+      config:
         region: cn-northwest-1
         bucket: test-kb-backup
-    secrets:
+      secrets:
         accessKeyId: <ACCESS KEY>
         secretAccessKey: <SECRET KEY>
     ```
 
     * `region`: specifies the region where S3 is located.
-    * `bucket`: specifies the bucket name of S3
-    * `accessKeyId`: specifies the Access Key of AWS
-    * `secretAccessKey`: specifies the Secret Key of AWS
+    * `bucket`: specifies the bucket name of S3.
+    * `accessKeyId`: specifies the Access Key of AWS.
+    * `secretAccessKey`: specifies the Secret Key of AWS.
 
     :::note
 
-    1. For KubeBlocks v0.6.0, the available `storageProvider` can be set as `s3`, `oss`, and `minio`.
+    1. For KubeBlocks v0.6.0, the available `storageProvider` are `s3`, `oss`, and `minio`.
     2. For different storage providers, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
-    3. You can run the command below to view the supported sotrage provider.
+    3. You can run the command below to view the supported storage provider.
 
        ```bash
        kubectl get storageproviders.storage.kubeblocks.io
@@ -62,6 +62,8 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    ```
 
 ## Manual BackupRepo configuration
+
+If you do not configure the BackupRepo information when installing KubeBlocks, you can manually configure it by the following instructions.
 
 1. Install S3 CSI driver.
 
@@ -119,9 +121,9 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
    The above command creates a default backup repository `my-repo`.
 
-   * `my-repo` is the name of the created backup repository. If you do not customize a name, the system creates a random name, following the format `backuprepo-xxxxx`.
-   * `--default` means that this repository is set as the default repo. Note that there can only be one default repository for the global. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar with the default StorageClass of Kubernetes), which further results into backup failure. Using `kbcli` to create BackupRepo can avoid such problem because `kbcli` checks whether there is another default repository before creating a new one.
-   * `--provider` specifies the storage type, i.e. `storageProvider` and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
+   * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
+   * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
+   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
 
    After `kbcli backuprepo create` is executed successfully, the system creates the K8s resource whose type is `BackupRepo`. You can modify the annotation of this resource to adjust the default repository.
 
@@ -143,7 +145,7 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
    <TabItem value="kubectl" label="kubectl">
 
-   `kubectl` is another option to create a BackupRepo, but the commands do not include parameter and default repository verification, which is not convient.
+   `kubectl` is another option to create a BackupRepo, but the commands do not include parameter and default repository verification compared with kbcli, which is not convenient.
 
    ```bash
    # Create a secret to save the access key for S3
@@ -178,3 +180,33 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    </TabItem>
 
    </Tabs>
+
+## (Optional) Change the backup repository for a cluster
+
+By default, all backups are stored in the global default repository when creating a cluster. You can specify another backup repository for this cluster by editing `BackupPolicy`.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster edit-backup-policy mysql-cluster --set="datafile.backupRepoName=my-repo"
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl>
+
+```bash
+kubectl edit backuppolicy mysql-cluster-mysql-backup-policy
+...
+spec:
+  datafile:
+    ... 
+    # Edit the backup repository name
+    backupRepoName: my-repo
+```
+
+</TabItem>
+
+</Tabs>

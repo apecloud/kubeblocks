@@ -1,19 +1,19 @@
 ---
-title: Data file backup and restore
-description: How to back up and restore databses by data files
-keywords: [backup and restore, data file]
+title: Datafile backup and restore
+description: How to back up databases by datafiles
+keywords: [backup and restore, datafile]
 sidebar_position: 3
-sidebar_label: Data file
+sidebar_label: Datafile
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Data file backup and restore
+# Datafile backup
 
 ## Before you start
 
-Prepare a cluster for testing the backup and restore function. The following insstructions uses MySQL as an example.
+Prepare a cluster for testing the backup and restore function. The following instructions use MySQL as an example.
 
 1. Create a cluster.
 
@@ -27,33 +27,7 @@ Prepare a cluster for testing the backup and restore function. The following ins
    kbcli cluster list-backup-policy mysql-cluster
    ```
 
-   By default, all the backups are stored in the default global repository. You can specify a new repository by editing the BackupPolicy resource.
-
-   <Tabs>
-
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster edit-backup-policy mysql-cluster --set="datafile.backupRepoName=my-repo"
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
-
-   ```bash
-   kubectl edit backuppolicy mysql-cluster-mysql-backup-policy
-   ...
-   spec:
-     datafile:
-       ... 
-       # Specify a backup repository name
-       backupRepoName: my-repo
-   ```
-
-   </TabItem>
-
-   </Tabs>
+   By default, all the backups are stored in the default global repository but you can specify a new repository by [editing the BackupPolicy resource](./backup-repo.md#optional-change-the-backup-repository-for-a-cluster).
 
 ## Create backup
 
@@ -73,7 +47,7 @@ Both kbcli and kubectl are supported.
    kbcli cluster list mysql-cluster
    ```
 
-2. Create backup.
+2. Create a backup.
 
    ```bash
    kbcli cluster backup mysql-cluster --type=datafile
@@ -89,7 +63,7 @@ Both kbcli and kubectl are supported.
 
 <TabItem value="kubectl" label="kubectl">
 
-Run the command below to create a data backup named `mybackup`.
+Run the command below to create a datafile backup named `mybackup`.
 
 ```bash
 kubectl apply -f - <<-'EOF'
@@ -122,7 +96,7 @@ Both kbcli and kubectl are supported.
    kbcli cluster list mysql-cluster
    ```
 
-2. Create backup.
+2. Create a snapshot backup.
 
    ```bash
    kbcli cluster backup mysql-cluster --type=snapshot
@@ -138,7 +112,7 @@ Both kbcli and kubectl are supported.
 
 <TabItem value="kubectl" label="kubectl">
 
-Run the command below to create a data backup named `mysnapshot`.
+Run the command below to create a snapshot backup named `mysnapshot`.
 
 ```bash
 kubectl apply -f - <<-'EOF'

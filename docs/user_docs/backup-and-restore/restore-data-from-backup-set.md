@@ -8,13 +8,15 @@ sidebar_label: Restore
 
 # Restore data from backup set
 
-1. View the log file backup to view the backup set.
+KubeBlocks supports restoring data from a backup set.
+
+1. View the backup set.
 
    ```bash
    kbcli cluster list-backups
    ```
 
-2. Specify a backup set to restore data.
+2. Specify a new cluster and a backup set to restore data.
 
    ```bash
    kbcli cluster restore new-mysql-cluster --backup backup-default-mysql-cluster-20230418124113

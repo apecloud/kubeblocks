@@ -1,7 +1,7 @@
 ---
-title: Scheduled backup and restore
-description: How to back up and restore databses by schedule
-keywords: [backup and restore, schedule]
+title: Scheduled backup
+description: How to back up databases by schedule
+keywords: [backup and restore, schedule, scheduled backup]
 sidebar_position: 5
 sidebar_label: Scheduled backup and restore
 ---
@@ -9,13 +9,13 @@ sidebar_label: Scheduled backup and restore
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Scheduled backup and restore
+# Scheduled backup
 
 You can customize your backup schedule by modifying relevant parameters.
 
 :::caution
 
-The backup created by kbcli or kubectl is saved permanently.
+The backup created by kbcli or kubectl is saved permanently. If you want to delete the backup, you can delete it manually.
 
 :::
 

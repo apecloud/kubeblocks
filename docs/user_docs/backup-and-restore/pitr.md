@@ -1,6 +1,6 @@
 ---
 title: PITR
-description: How to back up and restore databses by schedule
+description: How to implement point-in-time recovery of data
 keywords: [backup and restore, pitr]
 sidebar_position: 7
 sidebar_label: PITR
@@ -18,7 +18,7 @@ sidebar_label: PITR
    Enabled       0 18 * * *        datafile   7d           Jul 25,2023 19:36 UTC+0800   Jul 25,2023 14:53:00 UTC+0800 ~ Jul 25,2023 19:07:38 UTC+0800
    ```
 
-   `RECOVERABLE-TIME` stands for the time period that the cluster can be restored to.
+   `RECOVERABLE-TIME` stands for the time range to which the cluster can be restored.
 
 2. Run the command below to restore the cluster to the specified point.
 

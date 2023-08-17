@@ -147,6 +147,7 @@ const (
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
+	LastRoleChangedEventTimestampAnnotationKey  = "apps.kubeblocks.io/last-role-changed-event-timestamp"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

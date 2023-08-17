@@ -22,18 +22,25 @@ package components
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -158,6 +165,26 @@ var _ = Describe("replicationSet Util", func() {
 		Expect(len(newReplicationStatus.Secondaries)).Should(Equal(3))
 	}
 
+	createRoleChangedEvent := func(podName, role string, podUid types.UID) *corev1.Event {
+		seq, _ := password.Generate(16, 16, 0, true, true)
+		objectRef := corev1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "Pod",
+			Namespace:  testCtx.DefaultNamespace,
+			Name:       podName,
+			UID:        podUid,
+		}
+		eventName := strings.Join([]string{podName, seq}, ".")
+		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
+			SetInvolvedObject(objectRef).
+			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
+			SetReason(string(probeutil.CheckRoleOperation)).
+			SetType(corev1.EventTypeNormal).
+			SetFirstTimestamp(metav1.NewTime(time.Now())).
+			SetLastTimestamp(metav1.NewTime(time.Now())).
+			GetObject()
+	}
+
 	testHandleReplicationSetRoleChangeEvent := func() {
 		By("Creating a cluster with replication workloadType.")
 		clusterSwitchPolicy := &appsv1alpha1.ClusterSwitchPolicy{
@@ -210,11 +237,13 @@ var _ = Describe("replicationSet Util", func() {
 			Ctx: testCtx.Ctx,
 			Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
 		}
-		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompSpecName,
+		event := createRoleChangedEvent(secondaryPods[0].Name, constant.Primary, secondaryPods[0].UID)
+		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, event, clusterObj, testapps.DefaultRedisCompSpecName,
 			secondaryPods[0], constant.Primary)).ShouldNot(HaveOccurred())
 
 		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
-		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompSpecName,
+		event = createRoleChangedEvent(primaryPod.Name, constant.Secondary, primaryPod.UID)
+		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, event, clusterObj, testapps.DefaultRedisCompSpecName,
 			primaryPod, constant.Secondary)).ShouldNot(HaveOccurred())
 	}
 

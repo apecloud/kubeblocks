@@ -8,7 +8,8 @@ data:
     set -e
 
     URL="${BYTEBASE_ENTRYPOINT_PORT_8080_TCP_ADDR}:${BYTEBASE_ENTRYPOINT_PORT_8080_TCP_PORT}"
-    echo URL
+    sleep 10 # wait bytebase start up
+    echo $URL
     retry_count=0
     MAX_RETRIES=300
     while [ $retry_count -lt $MAX_RETRIES ]; do

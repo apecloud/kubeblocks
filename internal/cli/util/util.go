@@ -42,7 +42,6 @@ import (
 	"text/template"
 	"time"
 
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -75,6 +74,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 

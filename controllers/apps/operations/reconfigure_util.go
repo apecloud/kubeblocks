@@ -111,7 +111,7 @@ func fromKeyValuePair(parameters []appsv1alpha1.ParameterPair) map[string]interf
 		if param.Value != nil {
 			m[param.Key] = *param.Value
 		} else {
-			m[param.Key] = param.Value
+			m[param.Key] = nil
 		}
 	}
 	return m

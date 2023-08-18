@@ -22,7 +22,6 @@ package configuration
 import (
 	"encoding/json"
 	"path"
-	"reflect"
 	"strings"
 
 	"github.com/StudioSol/set"
@@ -198,18 +197,20 @@ func NewConfigLoader(option CfgOption) (*dataConfig, error) {
 type Option func(ctx *CfgOpOption)
 
 func (c *cfgWrapper) MergeFrom(params map[string]interface{}, option CfgOpOption) error {
-	cfg := c.getConfigObject(option)
-	if cfg == nil {
+	var err error
+	var cfg unstructured.ConfigObject
+
+	if cfg = c.getConfigObject(option); cfg == nil {
 		return MakeError("not found the config file:[%s]", option.FileName)
 	}
-
-	// TODO support param delete
 	for paramKey, paramValue := range params {
-		vi := reflect.ValueOf(paramValue)
-		if vi.Kind() != reflect.Ptr || !vi.IsNil() {
-			if err := cfg.Update(c.generateKey(paramKey, option), paramValue); err != nil {
-				return err
-			}
+		if paramValue != nil {
+			err = cfg.Update(c.generateKey(paramKey, option), paramValue)
+		} else {
+			err = cfg.RemoveKey(c.generateKey(paramKey, option))
+		}
+		if err != nil {
+			return err
 		}
 	}
 	return nil

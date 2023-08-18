@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	k8scomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/kubernetes"
@@ -616,9 +617,10 @@ func getSQLChannelPort(pod *corev1.Pod) string {
 
 func getOwnerRef(cluster *Cluster) metav1.OwnerReference {
 	clusterObj := cluster.resource.(*appsv1alpha1.Cluster)
+	gvk, _ := apiutil.GVKForObject(clusterObj, scheme.Scheme)
 	ownerRef := metav1.OwnerReference{
-		APIVersion: appsv1alpha1.GroupVersion.String(),
-		Kind:       "Cluster",
+		APIVersion: gvk.GroupVersion().String(),
+		Kind:       gvk.Kind,
 		UID:        clusterObj.UID,
 		Name:       clusterObj.Name,
 	}

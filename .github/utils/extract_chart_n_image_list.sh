@@ -124,7 +124,7 @@ for image in "${image_set[@]}"; do
     fi
 done
 
-whiteList=(kubeblocks mysql spilo mongo pgbouncer redis wal-g)
+whiteList=(kubeblocks mysql spilo mongo pgbouncer redis wal-g agamotto)
 cat <<EOF > prepuller.yaml
 apiVersion: apps/v1
 kind: DaemonSet

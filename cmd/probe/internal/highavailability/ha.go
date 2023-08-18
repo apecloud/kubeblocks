@@ -89,6 +89,7 @@ func (ha *Ha) RunCycle() {
 	currentMember := cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName())
 
 	if cluster.HaConfig.IsDeleting(currentMember) {
+		ha.logger.Info("Current Member is deleted!")
 		ha.DeleteCurrentMember(ha.ctx, cluster)
 		return
 	}
@@ -241,7 +242,7 @@ func (ha *Ha) Start() {
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
 		if ok, _ := ha.dbManager.IsLeader(context.Background(), cluster); ok {
-			_ = ha.dcs.Initialize()
+			_ = ha.dcs.Initialize(cluster)
 			break
 		}
 		ha.logger.Infof("Waiting for the database Leader to be ready.")

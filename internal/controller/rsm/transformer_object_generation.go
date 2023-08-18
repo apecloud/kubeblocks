@@ -140,7 +140,7 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 		return nil
 	}
 	labels := getLabels(&rsm)
-	selectors := getSvcSelector(&rsm)
+	selectors := getSvcSelector(&rsm, false)
 	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
@@ -175,10 +175,10 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	labels := getLabels(&rsm)
+	selectors := getSvcSelector(&rsm, true)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
-		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
-		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine)
+		AddSelectorsInMap(selectors)
 	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
 	// if component.Monitor.Enable {
 	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).

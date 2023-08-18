@@ -616,10 +616,9 @@ func getSQLChannelPort(pod *corev1.Pod) string {
 
 func getOwnerRef(cluster *Cluster) metav1.OwnerReference {
 	clusterObj := cluster.resource.(*appsv1alpha1.Cluster)
-	gvk := clusterObj.GroupVersionKind()
 	ownerRef := metav1.OwnerReference{
-		APIVersion: gvk.GroupVersion().String(),
-		Kind:       gvk.Kind,
+		APIVersion: appsv1alpha1.GroupVersion.String(),
+		Kind:       "Cluster",
 		UID:        clusterObj.UID,
 		Name:       clusterObj.Name,
 	}

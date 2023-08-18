@@ -6,7 +6,7 @@ metadata:
   name: kb-mongodb-cluster
   namespace: default
   labels:
-    helm.sh/chart: mongodb-cluster-0.6.0-beta.42
+    helm.sh/chart: mongodb-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "5.0.14"
     app.kubernetes.io/instance: mongodb-cluster
 ---
@@ -16,7 +16,7 @@ kind: ClusterRoleBinding
 metadata:
   name: kb-mongodb-cluster
   labels:
-    helm.sh/chart: mongodb-cluster-0.6.0-beta.42
+    helm.sh/chart: mongodb-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "5.0.14"
     app.kubernetes.io/instance: mongodb-cluster
 roleRef:
@@ -34,7 +34,7 @@ kind: RoleBinding
 metadata:
   name: kb-mongodb-cluster
   labels:
-    helm.sh/chart: mongodb-cluster-0.6.0-beta.42
+    helm.sh/chart: mongodb-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "5.0.14"
     app.kubernetes.io/instance: mongodb-cluster
 roleRef:
@@ -53,7 +53,7 @@ metadata:
   name: mongodb-cluster
   namespace: default
   labels: 
-    helm.sh/chart: mongodb-cluster-0.6.0-beta.42
+    helm.sh/chart: mongodb-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "5.0.14"
     app.kubernetes.io/instance: mongodb-cluster
 spec:

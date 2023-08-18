@@ -3,7 +3,7 @@ annotations:
 apiVersion: v2
 name: redis-cluster
 type: application
-version: 0.6.0-beta.42
+version: 0.6.0-beta.44
 description: A Redis Replication Cluster Helm chart for KubeBlocks.
 dependencies:
   - name: kblib

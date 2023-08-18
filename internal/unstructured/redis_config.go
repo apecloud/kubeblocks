@@ -48,6 +48,15 @@ func (r *redisConfig) Update(key string, value any) error {
 	return r.setString(key, cast.ToString(value))
 }
 
+func (r *redisConfig) RemoveKey(key string) error {
+	keys := strings.Split(key, " ")
+	v := r.GetItem(keys)
+	if v != nil {
+		r.lex.removeParameter(v)
+	}
+	return nil
+}
+
 func (r *redisConfig) setString(key string, value string) error {
 	keys := strings.Split(key, " ")
 	v := r.GetItem(keys)

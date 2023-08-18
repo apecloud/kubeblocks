@@ -50,6 +50,11 @@ func (x *xmlConfig) Update(key string, value any) error {
 	return x.data.SetValueForPath(value, key)
 }
 
+func (x *xmlConfig) RemoveKey(key string) error {
+	_ = x.data.Remove(key)
+	return nil
+}
+
 func (x *xmlConfig) Get(key string) interface{} {
 	keys := strings.Split(key, ".")
 	keysLen := len(keys)

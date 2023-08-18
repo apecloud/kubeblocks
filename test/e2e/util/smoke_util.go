@@ -371,16 +371,16 @@ func CheckCommand(command string, path string) bool {
 	return false
 }
 
-func Difference(a, b []string) []string {
+func RemoveElements(arr []string, elemsToRemove []string) []string {
+	var result []string
 	m := make(map[string]bool)
-	for _, v := range a {
-		m[v] = true
+	for _, e := range elemsToRemove {
+		m[e] = true
 	}
-	diff := make([]string, 0)
-	for _, v := range b {
-		if !m[v] {
-			diff = append(diff, v)
+	for _, e := range arr {
+		if !m[e] {
+			result = append(result, e)
 		}
 	}
-	return diff
+	return result
 }

@@ -21,7 +21,7 @@ data:
     else
     echo "Response code is $response_code. Waiting..."
     retry_count=$((retry_count + 1))
-    sleep 1  # 等待一秒后再次轮询
+    sleep 1
     fi
     done
 
@@ -61,31 +61,37 @@ data:
             port = os.getenv("BYTEBASE_ENTRYPOINT_PORT_8080_TCP_PORT")
         client = Client(f"{url}:{port}", "v1")
 
-        signup = {
-            "state": "ACTIVE",
+        code = client.login({
             "email": "admin@example.com",
-            "title": "kubeblocks",
-            "user_type": "USER",
-            "password": "admin",
-            "service_key": "",
-            "mfa_enabled": False
-        }
+            "password": "admin"
+        })
+        if code != 200:
+            print("login failed, signup first...")
+            signup = {
+                "state": "ACTIVE",
+                "email": "admin@example.com",
+                "title": "kubeblocks",
+                "user_type": "USER",
+                "password": "admin",
+                "service_key": "",
+                "mfa_enabled": False
+            }
 
-        res = client.signup(signup)
-        print("signup result: ", res[0], res[1])
+            res = client.signup(signup)
+            print("signup result: ", res[0], res[1])
 
         res, code = client.get_environment()
         if code != 200:
-          # create a new environment
-          new_environment = {
-              "uid": "kubeblocks",
-              "name": "environments/kubeblocks",
-              "title": "kubeblocks",
-              "state": API.StateActive,
-              "tier": API.TierUnprotected
-          }
-          res = client.create_environment(new_environment)
-          print(res)
+            # create a new environment
+            new_environment = {
+                "uid": "kubeblocks",
+                "name": "environments/kubeblocks",
+                "title": "kubeblocks",
+                "state": API.StateActive,
+                "tier": API.TierUnprotected
+            }
+            res = client.create_environment(new_environment)
+            print(res)
 
         # inject cluster
         for info in clusters:
@@ -96,27 +102,27 @@ data:
                 name = s.metadata.owner_references[0].name
                 code, date = client.get_instance(name)
                 if code != 200:
-                  username = base64.b64decode(s.data["username"]).decode("utf-8")
-                  password = base64.b64decode(s.data["password"]).decode("utf-8")
-                  host = base64.b64decode(s.data["host"]).decode("utf-8")
-                  port = base64.b64decode(s.data["port"]).decode("utf-8")
-                  new_instance = {
-                      "name": name,
-                      "title": name,
-                      "state": API.StateActive,
-                      "engine": engine_type,
-                      "dataSources": [{
-                          # "title": "",
-                          "type": API.ADMIN,
-                          "username": username,
-                          "password": password,
-                          "host": host,
-                          "port": port,
-                      }],
-                      "environment": "environments/kubeblocks",
-                  }
-                  res = client.create_instance(new_instance)
-                  print(res)
+                    username = base64.b64decode(s.data["username"]).decode("utf-8")
+                    password = base64.b64decode(s.data["password"]).decode("utf-8")
+                    host = base64.b64decode(s.data["host"]).decode("utf-8")
+                    port = base64.b64decode(s.data["port"]).decode("utf-8")
+                    new_instance = {
+                        "name": name,
+                        "title": name,
+                        "state": API.StateActive,
+                        "engine": engine_type,
+                        "dataSources": [{
+                            # "title": "",
+                            "type": API.ADMIN,
+                            "username": username,
+                            "password": password,
+                            "host": host,
+                            "port": port,
+                        }],
+                        "environment": "environments/kubeblocks",
+                    }
+                    res = client.create_instance(new_instance)
+                    print(res)
 
 
   bytebase_api.py: |
@@ -175,7 +181,6 @@ data:
             url = f"{self.url}/{self.version}/auth/login"
 
             response = requests.post(url, data=rb, headers=headers)
-            response.raise_for_status()
 
             accessToken = response.headers.get("Grpc-Metadata-Bytebase-Access-Token")
             refreshToken = response.headers.get("Grpc-Metadata-Bytebase-Refresh-Token")

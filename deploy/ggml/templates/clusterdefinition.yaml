@@ -9,6 +9,11 @@ spec:
     - name: ggml
       workloadType: Stateful
       characterType: ggml
+      service:
+        ports:
+          - name: model
+            port: 8000
+            targetPort: model
       podSpec:
         volumes:
           - name: models
@@ -23,6 +28,9 @@ spec:
             volumeMounts:
               - name: models
                 mountPath: /models
+            ports:
+              - name: model
+                containerPort: 8000
   connectionCredential:
     username: root
     password: ""

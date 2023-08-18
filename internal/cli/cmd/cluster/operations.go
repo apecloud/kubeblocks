@@ -82,6 +82,7 @@ type OperationsOptions struct {
 	KeyValues       map[string]*string `json:"keyValues"`
 	CfgTemplateName string             `json:"cfgTemplateName"`
 	CfgFile         string             `json:"cfgFile"`
+	ForceRestart    bool               `json:"forceRestart"`
 
 	// VolumeExpansion options.
 	// VCTNames VolumeClaimTemplate names

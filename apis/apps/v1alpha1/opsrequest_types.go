@@ -242,6 +242,10 @@ type Configuration struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
+	// policy defines the upgrade policy.
+	// +optional
+	Policy *UpgradePolicy `json:"policy,omitempty"`
+
 	// keys is used to set the parameters to be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1

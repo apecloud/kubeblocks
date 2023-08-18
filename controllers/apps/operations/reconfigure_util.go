@@ -88,14 +88,17 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	if !configPatch.IsModify {
 		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
 	}
-	return makeReconfiguringResult(syncConfigmap(cm, newCfg, cli, ctx, opsCrName, configSpec, &cc.Spec), withReturned(newCfg, configPatch))
+	return makeReconfiguringResult(syncConfigmap(cm, newCfg, cli, ctx, opsCrName, configSpec, &cc.Spec, config.Policy), withReturned(newCfg, configPatch))
 }
 
-func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec) error {
+func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec, policy *appsv1alpha1.UpgradePolicy) error {
 	patch := client.MergeFrom(cmObj.DeepCopy())
 	cmObj.Data = newCfg
 	if cmObj.Annotations == nil {
 		cmObj.Annotations = make(map[string]string)
+	}
+	if policy != nil {
+		cmObj.Annotations[constant.UpgradePolicyAnnotationKey] = string(*policy)
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
 	cfgcore.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)

@@ -617,7 +617,14 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				},
 			}
 		}
-		// TODO(free6om): mysql primary-secondary
+		return []workloads.Action{
+			{
+				Image: "free6om/kubeblocks:latest",
+				Command: []string{
+					"curl http://127.0.0.1:3501/v1.0/bindings/mysql?operation=checkRole&workloadType=Replication",
+				},
+			},
+		}
 	case "postgres":
 		return []workloads.Action{
 			{

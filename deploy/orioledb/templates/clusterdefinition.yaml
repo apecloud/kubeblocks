@@ -14,15 +14,8 @@ spec:
     port: "$(SVC_PORT_tcp-orioledb)"
   componentDefs:
     - name: orioledb
-      workloadType: Consensus
+      workloadType: Replication
       characterType: postgresql
-      consensusSpec:
-        leader:
-          name: leader
-          accessMode: ReadWrite
-        followers:
-          - name: follower
-            accessMode: Readonly
       switchoverSpec:
         withCandidate:
           cmdExecutorConfig:

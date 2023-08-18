@@ -57,6 +57,11 @@ var (
 		# Delete  benchmark
 		kbcli bench delete mybench
 	`)
+
+	benchDescribeExample = templates.Examples(`
+		# Describe  benchmark
+		kbcli bench describe mybench
+	`)
 )
 
 var benchGVRList = []schema.GroupVersionResource{
@@ -158,6 +163,7 @@ func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewTpchCmd(f, streams),
 		newListCmd(f, streams),
 		newDeleteCmd(f, streams),
+		newDescribeCmd(f, streams),
 	)
 
 	return cmd
@@ -176,6 +182,16 @@ type benchDeleteOption struct {
 	client    clientset.Interface
 	dynamic   dynamic.Interface
 	namespace string
+
+	genericclioptions.IOStreams
+}
+
+type benchDescribeOption struct {
+	factory   cmdutil.Factory
+	client    clientset.Interface
+	dynamic   dynamic.Interface
+	namespace string
+	benchs    []string
 
 	genericclioptions.IOStreams
 }
@@ -210,9 +226,34 @@ func newDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:   "Delete a benchmark.",
 		Aliases: []string{"del"},
 		Example: benchDeleteExample,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return registerBenchmarkCompletionFunc(cmd, f, args, toComplete)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.complete())
 			cmdutil.CheckErr(o.run(args))
+		},
+	}
+
+	return cmd
+}
+
+func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &benchDescribeOption{
+		factory:   f,
+		IOStreams: streams,
+	}
+	cmd := &cobra.Command{
+		Use:     "describe",
+		Short:   "Describe a benchmark.",
+		Aliases: []string{"desc"},
+		Example: benchDescribeExample,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return registerBenchmarkCompletionFunc(cmd, f, args, toComplete)
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.run())
 		},
 	}
 
@@ -340,6 +381,64 @@ func (o *benchDeleteOption) run(args []string) error {
 	return nil
 }
 
+func (o *benchDescribeOption) complete(args []string) error {
+	var err error
+
+	o.benchs = args
+
+	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *benchDescribeOption) run() error {
+	describe := func(benchName string) error {
+		var found bool
+
+		for _, gvr := range benchGVRList {
+			obj, err := o.dynamic.Resource(gvr).Namespace(o.namespace).Get(context.Background(), benchName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+
+			found = true
+
+			if err := printer.PrettyPrintObj(obj); err != nil {
+				return err
+			}
+
+			break
+		}
+
+		if !found {
+			return fmt.Errorf("benchmark %s not found", benchName)
+		}
+
+		return nil
+	}
+
+	for _, benchName := range o.benchs {
+		if err := describe(benchName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func registerClusterCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster",
@@ -347,6 +446,16 @@ func registerClusterCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 	))
+}
+
+func registerBenchmarkCompletionFunc(cmd *cobra.Command, f cmdutil.Factory, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	var benchs []string
+	for _, gvr := range benchGVRList {
+		comp, _ := util.ResourceNameCompletionFunc(f, gvr)(cmd, args, toComplete)
+		benchs = append(benchs, comp...)
+	}
+
+	return benchs, cobra.ShellCompDirectiveNoFileComp
 }
 
 func validateBenchmarkExist(factory cmdutil.Factory, streams genericclioptions.IOStreams, name string) error {

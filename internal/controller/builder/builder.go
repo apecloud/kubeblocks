@@ -631,7 +631,7 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				},
 			},
 		}
-	case "postgres":
+	case "postgres", "postgresql":
 		return []workloads.Action{
 			{
 				Image: "governmentpaas/psql:latest",
@@ -649,7 +649,7 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				},
 			},
 			{
-				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"master\"; else echo -n \"replica\"; fi"},
+				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi"},
 			},
 		}
 		// TODO(free6om): config the following actions

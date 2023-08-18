@@ -422,7 +422,7 @@ func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.Invok
 	ha := highavailability.GetHa()
 	if ha == nil {
 		opsRes["event"] = OperationNotImplemented
-		message := "The DB does not suport predelete yet!"
+		message := "The DB does not support predelete yet!"
 		opsRes["message"] = message
 		return opsRes, errors.New(message)
 	}
@@ -456,7 +456,9 @@ func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.Invok
 		opsRes["message"] = message
 		return opsRes, errors.New(message)
 	}
-	go ha.DeleteCurrentMember(ctx, cluster)
+	go func() {
+		_ = ha.DeleteCurrentMember(ctx, cluster)
+	}()
 
 	opsRes["event"] = OperationFailed
 	message := "Deletion of the current member is doing"

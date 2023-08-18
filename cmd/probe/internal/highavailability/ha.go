@@ -90,7 +90,7 @@ func (ha *Ha) RunCycle() {
 
 	if cluster.HaConfig.IsDeleting(currentMember) {
 		ha.logger.Info("Current Member is deleted!")
-		ha.DeleteCurrentMember(ha.ctx, cluster)
+		_ = ha.DeleteCurrentMember(ha.ctx, cluster)
 		return
 	}
 

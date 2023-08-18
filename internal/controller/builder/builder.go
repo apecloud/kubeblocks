@@ -624,6 +624,12 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 					"curl http://127.0.0.1:3501/v1.0/bindings/mysql?operation=checkRole&workloadType=Replication",
 				},
 			},
+			{
+				Image: "jetbrainsinfra/jq:latest",
+				Command: []string{
+					"echo $v_KB_RSM_LAST_STDOUT | jq -r '.role' | tr '[:upper:]' '[:lower:]' | xargs echo -n",
+				},
+			},
 		}
 	case "postgres":
 		return []workloads.Action{

@@ -42,6 +42,7 @@ import (
 	"text/template"
 	"time"
 
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -58,6 +59,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -561,6 +563,31 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 		}
 	}
 	return true, nil
+}
+
+func ValidateParametersModified(tpl *appsv1alpha1.ComponentConfigSpec, parameters sets.Set[string], cli dynamic.Interface) (err error) {
+	cc := appsv1alpha1.ConfigConstraint{}
+	ccKey := client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}
+	if err = GetResourceObjectFromGVR(types.ConfigConstraintGVR(), ccKey, cli, &cc); err != nil {
+		return
+	}
+	return ValidateParametersModified2(parameters, cc.Spec)
+}
+
+func ValidateParametersModified2(parameters sets.Set[string], cc appsv1alpha1.ConfigConstraintSpec) error {
+	if len(cc.ImmutableParameters) == 0 {
+		return nil
+	}
+
+	immutableParameters := sets.New(cc.ImmutableParameters...)
+	uniqueParameters := immutableParameters.Intersection(parameters)
+	if uniqueParameters.Len() == 0 {
+		return nil
+	}
+	return cfgcore.MakeError("parameter[%v] is immutable, cannot be modified!", cfgutil.ToSet(uniqueParameters).AsSlice())
 }
 
 func GetIPLocation() (string, error) {

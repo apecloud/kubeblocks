@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -98,6 +99,9 @@ func (o *configOpsOptions) Validate() error {
 		return nil
 	}
 	if err := o.validateConfigParams(o.wrapper.ConfigTemplateSpec()); err != nil {
+		return err
+	}
+	if err := util.ValidateParametersModified(o.wrapper.ConfigTemplateSpec(), sets.KeySet(o.KeyValues), o.Dynamic); err != nil {
 		return err
 	}
 	o.printConfigureTips()

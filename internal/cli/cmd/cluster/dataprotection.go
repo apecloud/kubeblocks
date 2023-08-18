@@ -531,10 +531,6 @@ func (o *CreateRestoreOptions) runPITR() error {
 			constant.RestoreFromSrcClusterAnnotationKey: o.SourceCluster,
 		},
 	}
-	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
-	if clusterObj.Spec.ClusterDefRef == "apecloud-mysql" {
-		clusterObj.Spec.ComponentSpecs[0].Replicas = 1
-	}
 	return o.createCluster(clusterObj)
 }
 

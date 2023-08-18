@@ -10,7 +10,9 @@ spec:
   deployKind: job
   env:
     - name: DATA_DIR
-      value: /data/mysql/data
+      value: {{ .Values.mysqlConfigs.dataDir }}
+    - name: LOG_BIN
+      value: {{ .Values.mysqlConfigs.logBin }}
   physical:
     restoreCommands:
       - sh
@@ -23,7 +25,7 @@ spec:
         xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
         xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
         xtrabackup --prepare --target-dir=${TMP_DIR}
-        xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/
+        xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
         touch ${DATA_DIR}/.xtrabackup_restore_new_cluster
         rm -rf ${TMP_DIR}
         chmod -R 0777 ${DATA_DIR}
@@ -36,6 +38,9 @@ spec:
     - -c
     - |
       set -e;
+      if [ -d ${BACKUP_DIR} ]; then
+        rm -rf ${BACKUP_DIR}
+      fi
       mkdir -p ${BACKUP_DIR};
       START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
       xtrabackup --compress=zstd --backup  --safe-slave-backup --slave-info --stream=xbstream \

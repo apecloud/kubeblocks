@@ -283,7 +283,7 @@ const (
 
 const (
 	// dataProtection env names
-
+	DPTargetPodName            = "DP_TARGET_POD_NAME"
 	DPDBHost                   = "DB_HOST"                     // db host for dataProtection
 	DPDBUser                   = "DB_USER"                     // db user for dataProtection
 	DPDBPassword               = "DB_PASSWORD"                 // db password for dataProtection

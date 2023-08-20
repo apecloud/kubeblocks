@@ -66,10 +66,10 @@ func (c configSpecsType) findByName(name string) *configSpecMeta {
 	return nil
 }
 
-func (c configSpecsType) listConfigSpecs() []string {
+func (c configSpecsType) listConfigSpecs(ccFilter bool) []string {
 	var names []string
 	for _, spec := range c {
-		if spec.ConfigSpec != nil && spec.ConfigConstraint != nil {
+		if spec.ConfigSpec != nil && (!ccFilter || spec.ConfigConstraint != nil) {
 			names = append(names, spec.Spec.Name)
 		}
 	}

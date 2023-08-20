@@ -140,7 +140,7 @@ func (w *configWrapper) fillConfigSpec() error {
 		vComponents = w.clusterVerObj.Spec.ComponentVersions
 	}
 
-	configSpecs, err := util.GetConfigTemplateListWithResource(cComponents, dComponents, vComponents, w.componentName, true)
+	configSpecs, err := util.GetConfigTemplateListWithResource(cComponents, dComponents, vComponents, w.componentName, w.configSpecName == "")
 	if err != nil {
 		return err
 	}

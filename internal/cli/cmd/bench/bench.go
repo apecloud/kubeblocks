@@ -173,6 +173,7 @@ type benchListOption struct {
 	Factory       cmdutil.Factory
 	LabelSelector string
 	Format        string
+	AllNamespaces bool
 
 	genericclioptions.IOStreams
 }
@@ -213,6 +214,8 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+
 	return cmd
 }
 
@@ -273,6 +276,7 @@ func (o *benchListOption) run() error {
 
 		bench.Print = false
 		bench.LabelSelector = o.LabelSelector
+		bench.AllNamespaces = o.AllNamespaces
 		result, err := bench.Run()
 		if err != nil {
 			if strings.Contains(err.Error(), "the server doesn't have a resource type") {
@@ -317,6 +321,7 @@ func (o *benchListOption) run() error {
 			obj := info.Object.(*unstructured.Unstructured)
 			tbl.AddRow(
 				obj.GetName(),
+				obj.GetNamespace(),
 				obj.GetKind(),
 				obj.Object["status"].(map[string]interface{})["phase"],
 				obj.Object["status"].(map[string]interface{})["completions"],
@@ -325,7 +330,7 @@ func (o *benchListOption) run() error {
 		return nil
 	}
 
-	if err := printer.PrintTable(o.Out, nil, printRows, "NAME", "KIND", "STATUS", "COMPLETIONS"); err != nil {
+	if err := printer.PrintTable(o.Out, nil, printRows, "NAME", "NAMESPACE", "KIND", "STATUS", "COMPLETIONS"); err != nil {
 		return err
 	}
 	return nil

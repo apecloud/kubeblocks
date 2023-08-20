@@ -47,6 +47,9 @@ type configOpsOptions struct {
 	editMode bool
 	wrapper  *configWrapper
 
+	// config file replace
+	replaceFile bool
+
 	// Reconfiguring options
 	ComponentName string
 	LocalFilePath string   `json:"localFilePath"`
@@ -106,7 +109,7 @@ func (o *configOpsOptions) validateReconfigureOptions() error {
 
 // Validate command flags or args is legal
 func (o *configOpsOptions) Validate() error {
-	if err := o.wrapper.ValidateRequiredParam(); err != nil {
+	if err := o.wrapper.ValidateRequiredParam(o.replaceFile); err != nil {
 		return err
 	}
 
@@ -239,6 +242,7 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmd
 	flags.AddComponentsFlag(f, cmd, false, &o.ComponentName, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
 	cmd.Flags().BoolVar(&o.ForceRestart, "force-restart", false, "Boolean flag to restart component. Default with false.")
 	cmd.Flags().StringVar(&o.LocalFilePath, "local-file", "", "Specify the local configuration file to be updated.")
+	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 }
 
 // NewReconfigureCmd creates a Reconfiguring command

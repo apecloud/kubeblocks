@@ -590,6 +590,9 @@ func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([
 	return roles, strategy
 }
 
+// buildActionFromCharacterType is a temporary workaround to provide vary engines' role probe functionality,
+// as there is no way to configure these fields in Cluster API currently.
+// TODO(free6om): remove this after ComponentDefinition API re-designed.
 func buildActionFromCharacterType(characterType string, isConsensus bool) []workloads.Action {
 	kind := strings.ToLower(characterType)
 	switch kind {

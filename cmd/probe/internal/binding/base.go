@@ -35,7 +35,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -417,56 +416,6 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 	return opsRes, nil
 }
 
-func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	opsRes := OpsResult{}
-
-	ha := highavailability.GetHa()
-	if ha == nil {
-		opsRes["event"] = OperationNotImplemented
-		message := "The DB does not support predelete yet!"
-		opsRes["message"] = message
-		return opsRes, errors.New(message)
-	}
-
-	dcsStore := dcs.GetStore()
-	var cluster *dcs.Cluster
-	cluster, err := dcsStore.GetCluster()
-	if err != nil {
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
-		return opsRes, err
-	}
-	currentMember := cluster.GetMemberWithName(ops.Manager.GetCurrentMemberName())
-
-	if cluster.HaConfig.IsDeleted(currentMember) {
-		opsRes["event"] = OperationSuccess
-		opsRes["message"] = "Deletion of the current member is complete"
-		return opsRes, nil
-	} else if cluster.HaConfig.IsDeleting(currentMember) {
-		opsRes["event"] = OperationFailed
-		message := "Deletion of the current member is doing"
-		opsRes["message"] = message
-		return opsRes, errors.New(message)
-	}
-
-	cluster.HaConfig.AddMemberToDelete(currentMember)
-	err = dcsStore.UpdateHaConfig()
-	if err != nil {
-		opsRes["event"] = OperationNotImplemented
-		message := fmt.Sprintf("Update Ha config failed: %v", err)
-		opsRes["message"] = message
-		return opsRes, errors.New(message)
-	}
-	go func() {
-		_ = ha.DeleteCurrentMember(ctx, cluster)
-	}()
-
-	opsRes["event"] = OperationFailed
-	message := "Deletion of the current member is doing"
-	opsRes["message"] = message
-	return opsRes, errors.New(message)
-}
-
 func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
@@ -483,6 +432,12 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.Inv
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
 		return opsRes, err
+	}
+
+	currentMember := cluster.GetMemberWithName(manager.GetCurrentMemberName())
+	if !cluster.HaConfig.IsDeleting(currentMember) {
+		cluster.HaConfig.AddMemberToDelete(currentMember)
+		_ = dcsStore.UpdateHaConfig()
 	}
 
 	// remove current member from db cluster

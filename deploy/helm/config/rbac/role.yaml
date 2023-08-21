@@ -751,6 +751,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - otelds
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - otelds/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - otelds/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets

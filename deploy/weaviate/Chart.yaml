@@ -5,7 +5,7 @@ description: Weaviate is an open-source vector database. It allows you to store 
 type: application
 
 # This is the chart version.
-version: 0.6.0-beta.44
+version: 0.7.0-alpha.0
 
 # This is the version number of weaviate.
 appVersion: "1.18.0"

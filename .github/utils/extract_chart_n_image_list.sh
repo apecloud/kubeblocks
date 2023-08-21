@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KB_VERSION=${1:-0.6.0-beta.38}
+KB_VERSION=${1:-0.7.0-alpha.0}
 KB_HELM_REPO_INDEX_URL_BASE=https://apecloud.github.io/helm-charts
 KB_HELM_REPO_INDEX_URL=${KB_HELM_REPO_INDEX_URL_BASE}/index.yaml
 

@@ -69,8 +69,8 @@ type DBManager interface {
 	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
 	IsFirstMember() bool
 
-	AddCurrentMemberToCluster(*dcs.Cluster) error
-	DeleteMemberFromCluster(context.Context, *dcs.Cluster, string) error
+	JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error
+	LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error
 
 	// IsPromoted is applicable only to consensus cluster, which is used to
 	// check if DB has complete switchover.
@@ -301,11 +301,11 @@ func (*FakeManager) IsFirstMember() bool {
 	return true
 }
 
-func (*FakeManager) AddCurrentMemberToCluster(*dcs.Cluster) error {
+func (*FakeManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*FakeManager) DeleteMemberFromCluster(context.Context, *dcs.Cluster, string) error {
+func (*FakeManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return fmt.Errorf("NotSuppported")
 }
 

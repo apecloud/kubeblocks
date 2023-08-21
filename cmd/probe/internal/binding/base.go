@@ -465,3 +465,67 @@ func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.Invok
 	opsRes["message"] = message
 	return opsRes, errors.New(message)
 }
+
+func (ops *BaseOperations) LevelMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	manager, err := component.GetDefaultManager()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = err.Error()
+		return opsRes, nil
+	}
+
+	dcsStore := dcs.GetStore()
+	var cluster *dcs.Cluster
+	cluster, err = dcsStore.GetCluster()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
+		return opsRes, err
+	}
+
+	// remove current member from db cluster
+	err = manager.LeaveMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
+	if err != nil {
+		message := fmt.Sprintf("Delete member form cluster failed: %v", err)
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = message
+		return opsRes, err
+	}
+
+	opsRes["event"] = OperationSuccess
+	opsRes["message"] = "Deletion of the current member is complete"
+	return opsRes, nil
+}
+
+func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	manager, err := component.GetDefaultManager()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = err.Error()
+		return opsRes, nil
+	}
+
+	dcsStore := dcs.GetStore()
+	var cluster *dcs.Cluster
+	cluster, err = dcsStore.GetCluster()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
+		return opsRes, err
+	}
+
+	// remove current member from db cluster
+	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
+	if err != nil {
+		message := fmt.Sprintf("Join member form cluster failed: %v", err)
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = message
+		return opsRes, err
+	}
+
+	opsRes["event"] = OperationSuccess
+	opsRes["message"] = "Join of the current member is complete"
+	return opsRes, nil
+}

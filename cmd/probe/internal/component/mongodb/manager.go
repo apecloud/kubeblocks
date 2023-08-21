@@ -454,16 +454,16 @@ func (mgr *Manager) Recover(context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
-	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
+	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
 		return err
 	}
-	defer client.Disconnect(context.TODO()) //nolint:errcheck
+	defer client.Disconnect(ctx) //nolint:errcheck
 
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
 	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
-	rsConfig, err := GetReplSetConfig(context.TODO(), client)
+	rsConfig, err := GetReplSetConfig(ctx, client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return err
@@ -482,10 +482,10 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	rsConfig.Members = append(rsConfig.Members, configMember)
 
 	rsConfig.Version++
-	return SetReplSetConfig(context.TODO(), client, rsConfig)
+	return SetReplSetConfig(ctx, client, rsConfig)
 }
 
-func (mgr *Manager) DeleteMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
 		return err

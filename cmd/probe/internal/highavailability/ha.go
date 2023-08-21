@@ -112,7 +112,7 @@ func (ha *Ha) RunCycle() {
 
 	case !ha.dbManager.IsCurrentMemberInCluster(ha.ctx, cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)):
 		ha.logger.Infof("Current member is not in cluster, add it to cluster")
-		_ = ha.dbManager.AddCurrentMemberToCluster(cluster)
+		_ = ha.dbManager.JoinCurrentMemberToCluster(ha.ctx, cluster)
 
 	case !ha.dbManager.IsCurrentMemberHealthy(ha.ctx, cluster):
 		ha.logger.Infof("DB Service is not healthy,  do some recover")
@@ -279,7 +279,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 		ha.logger.Infof("member %s exists, do not delete", memberName)
 		return
 	}
-	_ = ha.dbManager.DeleteMemberFromCluster(ha.ctx, cluster, memberName)
+	_ = ha.dbManager.LeaveMemberFromCluster(ha.ctx, cluster, memberName)
 }
 
 func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool {
@@ -381,7 +381,7 @@ func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs.Cluster) err
 	}
 
 	// remove current member from db cluster
-	err = ha.dbManager.DeleteMemberFromCluster(ctx, cluster, ha.dbManager.GetCurrentMemberName())
+	err = ha.dbManager.LeaveMemberFromCluster(ctx, cluster, ha.dbManager.GetCurrentMemberName())
 	if err != nil {
 		ha.logger.Warnf("Delete member form cluster failed: %v", err)
 		return err

@@ -457,11 +457,11 @@ func (mgr *Manager) Recover(context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) DeleteMemberFromCluster(context.Context, *dcs.Cluster, string) error {
+func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 

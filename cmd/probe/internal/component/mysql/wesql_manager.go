@@ -154,11 +154,11 @@ func (mgr *WesqlManager) Recover(context.Context) error {
 	return nil
 }
 
-func (mgr *WesqlManager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+func (mgr *WesqlManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *WesqlManager) DeleteMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (mgr *WesqlManager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	db, err := mgr.GetLeaderConn(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Infof("Get leader conn failed: %v", err)

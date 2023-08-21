@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
+      file-changes: ${{ steps.get_trigger_mode.outputs.file_changes }}
     steps:
       - name: Cancel Previous Runs
         if: github.ref_name != 'main'
@@ -36,8 +37,14 @@ jobs:
               --branch-name "${{ github.ref_name }}" \
               --base-branch "${{ env.BASE_BRANCH }}"`
 
-          echo $TRIGGER_MODE
+          FILE_CHANGES=`bash .github/utils/utils.sh --type 19 \
+              --branch-name "${{ github.ref_name }}" \
+              --base-branch "${{ env.BASE_BRANCH }}"`
+
+          echo "TRIGGER_MODE:$TRIGGER_MODE"
+          echo "FILE_CHANGES:$FILE_CHANGES"
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
+          echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
 
       - name: merge releasing to release
         if: ${{ startsWith(github.ref_name, 'releasing-') }}
@@ -65,7 +72,7 @@ jobs:
 
       - name: pcregrep Chinese
         run: |
-          FILE_PATH=`git diff --name-only HEAD HEAD^`
+          FILE_PATH="${{ needs.trigger-mode.outputs.file-changes }}"
 
           python ${{ github.workspace }}/.github/utils/pcregrep.py \
             --source="${{ github.workspace }}/pcregrep.out" \

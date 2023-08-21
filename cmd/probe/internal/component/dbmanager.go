@@ -47,12 +47,14 @@ type DBManager interface {
 
 	// IsClusterHealthy is only for consensus cluster healthy check.
 	// For Replication cluster IsClusterHealthy will always return true,
-	// and its cluster's healthty is equal to leader member's heathly.
+	// and its cluster's healthy is equal to leader member's healthy.
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 
 	// Member healthy check
+	// IsMemberHealthy focuses on the database's read and write capabilities.
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
 	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
+	// IsMemberLagging focuses on the latency between the leader and standby
 	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) bool
 	GetDBState(context.Context, *dcs.Cluster, *dcs.Member) *dcs.DBState
 
@@ -83,7 +85,7 @@ type DBManager interface {
 	Recover(context.Context) error
 
 	// Start and Stop just send signal to sqlChannel
-	Start() error
+	Start(*dcs.Cluster) error
 	Stop() error
 
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
@@ -103,6 +105,8 @@ type DBManager interface {
 	MoveData(context.Context, *dcs.Cluster) error
 
 	GetLogger() logger.Logger
+
+	ShutDownWithWait()
 }
 
 var managers = make(map[string]DBManager)
@@ -171,9 +175,9 @@ func (mgr *DBManagerBase) IsRootCreated(ctx context.Context) (bool, error) {
 }
 
 // Start does not directly mean to start a database instance,
-// but rather to sends signal2 to activate sql channel to start database
-func (mgr *DBManagerBase) Start() error {
-	mgr.Logger.Infof("send signal2 to activate sql channel")
+// but rather to sends SIGUSR2 to activate sql channel to start database
+func (mgr *DBManagerBase) Start(*dcs.Cluster) error {
+	mgr.Logger.Infof("send SIGUSR2 to activate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {
 		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
@@ -182,16 +186,16 @@ func (mgr *DBManagerBase) Start() error {
 
 	err = sqlChannelProc.Signal(syscall.SIGUSR2)
 	if err != nil {
-		mgr.Logger.Errorf("send signal2 to sql channel failed, err:%v", err)
+		mgr.Logger.Errorf("send SIGUSR2 to sql channel failed, err:%v", err)
 		return err
 	}
 	return nil
 }
 
 // Stop does not directly mean to stop a database instance,
-// but rather to sends signal1 to deactivate sql channel to stop starting database
+// but rather to sends SIGUSR1 to deactivate sql channel to stop starting database
 func (mgr *DBManagerBase) Stop() error {
-	mgr.Logger.Infof("send signal1 to deactivate sql channel")
+	mgr.Logger.Infof("send SIGUSR1 to deactivate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {
 		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
@@ -200,7 +204,7 @@ func (mgr *DBManagerBase) Stop() error {
 
 	err = sqlChannelProc.Signal(syscall.SIGUSR1)
 	if err != nil {
-		mgr.Logger.Errorf("send signal1 to sql channel failed, err:%v", err)
+		mgr.Logger.Errorf("send SIGUSR1 to sql channel failed, err:%v", err)
 		return err
 	}
 	return nil
@@ -208,6 +212,10 @@ func (mgr *DBManagerBase) Stop() error {
 
 func (mgr *DBManagerBase) CreateRoot(ctx context.Context) error {
 	return nil
+}
+
+func (mgr *DBManagerBase) ShutDownWithWait() {
+	mgr.Logger.Infof("Override me if need")
 }
 
 func RegisterManager(characterType, workloadType string, manager DBManager) {

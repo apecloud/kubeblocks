@@ -94,14 +94,16 @@ func (ha *Ha) RunCycle() {
 		return
 	}
 
-	switch {
-	case !ha.dbManager.IsRunning():
+	if !ha.dbManager.IsRunning() {
 		ha.logger.Infof("DB Service is not running,  wait for sqlctl to start it")
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
 		}
-		// _ = ha.dbManager.Follow(ha.ctx, cluster)
+		_ = ha.dbManager.Start(cluster)
+		return
+	}
 
+	switch {
 	// IsClusterHealthy is just for consensus cluster healthy check.
 	// For Replication cluster IsClusterHealthy will always return true,
 	// and its cluster's healthy is equal to leader member's healthy.

@@ -1,13 +1,24 @@
 ---
-title: kbcli bench
+title: kbcli bench describe
 ---
 
-Run a benchmark.
+Describe a benchmark.
+
+```
+kbcli bench describe [flags]
+```
+
+### Examples
+
+```
+  # Describe  benchmark
+  kbcli bench describe mybench
+```
 
 ### Options
 
 ```
-  -h, --help   help for bench
+  -h, --help   help for describe
 ```
 
 ### Options inherited from parent commands
@@ -36,15 +47,7 @@ Run a benchmark.
 
 ### SEE ALSO
 
-
-* [kbcli bench delete](kbcli_bench_delete.md)	 - Delete a benchmark.
-* [kbcli bench describe](kbcli_bench_describe.md)	 - Describe a benchmark.
-* [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
-* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
-* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run tpcc benchmark
-* [kbcli bench tpch](kbcli_bench_tpch.md)	 - Run tpch benchmark
-* [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
+* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

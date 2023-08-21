@@ -58,13 +58,6 @@ func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
 	}
 }
 
-func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
-	return client.MatchingLabels{
-		constant.AppInstanceLabelKey:  cluster.Name,
-		constant.AppManagedByLabelKey: constant.AppName,
-	}
-}
-
 // getClusterOwningNamespacedObjects reads namespaced objects owned by our cluster with kinds.
 func getClusterOwningNamespacedObjects(transCtx *ClusterTransformContext,
 	cluster appsv1alpha1.Cluster,

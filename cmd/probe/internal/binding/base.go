@@ -115,7 +115,8 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		SwitchoverOperation:   ops.SwitchoverOps,
 		LockOperation:         ops.LockOps,
 		UnlockOperation:       ops.UnlockOps,
-		PreDeleteOperation:    ops.PreDeleteOps,
+		JoinMemberOperation:   ops.JoinMemberOps,
+		LeaveMemberOperation:  ops.LeaveMemberOps,
 	}
 
 	ops.DBAddress = ops.getAddress()
@@ -466,7 +467,7 @@ func (ops *BaseOperations) PreDeleteOps(ctx context.Context, req *bindings.Invok
 	return opsRes, errors.New(message)
 }
 
-func (ops *BaseOperations) LevelMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
 	if err != nil {

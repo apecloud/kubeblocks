@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.6.0-alpha.0
+VERSION ?= 0.7.0-alpha.0
 GITHUB_PROXY ?=
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)

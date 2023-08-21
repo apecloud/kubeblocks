@@ -5,7 +5,7 @@ description: MySQL is a widely used, open-source relational database management 
 type: application
 
 # This is the version number of the helm chart.
-version: 0.6.0-alpha.21
+version: 0.7.0-alpha.0
 
 # This is the version number of the MySQL being deployed,
 appVersion: "8.0.32"

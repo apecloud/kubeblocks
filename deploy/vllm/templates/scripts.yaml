@@ -10,6 +10,9 @@ data:
     echo "model=\${MODEL_NAME}"
     ordinal=\${KB_POD_NAME##*-}
     echo "current pod ordinal: \$ordinal"
+    echo "EXTRA_ARGS=\${EXTRA_ARGS}"
+    EXTRA_ARGS=\`echo \${EXTRA_ARGS} | sed "s/KB_REPLICAS_PLACEHOLDER/\${KB_VLLM_N}/g"\`
+    echo "EXTRA_ARGS=\${EXTRA_ARGS}"
     if [ \$ordinal -eq 0 ]; then
       ray start --head
       while true; do

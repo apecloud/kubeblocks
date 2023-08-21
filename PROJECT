@@ -206,4 +206,28 @@ resources:
   kind: OTeld
   path: github.com/apecloud/kubeblocks/apis/monitor/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeblocks.io
+  group: monitor
+  kind: LogsExporterSink
+  path: github.com/apecloud/kubeblocks/apis/monitor/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeblocks.io
+  group: monitor
+  kind: MetricsExporterSink
+  path: github.com/apecloud/kubeblocks/apis/monitor/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeblocks.io
+  group: monitor
+  kind: CollectorDataSource
+  path: github.com/apecloud/kubeblocks/apis/monitor/v1alpha1
+  version: v1alpha1
 version: "3"

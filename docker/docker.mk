@@ -33,6 +33,7 @@ BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/apecloud/$(APP_NAME)
 TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tools
+OTELD_IMG ?= docker.io/apecloud/$(APP_NAME)-monitor
 CLI_IMG ?= docker.io/apecloud/kbcli
 CHARTS_IMG ?= docker.io/apecloud/$(APP_NAME)-charts
 CLI_TAG ?= v$(CLI_VERSION)
@@ -212,5 +213,34 @@ ifeq ($(TAG_LATEST), true)
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:latest --push
 else
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:${VERSION} --push
+endif
+endif
+
+.PHONY: build-monitor-image
+build-monitor-image: install-docker-buildx generate ## Build oteld manager container image.
+ifneq ($(BUILDX_ENABLED), true)
+	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-monitor --tag ${OTELD_IMG}:${VERSION} --tag ${OTELD_IMG}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-monitor --platform $(BUILDX_PLATFORMS) --tag ${OTELD_IMG}:latest
+else
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-monitor --platform $(BUILDX_PLATFORMS) --tag ${OTELD_IMG}:${VERSION}
+endif
+endif
+
+
+.PHONY: push-monitor-image
+push-monitor-image: install-docker-buildx generate ## Push oteld manager container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) push ${OTELD_IMG}:latest
+else
+	$(DOCKER) push ${OTELD_IMG}:${VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-monitor --platform $(BUILDX_PLATFORMS) --tag ${OTELD_IMG}:latest --push
+else
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-monitor --platform $(BUILDX_PLATFORMS) --tag ${OTELD_IMG}:${VERSION} --push
 endif
 endif

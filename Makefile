@@ -117,7 +117,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager dataprotection kbcli lorry reloader ## Make all cmd binaries.
+all: manager dataprotection oteld-manager kbcli lorry reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -369,6 +369,27 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 ifndef ignore-not-found
   ignore-not-found = false
 endif
+
+##@ Operator OTeld Controller Manager
+.PHONY: oteld-manager
+oteld-manager: build-checks ## Build manager binary.
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/oteld-manager ./cmd/oteld/manager/main.go
+
+.PHONY: run-oteld
+run-oteld: manifests generate fmt vet ## Run a controller from your host.
+ifeq ($(ENABLE_WEBHOOKS), true)
+	$(MAKE) webhook-cert
+endif
+	$(GO) run ./cmd/oteld/manager/main.go --zap-devel=false --zap-encoder=console --zap-time-encoding=iso8601
+
+# Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
+# Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
+GO_PACKAGE=./cmd/oteld/manager/main.go
+ARGUMENTS=
+DEBUG_PORT=2346
+run-oteld-delve: manifests generate fmt vet  ## Run Delve debugger.
+	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
+##@ Deployment
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.

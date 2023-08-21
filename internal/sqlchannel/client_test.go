@@ -45,7 +45,12 @@ type testDaprServer struct {
 	pb.UnimplementedDaprServer
 	state                       map[string][]byte
 	configurationSubscriptionID map[string]chan struct{}
-	cachedRequest               map[string]*pb.InvokeBindingResponse
+	cachedRequest               map[string]*response
+}
+
+type response struct {
+	bindingResponse *pb.InvokeBindingResponse
+	err             error
 }
 
 var _ pb.DaprServer = &testDaprServer{}
@@ -55,22 +60,25 @@ func (s *testDaprServer) InvokeBinding(ctx context.Context, req *pb.InvokeBindin
 	darpRequest := dapr.InvokeBindingRequest{Name: req.Name, Operation: req.Operation, Data: req.Data, Metadata: req.Metadata}
 	resp, ok := s.cachedRequest[GetMapKeyFromRequest(&darpRequest)]
 	if ok {
-		return resp, nil
+		return resp.bindingResponse, resp.err
 	} else {
 		return nil, fmt.Errorf("unexpected request")
 	}
 }
 
-func (s *testDaprServer) ExepctRequest(req *pb.InvokeBindingRequest, resp *pb.InvokeBindingResponse) {
+func (s *testDaprServer) ExepctRequest(req *pb.InvokeBindingRequest, resp *pb.InvokeBindingResponse, err error) {
 	darpRequest := dapr.InvokeBindingRequest{Name: req.Name, Operation: req.Operation, Data: req.Data, Metadata: req.Metadata}
-	s.cachedRequest[GetMapKeyFromRequest(&darpRequest)] = resp
+	s.cachedRequest[GetMapKeyFromRequest(&darpRequest)] = &response{
+		bindingResponse: resp,
+		err:             err,
+	}
 }
 
 func TestNewClientWithPod(t *testing.T) {
 	daprServer := &testDaprServer{
 		state:                       make(map[string][]byte),
 		configurationSubscriptionID: map[string]chan struct{}{},
-		cachedRequest:               make(map[string]*pb.InvokeBindingResponse),
+		cachedRequest:               make(map[string]*response),
 	}
 
 	port, closer := newTCPServer(t, daprServer, 50001)
@@ -157,7 +165,7 @@ func TestGetRole(t *testing.T) {
 		Operation: "getRole",
 	}, &pb.InvokeBindingResponse{
 		Data: []byte("{\"role\": \"leader\"}"),
-	})
+	}, nil)
 
 	t.Run("ResponseInTime", func(t *testing.T) {
 		cli.ReconcileTimeout = 1 * time.Second
@@ -217,7 +225,7 @@ func TestSystemAccounts(t *testing.T) {
 	daprServer.ExepctRequest(&pb.InvokeBindingRequest{
 		Name:      "mysql",
 		Operation: string(ListSystemAccountsOp),
-	}, resp)
+	}, resp, nil)
 
 	t.Run("ResponseByCache", func(t *testing.T) {
 		cli.ReconcileTimeout = 200 * time.Millisecond
@@ -229,6 +237,78 @@ func TestSystemAccounts(t *testing.T) {
 		if len(cli.cache) != 0 {
 			t.Errorf("cache should be cleared: %v", cli.cache)
 		}
+	})
+}
+
+func TestJoinMember(t *testing.T) {
+	daprServer, cli, closer, err := initSQLChannelClient(t)
+	if err != nil {
+		t.Errorf("new sql channel client error: %v", err)
+	}
+	defer closer()
+
+	sqlResponse := SQLChannelResponse{
+		Event: RespEveSucc,
+	}
+	respData, _ := json.Marshal(sqlResponse)
+	resp := &pb.InvokeBindingResponse{
+		Data: respData,
+	}
+
+	t.Run("Join Member success", func(t *testing.T) {
+		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
+			Name:      "mysql",
+			Operation: string(JoinMemberOperation),
+		}, resp, nil)
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err := cli.JoinMember()
+		assert.Nil(t, err)
+	})
+
+	t.Run("Join Member fail", func(t *testing.T) {
+		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
+			Name:      "mysql",
+			Operation: string(JoinMemberOperation),
+		}, nil, errors.New("join member failed"))
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err := cli.JoinMember()
+		assert.NotNil(t, err)
+	})
+}
+
+func TestLeaveMember(t *testing.T) {
+	daprServer, cli, closer, err := initSQLChannelClient(t)
+	if err != nil {
+		t.Errorf("new sql channel client error: %v", err)
+	}
+	defer closer()
+
+	sqlResponse := SQLChannelResponse{
+		Event: RespEveSucc,
+	}
+	respData, _ := json.Marshal(sqlResponse)
+	resp := &pb.InvokeBindingResponse{
+		Data: respData,
+	}
+
+	t.Run("Leave Member success", func(t *testing.T) {
+		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
+			Name:      "mysql",
+			Operation: string(LeaveMemberOperation),
+		}, resp, nil)
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err := cli.LeaveMember()
+		assert.Nil(t, err)
+	})
+
+	t.Run("Join Member success", func(t *testing.T) {
+		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
+			Name:      "mysql",
+			Operation: string(LeaveMemberOperation),
+		}, nil, errors.New("leave member failed"))
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err := cli.LeaveMember()
+		assert.NotNil(t, err)
 	})
 }
 
@@ -315,7 +395,7 @@ func initSQLChannelClient(t *testing.T) (*testDaprServer, *OperationClient, func
 	daprServer := &testDaprServer{
 		state:                       make(map[string][]byte),
 		configurationSubscriptionID: map[string]chan struct{}{},
-		cachedRequest:               make(map[string]*pb.InvokeBindingResponse),
+		cachedRequest:               make(map[string]*response),
 	}
 
 	port, closer := newTCPServer(t, daprServer, 50001)

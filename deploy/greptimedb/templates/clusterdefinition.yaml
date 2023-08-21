@@ -1,0 +1,382 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: greptimedb
+  labels:
+    {{- include "greptimedb.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-mysql)"
+    accesskey: ""
+    secretkey: ""
+  componentDefs:
+    - name: frontend
+      workloadType: Stateless
+      characterType: greptimedb
+      probes:
+      configSpecs:
+      service:
+        ports:
+          - name: http
+            port: 4000
+            targetPort: http
+          - name: grpc
+            port: 4001
+            targetPort: grpc
+          - name: mysql
+            port: 4002
+            targetPort: mysql
+          - name: postgres
+            port: 4003
+            targetPort: postgres
+          - name: opentsdb
+            port: 4242
+            targetPort: opentsdb
+      componentDefRef:
+        - &metaRef
+          componentDefName: meta
+          componentRefEnv:
+            - name: GREPTIMEDB_META_SVC
+              valueFrom:
+                type: ServiceRef
+      podSpec:
+        containers:
+          - name: frontend
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            readinessProbe:
+              failureThreshold: 5
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 15
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /etc/greptimedb
+                name: config
+            args:
+              - frontend
+              - start
+              - --metasrv-addr
+              - $(GREPTIMEDB_META_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:3002
+              - --http-addr
+              - 0.0.0.0:4000
+              - --grpc-addr
+              - 0.0.0.0:4001
+              - --mysql-addr
+              - 0.0.0.0:4002
+              - --postgres-addr
+              - 0.0.0.0:4003
+              - --opentsdb-addr
+              - 0.0.0.0:4242
+              - --config-file
+              - /etc/greptimedb/config.toml
+            ports:
+              - name: http
+                containerPort: 4000
+              - name: grpc
+                containerPort: 4001
+              - name: mysql
+                containerPort: 4002
+              - name: postgres
+                containerPort: 4003
+              - name: opentsdb
+                containerPort: 4242
+        serviceAccountName: greptimedb-cluster
+        terminationGracePeriodSeconds: 10
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        volumes:
+          - configMap:
+              defaultMode: 420
+              name: greptimedb-frontend
+            name: config
+    - name: datanode
+      workloadType: Stateful
+      characterType: greptimedb
+      probes:
+      logConfigs:
+      configSpecs:
+      service:
+        ports:
+          - name: http
+            port: 4000
+            targetPort: http
+          - name: grpc
+            port: 4001
+            targetPort: grpc
+      componentDefRef:
+        - *metaRef
+      podSpec:
+        containers:
+          - name: datanode
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            readinessProbe:
+              failureThreshold: 5
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 15
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              initialDelaySeconds: 20
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /etc/greptimedb
+                name: config
+              - mountPath: /tmp/greptimedb
+                name: datanode
+            ports:
+              - name: grpc
+                containerPort: 4001
+              - name: http
+                containerPort: 4000
+            args:
+              - datanode
+              - start
+              - --metasrv-addr
+              - $(GREPTIMEDB_META_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:3002
+              - --http-addr
+              - 0.0.0.0:4000
+              - --config-file
+              - /etc/greptimedb/config.toml
+        dnsPolicy: ClusterFirst
+        initContainers:
+          - name: initializer
+            args:
+              - --config-path
+              - /etc/greptimedb/config.toml
+              - --init-config-path
+              - /etc/greptimedb-init/config.toml
+              - --datanode-rpc-port
+              - "4001"
+              - --datanode-service-name
+              - $(KB_CLUSTER_COMP_NAME)-headless
+              - --namespace
+              - $(KB_NAMESPACE)
+              - --component-kind
+              - datanode
+            command:
+              - greptimedb-initializer
+            env:
+              - name: POD_IP
+                value: $(KB_POD_IP)
+              - name: POD_NAME
+                value: $(KB_POD_NAME)
+            image: docker.io/greptime/greptimedb-initializer:0.1.0-alpha.12
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /etc/greptimedb
+                name: config
+              - mountPath: /etc/greptimedb-init
+                name: init-config
+        serviceAccountName: greptimedb-cluster
+        terminationGracePeriodSeconds: 10
+        volumes:
+          - emptyDir: {}
+            name: config
+          - configMap:
+              defaultMode: 420
+              name: greptimedb-datanode
+            name: init-config
+    - name: meta
+      workloadType: Stateless
+      characterType: greptimedb
+      probes:
+      configSpecs:
+      service:
+        ports:
+          - name: grpc
+            port: 3002
+            targetPort: grpc
+          - name: http
+            port: 4000
+            targetPort: http
+      componentDefRef:
+        - &etcdRef
+          componentDefName: etcd
+          componentRefEnv:
+            - name: GREPTIMEDB_ETCD_SVC
+              valueFrom:
+                type: ServiceRef
+      podSpec:
+        containers:
+          - name: meta
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            readinessProbe:
+              failureThreshold: 5
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 15
+              httpGet:
+                path: /health
+                port: 4000
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /etc/greptimedb
+                name: config
+            args:
+              - metasrv
+              - start
+              - --bind-addr
+              - 0.0.0.0:3002
+              - --http-addr
+              - 0.0.0.0:4000
+              - --server-addr
+              - $(KB_POD_IP):3002
+              - --store-addr
+              - $(GREPTIMEDB_ETCD_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:2379
+              - --config-file
+              - /etc/greptimedb/config.toml
+        serviceAccountName: greptimedb-cluster
+        terminationGracePeriodSeconds: 10
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        volumes:
+          - configMap:
+              defaultMode: 420
+              name: greptimedb-meta
+            name: config
+    - name: etcd
+      workloadType: Consensus
+      characterType: etcd
+      consensusSpec:
+        leader:
+          name: "leader"
+          accessMode: ReadWrite
+        followers:
+          - name: "follower"
+            accessMode: ReadWrite
+        updateStrategy: BestEffortParallel
+      probes:
+        roleProbe:
+          periodSeconds: 1
+          failureThreshold: 3
+      configSpecs:
+      service:
+        ports:
+          - name: client
+            port: 2379
+            targetPort: client
+          - name: peer
+            port: 2380
+            targetPort: peer
+      podSpec:
+        containers:
+          - name: etcd
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /var/lib/etcd
+                name: etcd-storage
+            ports:
+              - name: client
+                containerPort: 2379
+              - name: peer
+                containerPort: 2380
+            command:
+              - bin/sh
+              - -c
+              - |
+                echo "start etcd..."
+                PEERS=""
+                DOMAIN=$KB_NAMESPACE".svc{{ .Values.clusterDomain }}"
+                i=0
+                while [ $i -lt $KB_REPLICA_COUNT ]; do
+                	if [ $i -ne 0 ]; then
+                		PEERS="$PEERS,";
+                	fi;
+                	host=$(eval echo \$KB_"$i"_HOSTNAME)
+                  host=$host"."$DOMAIN
+                  hostname=${KB_CLUSTER_COMP_NAME}-${i}
+                	PEERS="$PEERS$hostname=http://$host:2380"
+                  i=$(( i + 1 ))
+                done
+                MY_PEER=$KB_POD_FQDN{{ .Values.clusterDomain }}
+                exec etcd --name ${HOSTNAME} \
+                --listen-peer-urls http://0.0.0.0:2380 \
+                --listen-client-urls http://0.0.0.0:2379 \
+                --advertise-client-urls http://${MY_PEER}:2379 \
+                --initial-advertise-peer-urls http://${MY_PEER}:2380 \
+                --initial-cluster-token greptimedb-cluster \
+                --initial-cluster ${PEERS} \
+                --initial-cluster-state new \
+                --data-dir /var/lib/etcd
+            env:
+              - name: ETCDCTL_API
+                value: "3"
+              - name: ETCD_ON_K8S
+                value: "yes"

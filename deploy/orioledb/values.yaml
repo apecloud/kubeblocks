@@ -2,8 +2,8 @@
 
 image:
 #  registry: registry.cn-hangzhou.aliyuncs.com
-  registry: docker.io
-  repository: 941102297/orioledb
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/orioledb
   tag: beta1
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.

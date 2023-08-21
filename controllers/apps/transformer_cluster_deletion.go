@@ -158,8 +158,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delObjs := toDeleteObjs(namespacedObjs)
 
 	// add non-namespaced objects deletion vertex
-	nonNamespacedObjs, err := getClusterOwningNonNamespacedObjects(transCtx, *cluster,
-		getAppInstanceAndManagedByML(*cluster), toDeleteNonNamespacedKinds)
+	nonNamespacedObjs, err := getClusterOwningNonNamespacedObjects(transCtx, *cluster, ml, toDeleteNonNamespacedKinds)
 	if err != nil {
 		return err
 	}

@@ -12,7 +12,7 @@ terminationPolicy: "Delete"
 ##
 datanode:
   replicas: 3
-  resources:
+  resources: {}
     # We usually recommend not to specify default resources and to leave this as a conscious
     # choice for the user. This also increases chances charts run on environments with little
     # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -24,12 +24,6 @@ datanode:
     # requests:
     #   cpu: 500m
     #   memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:  # TODO: rm these limits later
-      cpu: 500m
-      memory: 512Mi
 
   volume:
     storage: 10Gi
@@ -38,13 +32,7 @@ datanode:
 ##
 etcd:
   replicas: 3
-  resources: 
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 500m
-      memory: 512Mi
+  resources: {}
   volume:
     storage: 10Gi
 
@@ -52,22 +40,10 @@ etcd:
 ##
 meta:
   replicas: 1
-  resources: 
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 500m
-      memory: 512Mi
+  resources: {}
 
 ## @param frontend configs
 ##
 frontend:
   replicas: 1
-  resources: 
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 500m
-      memory: 512Mi
+  resources: {}

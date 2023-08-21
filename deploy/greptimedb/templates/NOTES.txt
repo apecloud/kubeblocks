@@ -8,17 +8,17 @@ Example routines to create and connect a GreptimeDB cluster using kbcli.
 1. Create a GreptimeDB cluster
 
 Minimal >
-kbcli cluster create my-greptimedb-cluster --cluster-definition greptimedb
+kbcli cluster create my-cluster --cluster-definition greptimedb
 
 Replicas >
-helm install my-greptimedb-cluster ./deploy/greptimedb-cluster
+helm install my-cluster ./deploy/greptimedb-cluster
 
 2. Port-forward svc to localhost and connect to GreptimeDB cluster
 
 MySQL >
-kubectl port-forward svc/my-greptimedb-cluster-frontend 4002:4002
+kubectl port-forward svc/my-cluster-frontend 4002:4002
 mysql -h 127.0.0.1 -P 4002
 
 PostgreSQL >
-kubectl port-forward svc/my-greptimedb-cluster-frontend 4003:4003
+kubectl port-forward svc/my-cluster-frontend 4003:4003
 psql -h 127.0.0.1 -p 4003

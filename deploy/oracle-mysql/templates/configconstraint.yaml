@@ -1,0 +1,50 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: oracle-mysql-config-constraints
+  labels:
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+spec:
+  # mysql configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: mysqld
+
+  # mysql reload script for dynamic parameter
+  reloadOptions:
+    tplScriptTrigger:
+      sync: true
+      scriptConfigMapRef: oracle-mysql-reload-script
+      namespace: {{ .Release.Namespace }}
+
+  ## define static parameter list
+  staticParameters:
+    - open_files_limit
+    - performance_schema
+    - enforce_gtid_consistency
+
+  ## define dynamic parameter list
+  dynamicParameters:
+    - innodb_buffer_pool_size
+    - max_connections
+    - gtid_mode
+    - read_buffer_size
+    - read_only
+    - read_rnd_buffer_size
+    - join_buffer_size
+    - sort_buffer_size
+    - innodb_flush_log_at_trx_commit
+    - sync_binlog
+    - autocommit
+
+  # define parameter validation rules
+  # top level mysql configuration type
+  cfgSchemaTopLevelName: MysqlParameter
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/oracle-mysql-config-constraint.cue" | nindent 6 }}
+
+
+

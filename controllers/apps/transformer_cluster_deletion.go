@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -57,23 +59,24 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	// list all kinds to be deleted based on v1alpha1.TerminationPolicyType
-	var toDeleteKinds, toPreserveKinds []client.ObjectList
+	var toDeleteNamespacedKinds, toDeleteNonNamespacedKinds []client.ObjectList
+	var toPreserveKinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1alpha1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return graph.ErrPrematureStop
 	case appsv1alpha1.Halt:
-		toDeleteKinds = kindsForHalt()
+		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForHalt()
 		toPreserveKinds = []client.ObjectList{
 			&corev1.PersistentVolumeClaimList{},
 			&corev1.SecretList{},
 			&corev1.ConfigMapList{},
 		}
 	case appsv1alpha1.Delete:
-		toDeleteKinds = kindsForDelete()
+		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
 	case appsv1alpha1.WipeOut:
-		toDeleteKinds = kindsForWipeOut()
+		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForWipeOut()
 	}
 
 	transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
@@ -90,7 +93,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			return nil
 		}
 
-		objs, err := getClusterOwningObjects(transCtx, *cluster, ml, toPreserveKinds...)
+		objs, err := getClusterOwningNamespacedObjects(transCtx, *cluster, ml, toPreserveKinds)
 		if err != nil {
 			return err
 		}
@@ -149,12 +152,20 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return delObjs
 	}
 
-	// add objects deletion vertex
-	objs, err := getClusterOwningObjects(transCtx, *cluster, ml, toDeleteKinds...)
+	// add namespaced objects deletion vertex
+	namespacedObjs, err := getClusterOwningNamespacedObjects(transCtx, *cluster, ml, toDeleteNamespacedKinds)
 	if err != nil {
 		return err
 	}
-	delObjs := toDeleteObjs(objs)
+	delObjs := toDeleteObjs(namespacedObjs)
+
+	// add non-namespaced objects deletion vertex
+	nonNamespacedObjs, err := getClusterOwningNonNamespacedObjects(transCtx, *cluster, ml, toDeleteNonNamespacedKinds)
+	if err != nil {
+		return err
+	}
+	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
+
 	for _, o := range delObjs {
 		vertex := &ictrltypes.LifecycleVertex{Obj: o, Action: ictrltypes.ActionDeletePtr()}
 		dag.AddVertex(vertex)
@@ -173,41 +184,44 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	return graph.ErrPrematureStop
 }
 
-func kindsForDoNotTerminate() []client.ObjectList {
-	return []client.ObjectList{}
+func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
+	return []client.ObjectList{}, []client.ObjectList{}
 }
 
-func kindsForHalt() []client.ObjectList {
-	kinds := kindsForDoNotTerminate()
-	kindsPlus := []client.ObjectList{
+func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
+	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
+	namespacedKindsPlus := []client.ObjectList{
 		&policyv1.PodDisruptionBudgetList{},
-		&corev1.ServiceList{},
-		&appsv1.StatefulSetList{},
-		&appsv1.DeploymentList{},
-		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
+	}
+	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
 	}
-	return append(kinds, kindsPlus...)
+	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
+	} else {
+		namespacedKindsPlus = append(namespacedKindsPlus, &corev1.ServiceList{}, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})
+	}
+	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
 }
 
-func kindsForDelete() []client.ObjectList {
-	kinds := kindsForHalt()
-	kindsPlus := []client.ObjectList{
+func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
+	namespacedKinds, nonNamespacedKinds := kindsForHalt()
+	namespacedKindsPlus := []client.ObjectList{
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
 		&dataprotectionv1alpha1.BackupPolicyList{},
 		&batchv1.JobList{},
 	}
-	return append(kinds, kindsPlus...)
+	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }
 
-func kindsForWipeOut() []client.ObjectList {
-	kinds := kindsForDelete()
-	kindsPlus := []client.ObjectList{
+func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
+	namespacedKinds, nonNamespacedKinds := kindsForDelete()
+	namespacedKindsPlus := []client.ObjectList{
 		&dataprotectionv1alpha1.BackupList{},
 	}
-	return append(kinds, kindsPlus...)
+	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }

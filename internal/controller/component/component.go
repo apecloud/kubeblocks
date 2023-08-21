@@ -37,13 +37,12 @@ import (
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clsMgr *class.Manager,
 	cluster *appsv1alpha1.Cluster,
-	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, clsMgr, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, clsMgr, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
@@ -51,28 +50,30 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 func buildComponent(reqCtx intctrlutil.RequestCtx,
 	clsMgr *class.Manager,
 	cluster *appsv1alpha1.Cluster,
-	clusterTpl *appsv1alpha1.ClusterTemplate,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-
-	fillClusterTemplate := func() {
-		if clusterTpl == nil || len(clusterTpl.Spec.ComponentSpecs) == 0 {
-			return
-		}
-		for _, compSpecTpl := range clusterTpl.Spec.ComponentSpecs {
-			if compSpecTpl.ComponentDefRef == clusterCompDef.Name {
-				clusterCompSpec = compSpecTpl.DeepCopy()
-			}
-		}
+	hasSimplifiedAPI := func() bool {
+		return cluster.Spec.Replicas != nil ||
+			!cluster.Spec.Resources.CPU.IsZero() ||
+			!cluster.Spec.Resources.Memory.IsZero() ||
+			!cluster.Spec.Storage.Size.IsZero() ||
+			cluster.Spec.Monitor.MonitoringInterval != nil ||
+			cluster.Spec.Network != nil ||
+			len(cluster.Spec.Tenancy) > 0 ||
+			len(cluster.Spec.AvailabilityPolicy) > 0
 	}
 
 	fillSimplifiedAPI := func() {
 		// fill simplified api only to first defined component
 		if len(clusterDef.Spec.ComponentDefs) == 0 ||
 			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
+			return
+		}
+		// return if none of simplified api is defined
+		if !hasSimplifiedAPI() {
 			return
 		}
 		if clusterCompSpec == nil {
@@ -177,7 +178,6 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 
 	// priority: cluster.spec.componentSpecs > simplified api (e.g. cluster.spec.storage etc.) > cluster template
 	if clusterCompSpec == nil {
-		fillClusterTemplate()
 		fillSimplifiedAPI()
 	}
 	if clusterCompSpec == nil {

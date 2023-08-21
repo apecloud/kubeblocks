@@ -21,6 +21,7 @@ package template
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/sethvargo/go-password/password"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -59,8 +60,12 @@ func mockClusterObject(clusterDefObj *appsv1alpha1.ClusterDefinition, renderedOp
 		factory.AddComponent(component.CharacterType+"-"+RandomString(3), component.Name)
 		factory.SetReplicas(renderedOpts.Replicas)
 		if renderedOpts.DataVolumeName != "" {
-			pvcSpec := testapps.NewPVCSpec("10Gi")
-			factory.AddVolumeClaimTemplate(renderedOpts.DataVolumeName, pvcSpec)
+			fields := strings.SplitN(renderedOpts.DataVolumeName, ":", 2)
+			if len(fields) == 1 {
+				fields = append(fields, "10Gi")
+			}
+			pvcSpec := testapps.NewPVCSpec(fields[1])
+			factory.AddVolumeClaimTemplate(fields[0], pvcSpec)
 		}
 		if renderedOpts.CPU != "" || renderedOpts.Memory != "" {
 			factory.SetResources(fromResource(renderedOpts))
@@ -99,7 +104,7 @@ func RandomString(n int) string {
 	return s
 }
 
-func helmTemplate(helmPath string, helmOutput string) error {
+func HelmTemplate(helmPath string, helmOutput string) error {
 	o := helm.InstallOpts{
 		Name:      testing.KubeBlocksChartName,
 		Chart:     helmPath,

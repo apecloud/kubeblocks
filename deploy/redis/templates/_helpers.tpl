@@ -56,3 +56,13 @@ Define image
 {{- define "redis.image" -}}
 {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
 {{- end }}
+
+{{/*
+Generate scripts configmap
+*/}}
+{{- define "redis.extend.scripts" -}}
+{{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
+{{ $path | base }}: |-
+{{- $.Files.Get $path | nindent 2 }}
+{{- end }}
+{{- end }}

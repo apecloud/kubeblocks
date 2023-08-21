@@ -1,0 +1,22 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: oracle-mysql-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: oracle-mysql
+    {{- include "oracle-mysql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: oracle-mysql
+  backupPolicies:
+  - componentDefRef: mysql-compdef
+    schedule:
+      snapshot:
+        enable: true
+        cronExpression: "0 18 * * *"
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
+    snapshot:
+      backupsHistoryLimit: 5
+    datafile:
+      backupToolName: oracle-mysql-xtrabackup

@@ -96,14 +96,6 @@ type ClusterSpec struct {
 	// +optional
 	Storage ClusterStorage `json:"storage,omitempty"`
 
-	// mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.
-	// +optional
-	Mode ClusterMode `json:"mode,omitempty"`
-
-	// customized parameters that is used in different clusterdefinition
-	// +optional
-	Parameters map[string]string `json:"parameters,omitempty"`
-
 	// monitor specifies the configuration of monitor
 	// +optional
 	Monitor ClusterMonitor `json:"monitor,omitempty"`

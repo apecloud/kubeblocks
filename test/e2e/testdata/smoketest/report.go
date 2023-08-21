@@ -39,8 +39,8 @@ func UploadReport() {
 	Context("upload test report to s3", func() {
 		It("upload report", func() {
 			path, _ := os.Getwd()
-			e2eutil.UploadToS3(path+"/report.json", "e2e/"+Version, "e2e-test")
+			e2eutil.UploadToS3(path+"/report.json", "e2e/"+Version+"/"+TestType, "e2e-test")
+			e2eutil.UploadToS3(path+"/"+TestType+"-log.txt", "e2e/"+Version+"/"+TestType, "e2e-test")
 		})
-
 	})
 }

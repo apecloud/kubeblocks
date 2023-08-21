@@ -6,27 +6,27 @@ metadata:
   name: kb-redis-cluster
   namespace: default
   labels:
-    helm.sh/chart: redis-cluster-0.6.0-alpha.36
+    helm.sh/chart: redis-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/instance: redis-cluster
 ---
 # Source: redis-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRoleBinding
 metadata:
   name: kb-redis-cluster
-  namespace: default
   labels:
-    helm.sh/chart: redis-cluster-0.6.0-alpha.36
+    helm.sh/chart: redis-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/instance: redis-cluster
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-redis-cluster
+    namespace: default
 ---
 # Source: redis-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -34,13 +34,13 @@ kind: RoleBinding
 metadata:
   name: kb-redis-cluster
   labels:
-    helm.sh/chart: redis-cluster-0.6.0-alpha.36
+    helm.sh/chart: redis-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/instance: redis-cluster
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: kb-redis-cluster
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
 subjects:
   - kind: ServiceAccount
     name: kb-redis-cluster
@@ -53,7 +53,7 @@ metadata:
   name: redis-cluster
   namespace: default
   labels: 
-    helm.sh/chart: redis-cluster-0.6.0-alpha.36
+    helm.sh/chart: redis-cluster-0.6.0-beta.44
     app.kubernetes.io/version: "7.0.6"
     app.kubernetes.io/instance: redis-cluster
 spec:

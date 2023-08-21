@@ -40,6 +40,16 @@ move_shards() {
                 -d '{"move_shard":{"shard_id": '${shard_id}',"to_peer_id": '${leader_peer_id}',"from_peer_id": '${local_peer_id}}}'' \
                 ${local_uri}/collections/${col_name}/cluster
         done
+
+        while true; do
+            col_cluster_info=`$curl -s ${local_uri}/collections/${col_name}/cluster`
+            local_shard_ids=`echo ${col_cluster_info} | $jq -r '.result.local_shards[].shard_id'`
+            if [ -z "${local_shard_ids}" ]; then
+                echo "all shards in collection ${col_name} has been moved"
+                break
+            fi
+            sleep 1
+        done
     done
 }
 

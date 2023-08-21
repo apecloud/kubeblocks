@@ -18,15 +18,16 @@ mkdir -p $MONGODB_ROOT/logs
 mkdir -p $MONGODB_ROOT/tmp
 
 BACKUPFILE=$MONGODB_ROOT/db/mongodb.backup
+PORT_FOR_RESTORE=27027
 if [ -f $BACKUPFILE ]
 then
-  mongod --bind_ip_all --port $PORT --dbpath $MONGODB_ROOT/db --directoryperdb --logpath $MONGODB_ROOT/logs/mongodb.log  --logappend --pidfilepath $MONGODB_ROOT/tmp/mongodb.pid&
-  until mongosh --quiet --port $PORT --host $host --eval "print('restore process is ready')"; do sleep 1; done
+  mongod --bind_ip_all --port $PORT_FOR_RESTORE --dbpath $MONGODB_ROOT/db --directoryperdb --logpath $MONGODB_ROOT/logs/mongodb.log  --logappend --pidfilepath $MONGODB_ROOT/tmp/mongodb.pid&
+  until mongosh --quiet --port $PORT_FOR_RESTORE --host $host --eval "print('restore process is ready')"; do sleep 1; done
   PID=`cat $MONGODB_ROOT/tmp/mongodb.pid`
 
-  mongosh --quiet --port $PORT local --eval "db.system.replset.deleteOne({})"
-  mongosh --quiet --port $PORT local --eval "db.system.replset.find()"
-  mongosh --quiet --port $PORT admin --eval 'db.dropUser("root", {w: "majority", wtimeout: 4000})' || true
+  mongosh --quiet --port $PORT_FOR_RESTORE local --eval "db.system.replset.deleteOne({})"
+  mongosh --quiet --port $PORT_FOR_RESTORE local --eval "db.system.replset.find()"
+  mongosh --quiet --port $PORT_FOR_RESTORE admin --eval 'db.dropUser("root", {w: "majority", wtimeout: 4000})' || true
   kill $PID
   wait $PID
   rm $BACKUPFILE

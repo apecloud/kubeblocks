@@ -1,0 +1,41 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: mongodb-dump-tool
+  labels:
+    clusterdefinition.kubeblocks.io/name: mongodb
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+  deployKind: job
+  env:
+    - name: DATA_DIR
+      value: /data/mongodb/db
+  logical:
+    restoreCommands:
+    - sh
+    - -c
+    - |
+      mongo_uri="mongodb://${DB_HOST}:27017"
+      for dir_name in $(ls ${BACKUP_DIR} -l | grep ^d | awk '{print $9}'); do
+        database_dir=${BACKUP_DIR}/$dir_name
+        echo "INFO: restoring from ${database_dir}"
+        mongorestore --uri ${mongo_uri} -u ${MONGODB_ROOT_USER} -p ${MONGODB_ROOT_PASSWORD} -d $dir_name --authenticationDatabase admin ${database_dir}
+      done
+  backupCommands:
+    - bash
+    - -c
+    - |
+      if [ -d ${BACKUP_DIR} ]; then
+        rm -rf ${BACKUP_DIR}
+      fi
+      mkdir -p ${BACKUP_DIR}
+      {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 6 }}
+
+      # TODO: support endpoint env for sharding cluster.
+      mongo_uri="mongodb://${DB_HOST}:27017"
+      START_TIME=`get_current_time`
+      mongodump --uri ${mongo_uri} -u ${DB_USER} -p ${DB_PASSWORD} --authenticationDatabase admin --out ${BACKUP_DIR}
+
+      # stat and save the backup information
+      stat_and_save_backup_info $START_TIME

@@ -195,7 +195,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	for _, v := range []dataprotectionv1alpha1.BackupType{dataprotectionv1alpha1.BackupTypeDataFile,
 		dataprotectionv1alpha1.BackupTypeLogFile, dataprotectionv1alpha1.BackupTypeSnapshot} {
 		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupPolicy.Namespace,
-			Name: getCreatedCRNameByBackupPolicy(backupPolicy.Name, backupPolicy.Namespace, v),
+			Name: getCreatedCRNameByBackupPolicy(backupPolicy, v),
 		}, backup); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
@@ -324,7 +324,7 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	backType dataprotectionv1alpha1.BackupType,
 	cronExpression string) error {
-	backupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
+	backupName := getCreatedCRNameByBackupPolicy(backupPolicy, backType)
 	backup := &dataprotectionv1alpha1.Backup{}
 	exists, err := intctrlutil.CheckResourceExists(ctx, r.Client, types.NamespacedName{Name: backupName, Namespace: backupPolicy.Namespace}, backup)
 	if err != nil {
@@ -353,8 +353,8 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	if cronExpression != "" && slices.Contains([]dataprotectionv1alpha1.BackupPhase{
 		dataprotectionv1alpha1.BackupCompleted, dataprotectionv1alpha1.BackupFailed},
 		backup.Status.Phase) {
-		// if schedule is enabled and backup already is completed, update phase to running
-		backup.Status.Phase = dataprotectionv1alpha1.BackupRunning
+		// if schedule is enabled and backup already is completed, update phase to New
+		backup.Status.Phase = dataprotectionv1alpha1.BackupNew
 		backup.Status.FailureReason = ""
 		return r.Client.Status().Patch(ctx, backup, patch)
 	}
@@ -388,7 +388,7 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	if cronJobName == "" {
-		cronJobName = getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
+		cronJobName = getCreatedCRNameByBackupPolicy(backupPolicy, backType)
 	}
 	options := backupPolicyOptions{
 		Name:             cronJobName,
@@ -558,6 +558,9 @@ func (r *BackupPolicyReconciler) handleLogfilePolicy(
 		var cronExpression string
 		if schedule != nil && schedule.Enable {
 			cronExpression = schedule.CronExpression
+		}
+		if err := r.reconfigure(reqCtx, backupPolicy, logfile.BasePolicy, dataprotectionv1alpha1.BackupTypeLogFile); err != nil {
+			return err
 		}
 		return r.reconcileForStatefulSetKind(reqCtx.Ctx, backupPolicy, dataprotectionv1alpha1.BackupTypeLogFile, cronExpression)
 	}

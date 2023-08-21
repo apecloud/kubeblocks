@@ -30,7 +30,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 )
 
-// TODO: a copy of testutil.apps.base_factory, should make this as a common util both used by builder and testing
+// TODO(free6om): a copy(and updated) of testutil.apps.base_factory, should make this as a common util both used by builder and testing
 // Manipulate common attributes here to save boilerplate code
 
 type BaseBuilder[T intctrlutil.Object, PT intctrlutil.PObject[T], B any] struct {
@@ -41,12 +41,6 @@ type BaseBuilder[T intctrlutil.Object, PT intctrlutil.PObject[T], B any] struct 
 func (builder *BaseBuilder[T, PT, B]) init(namespace, name string, obj PT, b *B) {
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
-	if obj.GetLabels() == nil {
-		obj.SetLabels(map[string]string{})
-	}
-	if obj.GetAnnotations() == nil {
-		obj.SetAnnotations(map[string]string{})
-	}
 	builder.object = obj
 	builder.concreteBuilder = b
 }
@@ -72,6 +66,9 @@ func (builder *BaseBuilder[T, PT, B]) AddLabels(keysAndValues ...string) *B {
 
 func (builder *BaseBuilder[T, PT, B]) AddLabelsInMap(labels map[string]string) *B {
 	l := builder.object.GetLabels()
+	if l == nil {
+		l = make(map[string]string, 0)
+	}
 	for k, v := range labels {
 		l[k] = v
 	}
@@ -85,6 +82,9 @@ func (builder *BaseBuilder[T, PT, B]) AddAnnotations(keysAndValues ...string) *B
 }
 func (builder *BaseBuilder[T, PT, B]) AddAnnotationsInMap(annotations map[string]string) *B {
 	a := builder.object.GetAnnotations()
+	if a == nil {
+		a = make(map[string]string, 0)
+	}
 	for k, v := range annotations {
 		a[k] = v
 	}

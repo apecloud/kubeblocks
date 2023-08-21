@@ -155,10 +155,61 @@ var _ = Describe("clusterDefinition webhook", func() {
 			// reset account setting
 			mockAccounts[0].ProvisionPolicy.Type = CreateByStmt
 
+			By("Create accounts with empty deletion and update statements, should fail")
+			deletionStmt := mockAccounts[1].ProvisionPolicy.Statements.DeletionStatement
+			mockAccounts[1].ProvisionPolicy.Statements.DeletionStatement = ""
+			clusterDef.Spec.ComponentDefs[0].SystemAccounts = &SystemAccountSpec{
+				CmdExecutorConfig: cmdExecConfig,
+				PasswordConfig:    passwdConfig,
+				Accounts:          mockAccounts,
+			}
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+			// reset account setting
+			mockAccounts[1].ProvisionPolicy.Statements.DeletionStatement = deletionStmt
+
 			By("By creating a new clusterDefinition with valid accounts")
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)).Should(Succeed())
+
+		})
+
+		It("Validate Cluster Definition Component Refs", func() {
+			By("By creating a new clusterDefinition")
+			clusterDef, err := createMultiCompClusterDefObj(clusterDefinitionName3)
+			Expect(err).ShouldNot(HaveOccurred())
+			componentRefs := []ComponentDefRef{
+				{
+					ComponentRefEnvs: []ComponentRefEnv{
+						{
+							Name: "INJECTED_ENV",
+							ValueFrom: &ComponentValueFrom{
+								Type: FromHeadlessServiceRef,
+							},
+						},
+					},
+				},
+			}
+			By("By creating a new clusterDefinition with empty component name, should fail")
+			clusterDef.Spec.ComponentDefs[0].ComponentDefRef = componentRefs
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+
+			By("By creating a new clusterDefinition with invalid component name, should fail")
+			componentRefs[0].ComponentDefName = "invalid-name"
+			clusterDef.Spec.ComponentDefs[0].ComponentDefRef = componentRefs
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+
+			By("By creating a new clusterDefinition with invalid workload type, should fail")
+			componentRefs[0].ComponentDefName = "mysql-proxy"
+			clusterDef.Spec.ComponentDefs[0].ComponentDefRef = componentRefs
+			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
+
+			By("By creating a new clusterDefinition with valid valueFrom type, should succeed")
+			componentRefs[0].ComponentRefEnvs[0].ValueFrom = &ComponentValueFrom{
+				Type: FromServiceRef,
+			}
+			clusterDef.Spec.ComponentDefs[0].ComponentDefRef = componentRefs
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 		})
 
 		It("Should webhook validate configSpec", func() {
@@ -397,6 +448,32 @@ spec:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
+        command: ["/usr/bin/bash", "-c"]
+`, name)
+	clusterDefinition := &ClusterDefinition{}
+	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
+	return clusterDefinition, err
+}
+
+func createMultiCompClusterDefObj(name string) (*ClusterDefinition, error) {
+	clusterDefYaml := fmt.Sprintf(`
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: %s
+spec:
+  componentDefs:
+  - name: mysql-rafted
+    workloadType: Stateful
+    podSpec:
+      containers:
+      - name: mysql-raft
+        command: ["/usr/bin/bash", "-c"]
+  - name: mysql-proxy
+    workloadType: Stateless
+    podSpec:
+      containers:
+      - name: mysql-proxy
         command: ["/usr/bin/bash", "-c"]
 `, name)
 	clusterDefinition := &ClusterDefinition{}

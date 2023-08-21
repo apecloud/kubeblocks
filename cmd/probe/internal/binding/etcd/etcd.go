@@ -21,7 +21,6 @@ package etcd
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -61,9 +60,7 @@ func (e *Etcd) Init(metadata bindings.Metadata) error {
 	e.InitIfNeed = e.initIfNeed
 	e.DBPort = e.GetRunningPort()
 	e.BaseOperations.GetRole = e.GetRole
-	e.BaseOperations.LockInstance = e.LockInstance
-	e.BaseOperations.UnlockInstance = e.UnlockInstance
-	e.LegacyOperations[GetRoleOperation] = e.GetRoleOps
+	e.OperationsMap[GetRoleOperation] = e.GetRoleOps
 	return nil
 }
 
@@ -132,16 +129,6 @@ func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp
 	opsRes := OpsResult{}
 	opsRes["role"] = role
 	return opsRes, nil
-}
-
-func (e *Etcd) LockInstance(ctx context.Context) error {
-	// TODO: impl
-	return fmt.Errorf("NotSupported")
-}
-
-func (e *Etcd) UnlockInstance(ctx context.Context) error {
-	// TODO: impl
-	return fmt.Errorf("NotSupported")
 }
 
 func (e *Etcd) GetRunningPort() int {

@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-vexpand
+  generateName: redis-cluster-vexpand-
 spec:
   clusterRef: redis-cluster
   type: VolumeExpansion
@@ -9,4 +9,4 @@ spec:
     - componentName: redis
       volumeClaimTemplates:
         - name: data
-          storage: "11Gi"
+          storage: "21Gi"

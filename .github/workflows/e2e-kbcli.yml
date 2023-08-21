@@ -3,6 +3,14 @@ name: E2E Test KBCLI
 on:
   workflow_dispatch:
     inputs:
+      VERSION:
+        description: 'kubeblocks release version'
+        required: true
+        default: 'latest'
+      PRE_VERSION:
+        description: 'kubeblocks previous version of upgrade'
+        required: false
+        default: ''
       CLUSTER_VERSION:
         description: 'eks cluster version (e.g. 1.25)'
         required: false
@@ -21,10 +29,6 @@ on:
         options:
           - amd64
           - arm64
-      VERSION:
-        description: 'kubeblocks release version'
-        required: true
-        default: 'latest'
       BRANCH_NAME:
         description: 'testinfra branch name'
         required: false
@@ -34,7 +38,7 @@ on:
         required: false
         default: ''
 
-run-name: kbcli:${{ inputs.VERSION }} k8s:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
+run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} k8s:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
 
 env:
   GH_TOKEN: ${{ github.token }}
@@ -61,12 +65,13 @@ jobs:
 
   eks:
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-eks.yml@v0.1.7
+    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-eks.yml@v0.1.14
     with:
+      KB_VERSION: "${{ needs.check.outputs.release-version }}"
+      KB_PRE_VERSION: "${{ inputs.PRE_VERSION }}"
       CLUSTER_VERSION: "${{ inputs.CLUSTER_VERSION }}"
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
-      KB_VERSION: "${{ needs.check.outputs.release-version }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
-      APECD_REF: "v0.1.7"
+      APECD_REF: "v0.1.14"
       ARGS: "${{ inputs.ARGS }}"
     secrets: inherit

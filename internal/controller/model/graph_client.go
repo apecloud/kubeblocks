@@ -88,6 +88,9 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 		return
 	}
 	for _, d := range dependency {
+		if d == nil {
+			continue
+		}
 		v := r.findMatchedVertex(dag, d)
 		if v != nil {
 			dag.Connect(objectVertex, v)

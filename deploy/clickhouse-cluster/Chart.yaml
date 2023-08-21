@@ -4,9 +4,15 @@ description: A ClickHouse cluster Helm chart for KubeBlocks.
 
 type: application
 
-version: 0.6.0-alpha.36
+version: 0.7.0-alpha.0
 
 appVersion: 22.9.4
+
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
 
 
 home: https://clickhouse.com/

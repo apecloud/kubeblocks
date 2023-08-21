@@ -42,6 +42,7 @@ import (
 	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
 	. "github.com/apecloud/kubeblocks/test/e2e/installation"
 	. "github.com/apecloud/kubeblocks/test/e2e/testdata/smoketest"
+	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 )
 
 var cfg *rest.Config
@@ -105,6 +106,7 @@ var _ = BeforeSuite(func() {
 	Version = version
 	InitEnv = initEnv
 	TestType = testType
+	TestResults = make([]Result, 0)
 	if len(provider) > 0 && len(region) > 0 && len(secretID) > 0 && len(secretKey) > 0 {
 		Provider = provider
 		Region = region
@@ -126,13 +128,11 @@ var _ = AfterSuite(func() {
 		err := testEnv.Stop()
 		Expect(err).NotTo(HaveOccurred())
 	}
-	Cancel()
 })
 
 var _ = Describe("e2e test", func() {
-
-	log.Println(initEnv)
 	if initEnv {
+		Cancel()
 		Ctx, Cancel = context.WithCancel(context.TODO())
 		Logger = logf.FromContext(Ctx).WithValues()
 		Logger.Info("logger start")
@@ -167,17 +167,38 @@ var _ = Describe("e2e test", func() {
 		var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
 	}
 
-	var _ = Describe("KubeBlocks operator installation", InstallationTest)
+	var kubeblocks string
+
+	if initEnv == false {
+		It("check kbcli exist or not-exist", func() {
+			kbcli := e2eutil.CheckCommand("kbcli", "/usr/local/bin")
+			Expect(kbcli).Should(BeTrue())
+			kubeblocks = e2eutil.ExecCommand("kbcli version | grep KubeBlocks " +
+				"| (grep \"$1\" || true) | awk '{print $2}'")
+		})
+		It("check kubeblocks exist or not-exist", func() {
+			log.Println("kubeblocks : " + kubeblocks)
+			Expect(kubeblocks).ShouldNot(BeEmpty())
+			if len(kubeblocks) == 0 {
+				var _ = Describe("KubeBlocks operator installation", InstallationTest)
+			}
+		})
+	}
 
 	var _ = Describe("KubeBlocks smoke test run", SmokeTest)
 
-	var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
-
-	var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
+	if initEnv == false {
+		if len(kubeblocks) > 0 {
+			var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
+		}
+	}
 
 	if initEnv {
 		var _ = Describe("KubeBlocks playground destroy", PlaygroundDestroy)
+		var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
 	}
+
+	var _ = Describe("show test report", AnalyzeE2eReport)
 
 	var _ = Describe("save test report to s3", UploadReport)
 

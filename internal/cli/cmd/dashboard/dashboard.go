@@ -45,13 +45,25 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
+// kb support dashboard name
+const (
+	grafanaAddonName       = "kubeblocks-grafana"
+	bytebaseAddonName      = "bytebase"
+	nyancatAddonName       = "kubeblocks-nyancat"
+	prometheusAlertManager = "kubeblocks-prometheus-alertmanager"
+	prometheusServer       = "kubeblocks-prometheus-server"
+	pyroscopeServer        = "kubeblocks-pyroscope-server"
+	jupyterHubAddon        = "jupyter-hub"
+	jupyterNoteBookAddon   = "jupyter-notebook"
+)
+
 const (
 	podRunningTimeoutFlag = "pod-running-timeout"
 	defaultPodExecTimeout = 60 * time.Second
-	grafanaAddonName      = "kubeblocks-grafana"
-	lokiAddonName         = "kubeblocks-logs"
-	lokiGrafanaDirect     = "container-logs"
-	localAdd              = "127.0.0.1"
+
+	lokiAddonName     = "kubeblocks-logs"
+	lokiGrafanaDirect = "container-logs"
+	localAdd          = "127.0.0.1"
 )
 
 type dashboard struct {
@@ -93,19 +105,19 @@ var (
 			TargetPort: "13000",
 		},
 		{
-			Name:       "kubeblocks-prometheus-alertmanager",
+			Name:       prometheusAlertManager,
 			AddonName:  "kb-addon-prometheus-alertmanager",
 			Label:      "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
 			TargetPort: "19093",
 		},
 		{
-			Name:       "kubeblocks-prometheus-server",
+			Name:       prometheusServer,
 			AddonName:  "kb-addon-prometheus-server",
 			Label:      "app=prometheus,component=server,release=kb-addon-prometheus",
 			TargetPort: "19090",
 		},
 		{
-			Name:       "kubeblocks-nyancat",
+			Name:       nyancatAddonName,
 			AddonName:  "kb-addon-nyancat",
 			Label:      "app.kubernetes.io/instance=kb-addon-nyancat",
 			TargetPort: "8087",
@@ -117,10 +129,27 @@ var (
 			TargetPort: "13100",
 		},
 		{
-			Name:       "kubeblocks-pyroscope-server",
+			Name:       pyroscopeServer,
 			AddonName:  "kb-addon-pyroscope-server",
 			Label:      "app.kubernetes.io/instance=kb-addon-pyroscope-server,app.kubernetes.io/name=pyroscope",
 			TargetPort: "14040",
+		}, {
+			Name:       bytebaseAddonName,
+			AddonName:  "bytebase-entrypoint",
+			Label:      "app=bytebase",
+			TargetPort: "18080",
+		},
+		{
+			Name:       jupyterHubAddon,
+			AddonName:  "proxy-public",
+			Label:      "app=jupyterhub",
+			TargetPort: "18081",
+		},
+		{
+			Name:       jupyterNoteBookAddon,
+			AddonName:  "jupyter-notebook",
+			Label:      " app.kubernetes.io/instance=kb-addon-jupyter-notebook",
+			TargetPort: "18888",
 		},
 	}
 )

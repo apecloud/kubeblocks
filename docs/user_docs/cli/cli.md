@@ -37,15 +37,20 @@ BackupRepo command.
 Run a benchmark.
 
 * [kbcli bench delete](kbcli_bench_delete.md)	 - Delete a benchmark.
+* [kbcli bench describe](kbcli_bench_describe.md)	 - Describe a benchmark.
 * [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
 * [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run tpcc benchmark
+* [kbcli bench tpch](kbcli_bench_tpch.md)	 - Run tpch benchmark
+* [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
 
 
 ## [builder](kbcli_builder.md)
 
 builder command.
 
+* [kbcli builder migrate-scripts](kbcli_builder_migrate-scripts.md)	 - migrate - a developer tool.
 * [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
 
 
@@ -124,6 +129,16 @@ ClusterVersion command.
 * [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
+## [context](kbcli_context.md)
+
+kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
+
+* [kbcli context current](kbcli_context_current.md)	 - Get the currently used context.
+* [kbcli context describe](kbcli_context_describe.md)	 - Get the description information of a context.
+* [kbcli context list](kbcli_context_list.md)	 - List all created contexts.
+* [kbcli context use](kbcli_context_use.md)	 - Use another context that you have already created.
+
+
 ## [dashboard](kbcli_dashboard.md)
 
 List and open the KubeBlocks dashboards.
@@ -197,6 +212,16 @@ Data migration between two data sources.
 
 Print the list of flags inherited by all commands.
 
+
+
+## [org](kbcli_org.md)
+
+kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
+
+* [kbcli org current](kbcli_org_current.md)	 - Get current organization.
+* [kbcli org describe](kbcli_org_describe.md)	 - Get the description information of an organization.
+* [kbcli org list](kbcli_org_list.md)	 - List all organizations you have joined.
+* [kbcli org switch](kbcli_org_switch.md)	 - Switch to another organization you are already a member of.
 
 
 ## [playground](kbcli_playground.md)

@@ -323,7 +323,8 @@ spec:
                           description: "Claims lists the names of resources, defined
                             in spec.resourceClaims, that are used by this container.
                             \n This is an alpha field and requires enabling the DynamicResourceAllocation
-                            feature gate. \n This field is immutable."
+                            feature gate. \n This field is immutable. It can only
+                            be set for containers."
                           items:
                             description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                             properties:
@@ -514,7 +515,8 @@ spec:
                                       defined in spec.resourceClaims, that are used
                                       by this container. \n This is an alpha field
                                       and requires enabling the DynamicResourceAllocation
-                                      feature gate. \n This field is immutable."
+                                      feature gate. \n This field is immutable. It
+                                      can only be set for containers."
                                     items:
                                       description: ResourceClaim references one entry
                                         in PodSpec.ResourceClaims.
@@ -577,10 +579,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              mode:
-                description: 'mode specifies the mode of this cluster, the value of
-                  this can be one of the following: Standalone, Replication, RaftGroup.'
-                type: string
               monitor:
                 description: monitor specifies the configuration of monitor
                 properties:
@@ -605,11 +603,6 @@ spec:
                     description: publiclyAccessible specifies whether it is publicly
                       accessible. It defaults to false
                     type: boolean
-                type: object
-              parameters:
-                additionalProperties:
-                  type: string
-                description: customized parameters that is used in different clusterdefinition
                 type: object
               replicas:
                 description: replicas specifies the replicas of the first componentSpec,

@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -37,65 +35,65 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
-	driverMap = map[string]string{
+	sysbenchDriverMap = map[string]string{
 		"mysql":      "mysql",
 		"postgresql": "pgsql",
 	}
 )
 
 var sysbenchExample = templates.Examples(`
-		# sysbench on a cluster
+		# sysbench on a cluster, that will exec for all steps, cleanup, prepare and run
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
 
-		# sysbench on a cluster with different threads
+		# sysbench run on a cluster with cleanup, only cleanup by deleting the testdata
+		kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+		# sysbench run on a cluster with prepare, just prepare by creating the testdata
+		kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+		# sysbench run on a cluster with run, just run by running the test
+		kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
+
+		# sysbench on a cluster with thread counts
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
 
-		# sysbench on a cluster with different type
+		# sysbench on a cluster with type
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
 
 		# sysbench on a cluster with specified read/write ratio
-		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 20
 
 		# sysbench on a cluster with specified tables and size
 		kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 `)
 
 type SysBenchOptions struct {
-	factory   cmdutil.Factory
-	client    clientset.Interface
-	dynamic   dynamic.Interface
-	name      string
-	namespace string
-
 	Threads      []int // the number of threads
 	Tables       int   // the number of tables
 	Size         int   // the data size of per table
 	Duration     int
 	Type         []string
-	ExtraArgs    []string
 	ReadPercent  int
 	WritePercent int
 
 	BenchBaseOptions
-	*cluster.ClusterObjects     `json:"-"`
-	genericclioptions.IOStreams `json:"-"`
 }
 
 func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &SysBenchOptions{
-		factory:   f,
-		IOStreams: streams,
+		BenchBaseOptions: BenchBaseOptions{
+			IOStreams: streams,
+			factory:   f,
+		},
 	}
 
 	cmd := &cobra.Command{
-		Use:               "sysbench [ClusterName]",
-		Short:             "run a SysBench benchmark",
-		Example:           sysbenchExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Use:     "sysbench [Step] [BenchmarkName]",
+		Short:   "run a SysBench benchmark",
+		Example: sysbenchExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(args))
 			cmdutil.CheckErr(o.Validate())
@@ -117,62 +115,58 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 func (o *SysBenchOptions) Complete(args []string) error {
 	var err error
+	var driver string
 	var host string
 	var port int
 
-	// use the first argument as the name of the benchmark
-	if len(args) > 0 {
-		o.name = args[0]
-	}
-	if o.name == "" {
-		o.name = fmt.Sprintf("sysbench-%s", util.RandRFC1123String(6))
-	}
-
-	if o.ClusterName == "" {
-		return fmt.Errorf("cluster name should be specified")
-	}
-
-	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
+	if err = o.BenchBaseOptions.BaseComplete(); err != nil {
 		return err
 	}
 
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-		return err
+	o.Step, o.name = parseStepAndName(args, "sysbench")
+
+	if o.ClusterName != "" {
+		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+
+		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+			return err
+		}
+
+		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+			return err
+		}
+
+		clusterGetter := cluster.ObjectsGetter{
+			Client:    o.client,
+			Dynamic:   o.dynamic,
+			Name:      o.ClusterName,
+			Namespace: o.namespace,
+			GetOptions: cluster.GetOptions{
+				WithClusterDef:     true,
+				WithService:        true,
+				WithPod:            true,
+				WithEvent:          true,
+				WithPVC:            true,
+				WithDataProtection: true,
+			},
+		}
+		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+			return err
+		}
+		driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+		if err != nil {
+			return err
+		}
 	}
 
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-		return err
+	if v, ok := sysbenchDriverMap[driver]; ok && o.Driver == "" {
+		o.Driver = v
 	}
 
-	clusterGetter := cluster.ObjectsGetter{
-		Client:    o.client,
-		Dynamic:   o.dynamic,
-		Name:      o.ClusterName,
-		Namespace: o.namespace,
-		GetOptions: cluster.GetOptions{
-			WithClusterDef:     true,
-			WithService:        true,
-			WithPod:            true,
-			WithEvent:          true,
-			WithPVC:            true,
-			WithDataProtection: true,
-		},
-	}
-	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-		return err
-	}
-	o.Driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-	if err != nil {
-		return err
-	}
-	if driver, ok := driverMap[o.Driver]; ok {
-		o.Driver = driver
-	} else {
-		return fmt.Errorf("unsupported driver %s", o.Driver)
-	}
-
-	if o.Host == "" || o.Port == 0 {
+	if o.Host == "" && o.Port == 0 {
 		o.Host = host
 		o.Port = port
 	}
@@ -190,6 +184,29 @@ func (o *SysBenchOptions) Complete(args []string) error {
 
 func (o *SysBenchOptions) Validate() error {
 	if err := o.BaseValidate(); err != nil {
+		return err
+	}
+
+	var supported bool
+	for _, v := range sysbenchDriverMap {
+		if v == o.Driver {
+			supported = true
+			break
+		}
+	}
+	if !supported {
+		return fmt.Errorf("driver %s is not supported", o.Driver)
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
+	}
+
+	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
 		return err
 	}
 
@@ -233,19 +250,23 @@ func (o *SysBenchOptions) Run() error {
 			Namespace: o.namespace,
 		},
 		Spec: v1alpha1.SysbenchSpec{
-			Tables:    o.Tables,
-			Size:      o.Size,
-			Threads:   o.Threads,
-			Types:     o.Type,
-			Duration:  o.Duration,
-			ExtraArgs: o.ExtraArgs,
-			Target: v1alpha1.SysbenchTarget{
-				Driver:   o.Driver,
-				Host:     o.Host,
-				Port:     o.Port,
-				User:     o.User,
-				Password: o.Password,
-				Database: o.Database,
+			Tables:   o.Tables,
+			Size:     o.Size,
+			Threads:  o.Threads,
+			Types:    o.Type,
+			Duration: o.Duration,
+			BenchCommon: v1alpha1.BenchCommon{
+				ExtraArgs:   o.ExtraArgs,
+				Step:        o.Step,
+				Tolerations: o.Tolerations,
+				Target: v1alpha1.Target{
+					Driver:   o.Driver,
+					Host:     o.Host,
+					Port:     o.Port,
+					User:     o.User,
+					Password: o.Password,
+					Database: o.Database,
+				},
 			},
 		},
 	}

@@ -1,0 +1,25 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: foxlake-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "foxlake.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: foxlake
+  componentVersions:
+    - componentDefRef: foxlake-server
+      versionsContext:
+        containers:
+          - name: foxlake
+            image: {{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.foxlake.pullPolicy }}
+        initContainers:
+          - name: foxlake-gms-initializer
+            image: {{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.foxlake.pullPolicy }}
+    - componentDefRef: foxlake-metadb
+      versionsContext:
+        containers:
+          - name: mysql
+            image: {{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.mysql.pullPolicy }}

@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -59,12 +60,12 @@ func TestRedisInit(t *testing.T) {
 	defer r.Close()
 	// make sure operations are inited
 	assert.NotNil(t, r.client)
-	assert.NotNil(t, r.LegacyOperations[ListUsersOp])
-	assert.NotNil(t, r.LegacyOperations[CreateUserOp])
-	assert.NotNil(t, r.LegacyOperations[DeleteUserOp])
-	assert.NotNil(t, r.LegacyOperations[DescribeUserOp])
-	assert.NotNil(t, r.LegacyOperations[GrantUserRoleOp])
-	assert.NotNil(t, r.LegacyOperations[RevokeUserRoleOp])
+	assert.NotNil(t, r.OperationsMap[ListUsersOp])
+	assert.NotNil(t, r.OperationsMap[CreateUserOp])
+	assert.NotNil(t, r.OperationsMap[DeleteUserOp])
+	assert.NotNil(t, r.OperationsMap[DescribeUserOp])
+	assert.NotNil(t, r.OperationsMap[GrantUserRoleOp])
+	assert.NotNil(t, r.OperationsMap[RevokeUserRoleOp])
 }
 func TestRedisInvokeCreate(t *testing.T) {
 	r, mock := mockRedisOps(t)
@@ -559,6 +560,7 @@ func TestRedisAccounts(t *testing.T) {
 
 func mockRedisOps(t *testing.T) (*Redis, redismock.ClientMock) {
 	client, mock := redismock.NewClientMock()
+	viper.SetDefault("KB_ROLECHECK_DELAY", "0")
 
 	if client == nil || mock == nil {
 		t.Fatalf("failed to mock a redis client")

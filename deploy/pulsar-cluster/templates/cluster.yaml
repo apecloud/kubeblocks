@@ -101,6 +101,9 @@ spec:
           spec:
             accessModes:
               - ReadWriteOnce
+            {{- if .Values.bookies.persistence.data.storageClassName }}
+            storageClassName: {{ .Values.bookies.persistence.data.storageClassName}}
+            {{- end }}
             resources:
               requests:
                 storage: {{ .Values.bookies.persistence.data.size }}
@@ -108,6 +111,9 @@ spec:
           spec:
             accessModes:
               - ReadWriteOnce
+            {{- if .Values.bookies.persistence.log.storageClassName }}
+            storageClassName: {{ .Values.bookies.persistence.log.storageClassName}}
+            {{- end }}
             resources:
               requests:
                 storage: {{ .Values.bookies.persistence.log.size }}
@@ -135,6 +141,9 @@ spec:
           spec:
             accessModes:
               - ReadWriteOnce
+            {{- if .Values.zookeeper.persistence.data.storageClassName }}
+            storageClassName: {{ .Values.zookeeper.persistence.data.storageClassName}}
+            {{- end }}
             resources:
               requests:
                 storage: {{ .Values.zookeeper.persistence.data.size }}

@@ -227,8 +227,6 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
-	// add required
-	_ = cmd.MarkFlagRequired("cluster-definition")
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
 
@@ -354,6 +352,9 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 			" please check", backupCluster.Spec.ClusterVersionRef, o.ClusterVersionRef)
 	}
 
+	o.ClusterDefRef = curCluster.Spec.ClusterDefRef
+	o.ClusterVersionRef = curCluster.Spec.ClusterVersionRef
+
 	*cls = curCluster
 	return nil
 }
@@ -402,7 +403,8 @@ func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error
 	if err != nil {
 		return err
 	}
-	o.Annotations[constant.RestoreFromTimeAnnotationKey] = restoreTime.Format(time.RFC3339)
+	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
+	o.Annotations[constant.RestoreFromTimeAnnotationKey] = fmt.Sprintf(`{"%s":"%s"}`, components[0]["name"], restoreTime.Format(time.RFC3339))
 	o.Annotations[constant.RestoreFromSrcClusterAnnotationKey] = o.SourceCluster
 
 	return nil
@@ -581,7 +583,8 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		for _, setComp := range setsCompSpecs {
 			setsCompSpecsMap[setComp.Name] = setComp
 		}
-		for _, comp := range clusterCompSpecs {
+		for index := range clusterCompSpecs {
+			comp := clusterCompSpecs[index]
 			overrideComponentBySets(&comp, setsCompSpecsMap[comp.Name], compSets[comp.Name])
 			compSpecs = append(compSpecs, &comp)
 		}

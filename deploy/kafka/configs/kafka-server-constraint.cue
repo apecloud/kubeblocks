@@ -18,7 +18,7 @@
 // https://kafka.apache.org/documentation/#brokerconfigs
 #KafkaParameter: {
 
-	"allow.everyone.if.no.acl.found"?: bool & false | true
+	"allow.everyone.if.no.acl.found"?: bool
 
 	// The replication factor for the offsets topic (set higher to ensure availability). Internal topic creation will fail until the cluster size meets this replication factor requirement.
 	"offsets.topic.replication.factor"?: int & >=1 & <=32767
@@ -36,7 +36,7 @@
 	"transaction.state.log.min.isr"?: int & >=1
 
 	// Enables delete topic. Delete topic through the admin tool will have no effect if this config is turned off
-	"delete.topic.enable"?: bool & false | true
+	"delete.topic.enable"?: bool
 
 	// The largest record batch size allowed by Kafka
 	"message.max.bytes"?: int & >=0
@@ -70,9 +70,6 @@
 
 	// This is the maximum number of bytes in the log between the latest snapshot and the high-watermark needed before generating a new snapshot.
 	"metadata.log.max.record.bytes.between.snapshots"?: int & >=1
-
-	// This is the maximum number of milliseconds to wait to generate a snapshot if there are committed records in the log that are not included in the latest snapshot.
-	// "metadata.log.max.snapshot.interval.ms"?: int & >=0
 
 	// The length of time in milliseconds between broker heartbeats. Used when running in KRaft mode.
 	"broker.heartbeat.interval.ms"?: int
@@ -183,7 +180,7 @@
 	"log.cleaner.threads"?: int & >=0
 
 	// The log cleaner will be throttled so that the sum of its read and write i/o will be less than this value on average
-	"log.cleaner.io.max.bytes.per.second"?: int
+	"log.cleaner.io.max.bytes.per.second"?: number
 
 	// The total memory used for log deduplication across all cleaner threads
 	"log.cleaner.dedupe.buffer.size"?: int
@@ -192,16 +189,16 @@
 	"log.cleaner.io.buffer.size"?: int & >=0
 
 	// Log cleaner dedupe buffer load factor. The percentage full the dedupe buffer can become. A higher value will allow more log to be cleaned at once but will lead to more hash collisions
-	"log.cleaner.io.buffer.load.factor"?: int
+	"log.cleaner.io.buffer.load.factor"?: number
 
 	// The amount of time to sleep when there are no logs to clean
 	"log.cleaner.backoff.ms"?: int & >=0
 
 	// The minimum ratio of dirty log to total log for a log to eligible for cleaning.
-	"log.cleaner.min.cleanable.ratio"?: int & >=0 & <=1
+	"log.cleaner.min.cleanable.ratio"?: number & >=0 & <=1
 
 	// Enable the log cleaner process to run on the server.
-	"log.cleaner.enable"?: bool & false | true
+	"log.cleaner.enable"?: bool
 
 	// The amount of time to retain delete tombstone markers for log compacted topics.
 	"log.cleaner.delete.retention.ms"?: int & >=0
@@ -231,13 +228,13 @@
 	"log.flush.start.offset.checkpoint.interval.ms"?: int & >=0
 
 	// Should pre allocate file when create new segment? If you are using Kafka on Windows, you probably need to set it to true.
-	"log.preallocate"?: bool & false | true
+	"log.preallocate"?: bool
 
 	// The number of threads per data directory to be used for log recovery at startup and flushing at shutdown
 	"num.recovery.threads.per.data.dir"?: int & >=1
 
 	// Enable auto creation of topic on the server
-	"auto.create.topics.enable"?: bool & false | true
+	"auto.create.topics.enable"?: bool
 
 	// When a producer sets acks to "all" (or "-1"), min.insync.replicas specifies the minimum number of replicas that must acknowledge a write for the write to be considered successful.
 	// If this minimum cannot be met, then the producer will raise an exception (either NotEnoughReplicas or NotEnoughReplicasAfterAppend).
@@ -259,7 +256,7 @@
 	"alter.config.policy.class.name"?: string
 
 	// This configuration controls whether down-conversion of message formats is enabled to satisfy consume requests.
-	"log.message.downconversion.enable"?: bool & false | true
+	"log.message.downconversion.enable"?: bool
 
 	// The socket timeout for controller-to-broker channels
 	"controller.socket.timeout.ms"?: int
@@ -307,7 +304,7 @@
 	"delete.records.purgatory.purge.interval.requests"?: int
 
 	// Enables auto leader balancing.
-	"auto.leader.rebalance.enable"?: bool & false | true
+	"auto.leader.rebalance.enable"?: bool
 
 	// The ratio of leader imbalance allowed per broker.
 	"leader.imbalance.per.broker.percentage"?: int
@@ -316,7 +313,7 @@
 	"leader.imbalance.check.interval.seconds"?: int & >=1
 
 	// Indicates whether to enable replicas not in the ISR set to be elected as leader as a last resort, even though doing so may result in data loss
-	"unclean.leader.election.enable"?: bool & false | true
+	"unclean.leader.election.enable"?: bool
 
 	// Security protocol used to communicate between brokers.
 	"security.inter.broker.protocol"?: string & "PLAINTEXT" | "SSL" | "SASL_PLAINTEXT" | "SASL_SSL"
@@ -331,7 +328,7 @@
 	"controlled.shutdown.retry.backoff.ms"?: int
 
 	// Enable controlled shutdown of the server
-	"controlled.shutdown.enable"?: bool & false | true
+	"controlled.shutdown.enable"?: bool
 
 	// The minimum allowed session timeout for registered consumers.
 	"group.min.session.timeout.ms"?: int
@@ -552,10 +549,10 @@
 	"sasl.kerberos.kinit.cmd"?: string
 
 	// Login thread will sleep until the specified window factor of time from last refresh to ticket's expiry has been reached, at which time it will try to renew the ticket.
-	"sasl.kerberos.ticket.renew.window.factor"?: int
+	"sasl.kerberos.ticket.renew.window.factor"?: number
 
 	// Percentage of random jitter added to the renewal time.
-	"sasl.kerberos.ticket.renew.jitter"?: int
+	"sasl.kerberos.ticket.renew.jitter"?: number
 
 	// Login thread sleep time between refresh attempts.
 	"sasl.kerberos.min.time.before.relogin"?: int
@@ -564,10 +561,10 @@
 	"sasl.kerberos.principal.to.local.rules"?: string
 
 	// Login refresh thread will sleep until the specified window factor relative to the credential's lifetime has been reached, at which time it will try to refresh the credential. Legal values are between 0.5 (50%) and 1.0 (100%) inclusive; a default value of 0.8 (80%) is used if no value is specified. Currently applies only to OAUTHBEARER.
-	"sasl.login.refresh.window.factor"?: int & >=0.5 & <=1.0
+	"sasl.login.refresh.window.factor"?: number & >=0.5 & <=1.0
 
 	// The maximum amount of random jitter relative to the credential's lifetime that is added to the login refresh thread's sleep time.
-	"sasl.login.refresh.window.jitter"?: int & >=0.0 & <=0.25
+	"sasl.login.refresh.window.jitter"?: number & >=0.0 & <=0.25
 
 	// The desired minimum time for the login refresh thread to wait before refreshing a credential, in seconds.
 	"sasl.login.refresh.min.period.seconds"?: int & >=0 & <=900
@@ -668,6 +665,3 @@
 	// other parameters
 	...
 }
-
-// SectionName is section name
-[SectionName=_]: #KafkaParameter

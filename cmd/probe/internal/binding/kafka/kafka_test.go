@@ -41,7 +41,7 @@ func TestInit(t *testing.T) {
 
 	assert.Equal(t, "kafka", kafkaOps.DBType)
 	assert.NotNil(t, kafkaOps.InitIfNeed)
-	assert.NotNil(t, kafkaOps.LegacyOperations[CheckStatusOperation])
+	assert.NotNil(t, kafkaOps.OperationsMap[CheckStatusOperation])
 }
 
 func TestCheckStatusOps(t *testing.T) {

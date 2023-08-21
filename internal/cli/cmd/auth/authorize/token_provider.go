@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
@@ -56,40 +56,41 @@ func newTokenProvider(cached CachedTokenProvider, issued IssuedTokenProvider) Pr
 	}
 }
 
-func (p *TokenProvider) Login(ctx context.Context) (*authenticator.UserInfoResponse, error) {
+func (p *TokenProvider) Login(ctx context.Context) (*authenticator.UserInfoResponse, string, error) {
 	isAccessTokenValid := func(tokenResponse authenticator.TokenResponse) bool { return IsValidToken(tokenResponse.AccessToken) }
 	tokenResult, err := p.getTokenFromCache(isAccessTokenValid)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not refresh from cache")
+		return nil, "", errors.Wrap(err, "could not refresh from cache")
 	}
 
 	var userInfo *authenticator.UserInfoResponse
 	if tokenResult != nil {
 		userInfo, err = p.cached.getUserInfo()
 		if err != nil {
-			return nil, errors.Wrap(err, "could not get user info from cache")
+			return nil, "", errors.Wrap(err, "could not get user info from cache")
 		}
 	} else {
 		tokenResult, err = p.issued.authenticate(ctx)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not authenticate with cloud")
+			return nil, "", errors.Wrap(err, "could not authenticate with cloud")
 		}
 		userInfo, err = p.issued.getUserInfo(tokenResult.AccessToken)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not get user info from cloud")
+			return nil, "", errors.Wrap(err, "could not get user info from cloud")
 		}
 		err = p.cached.cacheUserInfo(userInfo)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not store user info")
+			return nil, "", errors.Wrap(err, "could not store user info")
 		}
 	}
 
 	err = p.cached.cacheTokens(tokenResult)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not cache tokens")
+		return nil, "", errors.Wrap(err, "could not cache tokens")
 	}
+	fmt.Println(tokenResult.IDToken)
 
-	return userInfo, nil
+	return userInfo, tokenResult.IDToken, nil
 }
 
 func (p *TokenProvider) Logout(ctx context.Context) error {

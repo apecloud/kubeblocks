@@ -1,0 +1,130 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: foxlake
+  labels:
+    {{- include "foxlake.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: "foxlake_root"
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_foxlake)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_foxlake)"
+    metaDbPasswd: "$(RANDOM_PASSWD)"
+  componentDefs:
+    - name: foxlake-server
+      workloadType: Stateless
+      characterType: foxlake
+      service:
+        ports:
+          - name: foxlake
+            targetPort: foxlake
+            port: 11288
+          - name: foxlake-coordinator
+            targetPort: mpp
+            port: 10030
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+          seccompProfile:
+            type: RuntimeDefault
+        initContainers:
+          - name: wait-mysql-ready
+            image: busybox:1.35
+            command: [ "sh" ]
+            args: [ "-c", 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z $(MYSQL_SERVICE_NAME) 3306; do sleep 1; printf "-"; done; echo -e "  >> MySQL Server has started";' ]
+            env:
+              - name: MYSQL_SERVICE_NAME
+                value: "{{ include "foxlake.metadb.fqdn" . }}"
+            resources:
+              limits:
+                cpu: "10m"
+                memory: "64Mi"
+          - name: foxlake-gms-initializer
+            env:
+              - name: initializeGms
+                value: "true"
+              {{- include "foxlake.env" . | nindent 14 }}
+            resources:
+              limits:
+                cpu: "100m"
+                memory: "1Gi"
+        containers:
+          - name: foxlake
+            ports:
+              - containerPort: 10030
+                name: mpp
+              - containerPort: 11288
+                name: foxlake
+            env:
+              {{- include "foxlake.env" . | nindent 14 }}
+      systemAccounts:
+        cmdExecutorConfig:
+          image: {{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
+          command:
+          - mysql
+          args:
+          - -u$(MYSQL_ROOT_USER)
+          - -p$(MYSQL_ROOT_PASSWORD)
+          - -h$(KB_ACCOUNT_ENDPOINT)
+          - -P$(SVC_PORT)
+          - -e
+          - "$(KB_ACCOUNT_STATEMENT)"
+          env:
+          - name: MYSQL_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: username
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: password
+          - name: SVC_PORT
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: port
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);
+    - name: foxlake-metadb
+      workloadType: Stateful
+      characterType: mysql
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+      podSpec:
+        containers:
+          - name: mysql
+            env:
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: metaDbPasswd
+            args:
+            - "--max_connections=2048"
+            - "--max_allowed_packet=1G"
+            - "--transaction-isolation=READ-COMMITTED"
+            ports:
+              - containerPort: 3306
+                name: mysql
+            volumeMounts:
+              - name: data
+                mountPath: /var/lib/mysql

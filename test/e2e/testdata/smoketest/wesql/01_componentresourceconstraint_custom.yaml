@@ -7,7 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: Helm
     resourceconstraint.kubeblocks.io/provider: kubeblocks
-  name: kb-resource-constraint-custom
+  name: kb-resource-constraint-e2e
 spec:
   rules:
     - cpu:
@@ -16,27 +16,4 @@ spec:
         step: "0.1"
       memory:
         sizePerCPU: 1Gi
-    - cpu:
-        max: 2
-        min: "0.1"
-        step: "0.1"
-      memory:
-        sizePerCPU: 2Gi
-    - cpu:
-        max: 2
-        min: "0.1"
-        step: "0.1"
-      memory:
-        sizePerCPU: 3Gi
-    - cpu:
-        max: 2
-        min: "0.1"
-        step: "0.1"
-      memory:
-        sizePerCPU: 4Gi
-    - cpu:
-        max: 2
-        min: "0.1"
-        step: "0.1"
-      memory:
-        sizePerCPU: 5Gi
+      name: e2e

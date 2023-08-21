@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package dcs
 
-import "github.com/spf13/viper"
+import (
+	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
+)
 
 type DCS interface {
 	Initialize() error
@@ -56,7 +60,8 @@ type DCS interface {
 var dcs DCS
 
 func init() {
-	viper.SetDefault("KB_TTL", 5)
+	viper.SetDefault(constant.KBEnvTTL, 5)
+	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
 
 func GetStore() DCS {

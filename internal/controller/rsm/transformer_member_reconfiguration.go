@@ -57,7 +57,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	// handle cluster initialization
 	// set initReplicas at creation
 	if rsm.Status.InitReplicas == 0 {
-		rsm.Status.InitReplicas = rsm.Spec.Replicas
+		rsm.Status.InitReplicas = *rsm.Spec.Replicas
 		return nil
 	}
 	// update readyInitReplicas
@@ -89,15 +89,15 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	// no enough replicas in scale out, tell sts to create them.
 	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
 	memberReadyReplicas := int32(len(rsm.Status.MembersStatus))
-	if memberReadyReplicas < rsm.Spec.Replicas &&
-		sts.Status.ReadyReplicas < rsm.Spec.Replicas {
+	if memberReadyReplicas < *rsm.Spec.Replicas &&
+		sts.Status.ReadyReplicas < *rsm.Spec.Replicas {
 		return nil
 	}
 
 	stsVertex.Immutable = true
 
 	// barrier: the underlying sts is ready and has enough replicas
-	if sts.Status.ReadyReplicas < rsm.Spec.Replicas || !isStatefulSetReady(sts) {
+	if sts.Status.ReadyReplicas < *rsm.Spec.Replicas || !isStatefulSetReady(sts) {
 		return nil
 	}
 
@@ -142,10 +142,10 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 // 2. all members have role set
 func isRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	membersStatus := rsm.Status.MembersStatus
-	if len(membersStatus) != int(rsm.Spec.Replicas) {
+	if len(membersStatus) != int(*rsm.Spec.Replicas) {
 		return false
 	}
-	for i := 0; i < int(rsm.Spec.Replicas); i++ {
+	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
 		podName := getPodName(rsm.Name, i)
 		if !isMemberReady(podName, membersStatus) {
 			return false
@@ -251,19 +251,19 @@ func generateActionInfoList(rsm *workloads.ReplicatedStateMachine) []*actionInfo
 	memberReadyReplicas := int32(len(rsm.Status.MembersStatus))
 
 	switch {
-	case memberReadyReplicas < rsm.Spec.Replicas:
+	case memberReadyReplicas < *rsm.Spec.Replicas:
 		// member join
 		// members with ordinal less than 'spec.replicas' should in the active cluster
 		actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
-		for i := memberReadyReplicas; i < rsm.Spec.Replicas; i++ {
+		for i := memberReadyReplicas; i < *rsm.Spec.Replicas; i++ {
 			actionInfos := generateActionInfos(rsm, int(i), actionTypeList)
 			actionInfoList = append(actionInfoList, actionInfos...)
 		}
-	case memberReadyReplicas > rsm.Spec.Replicas:
+	case memberReadyReplicas > *rsm.Spec.Replicas:
 		// member leave
 		// members with ordinal greater than 'spec.replicas - 1' should not in the active cluster
 		actionTypeList := []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
-		for i := memberReadyReplicas - 1; i >= rsm.Spec.Replicas; i-- {
+		for i := memberReadyReplicas - 1; i >= *rsm.Spec.Replicas; i-- {
 			actionInfos := generateActionInfos(rsm, int(i), actionTypeList)
 			actionInfoList = append(actionInfoList, actionInfos...)
 		}
@@ -278,7 +278,7 @@ func isPreAction(actionType string) bool {
 
 func shouldHaveActions(rsm *workloads.ReplicatedStateMachine) bool {
 	currentReplicas := len(rsm.Status.MembersStatus)
-	expectedReplicas := int(rsm.Spec.Replicas)
+	expectedReplicas := int(*rsm.Spec.Replicas)
 
 	var actionTypeList []string
 	switch {

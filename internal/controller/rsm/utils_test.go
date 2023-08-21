@@ -39,7 +39,10 @@ var _ = Describe("utils test", func() {
 	var priorityMap map[string]int
 
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).SetRoles(roles).GetObject()
+		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			SetService(corev1.ServiceSpec{}).
+			SetRoles(roles).
+			GetObject()
 		priorityMap = composeRolePriorityMap(*rsm)
 	})
 
@@ -140,7 +143,8 @@ var _ = Describe("utils test", func() {
 					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
 				},
 			}
-			rsm.Spec.Replicas = 3
+			replicas := int32(3)
+			rsm.Spec.Replicas = &replicas
 			rsm.Status.MembersStatus = oldMembersStatus
 			setMembersStatus(rsm, pods)
 
@@ -165,8 +169,8 @@ var _ = Describe("utils test", func() {
 	Context("getPodsOfStatefulSet function", func() {
 		It("should work well", func() {
 			sts := builder.NewStatefulSetBuilder(namespace, name).
-				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
-				AddLabels(constant.AppInstanceLabelKey, name).
+				AddMatchLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+				AddMatchLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
 				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).

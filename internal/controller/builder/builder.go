@@ -652,8 +652,18 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi"},
 			},
 		}
-		// TODO(free6om): config the following actions
 	case "mongodb":
+		return []workloads.Action{
+			{
+				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/mongo:5.0.14",
+				Command: []string{
+					"Status=$(mongosh -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --quiet --eval \"JSON.stringify(rs.status())\") &&",
+					"MyState=$(echo $Status | jq '.myState') &&",
+					"echo $Status | jq \".members[] | select(.state == ($MyState | tonumber)) | .stateStr\" |tr '[:upper:]' '[:lower:]' | xargs echo -n",
+				},
+			},
+		}
+		// TODO(free6om): config the following actions
 	case "etcd":
 	case "redis":
 	case "kafka":

@@ -198,4 +198,12 @@ resources:
   kind: Restore
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: monitor
+  kind: OTeld
+  path: github.com/apecloud/kubeblocks/apis/monitor/v1alpha1
+  version: v1alpha1
 version: "3"

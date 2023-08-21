@@ -675,9 +675,16 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				},
 			},
 		}
-		// TODO(free6om): config the following actions
 	case "redis":
-	case "kafka":
+		return []workloads.Action{
+			{
+				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8",
+				Command: []string{
+					"Role=$(redis-cli --user $KB_RSM_USERNAME --pass $KB_RSM_PASSWORD --no-auth-warning info | grep role | awk -F ':' '{print $2}' | tr '[:upper:]' '[:lower:]' | tr -d '\r' | tr -d '\n') &&",
+					"if [ \"master\" = \"$Role\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi",
+				},
+			},
+		}
 	}
 	return nil
 }

@@ -663,8 +663,19 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				},
 			},
 		}
-		// TODO(free6om): config the following actions
 	case "etcd":
+		return []workloads.Action{
+			{
+				Image: "quay.io/coreos/etcd:v3.5.6",
+				Command: []string{
+					"Status=$(etcdctl --endpoints=127.0.0.1:2379 endpoint status -w simple --command-timeout=300ms --dial-timeout=100m) &&",
+					"IsLeader=$(echo $Status | awk -F ', ' '{print $5}') &&",
+					"IsLearner=$(echo $Status | awk -F ', ' '{print $6}') &&",
+					"if [ \"true\" = \"$IsLeader\" ]; then echo -n \"leader\"; elif [ \"true\" = \"$IsLearner\" ]; then echo -n \"learner\"; else echo -n \"follower\"; fi",
+				},
+			},
+		}
+		// TODO(free6om): config the following actions
 	case "redis":
 	case "kafka":
 	}

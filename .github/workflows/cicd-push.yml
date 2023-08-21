@@ -225,7 +225,7 @@ jobs:
     uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.12
     with:
       MAKE_OPS: "bump-chart-ver"
-      VERSION: "v0.6.0-check"
+      VERSION: "v0.7.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       APECD_REF: "v0.1.12"

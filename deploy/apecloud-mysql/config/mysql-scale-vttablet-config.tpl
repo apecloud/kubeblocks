@@ -10,3 +10,12 @@ table_acl_config=
 queryserver_config_strict_table_acl=false
 table_acl_config_reload_interval=30s
 enforce_tableacl_config=false
+
+# OltpReadPool
+queryserver-config-pool-size=30
+
+# OlapReadPool
+queryserver-config-stream-pool-size=30
+
+# TxPool
+queryserver-config-transaction-cap=50

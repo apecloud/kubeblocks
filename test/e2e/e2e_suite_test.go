@@ -100,12 +100,12 @@ func GetKubeconfigContext() error {
 var _ = BeforeSuite(func() {
 	if len(version) == 0 {
 		log.Println("kubeblocks version is not specified")
-		return
 	}
 	log.Println("kb version:" + version)
 	Version = version
 	InitEnv = initEnv
 	TestType = testType
+	log.Println("TestType is ：" + TestType)
 	TestResults = make([]Result, 0)
 	if len(provider) > 0 && len(region) > 0 && len(secretID) > 0 && len(secretKey) > 0 {
 		Provider = provider
@@ -169,7 +169,7 @@ var _ = Describe("e2e test", func() {
 
 	var kubeblocks string
 
-	if initEnv == false {
+	if initEnv == false && len(version) > 0 {
 		It("check kbcli exist or not-exist", func() {
 			kbcli := e2eutil.CheckCommand("kbcli", "/usr/local/bin")
 			Expect(kbcli).Should(BeTrue())

@@ -6,7 +6,7 @@ nameOverride: ""
 fullnameOverride: ""
 clusterVersionOverride: ""
 
-clusterDomain: "cluster.local"
+clusterDomain: ".cluster.local"
 
 ## @param application images
 ##

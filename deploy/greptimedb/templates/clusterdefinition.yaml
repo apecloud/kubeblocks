@@ -8,9 +8,9 @@ spec:
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-greptimedb)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
     host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_tcp-greptimedb)"
+    port: "$(SVC_PORT_tcp-mysql)"
     accesskey: ""
     secretkey: ""
   componentDefs:
@@ -71,7 +71,7 @@ spec:
                 path: /health
                 port: 4000
                 scheme: HTTP
-              initialDelaySeconds: 60
+              initialDelaySeconds: 30
               periodSeconds: 10
               successThreshold: 1
               timeoutSeconds: 3
@@ -84,7 +84,7 @@ spec:
               - frontend
               - start
               - --metasrv-addr
-              - $(GREPTIMEDB_META_SVC)-headless.$(KB_NAMESPACE).svc.{{ .Values.clusterDomain }}:3002
+              - $(GREPTIMEDB_META_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:3002
               - --http-addr
               - 0.0.0.0:4000
               - --grpc-addr
@@ -110,6 +110,8 @@ spec:
                 containerPort: 4242
         serviceAccountName: greptimedb-cluster
         terminationGracePeriodSeconds: 10
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
         volumes:
           - configMap:
               defaultMode: 420
@@ -159,7 +161,7 @@ spec:
                 path: /health
                 port: 4000
                 scheme: HTTP
-              initialDelaySeconds: 30
+              initialDelaySeconds: 20
               periodSeconds: 10
               successThreshold: 1
               timeoutSeconds: 3
@@ -179,11 +181,12 @@ spec:
               - datanode
               - start
               - --metasrv-addr
-              - $(GREPTIMEDB_META_SVC)-headless.$(KB_NAMESPACE).svc.{{ .Values.clusterDomain }}:3002
+              - $(GREPTIMEDB_META_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:3002
               - --http-addr
               - 0.0.0.0:4000
               - --config-file
               - /etc/greptimedb/config.toml
+        dnsPolicy: ClusterFirst
         initContainers:
           - name: initializer
             args:
@@ -291,11 +294,13 @@ spec:
               - --server-addr
               - $(KB_POD_IP):3002
               - --store-addr
-              - $(GREPTIMEDB_ETCD_SVC).$(KB_NAMESPACE).svc.{{ .Values.clusterDomain }}:2379
+              - $(GREPTIMEDB_ETCD_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:2379
               - --config-file
               - /etc/greptimedb/config.toml
         serviceAccountName: greptimedb-cluster
         terminationGracePeriodSeconds: 10
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
         volumes:
           - configMap:
               defaultMode: 420
@@ -348,7 +353,7 @@ spec:
               - |
                 echo "start etcd..."
                 PEERS=""
-                DOMAIN=$KB_NAMESPACE".svc.{{ .Values.clusterDomain }}"
+                DOMAIN=$KB_NAMESPACE".svc{{ .Values.clusterDomain }}"
                 i=0
                 while [ $i -lt $KB_REPLICA_COUNT ]; do
                 	if [ $i -ne 0 ]; then
@@ -360,7 +365,7 @@ spec:
                 	PEERS="$PEERS$hostname=http://$host:2380"
                   i=$(( i + 1 ))
                 done
-                MY_PEER=$KB_POD_FQDN.{{ .Values.clusterDomain }}
+                MY_PEER=$KB_POD_FQDN{{ .Values.clusterDomain }}
                 exec etcd --name ${HOSTNAME} \
                 --listen-peer-urls http://0.0.0.0:2380 \
                 --listen-client-urls http://0.0.0.0:2379 \

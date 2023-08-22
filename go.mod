@@ -62,6 +62,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.8
 	github.com/opencontainers/image-spec v1.1.0-rc2
+	github.com/pashagolub/pgxmock/v2 v2.11.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus-community/pro-bing v0.3.0
@@ -330,7 +331,6 @@ require (
 	github.com/opencontainers/selinux v1.10.2 // indirect
 	github.com/openzipkin/zipkin-go v0.4.1 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f // indirect
-	github.com/pashagolub/pgxmock/v2 v2.11.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.17 // indirect

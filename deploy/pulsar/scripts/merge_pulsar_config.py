@@ -34,7 +34,7 @@ def update_config_file(file, updated_keys, updated_lines):
         updated_line = updated_lines[updated_keys[key]].strip()
         if key not in keys:
             print('[%s] Adding config: %s' % (file, updated_line))
-            lines.append('%s\n' % updated_line)
+            lines.append('\n%s\n' % updated_line)
         else:
             print('[%s] Updating config %s' % (file, updated_line))
             lines[keys[key]] = '%s\n' % updated_line

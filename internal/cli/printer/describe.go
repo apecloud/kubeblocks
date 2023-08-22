@@ -28,6 +28,7 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -144,4 +145,26 @@ func addRows(key string, value interface{}, p *TablePrinter, ori bool) {
 		data, _ := json.Marshal(value)
 		p.AddRow(key, string(data))
 	}
+}
+
+func PrettyPrintObj(obj *unstructured.Unstructured) error {
+	objYAML, err := yaml.Marshal(obj.Object)
+	if err != nil {
+		return err
+	}
+
+	// Parse YAML back into a structured map for pretty printing
+	var parsedObj map[string]interface{}
+	if err := yaml.Unmarshal(objYAML, &parsedObj); err != nil {
+		return err
+	}
+
+	// Marshal again with indentation for pretty printing
+	prettyYAML, err := yaml.Marshal(parsedObj)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(prettyYAML))
+	return nil
 }

@@ -4,7 +4,7 @@ description: A Pulsar Cluster Helm chart for KubeBlocks.
 
 type: application
 
-version: 0.6.0-alpha.28
+version: 0.7.0-alpha.0
 
 appVersion: 2.11.2
 

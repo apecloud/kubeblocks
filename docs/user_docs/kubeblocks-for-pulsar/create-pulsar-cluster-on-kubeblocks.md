@@ -111,10 +111,9 @@ Configuration:
     ```
     You can specify the storage name `<sc name>` .
 
-3. After performing `helm install`, you can check the cluster connection credentials with the output Notes, or you can check them with `helm get notes <cluster-name>`.
-4. Verify the cluster created.
+3. Verify the cluster created.
 
-```
-kubectl get cluster pulsar
-```
-When the status is Running, the cluster is created successfully.
+    ```
+    kubectl get cluster pulsar
+    ```
+    When the status is Running, the cluster is created successfully.

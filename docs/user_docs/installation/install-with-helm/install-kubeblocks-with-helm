@@ -9,6 +9,11 @@ sidebar_label: Install KubeBlocks
 # Install KubeBlocks with Helm
 
 KubeBlocks is kubernetes-native, you can use Helm to install it.
+:::note:
+If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
+
+:::
+
 
 ## Environment preparation
 
@@ -57,18 +62,6 @@ helm install kubeblocks kubeblocks/kubeblocks \
     --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
 ```
 
-**Use YAML to install KubeBlocks**
-
-If you prefer to not use Helm, you can generate YAMLs from KubeBlocks chart and install it with `kubectl`. 
-
-```bash
-helm repo add kubeblocks https://apecloud.github.io/helm-charts
-helm repo update
-helm template kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespaces | kubectl apply -f -
-```
-
-
 ## Verify KubeBlocks Installation
 
 Run the following command to check whether KubeBlocks is installed successfully.
@@ -81,3 +74,9 @@ kubeblocks-846b8878d9-q8g2w                              1/1     Running     0  
 ```
 
 If the operator pods are all `Running`, KubeBlocks has been installed successfully. You can cancel the above command by typing `Ctrl+C`.
+
+:::note:
+
+Clusters installed through `helm` need to be deleted using `helm` to avoid resource residue.
+
+:::

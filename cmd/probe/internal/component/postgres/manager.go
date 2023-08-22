@@ -40,6 +40,7 @@ type Manager struct {
 	Pool         PgxPoolIFace
 	Proc         *process.Process
 	syncStandbys *PGStandby
+	memberAddrs  []string
 	isLeader     bool
 	workLoadType string
 }
@@ -100,10 +101,11 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	return true
 }
 
+// GetDBState will refresh db completely refreshed with each loop
 func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
 	switch mgr.workLoadType {
 	case Consensus:
-		return nil
+		return mgr.GetDBStateConsensus(ctx, cluster)
 	case Replication:
 		return mgr.GetDBStateReplication(ctx, cluster)
 	default:

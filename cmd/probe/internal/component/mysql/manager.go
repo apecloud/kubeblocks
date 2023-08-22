@@ -302,27 +302,26 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 
 func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
 	mgr.DBState = nil
-	db := mgr.DB
 
-	globalState, err := mgr.GetGlobalState(ctx, db)
+	globalState, err := mgr.GetGlobalState(ctx, mgr.DB)
 	if err != nil {
 		mgr.Logger.Infof("select global failed: %v", err)
 		return nil
 	}
 
-	masterStatus, err := mgr.GetMasterStatus(ctx, db)
+	masterStatus, err := mgr.GetMasterStatus(ctx, mgr.DB)
 	if err != nil {
 		mgr.Logger.Infof("show master status failed: %v", err)
 		return nil
 	}
 
-	slaveStatus, err := mgr.GetSlaveStatus(ctx, db)
+	slaveStatus, err := mgr.GetSlaveStatus(ctx, mgr.DB)
 	if err != nil {
 		mgr.Logger.Infof("show slave status failed: %v", err)
 		return nil
 	}
 
-	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
+	opTimestamp, err := mgr.GetOpTimestamp(ctx, mgr.DB)
 	if err != nil {
 		mgr.Logger.Infof("get op timestamp failed: %v", err)
 		return nil

@@ -34,6 +34,30 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
+func (mgr *Manager) GetDBStateConsensus(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	mgr.DBState = nil
+	dbState := &dcs.DBState{
+		Extra: map[string]string{},
+	}
+
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err != nil {
+		mgr.Logger.Errorf("check is leader failed, err:%v", err)
+		return nil
+	}
+	mgr.isLeader = isLeader
+
+	memberAddrs := mgr.GetMemberAddrsConsensus(cluster)
+	if memberAddrs == nil {
+		mgr.Logger.Errorf("get member addr failed")
+		return nil
+	}
+	mgr.memberAddrs = memberAddrs
+
+	mgr.DBState = dbState
+	return dbState
+}
+
 func (mgr *Manager) IsConsensusReadyUp(ctx context.Context) bool {
 	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus_monitor';`
 	resp, err := mgr.Query(ctx, sql)
@@ -124,6 +148,10 @@ func (mgr *Manager) GetMemberRoleWithHostConsensus(ctx context.Context, host str
 }
 
 func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
+	if mgr.DBState != nil && mgr.memberAddrs != nil {
+		return mgr.memberAddrs
+	}
+
 	ctx := context.TODO()
 	sql := `select ip_port from consensus_cluster_status;`
 

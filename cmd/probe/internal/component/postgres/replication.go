@@ -39,7 +39,6 @@ import (
 )
 
 func (mgr *Manager) GetDBStateReplication(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
-	// db state needs to be completely refreshed with each loop
 	mgr.DBState = nil
 	dbState := &dcs.DBState{
 		Extra: map[string]string{},

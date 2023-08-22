@@ -138,6 +138,16 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
+func (cli *OperationClient) JoinMember() error {
+	// TODO: implement
+	return nil
+}
+
+func (cli *OperationClient) LeaveMember() error {
+	// TODO: implement
+	return nil
+}
+
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
 	ch := make(chan *OperationResult, 1)
 	go cli.InvokeComponent(ctxWithReconcileTimeout, req, ch)

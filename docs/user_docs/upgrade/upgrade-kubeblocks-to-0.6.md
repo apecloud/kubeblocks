@@ -1,10 +1,20 @@
+---
+title: Upgrade to KubeBlocks v0.6
+description: Upgrade to KubeBlocks, operation, tips and notes
+keywords: [upgrade, prepull images, feature changes between 0.5 and 0.6]
+sidebar_position: 1
+sidebar_label: Upgrade to KubeBlocks v0.6
+---
+
+
 # Upgrade to KubeBlocks v0.6
 
-This chapter shows notes and tips for you to upgrade KubeBlocks from version 0.5 to version 0.6.
+This chapter shows how to upgrade to the KubeBlocks 0.6, including notes and tips.
 
 ## Before upgrading
 
-### Pull image 
+### Pull images 
+
  KubeBlocks version 0.6 has many image changes from version 0.5. During upgrading, if there are many database instances in the cluster, the instance may be unavailable for a long time if images are pulled at the same time. It is recommended to pull the images required for version 0.6 in advance before upgrading.
  ***Steps***
  1. Write the following content to a `yaml` file.
@@ -243,7 +253,10 @@ In the cluster definition, add following content to enable full disk lock functi
         - highWatermark: 85
             name: data
     ```
+:::note:
+The recommended value of `highWatermark` is 90.
 
+:::
 
 ### Backup and restore
 

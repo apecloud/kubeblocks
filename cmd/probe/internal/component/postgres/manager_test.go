@@ -38,6 +38,9 @@ func mockDatabase(t *testing.T, workloadType string) (*Manager, pgxmock.PgxPoolI
 	viper.Set(PGDATA, "test")
 	viper.Set(constant.KBEnvWorkloadType, workloadType)
 	mock, err := pgxmock.NewPool(pgxmock.MonitorPingsOption(true))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	manager, err := NewManager(logger.NewLogger("test"))
 	if err != nil {

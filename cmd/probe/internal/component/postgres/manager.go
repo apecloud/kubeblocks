@@ -169,6 +169,18 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 	return mgr.IsMemberHealthy(ctx, cluster, cluster.GetMemberWithName(mgr.CurrentMemberName))
 }
 
+func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
+	switch mgr.workLoadType {
+	case Consensus:
+		return false, 0
+	case Replication:
+		return mgr.IsMemberLaggingReplication(ctx, cluster, member)
+	default:
+		mgr.Logger.Errorf("check current member healthy failed, err:%v", InvalidWorkLoadType)
+		return false, 0
+	}
+}
+
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	switch mgr.workLoadType {
 	case Consensus:

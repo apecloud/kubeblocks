@@ -235,13 +235,13 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 	return true
 }
 
-func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
 	var db *sql.DB
 	var err error
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
 		mgr.Logger.Warnf("No leader DBstate info")
-		return false
+		return false, 0
 	}
 	leaderDBState = cluster.Leader.DBState
 
@@ -250,23 +250,25 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
 			mgr.Logger.Infof("Get Member conn failed: %v", err)
-			return false
+			return false, 0
 		}
 		if db != nil {
 			defer db.Close()
 		}
+	} else {
+		db = mgr.DB
 	}
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
 	if err != nil {
 		mgr.Logger.Infof("get op timestamp failed: %v", err)
-		return false
+		return false, 0
 	}
 
 	if leaderDBState.OpTimestamp-opTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
-		return false
+		return false, 0
 	}
 	mgr.Logger.Warnf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-opTimestamp)
-	return true
+	return true, leaderDBState.OpTimestamp - opTimestamp
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {

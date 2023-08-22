@@ -22,11 +22,11 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cast"
 	"math"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 

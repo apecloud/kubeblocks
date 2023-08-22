@@ -260,6 +260,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 
 func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool {
 	currentMemberName := ha.dbManager.GetCurrentMemberName()
+	currentMember := cluster.GetMemberWithName(currentMemberName)
 	if cluster.Switchover != nil {
 		switchover := cluster.Switchover
 		leader := switchover.Leader
@@ -286,8 +287,22 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 		return false
 	}
 
-	currentMember := cluster.GetMemberWithName(currentMemberName)
-	return !ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)
+	isCurrentLagging, currentLag := ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)
+	if !isCurrentLagging {
+		return true
+	}
+
+	for _, member := range cluster.Members {
+		if member.Name != currentMemberName {
+			isLagging, lag := ha.dbManager.IsMemberLagging(ctx, cluster, &member)
+			// There are other members with smaller lag
+			if !isLagging || lag < currentLag {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (ha *Ha) HasOtherHealthyMember(cluster *dcs.Cluster) bool {
@@ -307,8 +322,10 @@ func (ha *Ha) HasOtherHealthyMember(cluster *dcs.Cluster) bool {
 	}
 
 	for _, other := range otherMembers {
-		if ha.dbManager.IsMemberHealthy(ha.ctx, cluster, other) && !ha.dbManager.IsMemberLagging(ha.ctx, cluster, other) {
-			return true
+		if ha.dbManager.IsMemberHealthy(ha.ctx, cluster, other) {
+			if isLagging, _ := ha.dbManager.IsMemberLagging(ha.ctx, cluster, other); !isLagging {
+				return true
+			}
 		}
 	}
 

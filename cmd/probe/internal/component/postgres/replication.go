@@ -134,15 +134,23 @@ func (mgr *Manager) IsMemberHealthyReplication(ctx context.Context, cluster *dcs
 		return false
 	}
 
-	//walPosition, _ := mgr.getWalPositionWithHost(ctx, host)
-	//if mgr.isLagging(walPosition, cluster) {
-	//	mgr.Logger.Infof("my wal position exceeds max lag")
-	//	return false
-	//}
-	//
-	//// TODO: check timeLine
-
 	return true
+}
+
+func (mgr *Manager) IsMemberLaggingReplication(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
+	if cluster.Leader == nil || cluster.Leader.DBState == nil {
+		mgr.Logger.Warnf("No leader DBState info")
+		return false, 0
+	}
+
+	walPosition, err := mgr.getWalPositionWithHost(ctx, cluster.GetMemberAddr(*member))
+	if err != nil {
+		mgr.Logger.Errorf("check member lagging failed, err:%v", err)
+	}
+
+	// TODO: check timeLine
+
+	return cluster.Leader.DBState.OpTimestamp-walPosition > cluster.HaConfig.GetMaxLagOnSwitchover(), cluster.Leader.DBState.OpTimestamp - walPosition
 }
 
 // Typically, the synchronous_commit parameter remains consistent between the primary and standby
@@ -234,11 +242,6 @@ func (mgr *Manager) getLsnWithHost(ctx context.Context, types string, host strin
 	}
 
 	return cast.ToInt64(resMap[0]["pg_wal_lsn_diff"]), nil
-}
-
-func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
-	lag := cluster.Leader.DBState.OpTimestamp - walPosition
-	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
 // only the leader has this information.

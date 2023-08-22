@@ -23,17 +23,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
-	"unicode"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -41,53 +38,81 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
-func (mgr *Manager) GetMemberStateWithPoolReplication(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+func (mgr *Manager) GetDBStateReplication(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	// db state needs to be completely refreshed with each loop
+	mgr.DBState = nil
+	dbState := &dcs.DBState{
+		Extra: map[string]string{},
+	}
+
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err != nil {
+		mgr.Logger.Errorf("check is leader failed, err:%v", err)
+		return nil
+	}
+	mgr.isLeader = isLeader
+
+	replicationMode, err := mgr.getReplicationMode(ctx)
+	if err != nil {
+		mgr.Logger.Errorf("get replication mode failed, err:%v", err)
+		return nil
+	}
+	dbState.Extra[ReplicationMode] = replicationMode
+
+	if replicationMode == synchronous && cluster.Leader != nil && cluster.Leader.Name == mgr.CurrentMemberName {
+		syncStandbys := mgr.getSyncStandbys(ctx)
+		if syncStandbys != nil {
+			mgr.syncStandbys = syncStandbys
+			dbState.Extra[SyncStandBys] = strings.Join(syncStandbys.Members.ToSlice(), ",")
+		}
+	}
+
+	walPosition, err := mgr.getWalPositionWithHost(ctx, "")
+	if err != nil {
+		mgr.Logger.Errorf("get wal position failed, err:%v", err)
+		return nil
+	}
+	dbState.Extra[WalPosition] = strconv.FormatInt(walPosition, 10)
+
+	timeLine := mgr.getReceivedTimeLine(ctx)
+	if timeLine != 0 {
+		mgr.Logger.Errorf("get received timeLine failed, err:%v", err)
+		return nil
+	}
+	dbState.Extra[ReceivedTimeLine] = strconv.FormatInt(timeLine, 10)
+
+	mgr.DBState = dbState
+	return mgr.DBState
+}
+
+func (mgr *Manager) GetMemberRoleWithHostReplication(ctx context.Context, host string) (string, error) {
 	sql := "select pg_is_in_recovery();"
 
-	var rows pgx.Rows
-	var err error
-	if pool != nil {
-		rows, err = pool.Query(ctx, sql)
-		defer pool.Close()
-	} else {
-		rows, err = mgr.Pool.Query(ctx, sql)
-	}
+	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil {
-		mgr.Logger.Infof("error executing %s: %v", sql, err)
-		return "", errors.Wrapf(err, "error executing %s", sql)
+		mgr.Logger.Errorf("get member role failed, err: %v", err)
+		return "", err
 	}
 
-	var isRecovery bool
-	var isReady bool
-	for rows.Next() {
-		if err = rows.Scan(&isRecovery); err != nil {
-			mgr.Logger.Errorf("Role query error: %v", err)
-			return "", err
-		}
-		isReady = true
+	result, err := parseQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse member role failed, err:%v", err)
+		return "", err
 	}
-	if isRecovery {
+
+	if cast.ToString(result[0]["pg_is_in_recovery"]) == "t" {
 		return binding.SECONDARY, nil
-	}
-	if isReady {
+	} else {
 		return binding.PRIMARY, nil
 	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (mgr *Manager) IsMemberHealthyReplication(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	pools := []*pgxpool.Pool{nil}
-	var err error
-
+	var host string
 	if member.Name != mgr.CurrentMemberName {
-		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
-		if err != nil || pools[0] == nil {
-			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
-			return false
-		}
+		host = cluster.GetMemberAddr(*member)
 	}
 
-	// Typically, the synchronous_commit parameter remains consistent between the primary and standby
 	replicationMode, err := mgr.getReplicationMode(ctx)
 	if err != nil {
 		mgr.Logger.Errorf("get db replication mode failed, err:%v", err)
@@ -95,34 +120,49 @@ func (mgr *Manager) IsMemberHealthyReplication(ctx context.Context, cluster *dcs
 	}
 
 	if replicationMode == synchronous {
-		if !mgr.checkStandbySynchronizedToLeader(ctx, member.Name, true, cluster) {
+		if !mgr.checkStandbySynchronizedToLeader(true, cluster) {
 			return false
 		}
 	}
 
-	walPosition, _ := mgr.getWalPositionWithPool(ctx, pools[0])
-	if mgr.isLagging(walPosition, cluster) {
-		mgr.Logger.Infof("my wal position exceeds max lag")
+	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
+		if !mgr.writeCheck(ctx, host) {
+			return false
+		}
+	}
+	if !mgr.readCheck(ctx, host) {
 		return false
 	}
 
-	// TODO: check timeLine
+	//walPosition, _ := mgr.getWalPositionWithHost(ctx, host)
+	//if mgr.isLagging(walPosition, cluster) {
+	//	mgr.Logger.Infof("my wal position exceeds max lag")
+	//	return false
+	//}
+	//
+	//// TODO: check timeLine
 
 	return true
 }
 
+// Typically, the synchronous_commit parameter remains consistent between the primary and standby
 func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
-	sql := "select pg_catalog.current_setting('synchronous_commit');"
+	if mgr.DBState != nil && mgr.DBState.Extra[ReplicationMode] != "" {
+		return mgr.DBState.Extra[ReplicationMode], nil
+	}
 
+	sql := "select pg_catalog.current_setting('synchronous_commit');"
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
 		return "", err
 	}
 
-	mode := strings.TrimFunc(strings.Split(string(resp), ":")[1], func(r rune) bool {
-		return !unicode.IsLetter(r)
-	})
-	switch mode {
+	resMap, err := parseQuery(string(resp))
+	if err != nil {
+		return "", errors.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+	}
+
+	switch cast.ToString(resMap[0]["current_setting"]) {
 	case "off":
 		return asynchronous, nil
 	case "local":
@@ -138,21 +178,30 @@ func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
 	}
 }
 
-func (mgr *Manager) getWalPositionWithPool(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
+func (mgr *Manager) getWalPositionWithHost(ctx context.Context, host string) (int64, error) {
+	if mgr.DBState != nil && mgr.DBState.Extra[WalPosition] != "" {
+		return strconv.ParseInt(mgr.DBState.Extra[WalPosition], 10, 64)
+	}
+
 	var (
 		lsn      int64
 		isLeader bool
 		err      error
 	)
 
-	if isLeader, err = mgr.IsLeaderWithPool(ctx, pool); isLeader && err == nil {
-		lsn, err = mgr.getLsnWithPool(ctx, "current", pool)
+	if host == "" {
+		isLeader = mgr.isLeader
+	} else {
+		isLeader, err = mgr.CheckMemberIsLeader(ctx, host)
+	}
+	if isLeader && err == nil {
+		lsn, err = mgr.getLsnWithHost(ctx, "current", host)
 		if err != nil {
 			return 0, err
 		}
 	} else {
-		replayLsn, errReplay := mgr.getLsnWithPool(ctx, "replay", pool)
-		receiveLsn, errReceive := mgr.getLsnWithPool(ctx, "receive", pool)
+		replayLsn, errReplay := mgr.getLsnWithHost(ctx, "replay", host)
+		receiveLsn, errReceive := mgr.getLsnWithHost(ctx, "receive", host)
 		if errReplay != nil && errReceive != nil {
 			return 0, errors.Errorf("get replayLsn or receiveLsn failed, replayLsn err:%v, receiveLsn err:%v", errReplay, errReceive)
 		}
@@ -162,7 +211,7 @@ func (mgr *Manager) getWalPositionWithPool(ctx context.Context, pool *pgxpool.Po
 	return lsn, nil
 }
 
-func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxpool.Pool) (int64, error) {
+func (mgr *Manager) getLsnWithHost(ctx context.Context, types string, host string) (int64, error) {
 	var sql string
 	switch types {
 	case "current":
@@ -173,21 +222,18 @@ func (mgr *Manager) getLsnWithPool(ctx context.Context, types string, pool *pgxp
 		sql = "select pg_catalog.pg_wal_lsn_diff(COALESCE(pg_catalog.pg_last_wal_receive_lsn(), '0/0'), '0/0')::bigint;"
 	}
 
-	resp, err := mgr.QueryWithPool(ctx, sql, pool)
+	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil {
 		mgr.Logger.Errorf("get wal position failed, err:%v", err)
 		return 0, err
 	}
-	lsnStr := strings.TrimFunc(string(resp), func(r rune) bool {
-		return !unicode.IsDigit(r)
-	})
 
-	lsn, err := strconv.ParseInt(lsnStr, 10, 64)
+	resMap, err := parseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("convert lsnStr to lsn failed, err:%v", err)
+		return 0, errors.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 	}
 
-	return lsn, nil
+	return cast.ToInt64(resMap[0]["pg_wal_lsn_diff"]), nil
 }
 
 func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
@@ -195,23 +241,41 @@ func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
-// TODO: restore the sync state to cluster coz these values only exist in primary
-func (mgr *Manager) checkStandbySynchronizedToLeader(ctx context.Context, memberName string, isLeader bool, cluster *dcs.Cluster) bool {
+// only the leader has this information.
+func (mgr *Manager) getSyncStandbys(ctx context.Context) *PGStandby {
+	if mgr.syncStandbys != nil {
+		return mgr.syncStandbys
+	}
+
 	sql := "select pg_catalog.current_setting('synchronous_standby_names');"
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s, err:%v", sql, err)
-		return false
+		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		return nil
 	}
-	standbyNames := strings.Split(strings.Split(string(resp), ":")[1], `"`)[1]
 
-	syncStandbys, err := parsePGSyncStandby(standbyNames)
+	resMap, err := parseQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		return nil
+	}
+
+	syncStandbys, err := parsePGSyncStandby(cast.ToString(resMap[0]["current_setting"]))
 	if err != nil {
 		mgr.Logger.Errorf("parse pg sync standby failed, err:%v", err)
+		return nil
+	}
+	return syncStandbys
+}
+
+func (mgr *Manager) checkStandbySynchronizedToLeader(checkLeader bool, cluster *dcs.Cluster) bool {
+	if cluster.Leader == nil || cluster.Leader.DBState == nil {
 		return false
 	}
+	syncStandBysStr := cluster.Leader.DBState.Extra[SyncStandBys]
+	syncStandBys := strings.Split(syncStandBysStr, ",")
 
-	return (isLeader && memberName == cluster.Leader.Name) || syncStandbys.Members.Contains(memberName) || syncStandbys.HasStar
+	return (checkLeader && mgr.CurrentMemberName == cluster.Leader.Name) || slices.Contains(syncStandBys, mgr.CurrentMemberName)
 }
 
 func (mgr *Manager) handleRewind(ctx context.Context, cluster *dcs.Cluster) error {
@@ -236,17 +300,8 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		return false
 	}
 
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*cluster.GetLeaderMember())})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
-		return false
-	}
-
-	role, err := mgr.GetMemberStateWithPool(ctx, pools[0])
-	if err != nil {
-		return false
-	}
-	if role != binding.PRIMARY {
+	isLeader, err := mgr.CheckMemberIsLeader(ctx, cluster.GetMemberAddr(*cluster.GetLeaderMember()))
+	if err != nil || !isLeader {
 		mgr.Logger.Warnf("Leader is still in recovery and can't rewind")
 		return false
 	}
@@ -318,7 +373,7 @@ func (mgr *Manager) getLocalTimeLineAndLsn(ctx context.Context) (bool, int64, in
 
 	inRecovery = true
 	timeLine := mgr.getReceivedTimeLine(ctx)
-	lsn, _ := mgr.getLsnWithPool(ctx, "replay", nil)
+	lsn, _ := mgr.getLsnWithHost(ctx, "replay", "")
 
 	return inRecovery, timeLine, lsn
 }
@@ -350,6 +405,10 @@ func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64)
 }
 
 func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
+	if mgr.DBState != nil && mgr.DBState.Extra[ReceivedTimeLine] != "" {
+		return cast.ToInt64(mgr.DBState.Extra[ReceivedTimeLine])
+	}
+
 	sql := "select case when latest_end_lsn is null then null " +
 		"else received_tli end as received_tli from pg_catalog.pg_stat_get_wal_receiver();"
 
@@ -359,7 +418,13 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
 		return 0
 	}
 
-	return int64(binary.BigEndian.Uint64(resp))
+	resMap, err := parseQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		return 0
+	}
+
+	return cast.ToInt64(resMap[0]["received_tli"])
 }
 
 func (mgr *Manager) getPgControlData() *map[string]string {
@@ -388,7 +453,7 @@ func (mgr *Manager) getPgControlData() *map[string]string {
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {
-	_, err := os.Stat("postgresql/data/standby.signal")
+	_, err := os.Stat(mgr.DataDir + "/standby.signal")
 	if os.IsNotExist(err) {
 		return true, true
 	}
@@ -398,7 +463,7 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 		return true, true
 	}
 
-	if strings.Split(primaryInfo["host"], ".")[0] != leaderName {
+	if strings.HasPrefix(primaryInfo["host"], leaderName) {
 		mgr.Logger.Warnf("host not match, need to reload")
 		return true, false
 	}
@@ -413,15 +478,14 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) map[string]string {
 		mgr.Logger.Errorf("get primary conn info failed, err:%v", err)
 		return nil
 	}
-	result, err := parseSingleQuery(string(resp))
+
+	resMap, err := parseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query failed, err:%v", err)
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 		return nil
 	}
-	primaryInfoStr := result["setting"].(string)
-	primaryInfo := parsePrimaryConnInfo(primaryInfoStr)
 
-	return primaryInfo
+	return parsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))
 }
 
 // TODO: Parse history file
@@ -462,14 +526,10 @@ func (mgr *Manager) postPromote() error {
 	return nil
 }
 
-func (mgr *Manager) DemoteReplication() error {
-	isLeader, err := mgr.IsLeader(context.TODO(), nil)
-	if !isLeader && err == nil {
+func (mgr *Manager) DemoteReplication(ctx context.Context) error {
+	if isLeader, err := mgr.IsLeader(ctx, nil); !isLeader && err == nil {
 		mgr.Logger.Infof("i am not the leader, don't need to demote")
 		return nil
-	} else if err != nil {
-		mgr.Logger.Errorf("check is leader failed, err:%v", err)
-		return err
 	}
 
 	return mgr.Stop()

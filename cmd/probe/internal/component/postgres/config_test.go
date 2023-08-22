@@ -25,6 +25,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func newMockConfig(t *testing.T) *Config {
+	properties := map[string]string{
+		connectionURLKey: "user=test password=test host=localhost port=5432 dbname=postgres",
+	}
+	mockConfig, err := NewConfig(properties)
+	if err != nil {
+		t.Fatal("new mock config failed")
+		return nil
+	}
+
+	return mockConfig
+}
+
 func TestGetPostgresqlMetadata(t *testing.T) {
 	t.Run("With defaults", func(t *testing.T) {
 		properties := map[string]string{

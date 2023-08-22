@@ -45,17 +45,19 @@ type DBManager interface {
 
 	// IsClusterHealthy is only for consensus cluster healthy check.
 	// For Replication cluster IsClusterHealthy will always return true,
-	// and its cluster's healthty is equal to leader member's heathly.
+	// and its cluster's healthy is equal to leader member's healthy.
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 
 	// Member healthy check
+	// IsMemberHealthy focuses on the database's read and write capabilities.
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
 	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
+	// IsMemberLagging focuses on the latency between the leader and standby
 	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) bool
 
-	// GetDBState will get all the required database kernel states in one HA loop,
-	// and we believe that the state of the database kernel remains unchanged within a single HA loop.
-	GetDBState(context.Context, *dcs.Cluster, *dcs.Member) *dcs.DBState
+	// GetDBState will get most required database kernel states of current member in one HA loop to Avoiding duplicate queries and conserve I/O.
+	// We believe that the states of database kernel remains unchanged within a single HA loop.
+	GetDBState(context.Context, *dcs.Cluster) *dcs.DBState
 
 	// HasOtherHealthyLeader is applicable only to consensus cluster,
 	// where the db's internal role services as the source of truth.
@@ -102,6 +104,8 @@ type DBManager interface {
 	Unlock(context.Context) error
 
 	GetLogger() logger.Logger
+
+	ShutDownWithWait()
 }
 
 var managers = make(map[string]DBManager)
@@ -149,8 +153,8 @@ func (mgr *DBManagerBase) IsMemberLagging(ctx context.Context, cluster *dcs.Clus
 	return false
 }
 
-func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
-	// mgr.DBState = mgr.GetDBState(ctx, cluster, member)
+func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	// mgr.DBState = DBState
 	return nil
 }
 
@@ -188,6 +192,10 @@ func (mgr *DBManagerBase) Stop() error {
 		return err
 	}
 	return nil
+}
+
+func (mgr *DBManagerBase) ShutDownWithWait() {
+	mgr.Logger.Infof("override me if need")
 }
 
 func RegisterManager(characterType string, manager DBManager) {

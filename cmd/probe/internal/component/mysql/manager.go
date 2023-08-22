@@ -226,35 +226,46 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	mgr.DBState = nil
 	// _, _ = mgr.EnsureServerID(ctx)
 	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
 	if !mgr.IsMemberHealthy(ctx, cluster, member) {
 		return false
 	}
 
-	mgr.DBState = mgr.GetDBState(ctx, cluster, member)
-	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
-		cluster.Leader.DBState = mgr.DBState
-	}
 	return true
 }
 
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	var db *sql.DB
+	var err error
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
 		mgr.Logger.Warnf("No leader DBstate info")
 		return false
 	}
 	leaderDBState = cluster.Leader.DBState
-	dbState := mgr.GetDBState(ctx, cluster, member)
-	if dbState == nil {
+
+	if member != nil && member.Name != mgr.CurrentMemberName {
+		addr := cluster.GetMemberAddrWithPort(*member)
+		db, err = config.GetDBConnWithAddr(addr)
+		if err != nil {
+			mgr.Logger.Infof("Get Member conn failed: %v", err)
+			return false
+		}
+		if db != nil {
+			defer db.Close()
+		}
+	}
+	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
+	if err != nil {
+		mgr.Logger.Infof("get op timestamp failed: %v", err)
 		return false
 	}
-	if leaderDBState.OpTimestamp-dbState.OpTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
+
+	if leaderDBState.OpTimestamp-opTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
 		return false
 	}
-	mgr.Logger.Warnf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-dbState.OpTimestamp)
+	mgr.Logger.Warnf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-opTimestamp)
 	return true
 }
 
@@ -287,27 +298,9 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	return true
 }
 
-func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
-	var db *sql.DB
-	var err error
-	var isCurrentMember bool
-	var memberName string
-	if member != nil && member.Name != mgr.CurrentMemberName {
-		memberName = member.Name
-		addr := cluster.GetMemberAddrWithPort(*member)
-		db, err = config.GetDBConnWithAddr(addr)
-		if err != nil {
-			mgr.Logger.Infof("Get Member conn failed: %v", err)
-			return nil
-		}
-		if db != nil {
-			defer db.Close()
-		}
-	} else {
-		memberName = mgr.CurrentMemberName
-		isCurrentMember = true
-		db = mgr.DB
-	}
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	mgr.DBState = nil
+	db := mgr.DB
 
 	globalState, err := mgr.GetGlobalState(ctx, db)
 	if err != nil {
@@ -341,7 +334,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 		dbState.Extra[k] = v
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name == memberName {
+	if cluster.Leader != nil && cluster.Leader.Name == mgr.CurrentMemberName {
 		dbState.Extra["Binlog_File"] = masterStatus.GetString("File")
 		dbState.Extra["Binlog_Pos"] = masterStatus.GetString("Pos")
 	} else {
@@ -357,12 +350,12 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster, member
 		dbState.Extra["Exec_Master_Log_Pos"] = slaveStatus.GetString("Exec_Master_Log_Pos")
 	}
 
-	if isCurrentMember {
-		mgr.globalState = globalState
-		mgr.masterStatus = masterStatus
-		mgr.slaveStatus = slaveStatus
-		mgr.opTimestamp = opTimestamp
-	}
+	mgr.globalState = globalState
+	mgr.masterStatus = masterStatus
+	mgr.slaveStatus = slaveStatus
+	mgr.opTimestamp = opTimestamp
+	mgr.DBState = dbState
+
 	return dbState
 }
 

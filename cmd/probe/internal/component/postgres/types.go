@@ -21,13 +21,16 @@ package postgres
 
 import (
 	"bufio"
-	"encoding/json"
+	"context"
 	"os"
 	"strconv"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/dlclark/regexp2"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 )
@@ -38,9 +41,14 @@ var (
 )
 
 const (
-	ReplicationMode = "replication_mode"
-	SyncStandBys    = "sync_standbys"
-	WalPosition     = "wal_position"
+	PGDATA = "PGDATA"
+)
+
+const (
+	ReplicationMode  = "replication_mode"
+	SyncStandBys     = "sync_standbys"
+	WalPosition      = "wal_position"
+	ReceivedTimeLine = "received_timeline"
 )
 
 const (
@@ -63,6 +71,22 @@ const (
 	priority         = "priority"
 	off              = "off"
 )
+
+type PgxIFace interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
+	QueryRow(context.Context, string, ...interface{}) pgx.Row
+	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
+	Ping(ctx context.Context) error
+	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
+}
+
+// PgxPoolIFace is interface representing pgx pool
+type PgxPoolIFace interface {
+	PgxIFace
+	Acquire(ctx context.Context) (*pgxpool.Conn, error)
+	Close()
+}
 
 type PidFile struct {
 	pid     int32
@@ -263,21 +287,6 @@ func parsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
-func parseSingleQuery(str string) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
-	str = strings.Trim(str, "[]")
-	if str == "" {
-		return result, nil
-	}
-
-	err := json.Unmarshal([]byte(str), &result)
-	if err != nil {
-		return nil, errors.Errorf("json unmarshal failed, err:%v", err)
-	}
-
-	return result, nil
-}
-
 func parsePrimaryConnInfo(str string) map[string]string {
 	infos := strings.Split(str, " ")
 	result := make(map[string]string)
@@ -290,15 +299,4 @@ func parsePrimaryConnInfo(str string) map[string]string {
 	}
 
 	return result
-}
-
-func parseQuery(str string) ([]map[string]string, error) {
-	var result []map[string]string
-
-	err := json.Unmarshal([]byte(str), &result)
-	if err != nil {
-		return nil, errors.Errorf("json unmarshal failed, err:%v", err)
-	}
-
-	return result, nil
 }

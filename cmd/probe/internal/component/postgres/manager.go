@@ -21,12 +21,8 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/dapr/kit/logger"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/v3/process"
@@ -36,12 +32,15 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type Manager struct {
 	component.DBManagerBase
-	Pool         *pgxpool.Pool
+	Pool         PgxPoolIFace
 	Proc         *process.Process
+	syncStandbys *PGStandby
+	isLeader     bool
 	workLoadType string
 }
 
@@ -55,141 +54,30 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 
 	Mgr = &Manager{
 		DBManagerBase: component.DBManagerBase{
-			CurrentMemberName: viper.GetString("KB_POD_NAME"),
-			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
-			Namespace:         viper.GetString("KB_NAMESPACE"),
+			CurrentMemberName: viper.GetString(constant.KBEnvPodName),
+			ClusterCompName:   viper.GetString(constant.KBEnvClusterCompName),
+			Namespace:         viper.GetString(constant.KBEnvNamespace),
 			Logger:            logger,
-			DataDir:           viper.GetString("PGDATA"),
+			DataDir:           viper.GetString(PGDATA),
 		},
 		Pool:         pool,
-		workLoadType: viper.GetString("KB_WORKLOAD_TYPE"),
+		workLoadType: viper.GetString(constant.KBEnvWorkloadType),
 	}
 
 	component.RegisterManager("postgresql", Mgr)
 	return Mgr, nil
 }
 
-func (mgr *Manager) newProcessFromPidFile() error {
-	pidFile, err := readPidFile(mgr.DataDir)
-	if err != nil {
-		mgr.Logger.Errorf("read pid file failed, err:%v", err)
-		return errors.Wrap(err, "read pid file")
+// GetMemberRoleWithHost get specified member's role with its connection
+func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
+	switch mgr.workLoadType {
+	case Consensus:
+		return mgr.GetMemberRoleWithHostConsensus(ctx, host)
+	case Replication:
+		return mgr.GetMemberRoleWithHostReplication(ctx, host)
+	default:
+		return "", InvalidWorkLoadType
 	}
-
-	proc, err := process.NewProcess(pidFile.pid)
-	if err != nil {
-		mgr.Logger.Errorf("new process failed, err:%v", err)
-		return err
-	}
-
-	mgr.Proc = proc
-	return nil
-}
-
-// Query is equivalent to QueryWithPool(ctx, sql, nil), query itself
-func (mgr *Manager) Query(ctx context.Context, sql string) (result []byte, err error) {
-	return mgr.QueryWithPool(ctx, sql, nil)
-}
-
-// QueryWithPool execute the query using the specified connection pool
-func (mgr *Manager) QueryWithPool(ctx context.Context, sql string, pool *pgxpool.Pool) (result []byte, err error) {
-	mgr.Logger.Debugf("query: %s", sql)
-
-	var rows pgx.Rows
-	if pool != nil {
-		rows, err = pool.Query(ctx, sql)
-		defer pool.Close()
-	} else {
-		rows, err = mgr.Pool.Query(ctx, sql)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error executing query: %w", err)
-	}
-	defer func() {
-		rows.Close()
-		_ = rows.Err()
-	}()
-
-	rs := make([]interface{}, 0)
-	columnTypes := rows.FieldDescriptions()
-	for rows.Next() {
-		values := make([]interface{}, len(columnTypes))
-		for i := range values {
-			values[i] = new(interface{})
-		}
-
-		if err = rows.Scan(values...); err != nil {
-			return nil, fmt.Errorf("error scanning row: %w", err)
-		}
-
-		r := map[string]interface{}{}
-		for i, ct := range columnTypes {
-			r[ct.Name] = values[i]
-		}
-		rs = append(rs, r)
-	}
-
-	if result, err = json.Marshal(rs); err != nil {
-		err = fmt.Errorf("error serializing results: %w", err)
-	}
-	return result, err
-}
-
-// Exec is equivalent to ExecWithPool(ctx, sql, nil), exec itself
-func (mgr *Manager) Exec(ctx context.Context, sql string) (result int64, err error) {
-	return mgr.ExecWithPool(ctx, sql, nil)
-}
-
-// ExecWithPool execute the exec using the specified connection pool
-func (mgr *Manager) ExecWithPool(ctx context.Context, sql string, pool *pgxpool.Pool) (result int64, err error) {
-	mgr.Logger.Debugf("exec: %s", sql)
-
-	var res pgconn.CommandTag
-	if pool != nil {
-		res, err = pool.Exec(ctx, sql)
-		defer pool.Close()
-	} else {
-		res, err = mgr.Pool.Exec(ctx, sql)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("error executing query: %w", err)
-	}
-
-	result = res.RowsAffected()
-
-	return
-}
-
-// QueryOthers execute query on other member's connection pool
-func (mgr *Manager) QueryOthers(ctx context.Context, sql string, memberHost string) (result []byte, err error) {
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{memberHost})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
-		return nil, errors.Errorf("get member:%s's pool failed, err:%v", memberHost, err)
-	}
-
-	return mgr.QueryWithPool(ctx, sql, pools[0])
-}
-
-// ExecOthers execute command on other member's connection pool
-func (mgr *Manager) ExecOthers(ctx context.Context, sql string, memberHost string) (result int64, err error) {
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{memberHost})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
-		return 0, errors.Errorf("get member:%s's pool failed, err:%v", memberHost, err)
-	}
-
-	return mgr.ExecWithPool(ctx, sql, pools[0])
-}
-
-func (mgr *Manager) IsPgReady(ctx context.Context) bool {
-	err := mgr.Pool.Ping(ctx)
-	if err != nil {
-		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
-		return false
-	}
-
-	return true
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -212,26 +100,29 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	return true
 }
 
-// GetMemberStateWithPool get specified member's role with its connection pool
-func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
 	switch mgr.workLoadType {
 	case Consensus:
-		return mgr.GetMemberStateWithPoolConsensus(ctx, pool)
+		return nil
 	case Replication:
-		return mgr.GetMemberStateWithPoolReplication(ctx, pool)
+		return mgr.GetDBStateReplication(ctx, cluster)
 	default:
-		return "", InvalidWorkLoadType
+		mgr.Logger.Errorf("get DB State failed, err:%v", InvalidWorkLoadType)
+		return nil
 	}
 }
 
-// IsLeader is equivalent to IsLeaderWithPool(ctx, nil), using its connection pool
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	return mgr.IsLeaderWithPool(ctx, nil)
+	if mgr.DBState != nil {
+		return mgr.isLeader, nil
+	}
+
+	return mgr.CheckMemberIsLeader(ctx, "")
 }
 
-// IsLeaderWithPool determines whether a specific member is the leader, using its connection pool
-func (mgr *Manager) IsLeaderWithPool(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
-	role, err := mgr.GetMemberStateWithPool(ctx, pool)
+// CheckMemberIsLeader determines whether a specific member is the leader, using its connection
+func (mgr *Manager) CheckMemberIsLeader(ctx context.Context, host string) (bool, error) {
+	role, err := mgr.GetMemberRoleWithHost(ctx, host)
 	if err != nil {
 		return false, errors.Wrap(err, "check is leader")
 	}
@@ -260,17 +151,6 @@ func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster)
 	default:
 		return InvalidWorkLoadType
 	}
-}
-
-func (mgr *Manager) IsRunning() bool {
-	if mgr.Proc != nil {
-		if isRunning, err := mgr.Proc.IsRunning(); isRunning && err == nil {
-			return true
-		}
-		mgr.Proc = nil
-	}
-
-	return mgr.newProcessFromPidFile() == nil
 }
 
 func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
@@ -353,13 +233,9 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 }
 
 func (mgr *Manager) Promote(ctx context.Context) error {
-	isLeader, err := mgr.IsLeader(ctx, nil)
-	if isLeader && err == nil {
+	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
 		mgr.Logger.Infof("i am already the leader, don't need to promote")
 		return nil
-	} else if err != nil {
-		mgr.Logger.Errorf("check is leader failed, err:%v", err)
-		return err
 	}
 
 	switch mgr.workLoadType {
@@ -372,14 +248,14 @@ func (mgr *Manager) Promote(ctx context.Context) error {
 	}
 }
 
-func (mgr *Manager) Demote(context.Context) error {
+func (mgr *Manager) Demote(ctx context.Context) error {
 	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
 
 	switch mgr.workLoadType {
 	case Consensus:
-		return mgr.DemoteConsensus()
+		return nil
 	case Replication:
-		return mgr.DemoteReplication()
+		return mgr.DemoteReplication(ctx)
 	default:
 		return InvalidWorkLoadType
 	}
@@ -388,7 +264,7 @@ func (mgr *Manager) Demote(context.Context) error {
 func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	switch mgr.workLoadType {
 	case Consensus:
-		return mgr.FollowConsensus()
+		return nil
 	case Replication:
 		return mgr.FollowReplication(ctx, cluster)
 	default:
@@ -402,33 +278,15 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 }
 
 func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-	isLeader, err := mgr.IsLeader(ctx, cluster)
-	if err == nil && isLeader {
-		// if current member is leader, just return
+	switch mgr.workLoadType {
+	case Consensus:
+		return mgr.HasOtherHealthyLeaderConsensus(ctx, cluster)
+	case Replication:
+		return nil
+	default:
+		mgr.Logger.Errorf("check other healthy leader failed, err:%v", InvalidWorkLoadType)
 		return nil
 	}
-
-	var hosts []string
-	for _, m := range cluster.Members {
-		if m.Name != mgr.CurrentMemberName {
-			hosts = append(hosts, cluster.GetMemberAddr(m))
-		}
-	}
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, hosts)
-	if err != nil {
-		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
-		return nil
-	}
-
-	for i, pool := range pools {
-		if pool != nil {
-			if isLeader, err = mgr.IsLeaderWithPool(ctx, pool); isLeader && err == nil {
-				return cluster.GetMemberWithHost(hosts[i])
-			}
-		}
-	}
-
-	return nil
 }
 
 func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
@@ -443,36 +301,8 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 	return members
 }
 
-func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) ([]*pgxpool.Pool, error) {
-	if len(hosts) == 0 {
-		return nil, errors.New("Get other pool without hosts")
-	}
-
-	resp := make([]*pgxpool.Pool, len(hosts))
-	for i, host := range hosts {
-		tempConfig, err := pgxpool.ParseConfig(config.GetConnectURLWithHost(host))
-		if err != nil {
-			return nil, errors.Wrap(err, "new temp config")
-		}
-
-		resp[i], err = pgxpool.NewWithConfig(ctx, tempConfig)
-		if err != nil {
-			mgr.Logger.Errorf("unable to ping the DB: %v, host:%s", err, host)
-			continue
-		}
-	}
-
-	return resp, nil
-}
-
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{cluster.GetMemberAddr(*member)})
-	if err != nil || pools[0] == nil {
-		mgr.Logger.Errorf("Get leader pools failed, err:%v", err)
-		return false, err
-	}
-
-	return mgr.IsLeaderWithPool(ctx, pools[0])
+	return mgr.CheckMemberIsLeader(ctx, cluster.GetMemberAddr(*member))
 }
 
 func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
@@ -481,48 +311,4 @@ func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
 
 func (mgr *Manager) CreateRoot(ctx context.Context) error {
 	return nil
-}
-
-func (mgr *Manager) Lock(ctx context.Context, reason string) error {
-	sql := "alter system set default_transaction_read_only=on;"
-
-	_, err := mgr.Exec(ctx, sql)
-	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
-		return err
-	}
-
-	if err = mgr.pgReload(ctx); err != nil {
-		mgr.Logger.Errorf("reload conf failed, err:%v", err)
-		return err
-	}
-
-	mgr.Logger.Infof("Lock db success: %s", reason)
-	return nil
-}
-
-func (mgr *Manager) Unlock(ctx context.Context) error {
-	sql := "alter system set default_transaction_read_only=off;"
-
-	_, err := mgr.Exec(ctx, sql)
-	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
-		return err
-	}
-
-	if err = mgr.pgReload(ctx); err != nil {
-		mgr.Logger.Errorf("reload conf failed, err:%v", err)
-		return err
-	}
-
-	mgr.Logger.Infof("UnLock db success")
-	return nil
-}
-
-func (mgr *Manager) pgReload(ctx context.Context) error {
-	reload := "select pg_reload_conf();"
-
-	_, err := mgr.Exec(ctx, reload)
-
-	return err
 }

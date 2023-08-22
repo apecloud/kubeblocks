@@ -80,7 +80,11 @@ func (ha *Ha) RunCycle() {
 		return
 	}
 
-	DBState := ha.dbManager.GetDBState(ha.ctx, cluster, nil)
+	DBState := ha.dbManager.GetDBState(ha.ctx, cluster)
+	// TODO: Is Reasonable?
+	if DBState == nil {
+		return
+	}
 	// store leader's db state in dcs
 	if cluster.Leader != nil && cluster.Leader.Name == ha.dbManager.GetCurrentMemberName() {
 		cluster.Leader.DBState = DBState
@@ -124,7 +128,7 @@ func (ha *Ha) RunCycle() {
 		if cluster.Switchover != nil {
 			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() ||
 				(cluster.Switchover.Candidate != "" && cluster.Switchover.Candidate != ha.dbManager.GetCurrentMemberName()) {
-				if ha.HasOtherHealthyMember(ha.ctx, cluster) {
+				if ha.HasOtherHealthyMember(cluster) {
 					_ = ha.dbManager.Demote(ha.ctx)
 					_ = ha.dcs.ReleaseLock()
 					break
@@ -286,7 +290,7 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 	return !ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)
 }
 
-func (ha *Ha) HasOtherHealthyMember(ctx context.Context, cluster *dcs.Cluster) bool {
+func (ha *Ha) HasOtherHealthyMember(cluster *dcs.Cluster) bool {
 	var otherMembers = make([]*dcs.Member, 0, 1)
 	if cluster.Switchover != nil && cluster.Switchover.Candidate != "" {
 		candidate := cluster.Switchover.Candidate
@@ -332,4 +336,5 @@ func (ha *Ha) IsPodReady() (bool, error) {
 }
 
 func (ha *Ha) ShutdownWithWait() {
+	ha.dbManager.ShutDownWithWait()
 }

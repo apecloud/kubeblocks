@@ -1,0 +1,106 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package postgres
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/pashagolub/pgxmock/v2"
+)
+
+func TestQuery(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := mockDatabase(t, "")
+	defer mock.Close()
+
+	t.Run("common query success", func(t *testing.T) {
+		sql := `select 1`
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"1"}))
+
+		_, err := manager.Query(ctx, sql)
+		if err != nil {
+			t.Errorf("expect query success, but failed, err:%v", err)
+		}
+
+		if err = mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+
+	t.Run("common query failed", func(t *testing.T) {
+		sql := `select 1`
+		mock.ExpectQuery("select").
+			WillReturnError(fmt.Errorf("some error"))
+
+		_, err := manager.Query(ctx, sql)
+		if err == nil {
+			t.Errorf("expect query failed, but success")
+		}
+
+		if err = mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+}
+
+func TestExec(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := mockDatabase(t, "")
+	defer mock.Close()
+
+	t.Run("common exec success", func(t *testing.T) {
+		sql := `create database test`
+
+		mock.ExpectBegin()
+		mock.ExpectExec("create database").
+			WillReturnResult(pgxmock.NewResult("CREATE DATABASE", 1))
+		mock.ExpectCommit()
+
+		_, err := manager.Exec(ctx, sql)
+		if err != nil {
+			t.Errorf("expect exec success, but failed, err:%v", err)
+		}
+
+		if err = mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+
+	t.Run("common exec failed", func(t *testing.T) {
+		sql := `create database test`
+
+		mock.ExpectBegin()
+		mock.ExpectExec("create database").
+			WillReturnError(fmt.Errorf("some error"))
+		mock.ExpectRollback()
+
+		_, err := manager.Exec(ctx, sql)
+		if err == nil {
+			t.Errorf("expect exec failed, but success")
+		}
+
+		if err = mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+}

@@ -21,7 +21,6 @@ resources:
 - bases/dataprotection.kubeblocks.io_restores.yaml
 - bases/apps.kubeblocks.io_configurations.yaml
 - bases/apps.kubeblocks.io_servicedescriptors.yaml
-- bases/monitor.kubeblocks.io_otelds.yaml
 - bases/monitor.kubeblocks.io_logsexportersinks.yaml
 - bases/monitor.kubeblocks.io_metricsexportersinks.yaml
 - bases/monitor.kubeblocks.io_collectordatasources.yaml
@@ -51,7 +50,6 @@ patchesStrategicMerge:
 #- patches/webhook_in_restores.yaml
 #- patches/webhook_in_configurations.yaml
 #- patches/webhook_in_servicedescriptors.yaml
-#- patches/webhook_in_otelds.yaml
 #- patches/webhook_in_logsexportersinks.yaml
 #- patches/webhook_in_metricsexportersinks.yaml
 #- patches/webhook_in_collectordatasources.yaml
@@ -80,7 +78,6 @@ patchesStrategicMerge:
 #- patches/cainjection_in_restores.yaml
 #- patches/cainjection_in_configurations.yaml
 #- patches/cainjection_in_servicedescriptors.yaml
-#- patches/cainjection_in_otelds.yaml
 #- patches/cainjection_in_logsexportersinks.yaml
 #- patches/cainjection_in_metricsexportersinks.yaml
 #- patches/cainjection_in_collectordatasources.yaml

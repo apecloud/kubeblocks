@@ -774,7 +774,7 @@ rules:
 - apiGroups:
   - monitor.kubeblocks.io
   resources:
-  - otelds
+  - collectordatasources
   verbs:
   - create
   - delete
@@ -786,13 +786,65 @@ rules:
 - apiGroups:
   - monitor.kubeblocks.io
   resources:
-  - otelds/finalizers
+  - collectordatasources/finalizers
   verbs:
   - update
 - apiGroups:
   - monitor.kubeblocks.io
   resources:
-  - otelds/status
+  - collectordatasources/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - logsexportersinks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - logsexportersinks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - logsexportersinks/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - metricsexportersinks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - metricsexportersinks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - monitor.kubeblocks.io
+  resources:
+  - metricsexportersinks/status
   verbs:
   - get
   - patch

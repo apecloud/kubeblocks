@@ -26,8 +26,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 )
 
 // OTeldReconciler reconciles a OTeld object
@@ -36,9 +34,15 @@ type OTeldReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=otelds,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=otelds/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=otelds/finalizers,verbs=update
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=collectordatasources,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=collectordatasources/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=collectordatasources/finalizers,verbs=update
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=logsexportersinks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=logsexportersinks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=logsexportersinks/finalizers,verbs=update
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=metricsexportersinks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=metricsexportersinks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=metricsexportersinks/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -60,6 +64,6 @@ func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 // SetupWithManager sets up the controller with the Manager.
 func (r *OTeldReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&monitorv1alpha1.OTeld{}).
+		// For(&monitorv1alpha1.OTeld{}).
 		Complete(r)
 }

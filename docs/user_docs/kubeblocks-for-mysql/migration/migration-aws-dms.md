@@ -215,11 +215,11 @@ Pay attention to the following potential issues during the migration task.
 
    Migration is a short-term behavior. To avoid unnecessary troubles, it is recommended not to perform DDL operations during the migration process.
 
-* binlog retention hours
+* BinLog retention hours
 
-   The incrementally migrating process of data transmission relies on the binlog of the source database.
+   The incrementally migrating process of data transmission relies on the BinLog of the source database.
 
-   It is recommended to extend the binlog retention hours to avoid a long-term interruption and the situation that the binlog of the source database is cleared during recovery, resulting in the migration not being resumed.
+   It is recommended to extend the BinLog retention hours to avoid a long-term interruption and the situation that the BinLog of the source database is cleared during recovery, resulting in the migration not being resumed.
 
    For example, in AWS RDS, connect to the database and run the command below:
 
@@ -228,7 +228,7 @@ Pay attention to the following potential issues during the migration task.
    # Input: 
    call mysql.rds_show_configuration;
 
-   # Output: Pay attention to the binlog retention hours.
+   # Output: Pay attention to the BinLog retention hours.
    +------------------------+-------+-----------------------------------------------------------------------------------------------------------+
    | name                   | value | description                                                                                               |
    +------------------------+-------+-----------------------------------------------------------------------------------------------------------+

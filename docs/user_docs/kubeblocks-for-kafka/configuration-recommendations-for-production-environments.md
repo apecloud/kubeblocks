@@ -3,9 +3,11 @@
 ## Java Heap
 
 Kafka Server's JVM Heap configuration, production environment can refer to the official recommended configuration:
-```
+
+```bash
 -Xmx6g -Xms6g -XX:MetaspaceSize=96m -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:G1HeapRegionSize=16M -XX:MinMetaspaceFreeRatio=50 -XX:MaxMetaspaceFreeRatio=80 -XX:+ExplicitGCInvokesConcurrent
 ```
+
 - Combined mode
     When creating a Kafka Cluster, specify the `--broker-heap` parameter.
 - Separated mode

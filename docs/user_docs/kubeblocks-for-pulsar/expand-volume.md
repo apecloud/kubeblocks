@@ -9,8 +9,6 @@ sidebar_label: Expand volume
 
 You can expand the storage volume size of each pod.
 
-
-
 ## Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
@@ -32,18 +30,22 @@ kbcli cluster list pulsar
     Expand volume for `journal` first. `Ledger` volume expansion must be performed after the `journal` volume expansion.
 
     :::
-  - Expand volume for `journal`.
-    ```bash
-    kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
-    ```
 
-    - `--components` describes the component name for volume expansion.
-    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-    - `--storage` describes the volume storage size.
-  - Expand volume for `ledger`.
-    ```
-    kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
-    ```
+   - Expand volume for `journal`.
+
+     ```bash
+     kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
+     ```
+
+     - `--components` describes the component name for volume expansion.
+     - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
+     - `--storage` describes the volume storage size.
+
+   - Expand volume for `ledger`.
+
+     ```bash
+     kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
+     ```
 
     **Option 2.** Create an OpsRequest
 
@@ -70,7 +72,7 @@ kbcli cluster list pulsar
 
     **Option 3.** Edit cluster with `kubectl`.
 
-    ```
+    ```bash
     kubectl edit cluster pulsar
     ```
 

@@ -6,9 +6,7 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
-# Scale for an Pulsar cluster
-
-
+# Scale for a Pulsar cluster
 
 ## Vertical scaling
 
@@ -16,7 +14,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 :::note
 
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
+During the vertical scaling process, all pods restart in the order of learner -> follower -> leader, and the leader pod may change after restarting.
 
 :::
 
@@ -48,40 +46,40 @@ kbcli cluster list pulsar
   
    Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
-   ```
-    kubectl create -f -<< EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      generateName: pulsar-vscale-
-    spec:
-      clusterRef: pulsar
-      type: VerticalScaling
-      verticalScaling:
-      - componentName: broker
-        requests:
-          memory: "10Gi"
-          cpu: 3
-        limits:
-          memory: "10Gi"
-          cpu: 3
-      - componentName: bookies
-        requests:
-          memory: "10Gi"
-          cpu: 3
-        limits:
-          memory: "10Gi"
-          cpu: 3      
-    EOF
+   ```bash
+   kubectl create -f -<< EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     generateName: pulsar-vscale-
+   spec:
+     clusterRef: pulsar
+     type: VerticalScaling
+     verticalScaling:
+     - componentName: broker
+       requests:
+         memory: "10Gi"
+         cpu: 3
+       limits:
+         memory: "10Gi"
+         cpu: 3
+     - componentName: bookies
+       requests:
+         memory: "10Gi"
+         cpu: 3
+       limits:
+         memory: "10Gi"
+         cpu: 3      
+   EOF
    ```
   
    **Option 3.** Edit Pulsar cluster with `kubectl`.
 
-   ```
+   ```bash
    kubectl edit cluster pulsar
    ```
   
-2. Check the cluste status to validate the vertical scaling.
+2. Check the cluster status to validate the vertical scaling.
 
     ```bash
     kbcli cluster list pulsar
@@ -107,8 +105,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 - It is recommended to keep 3 nodes without scaling for Zookeeper, and other components can scale horizontally for multiple or single components
 - The scaling of the Bookies node needs to be cautious. The data copy is related to the EnsembleSize, Write Quorum, and Ack Quorum configurations, scaling may cause data loss. Check [Pulsar official document](https://pulsar.apahe.org/docs/3.0.x/administration-zk-bk/#decommission-bookies-cleanly) for detailed information.
 
-
-
 ### Steps
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
@@ -128,48 +124,45 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
    Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
-    ```
-     kubectl create -f -<< EOF
+    ```bash
+    kubectl create -f -<< EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
-     generateName: pulsar-horizontalscaling-
+      generateName: pulsar-horizontalscaling-
     spec:
       clusterRef: pulsar
       type: HorizontalScaling  
       horizontalScaling:
-       - componentName: broker
-         replicas: 5
-       - componentName: bookies
-         replicas: 5
-     EOF
+      - componentName: broker
+        replicas: 5
+      - componentName: bookies
+        replicas: 5
+    EOF
     ```
 
    **Option 3.** Edit cluster with `kubectl`.
-   
-   ```kubectl edit cluster pulsar ```
-  
 
+   ```bash
+   kubectl edit cluster pulsar
+   ```
+  
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.
 
-  ```
-  kubectl get ops 
-  ```
-    
-    NAME                                   TYPE              CLUSTER   STATUS    PROGRESS   AGE
-    pulsar-horizontalscaling-9lfvc   HorizontalScaling  pulsar   Succeed   3/3        8m49s
-  
+   ```bash
+   kubectl get ops
+   >
+   NAME                             TYPE               CLUSTER   STATUS    PROGRESS   AGE
+   pulsar-horizontalscaling-9lfvc   HorizontalScaling  pulsar    Succeed   3/3        8m49s
+   ```
 
 3. Check whether the corresponding resources change.
 
-   
-    ```
-    kbcli cluster describe mysql-cluster
-    ```
-  
-
+   ```bash
+   kbcli cluster describe mysql-cluster
+   ```
 
 ### Handle the snapshot exception
 

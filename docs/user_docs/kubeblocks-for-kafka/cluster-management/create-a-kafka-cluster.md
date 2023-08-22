@@ -7,6 +7,7 @@ sidebar_label: Snapshot backup and restore
 ---
 
 # Create and connect to a kafka cluster
+
 This document shows how to create and connect to a kafka cluster.
 
 ## Before you start
@@ -67,97 +68,100 @@ See the table below for detailed descriptions of customizable parameters, settin
 | --monitor-enable=false                                                    | Enable monitor for Kafka.                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | --monitor-replicas=1                                                      | The number of Kafka monitor replicas.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | --sasl-enable=false                                                       | Enable authentication using SASL/PLAIN for Kafka. <br> -server: admin/kubeblocks <br> -client: client/kubeblocks  <br> built-in jaas file stores on /tools/client-ssl.properties                                                                                                                                                                                                                                                                  |
-<Tabs>
+</TabItem>
 
-<Tabs>
 <TabItem value="using kubectl" label="Using kubectl" default>
 
-
 * Create kafka cluster in combined mode.
-```
-# create kafka in combined mode 
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: kafka-combined
-  namespace: default
-spec:
-  affinity:
-    podAntiAffinity: Preferred
-    tenancy: SharedNode
-    topologyKeys:
-    - kubernetes.io/hostname
-  clusterDefinitionRef: kafka
-  clusterVersionRef: kafka-3.3.2
-  componentSpecs:
-  - componentDefRef: kafka-server
-    monitor: false
-    name: broker
-    noCreatePDB: false
-    replicas: 1
-    resources:
-      limits:
-        cpu: "0.5"
-        memory: 0.5Gi
-      requests:
-        cpu: "0.5"
-        memory: 0.5Gi
-    serviceAccountName: kb-kafka-sa
-  terminationPolicy: Delete
-EOF
-```
+
+    ```bash
+    # create kafka in combined mode 
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+      name: kafka-combined
+      namespace: default
+    spec:
+      affinity:
+        podAntiAffinity: Preferred
+        tenancy: SharedNode
+        topologyKeys:
+        - kubernetes.io/hostname
+      clusterDefinitionRef: kafka
+      clusterVersionRef: kafka-3.3.2
+      componentSpecs:
+      - componentDefRef: kafka-server
+        monitor: false
+        name: broker
+        noCreatePDB: false
+        replicas: 1
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 0.5Gi
+          requests:
+            cpu: "0.5"
+            memory: 0.5Gi
+        serviceAccountName: kb-kafka-sa
+      terminationPolicy: Delete
+    EOF
+    ```
+
 * Create kafka cluster in separated mode.
 
-```
-# Create kafka cluster in separated mode
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: kafka-separated
-  namespace: default
-spec:
-  affinity:
-    podAntiAffinity: Preferred
-    tenancy: SharedNode
-    topologyKeys:
-    - kubernetes.io/hostname
-  clusterDefinitionRef: kafka
-  clusterVersionRef: kafka-3.3.2
-  componentSpecs:
-  - componentDefRef: controller
-    monitor: false
-    name: controller
-    noCreatePDB: false
-    replicas: 1
-    resources:
-      limits:
-        cpu: "0.5"
-        memory: 0.5Gi
-      requests:
-        cpu: "0.5"
-        memory: 0.5Gi
-    serviceAccountName: kb-kafka-sa
-    tls: false
-  - componentDefRef: kafka-broker
-    monitor: false
-    name: broker
-    noCreatePDB: false
-    replicas: 1
-    resources:
-      limits:
-        cpu: "0.5"
-        memory: 0.5Gi
-      requests:
-        cpu: "0.5"
-        memory: 0.5Gi
-    serviceAccountName: kb-kafka-sa
-    tls: false
-  terminationPolicy: Delete
-EOF
-```
+    ```bash
+    # Create kafka cluster in separated mode
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+      name: kafka-separated
+      namespace: default
+    spec:
+      affinity:
+        podAntiAffinity: Preferred
+        tenancy: SharedNode
+        topologyKeys:
+        - kubernetes.io/hostname
+      clusterDefinitionRef: kafka
+      clusterVersionRef: kafka-3.3.2
+      componentSpecs:
+      - componentDefRef: controller
+        monitor: false
+        name: controller
+        noCreatePDB: false
+        replicas: 1
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 0.5Gi
+          requests:
+            cpu: "0.5"
+            memory: 0.5Gi
+        serviceAccountName: kb-kafka-sa
+        tls: false
+      - componentDefRef: kafka-broker
+        monitor: false
+        name: broker
+        noCreatePDB: false
+        replicas: 1
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 0.5Gi
+          requests:
+            cpu: "0.5"
+            memory: 0.5Gi
+        serviceAccountName: kb-kafka-sa
+        tls: false
+      terminationPolicy: Delete
+    EOF
+    ```
 
+</TabItem>
+
+</Tabs>
 
 ## Connect to a kafka Cluster
 

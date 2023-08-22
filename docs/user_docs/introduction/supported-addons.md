@@ -5,6 +5,7 @@ keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
 sidebar_position: 2
 sidebar_label: Supported add-ons 
 ---
+
 # Supported add-ons
 
 KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, providing management and control for relational databases, NoSQL databases, vector databases, and stream computing systems; and these databases can be all added as addons.
@@ -22,20 +23,24 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, providing
 | redis          | Redis is a fast, open source, in-memory, key-value data store.                                                                                                                                                    |
 | kafka          | Apache Kafka is an open-source distributed event streaming platform used by thousands of companies for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications. |
 
-
 To list supported add-ons, run `kbcli addon list` command.
+
 **To manually enable or disable add-ons**
+
 ***Steps:***
+
 1. To enable the add-on, use `kbcli addon enable`.
 
-***Example***
-    ```bash
-    kbcli addon enable snapshot-controller
-    ```
+   ***Example***
 
-    To disable the add-on, use `kbcli addon disable`.
+   ```bash
+   kbcli addon enable snapshot-controller
+   ```
+
+   To disable the add-on, use `kbcli addon disable`.
+
 2. List the add-ons again to check whether it is enabled.
 
-    ```bash
-    kbcli addon list
-    ```
+   ```bash
+   kbcli addon list
+   ```

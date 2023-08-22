@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 
 	corev1 "k8s.io/api/core/v1"
 

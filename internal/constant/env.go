@@ -37,4 +37,5 @@ const (
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceRoles    = "KB_SERVICE_ROLES"
 	KBEnvServicePort     = "KB_SERVICE_PORT"
+	KBEnvTTL             = "KB_TTL"
 )

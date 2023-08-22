@@ -244,7 +244,6 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	//}
 	//viper.Set("KB_RSM_ACTION_SVC_LIST", string(marshal))
 
-	addTokenEnv(roleChangedContainer)
 	//injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkrole", roleChangedContainer.Env)
 }
 
@@ -261,7 +260,6 @@ func buildStatusProbeContainer(characterType string, statusProbeContainer *corev
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
-	addTokenEnv(statusProbeContainer)
 }
 
 func buildRunningProbeContainer(characterType string, runningProbeContainer *corev1.Container,
@@ -277,7 +275,6 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
-	addTokenEnv(runningProbeContainer)
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
@@ -296,7 +293,6 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
 	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
 	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
-	addTokenEnv(c)
 }
 
 func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar {
@@ -308,15 +304,6 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 		Name:  constant.KBEnvVolumeProtectionSpec,
 		Value: string(value),
 	}
-}
-
-func addTokenEnv(container *corev1.Container) {
-	token := viper.GetString("PROBE_SERVICE_TOKEN")
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_PROBE_TOKEN",
-		Value:     token,
-		ValueFrom: nil,
-	})
 }
 
 func injectHttp2Shell(pod *corev1.PodSpec) {

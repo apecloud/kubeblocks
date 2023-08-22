@@ -159,6 +159,9 @@ A Command Line Interface for KubeBlocks`,
 
 			commandPath := cmd.CommandPath()
 			parts := strings.Split(commandPath, " ")
+			if len(parts) < 2 {
+				return nil
+			}
 			subCommand := parts[1]
 			if cloudCmds[subCommand] && !auth.IsLoggedIn() {
 				return fmt.Errorf("use 'kbcli login' to login first")

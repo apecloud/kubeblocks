@@ -22,7 +22,6 @@ package probe
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -30,7 +29,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -97,18 +95,6 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		uri := request.URL
 		method := request.Method
 
-		if method != http.MethodGet {
-			token := request.Header.Get(tokenKeyInHeader)
-			if token == "" {
-				handleTokenError(writer, "token missing... request refused!")
-				return
-			}
-			tokenInCluster := viper.GetString("KB_PROBE_TOKEN")
-			if tokenInCluster != "" && tokenInCluster != token {
-				handleTokenError(writer, fmt.Sprintf("token mismatch: %s is invalid.", token))
-			}
-		}
-
 		if method == http.MethodGet && strings.HasPrefix(uri.Path, bindingPath) {
 			request.Method = http.MethodPost
 
@@ -133,14 +119,5 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			// header has no statusCodeHeader
 			Logger.Info("response has no statusCodeHeader")
 		}
-	}
-}
-
-func handleTokenError(writer http.ResponseWriter, msg string) {
-	Logger.Info(msg)
-	writer.WriteHeader(http.StatusUnauthorized)
-	_, err := writer.Write([]byte(msg))
-	if err != nil {
-		Logger.Error(err, "error on write response body")
 	}
 }

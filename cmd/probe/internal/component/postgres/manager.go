@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package postgres
 
 import (
@@ -463,7 +482,7 @@ func (mgr *Manager) Stop() error {
 func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	if cluster.Leader == nil || cluster.Leader.Name == "" {
 		mgr.Logger.Info("no action coz cluster has no leader")
-		return mgr.Start()
+		return mgr.Start(cluster)
 	}
 
 	err := mgr.handleRewind(ctx, cluster)
@@ -733,23 +752,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	return mgr.Start()
-}
-
-func (mgr *Manager) Start() error {
-	mgr.Logger.Info("wait for send signal 2 to activate sql channel")
-	sqlChannelProc, err := component.GetSQLChannelProc()
-	if err != nil {
-		mgr.Logger.Error(err, "can't find sql channel process")
-		return errors.Errorf("can't find sql channel process, err:%v", err)
-	}
-
-	// activate sql channel restart db
-	err = sqlChannelProc.Signal(syscall.SIGUSR2)
-	if err != nil {
-		return errors.Errorf("send signal2 to sql channel failed, err:%v", err)
-	}
-	return nil
+	return mgr.Start(cluster)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
@@ -881,4 +884,8 @@ func (mgr *Manager) pgReload(ctx context.Context) error {
 	_, err := mgr.Exec(ctx, reload)
 
 	return err
+}
+
+func (mgr *Manager) ShutDownWithWait() {
+	mgr.Pool.Close()
 }

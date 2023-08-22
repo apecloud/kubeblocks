@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.6.0-alpha.0
+VERSION ?= 0.7.0-alpha.0
 GITHUB_PROXY ?=
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
@@ -599,6 +599,18 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
 	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) -C test/e2e run
+
+.PHONY: render-smoke-testdata-manifests-local
+render-smoke-testdata-manifests-local: ## Helm Install CD And CV
+	$(HELM) upgrade wesql deploy/apecloud-mysql
+	$(HELM) upgrade postgresql deploy/postgresql
+	$(HELM) upgrade mongodb deploy/mongodb
+	$(HELM) upgrade redis deploy/redis
+	$(HELM) upgrade pulsar deploy/pulsar
+
+.PHONY: test-e2e-local
+test-e2e-local: render-smoke-testdata-manifests-local helm-package render-smoke-testdata-manifests ## Run E2E tests on local.
+	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

@@ -6,7 +6,7 @@ metadata:
   name: pulsar-cluster
   namespace: default
   labels: 
-    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    helm.sh/chart: pulsar-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "2.11.2"
     app.kubernetes.io/instance: pulsar-cluster
   annotations:
@@ -82,7 +82,7 @@ kind: ConfigMap
 metadata:
   name: pulsar-cluster-omb-driver-cfg
   labels: 
-    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    helm.sh/chart: pulsar-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "2.11.2"
     app.kubernetes.io/instance: pulsar-cluster
   annotations:
@@ -160,7 +160,7 @@ kind: Pod
 metadata:
   name: pulsar-cluster-omb-k2k
   labels: 
-    helm.sh/chart: pulsar-cluster-0.6.0-alpha.28
+    helm.sh/chart: pulsar-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "2.11.2"
     app.kubernetes.io/instance: pulsar-cluster
   annotations:

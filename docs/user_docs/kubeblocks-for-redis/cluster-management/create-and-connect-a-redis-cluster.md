@@ -13,9 +13,9 @@ import TabItem from '@theme/TabItem';
 
 This tutorial shows how to create and connect to a Redis cluster.
 
-KuebBlocks for Redis supports Standalone clusters and PrimarySecondary clusters.
+KuebBlocks for Redis supports Standalone clusters and Replication Cluster.
 
-But for your better high-availability experience, KubeBlocks creates a Redis PrimarySecondary by default.
+But for your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
 
 ## Create a Redis cluster
 
@@ -101,7 +101,7 @@ But for your better high-availability experience, KubeBlocks creates a Redis Pri
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of Redis clusters: Standalone and Replication. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication, which creates a cluster with a PrimarySecondary to support automatic failover. And to ensure high availability, Primary and Secondary are distributed on different nodes by default.
+KubeBlocks supports creating two types of Redis clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which supports automatic failover. And to ensure high availability, Primary and Secondary are distributed on different nodes by default.
 
 <Tabs>
 
@@ -113,13 +113,13 @@ Create a Standalone.
 kbcli cluster create redis <clustername>
 ```
 
-Create a Replication.
+Create a Replication Cluster.
 
 ```bash
 kbcli cluster create redis --mode replication <clustername>
 ```
 
-If you only have one node for deploying a Replication, set the `availability-policy` as `true` when creating a Replication.
+If you only have one node for deploying a Replication, set the `availability-policy` as `none` when creating a Replication Cluster.
 
 ```bash
 kbcli cluster create redis --mode replication --availability-policy none <clustername>
@@ -199,7 +199,7 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. BHere is an example o
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
 * `spec.componentSpecs.volumeClaimTemplates` is the list of volume claim templates that define the volume claim templates for the component.
-* `spec.terminationPolicy` is the policy of the cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block delete operation. `Halt` will delete workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+* `spec.terminationPolicy` is the policy of the cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block delete operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=redis -n demo`.
 
@@ -211,7 +211,13 @@ Run the following command to see the created Redis cluster object:
 
 ```bash
 kubectl get cluster redis -n demo -o yaml
->
+```
+
+<details>
+
+<summary>Output</summary>
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -304,8 +310,9 @@ status:
   phase: Running
 ```
 
-</TabItem>
+</details>
 
+</TabItem>
 
 ## Connect to a Redis Cluster
 
@@ -325,7 +332,7 @@ You can use `kubectl exec` to exec into a Pod and connect to a database.
 
 KubeBlocks operator has created a new Secret called `redis-conn-credential` to store the connection credential of the Redis cluster. This secret contains the following keys:
 
-`username`: the root username of the Redis cluster.
+* `username`: the root username of the Redis cluster.
 * `password`: the password of the root user.
 * `port`: the port of the Redis cluster.
 * `host`: the host of the Redis cluster.

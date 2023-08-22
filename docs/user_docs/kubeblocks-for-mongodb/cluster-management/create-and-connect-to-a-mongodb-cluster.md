@@ -82,6 +82,7 @@ This tutorial shows how to create and connect to a MongoDB cluster.
   NAME             CLUSTER-DEFINITION   STATUS      AGE
   mongodb-5.0.14   mongodb              Available   118m
   ```
+
   </TabItem>
 
   </Tabs>
@@ -94,10 +95,9 @@ This tutorial shows how to create and connect to a MongoDB cluster.
   namespace/demo created
   ```
 
-
 ### Create a cluster
 
-KubeBlocks supports creating two types of MongoDB clusters: Standalone and Replicaset. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replicaset, which creates a cluster with a three replicas to support automatic failover. And to ensure high availability, all replicas are distributed on different nodes by default.
+KubeBlocks supports creating two types of MongoDB clusters: Standalone and ReplicaSet. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a ReplicaSet, which creates a cluster with a three replicas to support automatic failover. And to ensure high availability, all replicas are distributed on different nodes by default.
 
 <Tabs>
 
@@ -109,13 +109,13 @@ Create a Standalone.
 kbcli cluster create mongodb <clustername>
 ```
 
-Create a Replication.
+Create a ReplicatSet.
 
 ```bash
 kbcli cluster create mongodb --mode replicaset <clustername>
 ```
 
-If you only have one node for deploying a Replicaset, set the `availability-policy` as `true` when creating a Replicaset.
+If you only have one node for deploying a ReplicaSet, set the `availability-policy` as `none` when creating a ReplicaSet.
 
 ```bash
 kbcli cluster create mongodb --mode replicaset --availability-policy none <clustername>
@@ -203,7 +203,13 @@ Run the following command to see the created MongoDB cluster object.
 
 ```bash
 kubectl get cluster mongodb-cluster -n demo -o yaml
->
+```
+
+<details>
+
+<summary>Output</summary>
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -293,6 +299,8 @@ status:
   observedGeneration: 1
   phase: Running
 ```
+
+</details>
 
 </TabItem>
 

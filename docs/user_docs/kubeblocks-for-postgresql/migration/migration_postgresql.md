@@ -100,9 +100,9 @@ It is recommended to prepare data sampling for verification after the migration 
    | Option     | Descriprion |
    | :--------- | :---------- |
    | mystask    | The name of the migration task. You can customize it. |
-   | `--template` | It specifies the migration template. `--template apecloud-pg2pg` stands for this migration task uses the template of migrating from PostgreSQL to PostgreSQL created by KubeBlocks. Run `kbcli migration templates` to view all available templates and the supported database information.   |
-   | `--source`  | It specifies the source. `user:123456@127.0.0.1:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connect URL uses the public network address. |
-   | `--sink`     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
+   | `--template` | It specifies the migration template. `--template apecloud-pg2pg` means that this migration task uses the template of migrating from PostgreSQL to PostgreSQL created by KubeBlocks. Run `kbcli migration templates` to view all available templates and the supported database information.   |
+   | `--source`  | It specifies the source. `user:123456@127.0.0.1:5432/db_test` in the above example follows the format `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connect URL uses the public network address. |
+   | `--sink`     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example follows the format `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
    | `--migration-object`  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the sink.    |
 
    :::note
@@ -159,7 +159,7 @@ It is recommended to prepare data sampling for verification after the migration 
 If any step above fails, run the command below to troubleshoot the failure.
 
 ```bash
-# --step: Specify the step. Allow values: precheck,init-struct,init-data,cdc
+# --step: Specify the step. Allowed values: precheck,init-struct,init-data,cdc
 kbcli migration logs ${migration-task-name} --step ${step-name}
 ```
 
@@ -250,7 +250,7 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
       The results update every 10 seconds.
 
       ![Timestamp](../../../img/pgsql-migration-timestamp.png)
-2. Pause the business and stop new business data from being written in the source.
+2. Pause the business and stop new business data from being written into the source.
 3. View the migration status again and ensure the migration task runs normally, lasting at least one minute.
 
    Refer to the operations in step 1 and observe whether the link is normal and the timestamp meets the expectation.

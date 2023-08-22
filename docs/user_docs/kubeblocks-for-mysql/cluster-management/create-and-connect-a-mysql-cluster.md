@@ -91,7 +91,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of MySQL clusters: Standalone and Raft Group. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Raft Group, which creates a cluster with three replicas. And to ensure high availability, all replicas are distributed on different nodes by default.
+KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. And to ensure high availability, all replicas are distributed on different nodes by default.
 
 <Tabs>
 
@@ -103,13 +103,13 @@ Create a Standalone.
 kbcli cluster create mysql <clustername>
 ```
 
-Create a Raft Group.
+Create a RaftGroup Cluster.
 
 ```bash
 kbcli cluster create mysql --mode raftGroup <clustername>
 ```
 
-If you only have one node for deploying a Raft Group, set the `availability-policy` as `true` when creating a Raft Group.
+If you only have one node for deploying a RaftGroup Cluster, set the `availability-policy` as `none` when creating a RaftGroup Cluster.
 
 ```bash
 kbcli cluster create mysql --mode raftGroup --availability-policy none <clustername>
@@ -130,7 +130,7 @@ kbcli cluster create mysql --mode raftGroup --availability-policy none <clustern
 
 <TabItem value="kubectl" label="kubectl">
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Raft Group.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a RaftGroup Cluster.
 
    ```bash
    cat <<EOF | kubectl apply -f -
@@ -168,12 +168,12 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
 * `spec.clusterDefinitionRef` is the name of the cluster definition CRD that defines the cluster components.
 * `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
 * `spec.componentSpecs` is the list of components that define the cluster components.
-* `spec.componnetSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition, you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`
+* `spec.componnetSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
 * `spec.componentSpecs.name` is the name of the component.
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
 * `spec.componentSpecs.volumeClaimTemplates` is the list of volume claim templates that define the volume claim templates for the component.
-* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block deletion operation. `Halt` will delete workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
+* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mysql-cluster -n demo`.
 
@@ -185,7 +185,12 @@ Run the following command to see the created MySQL cluster object:
 
 ```bash
 kubectl get cluster mysql-cluster -n demo -o yaml
->
+```
+
+<details>
+<summary>Output</summary>
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -267,6 +272,8 @@ status:
   observedGeneration: 1
   phase: Running
 ```
+
+</details>
 
 </TabItem>
 

@@ -1,9 +1,9 @@
 ---
-title: How to use ApeCloud MySQL Proxy
-description: ApeCloud MySQL Proxy tutorial
+title: How to use ApeCloud MySQL Proxy Cluster
+description: ApeCloud MySQL Proxy Cluster tutorial
 keywords: [apecloud mysql proxy, proxy]
 sidebar_position: 2
-sidebar_label: ApeCloud MySQL Proxy
+sidebar_label: ApeCloud MySQL Proxy Cluster
 ---
 
 import Tabs from '@theme/Tabs';
@@ -28,13 +28,13 @@ import TabItem from '@theme/TabItem';
    Or if you already have a Kubernetes cluster, you can choose install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm) or [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
 3. Prepare an ApeCloud MySQL Raft Group named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
 
-## Create a Proxy cluster
+## Create a Proxy Cluster
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
-It is recommended to use kbcli to create an ApeCloud MySQL Proxy cluster.
+It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 ```bash
 kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none --proxy-enabled true
@@ -71,50 +71,24 @@ kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none -
 5. (Optional) If you disable the `apecloud-mysql` add-on when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
 
    ```bash
-   helm install myproxy kubeblocks/apecloud-mysql --version=v0.6.0-beta.29
+   helm install myproxy kubeblocks/apecloud-mysql --version=v0.6.0
    ```
 
-6. Create an ApeCloud MySQL Proxy cluster.
+6. Create an ApeCloud MySQL Proxy Cluster.
 
    ```bash
-   helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0-beta.29 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
+   helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true 
    ```
 
-</TabItem>
+:::note
 
-<TabItem value="Source code" label="Source code">
+If you only have one node for deploying a Raft Group, set the `availability-policy` as `none` when creating a Raft Group.
 
-If the versions in the Helm repo do not meet your need, you can create a Proxy cluster from your local helm chart.
+```bash
+helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
+```
 
-The following instructions are based on the latest change directory of the main branch of KubeBlocks.
-
-1. Clone the KubeBlocks repository.
-
-   ```bash
-   git clone git@github.com:apecloud/kubeblocks.git
-
-   cd kubeblocks
-   ```
-
-2. Install the cluster definition and cluster version.
-
-   ```bash
-   helm install myproxy deploy/apecloud-mysql
-   ```
-
-3. Run the commands below to build the dependency if you install the Proxy for the first time.
-
-   ```bash
-   cd deploy/apecloud-mysql-cluster/
-
-   helm dependency build
-   ```
-
-4. Set the mode as `proxyEnabled=true` to enable the proxy function.
-
-   ```bash
-   helm install myproxy deploy/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true
-   ```
+:::
 
 </TabItem>
 
@@ -122,7 +96,7 @@ The following instructions are based on the latest change directory of the main 
 
 ## Enable Proxy dynamically
 
-As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL Raft Group can be switched to an ApeCloud MySQL Proxy cluster by setting `proxyEnabled=true`.
+As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
 
 <Tabs>
 <TabItem value="kbcli" label="kbcli" default>
@@ -141,36 +115,20 @@ helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,pr
 
 </Tabs>
 
-## Connect Proxy cluster
+## Connect Proxy Cluster
 
 ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the MySQL Client accesses `vtgate` is similar to the way of accessing `mysqld`. The external SQL access address provided by ApeCloud MySQL Proxy is the `vtgate` address and port. The `vtgate` address created by KubeBlocks by default is `myproxy-cluster-vtgate-headless`, and the port number is `15306`. You can visit ApeCloud MySQL Proxy through the MySQL Client in any pod under the same namespace as ApeCloud MySQL Proxy.
 
-### Connect Proxy cluster by VTGate
+### Connect Proxy Cluster by VTGate
 
 <Tabs>
 <TabItem value="kbcli" label="kbcli" default>
 
-Run the command below to connect to the Proxy cluster.
+Run the command below to connect to the Proxy Cluster.
 
 ```bash
 kbcli cluster connect myproxy --component vtgate
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-1. Enter the Pod where VTGate is located.
-
-   ```bash
-   kubectl exec -it my-proxy-vtgate-7f859b8fbb-rfzhf -- bash
-   ```
-
-2. Connect to the Proxy cluster.
-
-   ```bash
-   mysql -P15306
-   ```
 
 </TabItem>
 
@@ -191,7 +149,7 @@ kbcli cluster connect myproxy --component vtgate
 </TabItem>
 </Tabs>
 
-### Connect Proxy cluster by MySQL Client
+### Connect Proxy Cluster by MySQL Client
 
 <Tabs>
 
@@ -216,7 +174,7 @@ kbcli cluster connect myproxy
 2. Connect to the cluster.
 
    ```bash
-   mysql -h 127.0.0.1 -P 15306
+   mysql -h 127.0.0.1 -P 3306
    ```
 
 </TabItem>
@@ -240,9 +198,9 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 :::
 
-## Configure Proxy cluster parameters
+## Configure Proxy Cluster parameters
 
-`vtgate`, `vtconsensus`, and `vttablet` supports parameter configuration. You can configure `vtgate` and `vtconsensus` by using `--component` to specify a component and configure `vttable` by using `--component=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since `vttablet` is the sidecar of MySQL component.
+VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure VTGate and VTConsensus by using `--component` to specify a component and configure VTTablet by using `--component=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
 
 ### View parameter details
 
@@ -291,7 +249,7 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
    mysql> show variables like '%health_check_interval%';
    ```
 
-2. Configure the `healthcheck_timeout` for `vtgate` and the `health_check_interval` for `vttablet`.
+2. Configure the `healthcheck_timeout` for VTGate and the `health_check_interval` for VTTablet.
 
    You can use `--set` flag or edit the parameter configuration file to edit values.
 

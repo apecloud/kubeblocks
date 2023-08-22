@@ -8,6 +8,12 @@ sidebar_label: PITR
 
 # PITR
 
+:::note
+
+PITR for MySQL and MongoDB is a beta feature.
+
+:::
+
 1. View the timestamp which the cluster can be restored to.
 
    ```bash

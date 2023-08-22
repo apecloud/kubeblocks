@@ -1792,11 +1792,7 @@ spec:
                                                 custom header to be used in HTTP probes
                                               properties:
                                                 name:
-                                                  description: The header field name.
-                                                    This will be canonicalized upon
-                                                    output, so case-variant names
-                                                    will be understood as the same
-                                                    header.
+                                                  description: The header field name
                                                   type: string
                                                 value:
                                                   description: The header field value
@@ -1904,11 +1900,7 @@ spec:
                                                 custom header to be used in HTTP probes
                                               properties:
                                                 name:
-                                                  description: The header field name.
-                                                    This will be canonicalized upon
-                                                    output, so case-variant names
-                                                    will be understood as the same
-                                                    header.
+                                                  description: The header field name
                                                   type: string
                                                 value:
                                                   description: The header field value
@@ -1995,7 +1987,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -2029,10 +2022,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -2214,7 +2204,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -2248,10 +2239,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -2346,28 +2334,6 @@ spec:
                                     format: int32
                                     type: integer
                                 type: object
-                              resizePolicy:
-                                description: Resources resize policy for the container.
-                                items:
-                                  description: ContainerResizePolicy represents resource
-                                    resize policy for the container.
-                                  properties:
-                                    resourceName:
-                                      description: 'Name of the resource to which
-                                        this resource resize policy applies. Supported
-                                        values: cpu, memory.'
-                                      type: string
-                                    restartPolicy:
-                                      description: Restart policy to apply when specified
-                                        resource is resized. If not specified, it
-                                        defaults to NotRequired.
-                                      type: string
-                                  required:
-                                  - resourceName
-                                  - restartPolicy
-                                  type: object
-                                type: array
-                                x-kubernetes-list-type: atomic
                               resources:
                                 description: 'Compute Resources required by this container.
                                   Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
@@ -2417,33 +2383,10 @@ spec:
                                       of compute resources required. If Requests is
                                       omitted for a container, it defaults to Limits
                                       if that is explicitly specified, otherwise to
-                                      an implementation-defined value. Requests cannot
-                                      exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      an implementation-defined value. More info:
+                                      https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                                     type: object
                                 type: object
-                              restartPolicy:
-                                description: 'RestartPolicy defines the restart behavior
-                                  of individual containers in a pod. This field may
-                                  only be set for init containers, and the only allowed
-                                  value is "Always". For non-init containers or when
-                                  this field is not specified, the restart behavior
-                                  is defined by the Pod''s restart policy and the
-                                  container type. Setting the RestartPolicy as "Always"
-                                  for the init container will have the following effect:
-                                  this init container will be continually restarted
-                                  on exit until all regular containers have terminated.
-                                  Once all regular containers have completed, all
-                                  init containers with restartPolicy "Always" will
-                                  be shut down. This lifecycle differs from normal
-                                  init containers and is often referred to as a "sidecar"
-                                  container. Although this init container still starts
-                                  in the init container sequence, it does not wait
-                                  for the container to complete before proceeding
-                                  to the next init container. Instead, the next init
-                                  container starts immediately after this init container
-                                  is started, or after any startupProbe has successfully
-                                  completed.'
-                                type: string
                               securityContext:
                                 description: 'SecurityContext defines the security
                                   options the container should be run with. If set,
@@ -2579,9 +2522,8 @@ spec:
                                           be used. The profile must be preconfigured
                                           on the node to work. Must be a descending
                                           path, relative to the kubelet's configured
-                                          seccomp profile location. Must be set if
-                                          type is "Localhost". Must NOT be set for
-                                          any other type.
+                                          seccomp profile location. Must only be set
+                                          if type is "Localhost".
                                         type: string
                                       type:
                                         description: "type indicates which kind of
@@ -2618,12 +2560,17 @@ spec:
                                       hostProcess:
                                         description: HostProcess determines if a container
                                           should be run as a 'Host Process' container.
-                                          All of a Pod's containers must have the
-                                          same effective HostProcess value (it is
-                                          not allowed to have a mix of HostProcess
-                                          containers and non-HostProcess containers).
-                                          In addition, if HostProcess is true then
-                                          HostNetwork must also be set to true.
+                                          This field is alpha-level and will only
+                                          be honored by components that enable the
+                                          WindowsHostProcessContainers feature flag.
+                                          Setting this field without the feature flag
+                                          will result in errors when validating the
+                                          Pod. All of a Pod's containers must have
+                                          the same effective HostProcess value (it
+                                          is not allowed to have a mix of HostProcess
+                                          containers and non-HostProcess containers).  In
+                                          addition, if HostProcess is true then HostNetwork
+                                          must also be set to true.
                                         type: boolean
                                       runAsUserName:
                                         description: The UserName in Windows to run
@@ -2674,7 +2621,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -2708,10 +2656,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -3264,11 +3209,7 @@ spec:
                                                 custom header to be used in HTTP probes
                                               properties:
                                                 name:
-                                                  description: The header field name.
-                                                    This will be canonicalized upon
-                                                    output, so case-variant names
-                                                    will be understood as the same
-                                                    header.
+                                                  description: The header field name
                                                   type: string
                                                 value:
                                                   description: The header field value
@@ -3376,11 +3317,7 @@ spec:
                                                 custom header to be used in HTTP probes
                                               properties:
                                                 name:
-                                                  description: The header field name.
-                                                    This will be canonicalized upon
-                                                    output, so case-variant names
-                                                    will be understood as the same
-                                                    header.
+                                                  description: The header field name
                                                   type: string
                                                 value:
                                                   description: The header field value
@@ -3466,7 +3403,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -3500,10 +3438,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -3676,7 +3611,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -3710,10 +3646,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -3808,28 +3741,6 @@ spec:
                                     format: int32
                                     type: integer
                                 type: object
-                              resizePolicy:
-                                description: Resources resize policy for the container.
-                                items:
-                                  description: ContainerResizePolicy represents resource
-                                    resize policy for the container.
-                                  properties:
-                                    resourceName:
-                                      description: 'Name of the resource to which
-                                        this resource resize policy applies. Supported
-                                        values: cpu, memory.'
-                                      type: string
-                                    restartPolicy:
-                                      description: Restart policy to apply when specified
-                                        resource is resized. If not specified, it
-                                        defaults to NotRequired.
-                                      type: string
-                                  required:
-                                  - resourceName
-                                  - restartPolicy
-                                  type: object
-                                type: array
-                                x-kubernetes-list-type: atomic
                               resources:
                                 description: Resources are not allowed for ephemeral
                                   containers. Ephemeral containers use spare resources
@@ -3880,16 +3791,10 @@ spec:
                                       of compute resources required. If Requests is
                                       omitted for a container, it defaults to Limits
                                       if that is explicitly specified, otherwise to
-                                      an implementation-defined value. Requests cannot
-                                      exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      an implementation-defined value. More info:
+                                      https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                                     type: object
                                 type: object
-                              restartPolicy:
-                                description: Restart policy for the container to manage
-                                  the restart behavior of each container within a
-                                  pod. This may only be set for init containers. You
-                                  cannot set this field on ephemeral containers.
-                                type: string
                               securityContext:
                                 description: 'Optional: SecurityContext defines the
                                   security options the ephemeral container should
@@ -4025,9 +3930,8 @@ spec:
                                           be used. The profile must be preconfigured
                                           on the node to work. Must be a descending
                                           path, relative to the kubelet's configured
-                                          seccomp profile location. Must be set if
-                                          type is "Localhost". Must NOT be set for
-                                          any other type.
+                                          seccomp profile location. Must only be set
+                                          if type is "Localhost".
                                         type: string
                                       type:
                                         description: "type indicates which kind of
@@ -4064,12 +3968,17 @@ spec:
                                       hostProcess:
                                         description: HostProcess determines if a container
                                           should be run as a 'Host Process' container.
-                                          All of a Pod's containers must have the
-                                          same effective HostProcess value (it is
-                                          not allowed to have a mix of HostProcess
-                                          containers and non-HostProcess containers).
-                                          In addition, if HostProcess is true then
-                                          HostNetwork must also be set to true.
+                                          This field is alpha-level and will only
+                                          be honored by components that enable the
+                                          WindowsHostProcessContainers feature flag.
+                                          Setting this field without the feature flag
+                                          will result in errors when validating the
+                                          Pod. All of a Pod's containers must have
+                                          the same effective HostProcess value (it
+                                          is not allowed to have a mix of HostProcess
+                                          containers and non-HostProcess containers).  In
+                                          addition, if HostProcess is true then HostNetwork
+                                          must also be set to true.
                                         type: boolean
                                       runAsUserName:
                                         description: The UserName in Windows to run
@@ -4112,7 +4021,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -4146,10 +4056,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -4734,11 +4641,7 @@ spec:
                                                 custom header to be used in HTTP probes
                                               properties:
                                                 name:
-                                                  description: The header field name.
-                                                    This will be canonicalized upon
-                                                    output, so case-variant names
-                                                    will be understood as the same
-                                                    header.
+                                                  description: The header field name
                                                   type: string
                                                 value:
                                                   description: The header field value
@@ -4846,11 +4749,7 @@ spec:
                                                 custom header to be used in HTTP probes
                                               properties:
                                                 name:
-                                                  description: The header field name.
-                                                    This will be canonicalized upon
-                                                    output, so case-variant names
-                                                    will be understood as the same
-                                                    header.
+                                                  description: The header field name
                                                   type: string
                                                 value:
                                                   description: The header field value
@@ -4937,7 +4836,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -4971,10 +4871,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -5156,7 +5053,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -5190,10 +5088,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -5288,28 +5183,6 @@ spec:
                                     format: int32
                                     type: integer
                                 type: object
-                              resizePolicy:
-                                description: Resources resize policy for the container.
-                                items:
-                                  description: ContainerResizePolicy represents resource
-                                    resize policy for the container.
-                                  properties:
-                                    resourceName:
-                                      description: 'Name of the resource to which
-                                        this resource resize policy applies. Supported
-                                        values: cpu, memory.'
-                                      type: string
-                                    restartPolicy:
-                                      description: Restart policy to apply when specified
-                                        resource is resized. If not specified, it
-                                        defaults to NotRequired.
-                                      type: string
-                                  required:
-                                  - resourceName
-                                  - restartPolicy
-                                  type: object
-                                type: array
-                                x-kubernetes-list-type: atomic
                               resources:
                                 description: 'Compute Resources required by this container.
                                   Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
@@ -5359,33 +5232,10 @@ spec:
                                       of compute resources required. If Requests is
                                       omitted for a container, it defaults to Limits
                                       if that is explicitly specified, otherwise to
-                                      an implementation-defined value. Requests cannot
-                                      exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      an implementation-defined value. More info:
+                                      https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                                     type: object
                                 type: object
-                              restartPolicy:
-                                description: 'RestartPolicy defines the restart behavior
-                                  of individual containers in a pod. This field may
-                                  only be set for init containers, and the only allowed
-                                  value is "Always". For non-init containers or when
-                                  this field is not specified, the restart behavior
-                                  is defined by the Pod''s restart policy and the
-                                  container type. Setting the RestartPolicy as "Always"
-                                  for the init container will have the following effect:
-                                  this init container will be continually restarted
-                                  on exit until all regular containers have terminated.
-                                  Once all regular containers have completed, all
-                                  init containers with restartPolicy "Always" will
-                                  be shut down. This lifecycle differs from normal
-                                  init containers and is often referred to as a "sidecar"
-                                  container. Although this init container still starts
-                                  in the init container sequence, it does not wait
-                                  for the container to complete before proceeding
-                                  to the next init container. Instead, the next init
-                                  container starts immediately after this init container
-                                  is started, or after any startupProbe has successfully
-                                  completed.'
-                                type: string
                               securityContext:
                                 description: 'SecurityContext defines the security
                                   options the container should be run with. If set,
@@ -5521,9 +5371,8 @@ spec:
                                           be used. The profile must be preconfigured
                                           on the node to work. Must be a descending
                                           path, relative to the kubelet's configured
-                                          seccomp profile location. Must be set if
-                                          type is "Localhost". Must NOT be set for
-                                          any other type.
+                                          seccomp profile location. Must only be set
+                                          if type is "Localhost".
                                         type: string
                                       type:
                                         description: "type indicates which kind of
@@ -5560,12 +5409,17 @@ spec:
                                       hostProcess:
                                         description: HostProcess determines if a container
                                           should be run as a 'Host Process' container.
-                                          All of a Pod's containers must have the
-                                          same effective HostProcess value (it is
-                                          not allowed to have a mix of HostProcess
-                                          containers and non-HostProcess containers).
-                                          In addition, if HostProcess is true then
-                                          HostNetwork must also be set to true.
+                                          This field is alpha-level and will only
+                                          be honored by components that enable the
+                                          WindowsHostProcessContainers feature flag.
+                                          Setting this field without the feature flag
+                                          will result in errors when validating the
+                                          Pod. All of a Pod's containers must have
+                                          the same effective HostProcess value (it
+                                          is not allowed to have a mix of HostProcess
+                                          containers and non-HostProcess containers).  In
+                                          addition, if HostProcess is true then HostNetwork
+                                          must also be set to true.
                                         type: boolean
                                       runAsUserName:
                                         description: The UserName in Windows to run
@@ -5616,7 +5470,8 @@ spec:
                                     type: integer
                                   grpc:
                                     description: GRPC specifies an action involving
-                                      a GRPC port.
+                                      a GRPC port. This is a beta field and requires
+                                      enabling GRPCContainerProbe feature gate.
                                     properties:
                                       port:
                                         description: Port number of the gRPC service.
@@ -5650,10 +5505,7 @@ spec:
                                             header to be used in HTTP probes
                                           properties:
                                             name:
-                                              description: The header field name.
-                                                This will be canonicalized upon output,
-                                                so case-variant names will be understood
-                                                as the same header.
+                                              description: The header field name
                                               type: string
                                             value:
                                               description: The header field value
@@ -6009,13 +5861,18 @@ spec:
                                       will be used to create a new ResourceClaim,
                                       which will be bound to this pod. When this pod
                                       is deleted, the ResourceClaim will also be deleted.
-                                      The pod name and resource name, along with a
-                                      generated component, will be used to form a
-                                      unique name for the ResourceClaim, which will
-                                      be recorded in pod.status.resourceClaimStatuses.
-                                      \n This field is immutable and no changes will
-                                      be made to the corresponding ResourceClaim by
-                                      the control plane after creating the ResourceClaim."
+                                      The name of the ResourceClaim will be <pod name>-<resource
+                                      name>, where <resource name> is the PodResourceClaim.Name.
+                                      Pod validation will reject the pod if the concatenated
+                                      name is not valid for a ResourceClaim (e.g.
+                                      too long). \n An existing ResourceClaim with
+                                      that name that is not owned by the pod will
+                                      not be used for the pod to avoid using an unrelated
+                                      resource by mistake. Scheduling and pod startup
+                                      are then blocked until the unrelated ResourceClaim
+                                      is removed. \n This field is immutable and no
+                                      changes will be made to the corresponding ResourceClaim
+                                      by the control plane after creating the ResourceClaim."
                                     type: string
                                 type: object
                             required:
@@ -6027,9 +5884,8 @@ spec:
                           x-kubernetes-list-type: map
                         restartPolicy:
                           description: 'Restart policy for all containers within the
-                            pod. One of Always, OnFailure, Never. In some contexts,
-                            only a subset of those values may be permitted. Default
-                            to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy'
+                            pod. One of Always, OnFailure, Never. Default to Always.
+                            More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy'
                           type: string
                         runtimeClassName:
                           description: 'RuntimeClassName refers to a RuntimeClass
@@ -6047,13 +5903,10 @@ spec:
                           type: string
                         schedulingGates:
                           description: "SchedulingGates is an opaque list of values
-                            that if specified will block scheduling the pod. If schedulingGates
-                            is not empty, the pod will stay in the SchedulingGated
-                            state and the scheduler will not attempt to schedule the
-                            pod. \n SchedulingGates can only be set at pod creation
-                            time, and be removed only afterwards. \n This is a beta
-                            feature enabled by the PodSchedulingReadiness feature
-                            gate."
+                            that if specified will block scheduling the pod. More
+                            info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+                            \n This is an alpha-level feature enabled by PodSchedulingReadiness
+                            feature gate."
                           items:
                             description: PodSchedulingGate is associated to a Pod
                               to guard its scheduling.
@@ -6164,8 +6017,7 @@ spec:
                                     The profile must be preconfigured on the node
                                     to work. Must be a descending path, relative to
                                     the kubelet's configured seccomp profile location.
-                                    Must be set if type is "Localhost". Must NOT be
-                                    set for any other type.
+                                    Must only be set if type is "Localhost".
                                   type: string
                                 type:
                                   description: "type indicates which kind of seccomp
@@ -6235,11 +6087,15 @@ spec:
                                   type: string
                                 hostProcess:
                                   description: HostProcess determines if a container
-                                    should be run as a 'Host Process' container. All
-                                    of a Pod's containers must have the same effective
-                                    HostProcess value (it is not allowed to have a
-                                    mix of HostProcess containers and non-HostProcess
-                                    containers). In addition, if HostProcess is true
+                                    should be run as a 'Host Process' container. This
+                                    field is alpha-level and will only be honored
+                                    by components that enable the WindowsHostProcessContainers
+                                    feature flag. Setting this field without the feature
+                                    flag will result in errors when validating the
+                                    Pod. All of a Pod's containers must have the same
+                                    effective HostProcess value (it is not allowed
+                                    to have a mix of HostProcess containers and non-HostProcess
+                                    containers).  In addition, if HostProcess is true
                                     then HostNetwork must also be set to true.
                                   type: boolean
                                 runAsUserName:
@@ -6403,20 +6259,15 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               matchLabelKeys:
-                                description: "MatchLabelKeys is a set of pod label
+                                description: MatchLabelKeys is a set of pod label
                                   keys to select the pods over which spreading will
                                   be calculated. The keys are used to lookup values
                                   from the incoming pod labels, those key-value labels
                                   are ANDed with labelSelector to select the group
                                   of existing pods over which spreading will be calculated
-                                  for the incoming pod. The same key is forbidden
-                                  to exist in both MatchLabelKeys and LabelSelector.
-                                  MatchLabelKeys cannot be set when LabelSelector
-                                  isn't set. Keys that don't exist in the incoming
-                                  pod labels will be ignored. A null or empty list
-                                  means only match against labelSelector. \n This
-                                  is a beta field and requires the MatchLabelKeysInPodTopologySpread
-                                  feature gate to be enabled (enabled by default)."
+                                  for the incoming pod. Keys that don't exist in the
+                                  incoming pod labels will be ignored. A null or empty
+                                  list means only match against labelSelector.
                                 items:
                                   type: string
                                 type: array
@@ -6977,7 +6828,7 @@ spec:
                                       specified here and the sum of memory limits
                                       of all containers in a pod. The default is nil
                                       which means that the limit is undefined. More
-                                      info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir'
+                                      info: http://kubernetes.io/docs/user-guide/volumes#emptydir'
                                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                     x-kubernetes-int-or-string: true
                                 type: object
@@ -7238,8 +7089,7 @@ spec:
                                                   for a container, it defaults to
                                                   Limits if that is explicitly specified,
                                                   otherwise to an implementation-defined
-                                                  value. Requests cannot exceed Limits.
-                                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                                  value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                                                 type: object
                                             type: object
                                           selector:

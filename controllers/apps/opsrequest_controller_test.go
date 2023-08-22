@@ -594,8 +594,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
-			// HACK: disable the lorry client since it's not ready for testing.
-			lorry.SetMockClient(nil, fmt.Errorf("NotSupported"))
+			lorry.SetMockClient(&mockLorryClient{replicas: 2, clusterKey: clusterKey, compName: mysqlCompName}, nil)
 			defer lorry.UnsetMockClient()
 
 			By("create a cluster with 3 pods")

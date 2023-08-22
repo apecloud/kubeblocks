@@ -569,11 +569,8 @@ func (c *statefulComponentBase) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCt
 		}
 		lorryCli, err1 := lorry.NewClient(c.Component.CharacterType, *pod)
 		if err1 != nil {
-			// HACK: remove this after the mock lorry client ready.
-			if strings.Compare(err1.Error(), "NotSupported") != 0 {
-				if err == nil {
-					err = err1
-				}
+			if err == nil {
+				err = err1
 			}
 			continue
 		}

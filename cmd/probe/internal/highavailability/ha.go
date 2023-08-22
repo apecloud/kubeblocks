@@ -113,8 +113,7 @@ func (ha *Ha) RunCycle() {
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			cluster.Leader.DBState = DBState
 			if ha.dcs.AttempAcquireLock() == nil {
-				err := ha.dbManager.Promote(ha.ctx)
-				if err != nil {
+				if ha.dbManager.Promote(ha.ctx) != nil {
 					ha.logger.Infof("Take the leader failed: %v", err)
 					_ = ha.dcs.ReleaseLock()
 				} else {

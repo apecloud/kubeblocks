@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package postgres
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -101,4 +103,8 @@ func (config *Config) GetConnectURLWithHost(host string) string {
 
 func getConsensusIPPort(cluster *dcs.Cluster, name string) string {
 	return fmt.Sprintf("%s.%s-headless.%s.svc:1%d", name, cluster.ClusterCompName, cluster.Namespace, config.port)
+}
+
+func (config *Config) GetOtherConnectionWithHost(ctx context.Context, host string) (*pgx.Conn, error) {
+	return pgx.Connect(ctx, config.GetConnectURLWithHost(host))
 }

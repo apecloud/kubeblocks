@@ -7,7 +7,7 @@ image:
   repository: apecloud/apecloud-mysql-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 8.0.30-5.beta1.20230802.g5b589f1.11
+  tag: 8.0.30-5.beta1.20230802.g5b589f1.12
 
 ## MySQL Cluster parameters
 cluster:

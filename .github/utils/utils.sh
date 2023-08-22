@@ -28,6 +28,7 @@ Usage: $(basename "$0") <options>
                                 16) get test packages
                                 17) delete actions cache
                                 18) check release tag
+                                19) get base commit id
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -129,6 +130,9 @@ main() {
         ;;
         18)
             check_release_tag
+        ;;
+        19)
+            get_trigger_mode
         ;;
         *)
             show_help
@@ -464,6 +468,10 @@ get_base_commit_id() {
 get_trigger_mode() {
     if [[ ! ("$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "release-"* || "$BRANCH_NAME" == "releasing-"*) ]]; then
         get_base_commit_id
+    fi
+    if [[ "$TYPE" == "19" ]]; then
+      echo "$BASE_COMMIT_ID"
+      return
     fi
     echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
     filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )

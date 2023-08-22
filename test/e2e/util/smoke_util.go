@@ -370,3 +370,17 @@ func CheckCommand(command string, path string) bool {
 
 	return false
 }
+
+func RemoveElements(arr []string, elemsToRemove []string) []string {
+	var result []string
+	m := make(map[string]bool)
+	for _, e := range elemsToRemove {
+		m[e] = true
+	}
+	for _, e := range arr {
+		if !m[e] {
+			result = append(result, e)
+		}
+	}
+	return result
+}

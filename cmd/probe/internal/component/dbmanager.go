@@ -195,7 +195,7 @@ func (mgr *DBManagerBase) Stop() error {
 }
 
 func (mgr *DBManagerBase) ShutDownWithWait() {
-	mgr.Logger.Infof("override me if need")
+	mgr.Logger.Infof("Override me if need")
 }
 
 func RegisterManager(characterType string, manager DBManager) {

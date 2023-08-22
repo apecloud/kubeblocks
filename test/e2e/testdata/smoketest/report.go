@@ -40,7 +40,7 @@ func UploadReport() {
 		It("upload report", func() {
 			path, _ := os.Getwd()
 			e2eutil.UploadToS3(path+"/report.json", "e2e/"+Version+"/"+TestType, "e2e-test")
+			e2eutil.UploadToS3(path+"/"+TestType+"-log.txt", "e2e/"+Version+"/"+TestType, "e2e-test")
 		})
-
 	})
 }

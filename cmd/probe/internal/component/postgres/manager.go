@@ -287,7 +287,6 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
-	// TODO: check SynchronizedToLeader and compare the lags
 	return nil
 }
 

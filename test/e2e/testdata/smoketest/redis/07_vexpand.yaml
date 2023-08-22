@@ -9,4 +9,4 @@ spec:
     - componentName: redis
       volumeClaimTemplates:
         - name: data
-          storage: "11Gi"
+          storage: "21Gi"

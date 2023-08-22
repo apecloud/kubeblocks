@@ -416,6 +416,48 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 	return opsRes, nil
 }
 
+// JoinMemberOps is used to join the current member into the DB cluster.
+// If OpsResult["event"] == "success" and err == nil, it indicates that the member has successfully left.
+// In any other situation, it signifies a failure.
+func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	manager, err := component.GetDefaultManager()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = err.Error()
+		return opsRes, nil
+	}
+
+	dcsStore := dcs.GetStore()
+	var cluster *dcs.Cluster
+	cluster, err = dcsStore.GetCluster()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
+		return opsRes, err
+	}
+
+	// remove current member from db cluster
+	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
+	if err != nil {
+		message := fmt.Sprintf("Join member form cluster failed: %v", err)
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = message
+		return opsRes, err
+	}
+
+	opsRes["event"] = OperationSuccess
+	opsRes["message"] = "Join of the current member is complete"
+	return opsRes, nil
+}
+
+// LeaveMemberOps is used to remove the current member from the DB cluster.
+// If OpsResult["event"] == "success" and err == nil, it indicates that the member has successfully left.
+// In any other situation, it signifies a failure.
+// - "error": is used to indicate if the leave operation has failed. If error is nil, it signifies a successful leave, and if it is not nil, it indicates a failure.
+// - "OpsResult": provides additional detailed messages regarding the operation.
+//   - "OpsResult['event']" can hold either "fail" or "success" based on the outcome of the leave operation.
+//   - "OpsResult['message']" provides a specific reason explaining the event.
 func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
@@ -451,37 +493,5 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.Inv
 
 	opsRes["event"] = OperationSuccess
 	opsRes["message"] = "Deletion of the current member is complete"
-	return opsRes, nil
-}
-
-func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	opsRes := OpsResult{}
-	manager, err := component.GetDefaultManager()
-	if err != nil {
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = err.Error()
-		return opsRes, nil
-	}
-
-	dcsStore := dcs.GetStore()
-	var cluster *dcs.Cluster
-	cluster, err = dcsStore.GetCluster()
-	if err != nil {
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
-		return opsRes, err
-	}
-
-	// remove current member from db cluster
-	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
-	if err != nil {
-		message := fmt.Sprintf("Join member form cluster failed: %v", err)
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = message
-		return opsRes, err
-	}
-
-	opsRes["event"] = OperationSuccess
-	opsRes["message"] = "Join of the current member is complete"
 	return opsRes, nil
 }

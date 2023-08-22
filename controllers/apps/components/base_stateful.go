@@ -562,19 +562,22 @@ func (c *statefulComponentBase) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCt
 	if err != nil {
 		return err
 	}
-	name := fmt.Sprintf("%s-%d", stsObj.Name, c.Component.Replicas)
+	basePodName := fmt.Sprintf("%s-%d", stsObj.Name, c.Component.Replicas)
 	for _, pod := range pods {
-		if strings.TrimSpace(pod.Name) < name {
+		if strings.TrimSpace(pod.Name) < basePodName {
 			continue
 		}
-		lorryCli, err1 := lorry.NewClientWithPod(pod, c.Component.CharacterType)
+		lorryCli, err1 := lorry.NewClient(c.Component.CharacterType, *pod)
 		if err1 != nil {
-			if err == nil {
-				err = err1
+			// HACK: remove this after the mock lorry client ready.
+			if strings.Compare(err1.Error(), "NotSupported") != 0 {
+				if err == nil {
+					err = err1
+				}
 			}
 			continue
 		}
-		if err2 := lorryCli.LeaveMember(); err2 != nil {
+		if err2 := lorryCli.LeaveMember(reqCtx.Ctx); err2 != nil {
 			if err == nil {
 				err = err2
 			}

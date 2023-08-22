@@ -36,6 +36,27 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
+// HACK: for unit test only.
+var mockClient *OperationClient
+var mockClientError error
+
+func SetMockClient(cli *OperationClient, err error) {
+	mockClient = cli
+	mockClientError = err
+}
+
+func UnsetMockClient() {
+	mockClient = nil
+	mockClientError = nil
+}
+
+func NewClient(characterType string, pod corev1.Pod) (*OperationClient, error) {
+	if mockClient != nil || mockClientError != nil {
+		return mockClient, mockClientError
+	}
+	return NewClientWithPod(&pod, characterType)
+}
+
 type OperationClient struct {
 	dapr.Client
 	CharacterType    string
@@ -138,12 +159,12 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
-func (cli *OperationClient) JoinMember() error {
+func (cli *OperationClient) JoinMember(ctx context.Context) error {
 	// TODO: implement
 	return nil
 }
 
-func (cli *OperationClient) LeaveMember() error {
+func (cli *OperationClient) LeaveMember(ctx context.Context) error {
 	// TODO: implement
 	return nil
 }

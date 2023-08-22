@@ -547,7 +547,7 @@ func (c *statefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli clien
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
 	err := c.leaveMember4ScaleIn(reqCtx, cli, stsObj)
 	if err != nil {
-		reqCtx.Log.Info("leave member at scaling-in error, retry later: %s", err.Error())
+		reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
 		return err
 	}
 	return c.deletePVCs4ScaleIn(reqCtx, cli, stsObj)

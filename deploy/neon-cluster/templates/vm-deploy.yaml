@@ -403,7 +403,7 @@ metadata:
 spec:
   schedulerName: autoscale-scheduler
   guest:
-    cpus: { min: 0.25, use: 0.25, max: 2 }
+    cpus: { min: 1, use: 1, max: 2 }
     memorySlotSize: 1Gi
     memorySlots: { min: 1, use: 1, max: 5 }
     rootDisk:

@@ -92,12 +92,6 @@ func SmokeTest() {
 				}
 			}
 		})
-		It("check addon", func() {
-			enabledSc := " kbcli addon enable csi-hostpath-driver"
-			log.Println(enabledSc)
-			csi := e2eutil.ExecCommand(enabledSc)
-			log.Println(csi)
-		})
 
 		It("run test cases", func() {
 			dir, err := os.Getwd()

@@ -36,6 +36,14 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
+type LorryClient interface {
+	GetRole() (string, error)
+	JoinMember() error
+	LeaveMember() error
+}
+
+var _ LorryClient = &OperationClient{}
+
 type OperationClient struct {
 	dapr.Client
 	CharacterType    string

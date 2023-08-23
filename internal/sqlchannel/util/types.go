@@ -58,7 +58,6 @@ const (
 
 	JoinMemberOperation  bindings.OperationKind = "joinMember"
 	LeaveMemberOperation bindings.OperationKind = "leaveMember"
-	PreDeleteOperation   bindings.OperationKind = "preDelete"
 
 	OperationNotImplemented = "NotImplemented"
 	OperationInvalid        = "Invalid"

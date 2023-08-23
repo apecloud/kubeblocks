@@ -38,6 +38,9 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
+const (
+	urlTemplate = "http://localhost:%d/v1.0/bindings/%s"
+)
 
 type Client interface {
 	JoinMember(ctx context.Context) error
@@ -64,7 +67,6 @@ func NewClient(characterType string, pod corev1.Pod) (Client, error) {
 	}
 	return NewClientWithPod(&pod, characterType)
 }
-
 
 type OperationClient struct {
 	Client           *http.Client
@@ -179,7 +181,6 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
-
 func (cli *OperationClient) JoinMember(ctx context.Context) error {
 	// TODO: implement
 	return nil
@@ -190,7 +191,7 @@ func (cli *OperationClient) LeaveMember(ctx context.Context) error {
 	return nil
 }
 
-func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
+func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
 	ch := make(chan *OperationResult, 1)
 	go cli.InvokeComponent(ctxWithReconcileTimeout, url, method, body, ch)
 	var resp *http.Response

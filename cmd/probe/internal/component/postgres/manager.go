@@ -41,6 +41,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
@@ -71,7 +72,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Pool: pool,
 	}
 
-	component.RegisterManager("postgresql", Mgr)
+	component.RegisterManager("postgresql", internal.Replication, Mgr)
 	return Mgr, nil
 }
 
@@ -215,7 +216,7 @@ func (mgr *Manager) IsLeaderWithPool(ctx context.Context, pool *pgxpool.Pool) (b
 	return role == binding.PRIMARY, nil
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
 	return cluster.GetMemberAddrs()
 }
 
@@ -390,12 +391,12 @@ func (mgr *Manager) Recover(context.Context) error {
 }
 
 // AddCurrentMemberToCluster postgresql don't need to add member
-func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	return nil
 }
 
 // DeleteMemberFromCluster postgresql don't need to delete member
-func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 
@@ -407,7 +408,7 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) Promote(ctx context.Context) error {
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if isLeader, err := mgr.IsLeader(ctx, nil); err == nil && isLeader {
 		mgr.Logger.Infof("i am already a leader, don't need to promote")
 		return nil

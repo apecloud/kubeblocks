@@ -31,6 +31,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
@@ -50,7 +51,6 @@ type Manager struct {
 	slaveStatus                  RowMap
 }
 
-var Mgr *Manager
 var _ component.DBManager = &Manager{}
 
 func NewManager(logger logger.Logger) (*Manager, error) {
@@ -78,7 +78,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		return nil, err
 	}
 
-	Mgr = &Manager{
+	mgr := &Manager{
 		DBManagerBase: component.DBManagerBase{
 			CurrentMemberName: currentMemberName,
 			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
@@ -89,8 +89,8 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		serverID: uint(serverID) + 1,
 	}
 
-	component.RegisterManager("mysql", Mgr)
-	return Mgr, nil
+	component.RegisterManager("mysql", internal.Replication, mgr)
+	return mgr, nil
 }
 
 func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
@@ -207,7 +207,7 @@ func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
 	return cluster.GetMemberAddrs()
 }
 
@@ -457,11 +457,11 @@ func (mgr *Manager) Recover(context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 
@@ -503,7 +503,7 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *Manager) Promote(ctx context.Context) error {
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if (mgr.globalState["super_read_only"] == "0" && mgr.globalState["read_only"] == "0") &&
 		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "No" &&
 			mgr.slaveStatus.GetString("Slave_SQL_Running") == "No")) {

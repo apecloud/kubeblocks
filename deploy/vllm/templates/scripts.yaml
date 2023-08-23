@@ -11,12 +11,10 @@ data:
     ordinal=\${KB_POD_NAME##*-}
     echo "current pod ordinal: \$ordinal"
     echo "EXTRA_ARGS=\${EXTRA_ARGS}"
-    EXTRA_ARGS=\`echo \${EXTRA_ARGS} | sed "s/KB_REPLICAS_PLACEHOLDER/\${KB_VLLM_N}/g"\`
-    echo "EXTRA_ARGS=\${EXTRA_ARGS}"
     if [ \$ordinal -eq 0 ]; then
       ray start --head
       while true; do
-        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8080 --model \${MODEL_NAME} \${EXTRA_ARGS}
+        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8080 --model \${MODEL_NAME} --gpu-memory-utilization 0.95 --tensor-parallel-size \${KB_VLLM_N} \${EXTRA_ARGS}
         code=\$?
         if [ \$code -eq 0 ]; then
           break

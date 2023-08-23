@@ -199,14 +199,14 @@ func handleGlobalInfoEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, rec
 	// pod involved is a follower, just update single pod
 	if global.Message != "" {
 		role := strings.ToLower(global.Message)
-		return components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
+		return components.UpdateConsensusSetRoleLabel(cli, reqCtx, event, componentDef, pod, role)
 	}
 
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		for _, pod := range pods.Items {
 			if role, ok := global.PodName2Role[pod.Name]; ok {
-				err := components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, &pod, role)
+				err := components.UpdateConsensusSetRoleLabel(cli, reqCtx, event, componentDef, &pod, role)
 				if err != nil {
 					return err
 				}
@@ -215,7 +215,7 @@ func handleGlobalInfoEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, rec
 	case appsv1alpha1.Replication:
 		for _, pod := range pods.Items {
 			if role, ok := global.PodName2Role[pod.Status.PodIP]; ok {
-				err := components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, &pod, role)
+				err := components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, event, cluster, compName, &pod, role)
 				if err != nil {
 					return err
 				}

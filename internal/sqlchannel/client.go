@@ -38,9 +38,33 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
-const (
-	urlTemplate = "http://localhost:%d/v1.0/bindings/%s"
-)
+
+type Client interface {
+	JoinMember(ctx context.Context) error
+	LeaveMember(ctx context.Context) error
+}
+
+// HACK: for unit test only.
+var mockClient Client
+var mockClientError error
+
+func SetMockClient(cli Client, err error) {
+	mockClient = cli
+	mockClientError = err
+}
+
+func UnsetMockClient() {
+	mockClient = nil
+	mockClientError = nil
+}
+
+func NewClient(characterType string, pod corev1.Pod) (Client, error) {
+	if mockClient != nil || mockClientError != nil {
+		return mockClient, mockClientError
+	}
+	return NewClientWithPod(&pod, characterType)
+}
+
 
 type OperationClient struct {
 	Client           *http.Client
@@ -52,6 +76,8 @@ type OperationClient struct {
 	ReconcileTimeout time.Duration
 	RequestTimeout   time.Duration
 }
+
+var _ Client = &OperationClient{}
 
 type OperationResult struct {
 	response *http.Response
@@ -153,7 +179,18 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
-func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
+
+func (cli *OperationClient) JoinMember(ctx context.Context) error {
+	// TODO: implement
+	return nil
+}
+
+func (cli *OperationClient) LeaveMember(ctx context.Context) error {
+	// TODO: implement
+	return nil
+}
+
+func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
 	ch := make(chan *OperationResult, 1)
 	go cli.InvokeComponent(ctxWithReconcileTimeout, url, method, body, ch)
 	var resp *http.Response

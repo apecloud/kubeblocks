@@ -62,7 +62,46 @@ type LokiConfig struct {
 	SinkQueueConfig *SinkQueueConfig `json:"sinkQueueConfig"`
 }
 
+type SecretKeySelector struct {
+	// Specifies the name of the secret.
+	// +kube:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the key of the secret to select from.  Must be a valid secret key.
+	// +kube:validation:Required
+	Key string `json:"key"`
+}
+
+type S3AccountConfig struct {
+	// Specifies the namespace of the secret.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// Specifies the access key to use to connect to the s3.
+	// +kube:validation:Required
+	AccessKey SecretKeySelector `json:"accessKey"`
+
+	// Specifies the secret key to use to connect to the s3.
+	// +kube:validation:Required
+	SecretKey SecretKeySelector `json:"secretKey"`
+}
+
 type S3Config struct {
+	// region defines the region of the s3
+	// +kube:validation:Required
+	Region string `json:"region"`
+
+	// bucket defines the bucket of the s3
+	// +kube:validation:Required
+	Bucket string `json:"bucket"`
+
+	// partitionKey defines the prefix of the s3
+	// +kube:validation:Required
+	PartitionKey string `json:"partitionKey"`
+
+	// accountConfig defines the config of the account
+	// +optional
+	AccountConfig *S3AccountConfig `json:"accountConfig"`
 }
 
 type SinkSource struct {

@@ -106,15 +106,66 @@ spec:
                             description: queueSize is the maximum number of batches
                               allowed in queue at a given time.
                             type: integer
-                        required:
-                        - numConsumers
-                        - queueSize
                         type: object
                     required:
                     - serviceConnectionCredential
                     type: object
                   s3Config:
                     description: s3Config defines the config of the s3
+                    properties:
+                      accountConfig:
+                        description: accountConfig defines the config of the account
+                        properties:
+                          accessKey:
+                            description: Specifies the access key to use to connect
+                              to the s3.
+                            properties:
+                              key:
+                                description: Specifies the key of the secret to select
+                                  from.  Must be a valid secret key.
+                                type: string
+                              name:
+                                description: Specifies the name of the secret.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          namespace:
+                            description: Specifies the namespace of the secret.
+                            type: string
+                          secretKey:
+                            description: Specifies the secret key to use to connect
+                              to the s3.
+                            properties:
+                              key:
+                                description: Specifies the key of the secret to select
+                                  from.  Must be a valid secret key.
+                                type: string
+                              name:
+                                description: Specifies the name of the secret.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        required:
+                        - accessKey
+                        - secretKey
+                        type: object
+                      bucket:
+                        description: bucket defines the bucket of the s3
+                        type: string
+                      partitionKey:
+                        description: partitionKey defines the prefix of the s3
+                        type: string
+                      region:
+                        description: region defines the region of the s3
+                        type: string
+                    required:
+                    - bucket
+                    - partitionKey
+                    - region
                     type: object
                 type: object
               type:

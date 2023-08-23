@@ -44,7 +44,8 @@ type editConfigOptions struct {
 	configOpsOptions
 
 	// config file replace
-	replaceFile bool
+	replaceFile  bool
+	enableDelete bool
 }
 
 var (
@@ -112,8 +113,10 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	}
 
 	fmt.Fprintf(o.Out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[o.CfgFile]))
-	if err := cfgcore.ValidateConfigPatch(configPatch, configConstraint.Spec.FormatterConfig); err != nil {
-		return err
+	if !o.enableDelete {
+		if err := cfgcore.ValidateConfigPatch(configPatch, configConstraint.Spec.FormatterConfig); err != nil {
+			return err
+		}
 	}
 
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
@@ -191,5 +194,6 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	o.buildReconfigureCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
+	cmd.Flags().BoolVar(&o.enableDelete, "enable-delete", false, "Boolean flag to enable delete configuration. Default with false.")
 	return cmd
 }

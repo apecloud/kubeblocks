@@ -86,7 +86,7 @@ func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1alpha1.Formatt
 	vParams := GenerateVisualizedParamsList(patch, formatCfg, nil)
 	for _, param := range vParams {
 		for _, p := range param.Parameters {
-			if p.Value == "" {
+			if p.Value == nil {
 				return MakeError("delete config parameter [%s] is not support!", p.Key)
 			}
 		}

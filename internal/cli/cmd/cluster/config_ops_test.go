@@ -106,7 +106,7 @@ var _ = Describe("reconfigure test", func() {
 				CreateOptions: *ops,
 			},
 		}
-		o.KeyValues = make(map[string]string)
+		o.KeyValues = make(map[string]*string)
 		defer ttf.Cleanup()
 
 		By("validate reconfiguring parameters")

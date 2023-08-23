@@ -100,6 +100,7 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
+	viper.SetDefault(constant.KBProbeImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault(constant.KBChartsImage, "apecloud/kubeblocks-charts:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)

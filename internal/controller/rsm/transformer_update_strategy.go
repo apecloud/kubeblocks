@@ -190,6 +190,13 @@ func shouldSwitchover(rsm *workloads.ReplicatedStateMachine, podsToBeUpdated []*
 		// replicas is less than 2, no need to switchover
 		return false
 	}
+	reconfiguration := rsm.Spec.MembershipReconfiguration
+	if reconfiguration == nil {
+		return false
+	}
+	if reconfiguration.SwitchoverAction == nil {
+		return false
+	}
 	leaderName := getLeaderPodName(rsm.Status.MembersStatus)
 	for _, pod := range podsToBeUpdated {
 		if pod.Name == leaderName {

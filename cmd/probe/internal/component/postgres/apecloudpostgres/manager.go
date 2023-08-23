@@ -22,7 +22,6 @@ package apecloudpostgres
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"strings"
 
 	"github.com/dapr/kit/logger"
@@ -31,6 +30,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
@@ -288,7 +288,7 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	sql := fmt.Sprintf(`alter system consensus add follower '%s:%d';`,
-		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), mgr.Config.Port)
+		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), mgr.Config.GetDBPort())
 
 	_, err := mgr.ExecLeader(context.TODO(), sql, cluster)
 	if err != nil {
@@ -301,7 +301,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 
 func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
 	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
-		host, mgr.Config.Port)
+		host, mgr.Config.GetDBPort())
 
 	// only leader can delete member, so don't need to get pool
 	_, err := mgr.ExecWithHost(context.TODO(), sql, "")
@@ -351,7 +351,7 @@ func (mgr *Manager) Promote(ctx context.Context) error {
 	}
 
 	currentLeaderAddr := strings.Split(cast.ToString(resMap[0]["ip_port"]), ":")[0]
-	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("KB_POD_FQDN"), mgr.Config.Port)
+	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("KB_POD_FQDN"), mgr.Config.GetDBPort())
 	_, err = mgr.ExecOthers(ctx, promoteSQL, currentLeaderAddr)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)

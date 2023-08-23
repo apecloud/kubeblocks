@@ -22,12 +22,14 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/dapr/kit/logger"
 	"github.com/pashagolub/pgxmock/v2"
+	"github.com/shirou/gopsutil/v3/process"
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
@@ -56,6 +58,49 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 	manager.Pool = mock
 
 	return manager, mock, err
+}
+
+func TestIsRunning(t *testing.T) {
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("proc is nil, can't read file", func(t *testing.T) {
+		isRunning := manager.IsRunning()
+		assert.False(t, isRunning)
+	})
+
+	t.Run("proc is not nil ,process is not exist", func(t *testing.T) {
+		manager.Proc = &process.Process{
+			Pid: 100000,
+		}
+
+		isRunning := manager.IsRunning()
+		assert.False(t, isRunning)
+	})
+}
+
+func TestNewProcessFromPidFile(t *testing.T) {
+	fs = afero.NewMemMapFs()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("file is not exist", func(t *testing.T) {
+		err := manager.newProcessFromPidFile()
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "file does not exist")
+	})
+
+	t.Run("process is not exist", func(t *testing.T) {
+		data := "100000\n/postgresql/data\n1692770488\n5432\n/var/run/postgresql\n*\n  2388960         4\nready"
+		err := afero.WriteFile(fs, manager.DataDir+"/postmaster.pid", []byte(data), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = manager.newProcessFromPidFile()
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "process does not exist")
+	})
 }
 
 func TestReadWrite(t *testing.T) {

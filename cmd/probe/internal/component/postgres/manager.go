@@ -77,7 +77,7 @@ func (mgr *Manager) newProcessFromPidFile() error {
 	pidFile, err := readPidFile(mgr.DataDir)
 	if err != nil {
 		mgr.Logger.Errorf("read pid file failed, err:%v", err)
-		return errors.Wrap(err, "read pid file")
+		return err
 	}
 
 	proc, err := process.NewProcess(pidFile.pid)

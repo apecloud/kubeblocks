@@ -67,7 +67,9 @@ func (mgr *Manager) QueryOthers(ctx context.Context, sql string, host string) (r
 		mgr.Logger.Errorf("get host:%s connection failed, err:%v", host, err)
 		return nil, err
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		_ = conn.Close(ctx)
+	}()
 
 	return conn.Query(ctx, sql)
 }
@@ -125,7 +127,9 @@ func (mgr *Manager) ExecOthers(ctx context.Context, sql string, host string) (re
 		mgr.Logger.Errorf("get host:%s connection failed, err:%v", host, err)
 		return resp, err
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		_ = conn.Close(ctx)
+	}()
 
 	tx, err := conn.Begin(ctx)
 	if err != nil {

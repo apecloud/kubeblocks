@@ -22,9 +22,11 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"testing"
 
 	"github.com/pashagolub/pgxmock/v2"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestQuery(t *testing.T) {
@@ -60,6 +62,43 @@ func TestQuery(t *testing.T) {
 		if err = mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("there were unfulfilled expectations: %v", err)
 		}
+	})
+
+	t.Run("can't connect db", func(t *testing.T) {
+		sql := `select 1`
+		resp, err := manager.QueryWithHost(ctx, sql, "localhost")
+		if err == nil {
+			t.Errorf("expect query failed, but success")
+		}
+		assert.Nil(t, resp)
+	})
+
+	t.Run("query without leader", func(t *testing.T) {
+		sql := `select 1`
+		cluster := &dcs.Cluster{}
+
+		resp, err := manager.QueryLeader(ctx, sql, cluster)
+		assert.NotNil(t, err)
+		assert.Nil(t, resp)
+		assert.ErrorIs(t, err, ClusterHasNoLeader)
+	})
+}
+
+func TestParseQuery(t *testing.T) {
+	t.Run("parse query success", func(t *testing.T) {
+		data := []byte(`[{"current_setting":"off"}]`)
+		resMap, err := ParseQuery(string(data))
+		assert.NotNil(t, resMap)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(resMap))
+		assert.Equal(t, "off", resMap[0]["current_setting"].(string))
+	})
+
+	t.Run("parse query failed", func(t *testing.T) {
+		data := []byte(`{"current_setting":"off"}`)
+		resMap, err := ParseQuery(string(data))
+		assert.NotNil(t, err)
+		assert.Nil(t, resMap)
 	})
 }
 
@@ -102,5 +141,24 @@ func TestExec(t *testing.T) {
 		if err = mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("there were unfulfilled expectations: %v", err)
 		}
+	})
+
+	t.Run("can't connect db", func(t *testing.T) {
+		sql := `create database test`
+		resp, err := manager.ExecWithHost(ctx, sql, "test")
+		if err == nil {
+			t.Errorf("expect query failed, but success")
+		}
+		assert.Equal(t, int64(0), resp)
+	})
+
+	t.Run("exec without leader", func(t *testing.T) {
+		sql := `create database test`
+		cluster := &dcs.Cluster{}
+
+		resp, err := manager.ExecLeader(ctx, sql, cluster)
+		assert.NotNil(t, err)
+		assert.Equal(t, int64(0), resp)
+		assert.ErrorIs(t, err, ClusterHasNoLeader)
 	})
 }

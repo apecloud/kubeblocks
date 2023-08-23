@@ -22,7 +22,6 @@ package postgres
 import (
 	"bufio"
 	"context"
-	"os"
 	"strconv"
 	"strings"
 
@@ -32,12 +31,16 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 )
 
 var (
 	ClusterHasNoLeader = errors.New("cluster has no leader now")
 )
+
+var fs = afero.NewOsFs()
 
 const (
 	PGDATA = "PGDATA"
@@ -96,7 +99,7 @@ type PidFile struct {
 
 func readPidFile(dataDir string) (*PidFile, error) {
 	file := &PidFile{}
-	f, err := os.Open(dataDir + "/postmaster.pid")
+	f, err := fs.Open(dataDir + "/postmaster.pid")
 	if err != nil {
 		return nil, err
 	}
@@ -205,27 +208,15 @@ func ParsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	switch {
 	case length >= 3 && matches[0][0] == anyA && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = quorum
-		amount, err := strconv.Atoi(matches[1][1])
-		if err != nil {
-			amount = 0
-		}
-		result.Amount = amount
+		result.Amount = cast.ToInt(matches[1][1])
 		syncList = matches[3 : length-1]
 	case length >= 3 && matches[0][0] == first && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
-		amount, err := strconv.Atoi(matches[1][1])
-		if err != nil {
-			amount = 0
-		}
-		result.Amount = amount
+		result.Amount = cast.ToInt(matches[1][1])
 		syncList = matches[3 : length-1]
 	case length >= 2 && matches[0][0] == num && matches[1][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
-		amount, err := strconv.Atoi(matches[0][1])
-		if err != nil {
-			amount = 0
-		}
-		result.Amount = amount
+		result.Amount = cast.ToInt(matches[0][1])
 		syncList = matches[2 : length-1]
 	default:
 		result.Types = priority

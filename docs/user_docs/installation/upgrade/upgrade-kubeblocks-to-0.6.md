@@ -223,7 +223,7 @@ KubeBlocks version 0.6 has many image changes from version 0.5. During upgrading
 
 ## Upgrade
 
-Since version 0.6 of the KubeBlocks DB cluster has many image changes, the Pod will be gradually restarted during the upgrade, resulting in the DB cluster unavailable for a short period of time. The unavailable time of the DB cluster is desided by network conditions and cluster size. The upgrade time of the KubeBlocks controller is about 2 minutes, the unavailable time of a single DB cluster is about 20s to 200s, and the complete recovery time of a single DB cluster is about 20s to 300s. If you pull images before you upgrade, see the section above, the unavailable time of a single DB cluster is about 20s to 100s, and the complete recovery time of a single DB cluster is about 20s to 150s.
+Since version 0.6 of the KubeBlocks DB cluster has many image changes, the Pod will be gradually restarted during the upgrade, resulting in the DB cluster unavailable for a short period of time. The unavailable time of the DB cluster is decided by network conditions and cluster size. The upgrade time of the KubeBlocks controller is about 2 minutes, the unavailable time of a single DB cluster is about 20s to 200s, and the complete recovery time of a single DB cluster is about 20s to 300s. If you pull images before you upgrade, see the section above, the unavailable time of a single DB cluster is about 20s to 100s, and the complete recovery time of a single DB cluster is about 20s to 150s.
 
 ***Steps***
 

@@ -7,7 +7,7 @@ sidebar_label: Simulate I/O faults
 
 # Simulate I/O faults
 
-IOChaos experiment can simulate file system faults. I/O fault injection currently supports latency, fault, attribure override, and mistake.
+IOChaos experiment can simulate file system faults. I/O fault injection currently supports latency, fault, attribute override, and mistake.
 
 * Latency: delays file system calls.
 * Fault: returns an error for filesystem calls.
@@ -86,7 +86,7 @@ You can use the following flags to modify attributes.
 
 | Option                   | Description               | Default value | Reuiqred |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--blocks` | Number of blcoks that a file uses. | None | No |
+| `--blocks` | Number of blocks that a file uses. | None | No |
 | `--ino` | ino number. | None | No |
 | `--nlink` | Number of hard links. | None | No |
 | `--perm` | File permissions in decimal. | None | No |

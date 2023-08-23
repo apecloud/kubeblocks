@@ -45,7 +45,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 
    - `--components` value can be `broker` or `controller`.
      - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the correponding nodes in the separated mode.
+     - controller: all the corresponding nodes in the separated mode.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
@@ -163,7 +163,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
  
    - `--components` value can be `broker` or `controller`.
      - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the correponding nodes in the separated mode.
+     - controller: all the corresponding nodes in the separated mode.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 

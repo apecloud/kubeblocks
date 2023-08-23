@@ -1,6 +1,6 @@
 ---
 title: Supported add-ons 
-description: add-ons suported by KubeBlocks
+description: add-ons supported by KubeBlocks
 keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
 sidebar_position: 2
 sidebar_label: Supported add-ons 

@@ -32,7 +32,7 @@ spec:
     datafile:
       # UTC time zone, the example below stands for 2 A.M. every Monday
       cronExpression: "0 18 * * 0"
-      # Enable this funciton
+      # Enable this function
       enable: true
 ```
 
@@ -50,7 +50,7 @@ spec:
     enabled: true
     # UTC time zone, the example below stands for 2 A.M. every Monday
     cronExpression: 0 18 * * *
-    # It specifies the backup method. Here is an example of backupTool. If your storage suports snapshot, you can change it to snapshot
+    # It specifies the backup method. Here is an example of backupTool. If your storage supports snapshot, you can change it to snapshot
     method: backupTool
     # Disable PITR. If enabled, automatic backup is enabled accordingly
     pitrEnabled: false

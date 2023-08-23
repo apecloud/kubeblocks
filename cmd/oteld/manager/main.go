@@ -36,6 +36,7 @@ import (
 
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitorcontrollers "github.com/apecloud/kubeblocks/controllers/monitor"
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -92,9 +93,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&monitorcontrollers.OTeldReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	if err = monitorcontrollers.New(types.OTeldParams{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("oteld-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OTeld")
 		os.Exit(1)

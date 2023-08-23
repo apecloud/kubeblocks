@@ -21,7 +21,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+
+	"github.com/spf13/viper"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,8 +40,11 @@ import (
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitorcontrollers "github.com/apecloud/kubeblocks/controllers/monitor"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	//+kubebuilder:scaffold:imports
 )
+
+const appName = "oteld"
 
 var (
 	scheme   = runtime.NewScheme()
@@ -50,6 +56,16 @@ func init() {
 
 	utilruntime.Must(monitorv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", appName))
+	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName))
+	viper.AddConfigPath(".")
+
+	// set env default value
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
+	viper.SetDefault(constant.KBMonitorImage, "apecloud/kubeblocks-monitor:latest")
 }
 
 func main() {
@@ -68,6 +84,13 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	setupLog.Info(fmt.Sprintf("oteld config file: %s", viper.ConfigFileUsed()))
+	config, err := types.LoadConfig(viper.ConfigFileUsed())
+	if err != nil {
+		setupLog.Error(err, "unable to load config")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -97,7 +120,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("oteld-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	}, config).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OTeld")
 		os.Exit(1)
 	}

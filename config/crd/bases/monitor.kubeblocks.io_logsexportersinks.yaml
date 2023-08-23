@@ -35,10 +35,97 @@ spec:
           spec:
             description: LogsExporterSinkSpec defines the desired state of LogsExporterSink
             properties:
-              foo:
-                description: Foo is an example field of LogsExporterSink. Edit logsexportersink_types.go
-                  to remove/update
+              inline:
+                description: SinkSource describes the config of the exporterSink
+                properties:
+                  lokiConfig:
+                    description: lokiConfig defines the config of the loki
+                    properties:
+                      clusterName:
+                        description: Specify the cluster of the referenced service.
+                        type: string
+                      endpoint:
+                        description: TODO the field for test Specify the endpoint
+                          of the referenced service.
+                        type: string
+                      namespace:
+                        default: default
+                        description: Specify the namespace of the referenced the serviceConnectionCredential
+                          object. An empty namespace is equivalent to the "default"
+                          namespace.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                        type: string
+                      retryPolicyOnFailure:
+                        description: Define retry strategy when loki service is unavailable.
+                          If not set, not retry sending batches in case of export
+                          failure.
+                        properties:
+                          initialInterval:
+                            description: initialInterval the time to wait after the
+                              first failure before retrying.
+                            format: int64
+                            type: integer
+                          maxElapsedTime:
+                            description: maxElapsedTime is the maximum amount of time
+                              (including retries) spent trying to send a request/batch.
+                              Once this value is reached, the data is discarded.
+                            format: int64
+                            type: integer
+                          maxInterval:
+                            description: maxInterval is the upper bound on backoff
+                              interval. Once this value is reached the delay between
+                              consecutive retries will always be `MaxInterval`.
+                            format: int64
+                            type: integer
+                          multiplier:
+                            description: multiplier is the value multiplied by the
+                              backoff interval bounds
+                            format: int64
+                            type: integer
+                          randomizationFactor:
+                            description: randomizationFactor is a random factor used
+                              to calculate next backoffs Randomized interval = RetryInterval
+                              * (1 ± RandomizationFactor)
+                            format: int64
+                            type: integer
+                        type: object
+                      serviceConnectionCredential:
+                        description: Specify the name of the referenced the serviceConnectionCredential
+                          object.
+                        type: string
+                      sinkQueueConfig:
+                        description: Define whether to not enqueue batches before
+                          sending to the consumerSender.
+                        properties:
+                          numConsumers:
+                            description: numConsumers is the number of consumers from
+                              the queue.
+                            type: integer
+                          queueSize:
+                            description: queueSize is the maximum number of batches
+                              allowed in queue at a given time.
+                            type: integer
+                        required:
+                        - numConsumers
+                        - queueSize
+                        type: object
+                    required:
+                    - serviceConnectionCredential
+                    type: object
+                  s3Config:
+                    description: s3Config defines the config of the s3
+                    type: object
+                type: object
+              type:
+                description: type defines the type of the exporterSink
+                enum:
+                - S3SinkType
+                - LokiSinkType
                 type: string
+            required:
+            - inline
+            - type
             type: object
           status:
             description: LogsExporterSinkStatus defines the observed state of LogsExporterSink

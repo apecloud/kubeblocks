@@ -55,8 +55,7 @@ func TestOperations(t *testing.T) {
 	properties := make(component.Properties)
 	properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
 	_ = pgOps.Init(properties)
-	assert.Equal(t, "postgres", pgOps.DBType)
-	assert.NotNil(t, pgOps.InitIfNeed)
+	assert.Equal(t, "postgresql", pgOps.DBType)
 	assert.NotNil(t, pgOps.GetRole)
 	assert.Equal(t, 5432, pgOps.DBPort)
 	assert.NotNil(t, pgOps.OperationsMap[GetRoleOperation])

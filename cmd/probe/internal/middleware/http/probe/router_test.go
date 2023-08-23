@@ -58,7 +58,7 @@ func TestGetRouter(t *testing.T) {
 		addr := s.Listener.Addr().String()
 		index := strings.LastIndex(addr, ":")
 		portStr := addr[index+1:]
-		viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", "["+portStr+"]")
+		viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
 
 		err := mockRegister()
 		assert.Nil(t, err)

@@ -32,7 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // RoleChangeEventHandler is the event handler for the role change event
@@ -43,9 +42,6 @@ var term int
 
 // Handle handles role changed event.
 func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.Reason != string(probeutil.GetGlobalInfoOperation) {
-		return nil
-	}
 	var (
 		err         error
 		annotations = event.GetAnnotations()
@@ -58,9 +54,9 @@ func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Re
 	if _, err = handleRoleChangedEvent(cli, reqCtx, recorder, event); err != nil {
 		return err
 	}
-	//if err = handleGlobalInfoEvent(cli, reqCtx, recorder, event); err != nil {
+	// if err = handleGlobalInfoEvent(cli, reqCtx, recorder, event); err != nil {
 	//	return err
-	//}
+	// }
 
 	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be filtered
 	patch := client.MergeFrom(event.DeepCopy())

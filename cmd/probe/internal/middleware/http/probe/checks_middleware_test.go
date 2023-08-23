@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	json "github.com/json-iterator/go"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,14 +59,12 @@ func TestSetMiddleware(t *testing.T) {
 	})
 
 	t.Run("Rewrite StatusCode", func(t *testing.T) {
-		viper.Set("KB_PROBE_TOKEN", "ok")
 
 		mockHandler := func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Add(statusCodeHeader, strconv.Itoa(http.StatusNotFound))
 		}
 
 		request := httptest.NewRequest("Post", "/v1.0/bindings", nil)
-		request.Header.Add(tokenKeyInHeader, "ok")
 		recorder := httptest.NewRecorder()
 
 		middleware := SetMiddleware(mockHandler)
@@ -77,44 +74,4 @@ func TestSetMiddleware(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, code)
 	})
 
-	t.Run("Token missing", func(t *testing.T) {
-		viper.Set("KB_PROBE_TOKEN", "nothing")
-
-		mockHandler := func(writer http.ResponseWriter, request *http.Request) {
-			writer.Header().Add(statusCodeHeader, strconv.Itoa(http.StatusNotFound))
-		}
-
-		request := httptest.NewRequest("Post", "/v1.0/bindings", nil)
-		recorder := httptest.NewRecorder()
-
-		middleware := SetMiddleware(mockHandler)
-		middleware(recorder, request)
-
-		code := recorder.Code
-		assert.Equal(t, http.StatusUnauthorized, code)
-
-		s := recorder.Body.String()
-		assert.Equal(t, "token missing... request refused!", s)
-	})
-
-	t.Run("Token mismatch", func(t *testing.T) {
-		viper.Set("KB_PROBE_TOKEN", "nothing")
-
-		mockHandler := func(writer http.ResponseWriter, request *http.Request) {
-			writer.Header().Add(statusCodeHeader, strconv.Itoa(http.StatusNotFound))
-		}
-
-		request := httptest.NewRequest("Post", "/v1.0/bindings", nil)
-		request.Header.Add(tokenKeyInHeader, "something")
-		recorder := httptest.NewRecorder()
-
-		middleware := SetMiddleware(mockHandler)
-		middleware(recorder, request)
-
-		code := recorder.Code
-		assert.Equal(t, http.StatusUnauthorized, code)
-
-		s := recorder.Body.String()
-		assert.Equal(t, "token mismatch: something is invalid.", s)
-	})
 }

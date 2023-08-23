@@ -41,7 +41,6 @@ const (
 	// by dapr framework and http framework in the end.
 	statusCodeHeader = "Metadata.status-Code"
 	bodyFmt          = `{"operation": "%s", "metadata": {"sql" : ""}}`
-	tokenKeyInHeader = "token"
 )
 
 type RequestMeta struct {

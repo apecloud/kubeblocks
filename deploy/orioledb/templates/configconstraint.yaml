@@ -9,7 +9,7 @@ spec:
   reloadOptions:
     tplScriptTrigger:
       sync: false
-      scriptConfigMapRef: patroni-reload-script
+      scriptConfigMapRef: orioledb-patroni-reload-script
       namespace: {{ .Release.Namespace }}
 
   # update patroni master

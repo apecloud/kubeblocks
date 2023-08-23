@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: patroni-reload-script
+  name: orioledb-patroni-reload-script
   labels:
     {{- include "orioledb.labels" . | nindent 4 }}
 data:

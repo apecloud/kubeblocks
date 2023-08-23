@@ -67,8 +67,8 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
           defaultMode: 0777
-        - name: pgbouncer-configuration
-          templateRef: pgbouncer-configuration
+        - name: orioledb-pgbouncer-configuration
+          templateRef: orioledb-pgbouncer-configuration
           keys:
             - pgbouncer.ini
           namespace: {{ .Release.Namespace }}
@@ -80,7 +80,7 @@ spec:
           volumeName: postgresql-custom-metrics
           defaultMode: 0777
         - name: agamotto-configuration
-          templateRef: postgresql-agamotto-configuration
+          templateRef: orioledb-agamotto-configuration
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
           defaultMode: 0777

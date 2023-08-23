@@ -1,7 +1,7 @@
 name: RENEW-ISSUE
 
 on:
-  workflow_call:
+  workflow_dispatch:
 
 jobs:
   renew-sealos-issue:

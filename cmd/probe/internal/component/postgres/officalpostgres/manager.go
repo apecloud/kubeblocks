@@ -71,11 +71,11 @@ func (mgr *Manager) IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool
 	return true
 }
 
-func (mgr *Manager) AddCurrentMemberToCluster(*dcs.Cluster) error {
+func (mgr *Manager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
+func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 
@@ -189,7 +189,7 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	}
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
 	return cluster.GetMemberAddrs()
 }
 
@@ -586,7 +586,7 @@ func (mgr *Manager) getHistory() []*postgres.History {
 	return nil
 }
 
-func (mgr *Manager) Promote(ctx context.Context) error {
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
 		mgr.Logger.Infof("i am already the leader, don't need to promote")
 		return nil
@@ -690,7 +690,9 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
 		return err
 	}
-	defer pgConf.Close()
+	defer func() {
+		_ = pgConf.Close()
+	}()
 
 	writer := bufio.NewWriter(pgConf)
 	_, err = writer.WriteString(primaryInfo)

@@ -72,7 +72,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	}
 	mgr.isLeader = isLeader
 
-	memberAddrs := mgr.GetMemberAddrs(cluster)
+	memberAddrs := mgr.GetMemberAddrs(ctx, cluster)
 	if memberAddrs == nil {
 		mgr.Logger.Errorf("get member addr failed")
 		return nil
@@ -212,12 +212,11 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	return role, nil
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
 	if mgr.DBState != nil && mgr.memberAddrs != nil {
 		return mgr.memberAddrs
 	}
 
-	ctx := context.TODO()
 	sql := `select ip_port from consensus_cluster_status;`
 
 	resp, err := mgr.QueryLeader(ctx, sql, cluster)
@@ -241,7 +240,7 @@ func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 }
 
 func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
-	memberAddrs := mgr.GetMemberAddrs(cluster)
+	memberAddrs := mgr.GetMemberAddrs(ctx, cluster)
 	// AddCurrentMemberToCluster is executed only when memberAddrs are successfully obtained and memberAddrs not Contains CurrentMember
 	if memberAddrs != nil && !slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName)) {
 		return false
@@ -286,11 +285,11 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 	return connected && logDelayNum <= cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
-func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	sql := fmt.Sprintf(`alter system consensus add follower '%s:%d';`,
 		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), mgr.Config.GetDBPort())
 
-	_, err := mgr.ExecLeader(context.TODO(), sql, cluster)
+	_, err := mgr.ExecLeader(ctx, sql, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
@@ -299,12 +298,12 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, host string) error {
 	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
 		host, mgr.Config.GetDBPort())
 
 	// only leader can delete member, so don't need to get pool
-	_, err := mgr.ExecWithHost(context.TODO(), sql, "")
+	_, err := mgr.ExecWithHost(ctx, sql, "")
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
 		return err
@@ -331,7 +330,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
 }
 
-func (mgr *Manager) Promote(ctx context.Context) error {
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
 		mgr.Logger.Infof("i am already the leader, don't need to promote")
 		return nil
@@ -361,12 +360,9 @@ func (mgr *Manager) Promote(ctx context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) Demote(context.Context) error {
-	return nil
-}
-
-func (mgr *Manager) Follow(context.Context, *dcs.Cluster) error {
-	return nil
+func (mgr *Manager) IsPromoted(ctx context.Context) bool {
+	isLeader, _ := mgr.IsLeader(ctx, nil)
+	return isLeader
 }
 
 func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {

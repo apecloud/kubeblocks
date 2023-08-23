@@ -383,7 +383,7 @@ test=test
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ApplyConfigPatch(tt.args.baseCfg, tt.args.updatedParameters, tt.args.formatConfig)
+			got, err := ApplyConfigPatch(tt.args.baseCfg, FromStringPointerMap(tt.args.updatedParameters), tt.args.formatConfig)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ApplyConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
 				return

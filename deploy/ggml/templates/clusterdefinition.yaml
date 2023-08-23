@@ -1,0 +1,36 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: ggml
+  labels:
+    {{- include "llm.labels" . | nindent 4}}
+spec:
+  componentDefs:
+    - name: ggml
+      workloadType: Stateful
+      characterType: ggml
+      service:
+        ports:
+          - name: model
+            port: 8000
+            targetPort: model
+      podSpec:
+        volumes:
+          - name: models
+            emptyDir: {}
+        containers:
+          - name: ggml
+            imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - name: models
+                mountPath: /models
+            ports:
+              - name: model
+                containerPort: 8000
+  connectionCredential:
+    username: root
+    password: ""

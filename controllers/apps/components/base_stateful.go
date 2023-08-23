@@ -41,6 +41,7 @@ import (
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
 )
 
 // rsmComponentBase as a base class for single rsm based component (stateful & replication & consensus).
@@ -539,8 +540,49 @@ func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.Requ
 func (c *rsmComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	// if scale in to 0, do not delete pvcs
 	if c.Component.Replicas == 0 {
+		reqCtx.Log.Info("scale in to 0, keep all PVCs")
 		return nil
 	}
+	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
+	err := c.leaveMember4ScaleIn(reqCtx, cli, stsObj)
+	if err != nil {
+		reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
+		return err
+	}
+	return c.deletePVCs4ScaleIn(reqCtx, cli, stsObj)
+}
+
+func (c *rsmComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+	return nil
+}
+
+func (c *rsmComponentBase) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		return err
+	}
+	basePodName := fmt.Sprintf("%s-%d", stsObj.Name, c.Component.Replicas)
+	for _, pod := range pods {
+		if strings.TrimSpace(pod.Name) < basePodName {
+			continue
+		}
+		lorryCli, err1 := lorry.NewClient(c.Component.CharacterType, *pod)
+		if err1 != nil {
+			if err == nil {
+				err = err1
+			}
+			continue
+		}
+		if err2 := lorryCli.LeaveMember(reqCtx.Ctx); err2 != nil {
+			if err == nil {
+				err = err2
+			}
+		}
+	}
+	return err // TODO: use requeue-after
+}
+
+func (c *rsmComponentBase) deletePVCs4ScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	for i := c.Component.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
@@ -558,10 +600,6 @@ func (c *rsmComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Cli
 			c.DeleteResource(&pvc, c.WorkloadVertex)
 		}
 	}
-	return nil
-}
-
-func (c *rsmComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	return nil
 }
 

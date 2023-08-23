@@ -72,7 +72,7 @@ type CfgOpOption struct {
 
 type ParameterPair struct {
 	Key   string
-	Value string
+	Value *string
 }
 
 // ParameterUpdateType describes how to update the parameters.

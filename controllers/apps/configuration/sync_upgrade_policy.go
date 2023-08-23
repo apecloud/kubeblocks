@@ -146,7 +146,9 @@ func getOnlineUpdateParams(configPatch *cfgutil.ConfigPatchInfo, formatConfig *a
 	for _, key := range parameters {
 		if key.UpdateType == cfgutil.UpdatedType {
 			for _, p := range key.Parameters {
-				r[p.Key] = p.Value
+				if p.Value != nil {
+					r[p.Key] = *p.Value
+				}
 			}
 		}
 	}

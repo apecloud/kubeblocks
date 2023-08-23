@@ -186,7 +186,7 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
 * `spec.clusterDefinitionRef` is the name of the cluster definition CRD that defines the cluster components.
 * `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
 * `spec.componentSpecs` is the list of components that define the cluster components.
-* `spec.componetSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition, you can get the component definition names with `kubectl get clusterdefinition mongodb -o json | jq '.spec.componentDefs[].name'`
+* `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition, you can get the component definition names with `kubectl get clusterdefinition mongodb -o json | jq '.spec.componentDefs[].name'`
 * `spec.componentSpecs.name` is the name of the component.
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.

@@ -22,16 +22,28 @@ package monitor
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/reconcile"
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // OTeldReconciler reconciles a OTeld object
 type OTeldReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+
+	// sub-controllers
+	tasks []types.ReconcileTask
 }
 
 //+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=collectordatasources,verbs=get;list;watch;create;update;patch;delete
@@ -54,16 +66,56 @@ type OTeldReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := types.ReconcileCtx{
+		Ctx:    ctx,
+		Req:    req,
+		Log:    log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
+		Config: &monitorv1alpha1.Config{},
+	}
 
-	// TODO(user): your logic here
+	if err := r.runTasks(reqCtx); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
+}
 
-	return ctrl.Result{}, nil
+func (r *OTeldReconciler) runTasks(reqCtx types.ReconcileCtx) error {
+	for _, task := range r.tasks {
+		if err := task.Do(reqCtx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func New(params types.OTeldParams) *OTeldReconciler {
+	return &OTeldReconciler{
+		Client:   params.Client,
+		Scheme:   params.Scheme,
+		Recorder: params.Recorder,
+		// sub-controllers
+		tasks: []types.ReconcileTask{
+			types.NewReconcileTask(reconcile.OTeldName, types.WithReconcileOption(reconcile.OTeld, params)),
+			types.NewReconcileTask(reconcile.OTeldAPIServerName, types.WithReconcileOption(reconcile.Deployment, params)),
+			types.NewReconcileTask(reconcile.OTeldAgentName, types.WithReconcileOption(reconcile.OTeldAgent, params)),
+			types.NewReconcileTask(reconcile.PrometheusName, types.WithReconcileOption(reconcile.Prometheus, params)),
+			types.NewReconcileTask(reconcile.LokiName, types.WithReconcileOption(reconcile.Loki, params)),
+			types.NewReconcileTask(reconcile.GrafnaName, types.WithReconcileOption(reconcile.Grafana, params)),
+			types.NewReconcileTask(reconcile.VMAgentName, types.WithReconcileOption(reconcile.VMAgent, params)),
+		},
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OTeldReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		// For(&monitorv1alpha1.OTeld{}).
+		For(&monitorv1alpha1.LogsExporterSink{}).
+		For(&monitorv1alpha1.MetricsExporterSink{}).
+		For(&monitorv1alpha1.CollectorDataSource{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
+		Owns(&appsv1.DaemonSet{}).
+		Owns(&appsv1.Deployment{}).
 		Complete(r)
 }

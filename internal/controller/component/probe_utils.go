@@ -228,6 +228,8 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 
+	// -> uncomment it to enable snapshot to cluster
+
 	//base := probeSvcHTTPPort + 2
 	//portNeeded := len(probeSetting.Actions)
 	//activePorts := make([]int32, portNeeded)
@@ -336,40 +338,40 @@ func injectHttp2Shell(pod *corev1.PodSpec) {
 	pod.InitContainers = append(pod.InitContainers, initContainer)
 }
 
-//func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
-//	port []int32, path, usage string,
-//	credentialEnv []corev1.EnvVar) {
-//	actions := probeSetting.Actions
-//	volumeMount := corev1.VolumeMount{
-//		Name:      constant.ProbeAgentMountName,
-//		MountPath: constant.ProbeAgentMountPath,
-//	}
-//	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
-//
-//	for i, action := range actions {
-//		image := action.Image
-//		if len(action.Image) == 0 {
-//			image = constant.DefaultActionImage
-//		}
-//
-//		command := []string{
-//			binPath,
-//			"-port", fmt.Sprintf("%d", port[i]),
-//			"-export-all-vars",
-//			"-form",
-//			path,
-//			strings.Join(action.Command, " "),
-//		}
-//
-//		container := corev1.Container{
-//			Name:            fmt.Sprintf("%s-action-%d", usage, i),
-//			Image:           image,
-//			ImagePullPolicy: corev1.PullIfNotPresent,
-//			VolumeMounts:    []corev1.VolumeMount{volumeMount},
-//			Env:             credentialEnv,
-//			Command:         command,
-//		}
-//
-//		pod.Containers = append(pod.Containers, container)
-//	}
-//}
+func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
+	port []int32, path, usage string,
+	credentialEnv []corev1.EnvVar) {
+	//actions := probeSetting.Actions
+	//volumeMount := corev1.VolumeMount{
+	//	Name:      constant.ProbeAgentMountName,
+	//	MountPath: constant.ProbeAgentMountPath,
+	//}
+	//binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
+	//
+	//for i, action := range actions {
+	//	image := action.Image
+	//	if len(action.Image) == 0 {
+	//		image = constant.DefaultActionImage
+	//	}
+	//
+	//	command := []string{
+	//		binPath,
+	//		"-port", fmt.Sprintf("%d", port[i]),
+	//		"-export-all-vars",
+	//		"-form",
+	//		path,
+	//		strings.Join(action.Command, " "),
+	//	}
+	//
+	//	container := corev1.Container{
+	//		Name:            fmt.Sprintf("%s-action-%d", usage, i),
+	//		Image:           image,
+	//		ImagePullPolicy: corev1.PullIfNotPresent,
+	//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
+	//		Env:             credentialEnv,
+	//		Command:         command,
+	//	}
+	//
+	//	pod.Containers = append(pod.Containers, container)
+	//}
+}

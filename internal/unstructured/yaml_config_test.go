@@ -56,6 +56,9 @@ spec:
 
 	assert.Nil(t, yamlConfigObj.Update("spec.my_test", "100"))
 	assert.EqualValues(t, yamlConfigObj.Get("spec.my_test"), "100")
+	assert.Nil(t, yamlConfigObj.RemoveKey("spec.my_test.xxx"))
+	assert.Nil(t, yamlConfigObj.RemoveKey("spec.my_test"))
+	assert.EqualValues(t, yamlConfigObj.Get("spec.my_test"), nil)
 }
 
 func TestYAMLFormatForBadCase(t *testing.T) {

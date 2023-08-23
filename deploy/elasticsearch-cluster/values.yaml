@@ -55,7 +55,6 @@ persistence:
     storageClassName:
     size: 1Gi
 
-# 从dashboard改成metrics
 metrics:
   resources: {}
   replicaCount: 1

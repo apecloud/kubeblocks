@@ -182,10 +182,6 @@ func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *DBManagerBase) IsLeader(context.Context, *dcs.Cluster) (bool, error) {
-	return false, errors.Errorf("Override me!")
-}
-
 // Start does not directly mean to start a database instance,
 // but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start(*dcs.Cluster) error {

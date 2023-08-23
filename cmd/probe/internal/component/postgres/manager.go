@@ -22,6 +22,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 
 	"github.com/dapr/kit/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -36,9 +37,10 @@ import (
 
 type Manager struct {
 	component.DBManagerBase
-	Pool   PgxPoolIFace
-	Proc   *process.Process
-	Config *Config
+	Pool     PgxPoolIFace
+	Proc     *process.Process
+	Config   *Config
+	isLeader bool
 }
 
 func NewManager(logger logger.Logger) (*Manager, error) {
@@ -96,6 +98,31 @@ func (mgr *Manager) Recover(context.Context) error {
 
 func (mgr *Manager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
+}
+
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	if mgr.DBState != nil {
+		return mgr.isLeader, nil
+	}
+
+	return mgr.IsLeaderWithHost(ctx, "")
+}
+
+func (mgr *Manager) SetLeader(isLeader bool) {
+	mgr.isLeader = isLeader
+}
+
+func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
+	role, err := mgr.GetMemberRoleWithHost(ctx, host)
+	if err != nil {
+		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
+	}
+
+	return role == binding.LEADER || role == binding.PRIMARY, nil
+}
+
+func (mgr *Manager) GetMemberRoleWithHost(context.Context, string) (string, error) {
+	return "", nil
 }
 
 func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {

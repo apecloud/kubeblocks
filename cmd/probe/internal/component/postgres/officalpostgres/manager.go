@@ -45,7 +45,6 @@ import (
 type Manager struct {
 	postgres.Manager
 	syncStandbys *postgres.PGStandby
-	isLeader     bool
 }
 
 var Mgr *Manager
@@ -97,7 +96,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("check is leader failed, err:%v", err)
 		return nil
 	}
-	mgr.isLeader = isLeader
+	mgr.SetLeader(isLeader)
 
 	replicationMode, err := mgr.getReplicationMode(ctx)
 	if err != nil {
@@ -130,15 +129,6 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 
 	mgr.DBState = dbState
 	return mgr.DBState
-}
-
-func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
-	role, err := mgr.GetMemberRoleWithHost(ctx, host)
-	if err != nil {
-		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
-	}
-
-	return role == binding.PRIMARY, nil
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
@@ -282,7 +272,7 @@ func (mgr *Manager) getWalPositionWithHost(ctx context.Context, host string) (in
 	)
 
 	if host == "" {
-		isLeader = mgr.isLeader
+		isLeader, err = mgr.IsLeader(ctx, nil)
 	} else {
 		isLeader, err = mgr.IsLeaderWithHost(ctx, host)
 	}

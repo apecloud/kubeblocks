@@ -26,13 +26,67 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type ServiceRef struct {
+	// Specify the cluster of the referenced service.
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// Specify the namespace of the referenced the serviceConnectionCredential object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace"`
+
+	// Specify the name of the referenced the serviceConnectionCredential object.
+	// +kubebuilder:validation:Required
+	ServiceConnectionCredential string `json:"serviceConnectionCredential"`
+
+	// TODO the field for test
+	// Specify the endpoint of the referenced service.
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+}
+
+type LokiConfig struct {
+	ServiceRef `json:",inline"`
+
+	// Define retry strategy when loki service is unavailable.
+	// If not set, not retry sending batches in case of export failure.
+	// +optional
+	RetryPolicyOnFailure *RetryPolicyOnFailure `json:"retryPolicyOnFailure"`
+
+	// Define whether to not enqueue batches before sending to the consumerSender.
+	// +optional
+	SinkQueueConfig *SinkQueueConfig `json:"sinkQueueConfig"`
+}
+
+type S3Config struct {
+}
+
+type SinkSource struct {
+	// lokiConfig defines the config of the loki
+	// +optional
+	LokiConfig *LokiConfig `json:"lokiConfig,omitempty"`
+
+	// s3Config defines the config of the s3
+	// +optional
+	S3Config *S3Config `json:"s3Config,omitempty"`
+}
+
 // LogsExporterSinkSpec defines the desired state of LogsExporterSink
 type LogsExporterSinkSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of LogsExporterSink. Edit logsexportersink_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// type defines the type of the exporterSink
+	// +kubebuilder:validation:Required
+	Type LogsSinkType `json:"type"`
+
+	// SinkSource describes the config of the exporterSink
+	// +kubebuilder:validation:Required
+	SinkSource `json:"inline"`
 }
 
 // LogsExporterSinkStatus defines the observed state of LogsExporterSink

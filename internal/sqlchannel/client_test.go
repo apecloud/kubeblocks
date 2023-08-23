@@ -101,15 +101,6 @@ func TestNewClientWithPod(t *testing.T) {
 		}
 	})
 
-	//t.Run("WithOutPodGPRCPort", func(t *testing.T) {
-	//	podWithoutGRPCPort := pod.DeepCopy()
-	//	podWithoutGRPCPort.Spec.Containers[0].Ports = podWithoutGRPCPort.Spec.Containers[0].Ports[:1]
-	//	_, err := NewClientWithPod(podWithoutGRPCPort, "mysql")
-	//	if err == nil {
-	//		t.Errorf("new sql channel client union")
-	//	}
-	//})
-
 	t.Run("Success", func(t *testing.T) {
 		_, err := NewClientWithPod(pod, "mysql")
 		if err != nil {
@@ -117,26 +108,6 @@ func TestNewClientWithPod(t *testing.T) {
 		}
 	})
 }
-
-//func TestGPRC(t *testing.T) {
-//	url := os.Getenv("PROBE_GRPC_URL")
-//	if url == "" {
-//		t.SkipNow()
-//	}
-//	req := &dapr.InvokeBindingRequest{
-//		Name:      "mongodb",
-//		Operation: "getRole",
-//		Data:      []byte(""),
-//		Metadata:  map[string]string{},
-//	}
-//	cli, _ := dapr.NewClientWithAddress(url)
-//	resp, _ := cli.InvokeBinding(context.Background(), req)
-//	t.Logf("probe response metadata: %v", resp.Metadata)
-//	result := map[string]string{}
-//	_ = json.Unmarshal(resp.Data, &result)
-//	t.Logf("probe response data: %v", result)
-//
-//}
 
 func TestGetRole(t *testing.T) {
 

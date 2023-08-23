@@ -267,6 +267,13 @@ func (mysqlOps *MysqlOperations) GetGlobalInfoForConsensus(ctx context.Context, 
 			portStartIndex := strings.LastIndex(ipPort, ":")
 			domainName := ipPort[:portStartIndex]
 			firstDot := strings.Index(domainName, ".")
+			if firstDot == -1 {
+				err = errors.Errorf("wrong domain name format: %s", domainName)
+				mysqlOps.Logger.Error(err, "Get global info err")
+				globalInfo.Event = OperationFailed
+				globalInfo.Message = err.Error()
+				return globalInfo, err
+			}
 			podName := domainName[:firstDot]
 			podName2Role[podName] = role
 		}

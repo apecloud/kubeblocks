@@ -115,7 +115,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 	defer resp.Body.Close()
 	result := map[string]string{}
 
-	buf, err := io.ReadAll(resp.Body)
+	buf, _ := io.ReadAll(resp.Body)
 	err = json.Unmarshal(buf, &result)
 	if err != nil {
 		return "", err

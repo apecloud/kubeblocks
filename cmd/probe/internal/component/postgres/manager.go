@@ -110,14 +110,6 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 	return members
 }
 
-func (mgr *Manager) IsRootCreated(context.Context) (bool, error) {
-	return true, nil
-}
-
-func (mgr *Manager) CreateRoot(context.Context) error {
-	return nil
-}
-
 func (mgr *Manager) ReadCheck(ctx context.Context, host string) bool {
 	readSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
 	_, err := mgr.QueryWithHost(ctx, readSQL, host)

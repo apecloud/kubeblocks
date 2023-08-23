@@ -364,17 +364,10 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 		return opsRes, nil
 	}
 
-	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
-	if characterType == "" {
+	manager, err := component.GetDefaultManager()
+	if err != nil {
 		opsRes["event"] = OperationFailed
-		opsRes["message"] = "KB_SERVICE_CHARACTER_TYPE not set"
-		return opsRes, nil
-	}
-
-	manager := component.GetManager(characterType)
-	if manager == nil {
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = fmt.Sprintf("No DB Manager for character type %s", characterType)
+		opsRes["message"] = err.Error()
 		return opsRes, nil
 	}
 

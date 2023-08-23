@@ -36,6 +36,32 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
+type Client interface {
+	JoinMember(ctx context.Context) error
+	LeaveMember(ctx context.Context) error
+}
+
+// HACK: for unit test only.
+var mockClient Client
+var mockClientError error
+
+func SetMockClient(cli Client, err error) {
+	mockClient = cli
+	mockClientError = err
+}
+
+func UnsetMockClient() {
+	mockClient = nil
+	mockClientError = nil
+}
+
+func NewClient(characterType string, pod corev1.Pod) (Client, error) {
+	if mockClient != nil || mockClientError != nil {
+		return mockClient, mockClientError
+	}
+	return NewClientWithPod(&pod, characterType)
+}
+
 type OperationClient struct {
 	dapr.Client
 	CharacterType    string
@@ -44,6 +70,8 @@ type OperationClient struct {
 	ReconcileTimeout time.Duration
 	RequestTimeout   time.Duration
 }
+
+var _ Client = &OperationClient{}
 
 type OperationResult struct {
 	response *dapr.BindingEvent
@@ -136,6 +164,16 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 		return nil, err
 	}
 	return result, err
+}
+
+func (cli *OperationClient) JoinMember(ctx context.Context) error {
+	// TODO: implement
+	return nil
+}
+
+func (cli *OperationClient) LeaveMember(ctx context.Context) error {
+	// TODO: implement
+	return nil
 }
 
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {

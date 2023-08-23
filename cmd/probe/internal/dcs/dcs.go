@@ -26,7 +26,7 @@ import (
 )
 
 type DCS interface {
-	Initialize() error
+	Initialize(*Cluster) error
 
 	// cluster manage functions
 	GetClusterName() string
@@ -36,6 +36,7 @@ type DCS interface {
 
 	// cluster scole ha config
 	GetHaConfig() (*HaConfig, error)
+	UpdateHaConfig() error
 
 	// member manager funtions
 	GetMembers() ([]Member, error)
@@ -60,7 +61,8 @@ type DCS interface {
 var dcs DCS
 
 func init() {
-	viper.SetDefault(constant.KBEnvTTL, 5)
+	viper.SetDefault("KB_TTL", 5)
+	viper.SetDefault("KB_MAX_LAG", 10)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
 

@@ -44,6 +44,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -593,6 +594,9 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
+			lorry.SetMockClient(&mockLorryClient{replicas: 2, clusterKey: clusterKey, compName: mysqlCompName}, nil)
+			defer lorry.UnsetMockClient()
+
 			By("create a cluster with 3 pods")
 			createMysqlCluster(3)
 

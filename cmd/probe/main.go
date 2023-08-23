@@ -134,8 +134,8 @@ func main() {
 	// ha dependent on dbmanager which is initialized by rt.Run
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	ha := highavailability.NewHa(logHa)
 	if IsHAAvailable(characterType, workloadType) {
-		ha := highavailability.NewHa(logHa)
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()

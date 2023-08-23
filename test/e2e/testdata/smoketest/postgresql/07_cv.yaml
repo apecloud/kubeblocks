@@ -10,6 +10,14 @@ spec:
         containers:
           - name: postgresql
             image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.2
+          - name: pgbouncer
+            image: registry.cn-hangzhou.aliyuncs.com/apecloud/pgbouncer:1.19.0
         initContainers:
           - image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.2
             name: pg-init-container
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.2
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.2

@@ -25,34 +25,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newMockConfig(t *testing.T) *Config {
-	properties := map[string]string{
-		connectionURLKey: "user=test password=test host=localhost port=5432 dbname=postgres",
-	}
-	mockConfig, err := NewConfig(properties)
-	if err != nil {
-		t.Fatal("new mock config failed")
-		return nil
-	}
-
-	return mockConfig
-}
-
 func TestGetPostgresqlMetadata(t *testing.T) {
 	t.Run("With defaults", func(t *testing.T) {
 		properties := map[string]string{
-			connectionURLKey: "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10",
+			ConnectionURLKey: "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10",
 		}
 
 		metadata, err := NewConfig(properties)
 		assert.Nil(t, err)
-		assert.Equal(t, "postgres", metadata.username)
-		assert.Equal(t, "docker", metadata.password)
-		assert.Equal(t, "localhost", metadata.host)
-		assert.Equal(t, 5432, metadata.port)
-		assert.Equal(t, "postgres", metadata.database)
-		assert.Equal(t, int32(1), metadata.minConns)
-		assert.Equal(t, int32(10), metadata.maxConns)
+		assert.Equal(t, "postgres", metadata.Username)
+		assert.Equal(t, "docker", metadata.Password)
+		assert.Equal(t, "localhost", metadata.Host)
+		assert.Equal(t, 5432, metadata.Port)
+		assert.Equal(t, "postgres", metadata.Database)
+		assert.Equal(t, int32(1), metadata.MinConnections)
+		assert.Equal(t, int32(10), metadata.MaxConnections)
 	})
 
 	t.Run("url not set", func(t *testing.T) {
@@ -64,7 +51,7 @@ func TestGetPostgresqlMetadata(t *testing.T) {
 
 	t.Run("pool max connection too small", func(t *testing.T) {
 		properties := map[string]string{
-			connectionURLKey: "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=0",
+			ConnectionURLKey: "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=0",
 		}
 
 		_, err := NewConfig(properties)

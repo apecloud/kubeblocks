@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package postgres
 
 import (
+	"context"
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/dapr/kit/logger"
@@ -29,14 +32,18 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-func mockDatabase(t *testing.T, workloadType string) (*Manager, pgxmock.PgxPoolIface, error) {
-	config = newMockConfig(t)
+func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
+	properties := map[string]string{
+		ConnectionURLKey: "user=test password=test host=localhost port=5432 dbname=postgres",
+	}
+	testConfig, err := NewConfig(properties)
+	assert.NotNil(t, testConfig)
+	assert.Nil(t, err)
 
 	viper.Set(constant.KBEnvPodName, "test-pod-0")
 	viper.Set(constant.KBEnvClusterCompName, "test")
 	viper.Set(constant.KBEnvNamespace, "default")
 	viper.Set(PGDATA, "test")
-	viper.Set(constant.KBEnvWorkloadType, workloadType)
 	mock, err := pgxmock.NewPool(pgxmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatal(err)
@@ -49,4 +56,82 @@ func mockDatabase(t *testing.T, workloadType string) (*Manager, pgxmock.PgxPoolI
 	manager.Pool = mock
 
 	return manager, mock, err
+}
+
+func TestReadWrite(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("write check success", func(t *testing.T) {
+		mock.ExpectBegin()
+		mock.ExpectExec(`create table if not exists`).
+			WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
+		mock.ExpectCommit()
+
+		if ok := manager.WriteCheck(ctx, ""); !ok {
+			t.Errorf("write check failed")
+		}
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+
+	t.Run("write check failed", func(t *testing.T) {
+		mock.ExpectBegin()
+		mock.ExpectExec(`create table if not exists`).
+			WillReturnError(fmt.Errorf("some error"))
+		mock.ExpectRollback()
+
+		if ok := manager.WriteCheck(ctx, ""); ok {
+			t.Errorf("expect write check failed, but success")
+		}
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+
+	t.Run("read check", func(t *testing.T) {
+		row := pgxmock.NewRows([]string{"check_ts"}).AddRow(1)
+		mock.ExpectQuery("select").WillReturnRows(row)
+
+		if ok := manager.ReadCheck(ctx, ""); !ok {
+			t.Errorf("read check failed")
+		}
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+}
+
+func TestPgIsReady(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("pg is ready", func(t *testing.T) {
+		mock.ExpectPing()
+
+		if isReady := manager.IsPgReady(ctx); !isReady {
+			t.Errorf("test pg is ready failed")
+		}
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
+
+	t.Run("pg is not ready", func(t *testing.T) {
+		mock.ExpectPing().WillReturnError(fmt.Errorf("can't ping to db"))
+		if isReady := manager.IsPgReady(ctx); isReady {
+			t.Errorf("expect pg is not ready, but get ready")
+		}
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+	})
 }

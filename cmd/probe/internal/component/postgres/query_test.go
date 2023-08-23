@@ -29,7 +29,7 @@ import (
 
 func TestQuery(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, "")
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("common query success", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestQuery(t *testing.T) {
 
 func TestExec(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, "")
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("common exec success", func(t *testing.T) {

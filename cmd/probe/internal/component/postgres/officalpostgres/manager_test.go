@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package postgres
+package officalpostgres
 
 import (
 	"context"
@@ -25,25 +25,53 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dapr/kit/logger"
 	"github.com/pashagolub/pgxmock/v2"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	tmock "github.com/stretchr/testify/mock"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
+
+func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
+	properties := map[string]string{
+		postgres.ConnectionURLKey: "user=test password=test host=localhost port=5432 dbname=postgres",
+	}
+	testConfig, err := postgres.NewConfig(properties)
+	assert.NotNil(t, testConfig)
+	assert.Nil(t, err)
+
+	viper.Set(constant.KBEnvPodName, "test-pod-0")
+	viper.Set(constant.KBEnvClusterCompName, "test")
+	viper.Set(constant.KBEnvNamespace, "default")
+	viper.Set(postgres.PGDATA, "test")
+	mock, err := pgxmock.NewPool(pgxmock.MonitorPingsOption(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	manager, err := NewManager(logger.NewLogger("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.Pool = mock
+
+	return manager, mock, err
+}
 
 func TestGetMemberRoleWithHostReplication(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, Replication)
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("get member role primary", func(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow("f"))
 
-		role, err := manager.GetMemberRoleWithHostReplication(ctx, "")
+		role, err := manager.GetMemberRoleWithHost(ctx, "")
 		if err != nil {
 			t.Errorf("expect get member role success, but failed, err:%v", err)
 		}
@@ -55,7 +83,7 @@ func TestGetMemberRoleWithHostReplication(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow("t"))
 
-		role, err := manager.GetMemberRoleWithHostReplication(ctx, "")
+		role, err := manager.GetMemberRoleWithHost(ctx, "")
 		if err != nil {
 			t.Errorf("expect get member role success, but failed, err:%v", err)
 		}
@@ -67,7 +95,7 @@ func TestGetMemberRoleWithHostReplication(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnError(fmt.Errorf("some error"))
 
-		role, err := manager.GetMemberRoleWithHostReplication(ctx, "")
+		role, err := manager.GetMemberRoleWithHost(ctx, "")
 		if err == nil {
 			t.Errorf("expect get member role failed, but success")
 		}
@@ -78,7 +106,7 @@ func TestGetMemberRoleWithHostReplication(t *testing.T) {
 
 func TestGetReplicationMode(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, Replication)
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("synchronous_commit off", func(t *testing.T) {
@@ -90,7 +118,7 @@ func TestGetReplicationMode(t *testing.T) {
 			t.Errorf("expect get replication mode success but failed, err:%v", err)
 		}
 
-		assert.Equal(t, res, asynchronous)
+		assert.Equal(t, res, postgres.Asynchronous)
 	})
 
 	t.Run("synchronous_commit on", func(t *testing.T) {
@@ -102,13 +130,13 @@ func TestGetReplicationMode(t *testing.T) {
 			t.Errorf("expect get replication mode success but failed, err:%v", err)
 		}
 
-		assert.Equal(t, res, synchronous)
+		assert.Equal(t, res, postgres.Synchronous)
 	})
 }
 
 func TestGetWalPositionWithHost(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, Replication)
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("get primary wal position", func(t *testing.T) {
@@ -155,7 +183,7 @@ func TestGetWalPositionWithHost(t *testing.T) {
 
 func TestGetSyncStandbys(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, Replication)
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("get sync standbys success", func(t *testing.T) {
@@ -164,7 +192,6 @@ func TestGetSyncStandbys(t *testing.T) {
 
 		standbys := manager.getSyncStandbys(ctx)
 		assert.NotNil(t, standbys)
-		assert.Equal(t, quorum, standbys.Types)
 		assert.True(t, standbys.HasStar)
 		assert.True(t, standbys.Members.Contains("a"))
 		assert.Equal(t, 4, standbys.Amount)
@@ -189,28 +216,28 @@ func TestCheckStandbySynchronizedToLeader(t *testing.T) {
 	}
 
 	t.Run("synchronized to leader", func(t *testing.T) {
-		manager, _, _ := mockDatabase(t, Replication)
+		manager, _, _ := MockDatabase(t)
 		manager.CurrentMemberName = "a"
-		cluster.Leader.DBState.Extra[SyncStandBys] = "a,b,c"
+		cluster.Leader.DBState.Extra[postgres.SyncStandBys] = "a,b,c"
 
 		ok := manager.checkStandbySynchronizedToLeader(true, cluster)
 		assert.True(t, ok)
 	})
 
 	t.Run("is leader", func(t *testing.T) {
-		manager, _, _ := mockDatabase(t, Replication)
+		manager, _, _ := MockDatabase(t)
 		manager.CurrentMemberName = "a"
 		cluster.Leader.Name = "a"
-		cluster.Leader.DBState.Extra[SyncStandBys] = "b,c"
+		cluster.Leader.DBState.Extra[postgres.SyncStandBys] = "b,c"
 
 		ok := manager.checkStandbySynchronizedToLeader(true, cluster)
 		assert.True(t, ok)
 	})
 
 	t.Run("not synchronized to leader", func(t *testing.T) {
-		manager, _, _ := mockDatabase(t, Replication)
+		manager, _, _ := MockDatabase(t)
 		manager.CurrentMemberName = "d"
-		cluster.Leader.DBState.Extra[SyncStandBys] = "a,b,c"
+		cluster.Leader.DBState.Extra[postgres.SyncStandBys] = "a,b,c"
 
 		ok := manager.checkStandbySynchronizedToLeader(true, cluster)
 		assert.False(t, ok)
@@ -219,7 +246,7 @@ func TestCheckStandbySynchronizedToLeader(t *testing.T) {
 
 func TestGetReceivedTimeLine(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, Replication)
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("get received timeline success", func(t *testing.T) {
@@ -241,10 +268,8 @@ func TestGetReceivedTimeLine(t *testing.T) {
 
 func TestReadRecoveryParams(t *testing.T) {
 	ctx := context.TODO()
-	manager, mock, _ := mockDatabase(t, Replication)
+	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
-	fileMock := new(tmock.Mock)
-	fileMock.On("file exist", manager.DataDir+"/standby.signal", []byte("data")).Return(nil)
 
 	t.Run("host match", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").

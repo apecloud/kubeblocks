@@ -36,8 +36,7 @@ import (
 )
 
 var (
-	InvalidWorkLoadType = errors.New("invalid workload type")
-	ClusterHasNoLeader  = errors.New("cluster has no leader now")
+	ClusterHasNoLeader = errors.New("cluster has no leader now")
 )
 
 const (
@@ -52,8 +51,8 @@ const (
 )
 
 const (
-	asynchronous = "asynchronous"
-	synchronous  = "synchronous"
+	Asynchronous = "asynchronous"
+	Synchronous  = "synchronous"
 )
 
 const (
@@ -135,7 +134,7 @@ type PGStandby struct {
 	HasStar bool
 }
 
-func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
+func ParsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	pattern := `(?P<first> [fF][iI][rR][sS][tT] )
 				|(?P<any> [aA][nN][yY] )
 				|(?P<space> \s+ )
@@ -186,9 +185,9 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	var matches [][]string
 	start := 0
 	for match != nil {
-		num := getMatchLastGroupNumber(rs, standbyRow, match.String(), start)
-		if groupNames[num+2] != space {
-			matches = append(matches, []string{groupNames[num+2], match.String(), strconv.FormatInt(int64(start), 10)})
+		nums := getMatchLastGroupNumber(rs, standbyRow, match.String(), start)
+		if groupNames[nums+2] != space {
+			matches = append(matches, []string{groupNames[nums+2], match.String(), strconv.FormatInt(int64(start), 10)})
 		}
 		start = match.Index + match.Length
 
@@ -271,12 +270,12 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 	return -1
 }
 
-type history struct {
-	parentTimeline int64
-	switchPoint    int64
+type History struct {
+	ParentTimeline int64
+	SwitchPoint    int64
 }
 
-func parsePgLsn(str string) int64 {
+func ParsePgLsn(str string) int64 {
 	list := strings.Split(str, "/")
 	if len(list) < 2 {
 		return 0
@@ -287,7 +286,7 @@ func parsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
-func parsePrimaryConnInfo(str string) map[string]string {
+func ParsePrimaryConnInfo(str string) map[string]string {
 	infos := strings.Split(str, " ")
 	result := make(map[string]string)
 

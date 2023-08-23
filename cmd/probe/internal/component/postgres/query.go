@@ -22,7 +22,6 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -178,23 +177,8 @@ func parseRows(rows pgx.Rows) (result []byte, err error) {
 	return result, err
 }
 
-func parseSingleQuery(str string) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
-	str = strings.Trim(str, "[]")
-	if str == "" {
-		return result, nil
-	}
-
-	err := json.Unmarshal([]byte(str), &result)
-	if err != nil {
-		return nil, errors.Errorf("json unmarshal failed, err:%v", err)
-	}
-
-	return result, nil
-}
-
-// Notice: in golang, json unmarshal will map all numeric types to float64.
-func parseQuery(str string) (result []map[string]interface{}, err error) {
+func ParseQuery(str string) (result []map[string]interface{}, err error) {
+	// Notice: in golang, json unmarshal will map all numeric types to float64.
 	err = json.Unmarshal([]byte(str), &result)
 	if err != nil || len(result) == 0 {
 		return nil, errors.Errorf("json unmarshal failed, err:%v", err)

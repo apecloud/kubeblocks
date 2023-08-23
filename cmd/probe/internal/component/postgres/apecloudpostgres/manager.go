@@ -17,24 +17,49 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package postgres
+package apecloudpostgres
 
 import (
 	"context"
 	"fmt"
-	"math"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"strings"
 
+	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
-func (mgr *Manager) GetDBStateConsensus(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+type Manager struct {
+	postgres.Manager
+	memberAddrs []string
+	isLeader    bool
+}
+
+var Mgr *Manager
+
+func NewManager(logger logger.Logger) (*Manager, error) {
+	Mgr = &Manager{}
+
+	baseManager, err := postgres.NewManager(logger)
+	if err != nil {
+		return nil, errors.Errorf("new base manager failed, err: %v", err)
+	}
+
+	Mgr.Manager = *baseManager
+	component.RegisterManager("postgresql", internal.Consensus, Mgr)
+
+	return Mgr, nil
+}
+
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
 	mgr.DBState = nil
 	dbState := &dcs.DBState{
 		Extra: map[string]string{},
@@ -47,7 +72,7 @@ func (mgr *Manager) GetDBStateConsensus(ctx context.Context, cluster *dcs.Cluste
 	}
 	mgr.isLeader = isLeader
 
-	memberAddrs := mgr.GetMemberAddrsConsensus(cluster)
+	memberAddrs := mgr.GetMemberAddrs(cluster)
 	if memberAddrs == nil {
 		mgr.Logger.Errorf("get member addr failed")
 		return nil
@@ -58,6 +83,46 @@ func (mgr *Manager) GetDBStateConsensus(ctx context.Context, cluster *dcs.Cluste
 	return dbState
 }
 
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	if mgr.DBState != nil {
+		return mgr.isLeader, nil
+	}
+
+	return mgr.IsLeaderWithHost(ctx, "")
+}
+
+func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
+	role, err := mgr.GetMemberRoleWithHost(ctx, host)
+	if err != nil {
+		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
+	}
+
+	return role == binding.LEADER, nil
+}
+
+func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+	return mgr.IsLeaderWithHost(ctx, cluster.GetMemberAddr(*member))
+}
+
+func (mgr *Manager) IsDBStartupReady() bool {
+	ctx := context.TODO()
+	if mgr.DBStartupReady {
+		return true
+	}
+
+	if !mgr.IsPgReady(ctx) {
+		return false
+	}
+
+	if !mgr.IsConsensusReadyUp(ctx) {
+		return false
+	}
+
+	mgr.DBStartupReady = true
+	mgr.Logger.Infof("DB startup ready")
+	return true
+}
+
 func (mgr *Manager) IsConsensusReadyUp(ctx context.Context) bool {
 	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus_monitor';`
 	resp, err := mgr.Query(ctx, sql)
@@ -66,16 +131,16 @@ func (mgr *Manager) IsConsensusReadyUp(ctx context.Context) bool {
 		return false
 	}
 
-	result, err := parseSingleQuery(string(resp))
+	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query failed, err:%v", err)
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 		return false
 	}
 
-	return result["extname"] != nil
+	return resMap[0]["extname"] != nil
 }
 
-func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if !mgr.IsFirstMember() {
 		mgr.Logger.Infof("I am not the first member, just skip and wait for the first member to initialize the cluster.")
 		return true, nil
@@ -92,16 +157,16 @@ func (mgr *Manager) IsClusterInitializedConsensus(ctx context.Context, cluster *
 		return false, err
 	}
 
-	result, err := parseSingleQuery(string(resp))
+	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query failed, err:%v", err)
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 		return false, err
 	}
 
-	return result["usename"] != nil, nil
+	return resMap[0]["usename"] != nil, nil
 }
 
-func (mgr *Manager) InitializeClusterConsensus(ctx context.Context, cluster *dcs.Cluster) error {
+func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	sql := "create role replicator with superuser login password 'replicator';" +
 		"create extension if not exists consensus_monitor;"
 
@@ -113,7 +178,7 @@ func (mgr *Manager) InitializeClusterConsensus(ctx context.Context, cluster *dcs
 	return nil
 }
 
-func (mgr *Manager) GetMemberRoleWithHostConsensus(ctx context.Context, host string) (string, error) {
+func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
 	sql := `select paxos_role from consensus_member_status;`
 
 	resp, err := mgr.QueryWithHost(ctx, sql, host)
@@ -122,15 +187,15 @@ func (mgr *Manager) GetMemberRoleWithHostConsensus(ctx context.Context, host str
 		return "", err
 	}
 
-	result, err := parseSingleQuery(string(resp))
-	if err != nil || result["paxos_role"] == nil {
-		mgr.Logger.Errorf("parse query failed, err:%v", err)
+	resMap, err := postgres.ParseQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 		return "", err
 	}
 
 	// TODO:paxos roles are currently represented by numbers, will change to string in the future
 	var role string
-	switch result["paxos_role"].(float64) {
+	switch cast.ToInt(resMap[0]["paxos_role"]) {
 	case 0:
 		role = binding.FOLLOWER
 	case 1:
@@ -140,14 +205,14 @@ func (mgr *Manager) GetMemberRoleWithHostConsensus(ctx context.Context, host str
 	case 3:
 		role = binding.LEARNER
 	default:
-		mgr.Logger.Warnf("get invalid role number:%s", result["paxos_role"].(float64))
+		mgr.Logger.Warnf("get invalid role number:%d", cast.ToInt(resMap[0]["paxos_role"]))
 		role = ""
 	}
 
 	return role, nil
 }
 
-func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
 	if mgr.DBState != nil && mgr.memberAddrs != nil {
 		return mgr.memberAddrs
 	}
@@ -161,7 +226,7 @@ func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 		return nil
 	}
 
-	result, err := parseQuery(string(resp))
+	result, err := postgres.ParseQuery(string(resp))
 	if err != nil {
 		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 		return nil
@@ -169,14 +234,14 @@ func (mgr *Manager) GetMemberAddrsConsensus(cluster *dcs.Cluster) []string {
 
 	var addrs []string
 	for _, m := range result {
-		addrs = append(addrs, strings.Split(m["ip_port"].(string), ":")[0])
+		addrs = append(addrs, strings.Split(cast.ToString(m["ip_port"]), ":")[0])
 	}
 
 	return addrs
 }
 
-func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, cluster *dcs.Cluster) bool {
-	memberAddrs := mgr.GetMemberAddrsConsensus(cluster)
+func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
+	memberAddrs := mgr.GetMemberAddrs(cluster)
 	// AddCurrentMemberToCluster is executed only when memberAddrs are successfully obtained and memberAddrs not Contains CurrentMember
 	if memberAddrs != nil && !slices.Contains(memberAddrs, cluster.GetMemberAddrWithName(mgr.CurrentMemberName)) {
 		return false
@@ -184,14 +249,18 @@ func (mgr *Manager) IsCurrentMemberInClusterConsensus(ctx context.Context, clust
 	return true
 }
 
-// IsMemberHealthyConsensus firstly get the leader's connection pool,
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	return mgr.IsMemberHealthy(ctx, cluster, cluster.GetMemberWithName(mgr.CurrentMemberName))
+}
+
+// IsMemberHealthy firstly get the leader's connection pool,
 // because only leader can get the cluster healthy view
-func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	IPPort := getConsensusIPPort(cluster, member.Name)
+func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	IPPort := mgr.Config.GetConsensusIPPort(cluster, member.Name)
 
 	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
 	resp, err := mgr.QueryLeader(ctx, sql, cluster)
-	if errors.Is(err, ClusterHasNoLeader) {
+	if errors.Is(err, postgres.ClusterHasNoLeader) {
 		mgr.Logger.Infof("cluster has no leader, will compete the leader lock")
 		return true
 	} else if err != nil {
@@ -199,27 +268,27 @@ func (mgr *Manager) IsMemberHealthyConsensus(ctx context.Context, cluster *dcs.C
 		return false
 	}
 
-	result, err := parseSingleQuery(string(resp))
+	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query failed, err:%v", err)
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 		return false
 	}
 
 	var connected bool
 	var logDelayNum int64
-	if result["connected"] != nil {
-		connected = result["connected"].(bool)
+	if resMap[0]["connected"] != nil {
+		connected = cast.ToBool(resMap[0]["connected"])
 	}
-	if result["log_delay_num"] != nil {
-		logDelayNum = int64(math.Round(result["log_delay_num"].(float64)))
+	if resMap[0]["log_delay_num"] != nil {
+		logDelayNum = cast.ToInt64(resMap[0]["log_delay_num"])
 	}
 
 	return connected && logDelayNum <= cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
-func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) error {
+func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 	sql := fmt.Sprintf(`alter system consensus add follower '%s:%d';`,
-		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), config.port)
+		cluster.GetMemberAddrWithName(mgr.CurrentMemberName), mgr.Config.Port)
 
 	_, err := mgr.ExecLeader(context.TODO(), sql, cluster)
 	if err != nil {
@@ -230,9 +299,9 @@ func (mgr *Manager) AddCurrentMemberToClusterConsensus(cluster *dcs.Cluster) err
 	return nil
 }
 
-func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host string) error {
+func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
 	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`,
-		host, config.port)
+		host, mgr.Config.Port)
 
 	// only leader can delete member, so don't need to get pool
 	_, err := mgr.ExecWithHost(context.TODO(), sql, "")
@@ -244,8 +313,8 @@ func (mgr *Manager) DeleteMemberFromClusterConsensus(cluster *dcs.Cluster, host 
 	return nil
 }
 
-// IsClusterHealthyConsensus considers the health status of the cluster equivalent to the health status of the leader
-func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.Cluster) bool {
+// IsClusterHealthy considers the health status of the cluster equivalent to the health status of the leader
+func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		mgr.Logger.Infof("cluster has no leader, wait for leader to take the lock")
@@ -259,10 +328,15 @@ func (mgr *Manager) IsClusterHealthyConsensus(ctx context.Context, cluster *dcs.
 		return true
 	}
 
-	return mgr.IsMemberHealthyConsensus(ctx, cluster, leaderMember)
+	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
 }
 
-func (mgr *Manager) PromoteConsensus(ctx context.Context) error {
+func (mgr *Manager) Promote(ctx context.Context) error {
+	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
+		mgr.Logger.Infof("i am already the leader, don't need to promote")
+		return nil
+	}
+
 	// TODO:will get leader ip_port from consensus_member_status directly in the future
 	sql := `select ip_port from consensus_cluster_status where server_id = (select current_leader from consensus_member_status);`
 	resp, err := mgr.Query(ctx, sql)
@@ -271,13 +345,13 @@ func (mgr *Manager) PromoteConsensus(ctx context.Context) error {
 		return err
 	}
 
-	result, err := parseSingleQuery(string(resp))
-	if err != nil || result["ip_port"] == nil {
-		return err
+	resMap, err := postgres.ParseQuery(string(resp))
+	if err != nil {
+		return errors.Errorf("parse query response:%s failed, err:%v", string(resp), err)
 	}
 
-	currentLeaderAddr := strings.Split(result["ip_port"].(string), ":")[0]
-	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("KB_POD_FQDN"), config.port)
+	currentLeaderAddr := strings.Split(cast.ToString(resMap[0]["ip_port"]), ":")[0]
+	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("KB_POD_FQDN"), mgr.Config.Port)
 	_, err = mgr.ExecOthers(ctx, promoteSQL, currentLeaderAddr)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
@@ -287,7 +361,15 @@ func (mgr *Manager) PromoteConsensus(ctx context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeaderConsensus(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+func (mgr *Manager) Demote(context.Context) error {
+	return nil
+}
+
+func (mgr *Manager) Follow(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	if isLeader, err := mgr.IsLeader(ctx, cluster); isLeader && err == nil {
 		// I am the leader, just return nil
 		return nil
@@ -301,7 +383,7 @@ func (mgr *Manager) HasOtherHealthyLeaderConsensus(ctx context.Context, cluster 
 		return nil
 	}
 
-	resMap, err := parseQuery(string(resp))
+	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
 		mgr.Logger.Errorf("parse query response:%s failed, err:%v", err)
 		return nil

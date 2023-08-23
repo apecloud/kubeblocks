@@ -21,6 +21,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dapr/kit/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,8 +29,6 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/viper"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -37,23 +36,18 @@ import (
 
 type Manager struct {
 	component.DBManagerBase
-	Pool         PgxPoolIFace
-	Proc         *process.Process
-	syncStandbys *PGStandby
-	memberAddrs  []string
-	isLeader     bool
-	workLoadType string
+	Pool   PgxPoolIFace
+	Proc   *process.Process
+	Config *Config
 }
 
-var Mgr *Manager
-
 func NewManager(logger logger.Logger) (*Manager, error) {
-	pool, err := pgxpool.NewWithConfig(context.Background(), config.pool)
+	pool, err := pgxpool.NewWithConfig(context.Background(), config.pgxConfig)
 	if err != nil {
 		return nil, errors.Errorf("unable to ping the DB: %v", err)
 	}
 
-	Mgr = &Manager{
+	mgr := &Manager{
 		DBManagerBase: component.DBManagerBase{
 			CurrentMemberName: viper.GetString(constant.KBEnvPodName),
 			ClusterCompName:   viper.GetString(constant.KBEnvClusterCompName),
@@ -61,245 +55,47 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 			Logger:            logger,
 			DataDir:           viper.GetString(PGDATA),
 		},
-		Pool:         pool,
-		workLoadType: viper.GetString(constant.KBEnvWorkloadType),
+		Pool:   pool,
+		Config: config,
 	}
 
-	component.RegisterManager("postgresql", Mgr)
-	return Mgr, nil
+	return mgr, nil
 }
 
-// GetMemberRoleWithHost get specified member's role with its connection
-func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.GetMemberRoleWithHostConsensus(ctx, host)
-	case Replication:
-		return mgr.GetMemberRoleWithHostReplication(ctx, host)
-	default:
-		return "", InvalidWorkLoadType
+func (mgr *Manager) IsRunning() bool {
+	if mgr.Proc != nil {
+		if isRunning, err := mgr.Proc.IsRunning(); isRunning && err == nil {
+			return true
+		}
+		mgr.Proc = nil
 	}
+
+	return mgr.newProcessFromPidFile() == nil
 }
 
-func (mgr *Manager) IsDBStartupReady() bool {
-	ctx := context.TODO()
-	if mgr.DBStartupReady {
-		return true
-	}
-
-	if !mgr.IsPgReady(ctx) {
-		return false
-	}
-
-	// For Consensus, probe relies on the consensus_monitor view.
-	if mgr.workLoadType == Consensus && !mgr.IsConsensusReadyUp(ctx) {
-		return false
-	}
-
-	mgr.DBStartupReady = true
-	mgr.Logger.Infof("DB startup ready")
-	return true
-}
-
-// GetDBState will refresh db completely refreshed with each loop
-func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.GetDBStateConsensus(ctx, cluster)
-	case Replication:
-		return mgr.GetDBStateReplication(ctx, cluster)
-	default:
-		mgr.Logger.Errorf("get DB State failed, err:%v", InvalidWorkLoadType)
-		return nil
-	}
-}
-
-func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	if mgr.DBState != nil {
-		return mgr.isLeader, nil
-	}
-
-	return mgr.CheckMemberIsLeader(ctx, "")
-}
-
-// CheckMemberIsLeader determines whether a specific member is the leader, using its connection
-func (mgr *Manager) CheckMemberIsLeader(ctx context.Context, host string) (bool, error) {
-	role, err := mgr.GetMemberRoleWithHost(ctx, host)
+func (mgr *Manager) newProcessFromPidFile() error {
+	pidFile, err := readPidFile(mgr.DataDir)
 	if err != nil {
-		return false, errors.Wrap(err, "check is leader")
+		mgr.Logger.Errorf("read pid file failed, err:%v", err)
+		return errors.Wrap(err, "read pid file")
 	}
 
-	return role == binding.PRIMARY || role == binding.LEADER, nil
-}
-
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.GetMemberAddrsConsensus(cluster)
-	case Replication:
-		return cluster.GetMemberAddrs()
-	default:
-		mgr.Logger.Errorf("get member addrs failed, err:%v", InvalidWorkLoadType)
-		return nil
+	proc, err := process.NewProcess(pidFile.pid)
+	if err != nil {
+		mgr.Logger.Errorf("new process failed, err:%v", err)
+		return err
 	}
-}
 
-func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.InitializeClusterConsensus(ctx, cluster)
-	case Replication:
-		return nil
-	default:
-		return InvalidWorkLoadType
-	}
-}
-
-func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.Cluster) bool {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.IsCurrentMemberInClusterConsensus(ctx, cluster)
-	case Replication:
-		return true
-	default:
-		mgr.Logger.Errorf("check current member in cluster failed, err:%v", InvalidWorkLoadType)
-		return false
-	}
-}
-
-func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	return mgr.IsMemberHealthy(ctx, cluster, cluster.GetMemberWithName(mgr.CurrentMemberName))
-}
-
-func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
-	switch mgr.workLoadType {
-	case Consensus:
-		return false, 0
-	case Replication:
-		return mgr.IsMemberLaggingReplication(ctx, cluster, member)
-	default:
-		mgr.Logger.Errorf("check current member healthy failed, err:%v", InvalidWorkLoadType)
-		return false, 0
-	}
-}
-
-func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.IsMemberHealthyConsensus(ctx, cluster, member)
-	case Replication:
-		return mgr.IsMemberHealthyReplication(ctx, cluster, member)
-	default:
-		mgr.Logger.Errorf("check current member healthy failed, err:%v", InvalidWorkLoadType)
-		return false
-	}
+	mgr.Proc = proc
+	return nil
 }
 
 func (mgr *Manager) Recover(context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.AddCurrentMemberToClusterConsensus(cluster)
-	case Replication:
-		return nil
-	default:
-		return InvalidWorkLoadType
-	}
-}
-
-func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.DeleteMemberFromClusterConsensus(cluster, host)
-	case Replication:
-		return nil
-	default:
-		return InvalidWorkLoadType
-	}
-}
-
-func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.IsClusterHealthyConsensus(ctx, cluster)
-	case Replication:
-		return true
-	default:
-		mgr.Logger.Errorf("check cluster healthy failed, err:%v", InvalidWorkLoadType)
-		return false
-	}
-}
-
-func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.IsClusterInitializedConsensus(ctx, cluster)
-	case Replication:
-		// for replication, the setup script imposes a constraint where the successful startup of the primary database (db0)
-		// is a prerequisite for the successful launch of the remaining databases.
-		return mgr.IsDBStartupReady(), nil
-	default:
-		return false, InvalidWorkLoadType
-	}
-}
-
-func (mgr *Manager) Promote(ctx context.Context) error {
-	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
-		mgr.Logger.Infof("i am already the leader, don't need to promote")
-		return nil
-	}
-
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.PromoteConsensus(ctx)
-	case Replication:
-		return mgr.PromoteReplication()
-	default:
-		return InvalidWorkLoadType
-	}
-}
-
-func (mgr *Manager) Demote(ctx context.Context) error {
-	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
-
-	switch mgr.workLoadType {
-	case Consensus:
-		return nil
-	case Replication:
-		return mgr.DemoteReplication(ctx)
-	default:
-		return InvalidWorkLoadType
-	}
-}
-
-func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
-	switch mgr.workLoadType {
-	case Consensus:
-		return nil
-	case Replication:
-		return mgr.FollowReplication(ctx, cluster)
-	default:
-		return InvalidWorkLoadType
-	}
-}
-
-func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
+func (mgr *Manager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
-}
-
-func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-	switch mgr.workLoadType {
-	case Consensus:
-		return mgr.HasOtherHealthyLeaderConsensus(ctx, cluster)
-	case Replication:
-		return nil
-	default:
-		mgr.Logger.Errorf("check other healthy leader failed, err:%v", InvalidWorkLoadType)
-		return nil
-	}
 }
 
 func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
@@ -314,14 +110,91 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 	return members
 }
 
-func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	return mgr.CheckMemberIsLeader(ctx, cluster.GetMemberAddr(*member))
-}
-
-func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
+func (mgr *Manager) IsRootCreated(context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *Manager) CreateRoot(ctx context.Context) error {
+func (mgr *Manager) CreateRoot(context.Context) error {
 	return nil
+}
+
+func (mgr *Manager) ReadCheck(ctx context.Context, host string) bool {
+	readSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
+	_, err := mgr.QueryWithHost(ctx, readSQL, host)
+	if err != nil {
+		mgr.Logger.Errorf("read check failed, err:%v", err)
+		return false
+	}
+	return true
+}
+
+func (mgr *Manager) WriteCheck(ctx context.Context, host string) bool {
+	writeSQL := fmt.Sprintf(`
+		create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));
+		insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do update set check_ts = CURRENT_TIMESTAMP;
+		`, component.CheckStatusType)
+	_, err := mgr.ExecWithHost(ctx, writeSQL, host)
+	if err != nil {
+		mgr.Logger.Errorf("write check failed, err:%v", err)
+		return false
+	}
+	return true
+}
+
+func (mgr *Manager) PgReload(ctx context.Context) error {
+	reload := "select pg_reload_conf();"
+
+	_, err := mgr.Exec(ctx, reload)
+
+	return err
+}
+
+func (mgr *Manager) IsPgReady(ctx context.Context) bool {
+	err := mgr.Pool.Ping(ctx)
+	if err != nil {
+		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
+		return false
+	}
+
+	return true
+}
+
+func (mgr *Manager) Lock(ctx context.Context, reason string) error {
+	sql := "alter system set default_transaction_read_only=on;"
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		return err
+	}
+
+	if err = mgr.PgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("Lock db success: %s", reason)
+	return nil
+}
+
+func (mgr *Manager) Unlock(ctx context.Context) error {
+	sql := "alter system set default_transaction_read_only=off;"
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		return err
+	}
+
+	if err = mgr.PgReload(ctx); err != nil {
+		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("UnLock db success")
+	return nil
+}
+
+func (mgr *Manager) ShutDownWithWait() {
+	mgr.Pool.Close()
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
+// GetDBConnWithMember retrieves a database connection for a specific member of a cluster.
 func (mgr *WesqlManager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member) (*sql.DB, error) {
 	var db *sql.DB
 	var err error
@@ -42,6 +43,7 @@ func (mgr *WesqlManager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.M
 	return db, nil
 }
 
+// GetLeaderConn retrieves a database connection to the leader member of a cluster.
 func (mgr *WesqlManager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster) (*sql.DB, error) {
 	mgr.Logger.Debugf("Get leaader from dcs cluster")
 	leaderMember := cluster.GetLeaderMember()
@@ -55,6 +57,7 @@ func (mgr *WesqlManager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster
 	return mgr.GetDBConnWithMember(cluster, leaderMember)
 }
 
+// GetLeaderMember retrieves the leader member of a cluster
 func (mgr *WesqlManager) GetLeaderMember(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
 	if err != nil || clusterLocalInfo == nil {

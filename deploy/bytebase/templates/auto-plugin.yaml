@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: python-job
+spec:
+  template:
+    spec:
+      serviceAccountName: kubeblocks
+      containers:
+        - name: bytebase-python-script
+          image: registry.cn-hangzhou.aliyuncs.com/apecloud/python11-tools:stable
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p /home/script
+              cp /script/* /home/script
+              chmod 777 /home/script/*
+              cd /home/script
+              ./init.sh
+          volumeMounts:
+            - name: script
+              mountPath: /script
+      restartPolicy: OnFailure
+      volumes:
+        - name: script
+          configMap:
+            name: bb-setup-script
+  backoffLimit: 3

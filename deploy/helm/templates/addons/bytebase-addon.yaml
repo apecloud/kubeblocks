@@ -15,8 +15,7 @@ spec:
 
   helm:
     # use the ApeCloud's chart repository since Bytebase's image doesn't currently support ARM64
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/bytebase-0.3.0.tgz
-    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/bytebase-0.1.0/bytebase-0.1.0.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/bytebase-0.4.0.tgz
   installable:
     autoInstall: false
 

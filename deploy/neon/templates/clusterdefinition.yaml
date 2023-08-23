@@ -31,6 +31,11 @@ spec:
                 type: HeadlessServiceRef
                 format: $(POD_FQDN){{ .Values.clusterDomain }}
                 joinWith: ","
+      service:
+        ports:
+        - name: safekeeper
+          protocol: TCP
+          port: 5454
       podSpec:
         containers:
           - name: neon-safekeeper
@@ -54,6 +59,11 @@ spec:
       characterType: pageserver
       componentDefRef:
         - *storagebrokerRef
+      service:
+        ports:
+        - name: pageserver
+          protocol: TCP
+          port: 6400
       podSpec:
         containers:
           - name: neon-pageserver

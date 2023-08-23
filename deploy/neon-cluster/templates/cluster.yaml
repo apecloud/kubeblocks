@@ -71,28 +71,3 @@ spec:
             resources:
               requests:
                 storage: {{ .Values.pageserver.dataStorage }}
-    - name: neon-compute
-      componentDefRef: neon-compute
-      replicas: {{ .Values.compute.replicas }}
-      {{- with  .Values.compute.resources }}
-      resources:
-        {{- with .limits }}
-        limits:
-          cpu: {{ .cpu | quote }}
-          memory: {{ .memory | quote }}
-            {{- end }}
-            {{- with .requests }}
-        requests:
-          cpu: {{ .cpu | quote }}
-          memory: {{ .memory | quote }}
-        {{- end }}
-      {{- end }}
-      volumeClaimTemplates:
-        - name: neon-compute # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            storageClassName: {{ .Values.storageClassName }}
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.compute.dataStorage }}

@@ -158,6 +158,10 @@ func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster) 
 	return nil
 }
 
+func (mgr *DBManagerBase) IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool {
+	return true
+}
+
 // Start does not directly mean to start a database instance,
 // but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start(*dcs.Cluster) error {

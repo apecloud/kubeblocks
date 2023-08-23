@@ -169,7 +169,7 @@ func GetCharacter(url string) string {
 		return ""
 	}
 	splits := strings.Split(url, "/")
-	if len(splits) != 4 {
+	if len(splits) < 4 {
 		return ""
 	}
 	return splits[3]

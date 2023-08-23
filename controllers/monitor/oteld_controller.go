@@ -21,7 +21,10 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,6 +44,7 @@ type OTeldReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+	Config   *types.Config
 
 	// sub-controllers
 	tasks []types.ReconcileTask
@@ -70,8 +74,10 @@ func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Ctx:    ctx,
 		Req:    req,
 		Log:    log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
-		Config: &monitorv1alpha1.Config{},
+		Config: r.Config,
 	}
+
+	// TODO prepare required resources
 
 	if err := r.runTasks(reqCtx); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -88,11 +94,13 @@ func (r *OTeldReconciler) runTasks(reqCtx types.ReconcileCtx) error {
 	return nil
 }
 
-func New(params types.OTeldParams) *OTeldReconciler {
-	return &OTeldReconciler{
+func New(params types.OTeldParams, config *types.Config) *OTeldReconciler {
+	reconcile := OTeldReconciler{
 		Client:   params.Client,
 		Scheme:   params.Scheme,
 		Recorder: params.Recorder,
+		Config:   config,
+
 		// sub-controllers
 		tasks: []types.ReconcileTask{
 			types.NewReconcileTask(reconcile.OTeldName, types.WithReconcileOption(reconcile.OTeld, params)),
@@ -104,6 +112,18 @@ func New(params types.OTeldParams) *OTeldReconciler {
 			types.NewReconcileTask(reconcile.VMAgentName, types.WithReconcileOption(reconcile.VMAgent, params)),
 		},
 	}
+
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		log.Log.Info(fmt.Sprintf("config file changed: %s", e.Name))
+		newConfig, err := types.LoadConfig(viper.ConfigFileUsed())
+		if err != nil {
+			log.Log.Error(err, fmt.Sprintf("failed to reload config: %s", e.Name))
+			return
+		}
+		// TODO how to trigger the operator to reconcile
+		reconcile.Config = newConfig
+	})
+	return &reconcile
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -28,7 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -43,7 +42,7 @@ type ReconcileCtx struct {
 	Ctx    context.Context
 	Req    ctrl.Request
 	Log    logr.Logger
-	Config *v1alpha1.Config
+	Config *Config
 }
 
 type ReconcileTask interface {

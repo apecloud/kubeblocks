@@ -65,6 +65,3 @@ type SinkQueueConfig struct {
 	// +optional
 	QueueSize int `json:"queueSize"`
 }
-
-type Config struct {
-}

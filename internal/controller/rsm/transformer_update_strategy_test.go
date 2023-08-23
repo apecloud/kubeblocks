@@ -42,6 +42,7 @@ var _ = Describe("update strategy transformer test.", func() {
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
+			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()
 		rsm.Status.UpdateRevision = newRevision

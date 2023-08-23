@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,12 +59,55 @@ import (
 	rsmpkg "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
-const backupPolicyTPLName = "test-backup-policy-template-mysql"
+const (
+	backupPolicyTPLName = "test-backup-policy-template-mysql"
+)
+
+var (
+	podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
+)
+
+type mockLorryClient struct {
+	clusterKey types.NamespacedName
+	compName   string
+	replicas   int
+}
+
+var _ lorry.Client = &mockLorryClient{}
+
+func (c *mockLorryClient) JoinMember(ctx context.Context) error {
+	return nil
+}
+
+func (c *mockLorryClient) LeaveMember(ctx context.Context) error {
+	var podList corev1.PodList
+	labels := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    c.clusterKey.Name,
+		constant.KBAppComponentLabelKey: c.compName,
+	}
+	if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(c.clusterKey.Namespace)); err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		if pod.Annotations == nil {
+			panic(fmt.Sprintf("pod annotaions is nil: %s", pod.Name))
+		}
+		if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", c.replicas) {
+			continue
+		}
+		pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", c.replicas)
+		if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 var _ = Describe("Cluster Controller", func() {
 	const (
@@ -508,6 +552,9 @@ var _ = Describe("Cluster Controller", func() {
 						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
+					Annotations: map[string]string{
+						podAnnotationKey4Test: fmt.Sprintf("%d", number),
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
@@ -738,10 +785,12 @@ var _ = Describe("Cluster Controller", func() {
 							g.Expect(pvc.DeletionTimestamp).Should(BeNil())
 						}
 					}
-				})
+				}).Should(Succeed())
 				return
 			}
+
 			checkUpdatedStsReplicas()
+
 			By("Checking pvcs deleting")
 			Eventually(func(g Gomega) {
 				pvcList := corev1.PersistentVolumeClaimList{}
@@ -756,7 +805,24 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
 					}
 				}
-			})
+			}).Should(Succeed())
+
+			By("Checking pod's annotation should be updated consistently")
+			Eventually(func(g Gomega) {
+				podList := corev1.PodList{}
+				g.Expect(testCtx.Cli.List(testCtx.Ctx, &podList, client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: comp.Name,
+				})).Should(Succeed())
+				for _, pod := range podList.Items {
+					ss := strings.Split(pod.Name, "-")
+					ordinal, _ := strconv.Atoi(ss[len(ss)-1])
+					if ordinal >= updatedReplicas {
+						continue
+					}
+					g.Expect(pod.Annotations[podAnnotationKey4Test]).Should(Equal(fmt.Sprintf("%d", updatedReplicas)))
+				}
+			}).Should(Succeed())
 		}
 
 		if int(comp.Replicas) < updatedReplicas {
@@ -836,6 +902,8 @@ var _ = Describe("Cluster Controller", func() {
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
 	// the matching names. If not provided, will set 1st ClusterDefinition.spec.componentDefs[0].horizontalScalePolicy.
 	horizontalScale := func(updatedReplicas int, policyType appsv1alpha1.HScaleDataClonePolicyType, componentDefsWithHScalePolicy ...string) {
+		defer lorry.UnsetMockClient()
+
 		cluster := &appsv1alpha1.Cluster{}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
 		initialGeneration := int(cluster.Status.ObservedGeneration)
@@ -859,6 +927,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			lorry.SetMockClient(&mockLorryClient{replicas: updatedReplicas, clusterKey: clusterKey, compName: comp.Name}, nil)
+
 			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], hscalePolicy(comp))
 		}
@@ -1656,6 +1726,7 @@ var _ = Describe("Cluster Controller", func() {
 		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
+		By("Waiting for the backup object been created")
 		ml := client.MatchingLabels{
 			constant.AppInstanceLabelKey:    clusterKey.Name,
 			constant.KBAppComponentLabelKey: compName,
@@ -1663,28 +1734,16 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.List(&testCtx, generics.BackupSignature,
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
+		By("Mocking backup status to failed")
 		backupList := dataprotectionv1alpha1.BackupList{}
 		Expect(testCtx.Cli.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
 		backupKey := types.NamespacedName{
 			Namespace: backupList.Items[0].Namespace,
 			Name:      backupList.Items[0].Name,
 		}
-		By("Mocking backup status to failed")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 		})()).Should(Succeed())
-
-		By("Set HorizontalScalePolicy")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-			func(clusterDef *appsv1alpha1.ClusterDefinition) {
-				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume,
-						BackupPolicyTemplateName: backupPolicyTPLName}
-			})()).ShouldNot(HaveOccurred())
-
-		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		By("Checking cluster status failed with backup error")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -1699,13 +1758,13 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 			if err == nil {
-				// this expect is intended for print all cluster.Status.Conditions
+				// this expectation is intended to print all cluster.Status.Conditions
 				g.Expect(cluster.Status.Conditions).Should(BeEmpty())
 			}
 			g.Expect(err).Should(HaveOccurred())
 		})).Should(Succeed())
 
-		By("expect for backup error event")
+		By("Expect for backup error event")
 		Eventually(func(g Gomega) {
 			eventList := corev1.EventList{}
 			Expect(k8sClient.List(ctx, &eventList, client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())

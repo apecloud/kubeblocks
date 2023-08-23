@@ -62,14 +62,14 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 	return manager, mock, err
 }
 
-func TestGetMemberRoleWithHostReplication(t *testing.T) {
+func TestGetMemberRoleWithHost(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("get member role primary", func(t *testing.T) {
 		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow("f"))
+			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(false))
 
 		role, err := manager.GetMemberRoleWithHost(ctx, "")
 		if err != nil {
@@ -81,7 +81,7 @@ func TestGetMemberRoleWithHostReplication(t *testing.T) {
 
 	t.Run("get member role secondary", func(t *testing.T) {
 		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow("t"))
+			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
 
 		role, err := manager.GetMemberRoleWithHost(ctx, "")
 		if err != nil {

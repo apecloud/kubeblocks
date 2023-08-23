@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
@@ -131,14 +132,6 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	return mgr.DBState
 }
 
-func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	if mgr.DBState != nil {
-		return mgr.isLeader, nil
-	}
-
-	return mgr.IsLeaderWithHost(ctx, "")
-}
-
 func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
 	role, err := mgr.GetMemberRoleWithHost(ctx, host)
 	if err != nil {
@@ -153,7 +146,8 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, me
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
-	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
 	if mgr.DBStartupReady {
 		return true
 	}
@@ -182,7 +176,7 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 		return "", err
 	}
 
-	if cast.ToString(result[0]["pg_is_in_recovery"]) == "t" {
+	if cast.ToBool(result[0]["pg_is_in_recovery"]) {
 		return binding.SECONDARY, nil
 	} else {
 		return binding.PRIMARY, nil

@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
@@ -74,21 +75,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 
 	memberAddrs := mgr.GetMemberAddrs(ctx, cluster)
 	if memberAddrs == nil {
-		mgr.Logger.Errorf("get member addr failed")
+		mgr.Logger.Errorf("get member addrs failed")
 		return nil
 	}
 	mgr.memberAddrs = memberAddrs
 
 	mgr.DBState = dbState
 	return dbState
-}
-
-func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	if mgr.DBState != nil {
-		return mgr.isLeader, nil
-	}
-
-	return mgr.IsLeaderWithHost(ctx, "")
 }
 
 func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
@@ -105,7 +98,8 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, me
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
-	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
 	if mgr.DBStartupReady {
 		return true
 	}

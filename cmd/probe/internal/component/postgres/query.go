@@ -75,6 +75,11 @@ func (mgr *Manager) QueryOthers(ctx context.Context, sql string, host string) (r
 }
 
 func (mgr *Manager) QueryLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result []byte, err error) {
+	isLeader, _ := mgr.IsLeader(ctx, cluster)
+	if isLeader {
+		return mgr.Query(ctx, sql)
+	}
+
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return nil, ClusterHasNoLeader

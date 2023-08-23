@@ -89,11 +89,11 @@ func (mgr *WesqlManager) InitializeCluster(ctx context.Context, cluster *dcs.Clu
 func (mgr *WesqlManager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	role, err := mgr.GetRole(ctx)
 
-	if err == nil && strings.EqualFold(role, "leader") {
-		return true, nil
+	if err != nil || !strings.EqualFold(role, "leader") {
+		return false, nil
 	}
 
-	return false, err
+	return true, err
 }
 
 func (mgr *WesqlManager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {

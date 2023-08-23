@@ -27,15 +27,12 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-
-	"github.com/go-logr/logr"
-
-	"github.com/spf13/viper"
-
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 

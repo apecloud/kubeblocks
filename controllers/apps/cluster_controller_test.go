@@ -1726,6 +1726,7 @@ var _ = Describe("Cluster Controller", func() {
 		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
+		By("Waiting for the backup object been created")
 		ml := client.MatchingLabels{
 			constant.AppInstanceLabelKey:    clusterKey.Name,
 			constant.KBAppComponentLabelKey: compName,
@@ -1733,28 +1734,16 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.List(&testCtx, generics.BackupSignature,
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
+		By("Mocking backup status to failed")
 		backupList := dataprotectionv1alpha1.BackupList{}
 		Expect(testCtx.Cli.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
 		backupKey := types.NamespacedName{
 			Namespace: backupList.Items[0].Namespace,
 			Name:      backupList.Items[0].Name,
 		}
-		By("Mocking backup status to failed")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 		})()).Should(Succeed())
-
-		By("Set HorizontalScalePolicy")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-			func(clusterDef *appsv1alpha1.ClusterDefinition) {
-				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume,
-						BackupPolicyTemplateName: backupPolicyTPLName}
-			})()).ShouldNot(HaveOccurred())
-
-		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		By("Checking cluster status failed with backup error")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -1769,13 +1758,13 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 			if err == nil {
-				// this expect is intended for print all cluster.Status.Conditions
+				// this expectation is intended to print all cluster.Status.Conditions
 				g.Expect(cluster.Status.Conditions).Should(BeEmpty())
 			}
 			g.Expect(err).Should(HaveOccurred())
 		})).Should(Succeed())
 
-		By("expect for backup error event")
+		By("Expect for backup error event")
 		Eventually(func(g Gomega) {
 			eventList := corev1.EventList{}
 			Expect(k8sClient.List(ctx, &eventList, client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())

@@ -54,10 +54,10 @@ metadata:
   namespace: default
   labels: 
     helm.sh/chart: mongodb-cluster-0.7.0-alpha.0
-    app.kubernetes.io/version: "5.0.14"
+    app.kubernetes.io/version: "5.0"
     app.kubernetes.io/instance: mongodb-cluster
 spec:
-  clusterVersionRef: mongodb-5.0.14
+  clusterVersionRef: mongodb-5.0
   terminationPolicy: Delete  
   affinity:
     podAntiAffinity: Preferred

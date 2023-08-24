@@ -42,6 +42,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
+	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.6.0
@@ -118,6 +119,7 @@ require (
 	k8s.io/kubelet v0.26.1
 	k8s.io/metrics v0.26.3
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	kmodules.xyz/crd-schema-fuzz v0.25.0
 	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/kustomize/kyaml v0.13.9
 	sigs.k8s.io/yaml v1.3.0
@@ -235,7 +237,6 @@ require (
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-containerregistry v0.14.0 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20221103000818-d260c55eee4c // indirect
 	github.com/google/s2a-go v0.1.3 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect

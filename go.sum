@@ -2995,6 +2995,8 @@ k8s.io/utils v0.0.0-20200729134348-d5654de09c73/go.mod h1:jPW/WVKK9YHAvNhRxK0md/
 k8s.io/utils v0.0.0-20201110183641-67b214c5f920/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 h1:qY1Ad8PODbnymg2pRbkyMT/ylpTrCM8P2RJ0yroCyIk=
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+kmodules.xyz/crd-schema-fuzz v0.25.0 h1:c5ZxNRqJak1bkGhECmyrKpzKGThFMB4088Kynyvngbc=
+kmodules.xyz/crd-schema-fuzz v0.25.0/go.mod h1:VigFz19GwCxMGhb3YjCtlSXmfXb0J/g9du1So6rvqsk=
 oras.land/oras-go v1.2.2 h1:0E9tOHUfrNH7TCDk5KU0jVBEzCqbfdyuVfGmJ7ZeRPE=
 oras.land/oras-go v1.2.2/go.mod h1:Apa81sKoZPpP7CDciE006tSZ0x3Q3+dOoBcMZ/aNxvw=
 periph.io/x/host/v3 v3.8.0 h1:T5ojZ2wvnZHGPS4h95N2ZpcCyHnsvH3YRZ1UUUiv5CQ=

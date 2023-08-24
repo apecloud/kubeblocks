@@ -597,6 +597,10 @@ ifeq (, $(shell which kubectl))
 endif
 KUBECTL=$(shell which kubectl)
 
+.PHONY: fuzz
+fuzz: ## test for crd schema.
+	go test -v -C apis/schema/install
+
 ##@ End-to-end (E2E) tests
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset

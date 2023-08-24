@@ -17,6 +17,7 @@
 APP_NAME = kubeblocks
 VERSION ?= 0.7.0-alpha.0
 GITHUB_PROXY ?=
+INIT_ENV ?= false
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
 GENERATED_CLIENT_PKG = "pkg/client"
@@ -602,11 +603,11 @@ test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV
-	$(HELM) upgrade wesql deploy/apecloud-mysql
-	$(HELM) upgrade postgresql deploy/postgresql
-	$(HELM) upgrade mongodb deploy/mongodb
-	$(HELM) upgrade redis deploy/redis
-	$(HELM) upgrade pulsar deploy/pulsar
+	$(HELM) upgrade --install wesql deploy/apecloud-mysql
+	$(HELM) upgrade --install postgresql deploy/postgresql
+	$(HELM) upgrade --install  mongodb deploy/mongodb
+	$(HELM) upgrade --install redis deploy/redis
+	$(HELM) upgrade --install pulsar deploy/pulsar
 
 .PHONY: test-e2e-local
 test-e2e-local: render-smoke-testdata-manifests-local helm-package render-smoke-testdata-manifests ## Run E2E tests on local.

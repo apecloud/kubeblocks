@@ -34,9 +34,10 @@ options: {
 	replicas: int
 	storage:  string
 	vctNames: [...string]
-	keyValues: [string]: string
+	keyValues: [string]: {string | null}
 	cfgTemplateName: string
 	cfgFile:         string
+	forceRestart:    bool
 	services: [
 		...{
 			name:        string
@@ -121,6 +122,9 @@ content: {
 				componentName: options.componentNames[0]
 				configurations: [ {
 					name: options.cfgTemplateName
+					if options.forceRestart {
+						policy: "simple"
+					}
 					keys: [{
 						key: options.cfgFile
 						parameters: [ for k, v in options.keyValues {

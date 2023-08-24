@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,15 +73,6 @@ var _ = Describe("RSM Component", func() {
 	AfterEach(cleanAll)
 
 	Context("RSM Component test", func() {
-		var oldValue bool
-		BeforeEach(func() {
-			oldValue = viper.GetBool(constant.FeatureGateReplicatedStateMachine)
-			viper.Set(constant.FeatureGateReplicatedStateMachine, true)
-		})
-		AfterEach(func() {
-			viper.Set(constant.FeatureGateReplicatedStateMachine, oldValue)
-		})
-
 		It("RSM Component test", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,

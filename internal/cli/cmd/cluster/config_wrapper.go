@@ -36,7 +36,7 @@ type configWrapper struct {
 	create.CreateOptions
 
 	clusterName   string
-	updatedParams map[string]string
+	updatedParams map[string]*string
 
 	// autofill field
 	componentName  string
@@ -214,7 +214,7 @@ func (w *configWrapper) filterForReconfiguring(data map[string]string) []string 
 	return keys
 }
 
-func newConfigWrapper(baseOptions create.CreateOptions, clusterName, componentName, configSpec, configKey string, params map[string]string) (*configWrapper, error) {
+func newConfigWrapper(baseOptions create.CreateOptions, clusterName, componentName, configSpec, configKey string, params map[string]*string) (*configWrapper, error) {
 	var (
 		err           error
 		clusterObj    *appsv1alpha1.Cluster

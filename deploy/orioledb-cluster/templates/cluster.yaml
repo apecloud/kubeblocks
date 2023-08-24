@@ -1,0 +1,15 @@
+{{- include "kblib.clusterCommon" . }}
+  clusterDefinitionRef: orioledb
+  componentSpecs:
+    - name: orioledb
+      componentDefRef: orioledb
+      {{- include "kblib.componentMonitor" . | indent 6 }}
+      {{- include "orioledb-cluster.replicaCount" . | indent 6 }}
+      enabledLogs:
+        - running
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      switchPolicy:
+        type: Noop
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentStorages" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}

@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
@@ -44,7 +45,8 @@ type editConfigOptions struct {
 	configOpsOptions
 
 	// config file replace
-	replaceFile bool
+	replaceFile  bool
+	enableDelete bool
 }
 
 var (
@@ -112,13 +114,23 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	}
 
 	fmt.Fprintf(o.Out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[o.CfgFile]))
-	if err := cfgcore.ValidateConfigPatch(configPatch, configConstraint.Spec.FormatterConfig); err != nil {
-		return err
+	if !o.enableDelete {
+		if err := cfgcore.ValidateConfigPatch(configPatch, configConstraint.Spec.FormatterConfig); err != nil {
+			return err
+		}
 	}
 
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
 	if err != nil {
 		return nil
+	}
+
+	// check immutable parameters
+	if len(configConstraint.Spec.ImmutableParameters) > 0 {
+		params := cfgcore.GenerateVisualizedParamsList(configPatch, formatterConfig, nil)
+		if err = util.ValidateParametersModified2(sets.KeySet(fromKeyValuesToMap(params, o.CfgFile)), configConstraint.Spec); err != nil {
+			return err
+		}
 	}
 
 	confirmPrompt := confirmApplyReconfigurePrompt
@@ -191,5 +203,6 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	o.buildReconfigureCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
+	cmd.Flags().BoolVar(&o.enableDelete, "enable-delete", false, "Boolean flag to enable delete configuration. Default with false.")
 	return cmd
 }

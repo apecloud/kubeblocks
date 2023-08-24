@@ -322,7 +322,7 @@ func TestGetReplicationMode(t *testing.T) {
 
 	t.Run("synchronous_commit has been set", func(t *testing.T) {
 		for i, _ := range values {
-			manager.DBState.Extra[postgres.ReplicationMode] = values[i]
+			manager.DBState.Extra[postgres.ReplicationMode] = expects[i]
 			res, err := manager.getReplicationMode(ctx)
 			if err != nil {
 				t.Errorf("expect get replication mode success but failed, err:%v", err)

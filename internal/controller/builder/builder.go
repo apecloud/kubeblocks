@@ -590,6 +590,9 @@ func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([
 	return roles, strategy
 }
 
+// buildActionFromCharacterType is a temporary workaround to provide vary engines' role probe functionality,
+// as there is no way to configure these fields in Cluster API currently.
+// TODO(free6om): remove this after ComponentDefinition API re-designed.
 func buildActionFromCharacterType(characterType string, isConsensus bool) []workloads.Action {
 	kind := strings.ToLower(characterType)
 	switch kind {
@@ -617,8 +620,21 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				},
 			}
 		}
-		// TODO(free6om): mysql primary-secondary
-	case "postgres":
+		return []workloads.Action{
+			{
+				Image: "free6om/kubeblocks:latest",
+				Command: []string{
+					"curl http://127.0.0.1:3501/v1.0/bindings/mysql?operation=checkRole&workloadType=Replication",
+				},
+			},
+			{
+				Image: "jetbrainsinfra/jq:latest",
+				Command: []string{
+					"echo $v_KB_RSM_LAST_STDOUT | jq -r '.role' | tr '[:upper:]' '[:lower:]' | xargs echo -n",
+				},
+			},
+		}
+	case "postgres", "postgresql":
 		return []workloads.Action{
 			{
 				Image: "governmentpaas/psql:latest",
@@ -636,14 +652,42 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 				},
 			},
 			{
-				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"master\"; else echo -n \"replica\"; fi"},
+				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi"},
 			},
 		}
-		// TODO(free6om): config the following actions
 	case "mongodb":
+		return []workloads.Action{
+			{
+				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/mongo:5.0.14",
+				Command: []string{
+					"Status=$(mongosh -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --quiet --eval \"JSON.stringify(rs.status())\") &&",
+					"MyState=$(echo $Status | jq '.myState') &&",
+					"echo $Status | jq \".members[] | select(.state == ($MyState | tonumber)) | .stateStr\" |tr '[:upper:]' '[:lower:]' | xargs echo -n",
+				},
+			},
+		}
 	case "etcd":
+		return []workloads.Action{
+			{
+				Image: "quay.io/coreos/etcd:v3.5.6",
+				Command: []string{
+					"Status=$(etcdctl --endpoints=127.0.0.1:2379 endpoint status -w simple --command-timeout=300ms --dial-timeout=100m) &&",
+					"IsLeader=$(echo $Status | awk -F ', ' '{print $5}') &&",
+					"IsLearner=$(echo $Status | awk -F ', ' '{print $6}') &&",
+					"if [ \"true\" = \"$IsLeader\" ]; then echo -n \"leader\"; elif [ \"true\" = \"$IsLearner\" ]; then echo -n \"learner\"; else echo -n \"follower\"; fi",
+				},
+			},
+		}
 	case "redis":
-	case "kafka":
+		return []workloads.Action{
+			{
+				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8",
+				Command: []string{
+					"Role=$(redis-cli --user $KB_RSM_USERNAME --pass $KB_RSM_PASSWORD --no-auth-warning info | grep role | awk -F ':' '{print $2}' | tr '[:upper:]' '[:lower:]' | tr -d '\r' | tr -d '\n') &&",
+					"if [ \"master\" = \"$Role\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi",
+				},
+			},
+		}
 	}
 	return nil
 }

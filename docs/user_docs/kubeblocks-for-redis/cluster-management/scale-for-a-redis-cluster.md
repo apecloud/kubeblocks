@@ -180,7 +180,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ```
 
    - `--components` describes the component name ready for vertical scaling.
-   - `--replicas` describes the replicas with the specified components.
+   - `--replicas` describes the replica amount of a specified component.
 
    **Option 2.** Create an OpsRequest
 

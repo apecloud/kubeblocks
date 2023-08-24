@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orioledb-pgbouncer-configuration
+  labels:
+    {{- include "orioledb.labels" . | nindent 4 }}
+data:
+  pgbouncer.ini: |-
+    {{- .Files.Get "config/pgbouncer-ini.tpl" | nindent 4 }}

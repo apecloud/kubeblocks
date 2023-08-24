@@ -155,6 +155,8 @@ func createMapUpdateFn[T comparable](v reflect.Value, isUpdate bool) func(key T,
 	return func(key T, val interface{}) {
 		if val != nil {
 			obj[key] = val
+		} else {
+			delete(obj, key)
 		}
 	}
 }

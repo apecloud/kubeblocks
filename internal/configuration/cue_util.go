@@ -56,13 +56,13 @@ func CueValidate(cueTpl string) error {
 	return tpl.Validate()
 }
 
-func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.CfgFileFormat, rawData string) error {
-	cfg, err := LoadConfigObjectFromContent(cfgType, rawData)
+func ValidateConfigurationWithCue(cueString string, cfgType appsv1alpha1.CfgFileFormat, rawData string) error {
+	parameters, err := LoadConfigObjectFromContent(cfgType, rawData)
 	if err != nil {
 		return WrapError(err, "failed to load configuration [%s]", rawData)
 	}
 
-	return unstructuredDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.PropertiesPlus)
+	return unstructuredDataValidateByCue(cueString, parameters, cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.PropertiesPlus)
 }
 
 func LoadConfigObjectFromContent(cfgType appsv1alpha1.CfgFileFormat, rawData string) (map[string]interface{}, error) {
@@ -74,28 +74,28 @@ func LoadConfigObjectFromContent(cfgType appsv1alpha1.CfgFileFormat, rawData str
 	return configObject.GetAllParameters(), nil
 }
 
-func unstructuredDataValidateByCue(cueTpl string, data interface{}, trimString bool) error {
+func unstructuredDataValidateByCue(cueString string, data interface{}, trimString bool) error {
 	defaultValidatePath := "configuration"
 	context := cuecontext.New()
-	tpl := context.CompileString(cueTpl)
-	if err := tpl.Err(); err != nil {
+	cueValue := context.CompileString(cueString)
+	if err := cueValue.Err(); err != nil {
 		return err
 	}
 
-	if err := processCfgNotStringParam(data, context, tpl, trimString); err != nil {
+	if err := processCfgNotStringParam(data, context, cueValue, trimString); err != nil {
 		return err
 	}
 
 	var paths []string
-	cueValue := tpl.LookupPath(cue.ParsePath(defaultValidatePath))
-	if cueValue.Err() == nil {
+	subValue := cueValue.LookupPath(cue.ParsePath(defaultValidatePath))
+	if subValue.Err() == nil {
 		paths = []string{defaultValidatePath}
 	}
 
-	tpl = tpl.Fill(data, paths...)
-	if err := tpl.Err(); err != nil {
+	cueValue = cueValue.Fill(data, paths...)
+	if err := cueValue.Err(); err != nil {
 		return WrapError(err, "failed to render cue template configure")
 	}
 
-	return tpl.Validate()
+	return cueValue.Validate()
 }

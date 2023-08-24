@@ -1,0 +1,377 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: orioledb
+  labels:
+    {{- include "orioledb.labels" . | nindent 4 }}
+spec:
+  type: orioledb
+  connectionCredential:
+    username: postgres
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-orioledb)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-orioledb)"
+  componentDefs:
+    - name: orioledb
+      workloadType: Replication
+      characterType: postgresql
+      switchoverSpec:
+        withCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_NAME)"}'
+        withoutCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)"}'
+      customLabelSpecs:
+        - key: apps.kubeblocks.postgres.patroni/scope
+          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
+          resources:
+            - gvk: "v1/Pod"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
+            - gvk: "apps/v1/StatefulSet"
+              selector:
+                app.kubernetes.io/managed-by: kubeblocks
+      probes:
+        roleProbe:
+          failureThreshold: 2
+          periodSeconds: 1
+          timeoutSeconds: 1
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: {{ .Values.metrics.service.port }}
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configSpecs:
+        - name: orioledb-configuration
+          templateRef: orioledb-configuration
+          constraintRef: orioledb-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+        - name: orioledb-pgbouncer-configuration
+          templateRef: orioledb-pgbouncer-configuration
+          keys:
+            - pgbouncer.ini
+          namespace: {{ .Release.Namespace }}
+          volumeName: pgbouncer-config
+          defaultMode: 0777
+        - name: orioledb-custom-metrics
+          templateRef: orioledb-custom-metrics
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-custom-metrics
+          defaultMode: 0777
+        - name: agamotto-configuration
+          templateRef: orioledb-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
+          defaultMode: 0777
+      scriptSpecs:
+        - name: orioledb-scripts
+          templateRef: orioledb-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
+      service:
+        ports:
+          - name: tcp-postgresql
+            port: 5432
+            targetPort: tcp-postgresql
+          - name: tcp-pgbouncer
+            port: 6432
+            targetPort: tcp-pgbouncer
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          runAsUser: 0
+          fsGroup: 103
+          runAsGroup: 103
+        containers:
+          - name: postgresql
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            command:
+              - bin/bash
+              - -c
+              - /kb-scripts/setup.sh
+            securityContext:
+              runAsUser: 0
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 10
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /home/postgres/pgdata
+              - name: postgresql-config
+                mountPath: /home/postgres/conf
+              - name: scripts
+                mountPath: /kb-scripts
+              - name: pod-info
+                mountPath: /kb-podinfo
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+              - name: patroni
+                containerPort: 8008
+            env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
+              - name: PGROOT
+                value: /home/postgres/pgdata/pgroot
+              - name: PATRONI_ETCD3_HOST
+                value: "etcd-etcd:2379" # todo : not hardcode
+              - name: SCOPE
+                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
+              - name: KUBERNETES_SCOPE_LABEL
+                value: "apps.kubeblocks.postgres.patroni/scope"
+              - name: KUBERNETES_ROLE_LABEL
+                value: "apps.kubeblocks.postgres.patroni/role"
+              - name: RESTORE_DATA_DIR
+                value: /home/postgres/pgdata/kb_restore
+              - name: KB_PG_CONFIG_PATH
+                value: /home/postgres/conf/postgresql.conf
+              - name: ALLOW_NOSSL
+                value: "true"
+              - name: PGROOT
+                value: /home/postgres/pgdata/pgroot
+              - name: PGDATA
+                value: /home/postgres/pgdata/pgroot/data
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+              - name: PGUSER_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: PGPASSWORD_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: PGUSER_ADMIN
+                value: superadmin
+              - name: PGPASSWORD_ADMIN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: PGUSER_STANDBY
+                value: standby
+              - name: PGPASSWORD_STANDBY
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+          - name: pgbouncer
+            imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
+            securityContext:
+              runAsUser: 0
+            ports:
+              - name: tcp-pgbouncer
+                containerPort: 6432
+            volumeMounts:
+              - name: pgbouncer-config
+                mountPath: /home/pgbouncer/conf
+              - name: scripts
+                mountPath: /kb-scripts
+            command:
+              - /kb-scripts/pgbouncer_setup.sh
+            livenessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
+            env:
+              - name: PGBOUNCER_AUTH_TYPE
+                value: md5
+              - name: POSTGRESQL_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: POSTGRESQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: POSTGRESQL_PORT
+                value: "5432"
+              - name: POSTGRESQL_HOST
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: PGBOUNCER_PORT
+                value: "6432"
+              - name: PGBOUNCER_BIND_ADDRESS
+                value: "0.0.0.0"
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsUser: 0
+            env:
+              - name: ENDPOINT
+                value: {{ printf "127.0.0.1:5432" }}
+              - name: DATA_SOURCE_PASS
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: DATA_SOURCE_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: postgresql-custom-metrics
+                mountPath: /opt/conf
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+              {{- with .Values.shmVolume.sizeLimit }}
+              sizeLimit: {{ . }}
+              {{- end }}
+          - name: pod-info
+            downwardAPI:
+              items:
+                - path: "pod-role"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']
+                - path: "primary-pod"
+                  fieldRef:
+                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
+      systemAccounts:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - psql
+          args:
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -c
+            - $(KB_ACCOUNT_STATEMENT)
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+                  optional: false
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy: &kbAdminAcctRef
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
+          - name: kbdataprotection
+            provisionPolicy: *kbAdminAcctRef
+          - name: kbprobe
+            provisionPolicy: &kbReadonlyAcctRef
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
+          - name: kbmonitoring
+            provisionPolicy: *kbReadonlyAcctRef
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';

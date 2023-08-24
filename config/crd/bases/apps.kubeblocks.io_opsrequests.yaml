@@ -173,12 +173,17 @@ spec:
                           description: keys is used to set the parameters to be updated.
                           items:
                             properties:
+                              fileContent:
+                                description: fileContent indicates the configuration
+                                  file content. update whole file.
+                                type: string
                               key:
                                 description: key indicates the key name of ConfigMap.
                                 type: string
                               parameters:
                                 description: Setting the list of parameters for a
-                                  single configuration file.
+                                  single configuration file. update specified the
+                                  parameters.
                                 items:
                                   properties:
                                     key:
@@ -194,11 +199,9 @@ spec:
                                   required:
                                   - key
                                   type: object
-                                minItems: 1
                                 type: array
                             required:
                             - key
-                            - parameters
                             type: object
                           minItems: 1
                           type: array
@@ -235,6 +238,8 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.reconfigure
                   rule: self == oldSelf
+                - message: Value can not be empty
+                  rule: self.configurations.size() > 0
               restart:
                 description: restart the specified components.
                 items:

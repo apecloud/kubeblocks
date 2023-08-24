@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orioledb-patroni-reload-script
+  labels:
+    {{- include "orioledb.labels" . | nindent 4 }}
+data:
+  patroni_reload.tpl: |-
+    {{- .Files.Get "scripts/patroni-reload.tpl" | nindent 4 }}
+  bootstrap.yaml: |-
+    {{- .Files.Get "scripts/restart-parameter.yaml" | nindent 4 }}
+  reload.yaml: |-
+    scripts: patroni_reload.tpl
+    dataType: patroni
+    dsn: localhost:8008

@@ -98,6 +98,7 @@ var _ = Describe("Volume Protection Operation", func() {
 		podName                      = rand.String(8)
 		DBWithLockCharacterType      = "DBWithLock"
 		DBWithoutLockCharacterType   = "DBWithoutLock"
+		workloadTypeForTest          = "workloadTypeForTest"
 		volumeName                   = rand.String(8)
 		defaultThreshold             = 90
 		zeroThreshold                = 0
@@ -131,14 +132,15 @@ var _ = Describe("Volume Protection Operation", func() {
 		dbManagerWithoutLock = &component.FakeManager{}
 	)
 
-	component.RegisterManager(DBWithLockCharacterType, dbManagerWithLock)
-	component.RegisterManager(DBWithoutLockCharacterType, dbManagerWithoutLock)
+	component.RegisterManager(DBWithLockCharacterType, workloadTypeForTest, dbManagerWithLock)
+	component.RegisterManager(DBWithoutLockCharacterType, workloadTypeForTest, dbManagerWithoutLock)
 
 	p.Init(component.Properties{})
 
 	setup := func() {
 		os.Setenv(constant.KBEnvPodName, podName)
 		os.Setenv(constant.KBEnvCharacterType, DBWithLockCharacterType)
+		os.Setenv(constant.KBEnvWorkloadType, workloadTypeForTest)
 		raw, _ := json.Marshal(volumeProtectionSpec)
 		os.Setenv(constant.KBEnvVolumeProtectionSpec, string(raw))
 		dbManagerWithLock.instanceLocked = false

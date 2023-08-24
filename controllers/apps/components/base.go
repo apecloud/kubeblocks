@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -186,7 +185,7 @@ func (c *componentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli 
 				c.GetClusterName(), c.GetName(), v)
 		}
 		if node.Action == nil {
-			if action, err := resolveObjectAction(snapshot, node); err != nil {
+			if action, err := resolveObjectAction(snapshot, node, cli.Scheme()); err != nil {
 				return err
 			} else {
 				node.Action = action
@@ -626,8 +625,8 @@ func readCacheSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
 			// put to snapshot if owned by our cluster
-			if isOwnerOf(cluster, object, k8sscheme.Scheme) {
-				name, err := getGVKName(object, k8sscheme.Scheme)
+			if isOwnerOf(cluster, object, cli.Scheme()) {
+				name, err := getGVKName(object, cli.Scheme())
 				if err != nil {
 					return nil, err
 				}
@@ -638,8 +637,8 @@ func readCacheSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	return snapshot, nil
 }
 
-func resolveObjectAction(snapshot clusterSnapshot, vertex *ictrltypes.LifecycleVertex) (*ictrltypes.LifecycleAction, error) {
-	gvk, err := getGVKName(vertex.Obj, k8sscheme.Scheme)
+func resolveObjectAction(snapshot clusterSnapshot, vertex *ictrltypes.LifecycleVertex, scheme *runtime.Scheme) (*ictrltypes.LifecycleAction, error) {
+	gvk, err := getGVKName(vertex.Obj, scheme)
 	if err != nil {
 		return nil, err
 	}

@@ -57,20 +57,6 @@ spec:
           spec:
             description: ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
             properties:
-              MemberUpdateStrategy:
-                description: 'MemberUpdateStrategy, Members(Pods) update strategy.
-                  serial: update Members one by one that guarantee minimum component
-                  unavailable time. Learner -> Follower(with AccessMode=none) -> Follower(with
-                  AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-                  bestEffortParallel: update Members in parallel that guarantee minimum
-                  component un-writable time. Learner, Follower(minority) in parallel
-                  -> Follower(majority) -> Leader, keep majority online all the time.
-                  parallel: force parallel'
-                enum:
-                - Serial
-                - BestEffortParallel
-                - Parallel
-                type: string
               alternativeServices:
                 description: AlternativeServices defines Alternative Services selector
                   pattern specifier. can be used for creating Readonly service.
@@ -807,6 +793,20 @@ spec:
                 - password
                 - username
                 type: object
+              memberUpdateStrategy:
+                description: 'MemberUpdateStrategy, Members(Pods) update strategy.
+                  serial: update Members one by one that guarantee minimum component
+                  unavailable time. Learner -> Follower(with AccessMode=none) -> Follower(with
+                  AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
+                  bestEffortParallel: update Members in parallel that guarantee minimum
+                  component un-writable time. Learner, Follower(minority) in parallel
+                  -> Follower(majority) -> Leader, keep majority online all the time.
+                  parallel: force parallel'
+                enum:
+                - Serial
+                - BestEffortParallel
+                - Parallel
+                type: string
               membershipReconfiguration:
                 description: MembershipReconfiguration provides actions to do membership
                   dynamic reconfiguration.

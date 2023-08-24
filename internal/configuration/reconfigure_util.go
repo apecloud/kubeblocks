@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"reflect"
 
-	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -104,11 +103,11 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	if err != nil {
 		return false, err
 	}
-	updateParams := set.NewLinkedHashSetString(params...)
+	updateParams := util.NewSet(params...)
 
 	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(cc.StaticParameters) > 0 {
-		staticParams := set.NewLinkedHashSetString(cc.StaticParameters...)
+		staticParams := util.NewSet(cc.StaticParameters...)
 		union := util.Union(staticParams, updateParams)
 		if union.Length() > 0 {
 			return false, nil
@@ -121,7 +120,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 
 	// if ConfigConstraint has DynamicParameter, and all updated params are dynamic
 	if len(cc.DynamicParameters) > 0 {
-		dynamicParams := set.NewLinkedHashSetString(cc.DynamicParameters...)
+		dynamicParams := util.NewSet(cc.DynamicParameters...)
 		diff := util.Difference(updateParams, dynamicParams)
 		return diff.Length() == 0, nil
 	}

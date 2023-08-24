@@ -20,11 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
@@ -43,8 +47,6 @@ import (
 type editConfigOptions struct {
 	configOpsOptions
 
-	// config file replace
-	replaceFile  bool
 	enableDelete bool
 }
 
@@ -57,10 +59,14 @@ var (
 	`)
 )
 
-func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error) error {
+func (o *editConfigOptions) Run(fn func() error) error {
 	wrapper := o.wrapper
 	cfgEditContext := newConfigContext(o.CreateOptions, o.Name, wrapper.ComponentName(), wrapper.ConfigSpecName(), wrapper.ConfigFile())
 	if err := cfgEditContext.prepare(); err != nil {
+		return err
+	}
+	reader, err := o.getReaderWrapper()
+	if err != nil {
 		return err
 	}
 
@@ -68,7 +74,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		"KUBE_EDITOR",
 		"EDITOR",
 	})
-	if err := cfgEditContext.editConfig(editor); err != nil {
+	if err := cfgEditContext.editConfig(editor, reader); err != nil {
 		return err
 	}
 
@@ -80,9 +86,18 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		fmt.Println("Edit cancelled, no changes made.")
 		return nil
 	}
-
 	util.DisplayDiffWithColor(o.IOStreams.Out, diff)
 
+	configSpec := wrapper.ConfigTemplateSpec()
+	if configSpec.ConfigConstraintRef != "" {
+		return o.runWithConfigConstraints(cfgEditContext, configSpec, fn)
+	}
+
+	o.FileContent = cfgEditContext.getEdited()
+	return fn()
+}
+
+func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditContext, configSpec *appsv1alpha1.ComponentConfigSpec, fn func() error) error {
 	oldVersion := map[string]string{
 		o.CfgFile: cfgEditContext.getOriginal(),
 	}
@@ -90,7 +105,6 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
 
-	configSpec := wrapper.ConfigTemplateSpec()
 	configConstraintKey := client.ObjectKey{
 		Namespace: "",
 		Name:      configSpec.ConfigConstraintRef,
@@ -101,13 +115,13 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	}
 	formatterConfig := configConstraint.Spec.FormatterConfig
 	if formatterConfig == nil {
-		return cfgcore.MakeError("config spec[%s] not support reconfigure!", wrapper.ConfigSpecName())
+		return cfgcore.MakeError("config spec[%s] not support reconfigure!", configSpec.Name)
 	}
-	configPatch, _, err := cfgcore.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, false)
+	configPatch, fileUpdated, err := cfgcore.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, true)
 	if err != nil {
 		return err
 	}
-	if !configPatch.IsModify {
+	if !fileUpdated && !configPatch.IsModify {
 		fmt.Println("No parameters changes made.")
 		return nil
 	}
@@ -119,14 +133,17 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		}
 	}
 
-	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
-	if err != nil {
-		return nil
+	params := cfgcore.GenerateVisualizedParamsList(configPatch, configConstraint.Spec.FormatterConfig, nil)
+	// check immutable parameters
+	if len(configConstraint.Spec.ImmutableParameters) > 0 {
+		if err = util.ValidateParametersModified2(sets.KeySet(fromKeyValuesToMap(params, o.CfgFile)), configConstraint.Spec); err != nil {
+			return err
+		}
 	}
 
-	confirmPrompt := confirmApplyReconfigurePrompt
-	if !dynamicUpdated || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions) {
-		confirmPrompt = restartConfirmPrompt
+	confirmPrompt, err := generateReconfiguringPrompt(o.Out, fileUpdated, configPatch, &configConstraint.Spec, o.CfgFile)
+	if err != nil {
+		return err
 	}
 	yes, err := o.confirmReconfigure(confirmPrompt)
 	if err != nil {
@@ -139,11 +156,30 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	validatedData := map[string]string{
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
-	options := cfgcore.WithKeySelector(wrapper.ConfigTemplateSpec().Keys)
+	options := cfgcore.WithKeySelector(configSpec.Keys)
 	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate edited config")
 	}
-	return fn(configPatch, &configConstraint.Spec)
+	o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
+	return fn()
+}
+
+func generateReconfiguringPrompt(out io.Writer, fileUpdated bool, configPatch *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, fileName string) (string, error) {
+	if fileUpdated {
+		return restartConfirmPrompt, nil
+	}
+
+	fmt.Fprintf(out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[fileName]))
+	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(cc, configPatch)
+	if err != nil {
+		return "", nil
+	}
+
+	confirmPrompt := confirmApplyReconfigurePrompt
+	if !dynamicUpdated || !cfgcm.IsSupportReload(cc.ReloadOptions) {
+		confirmPrompt = restartConfirmPrompt
+	}
+	return confirmPrompt, nil
 }
 
 func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
@@ -165,6 +201,18 @@ func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
 	return strings.ToLower(input) == yesStr, nil
 }
 
+func (o *editConfigOptions) getReaderWrapper() (io.Reader, error) {
+	var reader io.Reader
+	if o.replaceFile && o.LocalFilePath != "" {
+		b, err := os.ReadFile(o.LocalFilePath)
+		if err != nil {
+			return nil, err
+		}
+		reader = bytes.NewReader(b)
+	}
+	return reader, nil
+}
+
 // NewEditConfigureCmd shows the difference between two configuration version.
 func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &editConfigOptions{
@@ -183,17 +231,10 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 			cmdutil.CheckErr(o.CreateOptions.Complete())
 			util.CheckErr(o.Complete())
 			util.CheckErr(o.Validate())
-			util.CheckErr(o.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
-				// generate patch for config
-				formatterConfig := cc.FormatterConfig
-				params := cfgcore.GenerateVisualizedParamsList(info, formatterConfig, nil)
-				o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
-				return o.CreateOptions.Run()
-			}))
+			util.CheckErr(o.Run(o.CreateOptions.Run))
 		},
 	}
 	o.buildReconfigureCommonFlags(cmd, f)
-	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 	cmd.Flags().BoolVar(&o.enableDelete, "enable-delete", false, "Boolean flag to enable delete configuration. Default with false.")
 	return cmd
 }

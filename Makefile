@@ -299,7 +299,7 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 #	build-single-kbcli-embed-chart.weaviate-cluster
 
 .PHONY: kbcli
-kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
+kbcli: test-go-generate kbcli-fast ## Build bin/kbcli.
 
 .PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.

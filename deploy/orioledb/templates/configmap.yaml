@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orioledb-configuration
+  labels:
+    {{- include "orioledb.labels" . | nindent 4 }}
+data:
+  postgresql.conf: |-
+    {{- .Files.Get "config/orioledb-config.tpl" | nindent 4 }}
+  # TODO: check if it should trust all
+  pg_hba.conf: |
+    host     all             all             0.0.0.0/0                md5
+    host     all             all             ::/0                     md5
+    local    all             all                                     trust
+    host     all             all             127.0.0.1/32            trust
+    host     all             all             ::1/128                 trust
+    local     replication     all                                    trust
+    host      replication     all             0.0.0.0/0               md5
+    host      replication     all             ::/0                    md5
+  kb_pitr.conf: |
+    method: kb_restore_from_time
+    kb_restore_from_time:
+      command: bash /home/postgres/pgdata/kb_restore/kb_restore.sh
+      keep_existing_recovery_conf: false
+      recovery_conf: {}

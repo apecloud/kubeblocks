@@ -1,6 +1,7 @@
 project_name: kbcli
 
 release:
+  prerelease: true
   github:
     owner: apecloud
     name: kbcli

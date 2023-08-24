@@ -87,13 +87,13 @@ func main() {
 	// ha dependent on dbmanager which is initialized by rt.Run
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	production, err := zap.NewProduction()
+	if err != nil {
+		panic(fmt.Errorf("fatal error create ha logger:%v", err))
+	}
+	logHa := zapr.NewLogger(production)
+	ha := highavailability.NewHa(logHa)
 	if IsHAAvailable(characterType, workloadType) {
-		production, err := zap.NewProduction()
-		if err != nil {
-			panic(fmt.Errorf("fatal error create ha logger:%v", err))
-		}
-		logHa := zapr.NewLogger(production)
-		ha := highavailability.NewHa(logHa)
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()

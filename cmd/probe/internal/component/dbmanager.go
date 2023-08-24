@@ -26,9 +26,11 @@ import (
 	"syscall"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type DBManager interface {
@@ -67,8 +69,8 @@ type DBManager interface {
 	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
 	IsFirstMember() bool
 
-	AddCurrentMemberToCluster(*dcs.Cluster) error
-	DeleteMemberFromCluster(*dcs.Cluster, string) error
+	JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error
+	LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error
 
 	// IsPromoted is applicable only to consensus cluster, which is used to
 	// check if DB has complete switchover.
@@ -77,7 +79,7 @@ type DBManager interface {
 	// Functions related to HA
 	// The functions should be idempotent, indicating that if they have been executed in one ha cycle,
 	// any subsequent calls during that cycle will have no effect.
-	Promote(context.Context) error
+	Promote(context.Context, *dcs.Cluster) error
 	Demote(context.Context) error
 	Follow(context.Context, *dcs.Cluster) error
 	Recover(context.Context) error
@@ -90,7 +92,7 @@ type DBManager interface {
 	// IsHealthiestMember(*dcs.Cluster) bool
 
 	GetCurrentMemberName() string
-	GetMemberAddrs(*dcs.Cluster) []string
+	GetMemberAddrs(context.Context, *dcs.Cluster) []string
 
 	// Functions related to account manage
 	IsRootCreated(context.Context) (bool, error)
@@ -99,6 +101,8 @@ type DBManager interface {
 	// Readonly lock for disk full
 	Lock(context.Context, string) error
 	Unlock(context.Context) error
+
+	MoveData(context.Context, *dcs.Cluster) error
 
 	GetLogger() logr.Logger
 
@@ -154,6 +158,22 @@ func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, 
 	return nil
 }
 
+func (mgr *DBManagerBase) MoveData(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
+func (mgr *DBManagerBase) Demote(context.Context) error {
+	return nil
+}
+
+func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
+func (mgr *DBManagerBase) IsRootCreated(ctx context.Context) (bool, error) {
+	return true, nil
+}
+
 // Start does not directly mean to start a database instance,
 // but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start(*dcs.Cluster) error {
@@ -190,18 +210,22 @@ func (mgr *DBManagerBase) Stop() error {
 	return nil
 }
 
+func (mgr *DBManagerBase) CreateRoot(ctx context.Context) error {
+	return nil
+}
+
 func (mgr *DBManagerBase) ShutDownWithWait() {
 	mgr.Logger.Info("Override me if need")
 }
 
-func RegisterManager(characterType string, manager DBManager) {
-	characterType = strings.ToLower(characterType)
-	managers[characterType] = manager
+func RegisterManager(characterType, workloadType string, manager DBManager) {
+	key := strings.ToLower(characterType + "_" + workloadType)
+	managers[key] = manager
 }
 
-func GetManager(characterType string) DBManager {
-	characterType = strings.ToLower(characterType)
-	return managers[characterType]
+func GetManager(characterType, workloadType string) DBManager {
+	key := strings.ToLower(characterType + "_" + workloadType)
+	return managers[key]
 }
 
 func GetDefaultManager() (DBManager, error) {
@@ -209,8 +233,15 @@ func GetDefaultManager() (DBManager, error) {
 	if characterType == "" {
 		return nil, fmt.Errorf("KB_SERVICE_CHARACTER_TYPE not set")
 	}
-
-	return GetManager(characterType), nil
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if workloadType == "" {
+		return nil, fmt.Errorf("%s not set", constant.KBEnvWorkloadType)
+	}
+	manager := GetManager(characterType, workloadType)
+	if manager == nil {
+		return nil, errors.Errorf("no db manager for characterType %s and workloadType %s", characterType, workloadType)
+	}
+	return manager, nil
 }
 
 type FakeManager struct {
@@ -270,15 +301,15 @@ func (*FakeManager) IsFirstMember() bool {
 	return true
 }
 
-func (*FakeManager) AddCurrentMemberToCluster(*dcs.Cluster) error {
+func (*FakeManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*FakeManager) DeleteMemberFromCluster(*dcs.Cluster, string) error {
+func (*FakeManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return fmt.Errorf("NotSuppported")
 }
 
-func (*FakeManager) Promote(context.Context) error {
+func (*FakeManager) Promote(context.Context, *dcs.Cluster) error {
 	return fmt.Errorf("NotSupported")
 }
 
@@ -303,7 +334,7 @@ func (*FakeManager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
 }
 
-func (*FakeManager) GetMemberAddrs(*dcs.Cluster) []string {
+func (*FakeManager) GetMemberAddrs(context.Context, *dcs.Cluster) []string {
 	return nil
 }
 

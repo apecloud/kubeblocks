@@ -2,7 +2,7 @@
 title: Handle an exception
 description: How to handle an exception in a PostgreSQL cluster
 keywords: [postgresql, exception]
-sidebar_position: 7
+sidebar_position: 8
 ---
 
 # Handle an exception

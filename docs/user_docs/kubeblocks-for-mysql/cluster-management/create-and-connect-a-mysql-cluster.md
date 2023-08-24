@@ -6,17 +6,24 @@ sidebar_position: 1
 sidebar_label: Create and connect
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Create and connect to a MySQL cluster
 
-This document shows how to create and connect to a MySQL cluster.
+This tutorial shows how to create and connect to a MySQL cluster.
 
 ## Create a MySQL cluster
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-kbcli.md).
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the ApeCloud MySQL addon is installed with `kbcli addon list`.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a MySQL cluster by kbcli.
+* [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* Make sure the ApeCloud MySQL add-on is enabled.
+  
+  <Tabs>
+
+  <TabItem value="kbcli" label="kbcli" default>
   
   ```bash
   kbcli addon list
@@ -27,147 +34,315 @@ This document shows how to create and connect to a MySQL cluster.
   ...
   ```
 
-* View all the database types and versions available for creating a cluster.
+  </TabItem>
+
+  <TabItem value="kubectl" label="kubectl">
 
   ```bash
+  kubectl get addons.extensions.kubeblocks.io apecloud-mysql
+  >
+  NAME             TYPE   STATUS    AGE
+  apecloud-mysql   Helm   Enabled   61s
+  ```
+
+  </TabItem>
+  </Tabs>
+
+* View all the database types and versions available for creating a cluster.
+
+  <Tabs>
+
+  <TabItem value="kbcli" label="kbcli" default>
+
+  ```bash
+  kbcli clusterdefinition list
+
   kbcli clusterversion list
   ```
 
-### (Recommended) Create a cluster on a tainted node
+  </TabItem>
 
-In actual scenarios, you are recommended to create a cluster on nodes with taints and customized specifications.
+  <TabItem value="kubectl" label="kubectl">
+  
+  Make sure the `apecloud-mysql` cluster definition is installed with `kubectl get clusterdefinition apecloud-mysql`.
 
-1. Taint your node.
+  ```bash
+  kubectl get clusterdefinition apecloud-mysql
+  >
+  NAME             MAIN-COMPONENT-NAME   STATUS      AGE
+  apecloud-mysql   mysql                 Available   85m
+  ```
 
-   :::note
+  View all available versions for creating a cluster.
 
-   If you have already some tainted nodes, you can skip this step.
+  ```bash
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=apecloud-mysql
+  ```
 
-   :::
+  </TabItem>
 
-   1. Get Kubernetes nodes.
+  </Tabs>
 
-      ```bash
-      kubectl get node
-      ```
+* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
-   2. Place taints on the selected nodes.
+  ```bash
+  kubectl create namespace demo
+  ```
 
-      ```bash
-      kubectl taint nodes <nodename> <taint1name>=true:NoSchedule
-      ```
+### Create a cluster
 
-2. Create a MySQL cluster.
+KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. And to ensure high availability, all replicas are distributed on different nodes by default.
 
-   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you can customize your cluster resources as demanded.
+<Tabs>
 
-   The following example shows how to use `--set` to create a cluster with customized resources and add all taints on the current node in the `--toleration` flag to tolerate them.
+<TabItem value="kbcli" label="kbcli" default>
+
+Create a Standalone.
+
+```bash
+kbcli cluster create mysql <clustername>
+```
+
+Create a RaftGroup Cluster.
+
+```bash
+kbcli cluster create mysql --mode raftGroup <clustername>
+```
+
+If you only have one node for deploying a RaftGroup Cluster, set the `availability-policy` as `none` when creating a RaftGroup Cluster.
+
+```bash
+kbcli cluster create mysql --mode raftGroup --availability-policy none <clustername>
+```
+
+:::note
+
+* In the production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+* Run the command below to view the flags for creating a MySQL cluster and the default values.
+  
+  ```bash
+  kbcli cluster create mysql -h
+  ```
+
+:::
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a RaftGroup Cluster.
 
    ```bash
-   kbcli cluster create mysql-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=apecloud-mysql --set cpu=2000m,memory=2Gi,storage=20Gi,storageClass=<storageclassname> --namespace <name>
-   ```
-
-   Or change the corresponding parameters in the YAML file.
-
-   ```bash
-   kbcli cluster create mysql-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=apecloud-mysql --namespace <name> --set-file -<<EOF
-   - name: mysql-cluster
-     replicas: 3
-     componentDefRef: mysql
-     volumeClaimTemplates:
-     - name: data
-       spec:
-         storageClassName: <storageclassname>
-         accessModes:
-         - ReadWriteOnce
-         resources:
-           requests:
-             cpu: 2000m
-             memory: 2Gi
-             storage: 10Gi
+   cat <<EOF | kubectl apply -f -
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mysql-cluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: apecloud-mysql
+     clusterVersionRef: ac-mysql-8.0.30
+     componentSpecs:
+     - componentDefRef: mysql
+       name: mysql
+       replicas: 3
+       resources:
+         limits:
+           cpu: "1"
+           memory: 1Gi
+         requests:
+           cpu: "1"
+           memory: 1Gi
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+     terminationPolicy: Delete
    EOF
    ```
 
-See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
+* `spec.clusterDefinitionRef` is the name of the cluster definition CRD that defines the cluster components.
+* `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
+* `spec.componentSpecs` is the list of components that define the cluster components.
+* `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
+* `spec.componentSpecs.name` is the name of the component.
+* `spec.componentSpecs.replicas` is the number of replicas of the component.
+* `spec.componentSpecs.resources` is the resource requirements of the component.
+* `spec.componentSpecs.volumeClaimTemplates` is the list of volume claim templates that define the volume claim templates for the component.
+* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
 
-📎 Table 1. kbcli cluster create flags description
-
-| Option                 | Description             |
-|:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition. You can choose a database type. Run `kbcli cd list` to show all available cluster definitions.   |
-| `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
-| `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
-| `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
-| `--monitor`            | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want to set node labels, you can follow the example format: <br />`kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
-| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, and each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
-| `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
-| `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
-
-If no flags are used and no information is specified, you create a MySQL cluster with default settings.
+KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mysql-cluster -n demo`.
 
 ```bash
-kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' 
+kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mysql-cluster -n demo
 ```
 
-### Create a cluster on a node without taints
-
-The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
+Run the following command to see the created MySQL cluster object:
 
 ```bash
-kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set cpu=2000m,memory=2Gi,storage=20Gi,storageClass=<storageclassname> --namespace <name>
+kubectl get cluster mysql-cluster -n demo -o yaml
 ```
 
-***Result***
+<details>
+<summary>Output</summary>
 
-A cluster is created in the namespace `default` with the specified cluster resources.
-
-Or change the corresponding parameters in the YAML file.
-
-```bash
-kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set storageClass=<storageclassname> --namespace <name> --set-file -<<EOF
-- name: mysql-cluster
-  replicas: 3
-  componentDefRef: mysql
-  volumeClaimTemplates:
-  - name: data
-    spec:
-    accessModes:
-    - ReadWriteOnce
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-          storage: 10Gi
-EOF
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"name":"mysql-cluster","namespace":"demo"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"componentDefRef":"mysql","name":"mysql","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"1Gi"},"requests":{"cpu":"0.5","memory":"1Gi"}},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+  creationTimestamp: "2023-07-17T09:03:23Z"
+  finalizers:
+  - cluster.kubeblocks.io/finalizer
+  generation: 1
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+    clusterversion.kubeblocks.io/name: ac-mysql-8.0.30
+  name: mysql-cluster
+  namespace: demo
+  resourceVersion: "27158"
+  uid: de7c9fa4-7b94-4227-8852-8d76263aa326
+spec:
+  clusterDefinitionRef: apecloud-mysql
+  clusterVersionRef: ac-mysql-8.0.30
+  componentSpecs:
+  - componentDefRef: mysql
+    monitor: false
+    name: mysql
+    noCreatePDB: false
+    replicas: 1
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: 1Gi
+      requests:
+        cpu: "0.5"
+        memory: 1Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  terminationPolicy: Delete
+status:
+  clusterDefGeneration: 2
+  components:
+    mysql:
+      consensusSetStatus:
+        leader:
+          accessMode: None
+          name: ""
+          pod: Unknown
+      phase: Failed
+      podsReady: true
+      podsReadyTime: "2023-07-17T09:03:37Z"
+  conditions:
+  - lastTransitionTime: "2023-07-17T09:03:23Z"
+    message: 'The operator has started the provisioning of Cluster: mysql-cluster'
+    observedGeneration: 1
+    reason: PreCheckSucceed
+    status: "True"
+    type: ProvisioningStarted
+  - lastTransitionTime: "2023-07-17T09:03:23Z"
+    message: Successfully applied for resources
+    observedGeneration: 1
+    reason: ApplyResourcesSucceed
+    status: "True"
+    type: ApplyResources
+  - lastTransitionTime: "2023-07-17T09:03:37Z"
+    message: all pods of components are ready, waiting for the probe detection successful
+    reason: AllReplicasReady
+    status: "True"
+    type: ReplicasReady
+  - lastTransitionTime: "2023-07-17T09:03:23Z"
+    message: 'pods are unavailable in Components: [mysql], refer to related component
+      message in Cluster.status.components'
+    reason: ComponentsNotReady
+    status: "False"
+    type: Ready
+  observedGeneration: 1
+  phase: Running
 ```
 
-See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
+</details>
 
-📎 Table 2. kbcli cluster create flags description
+</TabItem>
 
-| Option                 | Description             |
-|:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition and you can choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
-| `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
-| `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
-| `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
-| `--monitor`            | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />`kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
-| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
-| `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
-| `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
-
-If no flags are used and no information is specified, you create a MySQL cluster with default settings.
-
-```bash
-kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql
-```
+</Tabs>
 
 ## Connect to a MySQL Cluster
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
 kbcli cluster connect <clustername>  --namespace <name>
 ```
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+You can use `kubectl exec` to exec into a Pod and connect to a database.
+
+KubeBlocks operator creates a new Secret called `mysql-cluster-conn-credential` to store the connection credential of the MySQL cluster. This secret contains the following keys:
+
+* `username`: the root username of the MySQL cluster.
+* `password`: the password of the root user.
+* `port`: the port of the MySQL cluster.
+* `host`: the host of the MySQL cluster.
+* `endpoint`: the endpoint of the MySQL cluster and it is the same as `host:port`.
+
+1. Run the command below to get the `username` and `password` for the `kubectl exec` command.
+
+   ```bash
+   kubectl get secrets -n demo mysql-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   root
+
+   kubectl get secrets -n demo mysql-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   2gvztbvz
+   ```
+
+2. Exec into the Pod `mysql-cluster-mysql-0` and connect to the database using username and password.
+
+   ```bash
+   kubectl exec -ti -n demo mysql-cluster-mysql-0 -- bash
+
+   mysql -uroot -p2gvztbvz
+   ```
+
+</TabItem>
+
+<TabItem value="port-forward" label="port-forward">
+
+You can also port forward the service to connect to a database from your local machine.
+
+1. Run the following command to port forward the service.
+
+   ```bash
+   kubectl port-forward svc/mysql-cluster-mysql 3306:3306 -n demo
+   ```
+
+2. Open a new terminal and run the following command to connect to the database.
+
+   ```bash
+   mysql -uroot -p2gvztbvz
+   ```
+
+</TabItem>
+
+</Tabs>
+
+For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md). 

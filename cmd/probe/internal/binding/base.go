@@ -322,9 +322,9 @@ func (ops *BaseOperations) GetGlobalInfoOps(ctx context.Context, req *ProbeReque
 		}
 	}
 
+	globalInfo.Transform(opsRes)
 	if ops.OriGlobalInfo == nil || globalInfo.ShouldUpdate(*ops.OriGlobalInfo) {
 		ops.OriGlobalInfo = &globalInfo
-		globalInfo.Transform(opsRes)
 		SentProbeEvent(ctx, opsRes, ops.Logger)
 	}
 

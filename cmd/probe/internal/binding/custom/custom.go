@@ -142,6 +142,7 @@ func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp 
 		}
 	}
 
+	// csv format: term,podname,role
 	parseCSV := func(input []byte) (GlobalInfo, error) {
 		res := GlobalInfo{PodName2Role: map[string]string{}}
 		str := string(input)
@@ -166,6 +167,7 @@ func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp 
 	if err != nil {
 		return GlobalInfo{}, err
 	}
+	res.Event = OperationSuccess
 	h.Logger.Info("GetGlobalInfo get result", "result", res)
 
 	return res, nil

@@ -21,8 +21,11 @@ package custom
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -84,4 +87,74 @@ func TestInit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGlobalInfo(t *testing.T) {
+	var lines []string
+	for i := 0; i < 3; i++ {
+		podName := "pod-" + strconv.Itoa(i)
+		var role string
+		if i == 0 {
+			role = "leader"
+		} else {
+			role = "follower"
+		}
+		lines = append(lines, fmt.Sprintf("%d,%s,%s", 1, podName, role))
+	}
+	join := strings.Join(lines, "\n")
+
+	s := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			_, _ = w.Write([]byte(join))
+		}),
+	)
+	defer s.Close()
+
+	addr := s.Listener.Addr().String()
+	index := strings.LastIndex(addr, ":")
+	portStr := addr[index+1:]
+	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
+	hs, _ := NewHTTPCustom()
+	metadata := make(component.Properties)
+	err := hs.Init(metadata)
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		input     string
+		operation string
+		metadata  map[string]string
+		path      string
+		err       string
+	}{
+		"get": {
+			input:     join,
+			operation: "getGlobalInfo",
+			metadata:  nil,
+			path:      "/",
+			err:       "",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
+				Data:      nil,
+				Metadata:  tc.metadata,
+				Operation: util.OperationKind(tc.operation),
+			})
+			result := binding.OpsResult{}
+			err = json.Unmarshal(response.Data, &result)
+			require.NoError(t, err)
+
+			marshal, err := json.Marshal(result)
+			require.NoError(t, err)
+			info := binding.GlobalInfo{}
+			err = json.Unmarshal(marshal, &info)
+			require.NoError(t, err)
+			require.Equal(t, util.OperationSuccess, info.Event)
+			require.Equal(t, 1, info.Term)
+			require.Equal(t, 3, len(info.PodName2Role))
+		})
+	}
+
 }

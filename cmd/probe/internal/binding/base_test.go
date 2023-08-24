@@ -82,7 +82,7 @@ func TestOperations(t *testing.T) {
 	}
 }
 
-func TestDispatch(t *testing.T) {
+func TestInvoke(t *testing.T) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	p := mockFakeOperations()
 	p.Init()

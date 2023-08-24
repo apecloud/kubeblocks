@@ -29,7 +29,6 @@ import (
 
 	"github.com/go-logr/zapr"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"go.uber.org/automaxprocs/maxprocs"
 	"go.uber.org/zap"
 
@@ -38,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var port int

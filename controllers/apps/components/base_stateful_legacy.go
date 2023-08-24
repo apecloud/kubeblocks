@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +39,7 @@ import (
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // statefulComponentBase as a base class for single stateful-set based component (stateful & replication & consensus).

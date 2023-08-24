@@ -32,12 +32,12 @@ import (
 	"time"
 
 	"github.com/go-logr/zapr"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // HTTPCustom is a binding for an http url endpoint invocation

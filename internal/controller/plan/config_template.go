@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // General Built-in objects

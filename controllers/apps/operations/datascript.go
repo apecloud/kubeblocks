@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,6 +38,7 @@ import (
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel/engine"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var _ OpsHandler = DataScriptOpsHandler{}

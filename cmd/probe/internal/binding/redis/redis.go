@@ -31,7 +31,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/redis/go-redis/v9"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
@@ -43,6 +42,7 @@ import (
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	rediscomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/redis"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var (

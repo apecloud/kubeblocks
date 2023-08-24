@@ -25,10 +25,10 @@ import (
 
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func InVolumeSnapshotV1Beta1() bool {

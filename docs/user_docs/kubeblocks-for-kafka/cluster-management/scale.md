@@ -6,7 +6,7 @@ sidebar_position: 3
 sidebar_label: Scale
 ---
 
-# Scale for an Kafka cluster
+# Scale a Kafka cluster
 
 You can scale a Kafka cluster in two ways, vertical scaling and horizontal scaling.
 

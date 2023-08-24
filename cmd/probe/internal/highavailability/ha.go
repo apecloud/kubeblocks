@@ -104,10 +104,6 @@ func (ha *Ha) RunCycle() {
 	}
 
 	DBState := ha.dbManager.GetDBState(ha.ctx, cluster)
-	// TODO: Is Reasonable?
-	if DBState == nil {
-		return
-	}
 	// store leader's db state in dcs
 	if cluster.Leader != nil && cluster.Leader.Name == ha.dbManager.GetCurrentMemberName() {
 		cluster.Leader.DBState = DBState

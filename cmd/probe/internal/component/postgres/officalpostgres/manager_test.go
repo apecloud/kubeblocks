@@ -475,9 +475,9 @@ func TestReadRecoveryParams(t *testing.T) {
 
 	t.Run("host match", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
-			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}).AddRow("primary_conninfo", "host=test port=5432 user=postgres application_name=my-application"))
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}).AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application"))
 
-		leaderName := "test"
+		leaderName := "maple72-postgresql-0"
 		primaryInfo := manager.readRecoveryParams(ctx)
 		assert.True(t, strings.HasPrefix(primaryInfo["host"], leaderName))
 	})

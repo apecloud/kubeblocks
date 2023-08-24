@@ -565,7 +565,7 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 		return true, true
 	}
 
-	if strings.HasPrefix(primaryInfo["host"], leaderName) {
+	if !strings.HasPrefix(primaryInfo["host"], leaderName) {
 		mgr.Logger.Warnf("host not match, need to reload")
 		return true, false
 	}
@@ -677,14 +677,14 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 
 	needChange, needRestart := mgr.checkRecoveryConf(ctx, cluster.Leader.Name)
 	if needChange {
-		return mgr.follow(needRestart, cluster)
+		return mgr.follow(ctx, needRestart, cluster)
 	}
 
 	mgr.Logger.Infof("no action coz i still follow the leader:%s", cluster.Leader.Name)
 	return nil
 }
 
-func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
+func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
 	if mgr.CurrentMemberName == leaderMember.Name {
 		mgr.Logger.Infof("i get the leader key, don't need to follow")
@@ -717,7 +717,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 	}
 
 	if !needRestart {
-		if err = mgr.PgReload(context.TODO()); err != nil {
+		if err = mgr.PgReload(ctx); err != nil {
 			mgr.Logger.Errorf("reload conf failed, err:%v", err)
 			return err
 		}

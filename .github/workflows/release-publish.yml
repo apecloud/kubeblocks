@@ -72,7 +72,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
-          version: latest
+          version: ${{ env.TAG_NAME }}
           args: release --config ${{ github.workspace }}/.goreleaser.yaml --clean
         env:
           GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}

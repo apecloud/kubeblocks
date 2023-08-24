@@ -436,7 +436,7 @@ func (d *snapshotDataClone) listVolumeSnapshotByLabels(vsList *snapshotv1.Volume
 	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
 	// get vs from backup.
 	backupList := dataprotectionv1alpha1.BackupList{}
-	if err := d.cli.List(d.reqCtx.Ctx, &backupList, ml); err != nil {
+	if err := d.cli.List(d.reqCtx.Ctx, &backupList, client.InNamespace(d.cluster.Namespace), ml); err != nil {
 		return err
 	} else if len(backupList.Items) == 0 {
 		// ignore not found
@@ -504,7 +504,7 @@ func (d *snapshotDataClone) deleteSnapshot() ([]client.Object, error) {
 func (d *snapshotDataClone) deleteBackup() ([]client.Object, error) {
 	ml := d.getBackupMatchingLabels()
 	backupList := dataprotectionv1alpha1.BackupList{}
-	if err := d.cli.List(d.reqCtx.Ctx, &backupList, ml); err != nil {
+	if err := d.cli.List(d.reqCtx.Ctx, &backupList, client.InNamespace(d.cluster.Namespace), ml); err != nil {
 		return nil, err
 	}
 	objs := make([]client.Object, 0)
@@ -570,7 +570,7 @@ func (d *backupDataClone) clearTmpResources() ([]client.Object, error) {
 	// delete backup
 	ml := d.getBackupMatchingLabels()
 	backupList := dataprotectionv1alpha1.BackupList{}
-	if err := d.cli.List(d.reqCtx.Ctx, &backupList, ml); err != nil {
+	if err := d.cli.List(d.reqCtx.Ctx, &backupList, client.InNamespace(d.cluster.Namespace), ml); err != nil {
 		return nil, err
 	}
 	for i := range backupList.Items {
@@ -578,7 +578,7 @@ func (d *backupDataClone) clearTmpResources() ([]client.Object, error) {
 	}
 	// delete restore job
 	jobList := v1.JobList{}
-	if err := d.cli.List(d.reqCtx.Ctx, &jobList, ml); err != nil {
+	if err := d.cli.List(d.reqCtx.Ctx, &jobList, client.InNamespace(d.cluster.Namespace), ml); err != nil {
 		return nil, err
 	}
 	for i := range jobList.Items {

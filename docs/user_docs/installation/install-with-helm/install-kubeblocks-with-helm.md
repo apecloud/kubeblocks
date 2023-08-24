@@ -62,7 +62,7 @@ helm install kubeblocks kubeblocks/kubeblocks \
     --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
 ```
 
-## Verify KubeBlocks Installation
+## Verify KubeBlocks installation
 
 Run the following command to check whether KubeBlocks is installed successfully.
 

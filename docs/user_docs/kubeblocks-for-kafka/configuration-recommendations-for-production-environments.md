@@ -1,3 +1,11 @@
+---
+title: Resource description
+description: Kafka resource description
+keywords: [kafka, java heap, hardware resource]
+sidebar_position: 2
+sidebar_label: Resource description
+---
+
 # Resource Description
 
 ## Java Heap

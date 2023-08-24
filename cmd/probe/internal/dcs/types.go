@@ -21,6 +21,10 @@ package dcs
 
 import (
 	"fmt"
+
+	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type Cluster struct {
@@ -91,7 +95,8 @@ func (c *Cluster) GetMemberAddrWithPort(member Member) string {
 }
 
 func (c *Cluster) GetMemberAddr(member Member) string {
-	return fmt.Sprintf("%s.%s-headless", member.Name, c.ClusterCompName)
+	clusterDomain := viper.GetString(constant.KubernetesClusterDomainEnv)
+	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, c.ClusterCompName, c.Namespace, clusterDomain)
 }
 
 func (c *Cluster) GetMemberAddrs() []string {

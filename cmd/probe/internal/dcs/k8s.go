@@ -216,7 +216,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member := &members[i]
 		member.Name = pod.Name
 		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
-		member.Role = pod.Labels["app.kubernetes.io/role"]
+		member.Role = pod.Labels[constant.RoleLabelKey]
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.SQLChannelPort = getSQLChannelPort(&pod)
@@ -264,7 +264,7 @@ func (store *KubernetesStore) CreateLock() error {
 	leaderName := store.currentMemberName
 	now := time.Now().Unix()
 	nowStr := strconv.FormatInt(now, 10)
-	ttl := viper.GetString("KB_TTL")
+	ttl := viper.GetString(constant.KBEnvTTL)
 	leaderConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: leaderConfigMapName,
@@ -308,7 +308,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	}
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = viper.GetInt("KB_TTL")
+		ttl = viper.GetInt(constant.KBEnvTTL)
 	}
 	leader := annotations["leader"]
 	stateStr, ok := annotations["dbstate"]
@@ -453,7 +453,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 		}
 		return &HaConfig{
 			index:              "",
-			ttl:                viper.GetInt("KB_TTL"),
+			ttl:                viper.GetInt(constant.KBEnvTTL),
 			maxLagOnSwitchover: 1048576,
 		}, err
 	}
@@ -461,7 +461,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	annotations := configmap.Annotations
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = viper.GetInt("KB_TTL")
+		ttl = viper.GetInt(constant.KBEnvTTL)
 	}
 	maxLagOnSwitchover, err := strconv.Atoi(annotations["MaxLagOnSwitchover"])
 	if err != nil {

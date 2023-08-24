@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //	    viperx.Set("key", "value")
 //
 //	    // Get a configuration value
-//	    val := vx.Get("key")
+//	    val := viperx.Get("key")
 //	    fmt.Println(val)
 //	}
 //

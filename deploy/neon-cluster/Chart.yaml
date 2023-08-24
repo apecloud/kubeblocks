@@ -13,8 +13,3 @@ maintainers:
 
 sources:
   - https://github.com/apecloud/kubeblocks/
-
-dependencies:
-  - name: neonvm
-    repository: file://.//neonvm
-    version: 0.6.0-alpha.21

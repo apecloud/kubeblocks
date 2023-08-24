@@ -1,4 +1,7 @@
 Example routines to install neon and neon-cluster using helm.
+0.Install cert-manager
+
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 
 1. Install neon and neon-cluster
 helm install neon ./deploy/neon

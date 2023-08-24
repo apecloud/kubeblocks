@@ -11,7 +11,7 @@ data:
 apiVersion: vm.neon.tech/v1
 kind: VirtualMachine
 metadata:
-  name: test
+  name: vm-compute-node
   annotations:
     # In this example, these bounds aren't necessary. So... here's what they look like :)
     autoscaling.neon.tech/bounds: '{ "min": { "cpu": 0.25, "mem": "1Gi" }, "max": { "cpu": 1.25, "mem": "5Gi" } }'

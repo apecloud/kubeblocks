@@ -135,7 +135,7 @@ func buildProbeContainer() (*corev1.Container, error) {
 }
 
 func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
-	container.Image = viper.GetString(constant.KBProbeImage)
+	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"probe",
 		"--port", strconv.Itoa(probeSvcHTTPPort)}

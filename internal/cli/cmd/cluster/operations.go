@@ -83,6 +83,7 @@ type OperationsOptions struct {
 	CfgTemplateName string             `json:"cfgTemplateName"`
 	CfgFile         string             `json:"cfgFile"`
 	ForceRestart    bool               `json:"forceRestart"`
+	FileContent     string             `json:"fileContent"`
 
 	// VolumeExpansion options.
 	// VCTNames VolumeClaimTemplate names

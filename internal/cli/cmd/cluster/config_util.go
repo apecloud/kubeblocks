@@ -93,8 +93,11 @@ func (c *configEditContext) prepare() error {
 	return nil
 }
 
-func (c *configEditContext) editConfig(editor editor.Editor) error {
-	edited, _, err := editor.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(c.configKey)), "", bytes.NewBufferString(c.original))
+func (c *configEditContext) editConfig(editor editor.Editor, reader io.Reader) error {
+	if reader == nil {
+		reader = bytes.NewBufferString(c.original)
+	}
+	edited, _, err := editor.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(c.configKey)), "", reader)
 	if err != nil {
 		return err
 	}

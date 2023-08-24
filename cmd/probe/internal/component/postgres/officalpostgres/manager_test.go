@@ -182,6 +182,112 @@ func TestGetMemberAddrs(t *testing.T) {
 	})
 }
 
+func TestIsCurrentMemberHealthy(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{}
+
+	t.Run("current member is healthy", func(t *testing.T) {
+		cluster.Leader = &dcs.Leader{
+			Name: "test-pod-0",
+		}
+		cluster.Members = append(cluster.Members, dcs.Member{
+			Name: manager.CurrentMemberName,
+		})
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectBegin()
+		mock.ExpectExec(`create table if not exists`).
+			WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
+		mock.ExpectCommit()
+		row := pgxmock.NewRows([]string{"check_ts"}).AddRow(1)
+		mock.ExpectQuery("select").WillReturnRows(row)
+
+		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+
+		assert.True(t, isCurrentMemberHealthy)
+	})
+
+	t.Run("get replication mode failed", func(t *testing.T) {
+		cluster.Leader = &dcs.Leader{}
+		cluster.Members = append(cluster.Members, dcs.Member{
+			Name: manager.CurrentMemberName,
+		})
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("on"))
+
+		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+
+		assert.False(t, isCurrentMemberHealthy)
+	})
+
+	t.Run("get replication mode failed", func(t *testing.T) {
+		cluster.Leader = &dcs.Leader{}
+		cluster.Members = append(cluster.Members, dcs.Member{
+			Name: manager.CurrentMemberName,
+		})
+		mock.ExpectQuery("select").
+			WillReturnError(fmt.Errorf("some err"))
+
+		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+
+		assert.False(t, isCurrentMemberHealthy)
+	})
+
+	t.Run("write check failed", func(t *testing.T) {
+		cluster.Leader = &dcs.Leader{
+			Name: "test-pod-0",
+		}
+		cluster.Members = append(cluster.Members, dcs.Member{
+			Name: manager.CurrentMemberName,
+		})
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectBegin()
+		mock.ExpectExec(`create table if not exists`).
+			WillReturnError(fmt.Errorf("some err"))
+		mock.ExpectRollback()
+
+		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+
+		assert.False(t, isCurrentMemberHealthy)
+	})
+
+	t.Run("read check failed", func(t *testing.T) {
+		cluster.Leader = &dcs.Leader{
+			Name: "test-pod-1",
+		}
+		cluster.Members = append(cluster.Members, dcs.Member{
+			Name: manager.CurrentMemberName,
+		})
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectQuery("select").
+			WillReturnError(fmt.Errorf("some err"))
+
+		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+
+		assert.False(t, isCurrentMemberHealthy)
+	})
+}
+
 func TestGetReplicationMode(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)

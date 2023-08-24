@@ -120,12 +120,17 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	}
 	dbState.OpTimestamp = walPosition
 
-	timeLine := mgr.getReceivedTimeLine(ctx)
-	if timeLine != 0 {
+	var timeLine int64
+	if isLeader {
+		timeLine = mgr.getCurrentTimeLine(ctx)
+	} else {
+		timeLine = mgr.getReceivedTimeLine(ctx)
+	}
+	if timeLine == 0 {
 		mgr.Logger.Errorf("get received timeLine failed, err:%v", err)
 		return nil
 	}
-	dbState.Extra[postgres.ReceivedTimeLine] = strconv.FormatInt(timeLine, 10)
+	dbState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
 
 	mgr.DBState = dbState
 	return mgr.DBState
@@ -496,9 +501,14 @@ func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64)
 	return inRecovery, timeLine, lsn
 }
 
+// TODO:fill it
+func (mgr *Manager) getCurrentTimeLine(ctx context.Context) int64 {
+	return 2
+}
+
 func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
-	if mgr.DBState != nil && mgr.DBState.Extra[postgres.ReceivedTimeLine] != "" {
-		return cast.ToInt64(mgr.DBState.Extra[postgres.ReceivedTimeLine])
+	if mgr.DBState != nil && mgr.DBState.Extra[postgres.TimeLine] != "" {
+		return cast.ToInt64(mgr.DBState.Extra[postgres.TimeLine])
 	}
 
 	sql := "select case when latest_end_lsn is null then null " +

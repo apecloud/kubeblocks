@@ -50,10 +50,10 @@ const (
 )
 
 const (
-	ReplicationMode  = "replication_mode"
-	SyncStandBys     = "sync_standbys"
-	WalPosition      = "wal_position"
-	ReceivedTimeLine = "received_timeline"
+	ReplicationMode = "replication_mode"
+	SyncStandBys    = "sync_standbys"
+	WalPosition     = "wal_position"
+	TimeLine        = "timeline"
 )
 
 const (

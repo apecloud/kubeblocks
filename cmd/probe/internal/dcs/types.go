@@ -107,10 +107,17 @@ func (c *Cluster) GetMemberAddrs() []string {
 	return hosts
 }
 
+type MemberToDelete struct {
+	UID        string
+	IsFinished bool
+}
+
 type HaConfig struct {
 	index              string
 	ttl                int
 	maxLagOnSwitchover int64
+	DeleteMembers      map[string]MemberToDelete
+	resource           any
 }
 
 func (c *HaConfig) GetTTL() int {
@@ -119,6 +126,45 @@ func (c *HaConfig) GetTTL() int {
 
 func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 	return c.maxLagOnSwitchover
+}
+
+func (c *HaConfig) IsDeleting(member *Member) bool {
+	memberToDelete := c.GetMemberToDelete(member)
+	return memberToDelete != nil
+}
+
+func (c *HaConfig) IsDeleted(member *Member) bool {
+	memberToDelete := c.GetMemberToDelete(member)
+	if memberToDelete == nil {
+		return false
+	}
+	return memberToDelete.IsFinished
+}
+
+func (c *HaConfig) FinishDeleted(member *Member) {
+	memberToDelete := c.GetMemberToDelete(member)
+	memberToDelete.IsFinished = true
+	c.DeleteMembers[member.Name] = *memberToDelete
+}
+
+func (c *HaConfig) GetMemberToDelete(member *Member) *MemberToDelete {
+	memberToDelete, ok := c.DeleteMembers[member.Name]
+	if !ok {
+		return nil
+	}
+
+	if memberToDelete.UID != member.UID {
+		return nil
+	}
+	return &memberToDelete
+}
+
+func (c *HaConfig) AddMemberToDelete(member *Member) {
+	memberToDelete := MemberToDelete{
+		UID:        member.UID,
+		IsFinished: false,
+	}
+	c.DeleteMembers[member.Name] = memberToDelete
 }
 
 type Leader struct {
@@ -142,6 +188,8 @@ type Member struct {
 	PodIP          string
 	DBPort         string
 	SQLChannelPort string
+	UID            string
+	resource       any
 }
 
 func (m *Member) GetName() string {

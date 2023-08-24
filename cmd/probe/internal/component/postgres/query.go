@@ -152,6 +152,11 @@ func (mgr *Manager) ExecOthers(ctx context.Context, sql string, host string) (re
 }
 
 func (mgr *Manager) ExecLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result int64, err error) {
+	isLeader, _ := mgr.IsLeader(ctx, cluster)
+	if isLeader {
+		return mgr.Exec(ctx, sql)
+	}
+
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return 0, ClusterHasNoLeader

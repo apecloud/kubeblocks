@@ -56,6 +56,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 			Namespace:         viper.GetString(constant.KBEnvNamespace),
 			Logger:            logger,
 			DataDir:           viper.GetString(PGDATA),
+			DBState:           nil,
 		},
 		Pool:   pool,
 		Config: config,
@@ -118,6 +119,7 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
 	}
 
+	mgr.Logger.Infof("get member:%s role:%s", host, role)
 	return role == binding.LEADER || role == binding.PRIMARY, nil
 }
 

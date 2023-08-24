@@ -29,7 +29,7 @@ service Probe {
 
 // ProbeRequest is the message to send data to output bindings
 message ProbeRequest {
-  // The name of the output binding to invoke. 用于区分不同类型的db
+  // The name of the output binding to invoke.
   string name = 1;
 
   // The data which will be sent to output binding.

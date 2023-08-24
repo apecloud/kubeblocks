@@ -56,6 +56,11 @@ func (v *viperWrap) GetAllParameters() map[string]interface{} {
 	return v.AllSettings()
 }
 
+func (v *viperWrap) RemoveKey(key string) error {
+	// TODO viper does not support remove key
+	return nil
+}
+
 func (v *viperWrap) SubConfig(key string) ConfigObject {
 	return &viperWrap{
 		Viper:  v.Sub(key),

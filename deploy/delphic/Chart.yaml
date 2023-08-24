@@ -13,9 +13,9 @@ dependencies:
   - name: postgresql-cluster
 #    repository: https://jihulab.com/api/v4/projects/85949/packages/helm/stable
     repository: file://../postgresql-cluster
-    version: ~0.6.0-0
+    version: ~0.7.0-0
     alias: pgcluster
   - name: redis-cluster
 #    repository: https://jihulab.com/api/v4/projects/85949/packages/helm/stable
     repository: file://../redis-cluster
-    version: ~0.6.0-0
+    version: ~0.7.0-0

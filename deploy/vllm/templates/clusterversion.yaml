@@ -16,7 +16,7 @@ spec:
               - name: MODEL_NAME
                 value: baichuan-inc/Baichuan-13B-Chat
               - name: EXTRA_ARGS
-                value: "--trust-remote-code --tensor-parallel-size 2"
+                value: "--trust-remote-code --tensor-parallel-size KB_REPLICAS_PLACEHOLDER"
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -36,7 +36,7 @@ spec:
               - name: MODEL_NAME
                 value: baichuan-inc/Baichuan-7B
               - name: EXTRA_ARGS
-                value: "--trust-remote-code --tensor-parallel-size 1"
+                value: "--trust-remote-code --tensor-parallel-size KB_REPLICAS_PLACEHOLDER"
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -56,4 +56,44 @@ spec:
               - name: MODEL_NAME
                 value: lmsys/vicuna-13b-v1.3
               - name: EXTRA_ARGS
-                value: "--trust-remote-code --swap-space 1 --tensor-parallel-size 2"
+                value: "--trust-remote-code --swap-space 1 --tensor-parallel-size KB_REPLICAS_PLACEHOLDER"
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: vllm-vicuna-7b
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: vllm
+  componentVersions:
+    - componentDefRef: vllm
+      versionsContext:
+        containers:
+          - name: vllm
+            image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+            env:
+              - name: MODEL_NAME
+                value: lmsys/vicuna-7b-v1.5
+              - name: EXTRA_ARGS
+                value: "--trust-remote-code --tensor-parallel-size KB_REPLICAS_PLACEHOLDER"
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: vllm-intern-lm-7b
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: vllm
+  componentVersions:
+    - componentDefRef: vllm
+      versionsContext:
+        containers:
+          - name: vllm
+            image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+            env:
+              - name: MODEL_NAME
+                value: internlm/internlm-7b
+              - name: EXTRA_ARGS
+                value: "--trust-remote-code --tensor-parallel-size KB_REPLICAS_PLACEHOLDER"

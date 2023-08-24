@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config-template
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+  {{- include "elasticsearch.labels" . | nindent 4 }}
+data:
+  elasticsearch.yaml: |-
+    {{- .Files.Get "configs/elasticsearch.yaml.tpl" | nindent 4 }}

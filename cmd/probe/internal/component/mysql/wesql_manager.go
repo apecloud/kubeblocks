@@ -32,6 +32,13 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
+)
+
+const (
+	Role        = "ROLE"
+	CurrentRole = "CURRENT_ROLE"
+	Leader      = "Leader"
 )
 
 type WesqlManager struct {
@@ -55,7 +62,7 @@ func NewWesqlManager(logger logger.Logger) (*WesqlManager, error) {
 		}
 	}()
 
-	currentMemberName := viper.GetString("KB_POD_NAME")
+	currentMemberName := viper.GetString(constant.KBEnvPodName)
 	if currentMemberName == "" {
 		return nil, fmt.Errorf("KB_POD_NAME is not set")
 	}
@@ -69,8 +76,8 @@ func NewWesqlManager(logger logger.Logger) (*WesqlManager, error) {
 		Manager: Manager{
 			DBManagerBase: component.DBManagerBase{
 				CurrentMemberName: currentMemberName,
-				ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
-				Namespace:         viper.GetString("KB_NAMESPACE"),
+				ClusterCompName:   viper.GetString(constant.KBEnvClusterCompName),
+				Namespace:         viper.GetString(constant.KBEnvNamespace),
 				Logger:            logger,
 			},
 			DB:       db,
@@ -89,11 +96,15 @@ func (mgr *WesqlManager) InitializeCluster(ctx context.Context, cluster *dcs.Clu
 func (mgr *WesqlManager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	role, err := mgr.GetRole(ctx)
 
-	if err == nil && strings.EqualFold(role, "leader") {
+	if err != nil {
+		return false, err
+	}
+
+	if strings.EqualFold(role, Leader) {
 		return true, nil
 	}
 
-	return false, err
+	return false, nil
 }
 
 func (mgr *WesqlManager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
@@ -194,7 +205,7 @@ func (mgr *WesqlManager) IsClusterHealthy(ctx context.Context, cluster *dcs.Clus
 	var leaderRecord RowMap
 	sql := "select * from information_schema.wesql_cluster_global;"
 	err = QueryRowsMap(db, sql, func(rMap RowMap) error {
-		if rMap.GetString("ROLE") == "Leader" {
+		if rMap.GetString(Role) == Leader {
 			leaderRecord = rMap
 		}
 		return nil
@@ -295,12 +306,12 @@ func (mgr *WesqlManager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs
 		return nil
 	}
 
-	if clusterLocalInfo.GetString("ROLE") == "Leader" {
+	if clusterLocalInfo.GetString(Role) == Leader {
 		// I am the leader, just return nil
 		return nil
 	}
 
-	leaderAddr := clusterLocalInfo.GetString("CURRENT_LEADER")
+	leaderAddr := clusterLocalInfo.GetString(CurrentRole)
 	if leaderAddr == "" {
 		return nil
 	}

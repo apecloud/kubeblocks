@@ -193,7 +193,6 @@ spec:
                                       type: string
                                   required:
                                   - key
-                                  - value
                                   type: object
                                 minItems: 1
                                 type: array
@@ -210,6 +209,15 @@ spec:
                           description: name is a config template name.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          description: policy defines the upgrade policy.
+                          enum:
+                          - simple
+                          - parallel
+                          - rolling
+                          - autoReload
+                          - operatorSyncUpdate
                           type: string
                       required:
                       - keys

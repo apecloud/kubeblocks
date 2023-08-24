@@ -3,7 +3,7 @@ annotations:
 apiVersion: v2
 name: mysql-cluster
 type: application
-version: 0.6.0-alpha.21
+version: 0.7.0-alpha.0
 description: MySQL is a widely used, open-source relational database management system (RDBMS)
 dependencies:
   - name: kblib

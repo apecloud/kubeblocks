@@ -178,11 +178,11 @@ func mergerConfigTemplate(template *appsv1alpha1.LazyRenderedTemplateSpec,
 	return templateMerger.Merge(baseData, data)
 }
 
-func splitParameters(params []cfgcore.VisualizedParam) map[string]map[string]string {
-	r := make(map[string]map[string]string)
+func splitParameters(params []cfgcore.VisualizedParam) map[string]map[string]*string {
+	r := make(map[string]map[string]*string)
 	for _, param := range params {
 		if _, ok := r[param.Key]; !ok {
-			r[param.Key] = make(map[string]string)
+			r[param.Key] = make(map[string]*string)
 		}
 		for _, kv := range param.Parameters {
 			r[param.Key][kv.Key] = kv.Value

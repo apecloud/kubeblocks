@@ -11,16 +11,16 @@ spec:
           - image: redis/redis-stack-server:7.0.6-RC8
             imagePullPolicy: IfNotPresent
             name: redis
-            resources: {}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: registry.cn-hangzhou.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8
     - componentDefRef: redis-sentinel
       versionsContext:
         containers:
           - image: redis/redis-stack-server:7.0.6-RC8
             imagePullPolicy: IfNotPresent
             name: redis-sentinel
-            resources: {}
         initContainers:
           - image: redis/redis-stack-server:7.0.6-RC8
             imagePullPolicy: IfNotPresent
             name: init-redis-sentinel
-            resources: {}

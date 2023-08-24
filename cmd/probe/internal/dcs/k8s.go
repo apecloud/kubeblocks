@@ -199,7 +199,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	labelsMap := map[string]string{
 		constant.AppInstanceLabelKey:    store.clusterName,
-		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppManagedByLabelKey:   "kubeblocks",
 		constant.KBAppComponentLabelKey: store.componentName,
 	}
 
@@ -423,7 +423,7 @@ func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
 	}
 
 	store.logger.Infof("Create Ha ConfigMap: %s", haName)
-	ttl := viper.GetString("KB_TTL")
+	ttl := viper.GetString(constant.KBEnvTTL)
 	maxLag := viper.GetString("KB_MAX_LAG")
 	haConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

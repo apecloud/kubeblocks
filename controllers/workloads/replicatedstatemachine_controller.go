@@ -141,7 +141,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Scheme:  *r.Scheme,
 	}
 
-	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
 		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
 		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})

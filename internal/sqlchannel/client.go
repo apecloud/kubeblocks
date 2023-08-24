@@ -36,13 +36,31 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
-type LorryClient interface {
-	GetRole() (string, error)
-	JoinMember() error
-	LeaveMember() error
+type Client interface {
+	JoinMember(ctx context.Context) error
+	LeaveMember(ctx context.Context) error
 }
 
-var _ LorryClient = &OperationClient{}
+// HACK: for unit test only.
+var mockClient Client
+var mockClientError error
+
+func SetMockClient(cli Client, err error) {
+	mockClient = cli
+	mockClientError = err
+}
+
+func UnsetMockClient() {
+	mockClient = nil
+	mockClientError = nil
+}
+
+func NewClient(characterType string, pod corev1.Pod) (Client, error) {
+	if mockClient != nil || mockClientError != nil {
+		return mockClient, mockClientError
+	}
+	return NewClientWithPod(&pod, characterType)
+}
 
 type OperationClient struct {
 	dapr.Client
@@ -52,6 +70,8 @@ type OperationClient struct {
 	ReconcileTimeout time.Duration
 	RequestTimeout   time.Duration
 }
+
+var _ Client = &OperationClient{}
 
 type OperationResult struct {
 	response *dapr.BindingEvent

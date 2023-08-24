@@ -66,5 +66,8 @@ $(if [ "$enable_query_log" == "true" ]; then echo "--log_queries_to_file $VTDATA
 $(if [ -n "$table_acl_config" ]; then echo "--table-acl-config $table_acl_config"; fi) \
 $(if [ "$queryserver_config_strict_table_acl" == "true" ]; then echo "--queryserver-config-strict-table-acl"; fi) \
 $(if [ "$enforce_tableacl_config" == "true" ]; then echo "--enforce-tableacl-config"; fi) \
---table-acl-config-reload-interval $table_acl_config_reload_interval
+--table-acl-config-reload-interval $table_acl_config_reload_interval \
+--queryserver-config-pool-size $queryserver_config_pool_size \
+--queryserver-config-stream-pool-size $queryserver_config_stream_pool_size \
+--queryserver-config-transaction-cap $queryserver_config_transaction_cap
 EOF

@@ -23,7 +23,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
-	"fmt"
 	"reflect"
 )
 
@@ -39,7 +38,10 @@ func jsonify(rows *sql.Rows) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		r := convert(columnTypes, values)
+		r, err := convert(columnTypes, values)
+		if err != nil {
+			return nil, err
+		}
 		ret = append(ret, r)
 	}
 	return json.Marshal(ret)
@@ -72,16 +74,16 @@ func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
 	return values
 }
 
-func convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
+func convert(columnTypes []*sql.ColumnType, values []interface{}) (map[string]interface{}, error) {
 	r := map[string]interface{}{}
 	for i, ct := range columnTypes {
 		value := values[i]
 		switch v := values[i].(type) {
 		case driver.Valuer:
-			if vv, err := v.Value(); err == nil {
-				value = interface{}(vv)
+			if vv, err := v.Value(); err != nil {
+				return nil, err
 			} else {
-				value = fmt.Sprintf("error to convert value: %v", err)
+				value = interface{}(vv)
 			}
 		case *sql.RawBytes:
 			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
@@ -94,5 +96,5 @@ func convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]int
 			r[ct.Name()] = value
 		}
 	}
-	return r
+	return r, nil
 }

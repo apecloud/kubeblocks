@@ -1,0 +1,53 @@
+{{- $cc := .Files.Get "config/orioledb-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: orioledb-cc
+  labels:
+    {{- include "orioledb.labels" . | nindent 4 }}
+spec:
+  reloadOptions:
+    tplScriptTrigger:
+      sync: false
+      scriptConfigMapRef: orioledb-patroni-reload-script
+      namespace: {{ .Release.Namespace }}
+
+  # update patroni master
+  selector:
+    matchLabels:
+      "apps.kubeblocks.postgres.patroni/role": "master"
+
+  # top level orioledb configuration type
+  cfgSchemaTopLevelName: PGParameter
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    # schema: auto generate from cue scripts
+    # example: ../../internal/configuration/testdata/mysql_openapi.json
+    cue: |-
+      {{- .Files.Get "config/orioledb-config-constraint.cue" | nindent 6 }}
+
+  ##  require db instance restart
+  ## staticParameters
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+      ## define immutable parameter list, this feature is not currently supported.
+  {{- if hasKey $cc "immutableParameters" }}
+  immutableParameters:
+   {{- $params := get $cc "immutableParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+  {{- end}}
+
+
+
+    # configuration file format
+  formatterConfig:
+    format: properties

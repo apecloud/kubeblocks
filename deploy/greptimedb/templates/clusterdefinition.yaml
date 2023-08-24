@@ -62,7 +62,7 @@ spec:
               - bin/sh
               - -c
               - |
-                until nslookup $(GREPTIMEDB_DATANODE_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}; do
+                until nslookup ${GREPTIMEDB_DATANODE_SVC}-headless.${KB_NAMESPACE}.svc{{ .Values.clusterDomain }}; do
                   # frontend requires at least one datanode is ready
                   echo "waiting for datanode"; sleep 2;
                 done;
@@ -197,7 +197,7 @@ spec:
               - bin/sh
               - -c
               - |
-                until nslookup $(GREPTIMEDB_META_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}; do
+                until nslookup ${GREPTIMEDB_META_SVC}-headless.${KB_NAMESPACE}.svc{{ .Values.clusterDomain }}; do
                   # datanode requires at least one meta is ready
                   echo "waiting for meta"; sleep 2;
                 done;
@@ -270,7 +270,7 @@ spec:
               - bin/sh
               - -c
               - |
-                until nslookup $(GREPTIMEDB_ETCD_SVC)-headless.$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}; do
+                until nslookup ${GREPTIMEDB_ETCD_SVC}-headless.${KB_NAMESPACE}.svc{{ .Values.clusterDomain }}; do
                   echo "waiting for etcd"; sleep 2;
                 done;
         containers:

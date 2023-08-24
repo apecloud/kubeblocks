@@ -61,6 +61,8 @@ kubectl delete secret cloud-key-secret-gcp
 
 </TabItem>
 
+</Tabs>
+
 ## Enable Chaos Mesh
 
 Both Helm and kbcli are provided as options to deploy Chaos Mesh.

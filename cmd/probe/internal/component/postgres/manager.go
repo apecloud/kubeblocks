@@ -390,12 +390,12 @@ func (mgr *Manager) Recover(context.Context) error {
 	return nil
 }
 
-// AddCurrentMemberToCluster postgresql don't need to add member
+// JoinCurrentMemberToCluster postgresql don't need to add member
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	return nil
 }
 
-// DeleteMemberFromCluster postgresql don't need to delete member
+// LeaveMemberFromCluster postgresql don't need to delete member
 func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return nil
 }

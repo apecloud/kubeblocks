@@ -497,7 +497,7 @@ func (store *KubernetesStore) UpdateHaConfig() error {
 	annotations["ttl"] = strconv.Itoa(haConfig.ttl)
 	deleteMembers, err := json.Marshal(haConfig.DeleteMembers)
 	if err != nil {
-		store.logger.Error(err, fmt.Sprintf("marsha delete members [%v] errors: %v", haConfig))
+		store.logger.Error(err, fmt.Sprintf("marsha delete members [%v]", haConfig))
 	}
 	annotations["delete-members"] = string(deleteMembers)
 	annotations["MaxLagOnSwitchover"] = strconv.Itoa(int(haConfig.maxLagOnSwitchover))

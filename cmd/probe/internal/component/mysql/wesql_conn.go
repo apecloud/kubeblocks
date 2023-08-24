@@ -45,10 +45,10 @@ func (mgr *WesqlManager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.M
 
 // GetLeaderConn retrieves a database connection to the leader member of a cluster.
 func (mgr *WesqlManager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster) (*sql.DB, error) {
-	mgr.Logger.Debugf("Get leaader from dcs cluster")
+	mgr.Logger.Info("Get leaader from dcs cluster")
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		mgr.Logger.Debugf("Get leaader from db cluster local")
+		mgr.Logger.Info("Get leaader from db cluster local")
 		leaderMember = mgr.GetLeaderMember(ctx, cluster)
 	}
 	if leaderMember == nil {
@@ -61,7 +61,7 @@ func (mgr *WesqlManager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster
 func (mgr *WesqlManager) GetLeaderMember(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
 	if err != nil || clusterLocalInfo == nil {
-		mgr.Logger.Errorf("Get cluster local info failed: %v", err)
+		mgr.Logger.Error(err, "Get cluster local info failed")
 		return nil
 	}
 

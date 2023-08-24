@@ -141,12 +141,12 @@ spec:
             - -c
             - $(KB_ACCOUNT_STATEMENT)
           env:
-            - name: POSTGRES_USER
+            - name: PGUSER
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
                   key: username
-            - name: POSTGRES_PASSWORD
+            - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)

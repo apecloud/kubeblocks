@@ -1,6 +1,6 @@
 ---
-title: Try out KubeBlocks on Cloud
-description: How to run Playground on Cloud
+title: Try out KubeBlocks on Cloud 
+description: How to run KubeBlocks with Playground on Cloud
 keywords: [Playground, try out, cloud]
 sidebar_position: 1
 sidebar_label: Try out KubeBlocks on cloud

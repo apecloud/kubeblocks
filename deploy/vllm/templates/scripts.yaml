@@ -23,7 +23,15 @@ data:
         sleep 1
       done
     else 
-      ray start --address="\${KB_VLLM_0_HOSTNAME}:6379"
+      while true; do
+        ray start --address="\${KB_VLLM_0_HOSTNAME}:6379"
+        code=\$?
+        if [ \$code -eq 0 ]; then
+          break
+        fi
+        echo "exit with code \$code, wait for 1 second and try again..."
+        sleep 1
+      done
       # keep pod running
       while true; do
         sleep 1

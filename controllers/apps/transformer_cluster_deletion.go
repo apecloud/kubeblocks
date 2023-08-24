@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
@@ -198,7 +198,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
 	}
-	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+	if intctrlutil.IsRSMEnabled() {
 		namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
 	} else {
 		namespacedKindsPlus = append(namespacedKindsPlus, &corev1.ServiceList{}, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})

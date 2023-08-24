@@ -111,7 +111,7 @@ type ReplicatedStateMachineSpec struct {
 	// parallel: force parallel
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
-	MemberUpdateStrategy *MemberUpdateStrategy `json:"MemberUpdateStrategy,omitempty"`
+	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 
 	// Credential used to connect to DB engine
 	// +optional

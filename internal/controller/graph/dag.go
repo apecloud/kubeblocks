@@ -267,13 +267,13 @@ func (d *DAG) Merge(subDag *DAG) {
 }
 
 // String returns a string representation of the DAG in topology order
-func (d *DAG) String(less func(v1, v2 Vertex) bool) string {
+func (d *DAG) String() string {
 	str := "|"
 	walkFunc := func(v Vertex) error {
 		str += fmt.Sprintf("->%v", v)
 		return nil
 	}
-	if err := d.WalkReverseTopoOrder(walkFunc, less); err != nil {
+	if err := d.WalkReverseTopoOrder(walkFunc, nil); err != nil {
 		return "->err"
 	}
 	return str

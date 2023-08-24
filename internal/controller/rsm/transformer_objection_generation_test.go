@@ -37,6 +37,8 @@ var _ = Describe("object generation transformer test.", func() {
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
+			AddMatchLabelsInMap(selectors).
+			SetServiceName(headlessSvcName).
 			SetRoles(roles).
 			SetService(service).
 			SetCredential(credential).

@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -182,7 +182,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			// wait for StatefulSet created by cluster controller
 			workloadName := clusterName + "-" + statefulMySQLCompName
 			var kd string
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if controllerutil.IsRSMEnabled() {
 				kd = constant.RSMKind
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
 					func(g Gomega, fetched *workloads.ReplicatedStateMachine) {

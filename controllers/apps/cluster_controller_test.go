@@ -250,7 +250,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	validateCompSvcList := func(g Gomega, compName string, compDefName string, expectServices map[string]ExpectService) {
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			return
 		}
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -441,7 +441,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			Eventually(func(g Gomega) {
 				l := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 				sts := components.ConvertRSMToSTS(&l.Items[0])
@@ -572,7 +572,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Mocking component PVCs to bound")
 		mockComponentPVCsBound(comp, int(comp.Replicas), true)
 
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			By("Checking rsm replicas right")
 			rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
 			Expect(int(*rsmList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
@@ -604,7 +604,7 @@ var _ = Describe("Cluster Controller", func() {
 		checkUpdatedStsReplicas := func() {
 			By("Checking updated sts replicas")
 			Eventually(func() int32 {
-				if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+				if intctrlutil.IsRSMEnabled() {
 					rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
 					return *rsmList.Items[0].Spec.Replicas
 				}
@@ -737,7 +737,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 
-			if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if !intctrlutil.IsRSMEnabled() {
 				By("Checking pod env config updated")
 				cmKey := types.NamespacedName{
 					Namespace: clusterKey.Namespace,
@@ -1004,7 +1004,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the replicas")
 		var sts *appsv1.StatefulSet
 		var rsm *workloads.ReplicatedStateMachine
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 			rsm = &rsmList.Items[0]
 			sts = components.ConvertRSMToSTS(rsm)
@@ -1047,7 +1047,7 @@ var _ = Describe("Cluster Controller", func() {
 		case statefulCompDefName, consensusCompDefName:
 			testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		}
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 				testk8s.MockRSMReady(rsm)
 			})).ShouldNot(HaveOccurred())
@@ -1162,7 +1162,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking the replicas")
 		var numbers int32
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 			numbers = *rsmList.Items[0].Spec.Replicas
 		} else {
@@ -1232,7 +1232,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		By("Checking PVCs are resized")
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 			numbers = *rsmList.Items[0].Spec.Replicas
 		} else {
@@ -1261,7 +1261,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking PVCs are resized")
 		Eventually(func(g Gomega) {
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if intctrlutil.IsRSMEnabled() {
 				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 				numbers = *rsmList.Items[0].Spec.Replicas
 			} else {
@@ -1567,7 +1567,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		var sts *appsv1.StatefulSet
 		var rsm *workloads.ReplicatedStateMachine
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			Eventually(func(g Gomega) {
 				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 				g.Expect(rsmList.Items).ShouldNot(BeEmpty())
@@ -1625,7 +1625,7 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(followerCount).Should(Equal(2))
 		}).Should(Succeed())
 
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			// trigger rsm to reconcile as the underlying sts is not created
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.ReplicatedStateMachine) {
 				rsm.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
@@ -1641,7 +1641,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
 			}
 		}).Should(Succeed())
-		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if intctrlutil.IsRSMEnabled() {
 			rsmPatch := client.MergeFrom(rsm.DeepCopy())
 			By("Updating RSM's status")
 			rsm.Status.UpdateRevision = "mock-version"
@@ -2064,7 +2064,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("Checking created rsm pods template without TopologySpreadConstraints")
 			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
 
-			if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if !intctrlutil.IsRSMEnabled() {
 				By("Check should create env configmap")
 				Eventually(func(g Gomega) {
 					cmList := &corev1.ConfigMapList{}
@@ -2134,7 +2134,7 @@ var _ = Describe("Cluster Controller", func() {
 				statefulCompName:    statefulCompDefName,
 				replicationCompName: replicationCompDefName,
 			}
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if intctrlutil.IsRSMEnabled() {
 				checkAllResourcesCreatedWithRSMEnabled(compNameNDef)
 			} else {
 				checkAllResourcesCreated(compNameNDef)
@@ -2142,7 +2142,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Mocking components' PVCs to bound")
 			var items []client.Object
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if intctrlutil.IsRSMEnabled() {
 				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 				for i := range rsmList.Items {
 					items = append(items, &rsmList.Items[i])
@@ -2219,7 +2219,7 @@ var _ = Describe("Cluster Controller", func() {
 					for _, secret := range secretList.Items {
 						checkObject(&secret)
 					}
-					if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+					if !intctrlutil.IsRSMEnabled() {
 						By("check configmap resources preserved")
 						Expect(cmList.Items).ShouldNot(BeEmpty())
 						for _, cm := range cmList.Items {
@@ -2233,7 +2233,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("create recovering cluster")
 			lastClusterUID := clusterObj.UID
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if intctrlutil.IsRSMEnabled() {
 				checkAllResourcesCreatedWithRSMEnabled(compNameNDef)
 			} else {
 				checkAllResourcesCreated(compNameNDef)
@@ -2247,7 +2247,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(outOfOrderEqualFunc(initSecretList.Items, lastSecretList.Items, func(i corev1.Secret, j corev1.Secret) bool {
 				return i.UID == j.UID
 			})).Should(BeTrue())
-			if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if !intctrlutil.IsRSMEnabled() {
 				Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, j corev1.ConfigMap) bool {
 					return i.UID == j.UID
 				})).Should(BeTrue())
@@ -2614,7 +2614,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, compName)
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if intctrlutil.IsRSMEnabled() {
 				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 				rsm := rsmList.Items[0]
 				sts := components.ConvertRSMToSTS(&rsm)
@@ -2687,7 +2687,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Checking statefulSet number")
 			var sts *appsv1.StatefulSet
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if intctrlutil.IsRSMEnabled() {
 				rsmList := testk8s.ListAndCheckRSMItemsCount(&testCtx, clusterKey, 1)
 				rsm := &rsmList.Items[0]
 				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
@@ -2840,7 +2840,7 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      clusterKey.Name + "-" + consensusCompName,
 			}
 
-			if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			if intctrlutil.IsRSMEnabled() {
 				By("checking workload exists")
 				Eventually(testapps.CheckObjExists(&testCtx, workloadKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
 

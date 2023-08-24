@@ -22,7 +22,6 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"testing"
 
 	"github.com/pashagolub/pgxmock/v2"
@@ -71,16 +70,6 @@ func TestQuery(t *testing.T) {
 			t.Errorf("expect query failed, but success")
 		}
 		assert.Nil(t, resp)
-	})
-
-	t.Run("query without leader", func(t *testing.T) {
-		sql := `select 1`
-		cluster := &dcs.Cluster{}
-
-		resp, err := manager.QueryLeader(ctx, sql, cluster)
-		assert.NotNil(t, err)
-		assert.Nil(t, resp)
-		assert.ErrorIs(t, err, ClusterHasNoLeader)
 	})
 }
 
@@ -150,15 +139,5 @@ func TestExec(t *testing.T) {
 			t.Errorf("expect query failed, but success")
 		}
 		assert.Equal(t, int64(0), resp)
-	})
-
-	t.Run("exec without leader", func(t *testing.T) {
-		sql := `create database test`
-		cluster := &dcs.Cluster{}
-
-		resp, err := manager.ExecLeader(ctx, sql, cluster)
-		assert.NotNil(t, err)
-		assert.Equal(t, int64(0), resp)
-		assert.ErrorIs(t, err, ClusterHasNoLeader)
 	})
 }

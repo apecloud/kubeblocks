@@ -56,6 +56,3 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 
 	return manager, mock, err
 }
-
-func TestIsLeader(t *testing.T) {
-}

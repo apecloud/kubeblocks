@@ -30,7 +30,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -62,7 +61,7 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 	return manager, mock, err
 }
 
-func TestGetMemberRoleWithHost(t *testing.T) {
+func TestIsLeader(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
@@ -71,36 +70,115 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(false))
 
-		role, err := manager.GetMemberRoleWithHost(ctx, "")
+		isLeader, err := manager.IsLeader(ctx, nil)
 		if err != nil {
 			t.Errorf("expect get member role success, but failed, err:%v", err)
 		}
 
-		assert.Equal(t, role, binding.PRIMARY)
+		assert.Equal(t, true, isLeader)
 	})
 
 	t.Run("get member role secondary", func(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
 
-		role, err := manager.GetMemberRoleWithHost(ctx, "")
+		isLeader, err := manager.IsLeader(ctx, nil)
 		if err != nil {
 			t.Errorf("expect get member role success, but failed, err:%v", err)
 		}
 
-		assert.Equal(t, role, binding.SECONDARY)
+		assert.Equal(t, false, isLeader)
 	})
 
 	t.Run("get member failed", func(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnError(fmt.Errorf("some error"))
 
-		role, err := manager.GetMemberRoleWithHost(ctx, "")
+		isLeader, err := manager.IsLeader(ctx, nil)
 		if err == nil {
 			t.Errorf("expect get member role failed, but success")
 		}
 
-		assert.Equal(t, role, "")
+		assert.Equal(t, false, isLeader)
+	})
+
+	t.Run("has set isLeader", func(t *testing.T) {
+		manager.SetIsLeader(true)
+		isLeader, err := manager.IsLeader(ctx, nil)
+		if err != nil {
+			t.Errorf("expect get member role success, but failed")
+		}
+
+		assert.Equal(t, true, isLeader)
+	})
+}
+
+func TestIsClusterInitialized(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{}
+
+	t.Run("DBStartup is set Ready", func(t *testing.T) {
+		manager.DBStartupReady = true
+
+		isInitialized, err := manager.IsClusterInitialized(ctx, cluster)
+		if err != nil {
+			t.Errorf("exepect check is cluster initialized success but failed")
+		}
+
+		assert.True(t, isInitialized)
+		manager.DBStartupReady = false
+	})
+
+	t.Run("DBStartup is not set ready and ping success", func(t *testing.T) {
+		mock.ExpectPing()
+		isInitialized, err := manager.IsClusterInitialized(ctx, cluster)
+		if err != nil {
+			t.Errorf("exepect check is cluster initialized success but failed")
+		}
+
+		if err = mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
+
+		assert.True(t, isInitialized)
+		manager.DBStartupReady = false
+	})
+
+	t.Run("DBStartup is not set ready but ping failed", func(t *testing.T) {
+		isInitialized, err := manager.IsClusterInitialized(ctx, cluster)
+		if err != nil {
+			t.Errorf("exepect check is cluster initialized success but failed")
+		}
+
+		assert.False(t, isInitialized)
+		manager.DBStartupReady = false
+	})
+}
+
+func TestGetMemberAddrs(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{}
+
+	t.Run("get empty addrs", func(t *testing.T) {
+		addrs := manager.GetMemberAddrs(ctx, cluster)
+
+		assert.Equal(t, []string{}, addrs)
+	})
+
+	t.Run("get addrs", func(t *testing.T) {
+		cluster.ClusterCompName = "test"
+		cluster.Members = append(cluster.Members, dcs.Member{
+			Name:   "test",
+			DBPort: "5432",
+		})
+		addrs := manager.GetMemberAddrs(ctx, cluster)
+
+		assert.Equal(t, 1, len(addrs))
+		assert.Equal(t, "test.test-headless:5432", addrs[0])
 	})
 }
 
@@ -140,7 +218,8 @@ func TestGetWalPositionWithHost(t *testing.T) {
 	defer mock.Close()
 
 	t.Run("get primary wal position", func(t *testing.T) {
-		manager.isLeader = true
+		manager.SetIsLeader(true)
+		manager.DBState = &dcs.DBState{}
 		mock.ExpectQuery("pg_catalog.pg_current_wal_lsn()").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(23454272))
 
@@ -149,11 +228,12 @@ func TestGetWalPositionWithHost(t *testing.T) {
 			t.Errorf("expect get wal postition success but failed, err:%v", err)
 		}
 
-		assert.Equal(t, res, int64(23454272))
+		assert.Equal(t, int64(23454272), res)
 	})
 
 	t.Run("get secondary wal position", func(t *testing.T) {
-		manager.isLeader = false
+		manager.SetIsLeader(false)
+		manager.DBState = &dcs.DBState{}
 		mock.ExpectQuery("pg_last_wal_replay_lsn()").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(23454272))
 		mock.ExpectQuery("pg_catalog.pg_last_wal_receive_lsn()").
@@ -168,7 +248,8 @@ func TestGetWalPositionWithHost(t *testing.T) {
 	})
 
 	t.Run("get wal position failed", func(t *testing.T) {
-		manager.isLeader = true
+		manager.SetIsLeader(true)
+		manager.DBState = &dcs.DBState{}
 		mock.ExpectQuery("pg_catalog.pg_current_wal_lsn()").
 			WillReturnError(fmt.Errorf("some error"))
 

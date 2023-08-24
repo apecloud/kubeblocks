@@ -75,17 +75,16 @@ func (mgr *Manager) QueryOthers(ctx context.Context, sql string, host string) (r
 }
 
 func (mgr *Manager) QueryLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result []byte, err error) {
-	isLeader, _ := mgr.IsLeader(ctx, cluster)
-	if isLeader {
-		return mgr.Query(ctx, sql)
-	}
-
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return nil, ClusterHasNoLeader
 	}
 
-	return mgr.QueryWithHost(ctx, sql, cluster.GetMemberAddr(*leaderMember))
+	var host string
+	if leaderMember.Name != mgr.CurrentMemberName {
+		host = cluster.GetMemberAddr(*leaderMember)
+	}
+	return mgr.QueryWithHost(ctx, sql, host)
 }
 
 // Exec is equivalent to ExecWithHost(ctx, sql, ""), exec itself.
@@ -152,17 +151,16 @@ func (mgr *Manager) ExecOthers(ctx context.Context, sql string, host string) (re
 }
 
 func (mgr *Manager) ExecLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result int64, err error) {
-	isLeader, _ := mgr.IsLeader(ctx, cluster)
-	if isLeader {
-		return mgr.Exec(ctx, sql)
-	}
-
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return 0, ClusterHasNoLeader
 	}
 
-	return mgr.ExecWithHost(ctx, sql, cluster.GetMemberAddr(*leaderMember))
+	var host string
+	if leaderMember.Name != mgr.CurrentMemberName {
+		host = cluster.GetMemberAddr(*leaderMember)
+	}
+	return mgr.ExecWithHost(ctx, sql, host)
 }
 
 func parseRows(rows pgx.Rows) (result []byte, err error) {

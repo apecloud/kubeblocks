@@ -22,8 +22,6 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-
 	"github.com/dapr/kit/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
@@ -40,7 +38,7 @@ type Manager struct {
 	Pool     PgxPoolIFace
 	Proc     *process.Process
 	Config   *Config
-	isLeader bool
+	isLeader int
 }
 
 func NewManager(logger logger.Logger) (*Manager, error) {
@@ -101,42 +99,34 @@ func (mgr *Manager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	if mgr.DBState != nil {
-		return mgr.isLeader, nil
+func (mgr *Manager) SetIsLeader(isLeader bool) {
+	if isLeader {
+		mgr.isLeader = 1
+	} else {
+		mgr.isLeader = -1
+	}
+}
+
+// GetIsLeader returns whether the "isLeader" is set or not and whether current member is leader or not
+func (mgr *Manager) GetIsLeader() (bool, bool) {
+	return mgr.isLeader != 0, mgr.isLeader == 1
+}
+
+func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+	if member == nil {
+		return false, nil
 	}
 
-	return mgr.IsLeaderWithHost(ctx, "")
-}
-
-func (mgr *Manager) SetLeader(isLeader bool) {
-	mgr.isLeader = isLeader
-}
-
-func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
-	role, err := mgr.GetMemberRoleWithHost(ctx, host)
-	if err != nil {
-		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
+	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		return false, nil
 	}
 
-	mgr.Logger.Infof("get member:%s role:%s", host, role)
-	return role == binding.LEADER || role == binding.PRIMARY, nil
-}
-
-func (mgr *Manager) GetMemberRoleWithHost(context.Context, string) (string, error) {
-	return "", nil
-}
-
-func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
-	members := make([]*dcs.Member, 0)
-
-	for i, m := range cluster.Members {
-		if m.Name != leader && mgr.IsMemberHealthy(ctx, cluster, &m) {
-			members = append(members, &cluster.Members[i])
-		}
+	if leaderMember.Name != member.Name {
+		return false, nil
 	}
 
-	return members
+	return true, nil
 }
 
 func (mgr *Manager) ReadCheck(ctx context.Context, host string) bool {

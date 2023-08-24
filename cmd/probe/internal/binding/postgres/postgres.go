@@ -33,7 +33,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres/apecloudpostgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres/officalpostgres"
@@ -82,16 +81,9 @@ const (
 	listSystemAccountsTpl = "SELECT rolname FROM pg_catalog.pg_roles WHERE pg_roles.rolname LIKE 'kb%'"
 )
 
-type PgIFace interface {
-	component.DBManager
-	GetMemberRoleWithHost(ctx context.Context, host string) (string, error)
-	Query(ctx context.Context, sql string) (result []byte, err error)
-	Exec(ctx context.Context, sql string) (result int64, err error)
-}
-
 // PostgresOperations represents PostgreSQL output binding.
 type PostgresOperations struct {
-	manager PgIFace
+	manager postgres.PgIFace
 	BaseOperations
 	workloadType string
 }
@@ -113,7 +105,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 		pgOps.Logger.Errorf("new postgresql config failed, err:%v", err)
 	}
 
-	var manager PgIFace
+	var manager postgres.PgIFace
 	if strings.EqualFold(pgOps.workloadType, internal.Consensus) {
 		manager, err = apecloudpostgres.NewManager(pgOps.Logger)
 		if err != nil {

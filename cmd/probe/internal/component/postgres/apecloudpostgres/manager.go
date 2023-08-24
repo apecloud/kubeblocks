@@ -70,7 +70,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("check is leader failed, err:%v", err)
 		return nil
 	}
-	mgr.SetLeader(isLeader)
+	mgr.SetIsLeader(isLeader)
 
 	memberAddrs := mgr.GetMemberAddrs(ctx, cluster)
 	if memberAddrs == nil {
@@ -83,8 +83,23 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	return dbState
 }
 
-func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	return mgr.IsLeaderWithHost(ctx, cluster.GetMemberAddr(*member))
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	isSet, isLeader := mgr.GetIsLeader()
+	if isSet {
+		return isLeader, nil
+	}
+
+	return mgr.IsLeaderWithHost(ctx, "")
+}
+
+func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
+	role, err := mgr.GetMemberRoleWithHost(ctx, host)
+	if err != nil {
+		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
+	}
+
+	mgr.Logger.Infof("get member:%s role:%s", host, role)
+	return role == binding.LEADER, nil
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -98,7 +113,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 		return false
 	}
 
-	if !mgr.IsConsensusReadyUp(ctx) {
+	if !mgr.isConsensusReadyUp(ctx) {
 		return false
 	}
 
@@ -107,7 +122,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	return true
 }
 
-func (mgr *Manager) IsConsensusReadyUp(ctx context.Context) bool {
+func (mgr *Manager) isConsensusReadyUp(ctx context.Context) bool {
 	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus_monitor';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
@@ -376,4 +391,16 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	}
 
 	return nil
+}
+
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
+	members := make([]*dcs.Member, 0)
+
+	for i, m := range cluster.Members {
+		if m.Name != leader && mgr.IsMemberHealthy(ctx, cluster, &m) {
+			members = append(members, &cluster.Members[i])
+		}
+	}
+
+	return members
 }

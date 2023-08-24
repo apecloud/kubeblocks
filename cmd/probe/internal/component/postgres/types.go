@@ -22,6 +22,7 @@ package postgres
 import (
 	"bufio"
 	"context"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"strconv"
 	"strings"
 
@@ -34,6 +35,8 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
 var (
@@ -74,13 +77,23 @@ const (
 	off              = "off"
 )
 
+type PgBaseIFace interface {
+	GetMemberRoleWithHost(ctx context.Context, host string) (string, error)
+	IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool
+	Query(ctx context.Context, sql string) (result []byte, err error)
+	Exec(ctx context.Context, sql string) (result int64, err error)
+}
+
+type PgIFace interface {
+	component.DBManager
+	PgBaseIFace
+}
+
 type PgxIFace interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
-	QueryRow(context.Context, string, ...interface{}) pgx.Row
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	Ping(ctx context.Context) error
-	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 }
 
 // PgxPoolIFace is interface representing pgx pool

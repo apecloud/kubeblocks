@@ -96,7 +96,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("check is leader failed, err:%v", err)
 		return nil
 	}
-	mgr.SetLeader(isLeader)
+	mgr.SetIsLeader(isLeader)
 
 	replicationMode, err := mgr.getReplicationMode(ctx)
 	if err != nil {
@@ -118,7 +118,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("get wal position failed, err:%v", err)
 		return nil
 	}
-	dbState.Extra[postgres.WalPosition] = strconv.FormatInt(walPosition, 10)
+	dbState.OpTimestamp = walPosition
 
 	timeLine := mgr.getReceivedTimeLine(ctx)
 	if timeLine != 0 {
@@ -131,8 +131,23 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	return mgr.DBState
 }
 
-func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	return mgr.IsLeaderWithHost(ctx, cluster.GetMemberAddr(*member))
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	isSet, isLeader := mgr.GetIsLeader()
+	if isSet {
+		return isLeader, nil
+	}
+
+	return mgr.IsLeaderWithHost(ctx, "")
+}
+
+func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, error) {
+	role, err := mgr.GetMemberRoleWithHost(ctx, host)
+	if err != nil {
+		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
+	}
+
+	mgr.Logger.Infof("get member:%s role:%s", host, role)
+	return role == binding.PRIMARY, nil
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -261,8 +276,8 @@ func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
 }
 
 func (mgr *Manager) getWalPositionWithHost(ctx context.Context, host string) (int64, error) {
-	if mgr.DBState != nil && mgr.DBState.Extra[postgres.WalPosition] != "" {
-		return strconv.ParseInt(mgr.DBState.Extra[postgres.WalPosition], 10, 64)
+	if mgr.DBState != nil && mgr.DBState.OpTimestamp != 0 {
+		return mgr.DBState.OpTimestamp, nil
 	}
 
 	var (
@@ -715,4 +730,16 @@ func (mgr *Manager) Start(cluster *dcs.Cluster) error {
 
 func (mgr *Manager) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {
 	return nil
+}
+
+func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {
+	members := make([]*dcs.Member, 0)
+
+	for i, m := range cluster.Members {
+		if m.Name != leader && mgr.IsMemberHealthy(ctx, cluster, &m) {
+			members = append(members, &cluster.Members[i])
+		}
+	}
+
+	return members
 }

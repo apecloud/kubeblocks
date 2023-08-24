@@ -162,10 +162,6 @@ func (mgr *DBManagerBase) GetDBState(context.Context, *dcs.Cluster) *dcs.DBState
 	return nil
 }
 
-func (mgr *DBManagerBase) IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool {
-	return true
-}
-
 func (mgr *DBManagerBase) MoveData(context.Context, *dcs.Cluster) error {
 	return nil
 }

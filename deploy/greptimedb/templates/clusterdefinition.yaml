@@ -19,6 +19,10 @@ spec:
       characterType: greptimedb
       probes:
       configSpecs:
+        - name: greptimedb-frontend
+          templateRef: greptimedb-frontend
+          volumeName: frontend-config
+          namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: http
@@ -87,7 +91,7 @@ spec:
             terminationMessagePolicy: File
             volumeMounts:
               - mountPath: /etc/greptimedb
-                name: config
+                name: frontend-config
             args:
               - frontend
               - start
@@ -120,17 +124,17 @@ spec:
         terminationGracePeriodSeconds: 10
         dnsPolicy: ClusterFirst
         restartPolicy: Always
-        volumes:
-          - configMap:
-              defaultMode: 420
-              name: greptimedb-frontend
-            name: config
+
     - name: datanode
       workloadType: Stateful
       characterType: greptimedb
       probes:
       logConfigs:
       configSpecs:
+        - name: greptimedb-datanode
+          templateRef: greptimedb-datanode
+          volumeName: datanode-config
+          namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: http
@@ -226,21 +230,22 @@ spec:
               - mountPath: /etc/greptimedb
                 name: config
               - mountPath: /etc/greptimedb-init
-                name: init-config
+                name: datanode-config
         serviceAccountName: greptimedb-cluster
         terminationGracePeriodSeconds: 10
         volumes:
           - emptyDir: {}
             name: config
-          - configMap:
-              defaultMode: 420
-              name: greptimedb-datanode
-            name: init-config
+
     - name: meta
       workloadType: Stateless
       characterType: greptimedb
       probes:
       configSpecs:
+        - name: greptimedb-meta
+          templateRef: greptimedb-meta
+          volumeName: meta-config
+          namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: grpc
@@ -298,7 +303,7 @@ spec:
                 name: http
             volumeMounts:
               - mountPath: /etc/greptimedb
-                name: config
+                name: meta-config
             args:
               - metasrv
               - start
@@ -319,11 +324,7 @@ spec:
         terminationGracePeriodSeconds: 10
         dnsPolicy: ClusterFirst
         restartPolicy: Always
-        volumes:
-          - configMap:
-              defaultMode: 420
-              name: greptimedb-meta
-            name: config
+
     - name: etcd
       workloadType: Consensus
       characterType: etcd

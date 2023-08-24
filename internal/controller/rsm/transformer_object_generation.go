@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type ObjectGenerationTransformer struct{}

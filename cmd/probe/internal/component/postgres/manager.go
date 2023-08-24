@@ -38,13 +38,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/v3/process"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type Manager struct {

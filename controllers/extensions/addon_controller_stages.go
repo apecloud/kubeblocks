@@ -27,7 +27,6 @@ import (
 	"time"
 
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +40,7 @@ import (
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type stageCtx struct {

@@ -29,11 +29,11 @@ import (
 
 	"github.com/dapr/kit/logger"
 	probing "github.com/prometheus-community/pro-bing"
-	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type Ha struct {

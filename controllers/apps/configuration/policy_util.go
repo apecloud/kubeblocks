@@ -26,7 +26,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +35,7 @@ import (
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {

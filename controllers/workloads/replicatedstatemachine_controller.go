@@ -22,7 +22,6 @@ package workloads
 import (
 	"context"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // ReplicatedStateMachineReconciler reconciles a ReplicatedStateMachine object

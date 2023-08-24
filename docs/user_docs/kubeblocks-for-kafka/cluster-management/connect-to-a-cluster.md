@@ -229,3 +229,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
       terminationPolicy: Delete
     EOF
     ```
+
+    </TabItem>
+
+    </Tabs>

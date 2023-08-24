@@ -21,8 +21,8 @@ But for your better high-availability experience, KubeBlocks creates a Redis Rep
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a cluster by kbcli.
-* [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a cluster by kbcli.
+* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 * Make sure the Redis add-on is enabled.
   
   <Tabs>
@@ -314,6 +314,8 @@ status:
 
 </TabItem>
 
+</Tabs>
+
 ## Connect to a Redis Cluster
 
 <Tabs>
@@ -360,7 +362,7 @@ KubeBlocks operator has created a new Secret called `redis-conn-credential` to s
 
 </TabItem>
 
-<TabItem value="port-forward" label="prot-forward">
+<TabItem value="port-forward" label="port-forward">
 
 You can also port forward the service to connect to the database from your local machine.
 

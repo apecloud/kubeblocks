@@ -9,14 +9,14 @@ sidebar_position: 1
 
 KubeBlocks integrates [the official Redis Sentinel solution](https://redis.io/docs/management/sentinel/) to realize high availability and adopts Noop as the switch policy.
 
-Redis Sentinel is the high availability solution for a Redis PrimarySecondary, which is recommended by Redis and is also the main-stream solution in the community.
+Redis Sentinel is the high availability solution for a Redis Replication Cluster, which is recommended by Redis and is also the main-stream solution in the community.
 
-In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an independent component.
+In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as an independent component.
 
 ## Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* [Create a Redis PrimarySecondary](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
+* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Create a Redis Replication Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
 * Check the Switch Policy and the role probe.
   * Check whether the switch policy is `Noop`.
 

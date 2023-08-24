@@ -15,7 +15,7 @@ AWSChaos simulates fault scenarios on the specified AWS instance. Currently, AWS
 
 ## Before you start
 
-* By default, the AWS authentication information for local code has been imported. If you have not imported the authentication, follow the steps in [Prerequisite](./configuration.md#check-your-permission).
+* By default, the AWS authentication information for local code has been imported. If you have not imported the authentication, follow the steps in [Prerequisite](./prerequisite.md#check-your-permission).
 
 * To connect to the AWS cluster easily, you can create a Kubernetes Secret file in advance to store authentication information. A `Secret` file sample is as follows:
 

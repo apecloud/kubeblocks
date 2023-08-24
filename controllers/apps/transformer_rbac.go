@@ -28,6 +28,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -124,6 +125,18 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 func isProbesEnabled(clusterDef *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) bool {
 	for _, compDef := range clusterDef.Spec.ComponentDefs {
 		if compDef.Name == compSpec.ComponentDefRef && compDef.Probes != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, compSpec *appsv1alpha1.ClusterComponentSpec) bool {
+	if backupTpl == nil {
+		return false
+	}
+	for _, policy := range backupTpl.Spec.BackupPolicies {
+		if policy.ComponentDefRef == compSpec.ComponentDefRef {
 			return true
 		}
 	}
@@ -265,15 +278,35 @@ func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.Cluste
 	return componentSpecs, nil
 }
 
+func getDefaultBackupPolicyTemplate(transCtx *ClusterTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
+	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
+	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
+		return nil, err
+	}
+	if len(backupPolicyTPLs.Items) == 0 {
+		return nil, nil
+	}
+	for _, item := range backupPolicyTPLs.Items {
+		if item.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
+			return &item, nil
+		}
+	}
+	return &backupPolicyTPLs.Items[0], nil
+}
+
 func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []appsv1alpha1.ClusterComponentSpec) (map[string]*corev1.ServiceAccount, map[string]*corev1.ServiceAccount, error) {
 	serviceAccounts := map[string]*corev1.ServiceAccount{}
 	serviceAccountsNeedCrb := map[string]*corev1.ServiceAccount{}
 	clusterDef := transCtx.ClusterDef
 	cluster := transCtx.Cluster
+	backupPolicyTPL, err := getDefaultBackupPolicyTemplate(transCtx, clusterDef.Name)
+	if err != nil {
+		return serviceAccounts, serviceAccountsNeedCrb, err
+	}
 	for _, compSpec := range componentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
 		if serviceAccountName == "" {
-			if !isProbesEnabled(clusterDef, &compSpec) && !isVolumeProtectionEnabled(clusterDef, &compSpec) {
+			if !isProbesEnabled(clusterDef, &compSpec) && !isVolumeProtectionEnabled(clusterDef, &compSpec) && !isDataProtectionEnabled(backupPolicyTPL, &compSpec) {
 				continue
 			}
 			serviceAccountName = "kb-" + cluster.Name

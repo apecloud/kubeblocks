@@ -1,0 +1,21 @@
+name: CHERRY-PICK
+on:
+  issue_comment:
+    types: [created]
+
+
+jobs:
+  cherry-pick:
+    name: Cherry Pick
+    if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/cherry-pick')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Automatic Cherry Pick
+        uses: apecloud/gha-cherry-pick@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

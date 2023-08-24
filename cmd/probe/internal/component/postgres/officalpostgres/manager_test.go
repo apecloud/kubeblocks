@@ -288,33 +288,48 @@ func TestIsCurrentMemberHealthy(t *testing.T) {
 	})
 }
 
+func TestIsMemberLagging(t *testing.T) {
+
+}
+
 func TestGetReplicationMode(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
+	values := []string{"off", "local", "remote_write", "remote_apply", "on", ""}
+	expects := []string{postgres.Asynchronous, postgres.Asynchronous, postgres.Asynchronous, postgres.Synchronous, postgres.Synchronous, postgres.Synchronous}
+	manager.DBState = &dcs.DBState{
+		Extra: map[string]string{},
+	}
 
-	t.Run("synchronous_commit off", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+	t.Run("synchronous_commit has not been set", func(t *testing.T) {
+		for i, _ := range values {
+			mock.ExpectQuery("select").
+				WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow(values[i]))
 
-		res, err := manager.getReplicationMode(ctx)
-		if err != nil {
-			t.Errorf("expect get replication mode success but failed, err:%v", err)
+			res, err := manager.getReplicationMode(ctx)
+			if err != nil {
+				t.Errorf("expect get replication mode success but failed, err:%v", err)
+			}
+
+			assert.Equal(t, expects[i], res)
 		}
 
-		assert.Equal(t, res, postgres.Asynchronous)
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %v", err)
+		}
 	})
 
-	t.Run("synchronous_commit on", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("on"))
+	t.Run("synchronous_commit has been set", func(t *testing.T) {
+		for i, _ := range values {
+			manager.DBState.Extra[postgres.ReplicationMode] = values[i]
+			res, err := manager.getReplicationMode(ctx)
+			if err != nil {
+				t.Errorf("expect get replication mode success but failed, err:%v", err)
+			}
 
-		res, err := manager.getReplicationMode(ctx)
-		if err != nil {
-			t.Errorf("expect get replication mode success but failed, err:%v", err)
+			assert.Equal(t, expects[i], res)
 		}
-
-		assert.Equal(t, res, postgres.Synchronous)
 	})
 }
 

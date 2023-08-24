@@ -92,8 +92,8 @@ func (config *Config) GetDBPort() int {
 }
 
 func (config *Config) GetConnectURLWithHost(host string) string {
-	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s pool_min_conns=%d pool_max_conns=%d",
-		config.Username, config.Password, host, config.Port, config.Database, config.MinConnections, config.MaxConnections)
+	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s",
+		config.Username, config.Password, host, config.Port, config.Database)
 }
 
 func (config *Config) GetConsensusIPPort(cluster *dcs.Cluster, name string) string {

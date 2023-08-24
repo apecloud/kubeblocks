@@ -18,3 +18,8 @@ images:
   etcd:
     repository: docker.io/greptime/etcd
     tag: v3.5.5
+
+## @param metasrv config
+##
+meta:
+  disableRegionFailover: true

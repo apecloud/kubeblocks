@@ -261,7 +261,7 @@ func TestJoinMember(t *testing.T) {
 			Operation: string(JoinMemberOperation),
 		}, resp, nil)
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.JoinMember()
+		err := cli.JoinMember(context.TODO())
 		assert.Nil(t, err)
 	})
 
@@ -271,7 +271,7 @@ func TestJoinMember(t *testing.T) {
 			Operation: string(JoinMemberOperation),
 		}, nil, errors.New("join member failed"))
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.JoinMember()
+		err := cli.JoinMember(context.TODO())
 		assert.NotNil(t, err)
 	})
 }
@@ -297,7 +297,7 @@ func TestLeaveMember(t *testing.T) {
 			Operation: string(LeaveMemberOperation),
 		}, resp, nil)
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.LeaveMember()
+		err := cli.LeaveMember(context.TODO())
 		assert.Nil(t, err)
 	})
 
@@ -307,7 +307,7 @@ func TestLeaveMember(t *testing.T) {
 			Operation: string(LeaveMemberOperation),
 		}, nil, errors.New("leave member failed"))
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.LeaveMember()
+		err := cli.LeaveMember(context.TODO())
 		assert.NotNil(t, err)
 	})
 }

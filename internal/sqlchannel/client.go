@@ -166,12 +166,12 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
-func (cli *OperationClient) JoinMember() error {
+func (cli *OperationClient) JoinMember(ctx context.Context) error {
 	_, err := cli.Request(string(JoinMemberOperation))
 	return err
 }
 
-func (cli *OperationClient) LeaveMember() error {
+func (cli *OperationClient) LeaveMember(ctx context.Context) error {
 	_, err := cli.Request(string(LeaveMemberOperation))
 	return err
 }

@@ -68,7 +68,7 @@ Both Helm and kbcli are provided as options to deploy Chaos Mesh.
 Here we use ChaosMesh v2.5.2 and the DNS server is enabled for DNS fault injection.
 
 <Tabs>
-<TabItem value="kbcli" label="kbcli" default
+<TabItem value="kbcli" label="kbcli" default>
 
 For installing ChaosMesh in Containerd, run the command below.
 

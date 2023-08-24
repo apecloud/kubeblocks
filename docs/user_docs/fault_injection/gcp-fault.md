@@ -15,7 +15,7 @@ By creating a GCPChaos experiment, you can simulate fault scenarios of the speci
 
 ## Before you start
 
-* By default, the GCP authentication information for local code has been imported. If you have not imported the authentication, follow the steps in [Prerequisite](./configuration.md#check-your-permission).
+* By default, the GCP authentication information for local code has been imported. If you have not imported the authentication, follow the steps in [Prerequisite](./prerequisite.md#check-your-permission).
 
 * To connect to the GCP cluster easily, you can create a Kubernetes Secret file in advance to store authentication information. A `Secret` file sample is as follows:
   

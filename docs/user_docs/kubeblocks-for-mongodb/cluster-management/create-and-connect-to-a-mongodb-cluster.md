@@ -17,8 +17,8 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a cluster by kbcli.
-* [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [install KubeBlocks by Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a cluster by kbcli.
+* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 * Make sure the MongoDB add-on is enabled.
   
   <Tabs>
@@ -352,7 +352,7 @@ root@mongodb-cluster-mongodb-0:/# mongo --username root --password svk9xzqs --au
 
 </TabItem>
 
-<TabItem value="port-forward" label="prot-forward">
+<TabItem value="port-forward" label="port-forward">
 
 You can also port forward the service to connect to the database from your local machine. 
 

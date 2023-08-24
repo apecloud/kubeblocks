@@ -195,7 +195,7 @@ kbcli cluster edit-backup-policy mysql-cluster --set="datafile.backupRepoName=my
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl>
+<TabItem value="kubectl" label="kubectl">
 
 ```bash
 kubectl edit backuppolicy mysql-cluster-mysql-backup-policy

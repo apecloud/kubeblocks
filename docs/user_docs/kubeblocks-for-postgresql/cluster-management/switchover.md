@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Switch over a PostgreSQL cluster
 
-You can initiate a switchover for a PostgreSQL PrimarySecondary database by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
+You can initiate a switchover for a PostgreSQL Replication Cluster by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
 
 ## Before you start
 

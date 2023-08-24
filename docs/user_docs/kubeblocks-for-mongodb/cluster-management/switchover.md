@@ -8,7 +8,7 @@ sidebar_label: Switchover
 
 # Switch over a MongoDB cluster
 
-You can initiate a switchover for a PrimarySecondary MongoDB database by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
+You can initiate a switchover for a MongoDB ReplicaSet by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
 
 ## Before you start
 
@@ -27,7 +27,7 @@ You can initiate a switchover for a PrimarySecondary MongoDB database by executi
 
 ## Initiate the switchover
 
-You can switch over a secondary of a MongoDB PrimarySecondary to the primary role, and the former primary instance to a secondary.
+You can switch over a secondary of a MongoDB ReplicaSet to the primary role, and the former primary instance to a secondary.
 
 <Tabs>
 

@@ -133,6 +133,14 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 		}
 	}
 
+	params := cfgcore.GenerateVisualizedParamsList(configPatch, configConstraint.Spec.FormatterConfig, nil)
+	// check immutable parameters
+	if len(configConstraint.Spec.ImmutableParameters) > 0 {
+		if err = util.ValidateParametersModified2(sets.KeySet(fromKeyValuesToMap(params, o.CfgFile)), configConstraint.Spec); err != nil {
+			return err
+		}
+	}
+
 	confirmPrompt, err := generateReconfiguringPrompt(o.Out, fileUpdated, configPatch, &configConstraint.Spec, o.CfgFile)
 	if err != nil {
 		return err
@@ -152,7 +160,6 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate edited config")
 	}
-	params := cfgcore.GenerateVisualizedParamsList(configPatch, configConstraint.Spec.FormatterConfig, nil)
 	o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
 	return fn()
 }
@@ -166,14 +173,6 @@ func generateReconfiguringPrompt(out io.Writer, fileUpdated bool, configPatch *c
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(cc, configPatch)
 	if err != nil {
 		return "", nil
-	}
-
-	// check immutable parameters
-	if len(cc.ImmutableParameters) > 0 {
-		params := cfgcore.GenerateVisualizedParamsList(configPatch, cc.FormatterConfig, nil)
-		if err = util.ValidateParametersModified2(sets.KeySet(fromKeyValuesToMap(params, fileName)), *cc); err != nil {
-			return "", err
-		}
 	}
 
 	confirmPrompt := confirmApplyReconfigurePrompt

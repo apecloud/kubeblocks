@@ -11,9 +11,9 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
 ## Before you start
 
-* [Install `kbcli`](./../../installation/install-kbcli.md).
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* [Create a PostgreSQL PrimarySecondary cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
+* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
+* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Create a PostgreSQL Replication Cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
 * Check the Switch Policy and the role probe.
   * Check whether the switch policy is `Noop`.
 

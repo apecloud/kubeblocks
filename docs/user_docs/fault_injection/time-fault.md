@@ -70,4 +70,4 @@ The fields in the YAML configuration file are described in the following table:
 | mode | string | It specifies the mode of an experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes |
 | value | string | It provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No |
 | containerNames | []string | It specifies the name of the container into which the fault is injected. | None | No |
-| selector | struct | It specifies the target Pod. For details, refer to [Define the experiment scope](./define-chaos-experiment-scope.md). | None | Yes |
+| selector | struct | It specifies the target Pod. | None | Yes |

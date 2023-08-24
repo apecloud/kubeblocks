@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
 var (
@@ -72,6 +73,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for upgrading KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready. It will wait for a --timeout period")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before upgrading KubeBlocks")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -114,6 +116,15 @@ func (o *InstallOptions) Upgrade() error {
 
 	if err = o.checkVersion(v); err != nil {
 		return err
+	}
+
+	// double check for KubeBlocks upgrade
+	if !o.autoApprove {
+		upgradeWarn := printer.BoldYellow(fmt.Sprintf("Warning: You're attempting to change KubeBlocks version from %s to %s, potentially impacting cluster functionality, particularly with downgrades. \nEnsure you proceed after reviewing detailed release notes at https://github.com/apecloud/kubeblocks/releases.", kbVersion, o.Version))
+		promptStr := fmt.Sprintf("Please type the version [%s] again:", o.Version)
+		if err = prompt.Confirm([]string{o.Version}, o.In, upgradeWarn, promptStr); err != nil {
+			return err
+		}
 	}
 
 	// add helm repo

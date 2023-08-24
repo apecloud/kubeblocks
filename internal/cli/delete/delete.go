@@ -154,7 +154,7 @@ func (o *DeleteOptions) complete() error {
 		if len(names) == 0 {
 			names = o.Names
 		}
-		if err = prompt.Confirm(names, o.In, fmt.Sprintf("%s to be deleted:[%s]", o.GVR.Resource, printer.BoldRed(strings.Join(names, " ")))); err != nil {
+		if err = prompt.Confirm(names, o.In, fmt.Sprintf("%s to be deleted:[%s]", o.GVR.Resource, printer.BoldRed(strings.Join(names, " "))), ""); err != nil {
 			return err
 		}
 	}

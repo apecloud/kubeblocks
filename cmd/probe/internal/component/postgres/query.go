@@ -97,7 +97,7 @@ func (mgr *Manager) ExecWithHost(ctx context.Context, sql string, host string) (
 
 	// when host is empty, use manager's connection pool
 	if host == "" {
-		res, err = mgr.ExecMyself(ctx, sql)
+		res, err = mgr.Pool.Exec(ctx, sql)
 	} else {
 		res, err = mgr.ExecOthers(ctx, sql, host)
 	}
@@ -109,45 +109,21 @@ func (mgr *Manager) ExecWithHost(ctx context.Context, sql string, host string) (
 	return result, nil
 }
 
-func (mgr *Manager) ExecMyself(ctx context.Context, sql string) (resp pgconn.CommandTag, err error) {
-	tx, err := mgr.Pool.Begin(ctx)
-	if err != nil {
-		return resp, err
-	}
-
-	resp, err = tx.Exec(ctx, sql)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return resp, err
-	}
-
-	err = tx.Commit(ctx)
-	return resp, err
-}
-
 func (mgr *Manager) ExecOthers(ctx context.Context, sql string, host string) (resp pgconn.CommandTag, err error) {
 	conn, err := pgx.Connect(ctx, config.GetConnectURLWithHost(host))
 	if err != nil {
-		mgr.Logger.Errorf("get host:%s connection failed, err:%v", host, err)
 		return resp, err
 	}
 	defer func() {
 		_ = conn.Close(ctx)
 	}()
 
-	tx, err := conn.Begin(ctx)
+	resp, err = conn.Exec(ctx, sql)
 	if err != nil {
 		return resp, err
 	}
 
-	resp, err = tx.Exec(ctx, sql)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return resp, err
-	}
-
-	err = tx.Commit(ctx)
-	return resp, err
+	return resp, nil
 }
 
 func (mgr *Manager) ExecLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result int64, err error) {

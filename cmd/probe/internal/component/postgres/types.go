@@ -22,7 +22,6 @@ package postgres
 import (
 	"bufio"
 	"context"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"strconv"
 	"strings"
 
@@ -36,6 +35,7 @@ import (
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
@@ -90,7 +90,6 @@ type PgIFace interface {
 }
 
 type PgxIFace interface {
-	Begin(ctx context.Context) (pgx.Tx, error)
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	Ping(ctx context.Context) error

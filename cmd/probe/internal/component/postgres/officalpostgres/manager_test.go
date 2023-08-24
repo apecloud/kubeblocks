@@ -197,10 +197,8 @@ func TestIsCurrentMemberHealthy(t *testing.T) {
 		})
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
-		mock.ExpectBegin()
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
-		mock.ExpectCommit()
 		row := pgxmock.NewRows([]string{"check_ts"}).AddRow(1)
 		mock.ExpectQuery("select").WillReturnRows(row)
 
@@ -254,10 +252,8 @@ func TestIsCurrentMemberHealthy(t *testing.T) {
 		})
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
-		mock.ExpectBegin()
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnError(fmt.Errorf("some err"))
-		mock.ExpectRollback()
 
 		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
 		if err := mock.ExpectationsWereMet(); err != nil {
@@ -303,9 +299,9 @@ func TestGetReplicationMode(t *testing.T) {
 	}
 
 	t.Run("synchronous_commit has not been set", func(t *testing.T) {
-		for i, _ := range values {
+		for i, v := range values {
 			mock.ExpectQuery("select").
-				WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow(values[i]))
+				WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow(v))
 
 			res, err := manager.getReplicationMode(ctx)
 			if err != nil {
@@ -321,8 +317,8 @@ func TestGetReplicationMode(t *testing.T) {
 	})
 
 	t.Run("synchronous_commit has been set", func(t *testing.T) {
-		for i, _ := range values {
-			manager.DBState.Extra[postgres.ReplicationMode] = expects[i]
+		for i, v := range expects {
+			manager.DBState.Extra[postgres.ReplicationMode] = v
 			res, err := manager.getReplicationMode(ctx)
 			if err != nil {
 				t.Errorf("expect get replication mode success but failed, err:%v", err)

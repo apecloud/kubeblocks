@@ -30,13 +30,18 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
+const (
+	execTest  = "create database test"
+	queryTest = "select 1"
+)
+
 func TestQuery(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
 	t.Run("common query success", func(t *testing.T) {
-		sql := `select 1`
+		sql := queryTest
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"1"}))
 
@@ -51,7 +56,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("common query failed", func(t *testing.T) {
-		sql := `select 1`
+		sql := queryTest
 		mock.ExpectQuery("select").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -66,7 +71,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("can't connect db", func(t *testing.T) {
-		sql := `select 1`
+		sql := queryTest
 		resp, err := manager.QueryWithHost(ctx, sql, "localhost")
 		if err == nil {
 			t.Errorf("expect query failed, but success")
@@ -75,7 +80,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("query leader success", func(t *testing.T) {
-		sql := `select 1`
+		sql := queryTest
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"1"}).AddRow("1"))
 		cluster := &dcs.Cluster{
@@ -96,7 +101,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("query leader failed, cluster has no leader", func(t *testing.T) {
-		sql := `select 1`
+		sql := queryTest
 		cluster := &dcs.Cluster{}
 
 		_, err := manager.QueryLeader(ctx, sql, cluster)
@@ -132,12 +137,10 @@ func TestExec(t *testing.T) {
 	defer mock.Close()
 
 	t.Run("common exec success", func(t *testing.T) {
-		sql := `create database test`
+		sql := execTest
 
-		mock.ExpectBegin()
 		mock.ExpectExec("create database").
 			WillReturnResult(pgxmock.NewResult("CREATE DATABASE", 1))
-		mock.ExpectCommit()
 
 		_, err := manager.Exec(ctx, sql)
 		if err != nil {
@@ -150,12 +153,10 @@ func TestExec(t *testing.T) {
 	})
 
 	t.Run("common exec failed", func(t *testing.T) {
-		sql := `create database test`
+		sql := execTest
 
-		mock.ExpectBegin()
 		mock.ExpectExec("create database").
 			WillReturnError(fmt.Errorf("some error"))
-		mock.ExpectRollback()
 
 		_, err := manager.Exec(ctx, sql)
 		if err == nil {
@@ -168,7 +169,7 @@ func TestExec(t *testing.T) {
 	})
 
 	t.Run("can't connect db", func(t *testing.T) {
-		sql := `create database test`
+		sql := execTest
 		resp, err := manager.ExecWithHost(ctx, sql, "test")
 		if err == nil {
 			t.Errorf("expect query failed, but success")
@@ -177,11 +178,9 @@ func TestExec(t *testing.T) {
 	})
 
 	t.Run("exec leader success", func(t *testing.T) {
-		sql := `create db`
-		mock.ExpectBegin()
+		sql := execTest
 		mock.ExpectExec("create").
 			WillReturnResult(pgxmock.NewResult("CREATE", 1))
-		mock.ExpectCommit()
 		cluster := &dcs.Cluster{
 			Leader: &dcs.Leader{
 				Name: manager.CurrentMemberName,
@@ -204,7 +203,7 @@ func TestExec(t *testing.T) {
 	})
 
 	t.Run("exec leader failed, cluster has no leader", func(t *testing.T) {
-		sql := `create db`
+		sql := execTest
 		cluster := &dcs.Cluster{}
 
 		_, err := manager.ExecLeader(ctx, sql, cluster)

@@ -109,10 +109,8 @@ func TestReadWrite(t *testing.T) {
 	defer mock.Close()
 
 	t.Run("write check success", func(t *testing.T) {
-		mock.ExpectBegin()
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
-		mock.ExpectCommit()
 
 		if ok := manager.WriteCheck(ctx, ""); !ok {
 			t.Errorf("write check failed")
@@ -124,10 +122,8 @@ func TestReadWrite(t *testing.T) {
 	})
 
 	t.Run("write check failed", func(t *testing.T) {
-		mock.ExpectBegin()
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnError(fmt.Errorf("some error"))
-		mock.ExpectRollback()
 
 		if ok := manager.WriteCheck(ctx, ""); ok {
 			t.Errorf("expect write check failed, but success")

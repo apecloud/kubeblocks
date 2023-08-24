@@ -22,6 +22,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+
 	"github.com/dapr/kit/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"

@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
@@ -122,6 +123,14 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
 	if err != nil {
 		return nil
+	}
+
+	// check immutable parameters
+	if len(configConstraint.Spec.ImmutableParameters) > 0 {
+		params := cfgcore.GenerateVisualizedParamsList(configPatch, formatterConfig, nil)
+		if err = util.ValidateParametersModified2(sets.KeySet(fromKeyValuesToMap(params, o.CfgFile)), configConstraint.Spec); err != nil {
+			return err
+		}
 	}
 
 	confirmPrompt := confirmApplyReconfigurePrompt

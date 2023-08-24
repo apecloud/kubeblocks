@@ -142,6 +142,7 @@ func TestGlobalInfo(t *testing.T) {
 				Metadata:  tc.metadata,
 				Operation: util.OperationKind(tc.operation),
 			})
+			require.NoError(t, err)
 			result := binding.OpsResult{}
 			err = json.Unmarshal(response.Data, &result)
 			require.NoError(t, err)

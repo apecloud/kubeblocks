@@ -52,7 +52,7 @@ const (
 const (
 	ReplicationMode = "replication_mode"
 	SyncStandBys    = "sync_standbys"
-	WalPosition     = "wal_position"
+	PrimaryInfo     = "primary_info"
 	TimeLine        = "timeline"
 )
 

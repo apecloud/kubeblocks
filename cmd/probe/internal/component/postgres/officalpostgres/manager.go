@@ -132,6 +132,12 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	}
 	dbState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
 
+	primaryInfo := mgr.readRecoveryParams(ctx)
+	if primaryInfo == nil {
+		mgr.Logger.Errorf("get primary info failed, err:%v", err)
+	}
+	dbState.Extra[postgres.PrimaryInfo] = primaryInfo["host"]
+
 	mgr.DBState = dbState
 	return mgr.DBState
 }
@@ -574,6 +580,12 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 }
 
 func (mgr *Manager) readRecoveryParams(ctx context.Context) map[string]string {
+	if mgr.DBState != nil && mgr.DBState.Extra[postgres.PrimaryInfo] != "" {
+		return map[string]string{
+			postgres.PrimaryInfo: mgr.DBState.Extra[postgres.PrimaryInfo],
+		}
+	}
+
 	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
@@ -691,6 +703,12 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 		return nil
 	}
 
+	oldPrimaryInfo := mgr.readRecoveryParams(ctx)
+	if strings.HasPrefix(oldPrimaryInfo["host"], leaderMember.Name) {
+		mgr.Logger.Infof("i have already followed this leader, don't need to rewrite primary info")
+		return nil
+	}
+
 	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
 		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, mgr.Config.Username, mgr.Config.Password)
 
@@ -724,18 +742,18 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 		return nil
 	}
 
-	return nil
+	return mgr.DBManagerBase.Start()
 }
 
 // Start for postgresql replication, not only means the start of a database instance
 // but also signifies its launch as a follower in the cluster, following the leader.
-func (mgr *Manager) Start(cluster *dcs.Cluster) error {
-	err := mgr.Follow(context.TODO(), cluster)
+func (mgr *Manager) Start(ctx context.Context, cluster *dcs.Cluster) error {
+	err := mgr.follow(ctx, true, cluster)
 	if err != nil {
 		return err
 	}
 
-	return mgr.DBManagerBase.Start(cluster)
+	return mgr.DBManagerBase.Start(ctx, cluster)
 }
 
 func (mgr *Manager) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {

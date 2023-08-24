@@ -33,7 +33,6 @@ import (
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
 
 	// +kubebuilder:scaffold:imports
-	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

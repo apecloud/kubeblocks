@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/spf13/viper"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

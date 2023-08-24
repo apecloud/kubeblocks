@@ -31,13 +31,13 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 
 	"github.com/onsi/ginkgo/v2/reporters"
-	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
 	. "github.com/apecloud/kubeblocks/test/e2e/installation"

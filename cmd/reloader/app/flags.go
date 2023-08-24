@@ -23,11 +23,11 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type NotifyEventType int

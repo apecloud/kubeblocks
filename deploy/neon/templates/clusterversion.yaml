@@ -22,8 +22,3 @@ spec:
         containers:
         - name: neon-pageserver
           image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-    - componentDefRef: neon-compute
-      versionsContext:
-        containers:
-        - name: neon-compute
-          image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}

@@ -57,3 +57,14 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ include "neon-cluster.chart" . }}
 {{- end }}
+
+
+{{/*
+Generate scripts configmap
+*/}}
+{{- define "neon-cluster.extend.scripts" -}}
+{{- range $path, $_ :=  $.Files.Glob "scripts/**" }}
+{{ $path | base }}: |-
+{{- $.Files.Get $path | nindent 2 }}
+{{- end }}
+{{- end }}

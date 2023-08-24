@@ -15,7 +15,7 @@ storagebroker:
   dataStorage: "5Gi"
 
 safekeeper:
-  replicas: 2
+  replicas: 3
   resources:
     requests:
       cpu: "500m"
@@ -26,17 +26,6 @@ safekeeper:
   dataStorage: "5Gi"
 
 pageserver:
-  replicas: 1
-  resources:
-    requests:
-      cpu: "500m"
-      memory: "500Mi"
-    limits:
-      cpu: "1"
-      memory: "2Gi"
-  dataStorage: "5Gi"
-
-compute:
   replicas: 1
   resources:
     requests:

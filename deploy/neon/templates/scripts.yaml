@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: neon-compute-scripts
-  labels:
-    {{- include "neon.labels" . | nindent 4 }}
-data:
-  {{- include "neon.extend.scripts" . | nindent 2 }}

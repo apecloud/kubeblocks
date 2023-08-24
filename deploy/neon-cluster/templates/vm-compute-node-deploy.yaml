@@ -3,9 +3,9 @@ kind: ConfigMap
 metadata:
   name: compute-node-config
   labels:
-    {{- include "neon.labels" . | nindent 4 }}
+    {{- include "neon-cluster.labels" . | nindent 4 }}
 data:
-  {{- include "neon.extend.scripts" . | nindent 2 }}
+  {{- include "neon-cluster.extend.scripts" . | nindent 2 }}
 
 ---
 apiVersion: vm.neon.tech/v1
@@ -47,14 +47,9 @@ spec:
         else
             echo "Scripts already executed."
         fi
-    env:
-      - name: PAGESERVER
-        value: "http://neon-cluster-neon-pageserver"
-      - name: SAFEKEEPERS
-        value: "http://neon-cluster-neon-safekeeper:5454"
     ports:
       - port: 22   # ssh
-      - port: 5432 # postgres
+      - port: 55432 # postgres
       - port: 9100 # metrics
       - port: 10301 # informant
   disks:

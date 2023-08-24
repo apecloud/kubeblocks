@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
-export PAGESERVER=neon-cluster-neon-pageserver
-export SAFEKEEPERS=neon-cluster-neon-safekeeper
+export PAGESERVER=neon-cluster-neon-pageserver-headless.default.svc.cluster.local
+export SAFEKEEPERS=neon-cluster-neon-safekeeper-headless.default.svc.cluster.local:5454
 SPEC_FILE_ORG=/spec_prep_docker.json
 SPEC_FILE=/spec.json
 PG_VERSION=14

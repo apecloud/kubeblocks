@@ -23,6 +23,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type PrometheusConfig struct {
+	ServiceRef `json:",inline"`
+
+	// namespace defines the namespace of the prometheus
+	// +kube:validation:Required
+	Namespace string `json:"namespace"`
+
+	// externalLabels defines the labels added to metrics
+	// +kube:validation:Required
+	ExternalLabels map[string]string `json:"external_labels"`
+}
+
+type MetricsSinkSource struct {
+	// lokiConfig defines the config of the loki
+	// +optional
+	PrometheusConfig *PrometheusConfig `json:"prometheus_config,omitempty"`
+}
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -31,8 +49,13 @@ type MetricsExporterSinkSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of MetricsExporterSink. Edit metricsexportersink_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// type defines the type of the exporterSink
+	// +kubebuilder:validation:Required
+	Type MetricsSinkType `json:"type"`
+
+	// MetricsSinkSource describes the config of the exporterSink
+	// +kubebuilder:validation:Required
+	MetricsSinkSource `json:"inline"`
 }
 
 // MetricsExporterSinkStatus defines the observed state of MetricsExporterSink

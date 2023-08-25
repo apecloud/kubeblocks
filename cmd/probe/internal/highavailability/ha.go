@@ -310,29 +310,15 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 			ha.logger.Infof("manual switchover to new leader: %s", candidate)
 			return false
 		}
-	} else {
-		if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {
-			ha.logger.Infof("there is a healthy leader exists: %s", member.Name)
-			return false
-		}
+		return ha.isMinimumLag(ctx, cluster, currentMember)
 	}
 
-	isCurrentLagging, currentLag := ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)
-	if !isCurrentLagging {
-		return true
+	if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {
+		ha.logger.Infof("there is a healthy leader exists: %s", member.Name)
+		return false
 	}
 
-	for _, member := range cluster.Members {
-		if member.Name != currentMemberName {
-			isLagging, lag := ha.dbManager.IsMemberLagging(ctx, cluster, &member)
-			// There are other members with smaller lag
-			if !isLagging || lag < currentLag {
-				return false
-			}
-		}
-	}
-
-	return true
+	return ha.isMinimumLag(ctx, cluster, currentMember)
 }
 
 func (ha *Ha) HasOtherHealthyMember(cluster *dcs.Cluster) bool {
@@ -430,6 +416,25 @@ func (ha *Ha) IsPodReady() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (ha *Ha) isMinimumLag(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
+	isCurrentLagging, currentLag := ha.dbManager.IsMemberLagging(ctx, cluster, member)
+	if !isCurrentLagging {
+		return true
+	}
+
+	for _, m := range cluster.Members {
+		if m.Name != member.Name {
+			isLagging, lag := ha.dbManager.IsMemberLagging(ctx, cluster, &m)
+			// There are other members with smaller lag
+			if !isLagging || lag < currentLag {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (ha *Ha) ShutdownWithWait() {

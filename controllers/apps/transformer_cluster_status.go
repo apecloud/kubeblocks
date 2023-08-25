@@ -88,9 +88,9 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 			return err
 		}
 	case origCluster.IsDeleting():
-		return fmt.Errorf("unexpected cluster status: %s", cluster)
+		return fmt.Errorf("unexpected cluster status: %+v", origCluster)
 	default:
-		panic(fmt.Sprintf("runtime error - unknown cluster status: %s", origCluster))
+		panic(fmt.Sprintf("runtime error - unknown cluster status: %+v", origCluster))
 	}
 
 	return nil

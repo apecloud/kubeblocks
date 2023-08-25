@@ -77,7 +77,10 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			if synthesizedComponent == nil {
 				continue
 			}
-			comps = []appsv1alpha1.ClusterComponentSpec{{ServiceAccountName: synthesizedComponent.ServiceAccountName}}
+			comps = []appsv1alpha1.ClusterComponentSpec{{
+				ServiceAccountName: synthesizedComponent.ServiceAccountName,
+				ComponentDefRef:    compDef.Name,
+			}}
 		}
 		componentSpecs = append(componentSpecs, comps...)
 	}
@@ -85,8 +88,8 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	for _, compSpec := range componentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
 		if serviceAccountName == "" {
-			if !(isProbesEnabled(clusterDef) || isVolumeProtectionEnabled(clusterDef)) {
-				return nil
+			if !(isProbesEnabled(clusterDef, &compSpec) || isVolumeProtectionEnabled(clusterDef, &compSpec)) {
+				continue
 			}
 			serviceAccountName = "kb-" + cluster.Name
 		}
@@ -103,7 +106,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		}
 
 		if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
-			if !(isVolumeProtectionEnabled(clusterDef) && !isClusterRoleBindingExist(transCtx, serviceAccountName)) {
+			if !(isVolumeProtectionEnabled(clusterDef, &compSpec) && !isClusterRoleBindingExist(transCtx, serviceAccountName)) {
 				continue
 			}
 		}
@@ -123,7 +126,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		// serviceaccount must be created before rolebinding and clusterrolebinding
 		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, rbVertex)
 
-		if isVolumeProtectionEnabled(clusterDef) {
+		if isVolumeProtectionEnabled(clusterDef, &compSpec) {
 			clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
 			if err != nil {
 				return err
@@ -148,18 +151,18 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	return nil
 }
 
-func isProbesEnabled(clusterDef *appsv1alpha1.ClusterDefinition) bool {
+func isProbesEnabled(clusterDef *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) bool {
 	for _, compDef := range clusterDef.Spec.ComponentDefs {
-		if compDef.Probes != nil {
+		if compDef.Name == compSpec.ComponentDefRef && compDef.Probes != nil {
 			return true
 		}
 	}
 	return false
 }
 
-func isVolumeProtectionEnabled(clusterDef *appsv1alpha1.ClusterDefinition) bool {
+func isVolumeProtectionEnabled(clusterDef *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) bool {
 	for _, compDef := range clusterDef.Spec.ComponentDefs {
-		if compDef.VolumeProtectionSpec != nil {
+		if compDef.Name == compSpec.ComponentDefRef && compDef.VolumeProtectionSpec != nil {
 			return true
 		}
 	}

@@ -61,6 +61,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 
 func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
 	mgr.DBState = nil
+	mgr.UnsetIsLeader()
 	dbState := &dcs.DBState{
 		Extra: map[string]string{},
 	}

@@ -108,6 +108,10 @@ func (mgr *Manager) SetIsLeader(isLeader bool) {
 	}
 }
 
+func (mgr *Manager) UnsetIsLeader() {
+	mgr.isLeader = 0
+}
+
 // GetIsLeader returns whether the "isLeader" is set or not and whether current member is leader or not
 func (mgr *Manager) GetIsLeader() (bool, bool) {
 	return mgr.isLeader != 0, mgr.isLeader == 1

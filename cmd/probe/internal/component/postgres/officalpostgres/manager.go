@@ -87,6 +87,7 @@ func (mgr *Manager) IsClusterInitialized(context.Context, *dcs.Cluster) (bool, e
 
 func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
 	mgr.DBState = nil
+	mgr.UnsetIsLeader()
 	dbState := &dcs.DBState{
 		Extra: map[string]string{},
 	}

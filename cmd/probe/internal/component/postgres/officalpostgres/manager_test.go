@@ -475,7 +475,7 @@ func TestReadRecoveryParams(t *testing.T) {
 
 		leaderName := "maple72-postgresql-0"
 		primaryInfo := manager.readRecoveryParams(ctx)
-		assert.True(t, strings.HasPrefix(primaryInfo["host"], leaderName))
+		assert.True(t, strings.HasPrefix(primaryInfo, leaderName))
 	})
 
 	t.Run("host not match", func(t *testing.T) {
@@ -484,7 +484,7 @@ func TestReadRecoveryParams(t *testing.T) {
 
 		leaderName := "a"
 		primaryInfo := manager.readRecoveryParams(ctx)
-		assert.False(t, strings.HasPrefix(primaryInfo["host"], leaderName))
+		assert.False(t, strings.HasPrefix(primaryInfo, leaderName))
 	})
 
 	t.Run("read recovery params failed", func(t *testing.T) {
@@ -492,6 +492,6 @@ func TestReadRecoveryParams(t *testing.T) {
 			WillReturnError(fmt.Errorf("some error"))
 
 		primaryInfo := manager.readRecoveryParams(ctx)
-		assert.Nil(t, primaryInfo)
+		assert.Equal(t, "", primaryInfo)
 	})
 }

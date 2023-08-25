@@ -88,16 +88,15 @@ But for your better high-availability experience, KubeBlocks creates a Redis Rep
   ```
 
   </TabItem>
+  </Tabs>
 
-  * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
   ```bash
   kubectl create namespace demo
   >
   namespace/demo created
   ```
-
-  </Tabs>
 
 ### Create a cluster
 

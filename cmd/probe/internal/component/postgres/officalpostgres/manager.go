@@ -132,11 +132,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	}
 	dbState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
 
-	primaryInfo := mgr.readRecoveryParams(ctx)
-	if primaryInfo == nil {
-		mgr.Logger.Errorf("get primary info failed, err:%v", err)
+	if !isLeader {
+		primaryInfo := mgr.readRecoveryParams(ctx)
+		if primaryInfo == "" {
+			mgr.Logger.Errorf("get primary info failed")
+		}
+		dbState.Extra[postgres.PrimaryInfo] = primaryInfo
 	}
-	dbState.Extra[postgres.PrimaryInfo] = primaryInfo["host"]
 
 	mgr.DBState = dbState
 	return mgr.DBState
@@ -567,11 +569,11 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 	}
 
 	primaryInfo := mgr.readRecoveryParams(ctx)
-	if primaryInfo == nil {
+	if primaryInfo == "" {
 		return true, true
 	}
 
-	if !strings.HasPrefix(primaryInfo["host"], leaderName) {
+	if !strings.HasPrefix(primaryInfo, leaderName) {
 		mgr.Logger.Warnf("host not match, need to reload")
 		return true, false
 	}
@@ -579,27 +581,25 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 	return false, false
 }
 
-func (mgr *Manager) readRecoveryParams(ctx context.Context) map[string]string {
+func (mgr *Manager) readRecoveryParams(ctx context.Context) string {
 	if mgr.DBState != nil && mgr.DBState.Extra[postgres.PrimaryInfo] != "" {
-		return map[string]string{
-			postgres.PrimaryInfo: mgr.DBState.Extra[postgres.PrimaryInfo],
-		}
+		return mgr.DBState.Extra[postgres.PrimaryInfo]
 	}
 
 	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
 		mgr.Logger.Errorf("get primary conn info failed, err:%v", err)
-		return nil
+		return ""
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
 		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
-		return nil
+		return ""
 	}
 
-	return postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))
+	return postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))["host"]
 }
 
 // TODO: Parse history file
@@ -704,7 +704,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 	}
 
 	oldPrimaryInfo := mgr.readRecoveryParams(ctx)
-	if strings.HasPrefix(oldPrimaryInfo["host"], leaderMember.Name) {
+	if strings.HasPrefix(oldPrimaryInfo, leaderMember.Name) {
 		mgr.Logger.Infof("i have already followed this leader, don't need to rewrite primary info")
 		return nil
 	}
@@ -742,7 +742,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 		return nil
 	}
 
-	return mgr.DBManagerBase.Start()
+	return mgr.DBManagerBase.Start(ctx, cluster)
 }
 
 // Start for postgresql replication, not only means the start of a database instance

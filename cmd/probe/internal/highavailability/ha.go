@@ -99,7 +99,7 @@ func (ha *Ha) RunCycle() {
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
 		}
-		_ = ha.dbManager.Start(cluster)
+		_ = ha.dbManager.Start(ha.ctx, cluster)
 		return
 	}
 
@@ -310,6 +310,10 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 			ha.logger.Infof("manual switchover to new leader: %s", candidate)
 			return false
 		}
+	}
+
+	if isLeader, err := ha.dbManager.IsLeader(ctx, cluster); isLeader && err == nil {
+		return true
 	}
 
 	if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {

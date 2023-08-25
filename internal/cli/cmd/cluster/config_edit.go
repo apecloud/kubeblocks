@@ -35,14 +35,13 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 )
 
@@ -143,7 +142,7 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 		}
 	}
 
-	confirmPrompt, err := generateReconfiguringPrompt(o.Out, fileUpdated, configPatch, &configConstraint.Spec, o.CfgFile)
+	confirmPrompt, err := generateReconfiguringPrompt(fileUpdated, configPatch, &configConstraint.Spec, o.CfgFile)
 	if err != nil {
 		return err
 	}
@@ -166,12 +165,11 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 	return fn()
 }
 
-func generateReconfiguringPrompt(out io.Writer, fileUpdated bool, configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, fileName string) (string, error) {
+func generateReconfiguringPrompt(fileUpdated bool, configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, fileName string) (string, error) {
 	if fileUpdated {
 		return restartConfirmPrompt, nil
 	}
 
-	fmt.Fprintf(out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[fileName]))
 	dynamicUpdated, err := core.IsUpdateDynamicParameters(cc, configPatch)
 	if err != nil {
 		return "", nil

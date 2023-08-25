@@ -425,7 +425,7 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *bindings.Invo
 	if err != nil {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
-		return opsRes, nil
+		return opsRes, err
 	}
 
 	dcsStore := dcs.GetStore()
@@ -464,7 +464,7 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.Inv
 	if err != nil {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
-		return opsRes, nil
+		return opsRes, err
 	}
 
 	dcsStore := dcs.GetStore()

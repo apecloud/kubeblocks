@@ -68,16 +68,16 @@ type ExporterRef struct {
 type MetricsDatasource struct {
 
 	// KubeletStateConfig is the configuration to scrape metrics from Kubelet
-	KubeletStateConfig *KubeletStateConfig `json:"kubelet_state"`
+	KubeletStateConfig *KubeletStateConfig `json:"kubeletState"`
 
 	// K8sNodeConfig is the configuration to scrape metrics from K8s node
-	K8sNodeConfig *K8sNodeConfig `json:"k8s_node"`
+	K8sNodeConfig *K8sNodeConfig `json:"k8sNode"`
 
 	// K8sClusterConfig is the configuration to scrape metrics from K8s cluster
-	K8sClusterConfig *K8sClusterConfig `json:"k8s_cluster"`
+	K8sClusterConfig *K8sClusterConfig `json:"k8sCluster"`
 
 	// CollectionInterval is the metrics collection interval
-	CollectionInterval string `json:"collection_interval"`
+	CollectionInterval string `json:"collectionInterval"`
 
 	// ExporterRef is the exporters to export metrics
 	ExporterRef
@@ -88,7 +88,7 @@ type PodsLogsConfig struct{}
 type LogsDatasource struct {
 
 	// PodsLogsConfig is the configuration to scrape logs from pods
-	PodsLogsConfig *PodsLogsConfig `json:"pods_logs"`
+	PodsLogsConfig *PodsLogsConfig `json:"podsLogs"`
 
 	// ExporterRef is the exporters to export logs
 	ExporterRef
@@ -107,7 +107,7 @@ type Config struct {
 	APIConfig `json:",inline"`
 
 	// CollectionInterval is the metrics collection interval
-	CollectionInterval time.Duration `json:"collection_interval"`
+	CollectionInterval time.Duration `json:"collectionInterval"`
 
 	// Datasource is the metrics and logs to be scraped
 	Datasource Datasource `json:"datasource"`

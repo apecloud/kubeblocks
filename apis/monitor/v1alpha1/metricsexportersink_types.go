@@ -32,13 +32,13 @@ type PrometheusConfig struct {
 
 	// externalLabels defines the labels added to metrics
 	// +kube:validation:Required
-	ExternalLabels map[string]string `json:"external_labels"`
+	ExternalLabels map[string]string `json:"externalLabels"`
 }
 
 type MetricsSinkSource struct {
 	// lokiConfig defines the config of the loki
 	// +optional
-	PrometheusConfig *PrometheusConfig `json:"prometheus_config,omitempty"`
+	PrometheusConfig *PrometheusConfig `json:"prometheusConfig,omitempty"`
 }
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -55,7 +55,7 @@ type MetricsExporterSinkSpec struct {
 
 	// MetricsSinkSource describes the config of the exporterSink
 	// +kubebuilder:validation:Required
-	MetricsSinkSource `json:"inline"`
+	MetricsSinkSource `json:",inline"`
 }
 
 // MetricsExporterSinkStatus defines the observed state of MetricsExporterSink

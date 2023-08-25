@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 1. [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
 2. Install KubeBlocks.
 
-   You can run `kbcli playground init` to install a k3d cluster and KubeBlocks. For details, refer to [Try KubeBlocks on your laptop](./../../playground/try-kubeblocks-on-your-laptop.md) or [Try KubeBlocks on cloud](./../../playground/try-kubeblocks-on-cloud.md).
+   You can run `kbcli playground init` to install a k3d cluster and KubeBlocks. For details, refer to [Try KubeBlocks on your laptop](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [Try KubeBlocks on cloud](./../../try-out-on-playground/try-kubeblocks-on-cloud.md).
 
    ```bash
    kbcli playground init

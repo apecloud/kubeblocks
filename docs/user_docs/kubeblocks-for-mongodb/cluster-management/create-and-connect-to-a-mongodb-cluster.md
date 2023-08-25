@@ -38,14 +38,14 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 
   <TabItem value="kubectl" label="kubectl">
 
-  </TabItem>
-
   ```bash
   kubectl get clusterdefinitions mongodb
   >
   NAME      MAIN-COMPONENT-NAME   STATUS      AGE
   mongodb   mongodb               Available   118m
   ```
+
+  </TabItem>
 
   </Tabs>
 

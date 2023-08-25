@@ -146,6 +146,51 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
 		return nil
 	}
+
+	// mergeAnnotations keeps the original annotations.
+	mergeAnnotations := func(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+		if targetAnnotations == nil || originalAnnotations == nil {
+			return
+		}
+		if *targetAnnotations == nil {
+			*targetAnnotations = map[string]string{}
+		}
+		for k, v := range originalAnnotations {
+			// if the annotation not exist in targetAnnotations, copy it from original.
+			if _, ok := (*targetAnnotations)[k]; !ok {
+				(*targetAnnotations)[k] = v
+			}
+		}
+	}
+
+	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
+		// if annotations exist and are replaced, the StatefulSet will be updated.
+		mergeAnnotations(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
+		oldSts.Spec.Template = newSts.Spec.Template
+		oldSts.Spec.Replicas = newSts.Spec.Replicas
+		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
+		return oldSts
+	}
+
+	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
+		// remove original monitor annotations
+		if len(oldSvc.Annotations) > 0 {
+		maps.DeleteFunc(oldSvc.Annotations, func(k, v string) bool {
+		return strings.HasPrefix(k, "monitor.kubeblocks.io")
+	})
+	}
+		mergeAnnotations(oldSvc.Annotations, &newSvc.Annotations)
+		oldSvc.Annotations = newSvc.Annotations
+		oldSvc.Spec = newSvc.Spec
+		return oldSvc
+	}
+
+	copyAndMergeCm := func(oldCm, newCm *corev1.ConfigMap) client.Object {
+		oldCm.Data = newCm.Data
+		oldCm.BinaryData = newCm.BinaryData
+		return oldCm
+	}
+
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
 	case *apps.StatefulSet:
@@ -157,33 +202,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	default:
 		return newObj
 	}
-}
-
-func copyAndMergeSts(oldSts, newSts *apps.StatefulSet) client.Object {
-	mergeAnnotations(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
-	oldSts.Spec.Template = newSts.Spec.Template
-	oldSts.Spec.Replicas = newSts.Spec.Replicas
-	oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
-	return oldSts
-}
-
-func copyAndMergeSvc(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-	// remove original monitor annotations
-	if len(oldSvc.Annotations) > 0 {
-		maps.DeleteFunc(oldSvc.Annotations, func(k, v string) bool {
-			return strings.HasPrefix(k, "monitor.kubeblocks.io")
-		})
-	}
-	mergeAnnotations(oldSvc.Annotations, &newSvc.Annotations)
-	oldSvc.Annotations = newSvc.Annotations
-	oldSvc.Spec = newSvc.Spec
-	return oldSvc
-}
-
-func copyAndMergeCm(oldCm, newCm *corev1.ConfigMap) client.Object {
-	oldCm.Data = newCm.Data
-	oldCm.BinaryData = newCm.BinaryData
-	return oldCm
 }
 
 func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
@@ -566,21 +584,4 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 
 	return envData
-}
-
-// mergeAnnotations keeps the original annotations.
-// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
-	if targetAnnotations == nil || originalAnnotations == nil {
-		return
-	}
-	if *targetAnnotations == nil {
-		*targetAnnotations = map[string]string{}
-	}
-	for k, v := range originalAnnotations {
-		// if the annotation not exist in targetAnnotations, copy it from original.
-		if _, ok := (*targetAnnotations)[k]; !ok {
-			(*targetAnnotations)[k] = v
-		}
-	}
 }

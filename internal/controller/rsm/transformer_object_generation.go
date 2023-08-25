@@ -175,10 +175,10 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
 		// remove original monitor annotations
 		if len(oldSvc.Annotations) > 0 {
-		maps.DeleteFunc(oldSvc.Annotations, func(k, v string) bool {
-		return strings.HasPrefix(k, "monitor.kubeblocks.io")
-	})
-	}
+			maps.DeleteFunc(oldSvc.Annotations, func(k, v string) bool {
+				return strings.HasPrefix(k, "monitor.kubeblocks.io")
+			})
+		}
 		mergeAnnotations(oldSvc.Annotations, &newSvc.Annotations)
 		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec

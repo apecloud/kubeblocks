@@ -28,9 +28,9 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/reloader/app"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // Reload configuration

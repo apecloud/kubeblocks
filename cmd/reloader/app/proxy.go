@@ -22,13 +22,13 @@ package app
 import (
 	"context"
 
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type reconfigureProxy struct {

@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: ape-postgresql12-cc
+  name: apecloud-postgresql12-cc
   labels:
     {{- include "apecloud-postgresql.labels" . | nindent 4 }}
 spec:

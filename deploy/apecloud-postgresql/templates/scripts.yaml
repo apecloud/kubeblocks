@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ape-postgresql-scripts
+  name: apecloud-postgresql-scripts
   labels:
     {{- include "apecloud-postgresql.labels" . | nindent 4 }}
 data:

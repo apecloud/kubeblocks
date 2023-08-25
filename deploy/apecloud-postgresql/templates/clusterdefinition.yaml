@@ -28,8 +28,8 @@ spec:
             targetPort: tcp-postgresql
       configSpecs:
         - name: postgresql-consensusset-configuration
-          templateRef: ape-postgresql12-configuration
-          constraintRef: ape-postgresql12-cc
+          templateRef: apecloud-postgresql12-configuration
+          constraintRef: apecloud-postgresql12-cc
           keys:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
@@ -39,8 +39,8 @@ spec:
         - name: data
           type: data
       scriptSpecs:
-        - name: ape-postgresql-scripts
-          templateRef: ape-postgresql-scripts
+        - name: apecloud-postgresql-scripts
+          templateRef: apecloud-postgresql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777

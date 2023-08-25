@@ -11,7 +11,7 @@ The KubeBlocks configuration function provides a set of consistent default confi
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 2. [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) and wait until the cluster status is Running.
 
 ## View parameter information

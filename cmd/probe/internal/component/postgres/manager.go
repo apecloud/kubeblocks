@@ -27,11 +27,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/v3/process"
-	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type Manager struct {

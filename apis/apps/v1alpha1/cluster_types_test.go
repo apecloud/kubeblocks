@@ -23,11 +23,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var _ = Describe("", func() {

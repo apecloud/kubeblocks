@@ -30,6 +30,7 @@ import (
 	"strings"
 	"text/template"
 
+	sprig "github.com/go-task/slim-sprig"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,13 +48,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	sprig "github.com/go-task/slim-sprig"
-	"github.com/spf13/viper"
-
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // BackupRepoReconciler reconciles a BackupRepo object

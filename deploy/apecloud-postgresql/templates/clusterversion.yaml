@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  name: ac-postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   annotations:
     kubeblocks.io/is-default-cluster-version: "false"
   labels:

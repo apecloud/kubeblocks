@@ -26,10 +26,10 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
-	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")

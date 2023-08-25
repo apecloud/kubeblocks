@@ -29,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,6 +47,7 @@ import (
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var (
@@ -672,7 +672,7 @@ func updateComponentInfoToPods(
 	}
 	// list all pods in cache
 	podList := corev1.PodList{}
-	if err := cli.List(ctx, &podList, ml); err != nil {
+	if err := cli.List(ctx, &podList, client.InNamespace(cluster.Namespace), ml); err != nil {
 		return err
 	}
 	// list all pods in dag

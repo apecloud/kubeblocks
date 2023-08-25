@@ -132,19 +132,18 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
 
 ### Before you start
 
-- Refer to [Backup and restore for MySQL](./../backup-and-restore/snapshot-backup-and-restore-for-mysql.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
-- Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
-  ```bash
-  kbcli cluster list mysql-cluster
-  >
-  NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-  mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
-  ```
+```bash
+kbcli cluster list mysql-cluster
+>
+NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
+mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+```
 
 ### Steps
 

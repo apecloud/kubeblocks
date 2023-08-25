@@ -31,7 +31,8 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

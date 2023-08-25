@@ -28,9 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -126,7 +125,7 @@ func (r *reconfigureAction) Handle(eventContext intctrlutil.ConfigEventContext, 
 }
 
 func handleReconfigureStatusProgress(execStatus core.PolicyExecStatus, phase appsv1alpha1.OpsPhase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
-	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
+	return func(cmStatus *appsv1alpha1.ConfigurationStatus) (err error) {
 		cmStatus.LastAppliedStatus = execStatus.ExecStatus
 		cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(execStatus.PolicyName)
 		cmStatus.SucceedCount = execStatus.SucceedCount
@@ -142,12 +141,12 @@ func handleReconfigureStatusProgress(execStatus core.PolicyExecStatus, phase app
 		default:
 			cmStatus.Status = appsv1alpha1.ReasonReconfigureRunning
 		}
-		return nil
+		return
 	}
 }
 
 func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
-	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
+	return func(cmStatus *appsv1alpha1.ConfigurationStatus) (err error) {
 		cmStatus.Status = appsv1alpha1.ReasonReconfigureMerged
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
 		cmStatus.UpdatedParameters = appsv1alpha1.UpdatedParameters{
@@ -155,7 +154,7 @@ func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedC
 			UpdatedKeys: b2sMap(configPatch.UpdateConfig),
 			DeletedKeys: i2sMap(configPatch.DeleteConfig),
 		}
-		return nil
+		return
 	}
 }
 
@@ -319,24 +318,31 @@ func (r *reconfigureAction) sync(reqCtx intctrlutil.RequestCtx,
 		configSpec := foundConfigSpec(config.Name)
 		if configSpec == nil {
 			return processMergedFailed(resource, true,
-				core.MakeError("failed to reconfigure, not existed config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
+				core.MakeError(
+					"failed to reconfigure, not existed config[%s], all configs: %v",
+					config.Name, getConfigSpecName(configSpecs)))
 		}
 		if len(configSpec.ConfigConstraintRef) == 0 {
 			return processMergedFailed(resource, true,
-				core.MakeError("current configSpec not support reconfigure, configSpec: %v", configSpec.Name))
+				core.MakeError(
+					"current configSpec not support reconfigure, configSpec: %v",
+					configSpec.Name))
 		}
-		result := updateConfigConfigmapResource(config, *configSpec, client.ObjectKey{
+		key := client.ObjectKey{
 			Name:      core.GetComponentCfgName(clusterName, componentName, configSpec.Name),
 			Namespace: resource.Cluster.Namespace,
-		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)
+		}
+		result := updateConfigConfigmapResource(config, *configSpec, key, reqCtx.Ctx, cli, resource.OpsRequest.Name,
+			updateOpsLabel(reqCtx, cli, resource.OpsRequest))
 		if result.err != nil {
 			return processMergedFailed(resource, result.failed, result.err)
-		} else {
-			reqCtx.Recorder.Eventf(resource.OpsRequest,
-				corev1.EventTypeNormal,
-				appsv1alpha1.ReasonReconfigureMerged,
-				"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
 		}
+
+		reqCtx.Recorder.Eventf(resource.OpsRequest,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureMerged,
+			"the reconfiguring operation of component[%s] in cluster[%s] merged successfully",
+			componentName, clusterName)
 
 		// merged successfully
 		if err := patchReconfigureOpsStatus(resource, configSpec.Name,
@@ -347,4 +353,15 @@ func (r *reconfigureAction) sync(reqCtx intctrlutil.RequestCtx,
 		resource.OpsRequest.SetStatusCondition(*condition)
 	}
 	return nil
+}
+
+func updateOpsLabel(reqCtx intctrlutil.RequestCtx, cli client.Client, request *appsv1alpha1.OpsRequest) updateReconfigureStatus {
+	deepObject := request.DeepCopy()
+	return func(params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) error {
+		if formatter == nil {
+			return nil
+		}
+		updateOpsLabelWithReconfigure(request, params, orinalData, formatter)
+		return cli.Patch(reqCtx.Ctx, request, client.MergeFrom(deepObject))
+	}
 }

@@ -74,16 +74,24 @@ func LoadRawConfigObject(data map[string]string, formatConfig *appsv1alpha1.Form
 		if cmKeySet != nil && !cmKeySet.InArray(key) {
 			continue
 		}
-		configObject, err := unstructured.LoadConfig(key, val, formatConfig.Format)
+		configObject, err := FromConfigObject(key, val, formatConfig)
 		if err != nil {
 			return nil, err
-		}
-		if formatConfig.IniConfig != nil {
-			configObject = configObject.SubConfig(formatConfig.IniConfig.SectionName)
 		}
 		r[key] = configObject
 	}
 	return r, nil
+}
+
+func FromConfigObject(name, config string, formatConfig *appsv1alpha1.FormatterConfig) (unstructured.ConfigObject, error) {
+	configObject, err := unstructured.LoadConfig(name, config, formatConfig.Format)
+	if err != nil {
+		return nil, err
+	}
+	if formatConfig.IniConfig != nil {
+		configObject = configObject.SubConfig(formatConfig.IniConfig.SectionName)
+	}
+	return configObject, nil
 }
 
 // TransformConfigFileToKeyValueMap transforms a config file in appsv1alpha1.CfgFileFormat format to a map in which the key is config name and the value is config value

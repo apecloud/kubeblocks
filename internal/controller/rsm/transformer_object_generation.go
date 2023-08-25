@@ -141,7 +141,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 // copyAndMerge merges two objects for updating:
 // 1. new an object targetObj by copying from oldObj
-// 2. merge none nil meta and spec from newObj into targetObj
+// 2. merge all fields can be updated from newObj into targetObj
 func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
 		return nil

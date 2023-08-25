@@ -76,18 +76,6 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	switch {
-	case origCluster.IsDeleting():
-		// if cluster is deleting, set root(cluster) vertex.action to DELETE
-		rootVertex.Action = ictrltypes.ActionPtr(ictrltypes.DELETE)
-		// TODO(refactor): move from object action, check it again
-		for _, vertex := range dag.Vertices() {
-			v, _ := vertex.(*ictrltypes.LifecycleVertex)
-			if *v.Action == ictrltypes.CREATE {
-				v.Action = ictrltypes.ActionPtr(ictrltypes.NOOP)
-			} else {
-				v.Action = ictrltypes.ActionPtr(ictrltypes.DELETE)
-			}
-		}
 	case origCluster.IsUpdating():
 		transCtx.Logger.Info(fmt.Sprintf("update cluster status after applying resources, generation: %d", cluster.Generation))
 		updateObservedGeneration()
@@ -99,6 +87,10 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		if err := t.reconcileClusterStatus(transCtx, dag, cluster); err != nil {
 			return err
 		}
+	case origCluster.IsDeleting():
+		return fmt.Errorf("unexpected cluster status: %s", cluster)
+	default:
+		panic(fmt.Sprintf("runtime error - unknown cluster status: %s", origCluster))
 	}
 
 	return nil

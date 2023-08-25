@@ -693,12 +693,6 @@ func (c *rsmComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestC
 	if err := c.UpdatePDB(reqCtx, cli); err != nil {
 		return err
 	}
-	// TODO(free6om): copy UpdateService&updatePodEnvConfig to rsm
-	// if err := c.UpdateService(reqCtx, cli); err != nil {
-	//	return err
-	// }
-	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
-	// c.updatePodEnvConfig()
 	return nil
 }
 

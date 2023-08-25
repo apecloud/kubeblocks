@@ -37,7 +37,10 @@ import (
 )
 
 type Client interface {
+	// JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
 	JoinMember(ctx context.Context) error
+
+	// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
 	LeaveMember(ctx context.Context) error
 }
 
@@ -166,18 +169,20 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
+// JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
 func (cli *OperationClient) JoinMember(ctx context.Context) error {
-	_, err := cli.Request(string(JoinMemberOperation))
+	_, err := cli.Request(ctx, string(JoinMemberOperation))
 	return err
 }
 
+// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
 func (cli *OperationClient) LeaveMember(ctx context.Context) error {
-	_, err := cli.Request(string(LeaveMemberOperation))
+	_, err := cli.Request(ctx, string(LeaveMemberOperation))
 	return err
 }
 
-func (cli *OperationClient) Request(operation string) (map[string]any, error) {
-	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
+func (cli *OperationClient) Request(ctx context.Context, operation string) (map[string]any, error) {
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 
 	// Request sql channel via Dapr SDK

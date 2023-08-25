@@ -417,7 +417,7 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 }
 
 // JoinMemberOps is used to join the current member into the DB cluster.
-// If OpsResult["event"] == "success" and err == nil, it indicates that the member has successfully left.
+// If OpsResult["event"] == "success" and err == nil, it indicates that the member has successfully Joined.
 // In any other situation, it signifies a failure.
 func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
@@ -437,10 +437,10 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *bindings.Invo
 		return opsRes, err
 	}
 
-	// remove current member from db cluster
+	// join current member to db cluster
 	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
 	if err != nil {
-		message := fmt.Sprintf("Join member form cluster failed: %v", err)
+		message := fmt.Sprintf("Join member to cluster failed: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = message
 		return opsRes, err
@@ -485,13 +485,13 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.Inv
 	// remove current member from db cluster
 	err = manager.LeaveMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
 	if err != nil {
-		message := fmt.Sprintf("Delete member form cluster failed: %v", err)
+		message := fmt.Sprintf("Leave member form cluster failed: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = message
 		return opsRes, err
 	}
 
 	opsRes["event"] = OperationSuccess
-	opsRes["message"] = "Deletion of the current member is complete"
+	opsRes["message"] = "left of the current member is complete"
 	return opsRes, nil
 }

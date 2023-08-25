@@ -1,0 +1,73 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "neon-cluster.name" . }}
+  labels:
+    {{ include "neon-cluster.labels" . | indent 4 }}
+spec:
+  clusterDefinitionRef: neon
+  clusterVersionRef: neon-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  componentSpecs:
+    - name: neon-storagebroker
+      componentDefRef: neon-storagebroker
+      replicas: 1
+      {{- with  .Values.storagebroker.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+            {{- end }}
+            {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: neon-storagebroker # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.storagebroker.dataStorage }}
+    - name: neon-safekeeper
+      componentDefRef: neon-safekeeper
+      replicas: {{ .Values.safekeeper.replicas }}
+      {{- with  .Values.safekeeper.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+            {{- end }}
+            {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: neon-safekeeper # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.safekeeper.dataStorage }}
+    - name: neon-pageserver
+      componentDefRef: neon-pageserver
+      replicas: {{ .Values.pageserver.replicas }}
+      volumeClaimTemplates:
+        - name: neon-pageserver # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.pageserver.dataStorage }}

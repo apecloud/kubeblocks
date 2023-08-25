@@ -31,6 +31,15 @@ const (
 	LokiSinkType LogsSinkType = "loki"
 )
 
+// MetricsSinkType defines the type for LogsExporterSink
+// +enum
+// +kubebuilder:validation:Enum={S3SinkType,LokiSinkType}
+type MetricsSinkType string
+
+const (
+	prometheusSinkType LogsSinkType = "proemtheus"
+)
+
 type RetryPolicyOnFailure struct {
 	// initialInterval the time to wait after the first failure before retrying.
 	// +optional

@@ -36,7 +36,9 @@ func IsHAAvailable(characterType, workloadType string) bool {
 			return true
 		}
 	case "postgresql":
-		return true
+		if strings.EqualFold(workloadType, Consensus) {
+			return true
+		}
 	}
 	return false
 }

@@ -228,11 +228,8 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	// _, _ = mgr.EnsureServerID(ctx)
 	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
-	if !mgr.IsMemberHealthy(ctx, cluster, member) {
-		return false
-	}
 
-	return true
+	return mgr.IsMemberHealthy(ctx, cluster, member)
 }
 
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {

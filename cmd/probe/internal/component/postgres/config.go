@@ -35,7 +35,7 @@ const (
 )
 
 type Config struct {
-	Url            string
+	URL            string
 	Username       string
 	Password       string
 	Host           string
@@ -76,8 +76,8 @@ func NewConfig(properties map[string]string) (*Config, error) {
 		config.Password = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
-	config.Url = config.GetConnectURLWithHost(config.Host)
-	pgxConfig, _ := pgxpool.ParseConfig(config.Url)
+	config.URL = config.GetConnectURLWithHost(config.Host)
+	pgxConfig, _ := pgxpool.ParseConfig(config.URL)
 	config.pgxConfig = pgxConfig
 
 	return config, nil

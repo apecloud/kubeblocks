@@ -39,7 +39,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
 
    If the loadbalancer is not enabled successfully, it may relate to your environment since the loadbalancer add-on relies on the EKS environment.
 
-   Check your EKS environment and enable this add-on again. For enabling add-on details, refer to [Enable add-ons](./../../introduction/supported-addons.md).
+   Check your EKS environment and enable this add-on again. For enabling add-on details, refer to [Enable add-ons](./../../overview/supported-addons.md).
 
 ***Steps***
 

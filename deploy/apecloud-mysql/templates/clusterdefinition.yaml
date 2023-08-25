@@ -216,8 +216,6 @@ spec:
                 name: vttabletport
               - containerPort: 16100
                 name: vttabletgrpc
-              - containerPort: 40000
-                name: delvedebug
             env:
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
@@ -352,17 +350,6 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      service:
-        ports:
-          - name: etcd-port
-            port: 2379
-            targetPort: etcd-client
-          - name: vtctld-webport
-            port: 15000
-            targetPort: vtctld-webport
-          - name: vtctld-grpcport
-            port: 15999
-            targetPort: vtctld-grpcport
       podSpec:
         containers:
           - name: vtconsensus
@@ -482,18 +469,9 @@ spec:
           scrapePort: 15001
       service:
         ports:
-          - name: webport
-            port: 15001
-            targetPort: webport
-          - name: grpcport
-            port: 15991
-            targetPort: grpcport
           - name: serverport
             port: 15306
             targetPort: serverport
-          - name: delvedebug
-            port: 40000
-            targetPort: delvedebug
       podSpec:
         initContainers:
           - name: wait-vtctld-ready
@@ -518,8 +496,6 @@ spec:
                 name: grpcport
               - containerPort: 15306
                 name: serverport
-              - containerPort: 40000
-                name: delvedebug
             env:
               - name: MYSQL_ROOT_USER
                 valueFrom:

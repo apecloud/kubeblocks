@@ -28,7 +28,6 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
@@ -350,7 +349,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	}
 
 	currentLeaderAddr := strings.Split(cast.ToString(resMap[0]["ip_port"]), ":")[0]
-	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, viper.GetString("KB_POD_FQDN"), mgr.Config.GetDBPort())
+	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, cluster.GetMemberAddrWithName(mgr.CurrentMemberName), mgr.Config.GetDBPort())
 	_, err = mgr.ExecOthers(ctx, promoteSQL, currentLeaderAddr)
 	if err != nil {
 		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)

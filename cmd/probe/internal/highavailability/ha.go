@@ -310,15 +310,11 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs.Cluster) bool
 			ha.logger.Infof("manual switchover to new leader: %s", candidate)
 			return false
 		}
-	}
-
-	if isLeader, err := ha.dbManager.IsLeader(ctx, cluster); isLeader && err == nil {
-		return true
-	}
-
-	if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {
-		ha.logger.Infof("there is a healthy leader exists: %s", member.Name)
-		return false
+	} else {
+		if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {
+			ha.logger.Infof("there is a healthy leader exists: %s", member.Name)
+			return false
+		}
 	}
 
 	isCurrentLagging, currentLag := ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)

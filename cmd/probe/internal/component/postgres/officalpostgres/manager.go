@@ -704,12 +704,6 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 		return nil
 	}
 
-	oldPrimaryInfo := mgr.readRecoveryParams(ctx)
-	if strings.HasPrefix(oldPrimaryInfo, leaderMember.Name) {
-		mgr.Logger.Infof("i have already followed this leader, don't need to rewrite primary info")
-		return nil
-	}
-
 	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
 		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, mgr.Config.Username, mgr.Config.Password)
 
@@ -751,10 +745,10 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 func (mgr *Manager) Start(ctx context.Context, cluster *dcs.Cluster) error {
 	err := mgr.follow(ctx, true, cluster)
 	if err != nil {
+		mgr.Logger.Errorf("start failed, err:%v", err)
 		return err
 	}
-
-	return mgr.DBManagerBase.Start(ctx, cluster)
+	return nil
 }
 
 func (mgr *Manager) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {

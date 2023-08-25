@@ -90,7 +90,7 @@ var _ = Describe("kubeblocks upgrade", func() {
 				Client:    testing.FakeClientSet(mockDeploy()),
 				Dynamic:   testing.FakeDynamicClient(),
 			},
-			Version: "fake-version",
+			Version: "0.5.0-fake",
 			Check:   false,
 		}
 		Expect(o.Upgrade()).Should(HaveOccurred())

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,9 +121,22 @@ func (o *InstallOptions) Upgrade() error {
 
 	// double check for KubeBlocks upgrade
 	if !o.autoApprove {
-		upgradeWarn := printer.BoldYellow(fmt.Sprintf("Warning: You're attempting to change KubeBlocks version from %s to %s, potentially impacting cluster functionality, particularly with downgrades. \nEnsure you proceed after reviewing detailed release notes at https://github.com/apecloud/kubeblocks/releases.", kbVersion, o.Version))
-		promptStr := fmt.Sprintf("Please type the version [%s] again:", o.Version)
-		if err = prompt.Confirm([]string{o.Version}, o.In, upgradeWarn, promptStr); err != nil {
+		oldVersion, err := version.NewVersion(kbVersion)
+		if err != nil {
+			return err
+		}
+		newVersion, err := version.NewVersion(o.Version)
+		if err != nil {
+			return err
+		}
+		upgradeWarn := ""
+		if oldVersion.GreaterThan(newVersion) {
+			upgradeWarn = printer.BoldYellow(fmt.Sprintf("Warning: You're attempting to downgrade KubeBlocks version from %s to %s, this action may cause your clusters and some KubeBlocks feature unavailable.\nEnsure you proceed after reviewing detailed release notes at https://github.com/apecloud/kubeblocks/releases.", kbVersion, o.Version))
+		} else {
+			upgradeWarn = fmt.Sprintf("Upgrade KubeBlocks from %s to %s", kbVersion, o.Version)
+		}
+
+		if err = prompt.Confirm([]string{"Yes"}, o.In, upgradeWarn, "Please type 'Yes' to confirm your operation:"); err != nil {
 			return err
 		}
 	}

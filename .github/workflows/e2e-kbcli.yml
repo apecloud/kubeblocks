@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release-version: ${{ steps.get_release_version.outputs.release-version }}
-      cliuster-region: ${{ steps.get_release_version.outputs.cluster-region }}
+      cluster-region: ${{ steps.get_release_version.outputs.cluster-region }}
     steps:
       - uses: actions/checkout@v3
       - name: check release version

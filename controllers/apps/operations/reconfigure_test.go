@@ -235,7 +235,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			// do Action
 			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsRes.Cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			Expect(opsRes.Cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 			By("Reconfigure operation success")
 			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
@@ -290,6 +290,16 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
 			By("Reconfigure configure")
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
+			// mock cluster.status.component.phase to Updating
+			mockClusterCompPhase := func(clusterObj *appsv1alpha1.Cluster, phase appsv1alpha1.ClusterComponentPhase) {
+				clusterObject := clusterObj.DeepCopy()
+				patch := client.MergeFrom(clusterObject.DeepCopy())
+				compStatus := clusterObject.Status.Components[consensusComp]
+				compStatus.Phase = phase
+				clusterObject.Status.Components[consensusComp] = compStatus
+				Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
+			}
+			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase)
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 
 			By("check cluster.status.components[*].phase == Reconfiguring")
@@ -297,6 +307,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
 			// TODO: add status condition expect
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
+			// mock cluster.status.component.phase to Running
+			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase)
 
 			By("check cluster.status.components[*].phase == Running")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())

@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "version": {
+      "title": "Version",
+      "description": "Cluster version.",
+      "type": "string",
+      "default": "ac-postgresql-latest"
+    },
+    "mode": {
+      "title": "Mode",
+      "description": "Cluster topology mode.",
+      "type": "string",
+      "default": "standalone",
+      "enum": [
+        "standalone",
+        "raftGroup"
+      ]
+    },
+    "replicas": {
+      "title": "Replicas",
+      "description": "The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2.",
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 5
+    },
+    "cpu": {
+      "title": "CPU",
+      "description": "CPU cores.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 0.5,
+      "minimum": 0.5,
+      "maximum": 64,
+      "multipleOf": 0.5
+    },
+    "memory": {
+      "title": "Memory(Gi)",
+      "description": "Memory, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 0.5,
+      "minimum": 0.5,
+      "maximum": 1000
+    },
+    "storage": {
+      "title": "Storage(Gi)",
+      "description": "Storage size, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 20,
+      "minimum": 1,
+      "maximum": 10000
+    }
+  }
+}

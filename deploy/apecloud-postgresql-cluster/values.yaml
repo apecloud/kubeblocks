@@ -1,0 +1,35 @@
+# Default values for apecloud-postgresql-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## @param version PostgreSQL cluster version
+##
+## TODO: Wait for ApeCloud PostgreSQL to determine the version number(and values.schema.json)
+version: ac-postgresql-latest
+
+## @param mode postgresql cluster topology mode, standalone, raftGroup
+##
+mode: standalone
+
+## @param replicas specify cluster replicas
+##
+replicas: 1
+
+## @param cpu
+##
+cpu: 0.5
+
+## @param memory, the unit is Gi
+##
+memory: 0.5
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
+## @param storage size, the unit is Gi
+##
+storage: 20

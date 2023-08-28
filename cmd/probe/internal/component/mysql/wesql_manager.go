@@ -157,8 +157,8 @@ func (mgr *WesqlManager) IsCurrentMemberInCluster(ctx context.Context, cluster *
 	return strings.Contains(clusterInfo, mgr.CurrentMemberName)
 }
 
-func (mgr *WesqlManager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	return false
+func (mgr *WesqlManager) IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) (bool, int64) {
+	return false, 0
 }
 
 func (mgr *WesqlManager) Recover(context.Context) error {

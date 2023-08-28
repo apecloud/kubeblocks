@@ -32,7 +32,11 @@ func IsHAAvailable(characterType, workloadType string) bool {
 	case "mongodb":
 		return true
 	case "mysql":
-		if strings.EqualFold(workloadType, Replication) {
+		if strings.EqualFold(workloadType, Replication) || strings.EqualFold(workloadType, Consensus) {
+			return true
+		}
+	case "postgresql":
+		if strings.EqualFold(workloadType, Consensus) {
 			return true
 		}
 	}

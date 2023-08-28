@@ -56,6 +56,9 @@ const (
 	RevokeUserRoleOp     bindings.OperationKind = "revokeUserRole"
 	ListSystemAccountsOp bindings.OperationKind = "listSystemAccounts"
 
+	JoinMemberOperation  bindings.OperationKind = "joinMember"
+	LeaveMemberOperation bindings.OperationKind = "leaveMember"
+
 	OperationNotImplemented = "NotImplemented"
 	OperationInvalid        = "Invalid"
 	OperationSuccess        = "Success"

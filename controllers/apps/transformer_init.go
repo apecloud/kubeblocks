@@ -37,6 +37,7 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.cluster, ObjCopy: t.originCluster, Action: ictrltypes.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
 
+	// TODO: why set cluster status phase here?
 	if t.cluster.IsUpdating() {
 		t.handleClusterPhase()
 	}

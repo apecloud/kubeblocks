@@ -19,10 +19,12 @@ package v1alpha1
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
@@ -80,6 +82,16 @@ var _ = Describe("", func() {
 
 	It("test IsDeleting", func() {
 		r := Cluster{}
+		Expect(r.IsDeleting()).Should(Equal(false))
+
+		r.Spec.TerminationPolicy = DoNotTerminate
+		Expect(r.IsDeleting()).Should(Equal(false))
+
+		r.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+		r.Spec.TerminationPolicy = ""
+		Expect(r.IsDeleting()).Should(Equal(true))
+
+		r.Spec.TerminationPolicy = DoNotTerminate
 		Expect(r.IsDeleting()).Should(Equal(false))
 	})
 

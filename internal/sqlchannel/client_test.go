@@ -20,12 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package sqlchannel
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -41,34 +39,6 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
-
-type testServer struct {
-	state                       map[string][]byte
-	configurationSubscriptionID map[string]chan struct{}
-	cachedRequest               map[string]*response
-}
-
-type response struct {
-	httpResponse *http.Response
-	err          error
-}
-
-func (s *testServer) InvokeBinding(ctx context.Context, req *http.Request) (*http.Response, error) {
-	time.Sleep(100 * time.Millisecond)
-	resp, ok := s.cachedRequest[GetMapKeyFromRequest(req)]
-	if ok {
-		return resp.httpResponse, nil
-	} else {
-		return nil, fmt.Errorf("unexpected request")
-	}
-}
-
-func (s *testServer) ExpectRequest(req *http.Request, resp *http.Response, err error) {
-	s.cachedRequest[GetMapKeyFromRequest(req)] = &response{
-		httpResponse: resp,
-		err:          err,
-	}
-}
 
 func TestNewClientWithPod(t *testing.T) {
 	port, closer := newTCPServer(t, 50001)
@@ -126,20 +96,11 @@ func TestGetRole(t *testing.T) {
 	portStr := addr[index+1:]
 	port, _ := strconv.Atoi(portStr)
 
-	server, cli, closer, err := initSQLChannelClient(port, t)
+	cli, closer, err := initSQLChannelClient(port, t)
 	if err != nil {
 		t.Errorf("new sql channel client error: %v", err)
 	}
 	defer closer()
-
-	requestBody := getRequestBody(GetRoleOperation, nil, t)
-	request, err := http.NewRequest(http.MethodGet, cli.Url, requestBody)
-	if err != nil {
-		t.Errorf("new request failed: %v", err)
-	}
-	response := &http.Response{Body: io.NopCloser(bytes.NewReader([]byte("{\"role\": \"leader\"}")))}
-
-	server.ExpectRequest(request, response, nil)
 
 	t.Run("ResponseInTime", func(t *testing.T) {
 		cli.ReconcileTimeout = 1 * time.Second
@@ -196,22 +157,11 @@ func TestSystemAccounts(t *testing.T) {
 	portStr := addr[index+1:]
 	port, _ := strconv.Atoi(portStr)
 
-	server, cli, closer, err := initSQLChannelClient(port, t)
+	cli, closer, err := initSQLChannelClient(port, t)
 	if err != nil {
 		t.Errorf("new sql channel client error: %v", err)
 	}
 	defer closer()
-
-	resp := &http.Response{
-		Body: io.NopCloser(bytes.NewReader(respData)),
-	}
-	requestBody := getRequestBody(ListSystemAccountsOp, nil, t)
-
-	request, err := http.NewRequest(http.MethodGet, cli.Url, requestBody)
-	if err != nil {
-		t.Errorf("new request error: %v", err)
-	}
-	server.ExpectRequest(request, resp, nil)
 
 	t.Run("ResponseByCache", func(t *testing.T) {
 		cli.ReconcileTimeout = 200 * time.Millisecond
@@ -227,34 +177,30 @@ func TestSystemAccounts(t *testing.T) {
 }
 
 func TestJoinMember(t *testing.T) {
-	sqlResponse := SQLChannelResponse{
-		Event: RespEveSucc,
-	}
-	respData, _ := json.Marshal(sqlResponse)
-	port := initHttpServer(respData)
-
-	server, cli, closer, err := initSQLChannelClient(port, t)
-	if err != nil {
-		t.Errorf("new sql channel client error: %v", err)
-	}
-	defer closer()
 
 	t.Run("Join Member success", func(t *testing.T) {
-		requestBody := getRequestBody(JoinMemberOperation, nil, t)
-		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
+		sqlResponse := SQLChannelResponse{
+			Event: RespEveSucc,
+		}
+		respData, _ := json.Marshal(sqlResponse)
+		port := initHttpServer(respData)
 
-		resp := &http.Response{Body: io.NopCloser(bytes.NewReader(respData))}
-
-		server.ExpectRequest(request, resp, nil)
+		cli, closer, err := initSQLChannelClient(port, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
 		err = cli.JoinMember(context.TODO())
 		assert.Nil(t, err)
 	})
 
 	t.Run("Join Member fail", func(t *testing.T) {
-		requestBody := getRequestBody(JoinMemberOperation, nil, t)
-		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
-		server.ExpectRequest(request, nil, errors.New("join member failed"))
+		cli, closer, err := initSQLChannelClient(-1, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
 		err = cli.JoinMember(context.TODO())
 		assert.NotNil(t, err)
@@ -262,32 +208,30 @@ func TestJoinMember(t *testing.T) {
 }
 
 func TestLeaveMember(t *testing.T) {
-	sqlResponse := SQLChannelResponse{
-		Event: RespEveSucc,
-	}
-	respData, _ := json.Marshal(sqlResponse)
-	port := initHttpServer(respData)
-
-	server, cli, closer, err := initSQLChannelClient(port, t)
-	if err != nil {
-		t.Errorf("new sql channel client error: %v", err)
-	}
-	defer closer()
 
 	t.Run("Leave Member success", func(t *testing.T) {
-		requestBody := getRequestBody(LeaveMemberOperation, nil, t)
-		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
-		resp := &http.Response{Body: io.NopCloser(bytes.NewReader(respData))}
-		server.ExpectRequest(request, resp, nil)
+		sqlResponse := SQLChannelResponse{
+			Event: RespEveSucc,
+		}
+		respData, _ := json.Marshal(sqlResponse)
+		port := initHttpServer(respData)
+
+		cli, closer, err := initSQLChannelClient(port, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
 		err = cli.LeaveMember(context.TODO())
 		assert.Nil(t, err)
 	})
 
-	t.Run("Join Member success", func(t *testing.T) {
-		requestBody := getRequestBody(LeaveMemberOperation, nil, t)
-		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
-		server.ExpectRequest(request, nil, errors.New("leave member failed"))
+	t.Run("Leave Member fail", func(t *testing.T) {
+		cli, closer, err := initSQLChannelClient(-1, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
 		err = cli.LeaveMember(context.TODO())
 		assert.NotNil(t, err)
@@ -363,13 +307,7 @@ func newTCPServer(t *testing.T, port int) (int, func()) {
 	return port, closer
 }
 
-func initSQLChannelClient(httpPort int, t *testing.T) (*testServer, *OperationClient, func(), error) {
-	server := &testServer{
-		state:                       make(map[string][]byte),
-		configurationSubscriptionID: map[string]chan struct{}{},
-		cachedRequest:               make(map[string]*response),
-	}
-
+func initSQLChannelClient(httpPort int, t *testing.T) (*OperationClient, func(), error) {
 	port, closer := newTCPServer(t, 50001)
 	podName := "pod-for-sqlchannel-test"
 	pod := testapps.NewPodFactory("default", podName).
@@ -391,22 +329,7 @@ func initSQLChannelClient(httpPort int, t *testing.T) (*testServer, *OperationCl
 	if err != nil {
 		t.Errorf("new sql channel client error: %v", err)
 	}
-	return server, cli, closer, err
-}
-
-func getRequestBody(op OperationKind, metadata map[string]string, t *testing.T) io.Reader {
-	reqBody := struct {
-		Operation string            `json:"operation"`
-		Metadata  map[string]string `json:"metadata"`
-	}{}
-	reqBody.Operation = string(op)
-	reqBody.Metadata = metadata
-
-	marshal, err := json.Marshal(reqBody)
-	if err != nil {
-		t.Errorf("marshal request body failed: %v", err)
-	}
-	return bytes.NewReader(marshal)
+	return cli, closer, err
 }
 
 func initHttpServer(resp []byte) int {

@@ -237,7 +237,16 @@ func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout con
 func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader, ch chan *OperationResult) {
 	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)
+	req, err := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)
+	if err != nil || req == nil {
+		operationRes := &OperationResult{
+			response: nil,
+			err:      err,
+			respTime: time.Now(),
+		}
+		ch <- operationRes
+		return
+	}
 
 	mapKey := GetMapKeyFromRequest(req)
 	operationRes, ok := cli.cache[mapKey]
@@ -255,8 +264,6 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 		err:      err,
 		respTime: time.Now(),
 	}
-	all, _ := io.ReadAll(resp.Body)
-	fmt.Println(string(all))
 	select {
 	case <-ctxWithReconcileTimeout.Done():
 		cli.cache[mapKey] = operationRes

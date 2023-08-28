@@ -265,9 +265,9 @@ func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.Cluste
 	return componentSpecs, nil
 }
 
-func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []appsv1alpha1.ClusterComponentSpec) (map[string]*corev1.ServiceAccount, map[string]struct{}, error) {
+func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []appsv1alpha1.ClusterComponentSpec) (map[string]*corev1.ServiceAccount, map[string]*corev1.ServiceAccount, error) {
 	serviceAccounts := map[string]*corev1.ServiceAccount{}
-	serviceAccountsNeedCrb := map[string]struct{}{}
+	serviceAccountsNeedCrb := map[string]*corev1.ServiceAccount{}
 	clusterDef := transCtx.ClusterDef
 	cluster := transCtx.Cluster
 	for _, compSpec := range componentSpecs {
@@ -285,17 +285,18 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 			}
 		}
 
-		if _, ok := serviceAccounts[serviceAccountName]; !ok {
-			serviceAccount, err := builder.BuildServiceAccount(cluster)
-			serviceAccount.Name = serviceAccountName
-			if err != nil {
-				return nil, nil, err
-			}
-			serviceAccounts[serviceAccountName] = serviceAccount
+		if _, ok := serviceAccounts[serviceAccountName]; ok {
+			continue
 		}
+		serviceAccount, err := builder.BuildServiceAccount(cluster)
+		serviceAccount.Name = serviceAccountName
+		if err != nil {
+			return nil, nil, err
+		}
+		serviceAccounts[serviceAccountName] = serviceAccount
 
 		if isVolumeProtectionEnabled(clusterDef, &compSpec) {
-			serviceAccountsNeedCrb[serviceAccountName] = struct{}{}
+			serviceAccountsNeedCrb[serviceAccountName] = serviceAccount
 		}
 	}
 	return serviceAccounts, serviceAccountsNeedCrb, nil
@@ -318,7 +319,7 @@ func buildReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]
 	return roleBinding, nil
 }
 
-func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]struct{}) (*rbacv1.ClusterRoleBinding, error) {
+func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.ClusterRoleBinding, error) {
 	clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
 	if err != nil {
 		return nil, err

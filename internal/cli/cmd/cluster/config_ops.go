@@ -21,9 +21,11 @@ package cluster
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -45,9 +47,12 @@ type configOpsOptions struct {
 	editMode bool
 	wrapper  *configWrapper
 
+	// config file replace
+	replaceFile bool
+
 	// Reconfiguring options
 	ComponentName string
-	URLPath       string   `json:"urlPath"`
+	LocalFilePath string   `json:"localFilePath"`
 	Parameters    []string `json:"parameters"`
 }
 
@@ -68,11 +73,9 @@ func (o *configOpsOptions) Complete() error {
 	}
 
 	if !o.editMode {
-		kvs, err := o.parseUpdatedParams()
-		if err != nil {
+		if err := o.validateReconfigureOptions(); err != nil {
 			return err
 		}
-		o.KeyValues = kvs
 	}
 
 	wrapper, err := newConfigWrapper(o.CreateOptions, o.Name, o.ComponentName, o.CfgTemplateName, o.CfgFile, o.KeyValues)
@@ -84,9 +87,29 @@ func (o *configOpsOptions) Complete() error {
 	return wrapper.AutoFillRequiredParam()
 }
 
+func (o *configOpsOptions) validateReconfigureOptions() error {
+	if o.LocalFilePath != "" && o.CfgFile == "" {
+		return cfgcore.MakeError("config file is required when using --local-file")
+	}
+	if o.LocalFilePath != "" {
+		b, err := os.ReadFile(o.LocalFilePath)
+		if err != nil {
+			return err
+		}
+		o.FileContent = string(b)
+	} else {
+		kvs, err := o.parseUpdatedParams()
+		if err != nil {
+			return err
+		}
+		o.KeyValues = cfgcore.FromStringPointerMap(kvs)
+	}
+	return nil
+}
+
 // Validate command flags or args is legal
 func (o *configOpsOptions) Validate() error {
-	if err := o.wrapper.ValidateRequiredParam(); err != nil {
+	if err := o.wrapper.ValidateRequiredParam(o.replaceFile); err != nil {
 		return err
 	}
 
@@ -98,6 +121,9 @@ func (o *configOpsOptions) Validate() error {
 		return nil
 	}
 	if err := o.validateConfigParams(o.wrapper.ConfigTemplateSpec()); err != nil {
+		return err
+	}
+	if err := util.ValidateParametersModified(o.wrapper.ConfigTemplateSpec(), sets.KeySet(o.KeyValues), o.Dynamic); err != nil {
 		return err
 	}
 	o.printConfigureTips()
@@ -114,10 +140,16 @@ func (o *configOpsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfi
 		return err
 	}
 
-	newConfigData, err := cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
-		Key:           o.CfgFile,
-		UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
-	}})
+	var err error
+	var newConfigData map[string]string
+	if o.FileContent != "" {
+		newConfigData = map[string]string{o.CfgFile: o.FileContent}
+	} else {
+		newConfigData, err = cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
+			Key:           o.CfgFile,
+			UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
+		}})
+	}
 	if err != nil {
 		return err
 	}
@@ -137,9 +169,12 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 		return o.confirmReconfigureWithRestart()
 	}
 
-	configPatch, _, err := cfgcore.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, false)
+	configPatch, restart, err := cfgcore.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, o.FileContent != "")
 	if err != nil {
 		return err
+	}
+	if restart {
+		return o.confirmReconfigureWithRestart()
 	}
 
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(cc, configPatch)
@@ -169,7 +204,7 @@ func (o *configOpsOptions) confirmReconfigureWithRestart() error {
 }
 
 func (o *configOpsOptions) parseUpdatedParams() (map[string]string, error) {
-	if len(o.Parameters) == 0 && len(o.URLPath) == 0 {
+	if len(o.Parameters) == 0 && len(o.LocalFilePath) == 0 {
 		return nil, cfgcore.MakeError(missingUpdatedParametersErrMessage)
 	}
 
@@ -205,6 +240,9 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmd
 	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 	flags.AddComponentsFlag(f, cmd, false, &o.ComponentName, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
+	cmd.Flags().BoolVar(&o.ForceRestart, "force-restart", false, "Boolean flag to restart component. Default with false.")
+	cmd.Flags().StringVar(&o.LocalFilePath, "local-file", "", "Specify the local configuration file to be updated.")
+	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 }
 
 // NewReconfigureCmd creates a Reconfiguring command

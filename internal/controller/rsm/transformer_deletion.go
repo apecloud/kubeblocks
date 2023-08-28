@@ -22,9 +22,9 @@ package rsm
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // ObjectDeletionTransformer handles object and its secondary resources' deletion
@@ -44,16 +44,32 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: obj.Name}
+	ml := getLabels(obj)
 	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, deletionKinds()...)
 	if err != nil {
 		return err
 	}
 	for _, object := range snapshot {
+		if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+			if !managedByRSM(object) {
+				continue
+			}
+		}
 		graphCli.Delete(dag, object)
 	}
 	graphCli.Delete(dag, obj)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
+}
+
+func managedByRSM(object client.Object) bool {
+	labels := object.GetLabels()
+	if labels == nil {
+		return false
+	}
+	if manager, ok := labels[workloadsManagedByLabelKey]; ok && manager == kindReplicatedStateMachine {
+		return true
+	}
+	return false
 }

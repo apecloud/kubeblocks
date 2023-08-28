@@ -23,7 +23,7 @@ import (
 	"fmt"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/spf13/viper"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type Cluster struct {
@@ -32,11 +32,10 @@ type Cluster struct {
 	Replicas        int32
 	HaConfig        *HaConfig
 	Leader          *Leader
-	OpTime          int64
 	Members         []Member
 	Switchover      *Switchover
 	Extra           map[string]string
-	resource        interface{}
+	resource        any
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -89,10 +88,6 @@ func (c *Cluster) IsLocked() bool {
 	return c.Leader != nil && c.Leader.Name != ""
 }
 
-func (c *Cluster) GetOpTime() int64 {
-	return c.OpTime
-}
-
 func (c *Cluster) GetMemberAddrWithPort(member Member) string {
 	addr := c.GetMemberAddr(member)
 	return fmt.Sprintf("%s:%s", addr, member.DBPort)
@@ -111,10 +106,17 @@ func (c *Cluster) GetMemberAddrs() []string {
 	return hosts
 }
 
+type MemberToDelete struct {
+	UID        string
+	IsFinished bool
+}
+
 type HaConfig struct {
 	index              string
 	ttl                int
 	maxLagOnSwitchover int64
+	DeleteMembers      map[string]MemberToDelete
+	resource           any
 }
 
 func (c *HaConfig) GetTTL() int {
@@ -125,15 +127,59 @@ func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 	return c.maxLagOnSwitchover
 }
 
+func (c *HaConfig) IsDeleting(member *Member) bool {
+	memberToDelete := c.GetMemberToDelete(member)
+	return memberToDelete != nil
+}
+
+func (c *HaConfig) IsDeleted(member *Member) bool {
+	memberToDelete := c.GetMemberToDelete(member)
+	if memberToDelete == nil {
+		return false
+	}
+	return memberToDelete.IsFinished
+}
+
+func (c *HaConfig) FinishDeleted(member *Member) {
+	memberToDelete := c.GetMemberToDelete(member)
+	memberToDelete.IsFinished = true
+	c.DeleteMembers[member.Name] = *memberToDelete
+}
+
+func (c *HaConfig) GetMemberToDelete(member *Member) *MemberToDelete {
+	memberToDelete, ok := c.DeleteMembers[member.Name]
+	if !ok {
+		return nil
+	}
+
+	if memberToDelete.UID != member.UID {
+		return nil
+	}
+	return &memberToDelete
+}
+
+func (c *HaConfig) AddMemberToDelete(member *Member) {
+	memberToDelete := MemberToDelete{
+		UID:        member.UID,
+		IsFinished: false,
+	}
+	c.DeleteMembers[member.Name] = memberToDelete
+}
+
 type Leader struct {
+	DBState     *DBState
 	Index       string
 	Name        string
 	AcquireTime int64
 	RenewTime   int64
 	TTL         int
-	Resource    interface{}
+	Resource    any
 }
 
+type DBState struct {
+	OpTimestamp int64
+	Extra       map[string]string
+}
 type Member struct {
 	Index          string
 	Name           string
@@ -141,6 +187,8 @@ type Member struct {
 	PodIP          string
 	DBPort         string
 	SQLChannelPort string
+	UID            string
+	resource       any
 }
 
 func (m *Member) GetName() string {

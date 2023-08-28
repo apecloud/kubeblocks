@@ -1,0 +1,14 @@
+Example routines to install neon and neon-cluster using helm.
+0.Install cert-manager
+
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+
+1. Install neon and neon-cluster
+helm install neon ./deploy/neon
+helm install neon-cluster ./deploy/neon-cluster
+
+2. Port-forward svc to localhost
+kubectl port-forward svc/neon-cluster-neon-compute-headless 55432:55432
+
+3.connect to neon
+psql postgresql://cloud_admin@localhost:55432/postgres

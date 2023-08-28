@@ -38,7 +38,9 @@ import (
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // MysqlOperations represents MySQL output bindings.
@@ -115,11 +117,19 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	workloadType := request.Metadata[WorkloadTypeKey]
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if strings.EqualFold(workloadType, Replication) {
-		return mysqlOps.GetRoleForReplication(ctx, request, response)
+		dcsStore := dcs.GetStore()
+		if dcsStore == nil {
+			return "", nil
+		}
+		k8sStore := dcsStore.(*dcs.KubernetesStore)
+		cluster := k8sStore.GetClusterFromCache()
+		if cluster == nil || !cluster.IsLocked() {
+			return "", nil
+		}
 	}
-	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+	return mysqlOps.manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
@@ -139,29 +149,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 		return SECONDARY, nil
 	}
 
-	getReadOnlySQL := `show global variables like 'read_only';`
-	data, err := mysqlOps.query(ctx, getReadOnlySQL)
-	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySQL, err)
-		return "", errors.Wrapf(err, "error executing %s", getReadOnlySQL)
-	}
-
-	queryRes := &QueryRes{}
-	err = json.Unmarshal(data, queryRes)
-	if err != nil {
-		return "", errors.Errorf("parse query failed, err:%v", err)
-	}
-
-	for _, mapVal := range *queryRes {
-		if mapVal["Variable_name"] == "read_only" {
-			if mapVal["Value"].(string) == "OFF" {
-				return PRIMARY, nil
-			} else if mapVal["Value"].(string) == "ON" {
-				return SECONDARY, nil
-			}
-		}
-	}
-	return "", errors.Errorf("parse query failed, no records")
+	return PRIMARY, nil
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {

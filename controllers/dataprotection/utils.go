@@ -27,7 +27,6 @@ import (
 	"sync"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +38,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var (
@@ -94,6 +94,10 @@ func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 }
 
+func excludeLabelsForWorkload() []string {
+	return []string{constant.KBAppComponentLabelKey}
+}
+
 func buildAutoCreationAnnotations(backupPolicyName string) map[string]string {
 	return map[string]string{
 		dataProtectionAnnotationCreateByPolicyKey: "true",
@@ -116,7 +120,7 @@ func buildBackupWorkloadsLabels(backup *dataprotectionv1alpha1.Backup) map[strin
 	if labels == nil {
 		labels = map[string]string{}
 	} else {
-		for _, v := range getClusterLabelKeys() {
+		for _, v := range excludeLabelsForWorkload() {
 			delete(labels, v)
 		}
 	}

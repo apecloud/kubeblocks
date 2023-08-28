@@ -31,11 +31,11 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
@@ -364,17 +364,10 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 		return opsRes, nil
 	}
 
-	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
-	if characterType == "" {
+	manager, err := component.GetDefaultManager()
+	if err != nil {
 		opsRes["event"] = OperationFailed
-		opsRes["message"] = "KB_SERVICE_CHARACTER_TYPE not set"
-		return opsRes, nil
-	}
-
-	manager := component.GetManager(characterType)
-	if manager == nil {
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = fmt.Sprintf("No DB Manager for character type %s", characterType)
+		opsRes["message"] = err.Error()
 		return opsRes, nil
 	}
 

@@ -43,11 +43,6 @@ spec:
         containerName: postgresql
         preCommands:
           - psql -c "CHECKPOINT;"
-      backupStatusUpdates:
-        - path: manifests.backupLog
-          containerName: postgresql
-          script: /kb-scripts/backup-info-collector.sh
-          updateStage: post
     datafile:
       backupToolName: postgres-basebackup
       backupStatusUpdates:

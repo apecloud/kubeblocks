@@ -46,7 +46,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
-	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -58,6 +57,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -73,7 +73,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // CloseQuietly closes `io.Closer` quietly. Very handy and helpful for code
@@ -526,7 +528,7 @@ func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) boo
 }
 
 // IsSupportReconfigureParams checks whether all updated parameters belong to config template parameters.
-func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
+func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]*string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
 		configConstraint = appsv1alpha1.ConfigConstraint{}
@@ -561,6 +563,31 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 		}
 	}
 	return true, nil
+}
+
+func ValidateParametersModified(tpl *appsv1alpha1.ComponentConfigSpec, parameters sets.Set[string], cli dynamic.Interface) (err error) {
+	cc := appsv1alpha1.ConfigConstraint{}
+	ccKey := client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}
+	if err = GetResourceObjectFromGVR(types.ConfigConstraintGVR(), ccKey, cli, &cc); err != nil {
+		return
+	}
+	return ValidateParametersModified2(parameters, cc.Spec)
+}
+
+func ValidateParametersModified2(parameters sets.Set[string], cc appsv1alpha1.ConfigConstraintSpec) error {
+	if len(cc.ImmutableParameters) == 0 {
+		return nil
+	}
+
+	immutableParameters := sets.New(cc.ImmutableParameters...)
+	uniqueParameters := immutableParameters.Intersection(parameters)
+	if uniqueParameters.Len() == 0 {
+		return nil
+	}
+	return cfgcore.MakeError("parameter[%v] is immutable, cannot be modified!", cfgutil.ToSet(uniqueParameters).AsSlice())
 }
 
 func GetIPLocation() (string, error) {

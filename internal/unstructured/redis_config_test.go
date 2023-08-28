@@ -111,6 +111,24 @@ func TestRedisConfigGetAllParameters(t *testing.T) {
 			"a d 1":   "2",
 			"a d e":   "1 2",
 		},
+	}, {
+		name: "multi field update and delete test",
+		fn: func() ConfigObject {
+			c, _ := LoadConfig("test", "", appsv1alpha1.RedisCfg)
+			_ = c.Update("port", "123")
+			_ = c.Update("a b", "123 234")
+			_ = c.Update("a c", "345")
+			_ = c.Update("a d", "1 2")
+			_ = c.Update("a d e", "1 2")
+			_ = c.RemoveKey("a d e")
+			_ = c.RemoveKey("a b")
+			_ = c.RemoveKey("port")
+			return c
+		},
+		want: map[string]interface{}{
+			"a c": "345",
+			"a d": "1 2",
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -79,9 +79,11 @@ type OperationsOptions struct {
 	Replicas int `json:"replicas"`
 
 	// Reconfiguring options
-	KeyValues       map[string]string `json:"keyValues"`
-	CfgTemplateName string            `json:"cfgTemplateName"`
-	CfgFile         string            `json:"cfgFile"`
+	KeyValues       map[string]*string `json:"keyValues"`
+	CfgTemplateName string             `json:"cfgTemplateName"`
+	CfgFile         string             `json:"cfgFile"`
+	ForceRestart    bool               `json:"forceRestart"`
+	FileContent     string             `json:"fileContent"`
 
 	// VolumeExpansion options.
 	// VCTNames VolumeClaimTemplate names
@@ -109,7 +111,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 
 	o := &OperationsOptions{
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
-		KeyValues:             map[string]string{},
+		KeyValues:             map[string]*string{},
 		OpsType:               opsType,
 		HasComponentNamesFlag: hasComponentNamesFlag,
 		autoApprove:           false,

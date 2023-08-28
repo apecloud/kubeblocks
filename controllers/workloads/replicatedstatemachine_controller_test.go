@@ -25,6 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -44,7 +46,15 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 					},
 				},
 			}
+			commonLabels := map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "ClusterDefName",
+				constant.AppComponentLabelKey:   "CompDefName",
+				constant.AppInstanceLabelKey:    "clusterName",
+				constant.KBAppComponentLabelKey: "componentName",
+			}
 			pod := builder.NewPodBuilder(testCtx.DefaultNamespace, "foo").
+				AddLabelsInMap(commonLabels).
 				AddContainer(corev1.Container{
 					Name:  "foo",
 					Image: "bar",
@@ -65,9 +75,10 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				Command: []string{"bar"},
 			}
 			rsm := builder.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
+				AddMatchLabelsInMap(commonLabels).
 				SetService(service).
 				SetTemplate(template).
-				AddObservationAction(action).
+				AddProbeAction(action).
 				GetObject()
 			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm),

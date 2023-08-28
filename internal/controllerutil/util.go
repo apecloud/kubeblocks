@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // GetUncachedObjects returns a list of K8s objects, for these object types,
@@ -82,4 +84,13 @@ func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
 // val.
 func (r *RequestCtx) WithValue(key, val any) context.Context {
 	return context.WithValue(r.Ctx, key, val)
+}
+
+// IsRSMEnabled enables rsm by default.
+// respect the feature gate if set, keep the ability to disable it.
+func IsRSMEnabled() bool {
+	if viper.IsSet(constant.FeatureGateReplicatedStateMachine) {
+		return viper.GetBool(constant.FeatureGateReplicatedStateMachine)
+	}
+	return true
 }

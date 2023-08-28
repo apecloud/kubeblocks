@@ -329,7 +329,7 @@ func TestMerge(t *testing.T) {
 
 func TestString(t *testing.T) {
 	dag := newTestDAG()
-	str := dag.String(nil)
+	str := dag.String()
 	expectedOrder := []string{"|", "4", "5", "1", "10", "12", "11", "9", "6", "0", "3", "2", "7", "8"}
 	expectedStr := strings.Join(expectedOrder, "->")
 	if str != expectedStr {

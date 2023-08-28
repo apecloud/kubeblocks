@@ -22,6 +22,7 @@ package builder
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -91,6 +92,14 @@ var _ = Describe("stateful_set builder", func() {
 				},
 			},
 		}
+		partition, maxUnavailable := int32(3), intstr.FromInt(2)
+		strategy := apps.StatefulSetUpdateStrategy{
+			Type: apps.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+				Partition:      &partition,
+				MaxUnavailable: &maxUnavailable,
+			},
+		}
 		strategyType := apps.OnDeleteStatefulSetStrategyType
 		sts := NewStatefulSetBuilder(ns, name).
 			AddMatchLabel(selectorKey1, selectorValue1).
@@ -103,13 +112,14 @@ var _ = Describe("stateful_set builder", func() {
 			SetTemplate(template).
 			SetVolumeClaimTemplates(vcs...).
 			AddVolumeClaimTemplates(vc).
+			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
 			GetObject()
 
 		Expect(sts.Name).Should(Equal(name))
 		Expect(sts.Namespace).Should(Equal(ns))
 		Expect(sts.Spec.Selector).ShouldNot(BeNil())
-		Expect(len(sts.Spec.Selector.MatchLabels)).Should(Equal(4))
+		Expect(sts.Spec.Selector.MatchLabels).Should(HaveLen(4))
 		Expect(sts.Spec.Selector.MatchLabels[selectorKey1]).Should(Equal(selectorValue1))
 		Expect(sts.Spec.Selector.MatchLabels[selectorKey2]).Should(Equal(selectorValue2))
 		Expect(sts.Spec.Selector.MatchLabels[selectorKey3]).Should(Equal(selectorValue3))
@@ -119,10 +129,20 @@ var _ = Describe("stateful_set builder", func() {
 		Expect(*sts.Spec.Replicas).Should(Equal(replicas))
 		Expect(sts.Spec.PodManagementPolicy).Should(Equal(policy))
 		Expect(sts.Spec.Template).Should(Equal(template))
-		Expect(len(sts.Spec.VolumeClaimTemplates)).Should(Equal(2))
+		Expect(sts.Spec.VolumeClaimTemplates).Should(HaveLen(2))
 		Expect(sts.Spec.VolumeClaimTemplates[0]).Should(Equal(vcs[0]))
 		Expect(sts.Spec.VolumeClaimTemplates[1]).Should(Equal(vc))
 		Expect(sts.Spec.UpdateStrategy.Type).Should(Equal(strategyType))
+		Expect(sts.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
+		Expect(sts.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(BeNil())
+		Expect(*sts.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
+		Expect(sts.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
+		Expect(sts.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
 
+		labelSelector := &metav1.LabelSelector{
+			MatchLabels: selectors,
+		}
+		sts = NewStatefulSetBuilder(ns, name).SetSelector(labelSelector).GetObject()
+		Expect(sts.Spec.Selector).Should(Equal(labelSelector))
 	})
 })

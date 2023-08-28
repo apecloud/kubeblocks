@@ -1,26 +1,4 @@
 #!/bin/bash
-drop_followers() {
-echo "leader=$leader" >> /data/mysql/.kb_pre_stop.log
-echo "KB_POD_NAME=$KB_POD_NAME" >> /data/mysql/.kb_pre_stop.log
-if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" ]; then
-  echo "no leader or self is leader, exit" >> /data/mysql/.kb_pre_stop.log
-  exit 0
-fi
-host=$(eval echo \$KB_"$idx"_HOSTNAME)
-echo "host=$host" >> /data/mysql/.kb_pre_stop.log
-leader_idx=${leader##*-}
-leader_host=$(eval echo \$KB_"$leader_idx"_HOSTNAME)
-if [ ! -z $leader_host ]; then 
-  host_flag="-h$leader_host"
-fi
-if [ ! -z $MYSQL_ROOT_PASSWORD ]; then 
-  password_flag="-p$MYSQL_ROOT_PASSWORD"
-fi
-echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.downgrade_follower('$host:13306');\" 2>&1 " >> /data/mysql/.kb_pre_stop.log
-mysql $host_flag -uroot $password_flag -e "call dbms_consensus.downgrade_follower('$host:13306');" 2>&1
-echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.drop_learner('$host:13306');\" 2>&1 " >> /data/mysql/.kb_pre_stop.log
-mysql $host_flag -uroot $password_flag -e "call dbms_consensus.drop_learner('$host:13306');" 2>&1
-}
 
 set_my_weight_to_zero() {
   if [ ! -z $MYSQL_ROOT_PASSWORD ]; then 
@@ -95,8 +73,6 @@ if [ ! $idx -lt $current_component_replicas ] && [ $current_component_replicas -
     # set wegiht to 0 and switch leader before leader scaling in itself
     set_my_weight_to_zero
     switchover
-    # only scaling in need to drop followers
-    drop_followers
 elif [ $current_component_replicas -eq 0 ]; then
     # stop, do nothing.
     echo "stop, do nothing" >> /data/mysql/.kb_pre_stop.log

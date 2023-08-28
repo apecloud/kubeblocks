@@ -30,18 +30,38 @@ import (
 
 // ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
 type ReplicatedStateMachineSpec struct {
-	// Replicas defines number of Pods
+	// replicas is the desired number of replicas of the given Template.
+	// These are replicas in the sense that they are instantiations of the
+	// same Template, but individual replicas also have a consistent identity.
+	// If unspecified, defaults to 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// selector is a label query over pods that should match the replica count.
+	// It must match the pod template's labels.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	Selector *metav1.LabelSelector `json:"selector"`
+
+	// serviceName is the name of the service that governs this StatefulSet.
+	// This service must exist before the StatefulSet, and is responsible for
+	// the network identity of the set. Pods get DNS/hostnames that follow the
+	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
+	// where "pod-specific-string" is managed by the StatefulSet controller.
+	ServiceName string `json:"serviceName"`
 
 	// service defines the behavior of a service spec.
 	// provides read-write service
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +kubebuilder:pruning:PreserveUnknownFields
-	// +kubebuilder:validation:Required
-	Service corev1.ServiceSpec `json:"service"`
+	// +optional
+	Service *corev1.ServiceSpec `json:"service,omitempty"`
+
+	// AlternativeServices defines Alternative Services selector pattern specifier.
+	// can be used for creating Readonly service.
+	// +optional
+	AlternativeServices []corev1.Service `json:"alternativeServices,omitempty"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
 
@@ -54,28 +74,44 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
-	// Roles, a list of roles defined in the system.
-	// +kubebuilder:validation:Required
-	Roles []ReplicaRole `json:"roles"`
+	// podManagementPolicy controls how pods are created during initial scale up,
+	// when replacing pods on nodes, or when scaling down. The default policy is
+	// `OrderedReady`, where pods are created in increasing order (pod-0, then
+	// pod-1, etc) and the controller will wait until each pod is ready before
+	// continuing. When scaling down, the pods are removed in the opposite order.
+	// The alternative policy is `Parallel` which will create pods in parallel
+	// to match the desired scale without waiting, and on scale down will delete
+	// all pods at once.
+	// +optional
+	PodManagementPolicy appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 
-	// RoleObservation provides method to observe role.
-	// +kubebuilder:validation:Required
-	RoleObservation RoleObservation `json:"roleObservation"`
+	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
+	// employed to update Pods in the RSM when a revision is made to
+	// Template.
+	// UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
+	UpdateStrategy appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// Roles, a list of roles defined in the system.
+	// +optional
+	Roles []ReplicaRole `json:"roles,omitempty"`
+
+	// RoleProbe provides method to probe role.
+	// +optional
+	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
 	// MembershipReconfiguration provides actions to do membership dynamic reconfiguration.
 	// +optional
 	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
 
-	// UpdateStrategy, Pods update strategy.
-	// serial: update Pods one by one that guarantee minimum component unavailable time.
+	// MemberUpdateStrategy, Members(Pods) update strategy.
+	// serial: update Members one by one that guarantee minimum component unavailable time.
 	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
+	// bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
 	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
 	// parallel: force parallel
-	// +kubebuilder:default=Serial
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
-	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 
 	// Credential used to connect to DB engine
 	// +optional
@@ -160,19 +196,19 @@ const (
 	NoneMode      AccessMode = "None"
 )
 
-// UpdateStrategy defines Cluster Component update strategy.
+// MemberUpdateStrategy defines Cluster Component update strategy.
 // +enum
-type UpdateStrategy string
+type MemberUpdateStrategy string
 
 const (
-	SerialUpdateStrategy             UpdateStrategy = "Serial"
-	BestEffortParallelUpdateStrategy UpdateStrategy = "BestEffortParallel"
-	ParallelUpdateStrategy           UpdateStrategy = "Parallel"
+	SerialUpdateStrategy             MemberUpdateStrategy = "Serial"
+	BestEffortParallelUpdateStrategy MemberUpdateStrategy = "BestEffortParallel"
+	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
 )
 
-// RoleObservation defines how to observe role
-type RoleObservation struct {
-	// ObservationActions define Actions to be taken in serial.
+// RoleProbe defines how to observe role
+type RoleProbe struct {
+	// ProbeActions define Actions to be taken in serial.
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// Environment variables can be used in Command:
@@ -180,37 +216,36 @@ type RoleObservation struct {
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
 	// +kubebuilder:validation:Required
-	ObservationActions []Action `json:"observationActions"`
+	ProbeActions []Action `json:"probeActions"`
 
-	// Number of seconds after the container has started before role observation has started.
+	// Number of seconds after the container has started before role probe has started.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
 
-	// Number of seconds after which the observation times out.
+	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 
-	// How often (in seconds) to perform the observation.
+	// How often (in seconds) to perform the probe.
 	// Default to 2 seconds. Minimum value is 1.
 	// +kubebuilder:default=2
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
 
-	// Minimum consecutive successes for the observation to be considered successful after having failed.
-	// Minimum consecutive successes for the observation to be considered successful after having failed.
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Defaults to 1. Minimum value is 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	SuccessThreshold int32 `json:"successThreshold,omitempty"`
 
-	// Minimum consecutive failures for the observation to be considered failed after having succeeded.
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// Defaults to 3. Minimum value is 1.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=1

@@ -133,7 +133,7 @@ spec:
             - |
               set -x
               /kb-scripts/merge_pulsar_config.py conf/client.conf /opt/pulsar/client-conf/client.conf && \
-              cp /opt/pulsar/conf/broker.conf conf/broker.conf && \
+              /kb-scripts/merge_pulsar_config.py conf/broker.conf /opt/pulsar/conf/broker.conf && \
               bin/apply-config-from-env.py conf/broker.conf && \
               bin/apply-config-from-env.py conf/client.conf && \
               echo 'OK' > status;exec bin/pulsar broker

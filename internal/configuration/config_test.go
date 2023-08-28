@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 var iniConfig = `
@@ -188,13 +189,13 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			Parameters: []ParameterPair{
 				{
 					Key:   "mysqld.max_connections",
-					Value: "666",
+					Value: util.ToPointer("666"),
 				}, {
 					Key:   "mysqld.read_buffer_size",
-					Value: "55288",
+					Value: util.ToPointer("55288"),
 				}, {
 					Key:   "mysqld.delete_params",
-					Value: "",
+					Value: nil,
 				}},
 		}},
 	}, {
@@ -216,13 +217,13 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			Parameters: []ParameterPair{
 				{
 					Key:   "max_connections",
-					Value: "666",
+					Value: util.ToPointer("666"),
 				}, {
 					Key:   "read_buffer_size",
-					Value: "55288",
+					Value: util.ToPointer("55288"),
 				}, {
 					Key:   "delete_params",
-					Value: "",
+					Value: nil,
 				}},
 		}},
 	}, {
@@ -245,10 +246,10 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			Parameters: []ParameterPair{
 				{
 					Key:   "max_connections",
-					Value: "666",
+					Value: util.ToPointer("666"),
 				}, {
 					Key:   "read_buffer_size",
-					Value: "55288",
+					Value: util.ToPointer("55288"),
 				}},
 		}},
 	}, {
@@ -271,10 +272,10 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			Parameters: []ParameterPair{
 				{
 					Key:   "max_connections",
-					Value: "666",
+					Value: util.ToPointer("666"),
 				}, {
 					Key:   "read_buffer_size",
-					Value: "55288",
+					Value: util.ToPointer("55288"),
 				}},
 		}},
 	}}

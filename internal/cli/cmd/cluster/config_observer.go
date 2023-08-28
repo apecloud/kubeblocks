@@ -128,7 +128,7 @@ func (r *configObserverOptions) printComponentConfigSpecsDescribe(objects *Confi
 	if !ok {
 		return cfgcore.MakeError("not found component: %s", component)
 	}
-	configs, err := r.getReconfigureMeta(objects, configSpecs)
+	configs, err := r.getReconfigureMeta(configSpecs)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (r *configObserverOptions) printComponentConfigSpecsDescribe(objects *Confi
 func (r *configObserverOptions) printComponentExplainConfigure(objects *ConfigRelatedObjects, component string) error {
 	configSpecs := r.configSpecs
 	if len(configSpecs) == 0 {
-		configSpecs = objects.ConfigSpecs[component].listConfigSpecs()
+		configSpecs = objects.ConfigSpecs[component].listConfigSpecs(true)
 	}
 	for _, templateName := range configSpecs {
 		fmt.Println("template meta:")
@@ -151,14 +151,14 @@ func (r *configObserverOptions) printComponentExplainConfigure(objects *ConfigRe
 			printer.NewPair("ComponentName", component),
 			printer.NewPair("ClusterName", r.clusterName),
 		)
-		if err := r.printExplainConfigure(objects, objects.ConfigSpecs[component], templateName); err != nil {
+		if err := r.printExplainConfigure(objects.ConfigSpecs[component], templateName); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *configObserverOptions) printExplainConfigure(objects *ConfigRelatedObjects, configSpecs configSpecsType, tplName string) error {
+func (r *configObserverOptions) printExplainConfigure(configSpecs configSpecsType, tplName string) error {
 	tpl := configSpecs.findByName(tplName)
 	if tpl == nil {
 		return nil
@@ -189,11 +189,11 @@ func (r *configObserverOptions) printExplainConfigure(objects *ConfigRelatedObje
 	return r.printConfigConstraint(schema.Schema, set.NewLinkedHashSetString(confSpec.StaticParameters...), set.NewLinkedHashSetString(confSpec.DynamicParameters...))
 }
 
-func (r *configObserverOptions) getReconfigureMeta(objects *ConfigRelatedObjects, configSpecs configSpecsType) ([]types.ConfigTemplateInfo, error) {
+func (r *configObserverOptions) getReconfigureMeta(configSpecs configSpecsType) ([]types.ConfigTemplateInfo, error) {
 	configs := make([]types.ConfigTemplateInfo, 0)
 	configList := r.configSpecs
 	if len(configList) == 0 {
-		configList = configSpecs.listConfigSpecs()
+		configList = configSpecs.listConfigSpecs(false)
 	}
 	for _, tplName := range configList {
 		tpl := configSpecs.findByName(tplName)

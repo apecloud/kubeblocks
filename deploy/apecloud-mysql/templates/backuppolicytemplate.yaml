@@ -28,16 +28,11 @@ spec:
       hooks:
         containerName: mysql
         preCommands:
-        - touch /data/mysql/data/.restore_new_cluster; printf $(date +'%FT%TZ') > /data/mysql/backup-datetime; sync
+        - touch /data/mysql/data/.restore_new_cluster; sync
         postCommands:
-        - "rm -f /data/mysql/data/.restore_new_cluster /data/mysql/backup-datetime; sync"
+        - "rm -f /data/mysql/data/.restore_new_cluster; sync"
       target:
         role: leader
-      backupStatusUpdates:
-        - path: manifests.backupLog
-          containerName: mysql
-          script: /scripts/snapshot-backup-collector.sh
-          updateStage: post
     datafile:
       backupToolName: xtrabackup-for-apecloud-mysql
       backupStatusUpdates:

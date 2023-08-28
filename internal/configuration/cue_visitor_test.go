@@ -196,24 +196,24 @@ func TestTransNumberOrBoolType(t *testing.T) {
 		name: "testInt",
 		args: args{
 			t:        IntType,
-			objs:     []string{"100", "-100", "0", "-1", "1"},
-			expected: []interface{}{100, -100, 0, -1, 1},
+			objs:     []string{"100", "-100", "0", "-1", "1", ""},
+			expected: []interface{}{100, -100, 0, -1, 1, nil},
 		},
 		wantErr: false,
 	}, {
 		name: "testFloat",
 		args: args{
 			t:        FloatType,
-			objs:     []string{"100.1", "-100.2", "0", "-1.11", "1.11", "1000"},
-			expected: []interface{}{100.1, -100.2, 0, -1.11, 1.11, 1000.0},
+			objs:     []string{"100.1", "-100.2", "0", "-1.11", "1.11", "1000", ""},
+			expected: []interface{}{100.1, -100.2, 0, -1.11, 1.11, 1000.0, nil},
 		},
 		wantErr: false,
 	}, {
 		name: "testBool",
 		args: args{
 			t:        BoolType,
-			objs:     []string{"true", "1", "0", "false", "t", "f"},
-			expected: []interface{}{true, true, false, false, true, false},
+			objs:     []string{"true", "1", "0", "false", "t", "f", ""},
+			expected: []interface{}{true, true, false, false, true, false, nil},
 		},
 		wantErr: false,
 	}, {

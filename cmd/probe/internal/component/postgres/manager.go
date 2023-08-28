@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package postgres
 
 import (
@@ -19,12 +38,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/v3/process"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type Manager struct {
@@ -52,7 +72,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Pool: pool,
 	}
 
-	component.RegisterManager("postgresql", Mgr)
+	component.RegisterManager("postgresql", internal.Replication, Mgr)
 	return Mgr, nil
 }
 
@@ -196,7 +216,7 @@ func (mgr *Manager) IsLeaderWithPool(ctx context.Context, pool *pgxpool.Pool) (b
 	return role == binding.PRIMARY, nil
 }
 
-func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
 	return cluster.GetMemberAddrs()
 }
 
@@ -219,8 +239,8 @@ func (mgr *Manager) IsCurrentMemberInCluster(ctx context.Context, cluster *dcs.C
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context) bool {
-	return mgr.IsMemberHealthy(ctx, nil, nil)
+func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	return mgr.IsMemberHealthy(ctx, cluster, nil)
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
@@ -362,19 +382,21 @@ func (mgr *Manager) isLagging(walPosition int64, cluster *dcs.Cluster) bool {
 	if cluster == nil {
 		return false
 	}
-	lag := cluster.GetOpTime() - walPosition
+	lag := cluster.Leader.DBState.OpTimestamp - walPosition
 	return lag > cluster.HaConfig.GetMaxLagOnSwitchover()
 }
 
-func (mgr *Manager) Recover() {}
-
-// AddCurrentMemberToCluster postgresql don't need to add member
-func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+func (mgr *Manager) Recover(context.Context) error {
 	return nil
 }
 
-// DeleteMemberFromCluster postgresql don't need to delete member
-func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+// JoinCurrentMemberToCluster postgresql don't need to add member
+func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
+	return nil
+}
+
+// LeaveMemberFromCluster postgresql don't need to delete member
+func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 
@@ -386,8 +408,8 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) Promote() error {
-	if isLeader, err := mgr.IsLeader(context.TODO(), nil); err == nil && isLeader {
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
+	if isLeader, err := mgr.IsLeader(ctx, nil); err == nil && isLeader {
 		mgr.Logger.Infof("i am already a leader, don't need to promote")
 		return nil
 	}
@@ -424,7 +446,7 @@ func (mgr *Manager) postPromote() error {
 	return nil
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(context.Context) error {
 	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
 
 	return mgr.Stop()
@@ -458,12 +480,10 @@ func (mgr *Manager) Stop() error {
 	return nil
 }
 
-func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
-	ctx := context.TODO()
-
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	if cluster.Leader == nil || cluster.Leader.Name == "" {
 		mgr.Logger.Warnf("no action coz cluster has no leader")
-		return mgr.Start()
+		return mgr.Start(cluster)
 	}
 
 	err := mgr.handleRewind(ctx, cluster)
@@ -733,23 +753,7 @@ func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	return mgr.Start()
-}
-
-func (mgr *Manager) Start() error {
-	mgr.Logger.Infof("wait for send signal 2 to activate sql channel")
-	sqlChannelProc, err := component.GetSQLChannelProc()
-	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
-		return errors.Errorf("can't find sql channel process, err:%v", err)
-	}
-
-	// activate sql channel restart db
-	err = sqlChannelProc.Signal(syscall.SIGUSR2)
-	if err != nil {
-		return errors.Errorf("send signal2 to sql channel failed, err:%v", err)
-	}
-	return nil
+	return mgr.Start(cluster)
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
@@ -881,4 +885,8 @@ func (mgr *Manager) pgReload(ctx context.Context) error {
 	_, err := mgr.Exec(ctx, reload)
 
 	return err
+}
+
+func (mgr *Manager) ShutDownWithWait() {
+	mgr.Pool.Close()
 }

@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compute-node-config
+  labels:
+    {{- include "neon-cluster.labels" . | nindent 4 }}
+data:
+  {{- include "neon-cluster.extend.scripts" . | nindent 2 }}
+
+---
+apiVersion: vm.neon.tech/v1
+kind: VirtualMachine
+metadata:
+  name: vm-compute-node
+  annotations:
+    # In this example, these bounds aren't necessary. So... here's what they look like :)
+    autoscaling.neon.tech/bounds: '{ "min": { "cpu": 0.25, "mem": "1Gi" }, "max": { "cpu": 1.25, "mem": "5Gi" } }'
+  labels:
+    autoscaling.neon.tech/enabled: "true"
+    # Set to "true" to continuously migrate the VM (TESTING ONLY)
+    autoscaling.neon.tech/testing-only-always-migrate: "false"
+spec:
+  schedulerName: autoscale-scheduler
+  guest:
+    cpus: { min: 1, use: 1, max: 2 }
+    memorySlotSize: 1Gi
+    memorySlots: { min: 1, use: 1, max: 5 }
+    rootDisk:
+      image: huyongqi/pg14-disk-test:test
+      size: 12Gi
+      imagePullPolicy: IfNotPresent
+    command: 
+      - /bin/bash
+      - -c
+      - |
+        if [ ! -f "/tmp/script_executed" ]; then
+            set -ex
+            trap : TERM INT
+            whoami
+            export PAGESERVER=neon-cluster-neon-pageserver-headless.default.svc.cluster.local
+            export SAFEKEEPERS=neon-cluster-neon-safekeeper-headless.default.svc.cluster.local:5454
+            cp scripts/* ./
+            chmod +x compute.sh entrypoint.sh spec.json spec_prep_docker.json
+            ./compute.sh
+
+            touch /tmp/script_executed
+        else
+            echo "Scripts already executed."
+        fi
+    ports:
+      - port: 22   # ssh
+      - port: 55432 # postgres
+      - port: 9100 # metrics
+      - port: 10301 # informant
+  disks:
+    - name: compute-node-config
+      mountPath: /scripts
+      readOnly: false
+      configMap:
+        name: compute-node-config

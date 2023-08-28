@@ -37,7 +37,6 @@ import (
 	stateLoader "github.com/dapr/dapr/pkg/components/state"
 	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
@@ -60,6 +59,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var (
@@ -134,8 +134,8 @@ func main() {
 	// ha dependent on dbmanager which is initialized by rt.Run
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	ha := highavailability.NewHa(logHa)
 	if IsHAAvailable(characterType, workloadType) {
-		ha := highavailability.NewHa(logHa)
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()

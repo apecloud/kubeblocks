@@ -1,8 +1,0 @@
-## All parameters need to be restarted
-staticParameters:
-  - cluster-enabled
-  - databases
-  - maxclients
-
-dynamicParameters:
-  ## -

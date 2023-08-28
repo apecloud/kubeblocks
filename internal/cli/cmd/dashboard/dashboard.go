@@ -53,6 +53,8 @@ const (
 	prometheusAlertManager = "kubeblocks-prometheus-alertmanager"
 	prometheusServer       = "kubeblocks-prometheus-server"
 	pyroscopeServer        = "kubeblocks-pyroscope-server"
+	jupyterHubAddon        = "jupyter-hub"
+	jupyterNoteBookAddon   = "jupyter-notebook"
 )
 
 const (
@@ -136,6 +138,18 @@ var (
 			AddonName:  "bytebase-entrypoint",
 			Label:      "app=bytebase",
 			TargetPort: "18080",
+		},
+		{
+			Name:       jupyterHubAddon,
+			AddonName:  "proxy-public",
+			Label:      "app=jupyterhub",
+			TargetPort: "18081",
+		},
+		{
+			Name:       jupyterNoteBookAddon,
+			AddonName:  "jupyter-notebook",
+			Label:      " app.kubernetes.io/instance=kb-addon-jupyter-notebook",
+			TargetPort: "18888",
 		},
 	}
 )

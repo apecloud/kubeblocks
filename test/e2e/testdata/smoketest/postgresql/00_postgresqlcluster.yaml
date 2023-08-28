@@ -6,62 +6,27 @@ metadata:
   name: kb-pg-cluster
   namespace: default
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
+    helm.sh/chart: postgresql-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 ---
 # Source: postgresql-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRoleBinding
 metadata:
   name: kb-pg-cluster
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
+    helm.sh/chart: postgresql-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-    verbs:
-      - create
-      - get
-      - list
-      - patch
-      - update
-      - watch
-      # delete is required only for 'patronictl remove'
-      - delete
-  - apiGroups:
-      - ""
-    resources:
-      - endpoints
-    verbs:
-      - get
-      - patch
-      - update
-      - create
-      - list
-      - watch
-      # delete is required only for 'patronictl remove'
-      - delete
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-    verbs:
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-pg-cluster
+    namespace: default
 ---
 # Source: postgresql-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -69,13 +34,13 @@ kind: RoleBinding
 metadata:
   name: kb-pg-cluster
   labels:
-    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
+    helm.sh/chart: postgresql-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: kb-pg-cluster
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
 subjects:
   - kind: ServiceAccount
     name: kb-pg-cluster
@@ -88,7 +53,7 @@ metadata:
   name: pg-cluster
   namespace: default
   labels: 
-    helm.sh/chart: postgresql-cluster-0.6.0-beta.21
+    helm.sh/chart: postgresql-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/instance: pg-cluster
 spec:

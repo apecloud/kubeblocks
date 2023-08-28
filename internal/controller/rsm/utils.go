@@ -31,10 +31,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
@@ -44,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type getRole func(int) string
@@ -91,21 +95,16 @@ func sortMembers[T any](membersStatus []T,
 	getRoleFunc getRole, getOrdinalFunc getOrdinal,
 	reverse bool) {
 	sort.SliceStable(membersStatus, func(i, j int) bool {
+		if reverse {
+			i, j = j, i
+		}
 		roleI := getRoleFunc(i)
 		roleJ := getRoleFunc(j)
-		if reverse {
-			roleI, roleJ = roleJ, roleI
-		}
-
 		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
 			ordinal1 := getOrdinalFunc(i)
 			ordinal2 := getOrdinalFunc(j)
-			if reverse {
-				ordinal1, ordinal2 = ordinal2, ordinal1
-			}
 			return ordinal1 < ordinal2
 		}
-
 		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
 	})
 }
@@ -168,6 +167,10 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 	return roleMap
 }
 
+func SetMembersStatusForTest(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
+	setMembersStatus(rsm, pods)
+}
+
 func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
@@ -204,7 +207,7 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	for podName := range memberToKeepSet {
 		ordinal, _ := getPodOrdinal(podName)
 		// members have left because of scale-in
-		if ordinal >= int(rsm.Spec.Replicas) {
+		if ordinal >= int(*rsm.Spec.Replicas) {
 			continue
 		}
 		newMembersStatus = append(newMembersStatus, *oldMemberMap[podName])
@@ -223,26 +226,25 @@ func ownedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&appsv1.StatefulSetList{},
 		&corev1.ServiceList{},
-		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
-		&policyv1.PodDisruptionBudgetList{},
 	}
 }
 
 func deletionKinds() []client.ObjectList {
 	kinds := ownedKinds()
-	kinds = append(kinds, &corev1.PersistentVolumeClaimList{}, &batchv1.JobList{})
+	kinds = append(kinds, &batchv1.JobList{})
 	return kinds
 }
 
 func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
+	selector, err := metav1.LabelSelectorAsMap(stsObj.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{
-			constant.KBManagedByKey:      stsObj.Labels[constant.KBManagedByKey],
-			constant.AppInstanceLabelKey: stsObj.Labels[constant.AppInstanceLabelKey],
-		}); err != nil {
+		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}
 	var pods []corev1.Pod
@@ -259,6 +261,9 @@ func getHeadlessSvcName(rsm workloads.ReplicatedStateMachine) string {
 }
 
 func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
+	if rsm.Spec.Service == nil {
+		return 0
+	}
 	port := rsm.Spec.Service.Ports[0]
 	for _, c := range rsm.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {
@@ -272,13 +277,12 @@ func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
 }
 
 func getActionList(transCtx *rsmTransformContext, actionScenario string) ([]*batchv1.Job, error) {
+	labels := getLabels(transCtx.rsm)
+	labels[jobScenarioLabel] = actionScenario
+	labels[jobHandledLabel] = jobHandledFalse
+	ml := client.MatchingLabels(labels)
+
 	var actionList []*batchv1.Job
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: transCtx.rsm.Name,
-		constant.KBManagedByKey:      kindReplicatedStateMachine,
-		jobScenarioLabel:             actionScenario,
-		jobHandledLabel:              jobHandledFalse,
-	}
 	jobList := &batchv1.JobList{}
 	if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
 		return nil, err
@@ -324,9 +328,9 @@ func getPodOrdinal(podName string) (int, error) {
 	return strconv.Atoi(subMatches[2])
 }
 
-// ordinal is the ordinal of pod which this action apply to
+// ordinal is the ordinal of pod which this action applies to
 func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
-	if err := intctrlutil.SetOwnership(rsm, action, model.GetScheme(), rsmFinalizerName); err != nil {
+	if err := setOwnership(rsm, action, model.GetScheme(), getFinalizer(action)); err != nil {
 		return err
 	}
 	cli.Create(dag, action)
@@ -336,9 +340,9 @@ func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.Replicat
 func buildAction(rsm *workloads.ReplicatedStateMachine, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
 	env := buildActionEnv(rsm, leader, target)
 	template := buildActionPodTemplate(rsm, env, actionType)
+	labels := getLabels(rsm)
 	return builder.NewJobBuilder(rsm.Namespace, actionName).
-		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabelsInMap(labels).
 		AddLabels(jobScenarioLabel, actionScenario).
 		AddLabels(jobTypeLabel, actionType).
 		AddLabels(jobHandledLabel, jobHandledFalse).
@@ -504,4 +508,144 @@ func emitAbnormalEvent(transCtx *rsmTransformContext, actionType, actionName str
 
 func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message string) {
 	transCtx.EventRecorder.Event(transCtx.rsm, eventType, strings.ToUpper(reason), message)
+}
+
+func getFinalizer(obj client.Object) string {
+	if _, ok := obj.(*workloads.ReplicatedStateMachine); ok {
+		return rsmFinalizerName
+	}
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		return constant.DBClusterFinalizerName
+	}
+	return rsmFinalizerName
+}
+
+func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		labels := make(map[string]string, 0)
+		keys := []string{
+			constant.AppManagedByLabelKey,
+			constant.AppNameLabelKey,
+			constant.AppComponentLabelKey,
+			constant.AppInstanceLabelKey,
+			constant.KBAppComponentLabelKey,
+		}
+		for _, key := range keys {
+			if value, ok := rsm.Labels[key]; ok {
+				labels[key] = value
+			}
+		}
+		labels[workloadsManagedByLabelKey] = kindReplicatedStateMachine
+		return labels
+	}
+	return map[string]string{
+		constant.AppInstanceLabelKey: rsm.Name,
+		workloadsManagedByLabelKey:   kindReplicatedStateMachine,
+	}
+}
+
+func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[string]string {
+	var leader *workloads.ReplicaRole
+	for _, role := range rsm.Spec.Roles {
+		if role.IsLeader && len(role.Name) > 0 {
+			leader = &role
+			break
+		}
+	}
+	selectors := make(map[string]string, 0)
+
+	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+		keys := []string{
+			constant.AppManagedByLabelKey,
+			constant.AppInstanceLabelKey,
+			constant.KBAppComponentLabelKey,
+		}
+		for _, key := range keys {
+			if value, ok := rsm.Labels[key]; ok {
+				selectors[key] = value
+			}
+		}
+		if leader != nil && !headless {
+			selectors[constant.RoleLabelKey] = leader.Name
+		}
+		return selectors
+	}
+
+	for k, v := range rsm.Spec.Selector.MatchLabels {
+		selectors[k] = v
+	}
+	if leader != nil && !headless {
+		selectors[rsmAccessModeLabelKey] = string(leader.AccessMode)
+	}
+	return selectors
+}
+
+func setOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+	// if viper.GetBool(FeatureGateRSMCompatibilityMode) {
+	//	return CopyOwnership(owner, obj, scheme, finalizer)
+	// }
+	return intctrlutil.SetOwnership(owner, obj, scheme, finalizer)
+}
+
+// CopyOwnership copies owner ref fields of 'owner' to 'obj'
+// and calls controllerutil.AddFinalizer if not exists.
+func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+	// Returns true if a and b point to the same object.
+	referSameObject := func(a, b metav1.OwnerReference) bool {
+		aGV, err := schema.ParseGroupVersion(a.APIVersion)
+		if err != nil {
+			return false
+		}
+		bGV, err := schema.ParseGroupVersion(b.APIVersion)
+		if err != nil {
+			return false
+		}
+		return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
+	}
+	// indexOwnerRef returns the index of the owner reference in the slice if found, or -1.
+	indexOwnerRef := func(ownerReferences []metav1.OwnerReference, ref metav1.OwnerReference) int {
+		for index, r := range ownerReferences {
+			if referSameObject(r, ref) {
+				return index
+			}
+		}
+		return -1
+	}
+	upsertOwnerRef := func(ref metav1.OwnerReference, object metav1.Object) {
+		owners := object.GetOwnerReferences()
+		if idx := indexOwnerRef(owners, ref); idx == -1 {
+			owners = append(owners, ref)
+		} else {
+			owners[idx] = ref
+		}
+		object.SetOwnerReferences(owners)
+	}
+
+	ownerRefs := owner.GetOwnerReferences()
+	for _, ref := range ownerRefs {
+		if ref.Controller == nil || !*ref.Controller {
+			continue
+		}
+		// Return early with an error if the object is already controlled.
+		if existing := metav1.GetControllerOf(obj); existing != nil && !referSameObject(*existing, ref) {
+			return &controllerutil.AlreadyOwnedError{
+				Object: obj,
+				Owner:  *existing,
+			}
+		}
+
+		// Update owner references and return.
+		upsertOwnerRef(ref, obj)
+	}
+
+	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+		// pvc objects do not need to add finalizer
+		_, ok := obj.(*corev1.PersistentVolumeClaim)
+		if !ok {
+			if !controllerutil.AddFinalizer(obj, finalizer) {
+				return intctrlutil.ErrFailedToAddFinalizer
+			}
+		}
+	}
+	return nil
 }

@@ -30,7 +30,7 @@ ginkgo: # Make sure ginkgo is in $GOPATH/bin
 ifeq ($(origin VERSION), command line)
     VERSION ?= $(VERSION)
 endif
-ifeq ($(origin VERSION), command line)
+ifeq ($(origin PROVIDER), command line)
     PROVIDER ?= $(PROVIDER)
 else
     PROVIDER ?= ""
@@ -40,6 +40,11 @@ ifeq ($(origin REGION), command line)
 else
     REGION ?= ""
 endif
+
+ifeq ($(origin INIT_ENV), command line)
+    INIT_ENV ?= $(INIT_ENV)
+endif
+
 .PHONY: run
 run: ginkgo ## Run end-to-end tests.
 	#ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) $(GINKGO) run .

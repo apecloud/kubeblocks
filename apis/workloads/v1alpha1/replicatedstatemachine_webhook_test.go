@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
+
 	corev1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,15 +36,27 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 		var rsm *ReplicatedStateMachine
 
 		BeforeEach(func() {
+			commonLabels := map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "ClusterDefName",
+				constant.AppComponentLabelKey:   "CompDefName",
+				constant.AppInstanceLabelKey:    "clusterName",
+				constant.KBAppComponentLabelKey: "componentName",
+			}
+			replicas := int32(1)
 			rsm = &ReplicatedStateMachine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: testCtx.DefaultNamespace,
 				},
 				Spec: ReplicatedStateMachineSpec{
-					Replicas: 1,
-					RoleObservation: RoleObservation{
-						ObservationActions: []Action{
+					Replicas: &replicas,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: commonLabels,
+					},
+					Service: &corev1.ServiceSpec{},
+					RoleProbe: &RoleProbe{
+						ProbeActions: []Action{
 							{
 								Image:   "foo",
 								Command: []string{"bar"},
@@ -50,6 +64,9 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 						},
 					},
 					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: commonLabels,
+						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{

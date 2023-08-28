@@ -35,6 +35,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
@@ -62,6 +63,13 @@ const (
 
 var (
 	uid = types.UID("rsm-mock-uid")
+
+	selectors = map[string]string{
+		constant.AppInstanceLabelKey: name,
+		workloadsManagedByLabelKey:   kindReplicatedStateMachine,
+	}
+
+	headlessSvcName = name + "-headless"
 
 	roles = []workloads.ReplicaRole{
 		{

@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dcs
 
 import (
-	"github.com/spf13/viper"
-
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type DCS interface {
-	Initialize() error
+	Initialize(*Cluster) error
 
 	// cluster manage functions
 	GetClusterName() string
@@ -36,6 +35,7 @@ type DCS interface {
 
 	// cluster scole ha config
 	GetHaConfig() (*HaConfig, error)
+	UpdateHaConfig() error
 
 	// member manager funtions
 	GetMembers() ([]Member, error)
@@ -61,6 +61,7 @@ var dcs DCS
 
 func init() {
 	viper.SetDefault("KB_TTL", 5)
+	viper.SetDefault("KB_MAX_LAG", 10)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
 

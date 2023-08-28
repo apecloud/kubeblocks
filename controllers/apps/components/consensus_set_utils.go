@@ -23,6 +23,7 @@ import (
 	"context"
 	"sort"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -165,16 +166,18 @@ func ComposeRolePriorityMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[st
 // UpdateConsensusSetRoleLabel updates pod role label when internal container role changed
 func UpdateConsensusSetRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
+	event *corev1.Event,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	pod *corev1.Pod, role string) error {
 	if componentDef == nil {
 		return nil
 	}
-	return updateConsensusSetRoleLabel(cli, reqCtx, componentDef.ConsensusSpec, pod, role)
+	return updateConsensusSetRoleLabel(cli, reqCtx, event, componentDef.ConsensusSpec, pod, role)
 }
 
 func updateConsensusSetRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
+	event *corev1.Event,
 	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	pod *corev1.Pod, role string) error {
 	ctx := reqCtx.Ctx
@@ -188,6 +191,10 @@ func updateConsensusSetRoleLabel(cli client.Client,
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Labels[constant.RoleLabelKey] = role
 	pod.Labels[constant.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = event.LastTimestamp.Time.Format(time.RFC3339)
 	return cli.Patch(ctx, pod, patch)
 }
 
@@ -350,7 +357,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
 	}
 	configList := &corev1.ConfigMapList{}
-	if err := cli.List(ctx, configList, ml); err != nil {
+	if err := cli.List(ctx, configList, client.InNamespace(cluster.Namespace), ml); err != nil {
 		return nil, err
 	}
 

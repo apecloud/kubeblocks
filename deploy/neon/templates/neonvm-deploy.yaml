@@ -1,0 +1,356 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: neonvm
+    app.kubernetes.io/instance: controller
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: deployment
+    app.kubernetes.io/part-of: neonvm
+    control-plane: controller
+  name: neonvm-controller
+  namespace: neonvm-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      - arm64
+                      - ppc64le
+                      - s390x
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - args:
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=127.0.0.1:8080
+            - --leader-elect
+            - --zap-devel=false
+            - --zap-time-encoding=iso8601
+            - --zap-log-level=info
+            - --zap-stacktrace-level=panic
+          command:
+            - /manager
+          env:
+            - name: NAD_IPAM_NAME
+              value: neonvm-overlay-ipam
+            - name: NAD_IPAM_NAMESPACE
+              value: neonvm-system
+            - name: NAD_RUNNER_NAME
+              value: neonvm-overlay-for-vms
+            - name: NAD_RUNNER_NAMESPACE
+              value: neonvm-system
+          image: neondatabase/neonvm-controller:v0.17.0
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: manager
+          ports:
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+        - args:
+            - --secure-listen-address=0.0.0.0:8443
+            - --upstream=http://127.0.0.1:8080/
+            - --logtostderr=true
+            - --v=0
+          image: docker.io/apecloud/kube-rbac-proxy:v0.13.0
+          name: kube-rbac-proxy
+          ports:
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 5m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: neonvm-controller
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: webhook-server-cert
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app.kubernetes.io/name: device-plugin
+  name: neonvm-device-plugin
+  namespace: neonvm-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: device-plugin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: device-plugin
+    spec:
+      containers:
+        - args:
+            - --log-level
+            - info
+            - --domain
+            - neonvm
+            - --device
+            - |
+              name: kvm
+              groups:
+                - count: 1000
+                  paths:
+                    - path: /dev/kvm
+            - --device
+            - |
+              name: vhost-net
+              groups:
+                - count: 1000
+                  paths:
+                    - path: /dev/vhost-net
+          image: squat/generic-device-plugin
+          name: generic-device-plugin
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            limits:
+              cpu: 50m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 10Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/lib/kubelet/device-plugins
+              name: device-plugin
+            - mountPath: /dev
+              name: dev
+      priorityClassName: system-node-critical
+      tolerations:
+        - effect: NoExecute
+          operator: Exists
+        - effect: NoSchedule
+          operator: Exists
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/device-plugins
+          name: device-plugin
+        - hostPath:
+            path: /dev
+          name: dev
+  updateStrategy:
+    type: RollingUpdate
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app.kubernetes.io/component: vxlan-controller
+    app.kubernetes.io/created-by: neonvm
+    app.kubernetes.io/instance: vxlan-controller
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/part-of: neonvm
+    control-plane: vxlan-controller
+  name: neonvm-vxlan-controller
+  namespace: neonvm-system
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: vxlan-controller
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: vxlan-controller
+      labels:
+        app.kubernetes.io/component: vxlan-controller
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - env:
+            - name: MY_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          image: neondatabase/neonvm-vxlan-controller:v0.17.0
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - vxlan-controller
+                  - -delete
+          name: vxlan-controller
+          resources:
+            limits:
+              cpu: 100m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            capabilities:
+              add:
+                - NET_RAW
+                - NET_ADMIN
+            privileged: false
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      initContainers:
+        - command:
+            - /bin/sh
+            - -c
+            - cp -rf /opt/cni/bin /host/opt/cni
+          image: neondatabase/neonvm-vxlan-controller:v0.17.0
+          imagePullPolicy: IfNotPresent
+          name: install-cni
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+      securityContext: {}
+      serviceAccount: vxlan-controller
+      serviceAccountName: neonvm-vxlan-controller
+      terminationGracePeriodSeconds: 10
+      tolerations:
+        - operator: Exists
+      volumes:
+        - hostPath:
+            path: /opt/cni/bin
+          name: cni-bin-dir
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/created-by: neonvm
+    app.kubernetes.io/instance: serving-cert
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: certificate
+    app.kubernetes.io/part-of: neonvm
+  name: neonvm-serving-cert
+  namespace: neonvm-system
+spec:
+  dnsNames:
+    - neonvm-webhook-service.neonvm-system.svc
+    - neonvm-webhook-service.neonvm-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: neonvm-selfsigned-issuer
+  secretName: webhook-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  labels:
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/created-by: neonvm
+    app.kubernetes.io/instance: selfsigned-issuer
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: issuer
+    app.kubernetes.io/part-of: neonvm
+  name: neonvm-selfsigned-issuer
+  namespace: neonvm-system
+spec:
+  selfSigned: {}
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: neonvm-overlay-for-pods
+  namespace: neonvm-system
+spec:
+  config: '{ "cniVersion": "0.3.1", "name": "overlay-for-pods", "type": "bridge",
+    "bridge": "neon-br0", "ipam": { "type": "whereabouts", "range": "10.100.0.0/16",
+    "range_start": "10.100.1.0", "range_end": "10.100.127.255" } }'
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: neonvm-overlay-for-vms
+  namespace: neonvm-system
+spec:
+  config: '{ "cniVersion": "0.3.1", "name": "overlay-for-vms", "type": "bridge", "bridge":
+    "neon-br0", "ipam": {} }'
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: neonvm-overlay-ipam
+  namespace: neonvm-system
+spec:
+  config: '{ "ipam": { "range": "10.100.0.0/16", "range_start": "10.100.128.0", "network_name":
+    "neonvm" } }'

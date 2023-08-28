@@ -35,9 +35,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
@@ -158,8 +160,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delObjs := toDeleteObjs(namespacedObjs)
 
 	// add non-namespaced objects deletion vertex
-	nonNamespacedObjs, err := getClusterOwningNonNamespacedObjects(transCtx, *cluster,
-		getAppInstanceAndManagedByML(*cluster), toDeleteNonNamespacedKinds)
+	nonNamespacedObjs, err := getClusterOwningNonNamespacedObjects(transCtx, *cluster, ml, toDeleteNonNamespacedKinds)
 	if err != nil {
 		return err
 	}
@@ -191,15 +192,16 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
 		&policyv1.PodDisruptionBudgetList{},
-		&corev1.ServiceList{},
-		&appsv1.StatefulSetList{},
-		&appsv1.DeploymentList{},
-		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
+	}
+	if intctrlutil.IsRSMEnabled() {
+		namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
+	} else {
+		namespacedKindsPlus = append(namespacedKindsPlus, &corev1.ServiceList{}, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
 }

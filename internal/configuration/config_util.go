@@ -109,7 +109,7 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // FromStringMap converts a map[string]string to a map[string]interface{}
-func FromStringMap(m map[string]string) map[string]interface{} {
+func FromStringMap(m map[string]*string) map[string]interface{} {
 	r := make(map[string]interface{}, len(m))
 	for key, v := range m {
 		r[key] = v
@@ -117,7 +117,16 @@ func FromStringMap(m map[string]string) map[string]interface{} {
 	return r
 }
 
-func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]string, formatConfig *appsv1alpha1.FormatterConfig) (string, error) {
+// FromStringPointerMap converts a map[string]string to a map[string]interface{}
+func FromStringPointerMap(m map[string]string) map[string]*string {
+	r := make(map[string]*string, len(m))
+	for key, v := range m {
+		r[key] = cfgutil.ToPointer(v)
+	}
+	return r
+}
+
+func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]*string, formatConfig *appsv1alpha1.FormatterConfig) (string, error) {
 	configLoaderOption := CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.TODO()),

@@ -27,9 +27,12 @@ kbcli cluster configure NAME --set key=value[,key=value] [--component=component-
       --config-file string             Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). For available templates and configs, refer to: 'kbcli cluster describe-config'.
       --config-spec string             Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). For available templates and configs, refer to: 'kbcli cluster describe-config'.
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --force-restart                  Boolean flag to restart component. Default with false.
   -h, --help                           help for configure
+      --local-file string              Specify the local configuration file to be updated.
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --replace                        Boolean flag to enable replacing config file. Default with false.
       --set strings                    Specify parameters list to be updated. For more details, refer to 'kbcli cluster describe-config'.
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```

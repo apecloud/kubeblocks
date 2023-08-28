@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -35,8 +34,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
-
-	infras "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
@@ -51,6 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
+	infras "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
@@ -61,6 +59,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (
@@ -159,6 +158,9 @@ A Command Line Interface for KubeBlocks`,
 
 			commandPath := cmd.CommandPath()
 			parts := strings.Split(commandPath, " ")
+			if len(parts) < 2 {
+				return nil
+			}
 			subCommand := parts[1]
 			if cloudCmds[subCommand] && !auth.IsLoggedIn() {
 				return fmt.Errorf("use 'kbcli login' to login first")

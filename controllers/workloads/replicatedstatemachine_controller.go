@@ -33,9 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/handler"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // ReplicatedStateMachineReconciler reconciles a ReplicatedStateMachine object
@@ -106,7 +109,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 			&rsm.ObjectGenerationTransformer{},
 			// handle status
 			&rsm.ObjectStatusTransformer{},
-			// handle UpdateStrategy
+			// handle MemberUpdateStrategy
 			&rsm.UpdateStrategyTransformer{},
 			// handle member reconfiguration
 			&rsm.MemberReconfigurationTransformer{},
@@ -132,16 +135,35 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	ctx := &handler.FinderContext{
+		Context: context.Background(),
+		Reader:  r.Client,
+		Scheme:  *r.Scheme,
+	}
+
+	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
+		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
+		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
+		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
+		stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+		podHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
+
+		return ctrl.NewControllerManagedBy(mgr).
+			For(&workloads.ReplicatedStateMachine{}).
+			Watches(&source.Kind{Type: &appsv1.StatefulSet{}}, stsHandler).
+			Watches(&source.Kind{Type: &batchv1.Job{}}, jobHandler).
+			Watches(&source.Kind{Type: &corev1.Pod{}}, podHandler).
+			Complete(r)
+	}
+
+	stsOwnerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
+	rsmOwnerFinder := handler.NewOwnerFinder(&workloads.ReplicatedStateMachine{})
+	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(rsmOwnerFinder).Build()
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&workloads.ReplicatedStateMachine{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}},
-			&rsm.EnqueueRequestForAncestor{
-				Client:    r.Client,
-				OwnerType: &workloads.ReplicatedStateMachine{},
-				UpToLevel: 2,
-				InTypes:   []runtime.Object{&appsv1.StatefulSet{}},
-			}).
+		Watches(&source.Kind{Type: &corev1.Pod{}}, podHandler).
 		Complete(r)
 }

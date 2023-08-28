@@ -36,7 +36,7 @@ type configWrapper struct {
 	create.CreateOptions
 
 	clusterName   string
-	updatedParams map[string]string
+	updatedParams map[string]*string
 
 	// autofill field
 	componentName  string
@@ -78,7 +78,7 @@ func (w *configWrapper) AutoFillRequiredParam() error {
 }
 
 // ValidateRequiredParam validates required param.
-func (w *configWrapper) ValidateRequiredParam() error {
+func (w *configWrapper) ValidateRequiredParam(forceReplace bool) error {
 	// step1: check existence of component.
 	if w.clusterObj.Spec.GetComponentByName(w.componentName) == nil {
 		return makeComponentNotExistErr(w.clusterName, w.componentName)
@@ -99,8 +99,7 @@ func (w *configWrapper) ValidateRequiredParam() error {
 		return makeNotFoundConfigFileErr(w.configFileKey, w.configSpecName, cfgutil.ToSet(cmObj.Data).AsSlice())
 	}
 
-	// TODO support all config file update.
-	if !cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, w.configFileKey) {
+	if !forceReplace && !cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, w.configFileKey) {
 		return makeNotSupportConfigFileUpdateErr(w.configFileKey, w.configTemplateSpec)
 	}
 	return nil
@@ -140,7 +139,7 @@ func (w *configWrapper) fillConfigSpec() error {
 		vComponents = w.clusterVerObj.Spec.ComponentVersions
 	}
 
-	configSpecs, err := util.GetConfigTemplateListWithResource(cComponents, dComponents, vComponents, w.componentName, true)
+	configSpecs, err := util.GetConfigTemplateListWithResource(cComponents, dComponents, vComponents, w.componentName, w.configSpecName == "")
 	if err != nil {
 		return err
 	}
@@ -214,7 +213,7 @@ func (w *configWrapper) filterForReconfiguring(data map[string]string) []string 
 	return keys
 }
 
-func newConfigWrapper(baseOptions create.CreateOptions, clusterName, componentName, configSpec, configKey string, params map[string]string) (*configWrapper, error) {
+func newConfigWrapper(baseOptions create.CreateOptions, clusterName, componentName, configSpec, configKey string, params map[string]*string) (*configWrapper, error) {
 	var (
 		err           error
 		clusterObj    *appsv1alpha1.Cluster

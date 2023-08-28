@@ -108,7 +108,9 @@ func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *appsv1al
 			continue
 		}
 		for _, kv := range param.Parameters {
-			result[kv.Key] = kv.Value
+			if kv.Value != nil {
+				result[kv.Key] = *kv.Value
+			}
 		}
 	}
 	return result, nil

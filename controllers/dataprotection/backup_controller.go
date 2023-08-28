@@ -34,7 +34,6 @@ import (
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -63,6 +62,7 @@ import (
 	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (
@@ -170,7 +170,8 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // checkPodsOfStatefulSetHasDeleted checks if the pods of statefulSet have been deleted
 func (r *BackupReconciler) checkPodsOfStatefulSetHasDeleted(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (bool, error) {
 	podList := &corev1.PodList{}
-	if err := r.Client.List(reqCtx.Ctx, podList, client.MatchingLabels(buildBackupWorkloadsLabels(backup))); err != nil {
+	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabels(buildBackupWorkloadsLabels(backup))); err != nil {
 		return false, err
 	}
 	for _, pod := range podList.Items {
@@ -726,7 +727,7 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 	}
 
 	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name}
-	isOK, err = r.ensureVolumeSnapshotReady(key)
+	isOK, snapshotTime, err := r.ensureVolumeSnapshotReady(key)
 	if err != nil {
 		return intctrlutil.ResultToP(r.updateStatusIfFailed(reqCtx, backup, err))
 	}
@@ -751,6 +752,12 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 
 	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{
+		BackupLog: &dataprotectionv1alpha1.BackupLogStatus{
+			StartTime: snapshotTime,
+			StopTime:  snapshotTime,
+		},
+	}
 	snap := &snapshotv1.VolumeSnapshot{}
 	exists, _ := r.snapshotCli.CheckResourceExists(key, snap)
 	if exists {
@@ -942,6 +949,7 @@ func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dataprotection
 	container.VolumeMounts = []corev1.VolumeMount{
 		{Name: fmt.Sprintf("backup-%s", backup.Status.PersistentVolumeClaimName), MountPath: backupPathBase},
 	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	container.Env = []corev1.EnvVar{
 		{Name: constant.DPBackupInfoFile, Value: buildBackupInfoENV(backupDestinationPath)},
 	}
@@ -1255,25 +1263,23 @@ func (r *BackupReconciler) getVolumeSnapshotClassOrCreate(ctx context.Context, s
 }
 
 func (r *BackupReconciler) ensureVolumeSnapshotReady(
-	key types.NamespacedName) (bool, error) {
+	key types.NamespacedName) (bool, *metav1.Time, error) {
 	snap := &snapshotv1.VolumeSnapshot{}
 	// not found, continue the creation process
 	exists, err := r.snapshotCli.CheckResourceExists(key, snap)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	ready := false
 	if exists && snap.Status != nil {
 		// check if snapshot status throws an error, e.g. csi does not support volume snapshot
 		if isVolumeSnapshotConfigError(snap) {
-			return false, errors.New(*snap.Status.Error.Message)
+			return false, nil, errors.New(*snap.Status.Error.Message)
 		}
-		if snap.Status.ReadyToUse != nil {
-			ready = *(snap.Status.ReadyToUse)
+		if snap.Status.ReadyToUse != nil && *snap.Status.ReadyToUse {
+			return true, snap.Status.CreationTime, nil
 		}
 	}
-
-	return ready, nil
+	return false, nil, nil
 }
 
 func (r *BackupReconciler) createUpdatesJobs(reqCtx intctrlutil.RequestCtx,
@@ -1391,6 +1397,7 @@ func (r *BackupReconciler) createDeleteBackupFileJob(
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser,
 	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	// build pod
 	podSpec := corev1.PodSpec{
@@ -1805,6 +1812,8 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
 
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+
 	envBackupName := corev1.EnvVar{
 		Name:  constant.DPBackupName,
 		Value: backup.Name,
@@ -1919,7 +1928,7 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	container.SecurityContext = &corev1.SecurityContext{
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
-
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	podSpec.Containers = []corev1.Container{container}
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
@@ -1975,6 +1984,7 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	} else {
 		podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	container.Args = []string{args}
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))

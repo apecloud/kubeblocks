@@ -25,13 +25,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var _ = Describe("affinity utils", func() {
@@ -91,7 +91,6 @@ var _ = Describe("affinity utils", func() {
 				reqCtx,
 				nil,
 				clusterObj,
-				nil,
 				clusterDefObj,
 				&clusterDefObj.Spec.ComponentDefs[0],
 				&clusterObj.Spec.ComponentSpecs[0],

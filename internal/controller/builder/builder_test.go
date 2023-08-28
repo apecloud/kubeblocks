@@ -26,7 +26,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/viper"
 
 	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var tlog = ctrl.Log.WithName("builder_testing")
@@ -170,7 +170,6 @@ var _ = Describe("builder", func() {
 			reqCtx,
 			nil,
 			cluster,
-			nil,
 			clusterDef,
 			&clusterDef.Spec.ComponentDefs[0],
 			&cluster.Spec.ComponentSpecs[0],

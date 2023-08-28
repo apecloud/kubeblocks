@@ -15,18 +15,13 @@ spec:
   type: Helm
 
   helm:
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/foxlake
-    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/foxlake-{{ default .Chart.Version .Values.versionOverride }}/foxlake-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/foxlake-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    {{- end }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "foxlake" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
-     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: {{ default .Chart.Version .Values.versionOverride }}
-     {{- end }}
+      {{- end }}
   
   installable:
     autoInstall: false

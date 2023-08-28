@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/leaanthony/debme"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -54,6 +53,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // BackupPolicyReconciler reconciles a BackupPolicy object
@@ -353,8 +353,8 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	if cronExpression != "" && slices.Contains([]dataprotectionv1alpha1.BackupPhase{
 		dataprotectionv1alpha1.BackupCompleted, dataprotectionv1alpha1.BackupFailed},
 		backup.Status.Phase) {
-		// if schedule is enabled and backup already is completed, update phase to running
-		backup.Status.Phase = dataprotectionv1alpha1.BackupRunning
+		// if schedule is enabled and backup already is completed, update phase to New
+		backup.Status.Phase = dataprotectionv1alpha1.BackupNew
 		backup.Status.FailureReason = ""
 		return r.Client.Status().Patch(ctx, backup, patch)
 	}
@@ -558,6 +558,9 @@ func (r *BackupPolicyReconciler) handleLogfilePolicy(
 		var cronExpression string
 		if schedule != nil && schedule.Enable {
 			cronExpression = schedule.CronExpression
+		}
+		if err := r.reconfigure(reqCtx, backupPolicy, logfile.BasePolicy, dataprotectionv1alpha1.BackupTypeLogFile); err != nil {
+			return err
 		}
 		return r.reconcileForStatefulSetKind(reqCtx.Ctx, backupPolicy, dataprotectionv1alpha1.BackupTypeLogFile, cronExpression)
 	}

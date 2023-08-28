@@ -23,6 +23,9 @@ type ConfigObject interface {
 	// Update sets the value for the key in ConfigObject
 	Update(key string, value any) error
 
+	// RemoveKey configuration parameter
+	RemoveKey(key string) error
+
 	// Get returns an interface.
 	Get(key string) interface{}
 

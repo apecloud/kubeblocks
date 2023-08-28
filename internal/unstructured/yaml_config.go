@@ -22,6 +22,7 @@ package unstructured
 import (
 	"strings"
 
+	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v2"
 
@@ -44,6 +45,12 @@ func (y *yamlConfig) Update(key string, value any) error {
 	lastKey := path[len(path)-1]
 	deepestMap := checkAndCreateNestedPrefixMap(y.config, path[0:len(path)-1])
 	deepestMap[lastKey] = value
+	return nil
+}
+
+func (y *yamlConfig) RemoveKey(key string) error {
+	var m mxjv2.Map = y.config
+	_ = m.Remove(key)
 	return nil
 }
 

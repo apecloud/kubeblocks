@@ -2,6 +2,11 @@ name: RELEASE-SYNC
 
 on:
   workflow_dispatch:
+    inputs:
+      sync_flag:
+        description: 'sync flag (eg. sealos)'
+        required: false
+        default: ''
   release:
     types: [ released, prereleased ]
 
@@ -89,4 +94,15 @@ jobs:
       WORKFLOW_ID: "publish-kbcli-choco.yml"
       VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
       APECD_REF: "v0.1.1"
+    secrets: inherit
+
+  release-sealos:
+    needs: update-release-kbcli
+    if: ${{ github.event.action== 'released' || inputs.sync_flag == 'sealos' }}
+    uses: apecloud/apecloud-cd/.github/workflows/comment-issue.yml@v0.1.16
+    with:
+      GITHUB_REPO: "${{ vars.SEALOS_ISSUE_REPO }}"
+      ISSUE_NUMBER: "${{ vars.SEALOS_ISSUE_NUMBER }}"
+      ISSUE_COMMENT_BODY: "/imagebuild_apps kubeblocks ${{ needs.update-release-kbcli.outputs.release-version }}"
+      APECD_REF: "v0.1.16"
     secrets: inherit

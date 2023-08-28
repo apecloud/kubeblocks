@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +30,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // ClusterSpec defines the desired state of Cluster.
@@ -95,14 +95,6 @@ type ClusterSpec struct {
 	// storage specifies the storage of the first componentSpec, if the storage of the first componentSpec is specified, this value will be ignored.
 	// +optional
 	Storage ClusterStorage `json:"storage,omitempty"`
-
-	// mode specifies the mode of this cluster, the value of this can be one of the following: Standalone, Replication, RaftGroup.
-	// +optional
-	Mode ClusterMode `json:"mode,omitempty"`
-
-	// customized parameters that is used in different clusterdefinition
-	// +optional
-	Parameters map[string]string `json:"parameters,omitempty"`
 
 	// monitor specifies the configuration of monitor
 	// +optional

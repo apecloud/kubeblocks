@@ -28,7 +28,6 @@ import (
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -38,11 +37,13 @@ var _ = Describe("object generation transformer test.", func() {
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
+			AddMatchLabelsInMap(selectors).
+			SetServiceName(headlessSvcName).
 			SetRoles(roles).
 			SetService(service).
 			SetCredential(credential).
 			SetTemplate(template).
-			SetObservationActions(observeActions).
+			SetProbeActions(observeActions).
 			GetObject()
 
 		transCtx = &rsmTransformContext{
@@ -74,18 +75,8 @@ var _ = Describe("object generation transformer test.", func() {
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.SecretList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.SecretList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &policyv1.PodDisruptionBudgetList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *policyv1.PodDisruptionBudgetList, _ ...client.ListOption) error {
 					return nil
 				}).Times(1)
 

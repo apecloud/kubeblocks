@@ -46,6 +46,11 @@ func (p *propertiesConfig) Update(key string, value any) error {
 	return err
 }
 
+func (p *propertiesConfig) RemoveKey(key string) error {
+	p.Properties.Delete(key)
+	return nil
+}
+
 func (p *propertiesConfig) Get(key string) interface{} {
 	val, ok := p.Properties.Get(key)
 	if ok {

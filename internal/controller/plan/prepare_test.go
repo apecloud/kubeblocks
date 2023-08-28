@@ -446,7 +446,7 @@ var _ = Describe("Cluster Controller", func() {
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
 					podSpec := sts.Spec.Template.Spec
-					Expect(len(podSpec.Containers)).Should(Equal(3))
+					Expect(len(podSpec.Containers)).Should(Equal(4))
 				}
 			}
 			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec

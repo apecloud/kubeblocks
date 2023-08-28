@@ -57,6 +57,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	var dag *graph.DAG
 	var transformer graph.Transformer
 	var cluster *appsv1alpha1.Cluster
+	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var saKey types.NamespacedName
 	var allSettings map[string]interface{}
 
@@ -70,7 +71,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			SetServiceAccountName(serviceAccountName).GetObject()
 		r := int32(1)
 		cluster.Spec.Replicas = &r
-		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, "sts").
 			GetObject()
 		clusterDefObj.Spec.ComponentDefs[0].Probes = &appsv1alpha1.ClusterDefinitionProbes{}
@@ -103,7 +104,8 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 
 	Context("transformer rbac manager", func() {
-		It("create serviceaccount, rolebinding and clusterrolebinding if not exist", func() {
+		It("create serviceaccount, rolebinding if not exist", func() {
+			clusterDefObj.Spec.ComponentDefs[0].VolumeProtectionSpec = nil
 			Eventually(testapps.CheckObjExists(&testCtx, saKey,
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
@@ -116,7 +118,27 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(err).Should(BeNil())
 			roleBinding.Subjects[0].Name = serviceAccountName
 
-			clusterRoleBinding, err := builder.BuildRoleBinding(cluster)
+			dagExpected := mockDAG(cluster)
+			ictrltypes.LifecycleObjectCreate(dagExpected, serviceAccount, nil)
+			ictrltypes.LifecycleObjectCreate(dagExpected, roleBinding, nil)
+			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
+		})
+
+		It("create clusterrolebinding if volumeprotection enabled", func() {
+			clusterDefObj.Spec.ComponentDefs[0].VolumeProtectionSpec = &appsv1alpha1.VolumeProtectionSpec{}
+			Eventually(testapps.CheckObjExists(&testCtx, saKey,
+				&corev1.ServiceAccount{}, false)).Should(Succeed())
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+
+			serviceAccount, err := builder.BuildServiceAccount(cluster)
+			Expect(err).Should(BeNil())
+			serviceAccount.Name = serviceAccountName
+
+			roleBinding, err := builder.BuildRoleBinding(cluster)
+			Expect(err).Should(BeNil())
+			roleBinding.Subjects[0].Name = serviceAccountName
+
+			clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
 			Expect(err).Should(BeNil())
 			clusterRoleBinding.Subjects[0].Name = serviceAccountName
 

@@ -119,7 +119,7 @@ var _ = Describe("component module", func() {
 				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
 
 			By("new init container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(

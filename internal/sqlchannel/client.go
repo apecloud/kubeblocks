@@ -199,20 +199,19 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 
-	// Request sql channel via Dapr SDK
-	req := &dapr.InvokeBindingRequest{
-		Name:      cli.CharacterType,
-		Operation: operation,
-		Data:      []byte(""),
-		Metadata:  map[string]string{},
-	}
+	// Request sql channel via http request
+	url := fmt.Sprintf("%s?operation=%s", cli.Url, operation)
 
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodPost, nil)
 	if err != nil {
 		return nil, err
 	}
 	result := map[string]any{}
-	err = json.Unmarshal(resp.Data, &result)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -239,8 +238,6 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)
-	token, _ := GetToken(ctxWithRequestTimeout)
-	req.Header.Add("token", token)
 
 	mapKey := GetMapKeyFromRequest(req)
 	operationRes, ok := cli.cache[mapKey]
@@ -258,6 +255,8 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 		err:      err,
 		respTime: time.Now(),
 	}
+	all, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(all))
 	select {
 	case <-ctxWithReconcileTimeout.Done():
 		cli.cache[mapKey] = operationRes

@@ -782,6 +782,8 @@ github.com/d2g/dhcp4server v0.0.0-20181031114812-7d4a0a7f59a5/go.mod h1:Eo87+Kg/
 github.com/d2g/hardwareaddr v0.0.0-20190221164911-e7d9fbe030e4/go.mod h1:bMl4RjIciD2oAxI7DmWRx6gbeqrkoLqv3MV0vzNad+I=
 github.com/danieljoos/wincred v1.1.2 h1:QLdCxFs1/Yl4zduvBdcHB8goaYk9RARS2SgLLRuAyr0=
 github.com/danieljoos/wincred v1.1.2/go.mod h1:GijpziifJoIBfYh+S7BbkdUTU4LfM+QnGqR5Vl2tAx0=
+github.com/dapr/go-sdk v1.8.0 h1:OEleeL3zUTqXxIZ7Vkk3PClAeCh1g8sZ1yR2JFZKfXM=
+github.com/dapr/go-sdk v1.8.0/go.mod h1:MBcTKXg8PmBc8A968tVWQg1Xt+DZtmeVR6zVVVGcmeA=
 github.com/dapr/kit v0.11.3 h1:u1X92tE8xsrwXIej7nkcI5Z1t1CFznPwlL18tizNEw4=
 github.com/dapr/kit v0.11.3/go.mod h1:hQA6xOhcLAiccXTj7e3/bzpHwvAJCSCp70p2xg3jB40=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

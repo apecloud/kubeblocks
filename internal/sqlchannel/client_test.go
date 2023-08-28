@@ -45,23 +45,29 @@ import (
 type testServer struct {
 	state                       map[string][]byte
 	configurationSubscriptionID map[string]chan struct{}
-	cachedRequest               map[string]*http.Response
+	cachedRequest               map[string]*response
 }
 
-var _ = &testServer{}
+type response struct {
+	httpResponse *http.Response
+	err          error
+}
 
 func (s *testServer) InvokeBinding(ctx context.Context, req *http.Request) (*http.Response, error) {
 	time.Sleep(100 * time.Millisecond)
 	resp, ok := s.cachedRequest[GetMapKeyFromRequest(req)]
 	if ok {
-		return resp, nil
+		return resp.httpResponse, nil
 	} else {
 		return nil, fmt.Errorf("unexpected request")
 	}
 }
 
-func (s *testServer) CacheRequest(req *http.Request, resp *http.Response) {
-	s.cachedRequest[GetMapKeyFromRequest(req)] = resp
+func (s *testServer) ExpectRequest(req *http.Request, resp *http.Response, err error) {
+	s.cachedRequest[GetMapKeyFromRequest(req)] = &response{
+		httpResponse: resp,
+		err:          err,
+	}
 }
 
 func TestNewClientWithPod(t *testing.T) {
@@ -110,7 +116,6 @@ func TestNewClientWithPod(t *testing.T) {
 }
 
 func TestGetRole(t *testing.T) {
-
 	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(200)
 		_, _ = writer.Write([]byte("{\"role\": \"leader\"}"))
@@ -127,15 +132,14 @@ func TestGetRole(t *testing.T) {
 	}
 	defer closer()
 
-	body := getRequestBody(string(GetRoleOperation), nil, t)
-	request, err := http.NewRequest(http.MethodGet, cli.Url, body)
+	requestBody := getRequestBody(GetRoleOperation, nil, t)
+	request, err := http.NewRequest(http.MethodGet, cli.Url, requestBody)
 	if err != nil {
 		t.Errorf("new request failed: %v", err)
 	}
-
 	response := &http.Response{Body: io.NopCloser(bytes.NewReader([]byte("{\"role\": \"leader\"}")))}
 
-	server.CacheRequest(request, response)
+	server.ExpectRequest(request, response, nil)
 
 	t.Run("ResponseInTime", func(t *testing.T) {
 		cli.ReconcileTimeout = 1 * time.Second
@@ -201,14 +205,13 @@ func TestSystemAccounts(t *testing.T) {
 	resp := &http.Response{
 		Body: io.NopCloser(bytes.NewReader(respData)),
 	}
+	requestBody := getRequestBody(ListSystemAccountsOp, nil, t)
 
-	reader := getRequestBody(string(ListSystemAccountsOp), nil, t)
-
-	request, err := http.NewRequest(http.MethodGet, cli.Url, reader)
+	request, err := http.NewRequest(http.MethodGet, cli.Url, requestBody)
 	if err != nil {
 		t.Errorf("new request error: %v", err)
 	}
-	server.CacheRequest(request, resp)
+	server.ExpectRequest(request, resp, nil)
 
 	t.Run("ResponseByCache", func(t *testing.T) {
 		cli.ReconcileTimeout = 200 * time.Millisecond
@@ -220,6 +223,74 @@ func TestSystemAccounts(t *testing.T) {
 		if len(cli.cache) != 0 {
 			t.Errorf("cache should be cleared: %v", cli.cache)
 		}
+	})
+}
+
+func TestJoinMember(t *testing.T) {
+	sqlResponse := SQLChannelResponse{
+		Event: RespEveSucc,
+	}
+	respData, _ := json.Marshal(sqlResponse)
+	port := initHttpServer(respData)
+
+	server, cli, closer, err := initSQLChannelClient(port, t)
+	if err != nil {
+		t.Errorf("new sql channel client error: %v", err)
+	}
+	defer closer()
+
+	t.Run("Join Member success", func(t *testing.T) {
+		requestBody := getRequestBody(JoinMemberOperation, nil, t)
+		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
+
+		resp := &http.Response{Body: io.NopCloser(bytes.NewReader(respData))}
+
+		server.ExpectRequest(request, resp, nil)
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err = cli.JoinMember(context.TODO())
+		assert.Nil(t, err)
+	})
+
+	t.Run("Join Member fail", func(t *testing.T) {
+		requestBody := getRequestBody(JoinMemberOperation, nil, t)
+		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
+		server.ExpectRequest(request, nil, errors.New("join member failed"))
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err = cli.JoinMember(context.TODO())
+		assert.NotNil(t, err)
+	})
+}
+
+func TestLeaveMember(t *testing.T) {
+	sqlResponse := SQLChannelResponse{
+		Event: RespEveSucc,
+	}
+	respData, _ := json.Marshal(sqlResponse)
+	port := initHttpServer(respData)
+
+	server, cli, closer, err := initSQLChannelClient(port, t)
+	if err != nil {
+		t.Errorf("new sql channel client error: %v", err)
+	}
+	defer closer()
+
+	t.Run("Leave Member success", func(t *testing.T) {
+		requestBody := getRequestBody(LeaveMemberOperation, nil, t)
+		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
+		resp := &http.Response{Body: io.NopCloser(bytes.NewReader(respData))}
+		server.ExpectRequest(request, resp, nil)
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err = cli.LeaveMember(context.TODO())
+		assert.Nil(t, err)
+	})
+
+	t.Run("Join Member success", func(t *testing.T) {
+		requestBody := getRequestBody(LeaveMemberOperation, nil, t)
+		request, err := http.NewRequest(http.MethodPost, cli.Url, requestBody)
+		server.ExpectRequest(request, nil, errors.New("leave member failed"))
+		cli.ReconcileTimeout = 200 * time.Millisecond
+		err = cli.LeaveMember(context.TODO())
+		assert.NotNil(t, err)
 	})
 }
 
@@ -296,7 +367,7 @@ func initSQLChannelClient(httpPort int, t *testing.T) (*testServer, *OperationCl
 	server := &testServer{
 		state:                       make(map[string][]byte),
 		configurationSubscriptionID: map[string]chan struct{}{},
-		cachedRequest:               make(map[string]*http.Response),
+		cachedRequest:               make(map[string]*response),
 	}
 
 	port, closer := newTCPServer(t, 50001)
@@ -323,12 +394,12 @@ func initSQLChannelClient(httpPort int, t *testing.T) (*testServer, *OperationCl
 	return server, cli, closer, err
 }
 
-func getRequestBody(op string, metadata map[string]string, t *testing.T) io.Reader {
+func getRequestBody(op OperationKind, metadata map[string]string, t *testing.T) io.Reader {
 	reqBody := struct {
 		Operation string            `json:"operation"`
 		Metadata  map[string]string `json:"metadata"`
 	}{}
-	reqBody.Operation = op
+	reqBody.Operation = string(op)
 	reqBody.Metadata = metadata
 
 	marshal, err := json.Marshal(reqBody)
@@ -336,4 +407,16 @@ func getRequestBody(op string, metadata map[string]string, t *testing.T) io.Read
 		t.Errorf("marshal request body failed: %v", err)
 	}
 	return bytes.NewReader(marshal)
+}
+
+func initHttpServer(resp []byte) int {
+	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(200)
+		_, _ = writer.Write(resp)
+	}))
+	addr := s.Listener.Addr().String()
+	index := strings.LastIndex(addr, ":")
+	portStr := addr[index+1:]
+	port, _ := strconv.Atoi(portStr)
+	return port
 }

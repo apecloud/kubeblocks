@@ -123,9 +123,18 @@ all: manager kbcli probe reloader ## Make all cmd binaries.
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
+	@$(MAKE) label-crds --no-print-directory
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(MAKE) client-sdk-gen
+
+.PHONY: label-crds
+label-crds:
+	@for f in config/crd/bases/*.yaml; do \
+		echo "applying app.kubernetes.io/name=kubeblocks label to $$f"; \
+		kubectl label --overwrite -f $$f --local=true -o yaml app.kubernetes.io/name=kubeblocks > bin/crd.yaml; \
+		mv bin/crd.yaml $$f; \
+	done
 
 .PHONY: preflight-manifests
 preflight-manifests: generate ## Generate external Preflight API

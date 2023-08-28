@@ -65,7 +65,7 @@ When adopting a multi-cloud or hybrid cloud strategy, it is essential to priorit
   
 ## Get started with KubeBlocks
 
-[Quick Start](https://kubeblocks.io/docs/preview/user_docs/quick-start/try-kubeblocks-on-your-laptop) shows you the quickest way to get started with KubeBlocks.
+[Quick Start](https://kubeblocks.io/docs/preview/user_docs/try-out-on-playground/try-kubeblocks-on-your-laptop) shows you the quickest way to get started with KubeBlocks.
 
 ## Community
 

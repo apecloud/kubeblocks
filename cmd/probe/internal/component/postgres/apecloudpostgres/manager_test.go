@@ -668,6 +668,168 @@ func TestPromote(t *testing.T) {
 	})
 
 	t.Run("exec promote failed", func(t *testing.T) {
+		mock.ExpectQuery("select ip_port from consensus_cluster_status").
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRow(":"))
+		mock.ExpectExec("alter system").
+			WillReturnError(fmt.Errorf("some error"))
 
+		err := manager.Promote(ctx, cluster)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("exec promote success", func(t *testing.T) {
+		mock.ExpectQuery("select ip_port from consensus_cluster_status").
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRow(":"))
+		mock.ExpectExec("alter system").
+			WillReturnResult(pgxmock.NewResult("alter system", 1))
+
+		err := manager.Promote(ctx, cluster)
+		assert.Nil(t, err)
+	})
+
+	t.Run("current member is already the leader", func(t *testing.T) {
+		manager.SetIsLeader(true)
+
+		err := manager.Promote(ctx, cluster)
+		assert.Nil(t, err)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestIsPromoted(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("is promoted", func(t *testing.T) {
+		manager.SetIsLeader(true)
+		isPromoted := manager.IsPromoted(ctx)
+
+		assert.True(t, isPromoted)
+	})
+}
+
+func TestHasOtherHealthyLeader(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{}
+
+	t.Run("query failed", func(t *testing.T) {
+		mock.ExpectQuery("select ip_port from consensus_cluster_status").
+			WillReturnError(fmt.Errorf("some error"))
+
+		member := manager.HasOtherHealthyLeader(ctx, cluster)
+		assert.Nil(t, member)
+	})
+
+	t.Run("parse query failed", func(t *testing.T) {
+		mock.ExpectQuery("select ip_port from consensus_cluster_status").
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}))
+
+		member := manager.HasOtherHealthyLeader(ctx, cluster)
+		assert.Nil(t, member)
+	})
+
+	t.Run("has other healthy leader", func(t *testing.T) {
+		cluster.Members = append(cluster.Members, dcs.Member{
+			Name: "test",
+		})
+		mock.ExpectQuery("select ip_port from consensus_cluster_status").
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRow("test:5432"))
+
+		member := manager.HasOtherHealthyLeader(ctx, cluster)
+		assert.NotNil(t, member)
+	})
+
+	t.Run("current member is leader", func(t *testing.T) {
+		manager.SetIsLeader(true)
+
+		member := manager.HasOtherHealthyLeader(ctx, cluster)
+		assert.Nil(t, member)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestHasOtherHealthyMembers(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{}
+	cluster.Members = append(cluster.Members, dcs.Member{
+		Name: manager.CurrentMemberName,
+	})
+
+	t.Run("", func(t *testing.T) {
+		members := manager.HasOtherHealthyMembers(ctx, cluster, manager.CurrentMemberName)
+		assert.Equal(t, 0, len(members))
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestGetDBState(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{}
+	cluster.Members = append(cluster.Members, dcs.Member{
+		Name: manager.CurrentMemberName,
+	})
+	cluster.Leader = &dcs.Leader{
+		Name: manager.CurrentMemberName,
+	}
+
+	t.Run("check is leader failed", func(t *testing.T) {
+		mock.ExpectQuery("select paxos_role").
+			WillReturnError(fmt.Errorf("some error"))
+
+		dbState := manager.GetDBState(ctx, cluster)
+		assert.Nil(t, dbState)
+	})
+
+	t.Run("get member addrs failed", func(t *testing.T) {
+		mock.ExpectQuery("select paxos_role").
+			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select ip_port").
+			WillReturnError(fmt.Errorf("some error"))
+
+		dbState := manager.GetDBState(ctx, cluster)
+		assert.Nil(t, dbState)
+	})
+
+	t.Run("get member health status failed", func(t *testing.T) {
+		mock.ExpectQuery("select paxos_role").
+			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select ip_port").
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRows([][]any{{"a"}, {"b"}, {"c"}}...))
+		mock.ExpectQuery("select connected, log_delay_num").
+			WillReturnError(fmt.Errorf("some error"))
+
+		dbState := manager.GetDBState(ctx, cluster)
+		assert.Nil(t, dbState)
+	})
+
+	t.Run("get db state success", func(t *testing.T) {
+		mock.ExpectQuery("select paxos_role").
+			WillReturnRows(pgxmock.NewRows([]string{"paxos_role"}).AddRow(2))
+		mock.ExpectQuery("select ip_port").
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRows([][]any{{"a"}, {"b"}, {"c"}}...))
+		mock.ExpectQuery("select connected, log_delay_num").
+			WillReturnRows(pgxmock.NewRows([]string{"connected", "log_delay_num"}).AddRow(true, 20))
+
+		dbState := manager.GetDBState(ctx, cluster)
+		assert.NotNil(t, dbState)
+		assert.Equal(t, []string{"a", "b", "c"}, manager.memberAddrs)
+		assert.Equal(t, int64(20), manager.healthStatus.LogDelayNum)
+		assert.True(t, manager.healthStatus.Connected)
 	})
 }

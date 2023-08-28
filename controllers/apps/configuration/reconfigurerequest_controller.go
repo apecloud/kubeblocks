@@ -37,8 +37,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -161,7 +161,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if !configPatch.IsModify {
 		reqCtx.Recorder.Eventf(config, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
 			"nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, config, cfgcore.ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, config, core.ReconfigureNoChangeType)
 	}
 
 	reqCtx.Log.V(1).Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
@@ -238,7 +238,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	}
 
 	returnedStatus, err := policy.Upgrade(params)
-	if err := r.handleConfigEvent(params, cfgcore.PolicyExecStatus{
+	if err := r.handleConfigEvent(params, core.PolicyExecStatus{
 		PolicyName:    policy.GetPolicyName(),
 		ExecStatus:    string(returnedStatus.Status),
 		SucceedCount:  returnedStatus.SucceedCount,
@@ -276,7 +276,7 @@ func getOpsRequestID(cm *corev1.ConfigMap) string {
 	return ""
 }
 
-func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status core.PolicyExecStatus, err error) error {
 	var (
 		cm             = params.ConfigMap
 		lastOpsRequest = ""

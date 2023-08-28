@@ -29,8 +29,9 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 

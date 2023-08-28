@@ -28,7 +28,7 @@ import (
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 const (
@@ -152,7 +152,7 @@ func handleClassicStorageType(expand string) cueExpandHandle {
 	return handleCueExpandHelper(expand, func(s string) (int64, error) {
 		digitNumber := parseDigitNumber(s)
 		if digitNumber == 0 {
-			return 0, configuration.MakeError("failed to parse storage type[%s]", s)
+			return 0, core.MakeError("failed to parse storage type[%s]", s)
 		}
 		iv, err := strconv.Atoi(s[:digitNumber])
 		if err != nil {
@@ -166,7 +166,7 @@ func handleClassicStorageType(expand string) cueExpandHandle {
 		if v, ok := bytesSizeTable[unit]; ok {
 			return int64(iv) * v, nil
 		}
-		return 0, configuration.MakeError("failed to parse storage value[%s]", s)
+		return 0, core.MakeError("failed to parse storage value[%s]", s)
 	})
 }
 
@@ -174,7 +174,7 @@ func handleClassicTimeDurationType(expand string) cueExpandHandle {
 	return handleCueExpandHelper(expand, func(s string) (int64, error) {
 		digitNumber := parseDigitNumber(s)
 		if digitNumber == 0 {
-			return 0, configuration.MakeError("failed to parse time duration type[%s]", s)
+			return 0, core.MakeError("failed to parse time duration type[%s]", s)
 		}
 		iv, err := strconv.Atoi(s[:digitNumber])
 		if err != nil {
@@ -188,6 +188,6 @@ func handleClassicTimeDurationType(expand string) cueExpandHandle {
 		if v, ok := timeDurationTable[unit]; ok {
 			return int64(iv) * int64(v), nil
 		}
-		return 0, configuration.MakeError("failed to parse time duration value[%s]", s)
+		return 0, core.MakeError("failed to parse time duration value[%s]", s)
 	})
 }

@@ -31,7 +31,7 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 // GenerateOpenAPISchema generates openapi schema from cue type Definitions.
@@ -44,11 +44,11 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	insts := load.Instances([]string{"-"}, cueOption)
 	for _, ins := range insts {
 		if err := ins.Err; err != nil {
-			return nil, configuration.WrapError(err, "failed to generate build.Instance for %s", schemaType)
+			return nil, core.WrapError(err, "failed to generate build.Instance for %s", schemaType)
 		}
 	}
 	if len(insts) != 1 {
-		return nil, configuration.MakeError("failed to create cue.Instances. [%s]", cueTpl)
+		return nil, core.MakeError("failed to create cue.Instances. [%s]", cueTpl)
 	}
 
 	openapiOption := &openapi.Config{
@@ -104,7 +104,7 @@ func transformOpenAPISchema(cueSchema *openapi.OrderedMap, schemaType string) (*
 
 	b, err := typeSchema.MarshalJSON()
 	if err != nil {
-		return nil, configuration.WrapError(err, "failed to marshal OpenAPI schema")
+		return nil, core.WrapError(err, "failed to marshal OpenAPI schema")
 	}
 
 	jsonProps := apiextv1.JSONSchemaProps{}

@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -155,7 +155,7 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 	}
 	for _, configSpec := range configSpecs {
 		labels := client.MatchingLabels{
-			cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name): configSpec.TemplateRef,
+			core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name): configSpec.TemplateRef,
 		}
 		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterVersionList{}, &appsv1alpha1.ClusterDefinitionList{}); err != nil {
 			return err
@@ -244,7 +244,7 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	case *appsv1alpha1.ClusterVersion:
 		configTemplates = getConfigTemplateFromCV(cr)
 	default:
-		return false, cfgcore.MakeError("not support CR type: %v", cr)
+		return false, core.MakeError("not support CR type: %v", cr)
 	}
 
 	switch {
@@ -306,9 +306,9 @@ func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli cli
 			labels = map[string]string{}
 		}
 		for _, configSpec := range configSpecs {
-			labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name)] = configSpec.TemplateRef
+			labels[core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name)] = configSpec.TemplateRef
 			if len(configSpec.ConfigConstraintRef) != 0 {
-				labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configSpec.ConfigConstraintRef)] = configSpec.ConfigConstraintRef
+				labels[core.GenerateConstraintsUniqLabelKeyWithConfig(configSpec.ConfigConstraintRef)] = configSpec.ConfigConstraintRef
 			}
 		}
 		obj.SetLabels(labels)
@@ -372,13 +372,13 @@ func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx,
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
+func createConfigPatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
-		return nil, false, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
+		return nil, false, core.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	return cfgcore.CreateConfigPatch(lastConfig, cfg.Data, format, cmKeys, true)
+	return core.CreateConfigPatch(lastConfig, cfg.Data, format, cmKeys, true)
 }
 
 func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ctx context.Context) error {

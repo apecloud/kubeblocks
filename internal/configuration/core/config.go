@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package core
 
 import (
 	"encoding/json"
@@ -25,10 +25,11 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
+	"github.com/spf13/cast"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/unstructured"
-	"github.com/spf13/cast"
 )
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)

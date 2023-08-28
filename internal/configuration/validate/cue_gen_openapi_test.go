@@ -28,7 +28,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -109,7 +110,7 @@ func getContentFromFile(file string) []byte {
 func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	cueTpl := getContentFromFile(cueFile)
 	if cueTpl == nil {
-		return nil, configuration.MakeError("cannot open file[%s]", cueTpl)
+		return nil, core.MakeError("cannot open file[%s]", cueTpl)
 	}
 
 	schema, err := GenerateOpenAPISchema(string(cueTpl), typeName)
@@ -118,7 +119,7 @@ func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	}
 
 	if schema == nil {
-		return nil, configuration.MakeError("cannot find schema.")
+		return nil, core.MakeError("cannot find schema.")
 	}
 
 	b, _ := json.Marshal(schema)

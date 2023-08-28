@@ -28,8 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 )
@@ -45,11 +46,11 @@ type ConfigEventContext struct {
 	DeploymentUnits  []appsv1.Deployment
 
 	ConfigSpecName   string
-	ConfigPatch      *configuration.ConfigPatchInfo
+	ConfigPatch      *core.ConfigPatchInfo
 	ConfigMap        *corev1.ConfigMap
 	ConfigConstraint *v1alpha1.ConfigConstraintSpec
 
-	PolicyStatus configuration.PolicyExecStatus
+	PolicyStatus core.PolicyExecStatus
 }
 
 type ConfigEventHandler interface {
@@ -59,37 +60,37 @@ type ConfigEventHandler interface {
 var ConfigEventHandlerMap = make(map[string]ConfigEventHandler)
 
 // MergeAndValidateConfigs merges and validates configuration files
-func MergeAndValidateConfigs(configConstraint v1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []configuration.ParamPairs) (map[string]string, error) {
+func MergeAndValidateConfigs(configConstraint v1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []core.ParamPairs) (map[string]string, error) {
 	var (
 		err error
 		fc  = configConstraint.FormatterConfig
 
 		newCfg         map[string]string
-		configOperator configuration.ConfigOperator
+		configOperator core.ConfigOperator
 		updatedKeys    = util.NewSet()
 	)
 
-	cmKeySet := configuration.FromCMKeysSelector(cmKey)
-	configLoaderOption := configuration.CfgOption{
-		Type:           configuration.CfgCmType,
+	cmKeySet := core.FromCMKeysSelector(cmKey)
+	configLoaderOption := core.CfgOption{
+		Type:           core.CfgCmType,
 		Log:            log.FromContext(context.TODO()),
 		CfgType:        fc.Format,
-		ConfigResource: configuration.FromConfigData(baseConfigs, cmKeySet),
+		ConfigResource: core.FromConfigData(baseConfigs, cmKeySet),
 	}
-	if configOperator, err = configuration.NewConfigLoader(configLoaderOption); err != nil {
+	if configOperator, err = core.NewConfigLoader(configLoaderOption); err != nil {
 		return nil, err
 	}
 
 	// merge param to config file
 	for _, params := range updatedParams {
-		if err := configOperator.MergeFrom(params.UpdatedParams, configuration.NewCfgOptions(params.Key, configuration.WithFormatterConfig(fc))); err != nil {
+		if err := configOperator.MergeFrom(params.UpdatedParams, core.NewCfgOptions(params.Key, core.WithFormatterConfig(fc))); err != nil {
 			return nil, err
 		}
 		updatedKeys.Add(params.Key)
 	}
 
 	if newCfg, err = configOperator.ToCfgContent(); err != nil {
-		return nil, configuration.WrapError(err, "failed to generate config file")
+		return nil, core.WrapError(err, "failed to generate config file")
 	}
 
 	// The ToCfgContent interface returns the file contents of all keys, the configuration file is encoded and decoded into keys,
@@ -97,9 +98,9 @@ func MergeAndValidateConfigs(configConstraint v1alpha1.ConfigConstraintSpec, bas
 	// in order to minimize the impact on the original file, only update the changed part.
 	updatedCfg := fromUpdatedConfig(newCfg, updatedKeys)
 	if err = validate.NewConfigValidator(&configConstraint, validate.WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
-		return nil, configuration.WrapError(err, "failed to validate updated config")
+		return nil, core.WrapError(err, "failed to validate updated config")
 	}
-	return configuration.MergeUpdatedConfig(baseConfigs, updatedCfg), nil
+	return core.MergeUpdatedConfig(baseConfigs, updatedCfg), nil
 }
 
 // fromUpdatedConfig filters out changed file contents.

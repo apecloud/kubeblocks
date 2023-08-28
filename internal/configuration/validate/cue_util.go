@@ -23,8 +23,9 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/unstructured"
 )
 
@@ -59,7 +60,7 @@ func CueValidate(cueTpl string) error {
 func ValidateConfigurationWithCue(cueString string, cfgType appsv1alpha1.CfgFileFormat, rawData string) error {
 	parameters, err := LoadConfigObjectFromContent(cfgType, rawData)
 	if err != nil {
-		return configuration.WrapError(err, "failed to load configuration [%s]", rawData)
+		return core.WrapError(err, "failed to load configuration [%s]", rawData)
 	}
 
 	return unstructuredDataValidateByCue(cueString, parameters, cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.PropertiesPlus)
@@ -94,7 +95,7 @@ func unstructuredDataValidateByCue(cueString string, data interface{}, trimStrin
 
 	cueValue = cueValue.Fill(data, paths...)
 	if err := cueValue.Err(); err != nil {
-		return configuration.WrapError(err, "failed to render cue template configure")
+		return core.WrapError(err, "failed to render cue template configure")
 	}
 
 	return cueValue.Validate()

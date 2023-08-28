@@ -27,10 +27,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	"github.com/StudioSol/set"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -100,7 +101,7 @@ var _ = Describe("config_util", func() {
 			type args struct {
 				configConstraint v1alpha1.ConfigConstraintSpec
 				baseCfg          map[string]string
-				updatedParams    []configuration.ParamPairs
+				updatedParams    []core.ParamPairs
 				cmKeys           []string
 			}
 
@@ -132,7 +133,7 @@ var _ = Describe("config_util", func() {
 						"key":  string(cfgContext),
 						"key2": "not support context",
 					},
-					updatedParams: []configuration.ParamPairs{
+					updatedParams: []core.ParamPairs{
 						{
 							Key: "key",
 							UpdatedParams: map[string]interface{}{
@@ -155,7 +156,7 @@ var _ = Describe("config_util", func() {
 						"key":  string(cfgContext),
 						"key2": "not_support_context",
 					},
-					updatedParams: []configuration.ParamPairs{
+					updatedParams: []core.ParamPairs{
 						{
 							Key: "key",
 							UpdatedParams: map[string]interface{}{
@@ -175,14 +176,14 @@ var _ = Describe("config_util", func() {
 					continue
 				}
 
-				option := configuration.CfgOption{
-					Type:    configuration.CfgTplType,
+				option := core.CfgOption{
+					Type:    core.CfgTplType,
 					CfgType: tt.args.configConstraint.FormatterConfig.Format,
 				}
 
-				patch, err := configuration.CreateMergePatch(&configuration.ConfigResource{
+				patch, err := core.CreateMergePatch(&core.ConfigResource{
 					ConfigData: tt.args.baseCfg,
-				}, &configuration.ConfigResource{
+				}, &core.ConfigResource{
 					ConfigData: got,
 				}, option)
 				Expect(err).Should(Succeed())

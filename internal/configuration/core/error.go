@@ -17,15 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package core
 
-import appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+import (
+	"fmt"
+	"strings"
 
-const (
-	ReconfigureCreatedPhase    = "created"
-	ReconfigureNoChangeType    = "noChange"
-	ReconfigureAutoReloadPhase = string(appsv1alpha1.AutoReload)
-	ReconfigureSimplePhase     = string(appsv1alpha1.NormalPolicy)
-	ReconfigureParallelPhase   = string(appsv1alpha1.RestartPolicy)
-	ReconfigureRollingPhase    = string(appsv1alpha1.RollingPolicy)
+	"cuelang.org/go/cue/errors"
 )
+
+func MakeError(formatMsg string, args ...interface{}) error {
+	return fmt.Errorf(formatMsg, args...)
+}
+
+func WrapError(err error, formatMsg string, args ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	// TODO add log info
+	return MakeError("%v: [%s]", MakeError(formatMsg, args...), strings.TrimSpace(errors.Details(err, nil)))
+}

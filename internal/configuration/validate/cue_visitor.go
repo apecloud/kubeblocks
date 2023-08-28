@@ -28,7 +28,8 @@ import (
 	"cuelang.org/go/cue"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -204,7 +205,7 @@ func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Valu
 		}
 		updateFn(v)
 	case reflect.Array, reflect.Slice, reflect.Struct:
-		return configuration.MakeError("not supported type[%s] trans.", obj.Type().Kind())
+		return core.MakeError("not supported type[%s] trans.", obj.Type().Kind())
 	}
 
 	return nil
@@ -230,7 +231,7 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 			}
 			err := transNumberOrBoolType(typeTransformer.fieldTypes[fieldPath], obj, fn, typeTransformer.fieldUnits[fieldPath], trimString)
 			if err != nil {
-				return configuration.WrapError(err, "failed to parse field %s", fieldPath)
+				return core.WrapError(err, "failed to parse field %s", fieldPath)
 			}
 			return nil
 		}, false)

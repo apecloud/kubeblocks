@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -183,11 +183,11 @@ func withConfigPatch(patch map[string]string) ParamsOps {
 	}
 	return func(params *reconfigureParams) {
 		cc := params.ConfigConstraint
-		newConfigData, _ := intctrlutil.MergeAndValidateConfigs(*cc, map[string]string{"for_test": ""}, nil, []cfgcore.ParamPairs{{
+		newConfigData, _ := intctrlutil.MergeAndValidateConfigs(*cc, map[string]string{"for_test": ""}, nil, []core.ParamPairs{{
 			Key:           "for_test",
 			UpdatedParams: transKeyPair(patch),
 		}})
-		configPatch, _, _ := cfgcore.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FormatterConfig.Format, nil, false)
+		configPatch, _, _ := core.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FormatterConfig.Format, nil, false)
 		params.ConfigPatch = configPatch
 	}
 }

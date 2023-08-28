@@ -28,8 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -124,13 +125,13 @@ func (r *reconfigureAction) Handle(eventContext intctrlutil.ConfigEventContext, 
 	}
 }
 
-func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase appsv1alpha1.OpsPhase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
+func handleReconfigureStatusProgress(execStatus core.PolicyExecStatus, phase appsv1alpha1.OpsPhase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
 		cmStatus.LastAppliedStatus = execStatus.ExecStatus
 		cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(execStatus.PolicyName)
 		cmStatus.SucceedCount = execStatus.SucceedCount
 		cmStatus.ExpectedCount = execStatus.ExpectedCount
-		if cmStatus.SucceedCount != cfgcore.Unconfirmed && cmStatus.ExpectedCount != cfgcore.Unconfirmed {
+		if cmStatus.SucceedCount != core.Unconfirmed && cmStatus.ExpectedCount != core.Unconfirmed {
 			opsStatus.Progress = getSlowestReconfiguringProgress(opsStatus.ReconfiguringStatus.ConfigurationStatus)
 		}
 		switch phase {
@@ -145,7 +146,7 @@ func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase 
 	}
 }
 
-func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
+func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
 		cmStatus.Status = appsv1alpha1.ReasonReconfigureMerged
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
@@ -201,7 +202,7 @@ func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.Reques
 	)
 
 	cmKey := client.ObjectKey{
-		Name:      cfgcore.GetComponentCfgName(ops.ClusterRef, ops.Reconfigure.ComponentName, configSpec.Name),
+		Name:      core.GetComponentCfgName(ops.ClusterRef, ops.Reconfigure.ComponentName, configSpec.Name),
 		Namespace: ns,
 	}
 	cm := &corev1.ConfigMap{}
@@ -275,21 +276,21 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		Name:      cluster.Spec.ClusterDefRef,
 		Namespace: cluster.Namespace,
 	}, clusterDefinition); err != nil {
-		return cfgcore.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
+		return core.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
 	}
 
 	if err := getClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, cli, reqCtx.Ctx); err != nil {
 		return err
 	}
 
-	configSpecs, err := cfgcore.GetConfigTemplatesFromComponent(
+	configSpecs, err := core.GetConfigTemplatesFromComponent(
 		cluster.Spec.ComponentSpecs,
 		clusterDefinition.Spec.ComponentDefs,
 		clusterVersion.Spec.ComponentVersions,
 		componentName)
 	if err != nil {
 		return processMergedFailed(resource, true,
-			cfgcore.WrapError(err, "failed to get config template in the component[%s]", componentName))
+			core.WrapError(err, "failed to get config template in the component[%s]", componentName))
 	}
 	return r.sync(reqCtx, cli, clusterName, componentName, spec.Reconfigure, resource, configSpecs)
 }
@@ -318,14 +319,14 @@ func (r *reconfigureAction) sync(reqCtx intctrlutil.RequestCtx,
 		configSpec := foundConfigSpec(config.Name)
 		if configSpec == nil {
 			return processMergedFailed(resource, true,
-				cfgcore.MakeError("failed to reconfigure, not existed config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
+				core.MakeError("failed to reconfigure, not existed config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
 		}
 		if len(configSpec.ConfigConstraintRef) == 0 {
 			return processMergedFailed(resource, true,
-				cfgcore.MakeError("current configSpec not support reconfigure, configSpec: %v", configSpec.Name))
+				core.MakeError("current configSpec not support reconfigure, configSpec: %v", configSpec.Name))
 		}
 		result := updateConfigConfigmapResource(config, *configSpec, client.ObjectKey{
-			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.Name),
+			Name:      core.GetComponentCfgName(clusterName, componentName, configSpec.Name),
 			Namespace: resource.Cluster.Namespace,
 		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)
 		if result.err != nil {

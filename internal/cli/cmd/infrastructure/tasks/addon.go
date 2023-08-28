@@ -24,9 +24,10 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/task"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/utils"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 type AddonsInstaller struct {

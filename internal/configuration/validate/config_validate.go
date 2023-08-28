@@ -27,8 +27,9 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 type ValidatorOptions = func(key string) bool
@@ -102,7 +103,7 @@ func (s *schemaValidator) Validate(data map[string]string) error {
 		}
 		res := validator.Validate(cfg)
 		if res.HasErrors() {
-			return configuration.WrapError(errors.CompositeValidationError(res.Errors...), "failed to schema validate for cfg: %s", key)
+			return core.WrapError(errors.CompositeValidationError(res.Errors...), "failed to schema validate for cfg: %s", key)
 		}
 	}
 	return nil
@@ -118,7 +119,7 @@ func (e emptyValidator) Validate(_ map[string]string) error {
 func WithKeySelector(keys []string) ValidatorOptions {
 	var sets *set.LinkedHashSetString
 	if len(keys) > 0 {
-		sets = configuration.FromCMKeysSelector(keys)
+		sets = core.FromCMKeysSelector(keys)
 	}
 	return func(key string) bool {
 		return sets == nil || sets.InArray(key)

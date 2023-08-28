@@ -29,8 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -45,7 +46,7 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 	injectConfigmap := func(envMap map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cmName string) error {
 		envConfigMap, err := createEnvFromConfigmap(cluster, component.Name, configSpec, client.ObjectKeyFromObject(cm), envMap, ctx, cli)
 		if err != nil {
-			return cfgcore.WrapError(err, "failed to generate env configmap[%s]", cmName)
+			return core.WrapError(err, "failed to generate env configmap[%s]", cmName)
 		}
 		injectEnvFrom(podSpec.Containers, configSpec.AsEnvFrom, envConfigMap.Name)
 		injectEnvFrom(podSpec.InitContainers, configSpec.AsEnvFrom, envConfigMap.Name)
@@ -56,7 +57,7 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 		if len(template.AsEnvFrom) == 0 || template.ConfigConstraintRef == "" {
 			continue
 		}
-		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, template.Name)
+		cmName := core.GetComponentCfgName(cluster.Name, component.Name, template.Name)
 		if cm, err = fetchConfigmap(localObjs, cmName, cluster.Namespace, cli, ctx); err != nil {
 			return err
 		}
@@ -85,10 +86,10 @@ func getConfigConstraint(template appsv1alpha1.ComponentConfigSpec, cli client.C
 	}
 	cc := &appsv1alpha1.ConfigConstraint{}
 	if err := cli.Get(ctx, ccKey, cc); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 	}
 	if cc.Spec.FormatterConfig == nil {
-		return nil, cfgcore.MakeError("ConfigConstraint[%v] is not a formatter", cc.Name)
+		return nil, core.MakeError("ConfigConstraint[%v] is not a formatter", cc.Name)
 	}
 	return &cc.Spec, nil
 }

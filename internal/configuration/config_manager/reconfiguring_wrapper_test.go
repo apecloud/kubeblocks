@@ -25,9 +25,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/DATA-DOG/go-sqlmock"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 var _ = Describe("Handler Util Test", func() {

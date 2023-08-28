@@ -32,8 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -92,14 +93,14 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 	}
 
 	// Config is exists
-	return cfgcore.IsNotUserReconfigureOperation(cmObj), cmObj, nil
+	return core.IsNotUserReconfigureOperation(cmObj), cmObj, nil
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, localObjs []client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range component.ConfigTemplates {
-		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
+		cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
 		if err != nil {
 			return err
@@ -131,7 +132,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 	localObjs []client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range component.ScriptTemplates {
-		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, templateSpec.Name)
+		cmName := core.GetComponentCfgName(cluster.Name, component.Name, templateSpec.Name)
 		object := findMatchedLocalObject(localObjs, client.ObjectKey{
 			Name:      cmName,
 			Namespace: wrapper.cluster.Namespace}, generics.ToGVK(&corev1.ConfigMap{}))
@@ -159,7 +160,7 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 		return err
 	}
 
-	cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+	core.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
 	wrapper.addVolumeMountMeta(templateSpec, cm, true)
 	return nil
 }
@@ -169,7 +170,7 @@ func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.Compo
 	if rendered {
 		wrapper.renderedObjs = append(wrapper.renderedObjs, object)
 	}
-	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
+	wrapper.templateAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
 }
 
 func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
@@ -185,7 +186,7 @@ func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.Conf
 	if origCMObj.Annotations == nil {
 		origCMObj.Annotations = make(map[string]string)
 	}
-	cfgcore.SetParametersUpdateSource(origCMObj, constant.ReconfigureManagerSource)
+	core.SetParametersUpdateSource(origCMObj, constant.ReconfigureManagerSource)
 	rawData, err := json.Marshal(origCMObj.Data)
 	if err != nil {
 		return err
@@ -270,7 +271,7 @@ func renderConfigMapTemplate(
 	templateBuilder.setTemplateName(templateSpec.TemplateRef)
 	renderedData, err := templateBuilder.render(cmObj.Data)
 	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to render configmap")
+		return nil, core.WrapError(err, "failed to render configmap")
 	}
 	return renderedData, nil
 }
@@ -289,7 +290,7 @@ func validateRenderedData(
 		Namespace: "",
 		Name:      configSpec.ConfigConstraintRef,
 	}, configConstraint); err != nil {
-		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
+		return core.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
 	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
 }
@@ -298,7 +299,7 @@ func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.Com
 	configChecker := validate.NewConfigValidator(cc, validate.WithKeySelector(configSpec.Keys))
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := configChecker.Validate(renderedData); err != nil {
-		return cfgcore.WrapError(err, "failed to validate configmap")
+		return core.WrapError(err, "failed to validate configmap")
 	}
 	return nil
 }

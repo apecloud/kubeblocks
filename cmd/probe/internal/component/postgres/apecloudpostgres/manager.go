@@ -170,11 +170,7 @@ func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster)
 		"create extension if not exists consensus_monitor;"
 
 	_, err := mgr.Exec(ctx, sql)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
@@ -217,7 +213,6 @@ func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []
 	}
 
 	sql := `select ip_port from consensus_cluster_status;`
-
 	resp, err := mgr.QueryLeader(ctx, sql, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("query %s with leader failed, err:%v", sql, err)

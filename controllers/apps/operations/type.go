@@ -62,11 +62,6 @@ type OpsBehaviour struct {
 	// ToClusterPhase indicates that the cluster will enter this phase during the operation.
 	ToClusterPhase appsv1alpha1.ClusterPhase
 
-	// MaintainClusterPhaseBySelf indicates whether the operation will maintain cluster/component phase by itself.
-	// Generally, the cluster/component phase will be maintained by cluster controller, but if the operation will not update
-	// StatefulSet/Deployment by Cluster controller and make pod rebuilt, maintain the cluster/component phase by self.
-	MaintainClusterPhaseBySelf bool
-
 	// ProcessingReasonInClusterCondition indicates the reason of the condition that type is "OpsRequestProcessed" in Cluster.Status.Conditions and
 	// is only valid when ToClusterPhase is not empty. it will indicate what operation the cluster is doing and
 	// will be displayed of "kbcli cluster list".

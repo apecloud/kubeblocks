@@ -62,7 +62,6 @@ func init() {
 	dataScriptOpsHander := DataScriptOpsHandler{}
 	dataScriptBehavior := OpsBehaviour{
 		FromClusterPhases:          []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase},
-		MaintainClusterPhaseBySelf: false,
 		OpsHandler:                 dataScriptOpsHander,
 	}
 	opsMgr := GetOpsManager()

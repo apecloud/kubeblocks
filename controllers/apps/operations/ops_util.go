@@ -288,7 +288,7 @@ func patchClusterStatusAndRecordEvent(reqCtx intctrlutil.RequestCtx,
 			`Start to process the %s opsRequest "%s" in Cluster: %s`, opsRes.OpsRequest.Spec.Type,
 			opsRes.OpsRequest.Name, opsRes.Cluster.Name)
 	}
-	if opsBehaviour.ToClusterPhase == "" || !opsBehaviour.MaintainClusterPhaseBySelf {
+	if opsBehaviour.ToClusterPhase == "" {
 		sendStartOpsRequestEvent()
 		return nil
 	}

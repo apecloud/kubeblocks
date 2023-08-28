@@ -46,7 +46,6 @@ func init() {
 		FromClusterPhases: appsv1alpha1.GetReconfiguringRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
-		MaintainClusterPhaseBySelf:         true,
 		OpsHandler:                         &reAction,
 		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
 	}
@@ -173,16 +172,10 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 	isNoChanged := isNoChange(condition)
 	if isSucceedPhase(condition) || isNoChanged {
 		// TODO Sync reload progress from config manager.
-		if err := r.syncReconfigureComponentStatus(reqCtx, cli, opsRes, isNoChanged); err != nil {
-			return "", time.Second, err
-		}
 		return appsv1alpha1.OpsSucceedPhase, 0, nil
 	}
 	if isFailedPhase(condition) {
 		// TODO Sync reload progress from config manager.
-		if err := r.syncReconfigureComponentStatus(reqCtx, cli, opsRes, true); err != nil {
-			return "", time.Second, err
-		}
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	if !isRunningPhase(condition) {
@@ -244,45 +237,6 @@ func checkFinishedReconfigure(cm *corev1.ConfigMap, opsRequestName string, logge
 		annotations[constant.LastAppliedOpsCRAnnotationKey],
 		labels[constant.CMInsConfigurationHashLabelKey]))
 	return labels[constant.CMInsConfigurationHashLabelKey] == hash
-}
-
-func (r *reconfigureAction) syncReconfigureComponentStatus(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	res *OpsResource,
-	skipCheckReload bool) error {
-	cluster := res.Cluster
-	opsRequest := res.OpsRequest
-
-	if opsRequest.Spec.Reconfigure == nil {
-		return nil
-	}
-
-	if !isReloadPolicy(opsRequest.Status.ReconfiguringStatus) && !skipCheckReload {
-		return nil
-	}
-
-	componentName := opsRequest.Spec.Reconfigure.ComponentName
-	c, ok := cluster.Status.Components[componentName]
-	if !ok || c.Phase != appsv1alpha1.SpecReconcilingClusterCompPhase {
-		return nil
-	}
-
-	clusterPatch := client.MergeFrom(cluster.DeepCopy())
-	c.Phase = appsv1alpha1.RunningClusterCompPhase
-	cluster.Status.SetComponentStatus(componentName, c)
-	return cli.Status().Patch(reqCtx.Ctx, cluster, clusterPatch)
-}
-
-func isReloadPolicy(status *appsv1alpha1.ReconfiguringStatus) bool {
-	if status == nil {
-		return false
-	}
-	for _, cmStatus := range status.ConfigurationStatus {
-		if cmStatus.UpdatePolicy == appsv1alpha1.AutoReload {
-			return true
-		}
-	}
-	return false
 }
 
 func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {

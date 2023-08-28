@@ -397,13 +397,13 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 
 	service, alternativeServices := separateServices(component.Services)
+	if service != nil {
+		rsmBuilder.SetService(service.Spec)
+	}
 	if len(alternativeServices) == 0 {
 		alternativeServices = nil
 	}
 	alternativeServices = fixService(cluster.Namespace, rsmName, component, alternativeServices...)
-	if service != nil {
-		rsmBuilder.SetService(service.Spec)
-	}
 	rsmBuilder.SetAlternativeServices(alternativeServices)
 
 	secretName := fmt.Sprintf("%s-conn-credential", cluster.Name)

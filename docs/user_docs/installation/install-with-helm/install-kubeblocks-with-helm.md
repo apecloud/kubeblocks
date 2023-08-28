@@ -51,13 +51,13 @@ Run the following command:
 helm repo add kubeblocks https://apecloud.github.io/helm-charts
 helm repo update
 helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespaces
+    --namespace kb-system --create-namespace
 ````
 
 If you want to install KubeBlocks with custom tolerations, you can use the following command:
 ```bash
 helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespaces \
+    --namespace kb-system --create-namespace \
     --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
     --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
 ```

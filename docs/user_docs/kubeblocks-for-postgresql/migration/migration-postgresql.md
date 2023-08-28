@@ -21,7 +21,7 @@ sidebar_label: Migration
 ### Enable kbcli migration
 
 1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Enable the migration add-on](./../../introduction/supported-addons.md).
+2. [Enable the migration add-on](./../../overview/supported-addons.md).
 
    ```bash
    kbcli addon list

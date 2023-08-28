@@ -11,6 +11,14 @@ on:
         description: 'kubeblocks previous version of upgrade'
         required: false
         default: ''
+      CLOUD_PROVIDER:
+        description: 'cloud provider'
+        required: true
+        default: 'eks'
+        type: choice
+        options:
+          - eks
+          - gke
       CLUSTER_VERSION:
         description: 'eks cluster version (e.g. 1.25)'
         required: false
@@ -29,6 +37,10 @@ on:
         options:
           - amd64
           - arm64
+      CLUSTER_REGION:
+        description: 'cluster region (e.g. cn-northwest-1)'
+        required: false
+        default: ''
       BRANCH_NAME:
         description: 'testinfra branch name'
         required: false
@@ -38,7 +50,7 @@ on:
         required: false
         default: ''
 
-run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} k8s:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
+run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} ${{ inputs.CLOUD_PROVIDER }}:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
 
 env:
   GH_TOKEN: ${{ github.token }}
@@ -47,7 +59,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     outputs:
-      release-version: ${{ steps.get_release_version.outputs.release_version }}
+      release-version: ${{ steps.get_release_version.outputs.release-version }}
+      cliuster-region: ${{ steps.get_release_version.outputs.cluster-region }}
     steps:
       - uses: actions/checkout@v3
       - name: check release version
@@ -60,18 +73,28 @@ jobs:
               exit 1
           else
               echo $RELEASE_VERSION
-              echo release_version=$RELEASE_VERSION >> $GITHUB_OUTPUT
+              echo release-version=$RELEASE_VERSION >> $GITHUB_OUTPUT
           fi
+          
+          CLUSTER_REGION="${{ inputs.CLUSTER_REGION }}"
+          if [[ "${{ inputs.CLOUD_PROVIDER }}" == 'eks' && -z "$CLUSTER_REGION" ]]; then
+              CLUSTER_REGION="${{ vars.REGION_AWK_EKS }}"
+          elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'gke' && -z "$CLUSTER_REGION" ]]; then
+              CLUSTER_REGION="${{ vars.REGION_GCP_GEK }}"
+          fi
+          echo cluster-region=$CLUSTER_REGION >> $GITHUB_OUTPUT
 
   eks:
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-eks.yml@v0.1.14
+    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k8s.yml@v0.1.17
     with:
+      CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"
       KB_PRE_VERSION: "${{ inputs.PRE_VERSION }}"
       CLUSTER_VERSION: "${{ inputs.CLUSTER_VERSION }}"
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
+      REGION: "${{ needs.check.outputs.cluster-region }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
-      APECD_REF: "v0.1.14"
+      APECD_REF: "v0.1.17"
       ARGS: "${{ inputs.ARGS }}"
     secrets: inherit

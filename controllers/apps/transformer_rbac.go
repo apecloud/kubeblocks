@@ -54,123 +54,19 @@ const (
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	clusterDef := transCtx.ClusterDef
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
 
-	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
-	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
-
-	serviceAccounts := map[string]*corev1.ServiceAccount{}
-	serviceAccountsNeedCrb := map[string]struct{}{}
-	buildServiceAccounts := func() error {
-		for _, compSpec := range componentSpecs {
-			serviceAccountName := compSpec.ServiceAccountName
-			if serviceAccountName == "" {
-				if !isProbesEnabled(clusterDef, &compSpec) && !isVolumeProtectionEnabled(clusterDef, &compSpec) {
-					continue
-				}
-				serviceAccountName = "kb-" + cluster.Name
-			}
-
-			if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
-				if !isVolumeProtectionEnabled(clusterDef, &compSpec) || isClusterRoleBindingExist(transCtx, serviceAccountName) {
-					continue
-				}
-			}
-
-			if _, ok := serviceAccounts[serviceAccountName]; !ok {
-				serviceAccount, err := builder.BuildServiceAccount(cluster)
-				serviceAccount.Name = serviceAccountName
-				if err != nil {
-					return err
-				}
-				serviceAccounts[serviceAccountName] = serviceAccount
-			}
-
-			if isVolumeProtectionEnabled(clusterDef, &compSpec) {
-				serviceAccountsNeedCrb[serviceAccountName] = struct{}{}
-			}
-		}
-		return nil
-	}
-
 	parentVertex := root
-	createSaVertex := func() []*ictrltypes.LifecycleVertex {
-		saVertexs := []*ictrltypes.LifecycleVertex{}
-		for _, sa := range serviceAccounts {
-			// serviceaccount must be created before rolebinding and clusterrolebinding
-			saVertex := ictrltypes.LifecycleObjectCreate(dag, sa, parentVertex)
-			saVertexs = append(saVertexs, saVertex)
-		}
-		return saVertexs
+	componentSpecs, err := getComponentSpecs(transCtx)
+	if err != nil {
+		return err
 	}
 
-	createRbVertex := func() error {
-		roleBinding, err := builder.BuildRoleBinding(cluster)
-		if err != nil {
-			return err
-		}
-		roleBinding.Subjects = []rbacv1.Subject{}
-		for saName := range serviceAccounts {
-			subject := rbacv1.Subject{
-				Name:      saName,
-				Namespace: cluster.Namespace,
-				Kind:      "ServiceAccount",
-			}
-			roleBinding.Subjects = append(roleBinding.Subjects, subject)
-		}
-		parentVertex = ictrltypes.LifecycleObjectCreate(dag, roleBinding, parentVertex)
-		return nil
-	}
-
-	createCrbVertex := func() error {
-		if len(serviceAccountsNeedCrb) > 0 {
-			clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
-			if err != nil {
-				return err
-			}
-			clusterRoleBinding.Subjects = []rbacv1.Subject{}
-			for saName := range serviceAccounts {
-				subject := rbacv1.Subject{
-					Name:      saName,
-					Namespace: cluster.Namespace,
-					Kind:      "ServiceAccount",
-				}
-				clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, subject)
-			}
-			parentVertex = ictrltypes.LifecycleObjectCreate(dag, clusterRoleBinding, parentVertex)
-
-		}
-		return nil
-	}
-
-	for _, compDef := range clusterDef.Spec.ComponentDefs {
-		comps := compSpecMap[compDef.Name]
-		if len(comps) == 0 {
-			// if componentSpecs is empty, it may be generated from the cluster template and cluster.
-			reqCtx := ictrlutil.RequestCtx{
-				Ctx: transCtx.Context,
-				Log: log.Log.WithName("rbac"),
-			}
-			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil)
-			if err != nil {
-				return err
-			}
-			if synthesizedComponent == nil {
-				continue
-			}
-			comps = []appsv1alpha1.ClusterComponentSpec{{
-				ServiceAccountName: synthesizedComponent.ServiceAccountName,
-				ComponentDefRef:    compDef.Name,
-			}}
-		}
-		componentSpecs = append(componentSpecs, comps...)
-	}
-
-	if err := buildServiceAccounts(); err != nil {
+	serviceAccounts, serviceAccountsNeedCrb, err := buildServiceAccounts(transCtx, componentSpecs)
+	if err != nil {
 		return err
 	}
 
@@ -190,15 +86,22 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		return nil
 	}
 
-	if err := createRbVertex(); err != nil {
+	rb, err := buildReloBinding(cluster, serviceAccounts)
+	if err != nil {
 		return err
 	}
 
-	if err := createCrbVertex(); err != nil {
-		return err
+	parentVertex = ictrltypes.LifecycleObjectCreate(dag, rb, parentVertex)
+	if len(serviceAccountsNeedCrb) > 0 {
+		crb, err := buildClusterReloBinding(cluster, serviceAccountsNeedCrb)
+		if err != nil {
+			return err
+		}
+
+		parentVertex = ictrltypes.LifecycleObjectCreate(dag, crb, parentVertex)
 	}
 
-	saVertexs := createSaVertex()
+	saVertexs := createSaVertex(serviceAccounts, dag, parentVertex)
 	statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
 	for _, statefulSetVertex := range statefulSetVertices {
 		// serviceaccount must be created before statefulset
@@ -330,4 +233,114 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 			serviceAccountName, "rolebinding.Subjects", rb.Subjects)
 	}
 	return true
+}
+
+func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.ClusterComponentSpec, error) {
+	cluster := transCtx.Cluster
+	clusterDef := transCtx.ClusterDef
+	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
+	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
+	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		comps := compSpecMap[compDef.Name]
+		if len(comps) == 0 {
+			// if componentSpecs is empty, it may be generated from the cluster template and cluster.
+			reqCtx := ictrlutil.RequestCtx{
+				Ctx: transCtx.Context,
+				Log: log.Log.WithName("rbac"),
+			}
+			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil)
+			if err != nil {
+				return nil, err
+			}
+			if synthesizedComponent == nil {
+				continue
+			}
+			comps = []appsv1alpha1.ClusterComponentSpec{{
+				ServiceAccountName: synthesizedComponent.ServiceAccountName,
+				ComponentDefRef:    compDef.Name,
+			}}
+		}
+		componentSpecs = append(componentSpecs, comps...)
+	}
+	return componentSpecs, nil
+}
+
+func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []appsv1alpha1.ClusterComponentSpec) (map[string]*corev1.ServiceAccount, map[string]struct{}, error) {
+	serviceAccounts := map[string]*corev1.ServiceAccount{}
+	serviceAccountsNeedCrb := map[string]struct{}{}
+	clusterDef := transCtx.ClusterDef
+	cluster := transCtx.Cluster
+	for _, compSpec := range componentSpecs {
+		serviceAccountName := compSpec.ServiceAccountName
+		if serviceAccountName == "" {
+			if !isProbesEnabled(clusterDef, &compSpec) && !isVolumeProtectionEnabled(clusterDef, &compSpec) {
+				continue
+			}
+			serviceAccountName = "kb-" + cluster.Name
+		}
+
+		if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
+			if !isVolumeProtectionEnabled(clusterDef, &compSpec) || isClusterRoleBindingExist(transCtx, serviceAccountName) {
+				continue
+			}
+		}
+
+		if _, ok := serviceAccounts[serviceAccountName]; !ok {
+			serviceAccount, err := builder.BuildServiceAccount(cluster)
+			serviceAccount.Name = serviceAccountName
+			if err != nil {
+				return nil, nil, err
+			}
+			serviceAccounts[serviceAccountName] = serviceAccount
+		}
+
+		if isVolumeProtectionEnabled(clusterDef, &compSpec) {
+			serviceAccountsNeedCrb[serviceAccountName] = struct{}{}
+		}
+	}
+	return serviceAccounts, serviceAccountsNeedCrb, nil
+}
+
+func buildReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.RoleBinding, error) {
+	roleBinding, err := builder.BuildRoleBinding(cluster)
+	if err != nil {
+		return nil, err
+	}
+	roleBinding.Subjects = []rbacv1.Subject{}
+	for saName := range serviceAccounts {
+		subject := rbacv1.Subject{
+			Name:      saName,
+			Namespace: cluster.Namespace,
+			Kind:      "ServiceAccount",
+		}
+		roleBinding.Subjects = append(roleBinding.Subjects, subject)
+	}
+	return roleBinding, nil
+}
+
+func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]struct{}) (*rbacv1.ClusterRoleBinding, error) {
+	clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
+	if err != nil {
+		return nil, err
+	}
+	clusterRoleBinding.Subjects = []rbacv1.Subject{}
+	for saName := range serviceAccounts {
+		subject := rbacv1.Subject{
+			Name:      saName,
+			Namespace: cluster.Namespace,
+			Kind:      "ServiceAccount",
+		}
+		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, subject)
+	}
+	return clusterRoleBinding, nil
+}
+
+func createSaVertex(serviceAccounts map[string]*corev1.ServiceAccount, dag *graph.DAG, parentVertex *ictrltypes.LifecycleVertex) []*ictrltypes.LifecycleVertex {
+	saVertexs := []*ictrltypes.LifecycleVertex{}
+	for _, sa := range serviceAccounts {
+		// serviceaccount must be created before rolebinding and clusterrolebinding
+		saVertex := ictrltypes.LifecycleObjectCreate(dag, sa, parentVertex)
+		saVertexs = append(saVertexs, saVertex)
+	}
+	return saVertexs
 }

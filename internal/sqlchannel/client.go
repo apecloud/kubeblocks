@@ -43,7 +43,10 @@ const (
 )
 
 type Client interface {
+	// JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
 	JoinMember(ctx context.Context) error
+
+	// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
 	LeaveMember(ctx context.Context) error
 }
 
@@ -122,7 +125,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		Url:              fmt.Sprintf(urlTemplate, port, characterType),
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
-		ReconcileTimeout: 100 * time.Millisecond,
+		ReconcileTimeout: 500 * time.Millisecond,
 		cache:            make(map[string]*OperationResult),
 	}
 	return operationClient, nil
@@ -130,7 +133,6 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 
 func (cli *OperationClient) GetRole() (string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
-
 	defer cancel()
 
 	// Http request
@@ -181,14 +183,41 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	return result, err
 }
 
+// JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
 func (cli *OperationClient) JoinMember(ctx context.Context) error {
-	// TODO: implement
-	return nil
+	_, err := cli.Request(ctx, string(JoinMemberOperation))
+	return err
 }
 
+// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
 func (cli *OperationClient) LeaveMember(ctx context.Context) error {
-	// TODO: implement
-	return nil
+	_, err := cli.Request(ctx, string(LeaveMemberOperation))
+	return err
+}
+
+func (cli *OperationClient) Request(ctx context.Context, operation string) (map[string]any, error) {
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
+	defer cancel()
+
+	// Request sql channel via Dapr SDK
+	req := &dapr.InvokeBindingRequest{
+		Name:      cli.CharacterType,
+		Operation: operation,
+		Data:      []byte(""),
+		Metadata:  map[string]string{},
+	}
+
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]any{}
+	err = json.Unmarshal(resp.Data, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
@@ -308,13 +337,6 @@ func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLC
 		err       error
 		response  = SQLChannelResponse{}
 	)
-
-	// attach token
-	if token, err := GetToken(context.Background()); err != nil {
-		return response, err
-	} else {
-		request.Metadata["token"] = token
-	}
 
 	if jsonData, err := json.Marshal(request); err != nil {
 		return response, err

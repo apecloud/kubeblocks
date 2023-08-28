@@ -3728,7 +3728,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">
-map[string]..ClusterComponentStatus
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ClusterComponentStatus
 </a>
 </em>
 </td>
@@ -5118,6 +5118,20 @@ string
 </tr>
 <tr>
 <td>
+<code>policy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.UpgradePolicy">
+UpgradePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>policy defines the upgrade policy.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>keys</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ParameterConfig">
@@ -6232,7 +6246,7 @@ ClassDefRef
 <td>
 <code>targetResources</code><br/>
 <em>
-map[..ComponentResourceKey][]string
+map[github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ComponentResourceKey][]string
 </em>
 </td>
 <td>
@@ -6274,7 +6288,7 @@ string
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">
-map[string]..LastComponentConfiguration
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.LastComponentConfiguration
 </a>
 </em>
 </td>
@@ -7030,7 +7044,7 @@ LastConfiguration
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">
-map[string]..OpsRequestComponentStatus
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.OpsRequestComponentStatus
 </a>
 </em>
 </td>
@@ -7227,7 +7241,20 @@ string
 </em>
 </td>
 <td>
-<p>Setting the list of parameters for a single configuration file.</p><br />
+<em>(Optional)</em>
+<p>Setting the list of parameters for a single configuration file.<br />update specified the parameters.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>fileContent</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>fileContent indicates the configuration file content.<br />update whole file.</p><br />
 </td>
 </tr>
 </tbody>
@@ -7266,6 +7293,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>parameter values to be updated.<br />if set nil, the parameter defined by the key field will be deleted from the configuration file.</p><br />
 </td>
 </tr>
@@ -7855,6 +7883,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsRequestSpec">OpsRequestSpec</a>)
 </p>
 <div>
+<p>Reconfigure defines the variables that need to input when updating configuration.</p><br />
 </div>
 <table>
 <thead>
@@ -9834,7 +9863,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.UpgradePolicy">UpgradePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationStatus">ConfigurationStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Configuration">Configuration</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationStatus">ConfigurationStatus</a>)
 </p>
 <div>
 <p>UpgradePolicy defines the policy of reconfiguring.</p><br />

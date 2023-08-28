@@ -21,11 +21,8 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
-	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -47,7 +44,6 @@ import (
 
 // MysqlOperations represents MySQL output bindings.
 type MysqlOperations struct {
-	manager *mysql.Manager
 	BaseOperations
 }
 
@@ -94,12 +90,25 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 		mysqlOps.Logger.Error(err, "MySQL config initialize failed")
 		return err
 	}
-	manager, err := mysql.NewManager(mysqlOps.Logger)
-	if err != nil {
-		mysqlOps.Logger.Error(err, "MySQL DB Manager initialize failed")
-		return err
+
+	var manager component.DBManager
+	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	if strings.EqualFold(workloadType, Consensus) {
+		manager, err = mysql.NewWesqlManager(mysqlOps.Logger)
+		if err != nil {
+			mysqlOps.Logger.Error(err, "WeSQL DB Manager initialize failed")
+			return err
+		}
+	} else {
+		manager, err = mysql.NewManager(mysqlOps.Logger)
+		if err != nil {
+			mysqlOps.Logger.Error(err, "MySQL DB Manager initialize failed")
+			return err
+		}
+
 	}
-	mysqlOps.manager = manager
+
+	mysqlOps.Manager = manager
 	mysqlOps.DBType = "mysql"
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
@@ -137,12 +146,16 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *ProbeRequ
 		if cluster == nil || !cluster.IsLocked() {
 			return "", nil
 		}
+
+		manager := mysqlOps.Manager.(*mysql.Manager)
+		return manager.GetRole(ctx)
 	}
-	return mysqlOps.manager.GetRole(ctx)
+	manager := mysqlOps.Manager.(*mysql.WesqlManager)
+	return manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
-	return mysqlOps.DBPort
+	return 0
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
@@ -163,8 +176,8 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 
 func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-
-	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
+	manager := mysqlOps.Manager.(*mysql.WesqlManager)
+	rows, err := manager.DB.QueryContext(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
 		return "", errors.Wrapf(err, "error executing %s", sql)
@@ -192,111 +205,7 @@ func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, reques
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
-// getTermAndRole is similar to GetRoleForConsensus
-func (mysqlOps *MysqlOperations) getTermAndRole(ctx context.Context) (int, string, error) {
-	sql := "select CURRENT_TERM,ROLE from information_schema.wesql_cluster_local;"
-
-	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
-	if err != nil {
-		mysqlOps.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
-		return -1, "", errors.Wrapf(err, "error executing %s", sql)
-	}
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var term int
-	var role string
-	for rows.Next() {
-		err := rows.Scan(&term, &role)
-		if err != nil {
-			return -1, "", err
-		}
-	}
-	return term, role, nil
-}
-
-func (mysqlOps *MysqlOperations) GetGlobalInfo(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error) {
-	workloadType := request.Metadata[WorkloadTypeKey]
-	if strings.EqualFold(workloadType, Replication) {
-		// todo implement Replication
-		return GlobalInfo{}, nil
-	}
-	return mysqlOps.GetGlobalInfoForConsensus(ctx, request, response)
-}
-
-func (mysqlOps *MysqlOperations) GetGlobalInfoForConsensus(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error) {
-	globalInfo := GlobalInfo{}
-	podName2Role := make(map[string]string)
-
-	term, role, err := mysqlOps.getTermAndRole(ctx)
-	if err != nil {
-		globalInfo.Event = OperationFailed
-		globalInfo.Message = fmt.Sprintf("Query term error: %v", err)
-		return globalInfo, err
-	}
-	globalInfo.Term = term
-
-	// it is not a leader, carry the role in message
-	if role == FOLLOWER || role == LEARNER {
-		globalInfo.Event = OperationSuccess
-		globalInfo.Message = role
-	} else {
-		// it is a leader, map "ip-role" in ip2Roles
-		sql := "select IP_PORT, ROLE from information_schema.wesql_cluster_global;"
-		rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
-		if err != nil {
-			globalInfo.Event = OperationFailed
-			globalInfo.Message = fmt.Sprintf("Query sql %s error: %v", sql, err)
-			return globalInfo, err
-		}
-		defer func() {
-			_ = rows.Close()
-			_ = rows.Err()
-		}()
-		var ipPort, role string
-		for rows.Next() {
-			if err := rows.Scan(&ipPort, &role); err != nil {
-				mysqlOps.Logger.Error(err, "Get global info err")
-				globalInfo.Event = OperationFailed
-				globalInfo.Message = fmt.Sprintf("Get global info err: %v", err)
-				return globalInfo, err
-			}
-			role = strings.ToLower(role)
-			portStartIndex := strings.LastIndex(ipPort, ":")
-			domainName := ipPort[:portStartIndex]
-			firstDot := strings.Index(domainName, ".")
-			if firstDot == -1 {
-				err = errors.Errorf("wrong domain name format: %s", domainName)
-				mysqlOps.Logger.Error(err, "Get global info err")
-				globalInfo.Event = OperationFailed
-				globalInfo.Message = err.Error()
-				return globalInfo, err
-			}
-			podName := domainName[:firstDot]
-			podName2Role[podName] = role
-		}
-		globalInfo.Event = OperationSuccess
-		globalInfo.PodName2Role = podName2Role
-	}
-	return globalInfo, nil
-}
-
-func (mysqlOps *MysqlOperations) LockInstance(ctx context.Context) error {
-	sql := "set global read_only=1"
-	_, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
-	return err
-}
-
-func (mysqlOps *MysqlOperations) UnlockInstance(ctx context.Context) error {
-	sql := "set global read_only=0"
-	_, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
-	return err
-}
-
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
-
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
@@ -304,7 +213,12 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *ProbeRequest,
 		result["message"] = ErrNoSQL
 		return result, nil
 	}
-	count, err := mysqlOps.exec(ctx, sql)
+
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	count, err := manager.Exec(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Error(err, "sql exec error")
 		result["event"] = OperationFailed
@@ -337,7 +251,12 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *ProbeReques
 	}
 
 	sql := "show slave status"
-	data, err := mysqlOps.query(ctx, sql)
+
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	data, err := manager.Query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Error(err, "GetLagOps error")
 		result["event"] = OperationFailed
@@ -363,7 +282,11 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *ProbeRequest
 		result["message"] = "no sql provided"
 		return result, nil
 	}
-	data, err := mysqlOps.query(ctx, sql)
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	data, err := manager.Query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Error(err, "Query error")
 		result["event"] = OperationFailed
@@ -384,13 +307,18 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *ProbeR
 	roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
 	var err error
 	var data []byte
+
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
 	switch mysqlOps.DBRoles[strings.ToLower(mysqlOps.OriRole)] {
 	case ReadWrite:
 		var count int64
-		count, err = mysqlOps.exec(ctx, rwSQL)
+		count, err = manager.Exec(ctx, rwSQL)
 		data = []byte(strconv.FormatInt(count, 10))
 	case Readonly:
-		data, err = mysqlOps.query(ctx, roSQL)
+		data, err = manager.Query(ctx, roSQL)
 	default:
 		msg := fmt.Sprintf("unknown access mode for role %s: %v", mysqlOps.OriRole, mysqlOps.DBRoles)
 		mysqlOps.Logger.Info(msg)
@@ -415,110 +343,22 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *ProbeR
 	return result, nil
 }
 
-func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte, error) {
-	mysqlOps.Logger.Info(fmt.Sprintf("query: %s", sql))
-	rows, err := mysqlOps.manager.DB.QueryContext(ctx, sql)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error executing %s", sql)
-	}
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-	result, err := mysqlOps.jsonify(rows)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
-	}
-	return result, nil
-}
-
-func (mysqlOps *MysqlOperations) exec(ctx context.Context, sql string) (int64, error) {
-	mysqlOps.Logger.Info(fmt.Sprintf("exec: %s", sql))
-	res, err := mysqlOps.manager.DB.ExecContext(ctx, sql)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error executing %s", sql)
-	}
-	return res.RowsAffected()
-}
-
-func (mysqlOps *MysqlOperations) jsonify(rows *sql.Rows) ([]byte, error) {
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-	var ret []interface{}
-	for rows.Next() {
-		values := prepareValues(columnTypes)
-		err := rows.Scan(values...)
-		if err != nil {
-			return nil, err
-		}
-		r := mysqlOps.convert(columnTypes, values)
-		ret = append(ret, r)
-	}
-	return json.Marshal(ret)
-}
-
-func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
-	types := make([]reflect.Type, len(columnTypes))
-	for i, tp := range columnTypes {
-		types[i] = tp.ScanType()
-	}
-	values := make([]interface{}, len(columnTypes))
-	for i := range values {
-		switch types[i].Kind() {
-		case reflect.String, reflect.Interface:
-			values[i] = &sql.NullString{}
-		case reflect.Bool:
-			values[i] = &sql.NullBool{}
-		case reflect.Float64:
-			values[i] = &sql.NullFloat64{}
-		case reflect.Int16, reflect.Uint16:
-			values[i] = &sql.NullInt16{}
-		case reflect.Int32, reflect.Uint32:
-			values[i] = &sql.NullInt32{}
-		case reflect.Int64, reflect.Uint64:
-			values[i] = &sql.NullInt64{}
-		default:
-			values[i] = reflect.New(types[i]).Interface()
-		}
-	}
-	return values
-}
-
-func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
-	r := map[string]interface{}{}
-	for i, ct := range columnTypes {
-		value := values[i]
-		switch v := values[i].(type) {
-		case driver.Valuer:
-			if vv, err := v.Value(); err == nil {
-				value = interface{}(vv)
-			} else {
-				mysqlOps.Logger.Error(err, "error to convert value")
-			}
-		case *sql.RawBytes:
-			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
-			switch ct.DatabaseTypeName() {
-			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
-				value = string(*v)
-			}
-		}
-		if value != nil {
-			r[ct.Name()] = value
-		}
-	}
-	return r
-}
-
 // InternalQuery is used for internal query, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
-	return mysqlOps.query(ctx, sql)
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	return manager.Query(ctx, sql)
 }
 
 // InternalExec is used for internal execution, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) InternalExec(ctx context.Context, sql string) (int64, error) {
-	return mysqlOps.exec(ctx, sql)
+	manager, ok := mysqlOps.Manager.(*mysql.Manager)
+	if !ok {
+		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
+	}
+	return manager.Exec(ctx, sql)
 }
 
 // GetLogger is used for getting logger, implements BaseInternalOps interface

@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/pashagolub/pgxmock/v2"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/afero"
@@ -51,7 +53,8 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewManager(logger.NewLogger("test"))
+	development, _ := zap.NewDevelopment()
+	manager, err := NewManager(zapr.NewLogger(development))
 	if err != nil {
 		t.Fatal(err)
 	}

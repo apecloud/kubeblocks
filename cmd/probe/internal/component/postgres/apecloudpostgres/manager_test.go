@@ -22,7 +22,9 @@ package apecloudpostgres
 import (
 	"testing"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/pashagolub/pgxmock/v2"
 	"github.com/stretchr/testify/assert"
 
@@ -48,7 +50,8 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewManager(logger.NewLogger("test"))
+	development, _ := zap.NewDevelopment()
+	manager, err := NewManager(zapr.NewLogger(development))
 	if err != nil {
 		t.Fatal(err)
 	}

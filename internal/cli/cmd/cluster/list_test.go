@@ -69,7 +69,7 @@ var _ = Describe("list", func() {
 			Reason: "HorizontalScaleFailed",
 		})
 		clusterWithVerticalScaling := testing.FakeCluster(clusterName1, namespace, metav1.Condition{
-			Type:   appsv1alpha1.ConditionTypeApplyResources,
+			Type:   appsv1alpha1.ConditionTypeReady,
 			Status: metav1.ConditionFalse,
 			Reason: verticalScalingReason,
 		})
@@ -115,7 +115,7 @@ var _ = Describe("list", func() {
 
 		cmd.Run(cmd, []string{clusterName, clusterName1, clusterName2})
 		Expect(out.String()).Should(ContainSubstring(testing.ClusterDefName))
-		Expect(out.String()).Should(ContainSubstring(verticalScalingReason))
+		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.SpecReconcilingClusterPhase)))
 		Expect(out.String()).Should(ContainSubstring(cluster.ConditionsError))
 		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.AbnormalClusterPhase)))
 	})

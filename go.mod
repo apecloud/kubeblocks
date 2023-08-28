@@ -21,7 +21,6 @@ require (
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3
 	github.com/containers/common v0.49.1
-	github.com/dapr/go-sdk v1.8.0
 	github.com/dapr/kit v0.11.3
 	github.com/deckarep/golang-set/v2 v2.3.1
 	github.com/dlclark/regexp2 v1.10.0

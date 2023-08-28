@@ -21,11 +21,12 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
+
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"

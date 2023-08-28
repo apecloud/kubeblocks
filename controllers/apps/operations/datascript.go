@@ -61,8 +61,8 @@ func init() {
 	// ToClusterPhase is not defined, because 'datascript' does not affect the cluster status.
 	dataScriptOpsHander := DataScriptOpsHandler{}
 	dataScriptBehavior := OpsBehaviour{
-		FromClusterPhases:          []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase},
-		OpsHandler:                 dataScriptOpsHander,
+		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase},
+		OpsHandler:        dataScriptOpsHander,
 	}
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(appsv1alpha1.DataScriptType, dataScriptBehavior)

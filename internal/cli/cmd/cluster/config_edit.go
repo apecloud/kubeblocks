@@ -116,7 +116,7 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 	}
 	formatterConfig := configConstraint.Spec.FormatterConfig
 	if formatterConfig == nil {
-		return core.MakeError("config spec[%s] not support reconfigure!", configSpec.Name)
+		return core.MakeError("config spec[%s] not support reconfiguring!", configSpec.Name)
 	}
 	configPatch, fileUpdated, err := core.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, true)
 	if err != nil {

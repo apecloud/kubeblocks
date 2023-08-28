@@ -325,7 +325,7 @@ func (r *reconfigureAction) sync(reqCtx intctrlutil.RequestCtx,
 		if len(configSpec.ConfigConstraintRef) == 0 {
 			return processMergedFailed(resource, true,
 				core.MakeError(
-					"current configSpec not support reconfigure, configSpec: %v",
+					"current configSpec not support reconfiguring, configSpec: %v",
 					configSpec.Name))
 		}
 		key := client.ObjectKey{

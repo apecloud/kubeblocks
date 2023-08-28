@@ -123,7 +123,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		)
 		By("Test Reconfigure")
 		{
-			// mock cluster is Running to support reconfigure ops
+			// mock cluster is Running to support reconfiguring ops
 			By("mock cluster status")
 			patch := client.MergeFrom(clusterObject.DeepCopy())
 			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase

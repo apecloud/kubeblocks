@@ -21,13 +21,11 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
-	"strings"
-
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -167,25 +165,5 @@ func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) 
 		Status:  metav1.ConditionFalse,
 		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonComponentsNotReady,
-	}
-}
-
-// newOpsRequestProcessingCondition creates a condition when the latest opsRequest of cluster is processing
-func newOpsRequestProcessingCondition(opsName, opsType, reason string) metav1.Condition {
-	return metav1.Condition{
-		Type:    appsv1alpha1.ConditionTypeLatestOpsRequestProcessed,
-		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("%s opsRequest: %s is processing", opsType, opsName),
-		Reason:  reason,
-	}
-}
-
-// newOpsRequestProcessedCondition creates a condition when the latest opsRequest of cluster has been processed
-func newOpsRequestProcessedCondition(processingMessage string) metav1.Condition {
-	return metav1.Condition{
-		Type:    appsv1alpha1.ConditionTypeLatestOpsRequestProcessed,
-		Status:  metav1.ConditionTrue,
-		Message: strings.Replace(processingMessage, "is processing", "has been processed", 1),
-		Reason:  ReasonOpsRequestProcessed,
 	}
 }

@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -359,9 +358,6 @@ func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newCondit
 
 func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1alpha1.ClusterStatus) {
 	cluster := c.transCtx.Cluster
-	if !reflect.DeepEqual(oldStatus, newStatus) {
-		_ = opsutil.MarkRunningOpsRequestAnnotation(c.transCtx.Context, c.cli, cluster)
-	}
 	newPhase := newStatus.Phase
 	if newPhase == oldStatus.Phase {
 		return

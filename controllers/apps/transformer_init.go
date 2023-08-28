@@ -20,11 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
@@ -41,9 +37,6 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.cluster, ObjCopy: t.originCluster, Action: ictrltypes.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
 
-	if !t.cluster.IsDeleting() {
-		t.handleLatestOpsRequestProcessingCondition()
-	}
 	if t.cluster.IsUpdating() {
 		t.handleClusterPhase()
 	}
@@ -56,27 +49,5 @@ func (t *initTransformer) handleClusterPhase() {
 		t.cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
 	} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
 		t.cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-	}
-}
-
-// updateLatestOpsRequestProcessingCondition handles the latest opsRequest processing condition.
-func (t *initTransformer) handleLatestOpsRequestProcessingCondition() {
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(t.cluster)
-	if len(opsRecords) == 0 {
-		return
-	}
-	ops := opsRecords[0]
-	opsBehaviour, ok := appsv1alpha1.OpsRequestBehaviourMapper[ops.Type]
-	if !ok {
-		return
-	}
-	opsCondition := newOpsRequestProcessingCondition(ops.Name, string(ops.Type), opsBehaviour.ProcessingReasonInClusterCondition)
-	oldCondition := meta.FindStatusCondition(t.cluster.Status.Conditions, opsCondition.Type)
-	if oldCondition == nil {
-		// if this condition not exists, insert it to the first position.
-		opsCondition.LastTransitionTime = metav1.Now()
-		t.cluster.Status.Conditions = append([]metav1.Condition{opsCondition}, t.cluster.Status.Conditions...)
-	} else {
-		meta.SetStatusCondition(&t.cluster.Status.Conditions, opsCondition)
 	}
 }

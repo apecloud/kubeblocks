@@ -69,7 +69,7 @@ var _ = Describe("list", func() {
 			Reason: "HorizontalScaleFailed",
 		})
 		clusterWithVerticalScaling := testing.FakeCluster(clusterName1, namespace, metav1.Condition{
-			Type:   appsv1alpha1.ConditionTypeLatestOpsRequestProcessed,
+			Type:   appsv1alpha1.ConditionTypeApplyResources,
 			Status: metav1.ConditionFalse,
 			Reason: verticalScalingReason,
 		})

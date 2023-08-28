@@ -3,7 +3,7 @@ title: Scheduled backup
 description: How to back up databases by schedule
 keywords: [backup and restore, schedule, scheduled backup]
 sidebar_position: 5
-sidebar_label: Scheduled backup and restore
+sidebar_label: Scheduled backup
 ---
 
 import Tabs from '@theme/Tabs';

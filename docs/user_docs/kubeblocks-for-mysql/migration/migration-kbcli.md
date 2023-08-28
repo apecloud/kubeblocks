@@ -88,14 +88,6 @@ It is recommended to prepare data sampling for verification after the migration 
    | `--sink`     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example follows the format `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
    | `--migration-object`  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the sink.    |
 
-   :::note
-
-   An example of the `--sink` URL:
-
-   ![Sink](../../../img/pgsql-migration-sink.png)
-
-   :::
-
 2. (Optional) Specify migration steps by the option `--steps`.
 
    The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck -> structure initialization -> data initialization -> incremental migration.
@@ -117,8 +109,6 @@ It is recommended to prepare data sampling for verification after the migration 
    # View the details of a specified task
    kbcli migration describe ${migration-task-name}
    ```
-
-   ![Describe migration task](../../../img/pgsql-migration-describe-task.png)
 
    Pay attention to Initialization, CDC, and CDC Metrics.
 

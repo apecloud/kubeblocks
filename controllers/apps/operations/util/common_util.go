@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -117,97 +116,3 @@ func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha
 	}
 	return opsRequestSlice, nil
 }
-
-// MarkRunningOpsRequestAnnotation marks reconcile annotation to the OpsRequest which is running in the cluster.
-// then the related OpsRequest can reconcile.
-// Note: if the client-go fetches the Cluster resources from cache,
-// it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
-// @return could return ErrNoOps
-func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
-	var (
-		opsRequestSlice []appsv1alpha1.OpsRecorder
-		err             error
-	)
-	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(cluster); err != nil {
-		return err
-	}
-	// mark annotation for operations
-	var notExistOps = map[string]struct{}{}
-	for _, v := range opsRequestSlice {
-		if err = PatchOpsRequestReconcileAnnotation(ctx, cli, cluster.Namespace, v.Name); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if apierrors.IsNotFound(err) {
-			notExistOps[v.Name] = struct{}{}
-		}
-	}
-	if len(notExistOps) != 0 {
-		return RemoveClusterInvalidOpsRequestAnnotation(ctx, cli, cluster, opsRequestSlice, notExistOps)
-	}
-	return nil
-}
-
-//// MarkRunningOpsRequestAnnotation2 marks reconcile annotation to the OpsRequest which is running in the cluster.
-//// then the related OpsRequest can reconcile.
-//// Note: if the client-go fetches the Cluster resources from cache,
-//// it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
-//// @return could return ErrNoOps
-// func MarkRunningOpsRequestAnnotation2(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
-//	var (
-//		opsRequestSlice []appsv1alpha1.OpsRecorder
-//		err             error
-//	)
-//	if opsRequestSlice, err = GetOpsRequestSliceFromCluster(cluster); err != nil {
-//		return err
-//	}
-//	// mark annotation for operations
-//	var notExistOps = map[string]struct{}{}
-//	for _, v := range opsRequestSlice {
-//		if err = PatchOpsRequestReconcileAnnotation2(ctx, cli, cluster.Namespace, v.Name, dag); err != nil && !apierrors.IsNotFound(err) {
-//			return err
-//		}
-//		if apierrors.IsNotFound(err) {
-//			notExistOps[v.Name] = struct{}{}
-//		}
-//	}
-//	if len(notExistOps) != 0 {
-//		return RemoveClusterInvalidOpsRequestAnnotation2(ctx, cli, cluster, opsRequestSlice, notExistOps)
-//	}
-//	return nil
-// }
-
-// RemoveClusterInvalidOpsRequestAnnotation deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
-func RemoveClusterInvalidOpsRequestAnnotation(
-	ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	opsRequestSlice []appsv1alpha1.OpsRecorder,
-	notExistOps map[string]struct{}) error {
-	// delete the OpsRequest annotation in cluster when the OpsRequest not existing.
-	newOpsRequestSlice := make([]appsv1alpha1.OpsRecorder, 0, len(opsRequestSlice))
-	for _, v := range opsRequestSlice {
-		if _, ok := notExistOps[v.Name]; ok {
-			continue
-		}
-		newOpsRequestSlice = append(newOpsRequestSlice, v)
-	}
-	return PatchClusterOpsAnnotations(ctx, cli, cluster, newOpsRequestSlice)
-}
-
-//// RemoveClusterInvalidOpsRequestAnnotation2 deletes the OpsRequest annotation in cluster when the OpsRequest not existing.
-// func RemoveClusterInvalidOpsRequestAnnotation2(ctx context.Context,
-//	cli client.Client,
-//	cluster *appsv1alpha1.Cluster,
-//	opsRequestSlice []appsv1alpha1.OpsRecorder,
-//	notExistOps map[string]struct{}) error {
-//	// delete the OpsRequest annotation in cluster when the OpsRequest not existing.
-//	newOpsRequestSlice := make([]appsv1alpha1.OpsRecorder, 0, len(opsRequestSlice))
-//	for _, v := range opsRequestSlice {
-//		if _, ok := notExistOps[v.Name]; ok {
-//			continue
-//		}
-//		newOpsRequestSlice = append(newOpsRequestSlice, v)
-//	}
-//	setOpsRequestToCluster(cluster, opsRequestSlice)
-//	return nil
-// }

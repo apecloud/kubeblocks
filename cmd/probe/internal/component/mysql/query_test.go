@@ -27,8 +27,9 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/dapr/kit/logger"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func TestQuery(t *testing.T) {

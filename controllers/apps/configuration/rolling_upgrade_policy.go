@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

@@ -28,12 +28,12 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

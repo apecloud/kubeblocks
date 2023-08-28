@@ -29,7 +29,6 @@ import (
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +41,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	k8scomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/kubernetes"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type KubernetesStore struct {
@@ -216,7 +216,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member := &members[i]
 		member.Name = pod.Name
 		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
-		member.Role = pod.Labels[constant.RoleLabelKey]
+		member.Role = pod.Labels["app.kubernetes.io/role"]
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.SQLChannelPort = getSQLChannelPort(&pod)
@@ -308,7 +308,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	}
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = viper.GetInt(constant.KBEnvTTL)
+		ttl = viper.GetInt("KB_TTL")
 	}
 	leader := annotations["leader"]
 	stateStr, ok := annotations["dbstate"]
@@ -453,7 +453,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 		}
 		return &HaConfig{
 			index:              "",
-			ttl:                viper.GetInt(constant.KBEnvTTL),
+			ttl:                viper.GetInt("KB_TTL"),
 			maxLagOnSwitchover: 1048576,
 		}, err
 	}
@@ -461,7 +461,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	annotations := configmap.Annotations
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = viper.GetInt(constant.KBEnvTTL)
+		ttl = viper.GetInt("KB_TTL")
 	}
 	maxLagOnSwitchover, err := strconv.Atoi(annotations["MaxLagOnSwitchover"])
 	if err != nil {

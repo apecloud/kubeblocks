@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
-	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // ObjectDeletionTransformer handles object and its secondary resources' deletion

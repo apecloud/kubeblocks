@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,6 +42,7 @@ import (
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete

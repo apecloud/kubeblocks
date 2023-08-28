@@ -21,10 +21,11 @@ package cluster
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

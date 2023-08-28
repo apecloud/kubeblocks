@@ -29,7 +29,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -40,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func generateComponents(component appsv1alpha1.ClusterComponentSpec, count int) []map[string]interface{} {

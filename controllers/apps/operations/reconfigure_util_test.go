@@ -69,6 +69,7 @@ var _ = Describe("Reconfigure util test", func() {
 					TemplateRef: "cm_obj",
 				},
 				ConfigConstraintRef: "cfg_constraint_obj",
+				Keys:                []string{"my.cnf"},
 			}
 			updatedCfg := appsv1alpha1.Configuration{
 				Keys: []appsv1alpha1.ParameterConfig{{
@@ -114,7 +115,7 @@ var _ = Describe("Reconfigure util test", func() {
 				cm, _ := obj.(*corev1.ConfigMap)
 				cmObj.Data = cm.Data
 				return nil
-			}), testutil.WithAnyTimes())
+			}, testutil.WithAnyTimes()))
 
 			By("CM object failed.")
 			// mock failed
@@ -154,7 +155,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
     9:44
     12:18`))
 
-			By("normal update.")
+			By("normal params update")
 			{
 				oldConfig := cmObj.Data
 				r := updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
@@ -170,6 +171,89 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 				Expect(err).Should(Succeed())
 				Expect(diff.IsModify).Should(BeTrue())
 				Expect(diff.UpdateConfig["my.cnf"]).Should(BeEquivalentTo(diffCfg))
+			}
+
+			// normal params update
+			By("normal file update with configSpec keys")
+			{
+				updatedFiles := appsv1alpha1.Configuration{
+					Keys: []appsv1alpha1.ParameterConfig{{
+						Key: "my.cnf",
+						FileContent: `
+[mysqld]
+x1=y1
+z2=y2
+`,
+					}},
+				}
+
+				oldConfig := cmObj.Data
+				r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
+				Expect(r.err).Should(Succeed())
+				diff, err := cfgcore.CreateMergePatch(
+					cfgcore.FromConfigData(oldConfig, nil),
+					cfgcore.FromConfigData(cmObj.Data, nil),
+					cfgcore.CfgOption{
+						Type:    cfgcore.CfgTplType,
+						CfgType: appsv1alpha1.Ini,
+						Log:     log.FromContext(context.Background()),
+					})
+				Expect(err).Should(Succeed())
+				Expect(diff.IsModify).Should(BeTrue())
+			}
+
+			// not params update, but file update
+			By("normal file update with configSpec keys")
+			{
+				oldConfig := cmObj.Data
+				newMyCfg := oldConfig["my.cnf"]
+				newMyCfg += `
+# for test
+# not valid parameter
+`
+				updatedFiles := appsv1alpha1.Configuration{
+					Keys: []appsv1alpha1.ParameterConfig{{
+						Key:         "my.cnf",
+						FileContent: newMyCfg,
+					}},
+				}
+
+				r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
+				Expect(r.err).Should(Succeed())
+				diff, err := cfgcore.CreateMergePatch(
+					cfgcore.FromConfigData(oldConfig, nil),
+					cfgcore.FromConfigData(cmObj.Data, nil),
+					cfgcore.CfgOption{
+						Type:    cfgcore.CfgTplType,
+						CfgType: appsv1alpha1.Ini,
+						Log:     log.FromContext(context.Background()),
+					})
+				Expect(err).Should(Succeed())
+				Expect(diff.IsModify).Should(BeFalse())
+			}
+
+			By("normal file update without configSpec keys")
+			{
+				updatedFiles := appsv1alpha1.Configuration{
+					Keys: []appsv1alpha1.ParameterConfig{{
+						Key:         "config2.txt",
+						FileContent: `# for test`,
+					}},
+				}
+
+				oldConfig := cmObj.Data
+				r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
+				Expect(r.err).Should(Succeed())
+				diff, err := cfgcore.CreateMergePatch(
+					cfgcore.FromConfigData(oldConfig, nil),
+					cfgcore.FromConfigData(cmObj.Data, nil),
+					cfgcore.CfgOption{
+						Type:    cfgcore.CfgTplType,
+						CfgType: appsv1alpha1.Ini,
+						Log:     log.FromContext(context.Background()),
+					})
+				Expect(err).Should(Succeed())
+				Expect(diff.IsModify).Should(BeFalse())
 			}
 		})
 	})

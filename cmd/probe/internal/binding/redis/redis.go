@@ -31,7 +31,6 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/redis/go-redis/v9"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	// import this json-iterator package to replace the default
@@ -41,6 +40,7 @@ import (
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	rediscomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/redis"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var (

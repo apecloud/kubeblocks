@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,6 +41,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // rsmComponentBase as a base class for single rsm based component (stateful & replication & consensus).
@@ -693,12 +693,6 @@ func (c *rsmComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestC
 	if err := c.UpdatePDB(reqCtx, cli); err != nil {
 		return err
 	}
-	// TODO(free6om): copy UpdateService&updatePodEnvConfig to rsm
-	// if err := c.UpdateService(reqCtx, cli); err != nil {
-	//	return err
-	// }
-	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
-	// c.updatePodEnvConfig()
 	return nil
 }
 

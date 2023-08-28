@@ -31,7 +31,6 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/components-contrib/metadata"
-	"github.com/spf13/viper"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/dapr/kit/logger"
@@ -42,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

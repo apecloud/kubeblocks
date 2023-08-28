@@ -26,10 +26,10 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
-	"github.com/spf13/viper"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")
@@ -148,19 +148,19 @@ func (c *cueTypeExtractor) hasFieldType(parent string, cur string) (string, bool
 func transNumberOrBoolType(t CueType, obj reflect.Value, fn util.UpdateFn, expand string, trimString bool) error {
 	switch t {
 	case IntType:
-		return processTypeTrans[int](obj, strconv.Atoi, fn, trimString)
+		return processTypeTrans[int](obj, strconv.Atoi, fn, trimString, false)
 	case BoolType:
-		return processTypeTrans[bool](obj, strconv.ParseBool, fn, trimString)
+		return processTypeTrans[bool](obj, strconv.ParseBool, fn, trimString, false)
 	case FloatType:
 		return processTypeTrans[float64](obj, func(s string) (float64, error) {
 			return strconv.ParseFloat(s, 64)
-		}, fn, trimString)
+		}, fn, trimString, false)
 	case K8SQuantityType:
-		return processTypeTrans[int64](obj, handleK8sQuantityType, fn, trimString)
+		return processTypeTrans[int64](obj, handleK8sQuantityType, fn, trimString, true)
 	case ClassicStorageType:
-		return processTypeTrans[int64](obj, handleClassicStorageType(expand), fn, trimString)
+		return processTypeTrans[int64](obj, handleClassicStorageType(expand), fn, trimString, true)
 	case ClassicTimeDurationType:
-		return processTypeTrans[int64](obj, handleClassicTimeDurationType(expand), fn, trimString)
+		return processTypeTrans[int64](obj, handleClassicTimeDurationType(expand), fn, trimString, true)
 	case StringType:
 		if trimString {
 			trimStringQuotes(obj, fn)
@@ -186,12 +186,16 @@ func trimStringQuotes(obj reflect.Value, fn util.UpdateFn) {
 	}
 }
 
-func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn util.UpdateFn, trimString bool) error {
+func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn util.UpdateFn, trimString bool, enableEmpty bool) error {
 	switch obj.Type().Kind() {
 	case reflect.String:
 		str := obj.String()
 		if trimString {
 			str = strings.Trim(str, "'\"")
+		}
+		if !enableEmpty && str == "" {
+			updateFn(nil)
+			return nil
 		}
 		v, err := transFn(str)
 		if err != nil {

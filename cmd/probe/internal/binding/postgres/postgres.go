@@ -24,14 +24,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres/apecloudpostgres"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres/officalpostgres"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // List of operations.
@@ -77,8 +83,9 @@ const (
 
 // PostgresOperations represents PostgreSQL output binding.
 type PostgresOperations struct {
-	manager *postgres.Manager
+	manager postgres.PgIFace
 	BaseOperations
+	workloadType string
 }
 
 var _ BaseInternalOps = &PostgresOperations{}
@@ -92,13 +99,25 @@ func NewPostgres(logger logger.Logger) bindings.OutputBinding {
 func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.Logger.Debug("Initializing Postgres binding")
 	pgOps.BaseOperations.Init(metadata)
+	pgOps.workloadType = viper.GetString(constant.KBEnvWorkloadType)
 	config, err := postgres.NewConfig(metadata.Properties)
 	if err != nil {
 		pgOps.Logger.Errorf("new postgresql config failed, err:%v", err)
 	}
-	manager, err := postgres.NewManager(pgOps.Logger)
-	if err != nil {
-		pgOps.Logger.Errorf("new postgresql manager failed, err:%v", err)
+
+	var manager postgres.PgIFace
+	if strings.EqualFold(pgOps.workloadType, internal.Consensus) {
+		manager, err = apecloudpostgres.NewManager(pgOps.Logger)
+		if err != nil {
+			pgOps.Logger.Errorf("ApeCloud PostgreSQL DB Manager initialize failed: %v", err)
+			return err
+		}
+	} else {
+		manager, err = officalpostgres.NewManager(pgOps.Logger)
+		if err != nil {
+			pgOps.Logger.Errorf("PostgreSQL DB Manager initialize failed: %v", err)
+			return err
+		}
 	}
 
 	pgOps.DBType = "postgresql"
@@ -127,7 +146,7 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 }
 
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	return pgOps.manager.GetMemberStateWithPool(ctx, nil)
+	return pgOps.manager.GetMemberRoleWithHost(ctx, "")
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

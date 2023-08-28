@@ -22,10 +22,11 @@ package rsm
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type ObjectGenerationTransformer struct{}
@@ -105,7 +107,9 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 	updateObjects := func() {
 		for name := range updateSet {
-			cli.Update(dag, oldSnapshot[name], newSnapshot[name])
+			oldObj := oldSnapshot[name]
+			newObj := copyAndMerge(oldObj, newSnapshot[name])
+			cli.Update(dag, oldObj, newObj)
 		}
 	}
 	deleteOrphanObjects := func() {
@@ -133,6 +137,71 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	handleDependencies()
 
 	return nil
+}
+
+// copyAndMerge merges two objects for updating:
+// 1. new an object targetObj by copying from oldObj
+// 2. merge all fields can be updated from newObj into targetObj
+func copyAndMerge(oldObj, newObj client.Object) client.Object {
+	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
+		return nil
+	}
+
+	// mergeAnnotations keeps the original annotations.
+	mergeAnnotations := func(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+		if targetAnnotations == nil || originalAnnotations == nil {
+			return
+		}
+		if *targetAnnotations == nil {
+			*targetAnnotations = map[string]string{}
+		}
+		for k, v := range originalAnnotations {
+			// if the annotation not exist in targetAnnotations, copy it from original.
+			if _, ok := (*targetAnnotations)[k]; !ok {
+				(*targetAnnotations)[k] = v
+			}
+		}
+	}
+
+	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
+		// if annotations exist and are replaced, the StatefulSet will be updated.
+		mergeAnnotations(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
+		oldSts.Spec.Template = newSts.Spec.Template
+		oldSts.Spec.Replicas = newSts.Spec.Replicas
+		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
+		return oldSts
+	}
+
+	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
+		// remove original monitor annotations
+		if len(oldSvc.Annotations) > 0 {
+			maps.DeleteFunc(oldSvc.Annotations, func(k, v string) bool {
+				return strings.HasPrefix(k, "monitor.kubeblocks.io")
+			})
+		}
+		mergeAnnotations(oldSvc.Annotations, &newSvc.Annotations)
+		oldSvc.Annotations = newSvc.Annotations
+		oldSvc.Spec = newSvc.Spec
+		return oldSvc
+	}
+
+	copyAndMergeCm := func(oldCm, newCm *corev1.ConfigMap) client.Object {
+		oldCm.Data = newCm.Data
+		oldCm.BinaryData = newCm.BinaryData
+		return oldCm
+	}
+
+	targetObj := oldObj.DeepCopyObject()
+	switch o := newObj.(type) {
+	case *apps.StatefulSet:
+		return copyAndMergeSts(targetObj.(*apps.StatefulSet), o)
+	case *corev1.Service:
+		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
+	case *corev1.ConfigMap:
+		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
+	default:
+		return newObj
+	}
 }
 
 func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {

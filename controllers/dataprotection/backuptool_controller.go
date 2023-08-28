@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 
-	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,6 +31,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // BackupToolReconciler reconciles a BackupTool object

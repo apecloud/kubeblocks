@@ -27,7 +27,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -46,6 +45,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

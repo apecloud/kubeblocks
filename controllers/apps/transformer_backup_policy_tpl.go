@@ -22,7 +22,6 @@ package apps
 import (
 	"fmt"
 
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // BackupPolicyTPLTransformer transforms the backup policy template to the backup policy.

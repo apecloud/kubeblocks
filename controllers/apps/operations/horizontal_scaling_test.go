@@ -148,10 +148,6 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
 			}
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
-			// TODO: remove it
-			By("test GetRealAffectedComponentMap function")
-			h := horizontalScalingOpsHandler{}
-			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
 		})
 
 		It("test canceling HScale opsRequest which scales down replicas of component", func() {

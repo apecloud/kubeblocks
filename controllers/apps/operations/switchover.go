@@ -103,11 +103,6 @@ func (r switchoverOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli
 	return opsRequestPhase, time.Second, nil
 }
 
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (r switchoverOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.Spec.GetSwitchoverComponentNameSet())
-}
-
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
 // empty implementation here.
 func (r switchoverOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {

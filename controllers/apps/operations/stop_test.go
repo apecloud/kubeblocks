@@ -85,10 +85,6 @@ var _ = Describe("Stop OpsRequest", func() {
 			}
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
-
-			By("test GetRealAffectedComponentMap function")
-			h := StopOpsHandler{}
-			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(3))
 		})
 
 	})

@@ -90,9 +90,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			Expect(vsHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
 			_, _, err = vsHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-
-			By("test GetRealAffectedComponentMap function")
-			Expect(len(vsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
 		}
 
 		It("vertical scaling by resource", func() {

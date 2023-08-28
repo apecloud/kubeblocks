@@ -125,20 +125,6 @@ func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (stop StopOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return getCompMapFromLastConfiguration(opsRequest)
-}
-
-// getCompMapFromLastConfiguration gets the component name map from status.lastConfiguration
-func getCompMapFromLastConfiguration(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	realChangedMap := realAffectedComponentMap{}
-	for k := range opsRequest.Status.LastConfiguration.Components {
-		realChangedMap[k] = struct{}{}
-	}
-	return realChangedMap
-}
-
 func deleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{

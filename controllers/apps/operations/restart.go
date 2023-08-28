@@ -74,11 +74,6 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
 }
 
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.Spec.GetRestartComponentNameSet())
-}
-
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
 // empty implementation here.
 func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {

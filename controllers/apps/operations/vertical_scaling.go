@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"reflect"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,23 +100,6 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 	}
 	opsRes.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
-}
-
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	realChangedMap := realAffectedComponentMap{}
-	vsMap := opsRequest.Spec.ToVerticalScalingListToMap()
-	for k, v := range opsRequest.Status.LastConfiguration.Components {
-		currVs, ok := vsMap[k]
-		if !ok {
-			continue
-		}
-		if !reflect.DeepEqual(currVs.ResourceRequirements, v.ResourceRequirements) ||
-			!reflect.DeepEqual(currVs.ClassDefRef, v.ClassDefRef) {
-			realChangedMap[k] = struct{}{}
-		}
-	}
-	return realChangedMap
 }
 
 // Cancel this function defines the cancel verticalScaling action.

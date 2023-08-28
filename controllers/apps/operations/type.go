@@ -46,15 +46,7 @@ type OpsHandler interface {
 	// SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration,
 	// and this method will be executed together when opsRequest in running.
 	SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
-
-	// GetRealAffectedComponentMap returns a component map that is actually affected by the opsRequest.
-	// when MaintainClusterPhaseBySelf of the opsBehaviour is true,
-	// will change the phase of the component to Updating after Action is done which exists in this map.
-	// Deprecated: will be removed soon.
-	GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap
 }
-
-type realAffectedComponentMap map[string]struct{}
 
 type OpsBehaviour struct {
 	FromClusterPhases []appsv1alpha1.ClusterPhase

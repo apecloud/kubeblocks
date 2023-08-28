@@ -155,10 +155,6 @@ func (o DataScriptOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCt
 	return nil
 }
 
-func (o DataScriptOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.Spec.GetDataScriptComponentNameSet())
-}
-
 // getScriptContent will get script content from script or scriptFrom
 func getScriptContent(reqCtx intctrlutil.RequestCtx, cli client.Client, spec *appsv1alpha1.ScriptSpec) ([]string, error) {
 	script := make([]string, 0)

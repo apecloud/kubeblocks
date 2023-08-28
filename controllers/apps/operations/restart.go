@@ -44,7 +44,6 @@ func init() {
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
 		OpsHandler:                         restartOpsHandler{},
-		MaintainClusterPhaseBySelf:         true,
 		ProcessingReasonInClusterCondition: ProcessingReasonRestarting,
 	}
 

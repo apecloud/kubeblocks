@@ -22,13 +22,66 @@ package postgres
 import (
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestReadPidFile(t *testing.T) {
+	fs = afero.NewMemMapFs()
+
+	t.Run("can't open file", func(t *testing.T) {
+		pidFile, err := readPidFile("")
+		assert.Nil(t, pidFile)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "file does not exist")
+	})
+
+	t.Run("read pid file success", func(t *testing.T) {
+		data := "97\n/postgresql/data\n1692770488\n5432\n/var/run/postgresql\n*\n  2388960         4\nready"
+		err := afero.WriteFile(fs, "/postmaster.pid", []byte(data), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pidFile, err := readPidFile("")
+		assert.Nil(t, err)
+		assert.Equal(t, pidFile.pid, int32(97))
+		assert.Equal(t, pidFile.port, 5432)
+		assert.Equal(t, pidFile.dataDir, "/postgresql/data")
+		assert.Equal(t, pidFile.startTS, int64(1692770488))
+	})
+
+	t.Run("pid invalid", func(t *testing.T) {
+		data := "test\n/postgresql/data\n1692770488\n5432\n/var/run/postgresql\n*\n  2388960         4\nready"
+		err := afero.WriteFile(fs, "/postmaster.pid", []byte(data), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pidFile, err := readPidFile("")
+		assert.Nil(t, pidFile)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "invalid syntax")
+	})
+
+	t.Run("pid invalid", func(t *testing.T) {
+		data := "97\n/postgresql/data\n1692770488\ntest\n/var/run/postgresql\n*\n  2388960         4\nready"
+		err := afero.WriteFile(fs, "/postmaster.pid", []byte(data), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pidFile, err := readPidFile("")
+		assert.Nil(t, pidFile)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "invalid syntax")
+	})
+}
 
 func TestParsePGSyncStandby(t *testing.T) {
 	t.Run("empty sync string", func(t *testing.T) {
 		syncStandBys := ""
-		resp, err := parsePGSyncStandby(syncStandBys)
+		resp, err := ParsePGSyncStandby(syncStandBys)
 
 		assert.Nil(t, err)
 		assert.Equal(t, off, resp.Types)
@@ -36,7 +89,7 @@ func TestParsePGSyncStandby(t *testing.T) {
 
 	t.Run("only first", func(t *testing.T) {
 		syncStandBys := "FiRsT"
-		resp, err := parsePGSyncStandby(syncStandBys)
+		resp, err := ParsePGSyncStandby(syncStandBys)
 
 		assert.Nil(t, err)
 		assert.True(t, resp.Members.Contains("FiRsT"))
@@ -46,7 +99,7 @@ func TestParsePGSyncStandby(t *testing.T) {
 
 	t.Run("custom values", func(t *testing.T) {
 		syncStandBys := `ANY 4("a",*,b)`
-		resp, err := parsePGSyncStandby(syncStandBys)
+		resp, err := ParsePGSyncStandby(syncStandBys)
 
 		assert.Nil(t, err)
 		assert.Equal(t, quorum, resp.Types)
@@ -57,7 +110,7 @@ func TestParsePGSyncStandby(t *testing.T) {
 
 	t.Run("custom values", func(t *testing.T) {
 		syncStandBys := ` a , b `
-		resp, err := parsePGSyncStandby(syncStandBys)
+		resp, err := ParsePGSyncStandby(syncStandBys)
 
 		assert.Nil(t, err)
 		assert.Equal(t, priority, resp.Types)
@@ -67,9 +120,33 @@ func TestParsePGSyncStandby(t *testing.T) {
 		assert.Equal(t, 1, resp.Amount)
 	})
 
+	t.Run("custom values", func(t *testing.T) {
+		syncStandBys := `FIRST 2 (s1,s2,s3)`
+		resp, err := ParsePGSyncStandby(syncStandBys)
+
+		assert.Nil(t, err)
+		assert.Equal(t, priority, resp.Types)
+		assert.False(t, resp.HasStar)
+		assert.True(t, resp.Members.Contains("s1"))
+		assert.True(t, resp.Members.Contains("s2"))
+		assert.Equal(t, 2, resp.Amount)
+	})
+
+	t.Run("custom values", func(t *testing.T) {
+		syncStandBys := `2 (s1,s2,s3)`
+		resp, err := ParsePGSyncStandby(syncStandBys)
+
+		assert.Nil(t, err)
+		assert.Equal(t, priority, resp.Types)
+		assert.False(t, resp.HasStar)
+		assert.True(t, resp.Members.Contains("s1"))
+		assert.True(t, resp.Members.Contains("s2"))
+		assert.Equal(t, 2, resp.Amount)
+	})
+
 	t.Run("can't parse synchronous standby name", func(t *testing.T) {
 		syncStandBys := `ANY 4("a" b,"c c")`
-		resp, err := parsePGSyncStandby(syncStandBys)
+		resp, err := ParsePGSyncStandby(syncStandBys)
 
 		assert.NotNil(t, err)
 		assert.Nil(t, resp)
@@ -81,34 +158,15 @@ func TestParsePGLsn(t *testing.T) {
 	t.Run("legal lsn str", func(t *testing.T) {
 		lsnStr := "16/B374D848"
 
-		lsn := parsePgLsn(lsnStr)
+		lsn := ParsePgLsn(lsnStr)
 		assert.Equal(t, int64(97500059720), lsn)
 	})
 
 	t.Run("illegal lsn str", func(t *testing.T) {
 		lsnStr := "B374D848"
 
-		lsn := parsePgLsn(lsnStr)
+		lsn := ParsePgLsn(lsnStr)
 		assert.Equal(t, int64(0), lsn)
-	})
-}
-
-func TestParseSingleQuery(t *testing.T) {
-	t.Run("legal query response", func(t *testing.T) {
-		queryResp := `[{"name":"primary_conninfo","setting":"host=pg-pg-replication-0.pg-pg-replication-headless port=5432 user=postgres application_name=my-application"}]`
-
-		result, err := parseSingleQuery(queryResp)
-		assert.Nil(t, err)
-		assert.Equal(t, "host=pg-pg-replication-0.pg-pg-replication-headless port=5432 user=postgres application_name=my-application", result["setting"])
-	})
-
-	t.Run("illegal query response", func(t *testing.T) {
-		queryResp := `{"name":"primary_conninfo","setting":"host=pg-pg-replication-0.pg-pg-replication-headless 
-						port=5432 user=postgres application_name=my-application"}`
-
-		result, err := parseSingleQuery(queryResp)
-		assert.NotNil(t, err)
-		assert.Nil(t, result)
 	})
 }
 
@@ -116,7 +174,7 @@ func TestParsePrimaryConnInfo(t *testing.T) {
 	t.Run("legal primary conn info str", func(t *testing.T) {
 		primaryConnInfoStr := "host=pg-pg-replication-0.pg-pg-replication-headless port=5432 user=postgres application_name=my-application"
 
-		result := parsePrimaryConnInfo(primaryConnInfoStr)
+		result := ParsePrimaryConnInfo(primaryConnInfoStr)
 		assert.NotNil(t, result)
 		assert.Equal(t, "pg-pg-replication-0.pg-pg-replication-headless", result["host"])
 		assert.Equal(t, "5432", result["port"])
@@ -127,7 +185,7 @@ func TestParsePrimaryConnInfo(t *testing.T) {
 	t.Run("illegal primary conn info str", func(t *testing.T) {
 		primaryConnInfoStr := "host pg-pg-replication-0.pg-pg-replication-headless port 5432 user postgres application_name my-application"
 
-		result := parsePrimaryConnInfo(primaryConnInfoStr)
+		result := ParsePrimaryConnInfo(primaryConnInfoStr)
 		assert.NotNil(t, result)
 		assert.Equal(t, map[string]string{}, result)
 	})

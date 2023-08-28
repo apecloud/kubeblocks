@@ -1,0 +1,17 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "kblib.clusterName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+spec:
+  clusterVersionRef: {{ .Values.version }}
+  terminationPolicy: {{ .Values.extra.terminationPolicy }}
+  {{- include "kblib.affinity" . | indent 2 }}
+  clusterDefinitionRef: apecloud-postgresql # ref clusterdefinition.name
+  componentSpecs:
+    - name: postgresql
+      componentDefRef: postgresql # ref clusterdefinition componentDefs.name
+      {{- include "kblib.componentMonitor" . | indent 6 }}
+      replicas: {{ include "apecloud-postgresql-cluster.replicas" . }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}

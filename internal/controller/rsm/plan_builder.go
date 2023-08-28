@@ -23,8 +23,6 @@ import (
 	"errors"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -123,13 +121,9 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.UPDATE:
-		o, err := b.buildUpdateObj(vertex)
-		if err != nil {
-			return err
-		}
-		err = b.cli.Update(b.transCtx.Context, o)
+		err := b.cli.Update(b.transCtx.Context, vertex.Obj)
 		if err != nil && !apierrors.IsNotFound(err) {
-			b.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", o, vertex.OriObj.GetName()))
+			b.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", vertex.Obj, vertex.OriObj.GetName()))
 			return err
 		}
 	case model.DELETE:
@@ -153,48 +147,6 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 		}
 	}
 	return nil
-}
-
-func (b *PlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Object, error) {
-	handleSts := func(origObj, targetObj *appsv1.StatefulSet) (client.Object, error) {
-		origObj.Spec.Template = targetObj.Spec.Template
-		origObj.Spec.Replicas = targetObj.Spec.Replicas
-		origObj.Spec.UpdateStrategy = targetObj.Spec.UpdateStrategy
-		return origObj, nil
-	}
-
-	handleSvc := func(origObj, targetObj *corev1.Service) (client.Object, error) {
-		origObj.Spec = targetObj.Spec
-		return origObj, nil
-	}
-
-	handlePVC := func(origObj, targetObj *corev1.PersistentVolumeClaim) (client.Object, error) {
-		if origObj.Spec.Resources.Requests[corev1.ResourceStorage] == targetObj.Spec.Resources.Requests[corev1.ResourceStorage] {
-			return origObj, nil
-		}
-		if targetObj.Spec.Resources.Requests == nil {
-			return origObj, nil
-		}
-		if origObj.Spec.Resources.Requests == nil {
-			origObj.Spec.Resources.Requests = corev1.ResourceList{}
-		}
-		origObj.Spec.Resources.Requests[corev1.ResourceStorage] = targetObj.Spec.Resources.Requests[corev1.ResourceStorage]
-		return origObj, nil
-	}
-
-	origObj := vertex.OriObj.DeepCopyObject()
-	switch v := vertex.Obj.(type) {
-	case *appsv1.StatefulSet:
-		return handleSts(origObj.(*appsv1.StatefulSet), v)
-	case *corev1.Service:
-		return handleSvc(origObj.(*corev1.Service), v)
-	case *corev1.PersistentVolumeClaim:
-		return handlePVC(origObj.(*corev1.PersistentVolumeClaim), v)
-	case *corev1.Secret, *corev1.ConfigMap:
-		return v, nil
-	}
-
-	return vertex.Obj, nil
 }
 
 // NewRSMPlanBuilder returns a RSMPlanBuilder powered PlanBuilder

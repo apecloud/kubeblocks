@@ -24,16 +24,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres/apecloudpostgres"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres/officalpostgres"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // List of operations.
@@ -79,8 +85,9 @@ const (
 
 // PostgresOperations represents PostgreSQL output binding.
 type PostgresOperations struct {
-	manager *postgres.Manager
+	manager postgres.PgIFace
 	BaseOperations
+	workloadType string
 }
 
 var _ BaseInternalOps = &PostgresOperations{}
@@ -99,13 +106,25 @@ func NewPostgres() (*PostgresOperations, error) {
 func (pgOps *PostgresOperations) Init(metadata Properties) error {
 	pgOps.Logger.Info("Initializing Postgres binding")
 	pgOps.BaseOperations.Init(metadata)
+	pgOps.workloadType = viper.GetString(constant.KBEnvWorkloadType)
 	config, err := postgres.NewConfig(metadata)
 	if err != nil {
 		pgOps.Logger.Error(err, "new postgresql config failed")
 	}
-	manager, err := postgres.NewManager(pgOps.Logger)
-	if err != nil {
-		pgOps.Logger.Error(err, "new postgresql manager failed")
+
+	var manager postgres.PgIFace
+	if strings.EqualFold(pgOps.workloadType, internal.Consensus) {
+		manager, err = apecloudpostgres.NewManager(pgOps.Logger)
+		if err != nil {
+			pgOps.Logger.Error(err, "ApeCloud PostgreSQL DB Manager initialize failed")
+			return err
+		}
+	} else {
+		manager, err = officalpostgres.NewManager(pgOps.Logger)
+		if err != nil {
+			pgOps.Logger.Error(err, "PostgreSQL DB Manager initialize failed")
+			return err
+		}
 	}
 
 	pgOps.DBType = "postgresql"
@@ -134,7 +153,7 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 }
 
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
-	return pgOps.manager.GetMemberStateWithPool(ctx, nil)
+	return pgOps.manager.GetMemberRoleWithHost(ctx, "")
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {

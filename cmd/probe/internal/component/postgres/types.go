@@ -21,20 +21,44 @@ package postgres
 
 import (
 	"bufio"
-	"encoding/json"
-	"os"
+	"context"
 	"strconv"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/dlclark/regexp2"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+)
+
+var (
+	ClusterHasNoLeader = errors.New("cluster has no leader now")
+)
+
+var fs = afero.NewOsFs()
+
+const (
+	PGDATA = "PGDATA"
 )
 
 const (
-	asynchronous = "asynchronous"
-	synchronous  = "synchronous"
+	ReplicationMode = "replication_mode"
+	SyncStandBys    = "sync_standbys"
+	PrimaryInfo     = "primary_info"
+	TimeLine        = "timeline"
+)
+
+const (
+	Asynchronous = "asynchronous"
+	Synchronous  = "synchronous"
 )
 
 const (
@@ -53,6 +77,31 @@ const (
 	off              = "off"
 )
 
+type PgBaseIFace interface {
+	GetMemberRoleWithHost(ctx context.Context, host string) (string, error)
+	IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool
+	Query(ctx context.Context, sql string) (result []byte, err error)
+	Exec(ctx context.Context, sql string) (result int64, err error)
+}
+
+type PgIFace interface {
+	component.DBManager
+	PgBaseIFace
+}
+
+type PgxIFace interface {
+	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
+	Ping(ctx context.Context) error
+}
+
+// PgxPoolIFace is interface representing pgx pool
+type PgxPoolIFace interface {
+	PgxIFace
+	Acquire(ctx context.Context) (*pgxpool.Conn, error)
+	Close()
+}
+
 type PidFile struct {
 	pid     int32
 	dataDir string
@@ -62,7 +111,7 @@ type PidFile struct {
 
 func readPidFile(dataDir string) (*PidFile, error) {
 	file := &PidFile{}
-	f, err := os.Open(dataDir + "/postmaster.pid")
+	f, err := fs.Open(dataDir + "/postmaster.pid")
 	if err != nil {
 		return nil, err
 	}
@@ -96,11 +145,11 @@ func readPidFile(dataDir string) (*PidFile, error) {
 type PGStandby struct {
 	Types   string
 	Amount  int
-	Members mapset.Set
+	Members mapset.Set[string]
 	HasStar bool
 }
 
-func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
+func ParsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	pattern := `(?P<first> [fF][iI][rR][sS][tT] )
 				|(?P<any> [aA][nN][yY] )
 				|(?P<space> \s+ )
@@ -127,7 +176,7 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	}
 	result := &PGStandby{
 		Types:   off,
-		Members: mapset.NewSet(),
+		Members: mapset.NewSet[string](),
 	}
 
 	rs := make([]*regexp2.Regexp, len(patterns))
@@ -151,9 +200,9 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	var matches [][]string
 	start := 0
 	for match != nil {
-		num := getMatchLastGroupNumber(rs, standbyRow, match.String(), start)
-		if groupNames[num+2] != space {
-			matches = append(matches, []string{groupNames[num+2], match.String(), strconv.FormatInt(int64(start), 10)})
+		nums := getMatchLastGroupNumber(rs, standbyRow, match.String(), start)
+		if groupNames[nums+2] != space {
+			matches = append(matches, []string{groupNames[nums+2], match.String(), strconv.FormatInt(int64(start), 10)})
 		}
 		start = match.Index + match.Length
 
@@ -171,27 +220,15 @@ func parsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	switch {
 	case length >= 3 && matches[0][0] == anyA && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = quorum
-		amount, err := strconv.Atoi(matches[1][1])
-		if err != nil {
-			amount = 0
-		}
-		result.Amount = amount
+		result.Amount = cast.ToInt(matches[1][1])
 		syncList = matches[3 : length-1]
 	case length >= 3 && matches[0][0] == first && matches[1][0] == num && matches[2][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
-		amount, err := strconv.Atoi(matches[1][1])
-		if err != nil {
-			amount = 0
-		}
-		result.Amount = amount
+		result.Amount = cast.ToInt(matches[1][1])
 		syncList = matches[3 : length-1]
 	case length >= 2 && matches[0][0] == num && matches[1][0] == parenthesisStart && matches[length-1][0] == parenthesisEnd:
 		result.Types = priority
-		amount, err := strconv.Atoi(matches[0][1])
-		if err != nil {
-			amount = 0
-		}
-		result.Amount = amount
+		result.Amount = cast.ToInt(matches[0][1])
 		syncList = matches[2 : length-1]
 	default:
 		result.Types = priority
@@ -236,12 +273,12 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 	return -1
 }
 
-type history struct {
-	parentTimeline int64
-	switchPoint    int64
+type History struct {
+	ParentTimeline int64
+	SwitchPoint    int64
 }
 
-func parsePgLsn(str string) int64 {
+func ParsePgLsn(str string) int64 {
 	list := strings.Split(str, "/")
 	if len(list) < 2 {
 		return 0
@@ -252,19 +289,7 @@ func parsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
-func parseSingleQuery(str string) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
-	str = strings.Trim(str, "[]")
-
-	err := json.Unmarshal([]byte(str), &result)
-	if err != nil {
-		return nil, errors.Errorf("json unmarshal failed, err:%v", err)
-	}
-
-	return result, nil
-}
-
-func parsePrimaryConnInfo(str string) map[string]string {
+func ParsePrimaryConnInfo(str string) map[string]string {
 	infos := strings.Split(str, " ")
 	result := make(map[string]string)
 

@@ -277,38 +277,6 @@ func patchOpsRequestToCreating(reqCtx intctrlutil.RequestCtx,
 	return PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
 }
 
-// patchClusterStatusAndRecordEvent records the ops event in the cluster and
-// will update the cluster status if the ops need to maintain cluster status by self.
-func patchClusterStatusAndRecordEvent(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	opsBehaviour OpsBehaviour) error {
-	sendStartOpsRequestEvent := func() {
-		opsRes.Recorder.Eventf(opsRes.Cluster, corev1.EventTypeNormal, string(opsRes.OpsRequest.Spec.Type),
-			`Start to process the %s opsRequest "%s" in Cluster: %s`, opsRes.OpsRequest.Spec.Type,
-			opsRes.OpsRequest.Name, opsRes.Cluster.Name)
-	}
-	if opsBehaviour.ToClusterPhase == "" {
-		sendStartOpsRequestEvent()
-		return nil
-	}
-	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-	opsRes.Cluster.Status.Phase = opsBehaviour.ToClusterPhase
-	// update cluster.status.components phase
-	realChangeCompMap := opsBehaviour.OpsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest)
-	for k := range realChangeCompMap {
-		if compStatus, ok := opsRes.Cluster.Status.Components[k]; ok {
-			compStatus.Phase = appsv1alpha1.SpecReconcilingClusterCompPhase
-			opsRes.Cluster.Status.SetComponentStatus(k, compStatus)
-		}
-	}
-	if err := cli.Status().Patch(reqCtx.Ctx, opsRes.Cluster, patch); err != nil {
-		return err
-	}
-	sendStartOpsRequestEvent()
-	return nil
-}
-
 // DeleteOpsRequestAnnotationInCluster when OpsRequest.status.phase is Succeeded or Failed
 // we should remove the OpsRequest Annotation of cluster, then unlock cluster
 func DeleteOpsRequestAnnotationInCluster(ctx context.Context, cli client.Client, opsRes *OpsResource) error {

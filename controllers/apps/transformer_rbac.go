@@ -62,6 +62,91 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
 	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
+
+	serviceAccounts := map[string]*corev1.ServiceAccount{}
+	serviceAccountsNeedCrb := map[string]struct{}{}
+	buildServiceAccounts := func() error {
+		for _, compSpec := range componentSpecs {
+			serviceAccountName := compSpec.ServiceAccountName
+			if serviceAccountName == "" {
+				if !isProbesEnabled(clusterDef, &compSpec) && !isVolumeProtectionEnabled(clusterDef, &compSpec) {
+					continue
+				}
+				serviceAccountName = "kb-" + cluster.Name
+			}
+
+			if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
+				if !isVolumeProtectionEnabled(clusterDef, &compSpec) || isClusterRoleBindingExist(transCtx, serviceAccountName) {
+					continue
+				}
+			}
+
+			if _, ok := serviceAccounts[serviceAccountName]; !ok {
+				serviceAccount, err := builder.BuildServiceAccount(cluster)
+				serviceAccount.Name = serviceAccountName
+				if err != nil {
+					return err
+				}
+				serviceAccounts[serviceAccountName] = serviceAccount
+			}
+
+			if isVolumeProtectionEnabled(clusterDef, &compSpec) {
+				serviceAccountsNeedCrb[serviceAccountName] = struct{}{}
+			}
+		}
+		return nil
+	}
+
+	parentVertex := root
+	createSaVertex := func() []*ictrltypes.LifecycleVertex {
+		saVertexs := []*ictrltypes.LifecycleVertex{}
+		for _, sa := range serviceAccounts {
+			// serviceaccount must be created before rolebinding and clusterrolebinding
+			saVertex := ictrltypes.LifecycleObjectCreate(dag, sa, parentVertex)
+			saVertexs = append(saVertexs, saVertex)
+		}
+		return saVertexs
+	}
+
+	createRbVertex := func() error {
+		roleBinding, err := builder.BuildRoleBinding(cluster)
+		if err != nil {
+			return err
+		}
+		roleBinding.Subjects = []rbacv1.Subject{}
+		for saName := range serviceAccounts {
+			subject := rbacv1.Subject{
+				Name:      saName,
+				Namespace: cluster.Namespace,
+				Kind:      "ServiceAccount",
+			}
+			roleBinding.Subjects = append(roleBinding.Subjects, subject)
+		}
+		parentVertex = ictrltypes.LifecycleObjectCreate(dag, roleBinding, parentVertex)
+		return nil
+	}
+
+	createCrbVertex := func() error {
+		if len(serviceAccountsNeedCrb) > 0 {
+			clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
+			if err != nil {
+				return err
+			}
+			clusterRoleBinding.Subjects = []rbacv1.Subject{}
+			for saName := range serviceAccounts {
+				subject := rbacv1.Subject{
+					Name:      saName,
+					Namespace: cluster.Namespace,
+					Kind:      "ServiceAccount",
+				}
+				clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, subject)
+			}
+			parentVertex = ictrltypes.LifecycleObjectCreate(dag, clusterRoleBinding, parentVertex)
+
+		}
+		return nil
+	}
+
 	for _, compDef := range clusterDef.Spec.ComponentDefs {
 		comps := compSpecMap[compDef.Name]
 		if len(comps) == 0 {
@@ -85,69 +170,51 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		componentSpecs = append(componentSpecs, comps...)
 	}
 
-	for _, compSpec := range componentSpecs {
-		serviceAccountName := compSpec.ServiceAccountName
-		if serviceAccountName == "" {
-			if !(isProbesEnabled(clusterDef, &compSpec) || isVolumeProtectionEnabled(clusterDef, &compSpec)) {
-				continue
-			}
-			serviceAccountName = "kb-" + cluster.Name
-		}
+	if err := buildServiceAccounts(); err != nil {
+		return err
+	}
 
-		if !viper.GetBool(constant.EnableRBACManager) {
-			transCtx.Logger.V(1).Info("rbac manager is disabled")
-			if !isServiceAccountExist(transCtx, serviceAccountName) {
+	if !viper.GetBool(constant.EnableRBACManager) {
+		transCtx.Logger.V(1).Info("rbac manager is disabled")
+		saNotExist := false
+		for saName := range serviceAccounts {
+			if !isServiceAccountExist(transCtx, saName) {
 				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
-					string(ictrlutil.ErrorTypeNotFound), serviceAccountName+" ServiceAccount is not exist")
-				return ictrlutil.NewRequeueError(time.Second,
-					fmt.Sprintf("RBAC manager is disabed, but service account %s is not exsit", serviceAccountName))
-			}
-			return nil
-		}
-
-		if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
-			if !(isVolumeProtectionEnabled(clusterDef, &compSpec) && !isClusterRoleBindingExist(transCtx, serviceAccountName)) {
-				continue
+					string(ictrlutil.ErrorTypeNotFound), saName+" ServiceAccount is not exist")
+				saNotExist = true
 			}
 		}
-
-		roleBinding, err := builder.BuildRoleBinding(cluster)
-		if err != nil {
-			return err
+		if saNotExist {
+			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabed, but service account is not exsit")
 		}
-		roleBinding.Subjects[0].Name = serviceAccountName
-		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
+		return nil
+	}
 
-		serviceAccount, err := builder.BuildServiceAccount(cluster)
-		if err != nil {
-			return err
-		}
-		serviceAccount.Name = serviceAccountName
-		// serviceaccount must be created before rolebinding and clusterrolebinding
-		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, rbVertex)
+	if err := createRbVertex(); err != nil {
+		return err
+	}
 
-		if isVolumeProtectionEnabled(clusterDef, &compSpec) {
-			clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
-			if err != nil {
-				return err
-			}
-			clusterRoleBinding.Subjects[0].Name = serviceAccountName
-			crbVertex := ictrltypes.LifecycleObjectCreate(dag, clusterRoleBinding, root)
-			dag.Connect(crbVertex, saVertex)
-		}
+	if err := createCrbVertex(); err != nil {
+		return err
+	}
 
-		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
-		for _, statefulSetVertex := range statefulSetVertices {
-			// serviceaccount must be created before statefulset
+	saVertexs := createSaVertex()
+	statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
+	for _, statefulSetVertex := range statefulSetVertices {
+		// serviceaccount must be created before statefulset
+		for _, saVertex := range saVertexs {
 			dag.Connect(statefulSetVertex, saVertex)
 		}
+	}
 
-		deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
-		for _, deploymentVertex := range deploymentVertices {
-			// serviceaccount must be created before deployment
+	deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
+	for _, deploymentVertex := range deploymentVertices {
+		// serviceaccount must be created before deployment
+		for _, saVertex := range saVertexs {
 			dag.Connect(deploymentVertex, saVertex)
 		}
 	}
+
 	return nil
 }
 

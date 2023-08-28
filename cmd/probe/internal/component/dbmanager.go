@@ -55,8 +55,11 @@ type DBManager interface {
 	IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool
 	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
 	// IsMemberLagging focuses on the latency between the leader and standby
-	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) bool
-	GetDBState(context.Context, *dcs.Cluster, *dcs.Member) *dcs.DBState
+	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) (bool, int64)
+
+	// GetDBState will get most required database kernel states of current member in one HA loop to Avoiding duplicate queries and conserve I/O.
+	// We believe that the states of database kernel remains unchanged within a single HA loop.
+	GetDBState(context.Context, *dcs.Cluster) *dcs.DBState
 
 	// HasOtherHealthyLeader is applicable only to consensus cluster,
 	// where the db's internal role services as the source of truth.
@@ -85,7 +88,7 @@ type DBManager interface {
 	Recover(context.Context) error
 
 	// Start and Stop just send signal to sqlChannel
-	Start(*dcs.Cluster) error
+	Start(context.Context, *dcs.Cluster) error
 	Stop() error
 
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
@@ -146,15 +149,16 @@ func (mgr *DBManagerBase) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
 	return true
 }
 
-func (mgr *DBManagerBase) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+func (mgr *DBManagerBase) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *DBManagerBase) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	return false
+func (mgr *DBManagerBase) IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) (bool, int64) {
+	return false, 0
 }
 
-func (mgr *DBManagerBase) GetDBState(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) *dcs.DBState {
+func (mgr *DBManagerBase) GetDBState(context.Context, *dcs.Cluster) *dcs.DBState {
+	// mgr.DBState = DBState
 	return nil
 }
 
@@ -170,13 +174,13 @@ func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *DBManagerBase) IsRootCreated(ctx context.Context) (bool, error) {
+func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 	return true, nil
 }
 
 // Start does not directly mean to start a database instance,
 // but rather to sends SIGUSR2 to activate sql channel to start database
-func (mgr *DBManagerBase) Start(*dcs.Cluster) error {
+func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
 	mgr.Logger.Infof("send SIGUSR2 to activate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {
@@ -210,7 +214,7 @@ func (mgr *DBManagerBase) Stop() error {
 	return nil
 }
 
-func (mgr *DBManagerBase) CreateRoot(ctx context.Context) error {
+func (mgr *DBManagerBase) CreateRoot(context.Context) error {
 	return nil
 }
 

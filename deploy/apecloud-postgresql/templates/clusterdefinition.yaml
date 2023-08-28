@@ -1,0 +1,166 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-postgresql
+  labels:
+    {{- include "apecloud-postgresql.labels" . | nindent 4 }}
+spec:
+  type: postgresql
+  connectionCredential:
+    username: postgres
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-postgresql)"
+  componentDefs:
+    - name: postgresql
+      characterType: postgresql
+      workloadType: Consensus
+      probes:
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      service:
+        ports:
+          - name: tcp-postgresql
+            port: 5432
+            targetPort: tcp-postgresql
+      configSpecs:
+        - name: postgresql-consensusset-configuration
+          templateRef: apecloud-postgresql12-configuration
+          constraintRef: apecloud-postgresql12-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+      volumeTypes:
+        - name: data
+          type: data
+      scriptSpecs:
+        - name: apecloud-postgresql-scripts
+          templateRef: apecloud-postgresql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
+      consensusSpec:
+        leader:
+          name: leader
+          accessMode: ReadWrite
+        followers:
+          - name: follower
+            accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
+      podSpec:
+        initContainers:
+          - name: init-permissions
+            image: busybox
+            securityContext:
+              runAsUser: 0
+            command: [ "chmod", "a+w", "/postgresql" ]
+            volumeMounts:
+              - name: data
+                mountPath: /postgresql
+        containers:
+          - name: postgresql
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            securityContext:
+              runAsUser: 999
+            command:
+              - /kb-scripts/setup.sh
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /postgresql
+              - name: postgresql-config
+                mountPath: /var/lib/postgresql/conf
+              - name: scripts
+                mountPath: /kb-scripts
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+              - name: paxos
+                containerPort: 15432
+            env:
+              - name: CONSENSUS_MODE
+                value: "data"
+              - name: KUBERNETES_USE_CONFIGMAPS
+                value: "true"
+              - name: ALLOW_NOSSL
+                value: "true"
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+              - name: POSTGRES_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: POSTGRESQL_PORT_NUMBER
+                value: "5432"
+              - name: PGDATA
+                value: postgresql/pgconsensus_data
+      systemAccounts:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+          command:
+            - psql
+          args:
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -Upostgres
+            - -c
+            - $(KB_ACCOUNT_STATEMENT)
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);

@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"reflect"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -80,6 +81,8 @@ func transformPodTemplate(obj client.Object) *corev1.PodTemplateSpec {
 	case *appv1.StatefulSet:
 		return &v.Spec.Template
 	case *appv1.Deployment:
+		return &v.Spec.Template
+	case *workloads.ReplicatedStateMachine:
 		return &v.Spec.Template
 	}
 }

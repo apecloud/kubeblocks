@@ -68,8 +68,9 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateDelete() error {
 	clusterlog.Info("validate delete", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object deletion.
+	if r.Spec.TerminationPolicy == DoNotTerminate {
+		return fmt.Errorf("the deletion for a cluster with DoNotTerminate termination policy is denied")
+	}
 	return nil
 }
 

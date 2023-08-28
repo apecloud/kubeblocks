@@ -179,7 +179,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
 			Namespace: opsRequest.Namespace}, opsRequest)).Should(Succeed())
 
-		By("expect an error for cancelling this opsRequest")
+		By("Expect an error for cancelling this opsRequest")
 		opsRequest.Spec.Cancel = true
 		Expect(k8sClient.Update(context.Background(), opsRequest).Error()).Should(ContainSubstring("forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"))
 	}

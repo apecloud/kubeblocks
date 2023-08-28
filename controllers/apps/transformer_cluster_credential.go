@@ -38,9 +38,6 @@ var _ graph.Transformer = &ClusterCredentialTransformer{}
 func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if cluster.IsDeleting() {
-		return nil
-	}
 
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {

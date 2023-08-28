@@ -634,7 +634,10 @@ func init() {
 }
 
 func (r Cluster) IsDeleting() bool {
-	return !r.GetDeletionTimestamp().IsZero()
+	if r.GetDeletionTimestamp().IsZero() {
+		return false
+	}
+	return r.Spec.TerminationPolicy != DoNotTerminate
 }
 
 func (r Cluster) IsUpdating() bool {

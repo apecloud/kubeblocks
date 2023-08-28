@@ -832,4 +832,8 @@ func TestGetDBState(t *testing.T) {
 		assert.Equal(t, int64(20), manager.healthStatus.LogDelayNum)
 		assert.True(t, manager.healthStatus.Connected)
 	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
 }

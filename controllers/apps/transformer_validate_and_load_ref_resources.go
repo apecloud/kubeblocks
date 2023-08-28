@@ -36,9 +36,6 @@ type ValidateAndLoadRefResourcesTransformer struct{}
 func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if cluster.IsDeleting() {
-		return nil
-	}
 
 	var err error
 	defer func() {

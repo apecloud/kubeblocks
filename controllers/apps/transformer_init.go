@@ -44,6 +44,7 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	if !t.cluster.IsDeleting() {
 		t.handleLatestOpsRequestProcessingCondition()
 	}
+	// TODO: why set cluster status phase here?
 	if t.cluster.IsUpdating() {
 		t.handleClusterPhase()
 	}

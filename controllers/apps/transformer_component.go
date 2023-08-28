@@ -39,11 +39,7 @@ var _ graph.Transformer = &ComponentTransformer{}
 
 func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
-	origCluster := transCtx.OrigCluster
 	cluster := transCtx.Cluster
-	if origCluster.IsDeleting() {
-		return nil
-	}
 
 	clusterDef := transCtx.ClusterDef
 	clusterVer := transCtx.ClusterVer

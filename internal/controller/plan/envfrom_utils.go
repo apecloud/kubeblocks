@@ -32,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
+	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -182,7 +183,7 @@ func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName str
 }
 
 func fromFileContent(format *appsv1alpha1.FormatterConfig, configContext string) (map[string]string, error) {
-	keyValue, err := cfgcore.LoadConfigObjectFromContent(format.Format, configContext)
+	keyValue, err := validate.LoadConfigObjectFromContent(format.Format, configContext)
 	if err != nil {
 		return nil, err
 	}

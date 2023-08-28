@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -294,7 +295,7 @@ func validateRenderedData(
 }
 
 func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec) error {
-	configChecker := cfgcore.NewConfigValidator(cc, cfgcore.WithKeySelector(configSpec.Keys))
+	configChecker := validate.NewConfigValidator(cc, validate.WithKeySelector(configSpec.Keys))
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := configChecker.Validate(renderedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate configmap")

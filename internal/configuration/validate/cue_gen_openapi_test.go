@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package validate
 
 import (
 	"bytes"
@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -108,7 +109,7 @@ func getContentFromFile(file string) []byte {
 func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	cueTpl := getContentFromFile(cueFile)
 	if cueTpl == nil {
-		return nil, MakeError("cannot open file[%s]", cueTpl)
+		return nil, configuration.MakeError("cannot open file[%s]", cueTpl)
 	}
 
 	schema, err := GenerateOpenAPISchema(string(cueTpl), typeName)
@@ -117,7 +118,7 @@ func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	}
 
 	if schema == nil {
-		return nil, MakeError("cannot find schema.")
+		return nil, configuration.MakeError("cannot find schema.")
 	}
 
 	b, _ := json.Marshal(schema)

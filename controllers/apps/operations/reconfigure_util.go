@@ -32,6 +32,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type reconfiguringResult struct {
@@ -111,7 +112,7 @@ func mergeUpdatedParams(base map[string]string,
 	if len(updatedParams) == 0 {
 		return updatedConfig, nil
 	}
-	return cfgcore.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
+	return intctrlutil.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
 }
 
 func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec, policy *appsv1alpha1.UpgradePolicy) error {

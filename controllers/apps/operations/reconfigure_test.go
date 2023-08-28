@@ -112,7 +112,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cmObj
 	}
 
-	assureMockReconfigureData := func(policyName string) (*OpsResource, cfgcore.ConfigEventContext) {
+	assureMockReconfigureData := func(policyName string) (*OpsResource, intctrlutil.ConfigEventContext) {
 		By("init operations resources ")
 		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
@@ -157,7 +157,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		}
 
 		By("mock event context")
-		eventContext := cfgcore.ConfigEventContext{
+		eventContext := intctrlutil.ConfigEventContext{
 			ConfigMap: cfgObj,
 			Component: &clusterDef.Spec.ComponentDefs[0],
 			Client:    k8sClient,

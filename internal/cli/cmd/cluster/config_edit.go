@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 )
 
 type editConfigOptions struct {
@@ -156,8 +157,8 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 	validatedData := map[string]string{
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
-	options := cfgcore.WithKeySelector(configSpec.Keys)
-	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
+	options := validate.WithKeySelector(configSpec.Keys)
+	if err = validate.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate edited config")
 	}
 	o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)

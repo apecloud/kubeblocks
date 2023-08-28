@@ -286,7 +286,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
 	}
 
-	eventContext := cfgcore.ConfigEventContext{
+	eventContext := intctrlutil.ConfigEventContext{
 		ConfigSpecName:   params.ConfigSpecName,
 		Client:           params.Client,
 		ReqCtx:           params.Ctx,
@@ -300,7 +300,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		PolicyStatus:     status,
 	}
 
-	for _, handler := range cfgcore.ConfigEventHandlerMap {
+	for _, handler := range intctrlutil.ConfigEventHandlerMap {
 		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(ExecStatus(status.ExecStatus)), err); err != nil {
 			return err
 		}

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package validate
 
 import (
 	"encoding/json"
@@ -30,6 +30,8 @@ import (
 	"cuelang.org/go/encoding/openapi"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 // GenerateOpenAPISchema generates openapi schema from cue type Definitions.
@@ -42,11 +44,11 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	insts := load.Instances([]string{"-"}, cueOption)
 	for _, ins := range insts {
 		if err := ins.Err; err != nil {
-			return nil, WrapError(err, "failed to generate build.Instance for %s", schemaType)
+			return nil, configuration.WrapError(err, "failed to generate build.Instance for %s", schemaType)
 		}
 	}
 	if len(insts) != 1 {
-		return nil, MakeError("failed to create cue.Instances. [%s]", cueTpl)
+		return nil, configuration.MakeError("failed to create cue.Instances. [%s]", cueTpl)
 	}
 
 	openapiOption := &openapi.Config{
@@ -102,7 +104,7 @@ func transformOpenAPISchema(cueSchema *openapi.OrderedMap, schemaType string) (*
 
 	b, err := typeSchema.MarshalJSON()
 	if err != nil {
-		return nil, WrapError(err, "failed to marshal OpenAPI schema")
+		return nil, configuration.WrapError(err, "failed to marshal OpenAPI schema")
 	}
 
 	jsonProps := apiextv1.JSONSchemaProps{}

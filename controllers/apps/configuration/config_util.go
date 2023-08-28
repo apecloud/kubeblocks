@@ -34,6 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -86,7 +87,7 @@ func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *appsv1a
 			return true, nil
 		}
 
-		err := cfgcore.CueValidate(ccSchema.CUE)
+		err := validate.CueValidate(ccSchema.CUE)
 		return err == nil, err
 	}
 
@@ -387,7 +388,7 @@ func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ct
 	}
 
 	// Because the conversion of cue to openAPISchema is restricted, and the definition of some cue may not be converted into openAPISchema, and won't return error.
-	openAPISchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, cc.Spec.CfgSchemaTopLevelName)
+	openAPISchema, err := validate.GenerateOpenAPISchema(schema.CUE, cc.Spec.CfgSchemaTopLevelName)
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package validate
 
 import (
 	"fmt"
@@ -28,6 +28,7 @@ import (
 	"cuelang.org/go/cue"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -203,7 +204,7 @@ func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Valu
 		}
 		updateFn(v)
 	case reflect.Array, reflect.Slice, reflect.Struct:
-		return MakeError("not supported type[%s] trans.", obj.Type().Kind())
+		return configuration.MakeError("not supported type[%s] trans.", obj.Type().Kind())
 	}
 
 	return nil
@@ -229,7 +230,7 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 			}
 			err := transNumberOrBoolType(typeTransformer.fieldTypes[fieldPath], obj, fn, typeTransformer.fieldUnits[fieldPath], trimString)
 			if err != nil {
-				return WrapError(err, "failed to parse field %s", fieldPath)
+				return configuration.WrapError(err, "failed to parse field %s", fieldPath)
 			}
 			return nil
 		}, false)

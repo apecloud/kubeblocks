@@ -25,15 +25,10 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
-	"github.com/spf13/cast"
-	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/unstructured"
+	"github.com/spf13/cast"
 )
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)
@@ -53,28 +48,6 @@ type PolicyExecStatus struct {
 	ExpectedCount int32
 }
 
-type ConfigEventContext struct {
-	Client  client.Client
-	ReqCtx  intctrlutil.RequestCtx
-	Cluster *appsv1alpha1.Cluster
-
-	ClusterComponent *appsv1alpha1.ClusterComponentSpec
-	Component        *appsv1alpha1.ClusterComponentDefinition
-	ComponentUnits   []appv1.StatefulSet
-	DeploymentUnits  []appv1.Deployment
-
-	ConfigSpecName   string
-	ConfigPatch      *ConfigPatchInfo
-	ConfigMap        *corev1.ConfigMap
-	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
-
-	PolicyStatus PolicyExecStatus
-}
-
-type ConfigEventHandler interface {
-	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, err error) error
-}
-
 const (
 	Unconfirmed int32 = -1
 	NotStarted  int32 = 0
@@ -83,8 +56,7 @@ const (
 const emptyJSON = "{}"
 
 var (
-	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}
-	ConfigEventHandlerMap = make(map[string]ConfigEventHandler)
+	loaderProvider = map[ConfigType]ConfigLoaderProvider{}
 )
 
 func init() {
@@ -420,20 +392,4 @@ func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, upd
 		}
 	}
 	return r
-}
-
-// isQuotesString checks whether a string is quoted.
-func isQuotesString(str string) bool {
-	const (
-		singleQuotes = '\''
-		doubleQuotes = '"'
-	)
-
-	if len(str) < 2 {
-		return false
-	}
-
-	firstChar := str[0]
-	lastChar := str[len(str)-1]
-	return (firstChar == singleQuotes && lastChar == singleQuotes) || (firstChar == doubleQuotes && lastChar == doubleQuotes)
 }

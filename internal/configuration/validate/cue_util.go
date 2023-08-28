@@ -17,15 +17,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package validate
 
 import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 
-	"github.com/apecloud/kubeblocks/internal/unstructured"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/unstructured"
 )
 
 // CueType defines cue type
@@ -59,7 +59,7 @@ func CueValidate(cueTpl string) error {
 func ValidateConfigurationWithCue(cueString string, cfgType appsv1alpha1.CfgFileFormat, rawData string) error {
 	parameters, err := LoadConfigObjectFromContent(cfgType, rawData)
 	if err != nil {
-		return WrapError(err, "failed to load configuration [%s]", rawData)
+		return configuration.WrapError(err, "failed to load configuration [%s]", rawData)
 	}
 
 	return unstructuredDataValidateByCue(cueString, parameters, cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.PropertiesPlus)
@@ -94,7 +94,7 @@ func unstructuredDataValidateByCue(cueString string, data interface{}, trimStrin
 
 	cueValue = cueValue.Fill(data, paths...)
 	if err := cueValue.Err(); err != nil {
-		return WrapError(err, "failed to render cue template configure")
+		return configuration.WrapError(err, "failed to render cue template configure")
 	}
 
 	return cueValue.Validate()

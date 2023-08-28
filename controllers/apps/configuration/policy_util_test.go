@@ -183,7 +183,7 @@ func withConfigPatch(patch map[string]string) ParamsOps {
 	}
 	return func(params *reconfigureParams) {
 		cc := params.ConfigConstraint
-		newConfigData, _ := cfgcore.MergeAndValidateConfigs(*cc, map[string]string{"for_test": ""}, nil, []cfgcore.ParamPairs{{
+		newConfigData, _ := intctrlutil.MergeAndValidateConfigs(*cc, map[string]string{"for_test": ""}, nil, []cfgcore.ParamPairs{{
 			Key:           "for_test",
 			UpdatedParams: transKeyPair(patch),
 		}})

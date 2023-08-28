@@ -22,7 +22,6 @@ package configuration
 import (
 	"context"
 
-	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -35,50 +34,6 @@ type ParamPairs struct {
 	UpdatedParams map[string]interface{}
 }
 
-// MergeAndValidateConfigs merges and validates configuration files
-func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
-	var (
-		err error
-		fc  = configConstraint.FormatterConfig
-
-		newCfg         map[string]string
-		configOperator ConfigOperator
-		updatedKeys    = cfgutil.NewSet()
-	)
-
-	cmKeySet := FromCMKeysSelector(cmKey)
-	configLoaderOption := CfgOption{
-		Type:           CfgCmType,
-		Log:            log.FromContext(context.TODO()),
-		CfgType:        fc.Format,
-		ConfigResource: FromConfigData(baseConfigs, cmKeySet),
-	}
-	if configOperator, err = NewConfigLoader(configLoaderOption); err != nil {
-		return nil, err
-	}
-
-	// merge param to config file
-	for _, params := range updatedParams {
-		if err := configOperator.MergeFrom(params.UpdatedParams, NewCfgOptions(params.Key, WithFormatterConfig(fc))); err != nil {
-			return nil, err
-		}
-		updatedKeys.Add(params.Key)
-	}
-
-	if newCfg, err = configOperator.ToCfgContent(); err != nil {
-		return nil, WrapError(err, "failed to generate config file")
-	}
-
-	// The ToCfgContent interface returns the file contents of all keys, the configuration file is encoded and decoded into keys,
-	// the content may be different with the original file, such as comments, blank lines, etc,
-	// in order to minimize the impact on the original file, only update the changed part.
-	updatedCfg := fromUpdatedConfig(newCfg, updatedKeys)
-	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
-		return nil, WrapError(err, "failed to validate updated config")
-	}
-	return MergeUpdatedConfig(baseConfigs, updatedCfg), nil
-}
-
 // MergeUpdatedConfig replaces the file content of the changed key.
 // baseMap is the original configuration file,
 // updatedMap is the updated configuration file
@@ -87,21 +42,6 @@ func MergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 	for key, val := range baseMap {
 		r[key] = val
 		if v, ok := updatedMap[key]; ok {
-			r[key] = v
-		}
-	}
-	return r
-}
-
-// fromUpdatedConfig filters out changed file contents.
-func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[string]string {
-	if sets.Length() == 0 {
-		return map[string]string{}
-	}
-
-	r := make(map[string]string, sets.Length())
-	for key, v := range m {
-		if sets.InArray(key) {
 			r[key] = v
 		}
 	}

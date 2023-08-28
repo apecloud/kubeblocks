@@ -49,7 +49,7 @@ func init() {
 		OpsHandler:                         &reAction,
 		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
 	}
-	cfgcore.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
+	intctrlutil.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
@@ -62,7 +62,7 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {
+func (r *reconfigureAction) Handle(eventContext intctrlutil.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {
 	var (
 		opsRequest = &appsv1alpha1.OpsRequest{}
 		cm         = eventContext.ConfigMap

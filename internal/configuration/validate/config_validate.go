@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package validate
 
 import (
 	"github.com/StudioSol/set"
@@ -28,6 +28,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 type ValidatorOptions = func(key string) bool
@@ -101,7 +102,7 @@ func (s *schemaValidator) Validate(data map[string]string) error {
 		}
 		res := validator.Validate(cfg)
 		if res.HasErrors() {
-			return WrapError(errors.CompositeValidationError(res.Errors...), "failed to schema validate for cfg: %s", key)
+			return configuration.WrapError(errors.CompositeValidationError(res.Errors...), "failed to schema validate for cfg: %s", key)
 		}
 	}
 	return nil
@@ -117,7 +118,7 @@ func (e emptyValidator) Validate(_ map[string]string) error {
 func WithKeySelector(keys []string) ValidatorOptions {
 	var sets *set.LinkedHashSetString
 	if len(keys) > 0 {
-		sets = FromCMKeysSelector(keys)
+		sets = configuration.FromCMKeysSelector(keys)
 	}
 	return func(key string) bool {
 		return sets == nil || sets.InArray(key)

@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type configOpsOptions struct {
@@ -145,7 +146,7 @@ func (o *configOpsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfi
 	if o.FileContent != "" {
 		newConfigData = map[string]string{o.CfgFile: o.FileContent}
 	} else {
-		newConfigData, err = cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
+		newConfigData, err = controllerutil.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
 			Key:           o.CfgFile,
 			UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
 		}})

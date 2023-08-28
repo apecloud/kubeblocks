@@ -35,6 +35,7 @@ options: {
 	storage:  string
 	vctNames: [...string]
 	keyValues: [string]: {string | null}
+  fileContent: string
 	cfgTemplateName: string
 	cfgFile:         string
 	forceRestart:    bool
@@ -127,6 +128,9 @@ content: {
 					}
 					keys: [{
 						key: options.cfgFile
+						if options.fileContent != "" {
+							fileContent: options.fileContent
+						}
 						parameters: [ for k, v in options.keyValues {
 							key:   k
 							value: v

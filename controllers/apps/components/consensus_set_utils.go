@@ -357,7 +357,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
 	}
 	configList := &corev1.ConfigMapList{}
-	if err := cli.List(ctx, configList, ml); err != nil {
+	if err := cli.List(ctx, configList, client.InNamespace(cluster.Namespace), ml); err != nil {
 		return nil, err
 	}
 

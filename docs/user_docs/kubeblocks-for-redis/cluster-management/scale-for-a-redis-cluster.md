@@ -148,21 +148,20 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ### Before you start
 
-- Refer to [Backup and restore for Redis](./../backup-and-restore/snapshot-backup-and-restore-for-redis.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
-- Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
-  ```bash
-  kbcli cluster list <name>
-  ```
+```bash
+kbcli cluster list <name>
+```
 
-  ***Example***
+***Example***
 
-  ```bash
-  kbcli cluster list redis-cluster
-  >
-  NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
-  redis-cluster        default          redis                     redis-7.0.6              Delete                    Running        Apr 10,2023 16:50 UTC+0800
-  ```
+```bash
+kbcli cluster list redis-cluster
+>
+NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
+redis-cluster        default          redis                     redis-7.0.6              Delete                    Running        Apr 10,2023 16:50 UTC+0800
+```
 
 ### Steps
 
@@ -180,7 +179,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ```
 
    - `--components` describes the component name ready for vertical scaling.
-   - `--replicas` describes the replicas with the specified components.
+   - `--replicas` describes the replica amount of a specified component.
 
    **Option 2.** Create an OpsRequest
 

@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"context"
-
 	"github.com/go-logr/logr"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var _ = Describe("object rbac transformer test.", func() {

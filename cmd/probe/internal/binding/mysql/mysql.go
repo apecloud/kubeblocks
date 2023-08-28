@@ -32,7 +32,6 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
@@ -41,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // MysqlOperations represents MySQL output bindings.

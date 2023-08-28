@@ -63,12 +63,12 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may
 
    ***Example***
 
-     ```bash
-     kbcli cluster list pg-cluster
-     >
-     NAME         NAMESPACE   CLUSTER-DEFINITION          VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-     pg-cluster   default     postgresql-cluster          postgresql-14.7.0   Delete               Running   Mar 03,2023 18:28 UTC+0800
-     ```
+   ```bash
+   kbcli cluster list pg-cluster
+   >
+   NAME         NAMESPACE   CLUSTER-DEFINITION          VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+   pg-cluster   default     postgresql-cluster          postgresql-14.7.0   Delete               Running   Mar 03,2023 18:28 UTC+0800
+   ```
 
    * STATUS=Restarting: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.

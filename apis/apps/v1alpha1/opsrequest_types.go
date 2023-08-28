@@ -105,6 +105,7 @@ type OpsRequestSpec struct {
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
+	// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 
 	// expose defines services the component needs to expose.
@@ -207,6 +208,7 @@ type HorizontalScaling struct {
 	Replicas int32 `json:"replicas"`
 }
 
+// Reconfigure defines the variables that need to input when updating configuration.
 type Reconfigure struct {
 	ComponentOps `json:",inline"`
 
@@ -273,9 +275,14 @@ type ParameterConfig struct {
 	Key string `json:"key"`
 
 	// Setting the list of parameters for a single configuration file.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	Parameters []ParameterPair `json:"parameters"`
+	// update specified the parameters.
+	// +optional
+	Parameters []ParameterPair `json:"parameters,omitempty"`
+
+	// fileContent indicates the configuration file content.
+	// update whole file.
+	// +optional
+	FileContent string `json:"fileContent,omitempty"`
 }
 
 type Expose struct {

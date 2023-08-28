@@ -33,7 +33,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -63,6 +62,7 @@ import (
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

@@ -50,56 +50,56 @@ redis-cluster        default          redis                     redis-7.0.6     
    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
    - `--storage` describes the volume storage size.
 
-    **Option 2**. Create an OpsRequest
+   **Option 2**. Create an OpsRequest
 
-    Run the command below to expand the volume of a cluster.
+   Run the command below to expand the volume of a cluster.
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: ops-volume-expansion
-    spec:
-      clusterRef: redis-cluster
-      type: VolumeExpansion
-      volumeExpansion:
-      - componentName: redis
-        volumeClaimTemplates:
-        - name: data
-          storage: "2Gi"
-    EOF
-    ```
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-volume-expansion
+   spec:
+     clusterRef: redis-cluster
+     type: VolumeExpansion
+     volumeExpansion:
+     - componentName: redis
+       volumeClaimTemplates:
+       - name: data
+         storage: "2Gi"
+   EOF
+   ```
 
-    **Option 3**. Change the YAML file of the cluster
+   **Option 3**. Change the YAML file of the cluster
 
-    Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
+   Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
-    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
-    ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: redis-cluster
-      namespace: default
-    spec:
-      clusterDefinitionRef: redis
-      clusterVersionRef: redis-7.0.6
-      componentSpecs:
-      - componentDefRef: redis
-        name: redis
-        replicas: 2
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-            - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi # Change the volume storage size.
-      terminationPolicy: Delete
-    ```
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: redis-cluster
+     namespace: default
+   spec:
+     clusterDefinitionRef: redis
+     clusterVersionRef: redis-7.0.6
+     componentSpecs:
+     - componentDefRef: redis
+       name: redis
+       replicas: 2
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi # Change the volume storage size.
+     terminationPolicy: Delete
+   ```
 
 2. Validate the volume expansion.
 

@@ -40,6 +40,8 @@ type Interface interface {
 	ConfigConstraints() ConfigConstraintInformer
 	// OpsRequests returns a OpsRequestInformer.
 	OpsRequests() OpsRequestInformer
+	// ServiceConnectionCredentials returns a ServiceConnectionCredentialInformer.
+	ServiceConnectionCredentials() ServiceConnectionCredentialInformer
 }
 
 type version struct {
@@ -91,4 +93,9 @@ func (v *version) ConfigConstraints() ConfigConstraintInformer {
 // OpsRequests returns a OpsRequestInformer.
 func (v *version) OpsRequests() OpsRequestInformer {
 	return &opsRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ServiceConnectionCredentials returns a ServiceConnectionCredentialInformer.
+func (v *version) ServiceConnectionCredentials() ServiceConnectionCredentialInformer {
+	return &serviceConnectionCredentialInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

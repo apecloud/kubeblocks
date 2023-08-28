@@ -375,6 +375,15 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Class")
 			os.Exit(1)
 		}
+
+		if err = (&appscontrollers.ServiceConnectionCredentialReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ServiceConnectionCredential")
+			os.Exit(1)
+		}
+
 	}
 
 	if viper.GetBool(dataProtectionFlagKey.viperName()) {
@@ -494,6 +503,11 @@ func main() {
 
 		if err = (&workloadsv1alpha1.ReplicatedStateMachine{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ReplicatedStateMachine")
+			os.Exit(1)
+		}
+
+		if err = (&appsv1alpha1.ServiceConnectionCredential{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceConnectionCredential")
 			os.Exit(1)
 		}
 

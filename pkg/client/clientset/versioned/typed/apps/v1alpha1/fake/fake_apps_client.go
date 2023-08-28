@@ -60,6 +60,10 @@ func (c *FakeAppsV1alpha1) OpsRequests(namespace string) v1alpha1.OpsRequestInte
 	return &FakeOpsRequests{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) ServiceConnectionCredentials(namespace string) v1alpha1.ServiceConnectionCredentialInterface {
+	return &FakeServiceConnectionCredentials{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1alpha1) RESTClient() rest.Interface {

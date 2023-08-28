@@ -57,3 +57,11 @@ type OpsRequestListerExpansion interface{}
 // OpsRequestNamespaceListerExpansion allows custom methods to be added to
 // OpsRequestNamespaceLister.
 type OpsRequestNamespaceListerExpansion interface{}
+
+// ServiceConnectionCredentialListerExpansion allows custom methods to be added to
+// ServiceConnectionCredentialLister.
+type ServiceConnectionCredentialListerExpansion interface{}
+
+// ServiceConnectionCredentialNamespaceListerExpansion allows custom methods to be added to
+// ServiceConnectionCredentialNamespaceLister.
+type ServiceConnectionCredentialNamespaceListerExpansion interface{}

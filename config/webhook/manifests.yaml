@@ -31,6 +31,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kubeblocks-io-v1alpha1-serviceconnectioncredential
+  failurePolicy: Fail
+  name: mserviceconnectioncredential.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceconnectioncredentials
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
   failurePolicy: Fail
   name: mreplicatedstatemachine.kb.io
@@ -131,6 +151,26 @@ webhooks:
     - UPDATE
     resources:
     - opsrequests
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kubeblocks-io-v1alpha1-serviceconnectioncredential
+  failurePolicy: Fail
+  name: vserviceconnectioncredential.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceconnectioncredentials
   sideEffects: None
 - admissionReviewVersions:
   - v1

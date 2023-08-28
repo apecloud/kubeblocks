@@ -672,7 +672,7 @@ func updateComponentInfoToPods(
 	}
 	// list all pods in cache
 	podList := corev1.PodList{}
-	if err := cli.List(ctx, &podList, ml); err != nil {
+	if err := cli.List(ctx, &podList, client.InNamespace(cluster.Namespace), ml); err != nil {
 		return err
 	}
 	// list all pods in dag

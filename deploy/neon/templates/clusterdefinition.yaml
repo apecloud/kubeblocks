@@ -1,0 +1,79 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: neon
+  labels:
+    {{- include "neon.labels" . | nindent 4 }}
+spec:
+  componentDefs:
+    - name: neon-storagebroker
+      workloadType: Stateful
+      characterType: storagebroker
+      podSpec:
+        containers:
+          - name: neon-storagebroker
+            volumeMounts:
+              - mountPath: /usr/local/neon/storagebroker
+                name: neon-storagebroker
+            command:
+              - "storage_broker"
+              - "-l"
+              - "0.0.0.0:50051"
+    - name: neon-safekeeper
+      workloadType: Stateful
+      characterType: safekeeper
+      componentDefRef:
+        - &storagebrokerRef
+          componentDefName: neon-storagebroker
+          componentRefEnv:
+            - name: NEON_BROKER_SVC
+              valueFrom:
+                type: HeadlessServiceRef
+                format: $(POD_FQDN){{ .Values.clusterDomain }}
+                joinWith: ","
+      service:
+        ports:
+        - name: safekeeper
+          protocol: TCP
+          port: 5454
+      podSpec:
+        containers:
+          - name: neon-safekeeper
+            volumeMounts:
+              - mountPath: /usr/local/neon/safekeeper
+                name: neon-safekeeper
+            env:
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                trap : TERM INT
+                exec safekeeper --id=1 -D /data --broker-endpoint=http://$NEON_BROKER_SVC:50051 -l ${POD_IP}:5454 --listen-http=0.0.0.0:7676
+    - name: neon-pageserver
+      workloadType: Stateful
+      characterType: pageserver
+      componentDefRef:
+        - *storagebrokerRef
+      service:
+        ports:
+        - name: pageserver
+          protocol: TCP
+          port: 6400
+      podSpec:
+        containers:
+          - name: neon-pageserver
+            volumeMounts:
+              - mountPath: /usr/local/neon/pageserver
+                name: neon-pageserver
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                trap : TERM INT
+                exec pageserver -D /data -c "id=1" -c "broker_endpoint='http://$NEON_BROKER_SVC:50051'" -c "listen_pg_addr='0.0.0.0:6400'" -c "listen_http_addr='0.0.0.0:9898'" -c "pg_distrib_dir='/opt/neondatabase-neon/pg_install'"

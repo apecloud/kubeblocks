@@ -170,7 +170,8 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // checkPodsOfStatefulSetHasDeleted checks if the pods of statefulSet have been deleted
 func (r *BackupReconciler) checkPodsOfStatefulSetHasDeleted(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (bool, error) {
 	podList := &corev1.PodList{}
-	if err := r.Client.List(reqCtx.Ctx, podList, client.MatchingLabels(buildBackupWorkloadsLabels(backup))); err != nil {
+	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabels(buildBackupWorkloadsLabels(backup))); err != nil {
 		return false, err
 	}
 	for _, pod := range podList.Items {

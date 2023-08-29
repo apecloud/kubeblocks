@@ -552,3 +552,51 @@ func TestReadRecoveryParams(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %v", err)
 	}
 }
+
+func TestIsMemberLagging(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{
+		HaConfig: &dcs.HaConfig{},
+	}
+	cluster.Members = append(cluster.Members, dcs.Member{
+		Name: manager.CurrentMemberName,
+	})
+	currentMember := cluster.GetMemberWithName(manager.CurrentMemberName)
+
+	t.Run("db state is nil", func(t *testing.T) {
+		isLagging, lag := manager.IsMemberLagging(ctx, cluster, currentMember)
+		assert.False(t, isLagging)
+		assert.Equal(t, int64(0), lag)
+	})
+
+	cluster.Leader = &dcs.Leader{
+		DBState: &dcs.DBState{
+			OpTimestamp: 100,
+		},
+	}
+	t.Run("get wal position failed", func(t *testing.T) {
+		manager.SetIsLeader(true)
+		mock.ExpectQuery("pg_catalog.pg_current_wal_lsn()").
+			WillReturnError(fmt.Errorf("some error"))
+
+		isLagging, lag := manager.IsMemberLagging(ctx, cluster, currentMember)
+		assert.True(t, isLagging)
+		assert.Equal(t, int64(1), lag)
+	})
+
+	t.Run("current member is not lagging", func(t *testing.T) {
+		manager.SetIsLeader(true)
+		mock.ExpectQuery("pg_catalog.pg_current_wal_lsn()").
+			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(100))
+
+		isLagging, lag := manager.IsMemberLagging(ctx, cluster, currentMember)
+		assert.False(t, isLagging)
+		assert.Equal(t, int64(0), lag)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}

@@ -246,9 +246,14 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 		return false, 0
 	}
 
-	walPosition, err := mgr.getWalPositionWithHost(ctx, cluster.GetMemberAddr(*member))
+	var host string
+	if member.Name != mgr.CurrentMemberName {
+		host = cluster.GetMemberAddr(*member)
+	}
+	walPosition, err := mgr.getWalPositionWithHost(ctx, host)
 	if err != nil {
 		mgr.Logger.Errorf("check member lagging failed, err:%v", err)
+		return true, cluster.HaConfig.GetMaxLagOnSwitchover() + 1
 	}
 
 	// TODO: check timeLine

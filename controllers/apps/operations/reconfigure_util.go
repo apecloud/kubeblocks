@@ -263,7 +263,7 @@ func constructReconfiguringConditions(result reconfiguringResult, resource *OpsR
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureMerged,
 			configSpec.Name,
-			formatReconfiguringMessage(result.configPatch))
+			formatConfigPatchToMessage(result.configPatch, nil))
 	}
 	return appsv1alpha1.NewReconfigureRunningCondition(
 		resource.OpsRequest,
@@ -306,17 +306,13 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	return nil
 }
 
-func formatReconfiguringMessage(configPatch *core.ConfigPatchInfo) string {
-	if configPatch != nil {
-		return formatConfigPatchToMessage(configPatch, nil)
-	}
-	return "updated full config files."
-}
-
 func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *core.PolicyExecStatus) string {
 	policyName := ""
 	if execStatus != nil {
 		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
+	}
+	if configPatch == nil {
+		return fmt.Sprintf("%supdated full config files.", policyName)
 	}
 	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
 		policyName,

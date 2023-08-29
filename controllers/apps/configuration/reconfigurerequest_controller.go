@@ -106,17 +106,17 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	if cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfiguring.")
-		return intctrlutil.Reconciled()
-	}
-
 	tpl := &appsv1alpha1.ConfigConstraint{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Namespace: config.Namespace,
-		Name:      config.Labels[constant.CMConfigurationConstraintsNameLabelKey],
-	}, tpl); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+	cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]
+	if !ok || len(cfgConstraintsName) == 0 {
+		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfiguring.")
+	} else {
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+			Namespace: config.Namespace,
+			Name:      config.Labels[constant.CMConfigurationConstraintsNameLabelKey],
+		}, tpl); err != nil {
+			return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+		}
 	}
 
 	return r.sync(reqCtx, config, tpl)
@@ -152,22 +152,25 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		keySelector = strings.Split(keysLabel, ",")
 	}
 
-	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
+	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig, keySelector)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// No parameters updated
-	if !configPatch.IsModify {
+	if configPatch != nil && !configPatch.IsModify {
 		reqCtx.Recorder.Eventf(config, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
 			"nothing changed, skip reconfigure")
 		return r.updateConfigCMStatus(reqCtx, config, core.ReconfigureNoChangeType)
 	}
 
-	reqCtx.Log.V(1).Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
-		configPatch.AddConfig,
-		configPatch.DeleteConfig,
-		configPatch.UpdateConfig))
+	if configPatch != nil {
+		reqCtx.Log.V(1).Info(fmt.Sprintf(
+			"reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
+			configPatch.AddConfig,
+			configPatch.DeleteConfig,
+			configPatch.UpdateConfig))
+	}
 
 	reconcileContext := newConfigReconcileContext(reqCtx.Ctx, r.Client, config, tpl, componentName, configSpecName, componentLabels)
 	if err := reconcileContext.GetRelatedObjects(); err != nil {

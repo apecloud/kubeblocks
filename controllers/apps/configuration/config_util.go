@@ -372,13 +372,17 @@ func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx,
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
+func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1alpha1.FormatterConfig, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
+	// support full update
+	if formatter == nil {
+		return nil, true, nil
+	}
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
 		return nil, false, core.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	return core.CreateConfigPatch(lastConfig, cfg.Data, format, cmKeys, true)
+	return core.CreateConfigPatch(lastConfig, cfg.Data, formatter.Format, cmKeys, true)
 }
 
 func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ctx context.Context) error {

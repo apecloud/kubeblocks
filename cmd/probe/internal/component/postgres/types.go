@@ -102,6 +102,11 @@ type PgxPoolIFace interface {
 	Close()
 }
 
+type ConsensusMemberHealthStatus struct {
+	Connected   bool
+	LogDelayNum int64
+}
+
 type PidFile struct {
 	pid     int32
 	dataDir string

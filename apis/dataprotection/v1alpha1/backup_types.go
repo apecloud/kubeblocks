@@ -26,18 +26,46 @@ import (
 
 // BackupSpec defines the desired state of Backup.
 type BackupSpec struct {
-	// Which backupPolicy is applied to perform this backup
+	// Which backupPolicy is applied to perform this backup.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.
+	// Deprecated: will be removed in a future release, use backupMethod instead.
 	// +kubebuilder:default=datafile
 	BackupType BackupType `json:"backupType"`
 
-	// if backupType is incremental, parentBackupName is required.
+	// Backup method name that is defined in backupPolicy.
+	// +kubebuilder:validation:Required
+	BackupMethod BackupMethod `json:"backupMethod"`
+
+	// if backupType is incremental or differential, parentBackupName is required.
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
+
+	// deletionPolicy determines whether the backup contents stored in backup repository
+	// should be deleted when the backup custom resource is deleted.
+	// Supported values are "Retain" and "Delete".
+	// "Retain" means that the backup content and its physical snapshot on backup repository are kept.
+	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// +kubebuilder:validation:Enum=Delete;Retain
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Delete
+	DeletionPolicy BackupDeletionPolicy `json:"deletionPolicy,omitempty"`
+
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	// You can also combine the above durations. For example: 30d12h30m
+	// +optional
+	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup.
@@ -171,6 +199,16 @@ type BackupToolManifestsStatus struct {
 	// +optional
 	Checkpoint string `json:"checkpoint,omitempty"`
 }
+
+// BackupDeletionPolicy describes a policy for end-of-life maintenance of backup content.
+// +enum
+// +kubebuilder:validation:Enum={Delete,Retain}
+type BackupDeletionPolicy string
+
+const (
+	BackupDeletionPolicyDelete BackupDeletionPolicy = "Delete"
+	BackupDeletionPolicyRetain BackupDeletionPolicy = "Retain"
+)
 
 // +genclient
 // +k8s:openapi-gen=true

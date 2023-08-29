@@ -69,7 +69,7 @@ When adopting a multi-cloud or hybrid cloud strategy, it is essential to priorit
 
 ## Community
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-1yyjf0rnn-bdYnuXLmjI_USzshhrWgKg)
+- KubeBlocks [Slack Channel](https://kubeblocks.slack.com/join/shared_invite/zt-22cx5p0y9-~BDNuPqxkdgswI_FSdx_8g)S
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 
 ## Contributing to KubeBlocks

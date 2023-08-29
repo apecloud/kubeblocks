@@ -77,25 +77,6 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 	return cli.Patch(ctx, opsRequest, patch)
 }
 
-//// PatchOpsRequestReconcileAnnotation2 patches the reconcile annotation to OpsRequest
-// func PatchOpsRequestReconcileAnnotation2(ctx context.Context, cli client.Client, namespace string, opsRequestName string, dag *graph.DAG) error {
-//	opsRequest := &appsv1alpha1.OpsRequest{}
-//	if err := cli.Get(ctx, client.ObjectKey{Name: opsRequestName, Namespace: namespace}, opsRequest); err != nil {
-//		return err
-//	}
-//
-//	opsRequestDeepCopy := opsRequest.DeepCopy()
-//	if opsRequest.Annotations == nil {
-//		opsRequest.Annotations = map[string]string{}
-//	}
-//	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
-//	// so use nanoseconds to record the time.
-//	opsRequest.Annotations[intctrlutil.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-//
-//	types.AddVertex4Patch(dag, opsRequest, opsRequestDeepCopy)
-//	return nil
-// }
-
 // GetOpsRequestSliceFromCluster gets OpsRequest slice from cluster annotations.
 // this records what OpsRequests are running in cluster
 func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.OpsRecorder, error) {

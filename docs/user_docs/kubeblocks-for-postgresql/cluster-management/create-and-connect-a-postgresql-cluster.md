@@ -19,7 +19,7 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 
 * [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a cluster by kbcli.
 * Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-* Make sure the Redis add-on is enabled.
+* Make sure the Postgre add-on is enabled.
   
   <Tabs>
 

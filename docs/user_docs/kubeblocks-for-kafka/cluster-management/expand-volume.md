@@ -1,7 +1,7 @@
 ---
 title: Expand volume
-description: How to expand the volume of a MongoDB cluster
-keywords: [mongodb, expand volume, volume expansion]
+description: How to expand the volume of a kafka cluster
+keywords: [kafka, expand volume, volume expansion]
 sidebar_position: 3
 sidebar_label: Expand volume
 ---
@@ -15,7 +15,7 @@ You can expand the storage volume size of each pod.
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list mongodb-cluster
+kbcli cluster list kafka  
 ```
 
 ## Option 1. Use kbcli
@@ -23,10 +23,7 @@ kbcli cluster list mongodb-cluster
 Use `kbcli cluster volume-expand` command, configure the resources required and enter the cluster name again to expand the volume.
 
 ```bash
-kbcli cluster volume-expand --storage=30G --component-names=mongodb --volume-claim-templates=data mongodb-cluster
->
-OpsRequest mongodb-cluster-volumeexpansion-gcfzp created successfully, you can view the progress:
-        kbcli cluster describe-ops mongodb-cluster-volumeexpansion-gcfzp -n default
+kbcli cluster volume-expand --storage=30G --component-names=kafka --volume-claim-templates=data kafka
 ```
 
 - `--component-names` describes the component name for volume expansion.
@@ -41,14 +38,14 @@ Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mongodb-cluster
+  name: kafka
   namespace: default
 spec:
-  clusterDefinitionRef: mongodb
-  clusterVersionRef: mongodb-5.0.14
+  clusterDefinitionRef: kafka
+  clusterVersionRef: kafka-3.3.2
   componentSpecs:
-  - name: mongodb 
-    componentDefRef: mongodb
+  - name: kafka 
+    componentDefRef: kafka
     replicas: 1
     volumeClaimTemplates:
     - name: data

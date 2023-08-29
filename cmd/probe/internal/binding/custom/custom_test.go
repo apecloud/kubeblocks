@@ -25,9 +25,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,6 +42,7 @@ import (
 )
 
 func TestInit(t *testing.T) {
+	os.Setenv(constant.KBEnvNamespace, "kb-system")
 	s := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			_, _ = w.Write([]byte("leader"))
@@ -90,6 +94,7 @@ func TestInit(t *testing.T) {
 }
 
 func TestGlobalInfo(t *testing.T) {
+	os.Setenv(constant.KBEnvNamespace, "kb-system")
 	var lines []string
 	for i := 0; i < 3; i++ {
 		podName := "pod-" + strconv.Itoa(i)

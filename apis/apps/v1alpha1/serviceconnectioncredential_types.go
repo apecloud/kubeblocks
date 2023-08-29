@@ -22,31 +22,29 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ServiceConnectionCredentialSpec defines the desired state of ServiceConnectionCredential
 type ServiceConnectionCredentialSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster.
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// endpoint is the endpoint of the service connection credential.
 	// +optional
 	EndPoint string `json:"endpoint,omitempty"`
 
 	// auth is the auth of the service connection credential.
 	// +optional
-	Auth *ServiceConnectionCredentialAuth `json:"auth,omitempty"`
+	Auth *ConnectionCredentialAuth `json:"auth,omitempty"`
 
 	// port is the port of the service connection credential.
 	// +optional
-	Port int32 `json:"port,omitempty"`
+	Port intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,4,opt,name=port"`
 
 	// extra is the extra information of the service connection credential, and it is a key-value pair.
 	// +optional
 	Extra map[string]string `json:"extra,omitempty"`
 }
 
-type ServiceConnectionCredentialAuth struct {
+type ConnectionCredentialAuth struct {
 	// service connection based-on username and password credential.
 	// +optional
 	Username *CredentialVar `json:"username,omitempty"`

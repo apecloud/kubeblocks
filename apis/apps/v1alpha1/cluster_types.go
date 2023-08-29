@@ -222,6 +222,14 @@ type ClusterComponentSpec struct {
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
+	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into three types:
+	// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceConnectionCredential object to establish the service binding.
+	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster. It is important to note that the hosting cluster should be in the same namespace.
+	// Service provided by other components within the current Cluster: It enables service references between components within the same cluster. This allows components in the same cluster to interact and communicate with each other by referencing the services provided by other components.
+	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
+	// +optional
+	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
+
 	// monitor is a switch to enable monitoring and is set as false by default.
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
@@ -598,6 +606,31 @@ type ClusterNetwork struct {
 	// +kubebuilder:default=false
 	// +optional
 	PubliclyAccessible bool `json:"publiclyAccessible,omitempty"`
+}
+
+type ServiceRef struct {
+	// name of the predefined service reference. references the serviceRefDeclaration name defined in clusterDefinition.componentDefs[x].serviceRefDeclarations[y].name
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced. and the referenced cluster should be in the same namespace.
+	// By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential corresponding to the referenced Cluster will be used to bind to the current component.
+	// If you have specified a Cluster, please do not simultaneously specify both a Component and a ConnectionCredential.
+	// +optional
+	Cluster string `json:"cluster,omitempty"`
+
+	// When referencing a service provided by other components within the current Cluster, you need to provide the name of the component being referenced within the current Cluster.
+	// By default, when other component within the current Cluster are referenced, the ClusterDefinition.spec.ComponentDefs[name].connectionCredential corresponding to the referenced component will be used to bind to the current component.
+	// If you have specified a Component, please do not simultaneously specify both a Cluster and a ConnectionCredential.
+	// +optional
+	Component string `json:"component,omitempty"`
+
+	// connectionCredential defines the credential used to establish the service binding.
+	// When referencing a service provided by external sources, you need to provide the ServiceConnectionCredential object name to establish the service binding. The ServiceConnectionCredential object should be in the same namespace with the cluster.
+	// And connectionCredential is the name of the ServiceConnectionCredential object.
+	// If you have specified a ConnectionCredential, please do not simultaneously specify both a Cluster and a Component.
+	// +optional
+	ConnectionCredential string `json:"connectionCredential,omitempty"`
 }
 
 // +genclient

@@ -270,6 +270,14 @@ type ProtectedVolume struct {
 	HighWatermark *int `json:"highWatermark,omitempty"`
 }
 
+type ServiceRefDeclaration struct {
+	// The name of the predefined service reference.
+	// The service reference can come from an external service that is not part of KubeBlocks, services provided by other KubeBlocks Cluster objects, or services provided by other ClusterComponentDefinition objects under the current ClusterDefinition.
+	// The specific type of service reference depends on the binding declaration when creates a Cluster.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+}
+
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
@@ -410,6 +418,27 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=componentDefName
 	// +optional
 	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
+
+	// serviceRefDeclarations is used to declare the serviceRef of the current component.
+	// +optional
+	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
+
+	// Connection credential template used for creating a component connection credential
+	// secret for cluster component object.
+	//
+	// Built-in objects are:
+	// - `$(RANDOM_PASSWD)` - random 8 characters.
+	// - `$(UUID)` - generate a random UUID v4 string.
+	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
+	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(COMP_NAME)-headless.$(NAMESPACE).svc,
+	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(COMP_NAME).$(NAMESPACE).svc,
+	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
+	//    connection credential value is 3306.
+	// +optional
+	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -1085,7 +1114,7 @@ type ComponentValueFrom struct {
 	// +optional
 	FieldPath string `json:"fieldPath,omitempty"`
 	// format is the format of each headless service address.
-	// there are three builtin variables can be used as placerholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
+	// there are three builtin variables can be used as placeholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
 	// $POD_ORDINAL is the ordinal of the pod.
 	// $POD_FQDN is the fully qualified domain name of the pod.
 	// $POD_NAME is the name of the pod

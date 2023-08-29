@@ -9,7 +9,7 @@ version: 0.7.0-alpha.0
 # The helm chart contains multiple kernel versions of Official PostgreSQL,
 # and each PostgreSQL version corresponds to a clusterVersion object.
 # appVersion should be consistent with the highest PostgreSQL kernel version in clusterVersion.
-appVersion: "14.7.2"
+appVersion: "14.7"
 
 annotations:
   kubeblocks.io/clusterVersions: "14.7.2,12.14.1"

@@ -31,7 +31,8 @@ check_oplog_push_process(){
     echo $errorLog && exit 1
   fi
   # check role of the connected mongodb
-  isPrimary=$(mongosh -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().ismaster' --quiet)
+  CLIENT=`which mongosh&&echo mongosh||echo mongo`
+  isPrimary=$(${CLIENT} -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().ismaster' --quiet)
   if [ "${isPrimary}" != "true" ]; then
     echo "isPrimary: ${isPrimary}"
     retryTimes=$(($retryTimes+1))

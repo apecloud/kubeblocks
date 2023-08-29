@@ -20,104 +20,136 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package validate
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
-	"cuelang.org/go/cue/load"
+	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/encoding/openapi"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/internal/configuration/cuewrapper"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+)
+
+const (
+	SchemaFieldName    = "schemas"
+	ComponentFieldName = "components"
 )
 
 // GenerateOpenAPISchema generates openapi schema from cue type Definitions.
 func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSchemaProps, error) {
 	const (
+		rootPath       = "root"
 		openAPIVersion = "3.1.0"
 	)
 
-	cueOption := &load.Config{Stdin: strings.NewReader(cueTpl)}
-	insts := load.Instances([]string{"-"}, cueOption)
-	for _, ins := range insts {
-		if err := ins.Err; err != nil {
-			return nil, core.WrapError(err, "failed to generate build.Instance for %s", schemaType)
-		}
-	}
-	if len(insts) != 1 {
-		return nil, core.MakeError("failed to create cue.Instances. [%s]", cueTpl)
+	rt, err := cuewrapper.NewRuntime(cueTpl)
+	if err != nil {
+		return nil, err
 	}
 
+	var path cue.Value
+	if schemaType != "" {
+		path = rt.Underlying().LookupPath(cue.MakePath(cue.Def(schemaType)))
+		if path.Err() != nil {
+			return nil, core.MakeError(errors.Details(path.Err(), nil))
+		}
+	} else {
+		defs, err := rt.Underlying().Fields(cue.Definitions(true))
+		if err != nil {
+			return nil, err
+		}
+		if !defs.Next() {
+			return nil, core.MakeError("no definitions found")
+		}
+		schemaType = strings.Trim(defs.Label(), "#")
+		path = defs.Value()
+	}
+
+	v := rt.Context().CompileString(fmt.Sprintf("#%s", schemaType))
+	defPath := cue.MakePath(cue.Def(schemaType))
+	defSche := v.FillPath(defPath, path)
 	openapiOption := &openapi.Config{
-		Version:       openAPIVersion,
-		SelfContained: true,
-		// ExpandReferences: true,
+		Version:          openAPIVersion,
+		SelfContained:    true,
+		ExpandReferences: false,
 		Info: ast.NewStruct(
 			"title", ast.NewString(fmt.Sprintf("%s configuration schema", schemaType)),
 			"version", ast.NewString(openAPIVersion),
 		),
 	}
-	// schema, err := openapiOption.All(cue.Build(insts)[0]) //nolint:staticcheck
-	schema, err := openapiOption.Schemas(cue.Build(insts)[0]) //nolint:staticcheck
+
+	astf, err := openapi.Generate(defSche.Eval(), openapiOption)
 	if err != nil {
 		return nil, err
 	}
-	if schema == nil {
-		return nil, nil
-	}
-	return transformOpenAPISchema(schema, schemaType)
-}
-
-func foundSchemaFromCueDefines(cueMap *openapi.OrderedMap, schemaType string) *openapi.OrderedMap {
-	for _, kv := range cueMap.Pairs() {
-		if schemaType == "" {
-			m, ok := kv.Value.(*openapi.OrderedMap)
-			if ok {
-				return m
-			}
-			continue
-		}
-		if kv.Key == schemaType {
-			return kv.Value.(*openapi.OrderedMap) //nolint:staticcheck
-		}
-	}
-	return nil
-}
-
-func transformOpenAPISchema(cueSchema *openapi.OrderedMap, schemaType string) (*apiextv1.JSONSchemaProps, error) {
-	allSchemaType := func(cueMap *openapi.OrderedMap) []string {
-		keys := make([]string, len(cueMap.Elts))
-		for i, pair := range cueMap.Pairs() {
-			keys[i] = pair.Key
-		}
-		return keys
-	}
-
-	typeSchema := foundSchemaFromCueDefines(cueSchema, schemaType)
-	if typeSchema == nil {
-		log.Log.Info(fmt.Sprintf("not found schema type:[%s], all: %v", schemaType, allSchemaType(cueSchema)))
-		return nil, nil
-	}
-
-	b, err := typeSchema.MarshalJSON()
+	schema, err := getSchemas(astf, schemaType)
 	if err != nil {
-		return nil, core.WrapError(err, "failed to marshal OpenAPI schema")
+		return nil, err
 	}
+	// yamlStr, err := yaml.Marshal(rt.BuildFile(astf))
+	// if err != nil {
+	//	return nil, fmt.Errorf("cue-yaml marshaling failed: %w", err)
+	// }
+	// fmt.Println(yamlStr)
 
-	jsonProps := apiextv1.JSONSchemaProps{}
-	if err = json.Unmarshal(b, &jsonProps); err != nil {
-		log.Log.Error(err, "failed to unmarshal raw OpenAPI schema to JSONSchemaProps")
+	return transformOpenAPISchema(rt, schema, cuewrapper.DeReference(astf, rt))
+}
+
+func getSchemas(f *ast.File, schemaType string) ([]ast.Decl, error) {
+	compos, err := cuewrapper.GetFieldByLabel(f, ComponentFieldName)
+	if err != nil {
+		return nil, err
+	}
+	schemas, err := cuewrapper.GetFieldByLabel(compos.Value, SchemaFieldName)
+	if err != nil {
+		return nil, err
+	}
+	typeSchema, err := cuewrapper.GetFieldByLabel(schemas.Value, schemaType)
+	if err != nil {
+		return nil, err
+	}
+	slit, ok := typeSchema.Value.(*ast.StructLit)
+	if ok {
+		return slit.Elts, nil
+	}
+	return nil, core.MakeError("not a struct literal")
+}
+
+func transformOpenAPISchema(rt *cuewrapper.Runtime, cueSchema []ast.Decl, refFn func(path string) (*apiextv1.JSONSchemaProps, error)) (*apiextv1.JSONSchemaProps, error) {
+	jsonProps, err := cuewrapper.FromCueAST(rt, cueSchema)
+	if err != nil {
 		return nil, err
 	}
 
+	if err := deReferenceSchema(jsonProps, refFn); err != nil {
+		return nil, err
+	}
 	r := apiextv1.JSONSchemaProps{
 		Type: "object",
 		Properties: map[string]apiextv1.JSONSchemaProps{
-			"spec": jsonProps,
+			"spec": *jsonProps,
 		},
 	}
 	return &r, nil
+}
+
+func deReferenceSchema(props *apiextv1.JSONSchemaProps, fn func(path string) (*apiextv1.JSONSchemaProps, error)) error {
+	for key := range props.Properties {
+		schemaProps := props.Properties[key]
+		if schemaProps.Ref != nil {
+			refProps, err := fn(*schemaProps.Ref)
+			if err != nil {
+				return err
+			}
+			schemaProps = *refProps
+		}
+		if err := deReferenceSchema(&schemaProps, fn); err != nil {
+			return err
+		}
+		props.Properties[key] = schemaProps
+	}
+	return nil
 }

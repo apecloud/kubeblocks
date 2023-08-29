@@ -45,6 +45,14 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 	}{{
 		name: "normal_test",
 		args: args{
+			cueFile:    "/test_import_type.cue",
+			schemaType: "Exemplar",
+		},
+		want:    "test_import_type.json",
+		wantErr: false,
+	}, {
+		name: "normal_test",
+		args: args{
 			cueFile:    "mysql_openapi.cue",
 			schemaType: "MysqlParameter",
 		},

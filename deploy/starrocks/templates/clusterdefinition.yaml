@@ -1,0 +1,210 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: starrocks
+  labels:
+    {{- include "starrocks.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: ""
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_fe)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_fe)"
+  componentDefs:
+  - name: fe
+    characterType: mysql
+    workloadType: Stateful
+    service:
+      ports:
+      - name: fe
+        port: {{ .Values.fe.queryPort }}
+        targetPort: query-port
+    volumeTypes:
+    - name: fe-data
+      type: data
+    - name: fe-log
+      type: log
+    configSpecs:
+    - name: starrocks-fe-cm
+      templateRef: starrocks-fe-cm
+      namespace: {{ .Release.Namespace }}
+      volumeName: starrocks-fe-cm
+    podSpec:
+      containers:
+      - name: fe
+        volumeMounts:
+        - mountPath: /opt/starrocks/fe/meta
+          name: fe-meta
+        - mountPath: /opt/starrocks/fe/log
+          name: fe-log
+        - mountPath: /opt/starrocks/fe/conf
+          name: starrocks-fe-cm
+        args:
+        - $(FE_SERVICE_NAME)
+        command:
+        - /opt/starrocks/fe_entrypoint.sh
+        env:
+        - name: TZ
+          value: {{ .Values.timezone }}
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: HOST_TYPE
+          value: FQDN
+        - name: COMPONENT_NAME
+          value: fe
+        - name: FE_SERVICE_NAME
+          value: $(KB_CLUSTER_COMP_NAME)-headless
+        - name: CONFIGMAP_MOUNT_PATH
+          value: /etc/starrocks/fe/conf
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /opt/starrocks/fe_prestop.sh
+        ports:
+        - containerPort: 8030
+          name: http-port
+          protocol: TCP
+        - containerPort: 9020
+          name: rpc-port
+          protocol: TCP
+        - containerPort: {{ .Values.fe.queryPort }}
+          name: query-port
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        {{- if .Values.fe.resources }}
+        resources:
+          {{- toYaml .Values.fe.resources | nindent 10 }}
+        {{- end }}
+        {{- if .Values.fe.probe }}
+        livenessProbe:
+          failureThreshold: 3
+          {{- toYaml .Values.fe.probe | nindent 10 }}
+        readinessProbe:
+          failureThreshold: 3
+          {{- toYaml .Values.fe.probe | nindent 10 }}
+        startupProbe:
+          failureThreshold: 60
+          {{- toYaml .Values.fe.probe | nindent 10 }}
+        {{- end }}
+  - name: be
+    characterType: starrocks
+    workloadType: Stateful
+    componentDefRef:
+    - componentDefName: fe
+      componentRefEnv:
+        - name: FE_SERVICE_NAME
+          valueFrom:
+            type: ServiceRef
+    configSpecs:
+    - name: starrocks-be-cm
+      templateRef: starrocks-be-cm
+      namespace: {{ .Release.Namespace }}
+      volumeName: starrocks-be-cm
+    volumeTypes:
+    - name: be-storage
+      type: data
+    - name: be-log
+      type: log
+    podSpec:
+      containers:
+      - name: be
+        args:
+        - $(FE_SERVICE_NAME)
+        command:
+        - /opt/starrocks/be_entrypoint.sh
+        volumeMounts:
+        - mountPath: /opt/starrocks/be/log
+          name: be-log
+        - mountPath: /opt/starrocks/be/storage
+          name: be-storage
+        - mountPath: /opt/starrocks/be/conf
+          name: starrocks-be-cm
+        env:
+        - name: TZ
+          value: Asia/Shanghai
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: HOST_TYPE
+          value: FQDN
+        - name: COMPONENT_NAME
+          value: be
+        - name: FE_QUERY_PORT
+          value: "{{ .Values.fe.queryPort }}"
+        - name: CONFIGMAP_MOUNT_PATH
+          value: /etc/starrocks/be/conf
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /opt/starrocks/be_prestop.sh
+        ports:
+        - containerPort: 9060
+          name: be-port
+          protocol: TCP
+        - containerPort: 8040
+          name: webserver-port
+          protocol: TCP
+        - containerPort: 9050
+          name: heartbeat-port
+          protocol: TCP
+        - containerPort: 8060
+          name: brpc-port
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        {{- if .Values.be.resources }}
+        resources:
+          {{- toYaml .Values.be.resources | nindent 10 }}
+        {{- end }}
+        {{- if .Values.be.probe }}
+        livenessProbe:
+          failureThreshold: 3
+          {{- toYaml .Values.be.probe | nindent 10 }}
+        readinessProbe:
+          failureThreshold: 3
+          {{- toYaml .Values.be.probe | nindent 10 }}
+        startupProbe:
+          failureThreshold: 60
+          {{- toYaml .Values.be.probe | nindent 10 }}
+        {{- end }}

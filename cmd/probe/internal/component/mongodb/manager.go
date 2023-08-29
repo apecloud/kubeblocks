@@ -21,6 +21,7 @@ package mongodb
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -127,7 +128,8 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 	}
 	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
-	mgr.Logger.Infof("Initial Replset Config: %v", config)
+	configJson, _ := json.Marshal(config)
+	mgr.Logger.Infof("Initial Replset Config: %s", string(configJson))
 	response := client.Database("admin").RunCommand(ctx, bson.M{"replSetInitiate": config})
 	if response.Err() != nil {
 		return response.Err()

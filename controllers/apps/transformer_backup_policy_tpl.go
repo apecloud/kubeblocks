@@ -47,10 +47,6 @@ type BackupPolicyTPLTransformer struct {
 
 var _ graph.Transformer = &BackupPolicyTPLTransformer{}
 
-const (
-	trueVal = "true"
-)
-
 func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	clusterDefName := transCtx.ClusterDef.Name

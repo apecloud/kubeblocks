@@ -237,7 +237,7 @@ var _ = Describe("PITR Functions", func() {
 			baseStartTime := &startTime
 			baseStopTime := &now
 			backupStatus := dpv1alpha1.BackupStatus{
-				Phase:                            dpv1alpha1.BackupCompleted,
+				Phase:                            dpv1alpha1.BackupPhaseCompleted,
 				StartTimestamp:                   baseStartTime,
 				CompletionTimestamp:              baseStopTime,
 				BackupToolName:                   fullBackupToolName,
@@ -272,7 +272,7 @@ var _ = Describe("PITR Functions", func() {
 				SetBackupType(dpv1alpha1.BackupTypeLogFile).
 				Create(&testCtx).GetObject()
 			backupStatus = dpv1alpha1.BackupStatus{
-				Phase:                     dpv1alpha1.BackupCompleted,
+				Phase:                     dpv1alpha1.BackupPhaseCompleted,
 				StartTimestamp:            incrStartTime,
 				CompletionTimestamp:       incrStopTime,
 				SourceCluster:             clusterName,

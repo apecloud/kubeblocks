@@ -162,7 +162,7 @@ var _ = Describe("MySQL data protection function", func() {
 
 		It("should be completed", func() {
 			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dpv1alpha1.Backup) {
-				g.Expect(backup.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+				g.Expect(backup.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 			})).Should(Succeed())
 		})
 	})

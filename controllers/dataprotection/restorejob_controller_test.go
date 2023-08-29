@@ -171,10 +171,10 @@ var _ = Describe("RestoreJob Controller", func() {
 		}
 		backupKey := types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}
 		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
-			g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupInProgress))
+			g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupPhaseInProgress))
 		})).Should(Succeed())
 
-		patchBackupStatus(dataprotectionv1alpha1.BackupCompleted, backupKey)
+		patchBackupStatus(dataprotectionv1alpha1.BackupPhaseCompleted, backupKey)
 
 		patchK8sJobStatus(batchv1.JobComplete, key)
 

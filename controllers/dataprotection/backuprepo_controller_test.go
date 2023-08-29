@@ -512,11 +512,11 @@ parameters:
 				obj := &dpv1alpha1.Backup{}
 				err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), obj)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				if obj.Status.Phase == dpv1alpha1.BackupFailed {
+				if obj.Status.Phase == dpv1alpha1.BackupPhaseFailed {
 					// the controller will set the status to failed because
 					// essential objects (e.g. backup policy) are missed.
 					// we set the status to completed after that, to avoid conflict.
-					obj.Status.Phase = dpv1alpha1.BackupCompleted
+					obj.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					err = testCtx.Cli.Status().Update(testCtx.Ctx, obj)
 					g.Expect(err).ShouldNot(HaveOccurred())
 				} else {

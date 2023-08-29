@@ -312,7 +312,7 @@ func printBackupList(o ListBackupOptions) error {
 			durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
 		}
 		statusString := string(backup.Status.Phase)
-		if backup.Status.Phase == dpv1alpha1.BackupRunning && backup.Status.AvailableReplicas != nil {
+		if backup.Status.Phase == dpv1alpha1.BackupPhaseRunning && backup.Status.AvailableReplicas != nil {
 			statusString = fmt.Sprintf("%s(AvailablePods: %d)", statusString, *backup.Status.AvailableReplicas)
 		}
 		if len(o.BackupName) > 0 {
@@ -452,7 +452,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
 		return err
 	}
-	if backup.Status.Phase != dpv1alpha1.BackupCompleted {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return errors.Errorf(`backup "%s" is not completed.`, backup.Name)
 	}
 	if len(backup.Labels[constant.AppInstanceLabelKey]) == 0 {

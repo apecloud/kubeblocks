@@ -368,7 +368,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
 		return err
 	}
-	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+	if backup.Status.Phase != dataprotectionv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf(`backup "%s" is not completed`, backup.Name)
 	}
 	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(components), components[0]["name"].(string))

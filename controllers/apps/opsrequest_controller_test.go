@@ -528,7 +528,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
 			backup := &dataprotectionv1alpha1.Backup{}
 			Expect(k8sClient.Get(testCtx.Ctx, backupKey, backup)).Should(Succeed())
-			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+			backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
 			Expect(k8sClient.Status().Update(testCtx.Ctx, backup)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))

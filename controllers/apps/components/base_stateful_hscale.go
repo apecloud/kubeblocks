@@ -396,11 +396,11 @@ func (d *snapshotDataClone) checkBackupStatus() (backupStatus, error) {
 			return backupStatusFailed, err
 		}
 	}
-	if backup.Status.Phase == dataprotectionv1alpha1.BackupFailed {
+	if backup.Status.Phase == dataprotectionv1alpha1.BackupPhaseFailed {
 		return backupStatusFailed, intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
 			backup.Status.FailureReason)
 	}
-	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+	if backup.Status.Phase != dataprotectionv1alpha1.BackupPhaseCompleted {
 		return backupStatusProcessing, nil
 	}
 	return backupStatusReadyToUse, nil
@@ -614,10 +614,10 @@ func (d *backupDataClone) checkBackupStatus() (backupStatus, error) {
 			return backupStatusFailed, err
 		}
 	}
-	if backup.Status.Phase == dataprotectionv1alpha1.BackupFailed {
+	if backup.Status.Phase == dataprotectionv1alpha1.BackupPhaseFailed {
 		return backupStatusFailed, fmt.Errorf("failed to backup: %s", backup.Status.FailureReason)
 	}
-	if backup.Status.Phase == dataprotectionv1alpha1.BackupCompleted {
+	if backup.Status.Phase == dataprotectionv1alpha1.BackupPhaseCompleted {
 		return backupStatusReadyToUse, nil
 	}
 	return backupStatusProcessing, nil

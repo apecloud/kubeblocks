@@ -65,6 +65,7 @@ type BackupSpec struct {
 	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m
 	// +optional
+	// +kubebuilder:default=7d
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 }
 
@@ -72,10 +73,6 @@ type BackupSpec struct {
 type BackupStatus struct {
 	// +optional
 	Phase BackupPhase `json:"phase,omitempty"`
-
-	// Records parentBackupName if backupType is incremental.
-	// +optional
-	ParentBackupName string `json:"parentBackupName,omitempty"`
 
 	// The date and time when the Backup is eligible for garbage collection.
 	// 'null' means the Backup is NOT be cleaned except delete manual.
@@ -210,6 +207,29 @@ const (
 	BackupDeletionPolicyRetain BackupDeletionPolicy = "Retain"
 )
 
+// BackupPhase is a string representation of the lifecycle phase of a Backup.
+// +enum
+// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed,Deleting}
+type BackupPhase string
+
+const (
+	// BackupPhaseNew means the backup has been created but not yet processed by
+	// the BackupController.
+	BackupPhaseNew BackupPhase = "New"
+
+	// BackupPhaseInProgress means the backup is currently executing.
+	BackupPhaseInProgress BackupPhase = "InProgress"
+
+	//
+	BackupPhaseRunning BackupPhase = "Running"
+
+	BackupPhaseCompleted BackupPhase = "Completed"
+
+	BackupPhaseFailed BackupPhase = "Failed"
+
+	BackupPhaseDeleting BackupPhase = "Deleting"
+)
+
 // +genclient
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
@@ -318,7 +338,7 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	getFirstRecoverableBaseBackup := func() *Backup {
 		for _, b := range backups {
 			if !slices.Contains([]BackupType{BackupTypeDataFile, BackupTypeSnapshot}, b.Spec.BackupType) ||
-				b.Status.Phase != BackupCompleted {
+				b.Status.Phase != BackupPhaseCompleted {
 				continue
 			}
 			backupStopTime := b.Status.GetStopTime()

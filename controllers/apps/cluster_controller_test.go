@@ -631,7 +631,7 @@ var _ = Describe("Cluster Controller", func() {
 					Namespace: testCtx.DefaultNamespace}
 				By("Mocking backup status to completed")
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
-					backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+					backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = "backup-data"
 					backup.Status.BackupToolName = backupToolName
 				})()).Should(Succeed())
@@ -1760,7 +1760,7 @@ var _ = Describe("Cluster Controller", func() {
 			Name:      backupList.Items[0].Name,
 		}
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
-			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
+			backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseFailed
 		})()).Should(Succeed())
 
 		By("Checking cluster status failed with backup error")
@@ -2600,13 +2600,13 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dataprotectionv1alpha1.Backup) {
 				backup.Status.BackupToolName = backupTool.Name
 				backup.Status.PersistentVolumeClaimName = "backup-pvc"
-				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+				backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
 			})).Should(Succeed())
 
 			By("checking backup status completed")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
 				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
-					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupPhaseCompleted))
 				})).Should(Succeed())
 
 			By("creating cluster with backup")

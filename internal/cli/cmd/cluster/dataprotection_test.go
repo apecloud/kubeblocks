@@ -249,7 +249,7 @@ var _ = Describe("DataProtection", func() {
 			constant.AppInstanceLabelKey: "apecloud-mysql",
 		}
 		AvailableReplicas := int32(1)
-		backup1.Status.Phase = dpv1alpha1.BackupRunning
+		backup1.Status.Phase = dpv1alpha1.BackupPhaseRunning
 		backup1.Status.AvailableReplicas = &AvailableReplicas
 		backup2 := testing.FakeBackup("test1")
 		backup2.Namespace = "backup"
@@ -340,7 +340,7 @@ var _ = Describe("DataProtection", func() {
 			SetBackLog(now.Add(-time.Minute), now.Add(-time.Second)).
 			SetLabels(backupLabels).GetObject()
 		baseBackup.TypeMeta = backupTypeMeta
-		baseBackup.Status.Phase = dpv1alpha1.BackupCompleted
+		baseBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 		logfileBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
 			SetBackupType(dpv1alpha1.BackupTypeLogFile).
 			SetBackLog(now.Add(-time.Minute), now.Add(time.Minute)).
@@ -405,7 +405,7 @@ var _ = Describe("DataProtection", func() {
 		backup1 := testing.FakeBackup(backupName)
 		args = append(args, backupName)
 		availableReplicas := int32(1)
-		backup1.Status.Phase = dpv1alpha1.BackupCompleted
+		backup1.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 		logNow := metav1.Now()
 		backup1.Status.StartTimestamp = &logNow
 		backup1.Status.CompletionTimestamp = &logNow

@@ -168,8 +168,8 @@ type UpdatableFlags struct {
 	TerminationPolicy string `json:"terminationPolicy"`
 
 	// Add-on switches for cluster observability
-	MonitoringInterval int8 `json:"monitor"`
-	EnableAllLogs      bool `json:"enableAllLogs"`
+	MonitoringInterval uint8 `json:"monitor"`
+	EnableAllLogs      bool  `json:"enableAllLogs"`
 
 	// Configuration and options for cluster affinity and tolerations
 	PodAntiAffinity string `json:"podAntiAffinity"`
@@ -256,7 +256,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	return o
 }
 
-func setMonitor(monitoringInterval int8, components []map[string]interface{}) {
+func setMonitor(monitoringInterval uint8, components []map[string]interface{}) {
 	if len(components) == 0 {
 		return
 	}
@@ -1168,7 +1168,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type, one of: (Preferred, Required)")
-	cmd.Flags().Int8Var(&f.MonitoringInterval, "monitoring-interval", 0, "The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.")
+	cmd.Flags().Uint8Var(&f.MonitoringInterval, "monitoring-interval", 0, "The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.")
 	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", false, "Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false")
 	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")

@@ -452,7 +452,7 @@ func buildLogsReconfiguringOps(clusterName, namespace, compName, configName, key
 }
 
 func (o *updateOptions) updateMonitor(val string) error {
-	intVal, err := strconv.ParseInt(val, 10, 8)
+	intVal, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
 		return err
 	}

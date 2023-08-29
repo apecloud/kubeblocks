@@ -202,8 +202,8 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		"tolerations": {field: "tolerations", obj: spec, fn: buildTolObj},
 
 		// monitor and logs
-		"monitor":         {field: "monitor", obj: nil, fn: buildComps},
-		"enable-all-logs": {field: "enable-all-logs", obj: nil, fn: buildComps},
+		"monitoring-interval": {field: "monitor", obj: nil, fn: buildComps},
+		"enable-all-logs":     {field: "enable-all-logs", obj: nil, fn: buildComps},
 	}
 
 	for _, flag := range flags {
@@ -452,13 +452,13 @@ func buildLogsReconfiguringOps(clusterName, namespace, compName, configName, key
 }
 
 func (o *updateOptions) updateMonitor(val string) error {
-	boolVal, err := strconv.ParseBool(val)
+	intVal, err := strconv.ParseInt(val, 10, 8)
 	if err != nil {
 		return err
 	}
 
 	for i := range o.cluster.Spec.ComponentSpecs {
-		o.cluster.Spec.ComponentSpecs[i].Monitor = boolVal
+		o.cluster.Spec.ComponentSpecs[i].Monitor = intVal != 0
 	}
 	return nil
 }

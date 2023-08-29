@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/pkg/encoding/yaml"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -114,7 +115,7 @@ func FromCueAST(rt *Runtime, cueSchema []ast.Decl) (*apiextv1.JSONSchemaProps, e
 		&ast.File{Decls: cueSchema},
 	))
 	if err != nil {
-		return nil, core.WrapError(err, "failed to marshal cue-yaml")
+		return nil, core.MakeError("failed to marshal cue-yaml: %s", errors.Details(err, nil))
 	}
 
 	jsonProps := apiextv1.JSONSchemaProps{}

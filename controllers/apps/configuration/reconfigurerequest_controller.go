@@ -108,8 +108,8 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	tpl := &appsv1alpha1.ConfigConstraint{}
 	cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]
-	if !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfiguring.")
+	if !ok || cfgConstraintsName == "" {
+		reqCtx.Log.Info("configuration without ConfigConstraints.")
 	} else {
 		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 			Namespace: config.Namespace,

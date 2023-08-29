@@ -37,7 +37,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
-//func TestInit(t *testing.T) {
+// func TestInit(t *testing.T) {
 //	s := httptest.NewServer(
 //		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 //			_, _ = w.Write([]byte("leader"))
@@ -86,7 +86,7 @@ import (
 //			}
 //		})
 //	}
-//}
+// }
 
 func TestGlobalInfo(t *testing.T) {
 	var lines []string

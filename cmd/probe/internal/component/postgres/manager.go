@@ -119,12 +119,12 @@ func (mgr *Manager) GetIsLeader() (bool, bool) {
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	if member == nil {
-		return false, nil
+		return false, errors.Errorf("member is nil, can't check is leader member or not")
 	}
 
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		return false, nil
+		return false, errors.Errorf("leader member is nil, can't check is leader member or not")
 	}
 
 	if leaderMember.Name != member.Name {

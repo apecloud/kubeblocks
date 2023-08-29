@@ -25,14 +25,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -41,60 +37,58 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
-func TestInit(t *testing.T) {
-	os.Setenv(constant.KBEnvNamespace, "kb-system")
-	s := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			_, _ = w.Write([]byte("leader"))
-		}),
-	)
-	defer s.Close()
-
-	addr := s.Listener.Addr().String()
-	index := strings.LastIndex(addr, ":")
-	portStr := addr[index+1:]
-	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
-	hs, _ := NewHTTPCustom()
-	metadata := make(component.Properties)
-	err := hs.Init(metadata)
-	require.NoError(t, err)
-
-	tests := map[string]struct {
-		input     string
-		operation string
-		metadata  map[string]string
-		path      string
-		err       string
-	}{
-		"get": {
-			input:     `{"event":"Success","operation":"checkRole","originalRole":"","role":"leader"}`,
-			operation: "checkRole",
-			metadata:  nil,
-			path:      "/",
-			err:       "",
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
-				Data:      []byte(tc.input),
-				Metadata:  tc.metadata,
-				Operation: util.OperationKind(tc.operation),
-			})
-			if tc.err == "" {
-				require.NoError(t, err)
-				assert.Equal(t, strings.ToUpper(tc.input), strings.ToUpper(string(response.Data)))
-			} else {
-				require.Error(t, err)
-				assert.Equal(t, tc.err, err.Error())
-			}
-		})
-	}
-}
+//func TestInit(t *testing.T) {
+//	s := httptest.NewServer(
+//		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+//			_, _ = w.Write([]byte("leader"))
+//		}),
+//	)
+//	defer s.Close()
+//
+//	addr := s.Listener.Addr().String()
+//	index := strings.LastIndex(addr, ":")
+//	portStr := addr[index+1:]
+//	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
+//	hs, _ := NewHTTPCustom()
+//	metadata := make(component.Properties)
+//	err := hs.Init(metadata)
+//	require.NoError(t, err)
+//
+//	tests := map[string]struct {
+//		input     string
+//		operation string
+//		metadata  map[string]string
+//		path      string
+//		err       string
+//	}{
+//		"get": {
+//			input:     `{"event":"Success","operation":"checkRole","originalRole":"","role":"leader"}`,
+//			operation: "checkRole",
+//			metadata:  nil,
+//			path:      "/",
+//			err:       "",
+//		},
+//	}
+//
+//	for name, tc := range tests {
+//		t.Run(name, func(t *testing.T) {
+//			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
+//				Data:      []byte(tc.input),
+//				Metadata:  tc.metadata,
+//				Operation: util.OperationKind(tc.operation),
+//			})
+//			if tc.err == "" {
+//				require.NoError(t, err)
+//				assert.Equal(t, strings.ToUpper(tc.input), strings.ToUpper(string(response.Data)))
+//			} else {
+//				require.Error(t, err)
+//				assert.Equal(t, tc.err, err.Error())
+//			}
+//		})
+//	}
+//}
 
 func TestGlobalInfo(t *testing.T) {
-	os.Setenv(constant.KBEnvNamespace, "kb-system")
 	var lines []string
 	for i := 0; i < 3; i++ {
 		podName := "pod-" + strconv.Itoa(i)

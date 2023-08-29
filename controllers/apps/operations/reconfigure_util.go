@@ -87,7 +87,7 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 		}
 	}
 
-	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc.Spec, configSpec); err != nil {
+	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc, configSpec); err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
 	configPatch, restart, err := core.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, configSpec.Keys, len(updatedFiles) != 0)
@@ -112,7 +112,7 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
 	updatedParams []core.ParamPairs,
-	cc appsv1alpha1.ConfigConstraintSpec,
+	cc *appsv1alpha1.ConfigConstraint,
 	tpl appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
 	updatedConfig := base
 
@@ -120,10 +120,10 @@ func mergeUpdatedParams(base map[string]string,
 	if len(updatedFiles) != 0 {
 		return core.MergeUpdatedConfig(base, updatedFiles), nil
 	}
-	if len(updatedParams) == 0 {
+	if cc == nil {
 		return updatedConfig, nil
 	}
-	return intctrlutil.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
+	return intctrlutil.MergeAndValidateConfigs(cc.Spec, updatedConfig, tpl.Keys, updatedParams)
 }
 
 func syncConfigmap(
@@ -258,12 +258,12 @@ func getConfigSpecName(configSpec []appsv1alpha1.ComponentConfigSpec) []string {
 }
 
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
-	if result.configPatch.IsModify || result.noFormatFilesUpdated {
+	if result.noFormatFilesUpdated || result.configPatch.IsModify {
 		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureMerged,
 			configSpec.Name,
-			formatConfigPatchToMessage(result.configPatch, nil))
+			formatReconfiguringMessage(result.configPatch))
 	}
 	return appsv1alpha1.NewReconfigureRunningCondition(
 		resource.OpsRequest,
@@ -304,6 +304,13 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	failedCondition := appsv1alpha1.NewReconfigureFailedCondition(resource.OpsRequest, err)
 	resource.OpsRequest.SetStatusCondition(*failedCondition)
 	return nil
+}
+
+func formatReconfiguringMessage(configPatch *core.ConfigPatchInfo) string {
+	if configPatch != nil {
+		return formatConfigPatchToMessage(configPatch, nil)
+	}
+	return "updated full config files."
 }
 
 func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *core.PolicyExecStatus) string {

@@ -108,6 +108,7 @@ var _ = Describe("reconfigure test", func() {
 			},
 		}
 		o.KeyValues = make(map[string]*string)
+		o.HasPatch = true
 		defer ttf.Cleanup()
 
 		By("validate reconfiguring parameters")

@@ -60,7 +60,7 @@ func makeConfigSpecNotExistErr(clusterName, component, configSpec string) error 
 }
 
 func makeNotFoundTemplateErr(clusterName, component string) error {
-	return cfgcore.MakeError(notFoundValidConfigTemplateErrorMessage, clusterName, component)
+	return cfgcore.MakeError(notFoundValidConfigTemplateErrorMessage, component, clusterName)
 }
 
 func makeNotFoundConfigFileErr(configFile, configSpec string, all []string) error {

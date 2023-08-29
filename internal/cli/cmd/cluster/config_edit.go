@@ -94,6 +94,7 @@ func (o *editConfigOptions) Run(fn func() error) error {
 		return o.runWithConfigConstraints(cfgEditContext, configSpec, fn)
 	}
 
+	o.HasPatch = false
 	o.FileContent = cfgEditContext.getEdited()
 	return fn()
 }

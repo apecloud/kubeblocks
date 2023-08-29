@@ -1,15 +1,15 @@
 ---
-title: Manual backup
-description: How to back up databases manually by snapshot and backup tool
-keywords: [backup, manual backup, snapshot backup, backup tool]
+title: On-demand backup
+description: How to back up databases on-demand by snapshot and backup tool
+keywords: [backup, on-demand backup, snapshot backup, backup tool]
 sidebar_position: 3
-sidebar_label: Manual backup
+sidebar_label: On-demand backup
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Manual backup
+# On-demand backup
 
 ## Before you start
 
@@ -63,7 +63,7 @@ Both kbcli and kubectl are supported.
 
 <TabItem value="kubectl" label="kubectl">
 
-Run the command below to create a manual backup named `mybackup`.
+Run the command below to create a backup named `mybackup`.
 
 ```bash
 kubectl apply -f - <<-'EOF'

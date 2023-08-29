@@ -44,7 +44,7 @@ The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and
 The command `kbcli kubeblocks install` installs KubeBlocks in the `kb-system` namespace, or you can use the `--namespace` flag to specify one.
 
 ```bash
-    kbcli kubeblocks install
+kbcli kubeblocks install
 ```
 
 

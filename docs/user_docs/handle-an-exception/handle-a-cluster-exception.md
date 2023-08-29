@@ -1,8 +1,8 @@
 ---
-title: Handle an exception
-description: How to handle an exception in a MongoDB cluster
-keywords: [mongodb, exception]
-sidebar_position: 8
+title: Handle a cluster exception
+description: How to handle an exception in a cluster
+keywords: [cluster exception]
+sidebar_position: 1
 sidebar_label: Handle an exception
 ---
 
@@ -15,7 +15,7 @@ When an exception occurs during your operation, you can perform the following st
 1. Check the cluster status.
 
     ```bash
-    kbcli cluster list mongodb-cluster
+    kbcli cluster list mycluster
     ```
 
 2. Handle the exception according to the status information.

@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -33,7 +32,6 @@ import (
 )
 
 const (
-	ReasonOpsRequestProcessed   = "Processed"             // ReasonOpsRequestProcessed the latest OpsRequest has been processed.
 	ReasonPreCheckSucceed       = "PreCheckSucceed"       // ReasonPreCheckSucceed preChecks succeeded for provisioning started
 	ReasonPreCheckFailed        = "PreCheckFailed"        // ReasonPreCheckFailed preChecks failed for provisioning started
 	ReasonApplyResourcesFailed  = "ApplyResourcesFailed"  // ReasonApplyResourcesFailed applies resources failed to create or change the cluster
@@ -43,15 +41,6 @@ const (
 	ReasonComponentsNotReady    = "ComponentsNotReady"    // ReasonComponentsNotReady the components of cluster are not ready
 	ReasonClusterReady          = "ClusterReady"          // ReasonClusterReady the components of cluster are ready, the component phase is running
 )
-
-// conditionIsChanged checks if the condition is changed.
-func conditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Condition) bool {
-	if newCondition.LastTransitionTime.IsZero() && oldCondition != nil {
-		// assign the old condition's LastTransitionTime to the new condition for "DeepEqual" checking.
-		newCondition.LastTransitionTime = oldCondition.LastTransitionTime
-	}
-	return !reflect.DeepEqual(oldCondition, &newCondition)
-}
 
 func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
 	var condition metav1.Condition

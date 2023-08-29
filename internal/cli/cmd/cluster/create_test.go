@@ -71,15 +71,15 @@ var _ = Describe("create", func() {
 			components = generateComponents(component, 3)
 		})
 
-		It("set monitor param to false", func() {
-			setMonitor(false, components)
+		It("set monitoring interval to 0 to disable monitor", func() {
+			setMonitor(0, components)
 			for _, c := range components {
 				Expect(c[monitorKey]).ShouldNot(BeTrue())
 			}
 		})
 
-		It("set monitor param to true", func() {
-			setMonitor(true, components)
+		It("set monitoring interval to 15 to enable monitor", func() {
+			setMonitor(15, components)
 			for _, c := range components {
 				Expect(c[monitorKey]).Should(BeTrue())
 			}

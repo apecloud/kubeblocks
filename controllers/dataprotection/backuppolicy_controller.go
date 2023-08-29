@@ -203,7 +203,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 			return err
 		}
 		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+		backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
 		backup.Status.CompletionTimestamp = &metav1.Time{Time: time.Now().UTC()}
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 			return err
@@ -299,8 +299,8 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 	// filter final state backups only
 	backupItems := []dataprotectionv1alpha1.Backup{}
 	for _, item := range backups.Items {
-		if item.Status.Phase == dataprotectionv1alpha1.BackupCompleted ||
-			item.Status.Phase == dataprotectionv1alpha1.BackupFailed {
+		if item.Status.Phase == dataprotectionv1alpha1.BackupPhaseCompleted ||
+			item.Status.Phase == dataprotectionv1alpha1.BackupPhaseFailed {
 			backupItems = append(backupItems, item)
 		}
 	}
@@ -351,10 +351,10 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 
 	// notice to reconcile backup CR
 	if cronExpression != "" && slices.Contains([]dataprotectionv1alpha1.BackupPhase{
-		dataprotectionv1alpha1.BackupCompleted, dataprotectionv1alpha1.BackupFailed},
+		dataprotectionv1alpha1.BackupPhaseCompleted, dataprotectionv1alpha1.BackupPhaseFailed},
 		backup.Status.Phase) {
 		// if schedule is enabled and backup already is completed, update phase to New
-		backup.Status.Phase = dataprotectionv1alpha1.BackupNew
+		backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseNew
 		backup.Status.FailureReason = ""
 		return r.Client.Status().Patch(ctx, backup, patch)
 	}

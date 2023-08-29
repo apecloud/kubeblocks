@@ -178,7 +178,7 @@ var _ = Describe("Backup Policy Controller", func() {
 			It("limit backups to 1", func() {
 				now := metav1.Now()
 				backupStatus := dpv1alpha1.BackupStatus{
-					Phase:               dpv1alpha1.BackupCompleted,
+					Phase:               dpv1alpha1.BackupPhaseCompleted,
 					Expiration:          &now,
 					StartTimestamp:      &now,
 					CompletionTimestamp: &now,
@@ -214,7 +214,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				patchK8sJobStatus(backupExpiredKey, batchv1.JobComplete)
 				Eventually(testapps.CheckObj(&testCtx, backupExpiredKey,
 					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					})).Should(Succeed())
 				By("mock update expired backup status to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
@@ -226,7 +226,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
 				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
 					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					})).Should(Succeed())
 				By("mock update 1st limit backup NOT to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
@@ -238,7 +238,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
 				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
 					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					})).Should(Succeed())
 				By("mock update 2nd limit backup NOT to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
@@ -424,7 +424,7 @@ var _ = Describe("Backup Policy Controller", func() {
 						Namespace: testCtx.DefaultNamespace,
 					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
 						backup = tmpBackup
-						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupRunning))
+						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					})).Should(Succeed())
 					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
 						Name:      backupName,
@@ -484,7 +484,7 @@ var _ = Describe("Backup Policy Controller", func() {
 						Namespace: testCtx.DefaultNamespace,
 					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
 						g.Expect(tmpBackup.Generation).Should(Equal(int64(1)))
-						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupRunning))
+						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					})).Should(Succeed())
 
 					By("disable logfile, expect the backup phase to Completed and sts is deleted")
@@ -495,7 +495,7 @@ var _ = Describe("Backup Policy Controller", func() {
 						Name:      backupName,
 						Namespace: testCtx.DefaultNamespace,
 					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupCompleted))
+						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
 					})).Should(Succeed())
 					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
 						Name:      backupName,
@@ -510,7 +510,7 @@ var _ = Describe("Backup Policy Controller", func() {
 						Name:      backupName,
 						Namespace: testCtx.DefaultNamespace,
 					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupRunning))
+						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					})).Should(Succeed())
 
 					By("delete cluster, expect the backup phase to Completed")
@@ -522,7 +522,7 @@ var _ = Describe("Backup Policy Controller", func() {
 						Name:      backupName,
 						Namespace: testCtx.DefaultNamespace,
 					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupCompleted))
+						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
 					})).Should(Succeed())
 
 					// disabled logfile

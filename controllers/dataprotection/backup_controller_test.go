@@ -212,7 +212,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.SourceCluster).Should(Equal(clusterName))
 					g.Expect(fetched.Labels[constant.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
@@ -229,7 +229,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
 		})
@@ -371,7 +371,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 				})).Should(Succeed())
 
 				sizeJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-1-post"), Namespace: backupKey.Namespace}
@@ -392,7 +392,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
 
@@ -414,7 +414,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("checking backup failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
 		})
@@ -443,7 +443,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
 
@@ -459,7 +459,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
 
@@ -499,7 +499,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.SourceCluster).Should(Equal(clusterName))
 					g.Expect(fetched.Labels[constant.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
@@ -516,21 +516,21 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 
 				By("Patch backup Phase to New")
 				Eventually(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
-					fetched.Status.Phase = dpv1alpha1.BackupNew
+					fetched.Status.Phase = dpv1alpha1.BackupPhaseNew
 				})).Should(Succeed())
 
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseInProgress))
 				})).Should(Succeed())
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 				})).Should(Succeed())
 			})
 		})
@@ -578,7 +578,7 @@ var _ = Describe("Backup Controller test", func() {
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.Manifests.BackupTool.FilePath).To(Equal(fmt.Sprintf("/%s%s/%s", backupKey.Namespace, pathPrefix, backupKey.Name)))
 				})).Should(Succeed())
 			})
@@ -605,7 +605,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("create backup with non existent configmap of pv template")
 				createBackup(backupName)
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 					g.Expect(fetched.Status.FailureReason).To(ContainSubstring(fmt.Sprintf(`ConfigMap "%s" not found`, configMapName)))
 				})).Should(Succeed())
 				configMap := &corev1.ConfigMap{
@@ -620,7 +620,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("create backup with the configmap not contains the key 'persistentVolume'")
 				createBackup(backupName + "1")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 					g.Expect(fetched.Status.FailureReason).To(ContainSubstring("the persistentVolume template is empty in the configMap"))
 				})).Should(Succeed())
 
@@ -651,7 +651,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 				createBackup(backupName + "2")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseInProgress))
 				})).Should(Succeed())
 
 				By("check pvc and pv created by backup controller")
@@ -681,7 +681,7 @@ var _ = Describe("Backup Controller test", func() {
 			It("Should fail", func() {
 				By("Check backup status failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
 		})
@@ -706,7 +706,7 @@ var _ = Describe("Backup Controller test", func() {
 					SetBackupType(dpv1alpha1.BackupTypeLogFile).
 					Create(&testCtx).GetObject()
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
-					g.Expect(backup.Status.Phase).Should(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(backup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
 					expectErr := intctrlutil.NewInvalidLogfileBackupName(backupPolicyName)
 					g.Expect(backup.Status.FailureReason).Should(Equal(expectErr.Error()))
 				})).Should(Succeed())
@@ -717,7 +717,7 @@ var _ = Describe("Backup Controller test", func() {
 					SetBackupType(dpv1alpha1.BackupTypeLogFile).
 					Create(&testCtx).GetObject()
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
-					g.Expect(backup.Status.Phase).Should(Equal(dpv1alpha1.BackupFailed))
+					g.Expect(backup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
 					expectErr := intctrlutil.NewBackupScheduleDisabled(string(dpv1alpha1.BackupTypeLogFile), backupPolicyName)
 					g.Expect(backup.Status.FailureReason).Should(Equal(expectErr.Error()))
 				})).Should(Succeed())
@@ -869,7 +869,7 @@ var _ = Describe("Backup Controller test", func() {
 					backup := createBackup(policy, nil)
 					By("checking backup, it should fail because there are multiple default backup repos")
 					Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
-						g.Expect(backup.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupFailed))
+						g.Expect(backup.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupPhaseFailed))
 						g.Expect(backup.Status.FailureReason).Should(ContainSubstring("multiple default BackupRepo found"))
 					})).Should(Succeed())
 				})
@@ -907,7 +907,7 @@ var _ = Describe("Backup Controller test", func() {
 				backup := createBackup(policy, nil)
 				By("checking backup, it should fail because neither the backup repo nor the legacy PVC are available")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
-					g.Expect(backup.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupFailed))
+					g.Expect(backup.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupPhaseFailed))
 					g.Expect(backup.Status.FailureReason).Should(ContainSubstring("the persistentVolumeClaim name of spec.datafile is empty"))
 				})).Should(Succeed())
 			})

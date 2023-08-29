@@ -124,7 +124,7 @@ var _ = Describe("Expose", func() {
 		}
 		now := metav1.Now()
 		fakeBackups[0].Status = dpv1alpha1.BackupStatus{
-			Phase: dpv1alpha1.BackupCompleted,
+			Phase: dpv1alpha1.BackupPhaseCompleted,
 			Manifests: &dpv1alpha1.ManifestsStatus{
 				BackupLog: &dpv1alpha1.BackupLogStatus{
 					StartTime: &now,
@@ -134,7 +134,7 @@ var _ = Describe("Expose", func() {
 		}
 		after := metav1.Time{Time: now.Add(time.Hour)}
 		fakeBackups[1].Status = dpv1alpha1.BackupStatus{
-			Phase: dpv1alpha1.BackupCompleted,
+			Phase: dpv1alpha1.BackupPhaseCompleted,
 			Manifests: &dpv1alpha1.ManifestsStatus{
 				BackupLog: &dpv1alpha1.BackupLogStatus{
 					StartTime: &now,

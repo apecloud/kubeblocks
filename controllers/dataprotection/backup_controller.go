@@ -127,17 +127,17 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	switch backup.Status.Phase {
-	case "", dataprotectionv1alpha1.BackupNew:
+	case "", dataprotectionv1alpha1.BackupPhaseNew:
 		return r.doNewPhaseAction(reqCtx, backup)
-	case dataprotectionv1alpha1.BackupInProgress:
+	case dataprotectionv1alpha1.BackupPhaseInProgress:
 		return r.doInProgressPhaseAction(reqCtx, backup)
-	case dataprotectionv1alpha1.BackupRunning:
+	case dataprotectionv1alpha1.BackupPhaseRunning:
 		if err = r.doInRunningPhaseAction(reqCtx, backup); err != nil {
 			sendWarningEventForError(r.Recorder, backup, err)
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
-	case dataprotectionv1alpha1.BackupCompleted:
+	case dataprotectionv1alpha1.BackupPhaseCompleted:
 		return r.doCompletedPhaseAction(reqCtx, backup)
 	default:
 		return intctrlutil.Reconciled()
@@ -227,7 +227,7 @@ func (r *BackupReconciler) handleBackupDeleting(reqCtx intctrlutil.RequestCtx, b
 }
 
 func (r *BackupReconciler) handleBackupDeletion(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (*ctrl.Result, error) {
-	if backup.Status.Phase == dataprotectionv1alpha1.BackupDeleting {
+	if backup.Status.Phase == dataprotectionv1alpha1.BackupPhaseDeleting {
 		// handle deleting
 		if err := r.handleBackupDeleting(reqCtx, backup); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
@@ -240,7 +240,7 @@ func (r *BackupReconciler) handleBackupDeletion(reqCtx intctrlutil.RequestCtx, b
 		}
 		// backup phase to Deleting
 		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.Phase = dataprotectionv1alpha1.BackupDeleting
+		backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseDeleting
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
@@ -327,7 +327,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	patch := client.MergeFrom(backup.DeepCopy())
 	// HACK/TODO: ought to move following check to validation webhook
 	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot && !viper.GetBool("VOLUMESNAPSHOT") {
-		backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
+		backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseFailed
 		backup.Status.FailureReason = "VolumeSnapshot feature disabled."
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -396,9 +396,9 @@ func (r *BackupReconciler) doNewPhaseAction(
 
 	// update Phase to InProgress/Running
 	if isStatefulSetKind {
-		backup.Status.Phase = dataprotectionv1alpha1.BackupRunning
+		backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseRunning
 	} else {
-		backup.Status.Phase = dataprotectionv1alpha1.BackupInProgress
+		backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseInProgress
 	}
 	backup.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
@@ -750,7 +750,7 @@ func (r *BackupReconciler) doSnapshotInProgressPhaseAction(reqCtx intctrlutil.Re
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 	}
 
-	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+	backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 	backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{
 		BackupLog: &dataprotectionv1alpha1.BackupLogStatus{
@@ -798,7 +798,7 @@ func (r *BackupReconciler) doBaseBackupInProgressPhaseAction(reqCtx intctrlutil.
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 	}
 	// updates Phase directly to Completed because `ensureBatchV1JobCompleted` has checked job failed
-	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+	backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 
 	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeLogFile {
@@ -888,7 +888,7 @@ func (r *BackupReconciler) checkBackupIsCompletedDuringRunning(reqCtx intctrluti
 		}
 	}
 	patch := client.MergeFrom(backup.DeepCopy())
-	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+	backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 	if !backup.Status.StartTimestamp.IsZero() {
 		// round the duration to a multiple of seconds.
@@ -1019,7 +1019,7 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, err error) (ctrl.Result, error) {
 	patch := client.MergeFrom(backup.DeepCopy())
 	sendWarningEventForError(r.Recorder, backup, err)
-	backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
+	backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseFailed
 	backup.Status.FailureReason = err.Error()
 	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); errUpdate != nil {
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
@@ -1606,7 +1606,7 @@ func (r *BackupReconciler) handleDeleteBackupFiles(reqCtx intctrlutil.RequestCtx
 		// no file to delete for this type
 		return nil, nil
 	}
-	if backup.Status.Phase == dataprotectionv1alpha1.BackupNew {
+	if backup.Status.Phase == dataprotectionv1alpha1.BackupPhaseNew {
 		// nothing to delete
 		return nil, nil
 	}

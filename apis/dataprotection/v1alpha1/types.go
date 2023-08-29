@@ -16,20 +16,6 @@ limitations under the License.
 
 package v1alpha1
 
-// BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.
-// +enum
-// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed,Deleting}
-type BackupPhase string
-
-const (
-	BackupNew        BackupPhase = "New"
-	BackupInProgress BackupPhase = "InProgress"
-	BackupRunning    BackupPhase = "Running"
-	BackupCompleted  BackupPhase = "Completed"
-	BackupFailed     BackupPhase = "Failed"
-	BackupDeleting   BackupPhase = "Deleting"
-)
-
 // BackupType the backup type, marked backup set is datafile or logfile or snapshot.
 // +enum
 // +kubebuilder:validation:Enum={datafile,logfile,snapshot}

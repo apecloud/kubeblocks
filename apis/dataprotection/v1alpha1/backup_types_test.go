@@ -55,7 +55,7 @@ func TestGetRecoverableTimeRange(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "backup-snapshot"},
 		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
 		Status: BackupStatus{
-			Phase: BackupCompleted,
+			Phase: BackupPhaseCompleted,
 			Manifests: &ManifestsStatus{
 				BackupLog: &BackupLogStatus{
 					StartTime: &now,
@@ -68,7 +68,7 @@ func TestGetRecoverableTimeRange(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "backup-snapshot1"},
 		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
 		Status: BackupStatus{
-			Phase: BackupCompleted,
+			Phase: BackupPhaseCompleted,
 			Manifests: &ManifestsStatus{
 				BackupLog: &BackupLogStatus{
 					StopTime: &now,
@@ -80,14 +80,14 @@ func TestGetRecoverableTimeRange(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "backup-snapshot2"},
 		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
 		Status: BackupStatus{
-			Phase: BackupCompleted,
+			Phase: BackupPhaseCompleted,
 		},
 	}
 	stopTimeGTLogFileStopTimeBaseBackup := Backup{
 		ObjectMeta: metav1.ObjectMeta{Name: "backup-snapshot2"},
 		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
 		Status: BackupStatus{
-			Phase: BackupCompleted,
+			Phase: BackupPhaseCompleted,
 			Manifests: &ManifestsStatus{
 				BackupLog: &BackupLogStatus{
 					StartTime: &now,
@@ -100,7 +100,7 @@ func TestGetRecoverableTimeRange(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "backup-logfile"},
 		Spec:       BackupSpec{BackupType: BackupTypeLogFile},
 		Status: BackupStatus{
-			Phase: BackupCompleted,
+			Phase: BackupPhaseCompleted,
 			Manifests: &ManifestsStatus{
 				BackupLog: &BackupLogStatus{
 					StartTime: &now,
@@ -130,7 +130,7 @@ func TestGetStartTime(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "backup1"},
 		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
 		Status: BackupStatus{
-			Phase:          BackupCompleted,
+			Phase:          BackupPhaseCompleted,
 			StartTimestamp: &startTimestamp,
 			Manifests: &ManifestsStatus{
 				BackupLog: &BackupLogStatus{
@@ -153,7 +153,7 @@ func TestGetStopTime(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "backup1"},
 		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
 		Status: BackupStatus{
-			Phase:               BackupCompleted,
+			Phase:               BackupPhaseCompleted,
 			CompletionTimestamp: &stopTimestamp,
 			Manifests: &ManifestsStatus{
 				BackupLog: &BackupLogStatus{

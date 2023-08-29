@@ -240,7 +240,7 @@ func (p *RestoreManager) listCompletedBackups(componentName string) (backupItems
 
 	backupItems = []dpv1alpha1.Backup{}
 	for _, b := range backups.Items {
-		if b.Status.Phase == dpv1alpha1.BackupCompleted && b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
+		if b.Status.Phase == dpv1alpha1.BackupPhaseCompleted && b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
 			backupItems = append(backupItems, b)
 		}
 	}

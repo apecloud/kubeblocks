@@ -36,11 +36,12 @@ type BackupSpec struct {
 	// +kubebuilder:default=datafile
 	BackupType BackupType `json:"backupType"`
 
-	// Backup method name that is defined in backupPolicy.
+	// backupMethod specifies the backup method name that is defined in backupPolicy.
 	// +kubebuilder:validation:Required
 	BackupMethod BackupMethod `json:"backupMethod"`
 
-	// if backupType is incremental or differential, parentBackupName is required.
+	// parentBackupName specifies the parent backup name. If backup type of BackupMethod
+	// is incremental or differential, ParentBackupName is required.
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 
@@ -71,24 +72,32 @@ type BackupSpec struct {
 
 // BackupStatus defines the observed state of Backup.
 type BackupStatus struct {
+	// formatVersion is the backup format version, including major, minor and patch version.
+	// +optional
+	FormatVersion string `json:"formatVersion,omitempty"`
+
+	// phase is the current state of the Backup.
 	// +optional
 	Phase BackupPhase `json:"phase,omitempty"`
 
-	// The date and time when the Backup is eligible for garbage collection.
-	// 'null' means the Backup is NOT be cleaned except delete manual.
+	// expiration is when this backup is eligible for garbage collection.
+	// 'null' means the Backup will NOT be cleaned except delete manual.
 	// +optional
 	Expiration *metav1.Time `json:"expiration,omitempty"`
 
-	// Date/time when the backup started being processed.
+	// startTimestamp records the time a backup was started.
+	// The server's time is used for StartTimestamp.
 	// +optional
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
-	// Date/time when the backup finished being processed.
+	// completionTimestamp records the time a backup was completed.
+	// Completion time is recorded even on failed backups.
+	// The server's time is used for CompletionTimestamp.
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// The duration time of backup execution.
-	// When converted to a string, the form is "1h2m0.5s".
+	// When converted to a string, the format is "1h2m0.5s".
 	// +optional
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
@@ -97,7 +106,7 @@ type BackupStatus struct {
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 
-	// The reason for a backup failure.
+	// failureReason is an error that caused the backup to fail.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
@@ -218,15 +227,20 @@ const (
 	BackupPhaseNew BackupPhase = "New"
 
 	// BackupPhaseInProgress means the backup is currently executing.
+	// TODO: delete it
 	BackupPhaseInProgress BackupPhase = "InProgress"
 
-	//
+	// BackupPhaseRunning means the backup is currently executing.
 	BackupPhaseRunning BackupPhase = "Running"
 
+	// BackupPhaseCompleted means the backup has run successfully without errors.
 	BackupPhaseCompleted BackupPhase = "Completed"
 
+	// BackupPhaseFailed means the backup ran but encountered an error that
+	// prevented it from completing successfully.
 	BackupPhaseFailed BackupPhase = "Failed"
 
+	// BackupPhaseDeleting means the backup and all its associated data are being deleted.
 	BackupPhaseDeleting BackupPhase = "Deleting"
 )
 

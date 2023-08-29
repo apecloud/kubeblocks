@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
@@ -40,7 +39,8 @@ import (
 
 type Manager struct {
 	postgres.Manager
-	memberAddrs []string
+	memberAddrs  []string
+	healthStatus *postgres.ConsensusMemberHealthStatus
 }
 
 var Mgr *Manager
@@ -79,6 +79,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		return nil
 	}
 	mgr.memberAddrs = memberAddrs
+
+	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, cluster.GetMemberWithName(mgr.CurrentMemberName))
+	if err != nil {
+		mgr.Logger.Error(err, "get member health status failed")
+		return nil
+	}
+	mgr.healthStatus = healthStatus
 
 	mgr.DBState = dbState
 	return dbState
@@ -171,11 +178,7 @@ func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster)
 		"create extension if not exists consensus_monitor;"
 
 	_, err := mgr.Exec(ctx, sql)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
@@ -218,7 +221,6 @@ func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []
 	}
 
 	sql := `select ip_port from consensus_cluster_status;`
-
 	resp, err := mgr.QueryLeader(ctx, sql, cluster)
 	if err != nil {
 		mgr.Logger.Error(err, fmt.Sprintf("query %s with leader failed", sql))
@@ -255,34 +257,57 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 // IsMemberHealthy firstly get the leader's connection pool,
 // because only leader can get the cluster healthy view
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	IPPort := mgr.Config.GetConsensusIPPort(cluster, member.Name)
-
-	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
-	resp, err := mgr.QueryLeader(ctx, sql, cluster)
+	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, member)
 	if errors.Is(err, postgres.ClusterHasNoLeader) {
 		mgr.Logger.Info("cluster has no leader, will compete the leader lock")
 		return true
 	} else if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("query %s with leader failed", sql))
+		mgr.Logger.Error(err, "check member healthy failed")
 		return false
+	}
+
+	return healthStatus.Connected
+}
+
+func (mgr *Manager) getMemberHealthStatus(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (*postgres.ConsensusMemberHealthStatus, error) {
+	if mgr.DBState != nil && mgr.healthStatus != nil {
+		return mgr.healthStatus, nil
+	}
+	res := &postgres.ConsensusMemberHealthStatus{}
+
+	IPPort := mgr.Config.GetConsensusIPPort(cluster, member.Name)
+	sql := fmt.Sprintf(`select connected, log_delay_num from consensus_cluster_health where ip_port = '%s';`, IPPort)
+	resp, err := mgr.QueryLeader(ctx, sql, cluster)
+	if err != nil {
+		return nil, err
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
-		return false
+		return nil, err
 	}
 
-	var connected bool
-	var logDelayNum int64
 	if resMap[0]["connected"] != nil {
-		connected = cast.ToBool(resMap[0]["connected"])
+		res.Connected = cast.ToBool(resMap[0]["connected"])
 	}
 	if resMap[0]["log_delay_num"] != nil {
-		logDelayNum = cast.ToInt64(resMap[0]["log_delay_num"])
+		res.LogDelayNum = cast.ToInt64(resMap[0]["log_delay_num"])
 	}
 
-	return connected && logDelayNum <= cluster.HaConfig.GetMaxLagOnSwitchover()
+	return res, nil
+}
+
+func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
+	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, member)
+	if errors.Is(err, postgres.ClusterHasNoLeader) {
+		mgr.Logger.Info("cluster has no leader, so member has no lag")
+		return false, 0
+	} else if err != nil {
+		mgr.Logger.Error(err, "check member lag failed")
+		return true, cluster.HaConfig.GetMaxLagOnSwitchover() + 1
+	}
+
+	return healthStatus.LogDelayNum > cluster.HaConfig.GetMaxLagOnSwitchover(), healthStatus.LogDelayNum
 }
 
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
@@ -351,7 +376,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 
 	currentLeaderAddr := strings.Split(cast.ToString(resMap[0]["ip_port"]), ":")[0]
 	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, cluster.GetMemberAddrWithName(mgr.CurrentMemberName), mgr.Config.GetDBPort())
-	_, err = mgr.ExecOthers(ctx, promoteSQL, currentLeaderAddr)
+	_, err = mgr.ExecWithHost(ctx, promoteSQL, currentLeaderAddr)
 	if err != nil {
 		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err

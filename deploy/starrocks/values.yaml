@@ -1,0 +1,74 @@
+# Default values for starrocks.
+# This is a YAML-formatted file.
+
+nameOverride: ""
+fullnameOverride: ""
+clusterVersionOverride: ""
+
+timezone: Asia/Shanghai
+
+fe:
+  image:
+    registry: docker.io
+    repository: starrocks/fe-ubuntu
+    pullPolicy: IfNotPresent
+    tag: 2.5.4
+  config: |
+    LOG_DIR = ${STARROCKS_HOME}/log
+    DATE = "$(date +%Y%m%d-%H%M%S)"
+    JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseMembar -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=7 -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -XX:+CMSClassUnloadingEnabled -XX:-CMSParallelRemarkEnabled -XX:CMSInitiatingOccupancyFraction=80 -XX:SoftRefLRUPolicyMSPerMB=0 -Xloggc:${LOG_DIR}/fe.gc.log.$DATE"
+    JAVA_OPTS_FOR_JDK_9="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=7 -XX:+CMSClassUnloadingEnabled -XX:-CMSParallelRemarkEnabled -XX:CMSInitiatingOccupancyFraction=80 -XX:SoftRefLRUPolicyMSPerMB=0 -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"
+    http_port = 8030
+    rpc_port = 9020
+    query_port = 9030
+    edit_log_port = 9010
+    mysql_service_nio_enabled = true
+    sys_log_level = INFO
+
+  queryPort: 9030
+  probe:
+    # failureThreshold will be set in the helm template
+    httpGet:
+      path: /api/health
+      port: 8030
+      scheme: HTTP
+    periodSeconds: 5
+    successThreshold: 1
+    timeoutSeconds: 1
+  resources:
+    limits:
+      cpu: "8"
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+be:
+  image:
+    registry: docker.io
+    repository: starrocks/be-ubuntu
+    pullPolicy: IfNotPresent
+    tag: 2.5.4
+  config: |
+    be_port = 9060
+    webserver_port = 8040
+    heartbeat_service_port = 9050
+    brpc_port = 8060
+    sys_log_level = INFO
+    default_rowset_type = beta
+  probe:
+    # failureThreshold will be set in the helm template
+    httpGet:
+      path: /api/health
+      port: 8040
+      scheme: HTTP
+    periodSeconds: 5
+    successThreshold: 1
+    timeoutSeconds: 1
+  resources:
+    limits:
+      cpu: "8"
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 100Mi

@@ -45,3 +45,7 @@ const (
 	reasonOpsReconcileStatusFailed    = "ReconcileStatusFailed"
 	reasonOpsDoActionFailed           = "DoActionFailed"
 )
+
+const (
+	trueVal = "true"
+)

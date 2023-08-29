@@ -497,10 +497,10 @@ func (o *initOptions) createCluster() error {
 	c.Namespace = defaultNamespace
 	c.Name = kbClusterName
 	c.UpdatableFlags = cmdcluster.UpdatableFlags{
-		TerminationPolicy: "WipeOut",
-		Monitor:           true,
-		PodAntiAffinity:   "Preferred",
-		Tenancy:           "SharedNode",
+		TerminationPolicy:  "WipeOut",
+		MonitoringInterval: 15,
+		PodAntiAffinity:    "Preferred",
+		Tenancy:            "SharedNode",
 	}
 
 	// if we are running on local, create cluster with one replica

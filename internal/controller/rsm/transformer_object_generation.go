@@ -296,7 +296,7 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
 	}
-	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-env").
+	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-rsm-env").
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }

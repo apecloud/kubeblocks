@@ -120,3 +120,7 @@ const (
 	BackupRepoReady       BackupRepoPhase = "Ready"
 	BackupRepoDeleting    BackupRepoPhase = "Deleting"
 )
+
+// RetentionPeriod represents a duration in the format "1y2mo3w4d5h6m", where
+// y=year, mo=month, w=week, d=day, h=hour, m=minute.
+type RetentionPeriod string

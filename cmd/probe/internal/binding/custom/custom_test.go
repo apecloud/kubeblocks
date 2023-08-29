@@ -21,7 +21,6 @@ package custom
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +28,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -37,56 +37,43 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
-// func TestInit(t *testing.T) {
-//	s := httptest.NewServer(
-//		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-//			_, _ = w.Write([]byte("leader"))
-//		}),
-//	)
-//	defer s.Close()
-//
-//	addr := s.Listener.Addr().String()
-//	index := strings.LastIndex(addr, ":")
-//	portStr := addr[index+1:]
-//	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
-//	hs, _ := NewHTTPCustom()
-//	metadata := make(component.Properties)
-//	err := hs.Init(metadata)
-//	require.NoError(t, err)
-//
-//	tests := map[string]struct {
-//		input     string
-//		operation string
-//		metadata  map[string]string
-//		path      string
-//		err       string
-//	}{
-//		"get": {
-//			input:     `{"event":"Success","operation":"checkRole","originalRole":"","role":"leader"}`,
-//			operation: "checkRole",
-//			metadata:  nil,
-//			path:      "/",
-//			err:       "",
-//		},
-//	}
-//
-//	for name, tc := range tests {
-//		t.Run(name, func(t *testing.T) {
-//			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
-//				Data:      []byte(tc.input),
-//				Metadata:  tc.metadata,
-//				Operation: util.OperationKind(tc.operation),
-//			})
-//			if tc.err == "" {
-//				require.NoError(t, err)
-//				assert.Equal(t, strings.ToUpper(tc.input), strings.ToUpper(string(response.Data)))
-//			} else {
-//				require.Error(t, err)
-//				assert.Equal(t, tc.err, err.Error())
-//			}
-//		})
-//	}
-// }
+func TestInit(t *testing.T) {
+	hs, s := setUpHost("leader", t)
+	defer s.Close()
+
+	tests := map[string]struct {
+		input     string
+		operation string
+		metadata  map[string]string
+		path      string
+		err       string
+	}{
+		"get": {
+			input:     `{"event":"Success","operation":"checkRole","originalRole":"","role":"leader"}`,
+			operation: "checkRole",
+			metadata:  nil,
+			path:      "/",
+			err:       "",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
+				Data:      []byte(tc.input),
+				Metadata:  tc.metadata,
+				Operation: util.OperationKind(tc.operation),
+			})
+			if tc.err == "" {
+				require.NoError(t, err)
+				assert.Equal(t, strings.ToUpper(tc.input), strings.ToUpper(string(response.Data)))
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tc.err, err.Error())
+			}
+		})
+	}
+}
 
 func TestGlobalInfo(t *testing.T) {
 	var lines []string
@@ -102,21 +89,8 @@ func TestGlobalInfo(t *testing.T) {
 	}
 	join := strings.Join(lines, "\n")
 
-	s := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			_, _ = w.Write([]byte(join))
-		}),
-	)
+	hs, s := setUpHost(join, t)
 	defer s.Close()
-
-	addr := s.Listener.Addr().String()
-	index := strings.LastIndex(addr, ":")
-	portStr := addr[index+1:]
-	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
-	hs, _ := NewHTTPCustom()
-	metadata := make(component.Properties)
-	err := hs.Init(metadata)
-	require.NoError(t, err)
 
 	tests := map[string]struct {
 		input     string
@@ -136,25 +110,32 @@ func TestGlobalInfo(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
-				Data:      nil,
-				Metadata:  tc.metadata,
+			response := binding.ProbeResponse{}
+			info, err := hs.GetGlobalInfo(context.TODO(), &binding.ProbeRequest{
 				Operation: util.OperationKind(tc.operation),
-			})
+			}, &response)
 			require.NoError(t, err)
-			result := binding.OpsResult{}
-			err = json.Unmarshal(response.Data, &result)
-			require.NoError(t, err)
-
-			marshal, err := json.Marshal(result)
-			require.NoError(t, err)
-			info := binding.GlobalInfo{}
-			err = json.Unmarshal(marshal, &info)
-			require.NoError(t, err)
-			require.Equal(t, util.OperationSuccess, info.Event)
-			require.Equal(t, 1, info.Term)
-			require.Equal(t, 3, len(info.PodName2Role))
+			assert.Equal(t, util.OperationSuccess, info.Event)
+			assert.Equal(t, 3, len(info.PodName2Role))
+			assert.Equal(t, 1, info.Term)
 		})
 	}
 
+}
+
+func setUpHost(respContent string, t *testing.T) (*HTTPCustom, *httptest.Server) {
+	s := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			_, _ = w.Write([]byte(respContent))
+		}),
+	)
+	addr := s.Listener.Addr().String()
+	index := strings.LastIndex(addr, ":")
+	portStr := addr[index+1:]
+	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
+	hs, _ := NewHTTPCustom()
+	metadata := make(component.Properties)
+	err := hs.Init(metadata)
+	require.NoError(t, err)
+	return hs, s
 }

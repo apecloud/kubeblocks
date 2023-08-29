@@ -86,7 +86,7 @@ jobs:
 
   eks:
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k8s.yml@v0.1.17
+    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k8s.yml@provider
     with:
       CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"
@@ -95,6 +95,6 @@ jobs:
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       REGION: "${{ needs.check.outputs.cluster-region }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
-      APECD_REF: "v0.1.17"
+      APECD_REF: "provider"
       ARGS: "${{ inputs.ARGS }}"
     secrets: inherit

@@ -6,7 +6,7 @@ type: application
 
 version: 0.7.0-alpha.0
 
-appVersion: "5.0.14"
+appVersion: "5.0"
 
 home: https://www.mongodb.com
 icon: https://bitnami.com/assets/stacks/mongodb/img/mongodb-stack-220x234.png

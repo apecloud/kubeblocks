@@ -42,3 +42,8 @@ func (builder *BackupBuilder) SetBackupMethod(method string) *BackupBuilder {
 	builder.get().Spec.BackupMethod = method
 	return builder
 }
+
+func (builder *BackupBuilder) SetParentBackupName(parent string) *BackupBuilder {
+	builder.get().Spec.ParentBackupName = parent
+	return builder
+}

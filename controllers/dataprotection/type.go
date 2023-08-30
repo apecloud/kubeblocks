@@ -40,7 +40,6 @@ const (
 	dataProtectionLabelBackupMethodKey   = "dataprotection.kubeblocks.io/backup-method"
 	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
 	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
-	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
 
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
 	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
@@ -80,6 +79,8 @@ const (
 	ReasonDerivedObjectsDeleted    = "DerivedObjectsDeleted"
 	ReasonUnknownError             = "UnknownError"
 )
+
+const manifestsUpdaterContainerName = "manifests-updater"
 
 var reconcileInterval = time.Second
 

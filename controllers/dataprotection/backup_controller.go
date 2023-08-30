@@ -128,14 +128,11 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.StatefulSet{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
 
-	if viper.GetBool("VOLUMESNAPSHOT") {
-		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
-		} else {
-			b.Owns(&vsv1.VolumeSnapshot{}, builder.Predicates{})
-		}
+	if intctrlutil.InVolumeSnapshotV1Beta1() {
+		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
+	} else {
+		b.Owns(&vsv1.VolumeSnapshot{}, builder.Predicates{})
 	}
-
 	return b.Complete(r)
 }
 
@@ -361,8 +358,8 @@ func (r *BackupReconciler) handleBackupRepo(request *dpbackup.Request) error {
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
-	if err = r.Client.Get(request.Ctx, pvcKey, pvc); client.IgnoreNotFound(err) != nil {
-		return err
+	if err = r.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 
 	// backupRepo PVC exists, record the PVC name
@@ -508,7 +505,10 @@ func (r *BackupReconciler) handleRunningPhase(
 	// if all actions completed, update backup status to completed, otherwise,
 	// continue to handle following actions.
 	for i, act := range actions {
-		status, _ := act.Execute(actionCtx)
+		status, err := act.Execute(actionCtx)
+		if err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+		}
 		request.Status.Actions[i] = mergeActionStatus(&request.Status.Actions[i], status)
 
 		switch status.Phase {

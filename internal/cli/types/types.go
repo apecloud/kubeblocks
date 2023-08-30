@@ -103,7 +103,7 @@ const (
 	KindClusterVersion                  = "ClusterVersion"
 	KindConfigConstraint                = "ConfigConstraint"
 	KindBackup                          = "Backup"
-	KindRestoreJob                      = "RestoreJob"
+	KindRestore                         = "Restore"
 	KindBackupPolicy                    = "BackupPolicy"
 	KindOps                             = "OpsRequest"
 )
@@ -136,7 +136,7 @@ const (
 	DPAPIVersion            = "v1alpha1"
 	ResourceBackups         = "backups"
 	ResourceActionSets      = "actionsets"
-	ResourceRestoreJobs     = "restorejobs"
+	ResourceRestores        = "restores"
 	ResourceBackupPolicies  = "backuppolicies"
 	ResourceBackupRepos     = "backuprepos"
 	ResourceBackupSchedules = "backupschedules"
@@ -264,8 +264,8 @@ func BackupRepoGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupRepos}
 }
 
-func RestoreJobGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestoreJobs}
+func RestoreGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestores}
 }
 
 func AddonGVR() schema.GroupVersionResource {

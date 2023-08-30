@@ -700,6 +700,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - restores
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - restores/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - restores/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - extensions.kubeblocks.io
   resources:
   - addons

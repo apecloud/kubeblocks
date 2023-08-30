@@ -81,8 +81,10 @@ func (r *ActionSetStatus) GetTerminalPhases() []Phase {
 type BackupType string
 
 const (
-	BackupTypeFull       BackupType = "Full"
-	BackupTypeContinuous BackupType = "Continuous"
+	BackupTypeFull         BackupType = "Full"
+	BackupTypeContinuous   BackupType = "Continuous"
+	BackupTypeIncremental  BackupType = "Incremental"
+	BackupTypeDifferential BackupType = "Differential"
 )
 
 type BackupActionSpec struct {
@@ -232,4 +234,11 @@ type ActionSetList struct {
 
 func init() {
 	SchemeBuilder.Register(&ActionSet{}, &ActionSetList{})
+}
+
+func (r *ActionSet) HasPrepareDataStage() bool {
+	if r == nil || r.Spec.Restore == nil {
+		return false
+	}
+	return r.Spec.Restore.PrepareData != nil
 }

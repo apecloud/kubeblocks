@@ -415,9 +415,9 @@ type CreateRestoreOptions struct {
 	Backup string `json:"backup,omitempty"`
 
 	// point in time recovery args
-	RestoreTime    *time.Time `json:"restoreTime,omitempty"`
-	RestoreTimeStr string     `json:"restoreTimeStr,omitempty"`
-	SourceCluster  string     `json:"sourceCluster,omitempty"`
+	RestoreTime             *time.Time `json:"restoreTime,omitempty"`
+	RestoreTimeStr          string     `json:"restoreTimeStr,omitempty"`
+	RestoreManagementPolicy string     `json:"volumeRestorePolicy,omitempty"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -439,8 +439,6 @@ func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*app
 func (o *CreateRestoreOptions) Run() error {
 	if o.Backup != "" {
 		return o.runRestoreFromBackup()
-	} else if o.RestoreTime != nil {
-		return o.runPITR()
 	}
 	return nil
 }
@@ -457,12 +455,17 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if len(backup.Labels[constant.AppInstanceLabelKey]) == 0 {
 		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
 	}
+
+	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
+	if err != nil {
+		return err
+	}
 	// get the cluster object and set the annotation for restore
 	clusterObj, err := o.getClusterObject(backup)
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name)
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
 	}
@@ -496,106 +499,13 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 	return nil
 }
 
-func (o *CreateRestoreOptions) runPITR() error {
-	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
-		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s",
-				constant.AppInstanceLabelKey, o.SourceCluster),
-		})
-	if err != nil {
-		return err
-	}
-	backup := &dpv1alpha1.Backup{}
-
-	// no need to check items len because it is validated by o.validateRestoreTime().
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].Object, backup); err != nil {
-		return err
-	}
-	compName := backup.Labels[constant.KBAppComponentLabelKey]
-	if compName == "" {
-		return fmt.Errorf(`component name label %s is missing in backup "%s"`, constant.KBAppComponentLabelKey, backup.Name)
-	}
-	// TODO: use opsRequest to create cluster.
-	// get the cluster object and set the annotation for restore
-	clusterObj, err := o.getClusterObject(backup)
-	if err != nil {
-		return err
-	}
-	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
-	clusterObj.ObjectMeta = metav1.ObjectMeta{
-		Namespace: clusterObj.Namespace,
-		Name:      o.Name,
-		Annotations: map[string]string{
-			constant.RestoreFromTimeAnnotationKey:       fmt.Sprintf(`{"%s":"%s"}`, compName, o.RestoreTime.Format(time.RFC3339)),
-			constant.RestoreFromSrcClusterAnnotationKey: o.SourceCluster,
-		},
-	}
-	return o.createCluster(clusterObj)
-}
-
 func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func (o *CreateRestoreOptions) validateRestoreTime() error {
-	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
-		return nil
-	}
-	if o.RestoreTimeStr != "" && o.SourceCluster == "" {
-		return fmt.Errorf("--source-cluster must be specified if specified --restore-to-time")
-	}
-	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)
-	if err != nil {
-		// retry to parse time with RFC3339 format.
-		var errRFC error
-		restoreTime, errRFC = time.Parse(time.RFC3339, o.RestoreTimeStr)
-		if errRFC != nil {
-			// if retry failure, report the error
-			return err
-		}
-	}
-	o.RestoreTime = &restoreTime
-	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
-		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s",
-				constant.AppInstanceLabelKey, o.SourceCluster),
-		})
-	if err != nil {
-		return err
-	}
-	backupMap := map[string][]dpv1alpha1.Backup{}
-	for _, i := range objs.Items {
-		obj := dpv1alpha1.Backup{}
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
-			return err
-		}
-		uid := obj.Labels[dptypes.DataProtectionLabelClusterUIDKey]
-		if backupMap[uid] == nil {
-			backupMap[uid] = make([]dpv1alpha1.Backup, 0)
-		}
-		backupMap[uid] = append(backupMap[uid], obj)
-	}
-	for _, backups := range backupMap {
-		for _, backup := range backups {
-			timeRange := backup.Status.TimeRange
-			if timeRange == nil {
-				continue
-			}
-			if isTimeInRange(restoreTime, timeRange.Start.Time, timeRange.End.Time) {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
-		"\tkbcli cluster describe %s -n %s", o.SourceCluster, o.Namespace)
-}
-
 func (o *CreateRestoreOptions) Validate() error {
-	if o.Backup == "" && o.RestoreTimeStr == "" {
-		return fmt.Errorf("must be specified one of the --backup or --restore-to-time")
-	}
-	if err := o.validateRestoreTime(); err != nil {
-		return err
+	if o.Backup == "" {
+		return fmt.Errorf("must be specified one of the --backup ")
 	}
 
 	if o.Name == "" {
@@ -633,7 +543,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
-	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "source cluster name")
+	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [OrderedReady, Parallel]")
 	return cmd
 }
 

@@ -11,6 +11,6 @@ function stat_and_save_backup_info() {
   if [ -z $STOP_TIME ]; then
     STOP_TIME=`get_current_time`
   fi
-  TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
-  echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
+  TOTAL_SIZE=$(du -shx ${DP_BACKUP_DIR}|awk '{print $1}')
+  echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${DP_BACKUP_DIR}/backup.info
 }

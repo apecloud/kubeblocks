@@ -21,14 +21,18 @@ package utils
 
 import (
 	"context"
+	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -65,6 +69,59 @@ func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj c
 	patch := client.MergeFrom(obj.DeepCopyObject().(client.Object))
 	controllerutil.RemoveFinalizer(obj, dptypes.DataProtectionFinalizerName)
 	return cli.Patch(ctx, obj, patch)
+}
+
+// GetActionSetByName gets the ActionSet by name.
+func GetActionSetByName(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, name string) (*dpv1alpha1.ActionSet, error) {
+	if name == "" {
+		return nil, nil
+	}
+	as := &dpv1alpha1.ActionSet{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: name}, as); err != nil {
+		reqCtx.Log.Error(err, "failed to get ActionSet for backup.", "ActionSet", name)
+		return nil, err
+	}
+	return as, nil
+}
+
+func GetPodListByLabelSelector(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	labelSelector metav1.LabelSelector) (*corev1.PodList, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		return nil, err
+	}
+	targetPodList := &corev1.PodList{}
+	if err = cli.List(reqCtx.Ctx, targetPodList,
+		client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return nil, err
+	}
+	return targetPodList, nil
+}
+
+func GetBackupVolumeSnapshotName(backupName, volumeSource string) string {
+	return fmt.Sprintf("%s-%s", backupName, volumeSource)
+}
+
+// MergeEnv merges the targetEnv to original env. if original env exist the same name var, it will be replaced.
+func MergeEnv(originalEnv, targetEnv []corev1.EnvVar) []corev1.EnvVar {
+	if len(targetEnv) == 0 {
+		return originalEnv
+	}
+	originalEnvIndexMap := map[string]int{}
+	for i := range originalEnv {
+		originalEnvIndexMap[originalEnv[i].Name] = i
+	}
+	for i := range targetEnv {
+		if index, ok := originalEnvIndexMap[targetEnv[i].Name]; ok {
+			originalEnv[index] = targetEnv[i]
+		} else {
+			originalEnv = append(originalEnv, targetEnv[i])
+		}
+	}
+	return originalEnv
 }
 
 func VolumeSnapshotEnabled() bool {

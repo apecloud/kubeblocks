@@ -25,10 +25,12 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -267,11 +269,21 @@ func (r *BackupPolicyTplTransformer) syncBackupPolicy(backupPolicy *dpv1alpha1.B
 	if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
 		podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 	}
-	if comp.Replicas == 1 {
+	if r.getCompReplicas() == 1 {
 		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
 	} else {
 		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
 	}
+}
+
+func (r *BackupPolicyTplTransformer) getCompReplicas() int32 {
+	rsm := &workloads.ReplicatedStateMachine{}
+	compSpec := r.getClusterComponentSpec()
+	rsmName := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
+	if err := r.Client.Get(r.Context, types.NamespacedName{Name: rsmName, Namespace: r.Cluster.Namespace}, rsm); err != nil {
+		return compSpec.Replicas
+	}
+	return *rsm.Spec.Replicas
 }
 
 // buildBackupPolicy builds a new backup policy from the backup policy template.
@@ -437,7 +449,7 @@ func (r *BackupPolicyTplTransformer) buildTargetPodLabels(comp *appsv1alpha1.Clu
 	// append label to filter specific role of the component.
 	targetTpl := &r.backupPolicy.Target
 	if workloadHasRoleLabel(r.compWorkloadType) &&
-		len(targetTpl.Role) > 0 && comp.Replicas > 1 {
+		len(targetTpl.Role) > 0 && r.getCompReplicas() > 1 {
 		// the role only works when the component has multiple replicas.
 		labels[constant.RoleLabelKey] = targetTpl.Role
 	}

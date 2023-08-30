@@ -207,9 +207,8 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 			Name:      r.Backup.Name,
 			Labels:    BuildBackupWorkloadLabels(r.Backup),
 		},
-		Owner:                    r.Backup,
-		VolumeSnapshotNamePrefix: GetVolumeSnapshotNamePrefix(r.Backup),
-		PersistentVolumeClaims:   pvcs,
+		Owner:                         r.Backup,
+		PersistentVolumeClaimWrappers: pvcs,
 	}, nil
 }
 
@@ -285,12 +284,11 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 				Value: r.Spec.RetentionPeriod.String(),
 			},
 		}
-		envVars = append(envVars, utils.BuildEnvByCredential(r.BackupPolicy.Spec.Target.ConnectionCredential)...)
+		envVars = append(envVars, utils.BuildEnvByCredential(targetPod, r.BackupPolicy.Spec.Target.ConnectionCredential)...)
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
 		}
-		envVars = append(envVars, r.BackupMethod.Env...)
-		return envVars
+		return utils.MergeEnv(envVars, r.BackupMethod.Env)
 	}
 
 	buildVolumes := func() []corev1.Volume {

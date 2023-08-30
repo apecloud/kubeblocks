@@ -180,7 +180,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ValidateEnableLogsTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
-			// handle restore
+			// handle restore before ComponentTransformer
 			&RestoreTransformer{Client: r.Client},
 			// create all components objects
 			&ComponentTransformer{Client: r.Client},
@@ -230,6 +230,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&batchv1.Job{}).
+		Owns(&dpv1alpha1.Restore{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {

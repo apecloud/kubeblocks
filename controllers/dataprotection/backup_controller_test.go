@@ -271,7 +271,7 @@ var _ = Describe("Backup Controller test", func() {
 				})
 				backupKey = client.ObjectKeyFromObject(backup)
 				vsKey = client.ObjectKey{
-					Name:      dpbackup.GetVolumeSnapshotNamePrefix(backup) + pvcName,
+					Name:      dputils.GetBackupVolumeSnapshotName(backup.Name, "data"),
 					Namespace: backup.Namespace,
 				}
 			})

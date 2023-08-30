@@ -112,12 +112,7 @@ type ConnectionCredential struct {
 	// +kubebuilder:default=password
 	PasswordKey string `json:"passwordKey,omitempty"`
 
-	// endpointKey specifies the map key of the endpoint in the connection credential secret.
-	// +kubebuilder:default=endpoint
-	EndpointKey string `json:"endpointKey,omitempty"`
-
 	// hostKey specifies the map key of the host in the connection credential secret.
-	// +kubebuilder:default=host
 	HostKey string `json:"hostKey,omitempty"`
 
 	// portKey specifies the map key of the port in the connection credential secret.

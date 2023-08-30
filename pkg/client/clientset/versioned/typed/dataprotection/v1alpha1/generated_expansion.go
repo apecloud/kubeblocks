@@ -28,4 +28,4 @@ type BackupRepoExpansion interface{}
 
 type BackupScheduleExpansion interface{}
 
-type RestoreJobExpansion interface{}
+type RestoreExpansion interface{}

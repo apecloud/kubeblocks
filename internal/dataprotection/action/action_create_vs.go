@@ -36,6 +36,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/builder"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 )
 
 // CreateVolumeSnapshotAction is an action that creates the volume snapshot.
@@ -49,11 +50,17 @@ type CreateVolumeSnapshotAction struct {
 	// ObjectMeta is the metadata of the volume snapshot.
 	ObjectMeta metav1.ObjectMeta
 
-	// VolumeSnapshotNamePrefix is the prefix of the volume snapshot name.
-	VolumeSnapshotNamePrefix string
+	// PersistentVolumeClaimWrappers is the list of persistent volume claims wrapper to snapshot.
+	PersistentVolumeClaimWrappers []PersistentVolumeClaimWrapper
+}
 
-	// PersistentVolumeClaims is the list of persistent volume claims to snapshot.
-	PersistentVolumeClaims []corev1.PersistentVolumeClaim
+type PersistentVolumeClaimWrapper struct {
+	VolumeName            string
+	PersistentVolumeClaim corev1.PersistentVolumeClaim
+}
+
+func NewPersistentVolumeClaimWrapper(pvc corev1.PersistentVolumeClaim, volumeName string) PersistentVolumeClaimWrapper {
+	return PersistentVolumeClaimWrapper{PersistentVolumeClaim: pvc, VolumeName: volumeName}
 }
 
 var configVolumeSnapshotError = []string{
@@ -90,10 +97,10 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 		err  error
 		snap *vsv1.VolumeSnapshot
 	)
-	for _, pvc := range c.PersistentVolumeClaims {
-		key := client.ObjectKey{Namespace: pvc.Namespace, Name: c.VolumeSnapshotNamePrefix + pvc.Name}
-		// check if volume snapshot exists, if not, create it
-		if err = c.createVolumeSnapshotIfNotExist(ctx, vsCli, &pvc, key); err != nil {
+	for _, w := range c.PersistentVolumeClaimWrappers {
+		key := client.ObjectKey{Namespace: w.PersistentVolumeClaim.Namespace, Name: dputils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName)}
+		// create volume snapshot
+		if err = c.createVolumeSnapshotIfNotExist(ctx, vsCli, &w.PersistentVolumeClaim, key); err != nil {
 			return handleErr(err)
 		}
 
@@ -117,13 +124,10 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 }
 
 func (c *CreateVolumeSnapshotAction) validate() error {
-	if c.VolumeSnapshotNamePrefix == "" {
-		return errors.New("volume snapshot name prefix is required")
-	}
-	if len(c.PersistentVolumeClaims) == 0 {
+	if len(c.PersistentVolumeClaimWrappers) == 0 {
 		return errors.New("persistent volume claims are required")
 	}
-	if len(c.PersistentVolumeClaims) > 1 {
+	if len(c.PersistentVolumeClaimWrappers) > 1 {
 		return errors.New("only one persistent volume claim is supported")
 	}
 	return nil

@@ -27,13 +27,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // BackupPolicyReconciler reconciles a BackupPolicy object
@@ -96,9 +94,6 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *BackupPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupPolicy{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
-		}).
 		Complete(r)
 }
 

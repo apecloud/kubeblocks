@@ -48,8 +48,8 @@ func (c *FakeDataprotectionV1alpha1) BackupSchedules(namespace string) v1alpha1.
 	return &FakeBackupSchedules{c, namespace}
 }
 
-func (c *FakeDataprotectionV1alpha1) RestoreJobs(namespace string) v1alpha1.RestoreJobInterface {
-	return &FakeRestoreJobs{c, namespace}
+func (c *FakeDataprotectionV1alpha1) Restores(namespace string) v1alpha1.RestoreInterface {
+	return &FakeRestores{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

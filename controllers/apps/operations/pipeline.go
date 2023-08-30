@@ -38,18 +38,20 @@ type reconfigureContext struct {
 
 	clusterName   string
 	componentName string
-	configSpecs   []appsv1alpha1.ComponentConfigSpec
 }
 
 type pipeline struct {
 	err      error
 	isFailed bool
 
-	mergedConfig  map[string]string
-	configPatch   *cfgcore.ConfigPatchInfo
-	isFileUpdated bool
+	updatedParameters []cfgcore.ParamPairs
+	mergedConfig      map[string]string
+	configPatch       *cfgcore.ConfigPatchInfo
+	isFileUpdated     bool
 
 	configMap        *corev1.ConfigMap
+	clusterVer       *appsv1alpha1.ClusterVersion
+	clusterDef       *appsv1alpha1.ClusterDefinition
 	configConstraint *appsv1alpha1.ConfigConstraint
 	configSpec       *appsv1alpha1.ComponentConfigSpec
 
@@ -65,11 +67,11 @@ func (p *pipeline) wrapper(fn func() error) (ret *pipeline) {
 	return
 }
 
-func (p pipeline) foundConfigSpec(name string) *appsv1alpha1.ComponentConfigSpec {
-	if len(name) == 0 && len(p.configSpecs) == 1 {
-		return &p.configSpecs[0]
+func (p pipeline) foundConfigSpec(name string, configSpecs []appsv1alpha1.ComponentConfigSpec) *appsv1alpha1.ComponentConfigSpec {
+	if len(name) == 0 && len(configSpecs) == 1 {
+		return &configSpecs[0]
 	}
-	for _, configSpec := range p.configSpecs {
+	for _, configSpec := range configSpecs {
 		if configSpec.Name == name {
 			return &configSpec
 		}
@@ -77,19 +79,62 @@ func (p pipeline) foundConfigSpec(name string) *appsv1alpha1.ComponentConfigSpec
 	return nil
 }
 
-func (p *pipeline) ValidateParameters() *pipeline {
-	validateFn := func() error {
-		configSpec := p.foundConfigSpec(p.config.Name)
+func (p *pipeline) Validate() *pipeline {
+	validateFn := func() (err error) {
+		var components []appsv1alpha1.ClusterComponentVersion
+		var configSpecs []appsv1alpha1.ComponentConfigSpec
+
+		if p.clusterVer != nil {
+			components = p.clusterVer.Spec.ComponentVersions
+		}
+		configSpecs, err = cfgcore.GetConfigTemplatesFromComponent(
+			p.resource.Cluster.Spec.ComponentSpecs,
+			p.clusterDef.Spec.ComponentDefs,
+			components,
+			p.componentName)
+		if err != nil {
+			p.isFailed = true
+			return
+		}
+
+		configSpec := p.foundConfigSpec(p.config.Name, configSpecs)
 		if configSpec != nil {
 			p.configSpec = configSpec
+			return
+		}
+		err = cfgcore.MakeError(
+			"failed to reconfigure, not existed config[%s], all configs: %v",
+			p.config.Name, getConfigSpecName(configSpecs))
+		p.isFailed = true
+		return
+	}
+
+	return p.wrapper(validateFn)
+}
+
+func (p *pipeline) ClusterDefinition() *pipeline {
+	cdKey := client.ObjectKey{
+		Name: p.resource.Cluster.Spec.ClusterDefRef,
+	}
+
+	return p.wrapper(func() error {
+		p.clusterDef = &appsv1alpha1.ClusterDefinition{}
+		return p.cli.Get(p.reqCtx.Ctx, cdKey, p.clusterDef)
+	})
+}
+
+func (p *pipeline) ClusterVersion() *pipeline {
+	cvKey := client.ObjectKey{
+		Name: p.resource.Cluster.Spec.ClusterVersionRef,
+	}
+
+	return p.wrapper(func() error {
+		if cvKey.Name == "" {
 			return nil
 		}
-		p.isFailed = true
-		return cfgcore.MakeError(
-			"failed to reconfigure, not existed config[%s], all configs: %v",
-			p.config.Name, getConfigSpecName(p.configSpecs))
-	}
-	return p.wrapper(validateFn)
+		p.clusterVer = &appsv1alpha1.ClusterVersion{}
+		return p.cli.Get(p.reqCtx.Ctx, cvKey, p.clusterVer)
+	})
 }
 
 func (p *pipeline) ConfigMap() *pipeline {
@@ -116,8 +161,7 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 	}
 
 	ccKey := client.ObjectKey{
-		Namespace: p.configSpec.Namespace,
-		Name:      p.configSpec.ConfigConstraintRef,
+		Name: p.configSpec.ConfigConstraintRef,
 	}
 	fetchCCFn := func() error {
 		p.configConstraint = &appsv1alpha1.ConfigConstraint{}
@@ -179,11 +223,30 @@ func (p *pipeline) doMerge() error {
 	}
 	p.isFileUpdated = restart
 	p.configPatch = configPatch
+	p.updatedParameters = updatedParams
 	return nil
 }
 
 func (p *pipeline) Merge() *pipeline {
 	return p.wrapper(p.doMerge)
+}
+
+func (p *pipeline) UpdateOpsLabel() *pipeline {
+	updateFn := func() error {
+		if len(p.updatedParameters) == 0 ||
+			p.configConstraint == nil ||
+			p.configConstraint.Spec.FormatterConfig == nil {
+			return nil
+		}
+
+		request := p.resource.OpsRequest
+		deepObject := request.DeepCopy()
+		formatter := p.configConstraint.Spec.FormatterConfig
+		updateOpsLabelWithReconfigure(request, p.updatedParameters, p.configMap.Data, formatter)
+		return p.cli.Patch(p.reqCtx.Ctx, request, client.MergeFrom(deepObject))
+	}
+
+	return p.wrapper(updateFn)
 }
 
 func (p *pipeline) Sync() *pipeline {
@@ -212,7 +275,8 @@ func (p *pipeline) Complete() reconfiguringResult {
 
 	return makeReconfiguringResult(nil,
 		withReturned(p.mergedConfig, p.configPatch),
-		withNoFormatFilesUpdated(p.isFileUpdated))
+		withNoFormatFilesUpdated(p.isFileUpdated),
+	)
 }
 
 func newPipeline(context reconfigureContext) *pipeline {

@@ -264,44 +264,12 @@ func isRunningPhase(condition metav1.Condition) bool {
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
 	var (
-		opsRequest        = resource.OpsRequest
-		spec              = &opsRequest.Spec
-		clusterName       = spec.ClusterRef
-		componentName     = spec.Reconfigure.ComponentName
-		cluster           = resource.Cluster
-		clusterDefinition = &appsv1alpha1.ClusterDefinition{}
-		clusterVersion    = &appsv1alpha1.ClusterVersion{}
+		opsRequest    = resource.OpsRequest
+		spec          = &opsRequest.Spec
+		clusterName   = spec.ClusterRef
+		componentName = spec.Reconfigure.ComponentName
+		reconfigure   = spec.Reconfigure
 	)
-
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
-		Name:      cluster.Spec.ClusterDefRef,
-		Namespace: cluster.Namespace,
-	}, clusterDefinition); err != nil {
-		return core.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
-	}
-
-	if err := getClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, cli, reqCtx.Ctx); err != nil {
-		return err
-	}
-
-	configSpecs, err := core.GetConfigTemplatesFromComponent(
-		cluster.Spec.ComponentSpecs,
-		clusterDefinition.Spec.ComponentDefs,
-		clusterVersion.Spec.ComponentVersions,
-		componentName)
-	if err != nil {
-		return processMergedFailed(resource, true,
-			core.WrapError(err, "failed to get config template in the component[%s]", componentName))
-	}
-	return r.sync(reqCtx, cli, clusterName, componentName, spec.Reconfigure, resource, configSpecs)
-}
-
-func (r *reconfigureAction) sync(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	clusterName, componentName string,
-	reconfigure *appsv1alpha1.Reconfigure,
-	resource *OpsResource,
-	configSpecs []appsv1alpha1.ComponentConfigSpec) error {
 
 	// Update params to configmap
 	if len(reconfigure.Configurations) == 0 {
@@ -314,26 +282,29 @@ func (r *reconfigureAction) sync(reqCtx intctrlutil.RequestCtx,
 		reqCtx:        reqCtx,
 		resource:      resource,
 		config:        reconfigure.Configurations[0],
-		configSpecs:   configSpecs,
 		clusterName:   clusterName,
 		componentName: componentName,
 	})
 
-	result := pipeline.ValidateParameters().
+	result := pipeline.
+		ClusterDefinition().
+		ClusterVersion().
+		Validate().
 		ConfigMap().
 		ConfigConstraints().
 		Merge().
+		UpdateOpsLabel().
 		Sync().
 		Complete()
 
 	if result.err != nil {
 		return processMergedFailed(resource, result.failed, result.err)
-	} else {
-		reqCtx.Recorder.Eventf(resource.OpsRequest,
-			corev1.EventTypeNormal,
-			appsv1alpha1.ReasonReconfigureMerged,
-			"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
 	}
+
+	reqCtx.Recorder.Eventf(resource.OpsRequest,
+		corev1.EventTypeNormal,
+		appsv1alpha1.ReasonReconfigureMerged,
+		"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
 
 	// merged successfully
 	if err := patchReconfigureOpsStatus(resource, pipeline.configSpec.Name,

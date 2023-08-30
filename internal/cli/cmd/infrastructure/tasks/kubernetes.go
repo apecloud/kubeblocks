@@ -35,10 +35,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 

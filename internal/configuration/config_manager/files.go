@@ -24,7 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type files string

@@ -23,13 +23,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -92,7 +93,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		}
 		var cmObj *corev1.ConfigMap
 		for _, configSpec := range cdComponent.ConfigSpecs {
-			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, configSpec.Name)
+			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
 			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 				&corev1.ConfigMap{},
 				testapps.WithNamespacedName(cmInsName, ns),
@@ -112,7 +113,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cmObj
 	}
 
-	assureMockReconfigureData := func(policyName string) (*OpsResource, cfgcore.ConfigEventContext) {
+	assureMockReconfigureData := func(policyName string) (*OpsResource, intctrlutil.ConfigEventContext) {
 		By("init operations resources ")
 		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
@@ -157,7 +158,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		}
 
 		By("mock event context")
-		eventContext := cfgcore.ConfigEventContext{
+		eventContext := intctrlutil.ConfigEventContext{
 			ConfigMap: cfgObj,
 			Component: &clusterDef.Spec.ComponentDefs[0],
 			Client:    k8sClient,
@@ -168,12 +169,12 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			},
 			Cluster:        clusterObject,
 			ConfigSpecName: "mysql-test",
-			ConfigPatch: &cfgcore.ConfigPatchInfo{
+			ConfigPatch: &core.ConfigPatchInfo{
 				AddConfig:    map[string]interface{}{},
 				UpdateConfig: map[string][]byte{},
 				DeleteConfig: map[string]interface{}{},
 			},
-			PolicyStatus: cfgcore.PolicyExecStatus{
+			PolicyStatus: core.PolicyExecStatus{
 				PolicyName:    policyName,
 				SucceedCount:  2,
 				ExpectedCount: 3,

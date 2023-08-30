@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type simplePolicy struct {
@@ -42,7 +42,7 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 
 	switch params.WorkloadType() {
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type:[%s]", params.WorkloadType())
+		return makeReturnedStatus(ESNotSupport), core.MakeError("not supported component workload type:[%s]", params.WorkloadType())
 	case appsv1alpha1.Consensus:
 		funcs = GetConsensusRollingUpgradeFuncs()
 		compLists = fromStatefulSetObjects(params.ComponentUnits)
@@ -69,7 +69,7 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 		configKey  = param.getConfigKey()
 
 		retStatus = ESRetry
-		progress  = cfgcore.NotStarted
+		progress  = core.NotStarted
 	)
 
 	recordEvent := func(obj client.Object) {

@@ -28,16 +28,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type reconfiguringResult struct {
 	failed               bool
 	noFormatFilesUpdated bool
-	configPatch          *cfgcore.ConfigPatchInfo
+	configPatch          *core.ConfigPatchInfo
 	lastAppliedConfigs   map[string]string
 	err                  error
 }
@@ -68,14 +70,14 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	}
 
 	updatedFiles := make(map[string]string, len(config.Keys))
-	updatedParams := make([]cfgcore.ParamPairs, 0, len(config.Keys))
+	updatedParams := make([]core.ParamPairs, 0, len(config.Keys))
 	for _, key := range config.Keys {
 		if key.FileContent != "" {
 			updatedFiles[key.Key] = key.FileContent
 			continue
 		}
 		if len(key.Parameters) > 0 {
-			updatedParams = append(updatedParams, cfgcore.ParamPairs{
+			updatedParams = append(updatedParams, core.ParamPairs{
 				Key:           key.Key,
 				UpdatedParams: fromKeyValuePair(key.Parameters)})
 		}
@@ -84,7 +86,7 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc.Spec, configSpec); err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
-	configPatch, restart, err := cfgcore.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, configSpec.Keys, len(updatedFiles) != 0)
+	configPatch, restart, err := core.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, configSpec.Keys, len(updatedFiles) != 0)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}
@@ -99,19 +101,19 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
-	updatedParams []cfgcore.ParamPairs,
+	updatedParams []core.ParamPairs,
 	cc appsv1alpha1.ConfigConstraintSpec,
 	tpl appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
 	updatedConfig := base
 
 	// merge updated files into configmap
 	if len(updatedFiles) != 0 {
-		updatedConfig = cfgcore.MergeUpdatedConfig(base, updatedFiles)
+		updatedConfig = core.MergeUpdatedConfig(base, updatedFiles)
 	}
 	if len(updatedParams) == 0 {
 		return updatedConfig, nil
 	}
-	return cfgcore.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
+	return intctrlutil.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
 }
 
 func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec, policy *appsv1alpha1.UpgradePolicy) error {
@@ -124,7 +126,7 @@ func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client
 		cmObj.Annotations[constant.UpgradePolicyAnnotationKey] = string(*policy)
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
-	cfgcore.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
+	core.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
 	if err := plan.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
 		return err
 	}
@@ -149,7 +151,7 @@ func withFailed(failed bool) func(result *reconfiguringResult) {
 	}
 }
 
-func withReturned(configs map[string]string, patch *cfgcore.ConfigPatchInfo) func(result *reconfiguringResult) {
+func withReturned(configs map[string]string, patch *core.ConfigPatchInfo) func(result *reconfiguringResult) {
 	return func(result *reconfiguringResult) {
 		result.lastAppliedConfigs = configs
 		result.configPatch = patch
@@ -221,7 +223,7 @@ func b2sMap(config map[string][]byte) map[string]string {
 
 func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error {
 	if !isInvalid {
-		return cfgcore.WrapError(err, "failed to update param!")
+		return core.WrapError(err, "failed to update param!")
 	}
 
 	// if failed to validate configure, set opsRequest to failed and return
@@ -230,7 +232,7 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	return nil
 }
 
-func formatConfigPatchToMessage(configPatch *cfgcore.ConfigPatchInfo, execStatus *cfgcore.PolicyExecStatus) string {
+func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *core.PolicyExecStatus) string {
 	policyName := ""
 	if execStatus != nil {
 		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
@@ -251,7 +253,7 @@ func getClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, c
 		Name:      cvName,
 	}
 	if err := cli.Get(ctx, clusterVersionKey, cv); err != nil {
-		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cvName)
+		return core.WrapError(err, "failed to get clusterversion[%s]", cvName)
 	}
 	return nil
 }

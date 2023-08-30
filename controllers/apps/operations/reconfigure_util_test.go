@@ -25,12 +25,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -96,7 +97,7 @@ var _ = Describe("Reconfigure util test", func() {
 				// for cm
 				client.ObjectKeyFromObject(cmObj): {{
 					Object: nil,
-					Err:    cfgcore.MakeError("failed to get cm object"),
+					Err:    core.MakeError("failed to get cm object"),
 				}, {
 					Object: cmObj,
 					Err:    nil,
@@ -104,7 +105,7 @@ var _ = Describe("Reconfigure util test", func() {
 				// for tpl
 				client.ObjectKeyFromObject(tplObj): {{
 					Object: nil,
-					Err:    cfgcore.MakeError("failed to get tpl object"),
+					Err:    core.MakeError("failed to get tpl object"),
 				}, {
 					Object: tplObj,
 					Err:    nil,
@@ -160,11 +161,11 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 				oldConfig := cmObj.Data
 				r := updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 				Expect(r.err).Should(Succeed())
-				diff, err := cfgcore.CreateMergePatch(
-					cfgcore.FromConfigData(oldConfig, nil),
-					cfgcore.FromConfigData(cmObj.Data, nil),
-					cfgcore.CfgOption{
-						Type:    cfgcore.CfgTplType,
+				diff, err := core.CreateMergePatch(
+					core.FromConfigData(oldConfig, nil),
+					core.FromConfigData(cmObj.Data, nil),
+					core.CfgOption{
+						Type:    core.CfgTplType,
 						CfgType: appsv1alpha1.Ini,
 						Log:     log.FromContext(context.Background()),
 					})
@@ -190,11 +191,11 @@ z2=y2
 				oldConfig := cmObj.Data
 				r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 				Expect(r.err).Should(Succeed())
-				diff, err := cfgcore.CreateMergePatch(
-					cfgcore.FromConfigData(oldConfig, nil),
-					cfgcore.FromConfigData(cmObj.Data, nil),
-					cfgcore.CfgOption{
-						Type:    cfgcore.CfgTplType,
+				diff, err := core.CreateMergePatch(
+					core.FromConfigData(oldConfig, nil),
+					core.FromConfigData(cmObj.Data, nil),
+					core.CfgOption{
+						Type:    core.CfgTplType,
 						CfgType: appsv1alpha1.Ini,
 						Log:     log.FromContext(context.Background()),
 					})
@@ -220,11 +221,11 @@ z2=y2
 
 				r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 				Expect(r.err).Should(Succeed())
-				diff, err := cfgcore.CreateMergePatch(
-					cfgcore.FromConfigData(oldConfig, nil),
-					cfgcore.FromConfigData(cmObj.Data, nil),
-					cfgcore.CfgOption{
-						Type:    cfgcore.CfgTplType,
+				diff, err := core.CreateMergePatch(
+					core.FromConfigData(oldConfig, nil),
+					core.FromConfigData(cmObj.Data, nil),
+					core.CfgOption{
+						Type:    core.CfgTplType,
 						CfgType: appsv1alpha1.Ini,
 						Log:     log.FromContext(context.Background()),
 					})
@@ -244,11 +245,11 @@ z2=y2
 				oldConfig := cmObj.Data
 				r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 				Expect(r.err).Should(Succeed())
-				diff, err := cfgcore.CreateMergePatch(
-					cfgcore.FromConfigData(oldConfig, nil),
-					cfgcore.FromConfigData(cmObj.Data, nil),
-					cfgcore.CfgOption{
-						Type:    cfgcore.CfgTplType,
+				diff, err := core.CreateMergePatch(
+					core.FromConfigData(oldConfig, nil),
+					core.FromConfigData(cmObj.Data, nil),
+					core.CfgOption{
+						Type:    core.CfgTplType,
 						CfgType: appsv1alpha1.Ini,
 						Log:     log.FromContext(context.Background()),
 					})

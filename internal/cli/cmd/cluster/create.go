@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -133,6 +134,9 @@ var clusterCreateExample = templates.Examples(`
 
     # Create a cluster with time to restore from point in time
     kbcli cluster create --restore-to-time "Jun 16,2023 18:58:53 UTC+0800" --source-cluster mycluster
+
+	# Create a cluster with auto backup
+	kbcli cluster create --cluster-definition apecloud-mysql --backup-enabled
 `)
 
 const (
@@ -178,6 +182,15 @@ type UpdatableFlags struct {
 	NodeLabels     map[string]string `json:"nodeLabels,omitempty"`
 	Tenancy        string            `json:"tenancy"`
 	TolerationsRaw []string          `json:"-"`
+
+	// backup config
+	BackupEnabled                 bool   `json:"-"`
+	BackupRetentionPeriod         string `json:"-"`
+	BackupMethod                  string `json:"-"`
+	BackupCronExpression          string `json:"-"`
+	BackupStartingDeadlineMinutes int64  `json:"-"`
+	BackupRepoName                string `json:"-"`
+	BackupPITREnabled             bool   `json:"-"`
 }
 
 type CreateOptions struct {
@@ -195,6 +208,9 @@ type CreateOptions struct {
 	Backup        string `json:"backup,omitempty"`
 	RestoreTime   string `json:"restoreTime,omitempty"`
 	SourceCluster string `json:"sourceCluster,omitempty"`
+
+	// backup config
+	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`
 
 	UpdatableFlags
 	create.CreateOptions `json:"-"`
@@ -489,6 +505,11 @@ func (o *CreateOptions) Complete() error {
 
 	// build cluster version
 	o.buildClusterVersion(cls)
+
+	// build backup config
+	if err := o.buildBackupConfig(cls); err != nil {
+		return err
+	}
 
 	// build components
 	components, err := o.buildComponents(clusterCompSpecs)
@@ -1175,6 +1196,13 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
 	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'`)
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
+	cmd.Flags().BoolVar(&f.BackupEnabled, "backup-enabled", false, "Specify whether enabled automated backup")
+	cmd.Flags().StringVar(&f.BackupRetentionPeriod, "backup-retention-period", "", "a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained")
+	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "", "the backup method, support: snapshot, backupTool")
+	cmd.Flags().StringVar(&f.BackupCronExpression, "backup-cron-expression", "", "the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.")
+	cmd.Flags().Int64Var(&f.BackupStartingDeadlineMinutes, "backup-starting-deadline-minutes", 0, "the deadline in minutes for starting the backup job if it misses its scheduled time for any reason")
+	cmd.Flags().StringVar(&f.BackupRepoName, "backup-repo-name", "", "the backup repository name")
+	cmd.Flags().BoolVar(&f.BackupPITREnabled, "pitr-enabled", false, "Specify whether enabled point in time recovery")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",
@@ -1333,6 +1361,83 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 	if o.Annotations == nil {
 		o.Annotations = cls.Annotations
 	}
+}
+
+func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
+	// set default value in here
+	// if set in flag, we don't know whether it is set by user or default value
+	defaultRetentionPeriod := "1d"
+	defaultMethod := "snapshot"
+
+	// get backup config from cluster
+	if cls != nil && cls.Spec.Backup != nil {
+		backup := cls.Spec.Backup
+		if backup.Enabled != nil && !o.BackupEnabled {
+			o.BackupEnabled = *backup.Enabled
+		}
+		if backup.RetentionPeriod != nil && o.BackupRetentionPeriod == "" {
+			o.BackupRetentionPeriod = *backup.RetentionPeriod
+		}
+		if backup.Method != "" && o.BackupMethod == "" {
+			o.BackupMethod = string(backup.Method)
+		}
+		if backup.CronExpression != "" && o.BackupCronExpression == "" {
+			o.BackupCronExpression = backup.CronExpression
+		}
+		if backup.StartingDeadlineMinutes != nil && o.BackupStartingDeadlineMinutes == 0 {
+			o.BackupStartingDeadlineMinutes = *backup.StartingDeadlineMinutes
+		}
+		if backup.RepoName != "" && o.BackupRepoName == "" {
+			o.BackupRepoName = backup.RepoName
+		}
+		if backup.PITREnabled != nil && !o.BackupPITREnabled {
+			o.BackupPITREnabled = *backup.PITREnabled
+		}
+	}
+
+	o.BackupConfig = new(appsv1alpha1.ClusterBackup)
+	if o.BackupEnabled {
+		o.BackupConfig.Enabled = &o.BackupEnabled
+	}
+
+	if o.BackupRetentionPeriod != "" {
+		// judge whether val end with the 'd'|'D'|'h'|'H' character
+		lastChar := o.BackupRetentionPeriod[len(o.BackupRetentionPeriod)-1]
+		if lastChar != 'd' && lastChar != 'D' && lastChar != 'h' && lastChar != 'H' {
+			return fmt.Errorf("invalid retention period: %s, only support d|D|h|H", o.BackupRetentionPeriod)
+		}
+		o.BackupConfig.RetentionPeriod = &o.BackupRetentionPeriod
+	} else {
+		// set default retention period
+		o.BackupConfig.RetentionPeriod = &defaultRetentionPeriod
+	}
+
+	if o.BackupCronExpression != "" {
+		// validate the cron expression
+		if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
+			return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+		}
+		o.BackupConfig.CronExpression = o.BackupCronExpression
+	}
+
+	if o.BackupMethod != "" {
+		o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(o.BackupMethod)
+	} else {
+		// set default backup method
+		o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(defaultMethod)
+	}
+
+	if o.BackupStartingDeadlineMinutes != 0 {
+		o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
+	}
+	if o.BackupRepoName != "" {
+		o.BackupConfig.RepoName = o.BackupRepoName
+	}
+	if o.BackupPITREnabled {
+		o.BackupConfig.PITREnabled = &o.BackupPITREnabled
+	}
+
+	return nil
 }
 
 // parse the cluster component spec

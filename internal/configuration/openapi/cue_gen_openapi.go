@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package validate
+package openapi
 
 import (
 	"fmt"
@@ -29,7 +29,6 @@ import (
 	"cuelang.org/go/encoding/openapi"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/cuewrapper"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
@@ -45,7 +44,7 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 		openAPIVersion = "3.1.0"
 	)
 
-	rt, err := cuewrapper.NewRuntime(cueTpl)
+	rt, err := NewRuntime(cueTpl)
 	if err != nil {
 		return nil, err
 	}
@@ -89,25 +88,20 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	if err != nil {
 		return nil, err
 	}
-	// yamlStr, err := yaml.Marshal(rt.BuildFile(astf))
-	// if err != nil {
-	//	return nil, fmt.Errorf("cue-yaml marshaling failed: %w", err)
-	// }
-	// fmt.Println(yamlStr)
 
-	return transformOpenAPISchema(rt, schema, cuewrapper.DeReference(astf, rt))
+	return transformOpenAPISchema(rt, schema, DeReference(astf, rt))
 }
 
 func getSchemas(f *ast.File, schemaType string) ([]ast.Decl, error) {
-	compos, err := cuewrapper.GetFieldByLabel(f, ComponentFieldName)
+	compos, err := GetFieldByLabel(f, ComponentFieldName)
 	if err != nil {
 		return nil, err
 	}
-	schemas, err := cuewrapper.GetFieldByLabel(compos.Value, SchemaFieldName)
+	schemas, err := GetFieldByLabel(compos.Value, SchemaFieldName)
 	if err != nil {
 		return nil, err
 	}
-	typeSchema, err := cuewrapper.GetFieldByLabel(schemas.Value, schemaType)
+	typeSchema, err := GetFieldByLabel(schemas.Value, schemaType)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +112,8 @@ func getSchemas(f *ast.File, schemaType string) ([]ast.Decl, error) {
 	return nil, core.MakeError("not a struct literal")
 }
 
-func transformOpenAPISchema(rt *cuewrapper.Runtime, cueSchema []ast.Decl, refFn func(path string) (*apiextv1.JSONSchemaProps, error)) (*apiextv1.JSONSchemaProps, error) {
-	jsonProps, err := cuewrapper.FromCueAST(rt, cueSchema)
+func transformOpenAPISchema(rt *Runtime, cueSchema []ast.Decl, refFn func(path string) (*apiextv1.JSONSchemaProps, error)) (*apiextv1.JSONSchemaProps, error) {
+	jsonProps, err := FromCueAST(rt, cueSchema)
 	if err != nil {
 		return nil, err
 	}

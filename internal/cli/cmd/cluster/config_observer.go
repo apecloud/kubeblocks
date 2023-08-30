@@ -41,7 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/validate"
+	"github.com/apecloud/kubeblocks/internal/configuration/openapi"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -177,7 +177,7 @@ func (r *configObserverOptions) printExplainConfigure(configSpecs configSpecsTyp
 			fmt.Printf("\n%s\n", fmt.Sprintf(notConfigSchemaPrompt, printer.BoldYellow(tplName)))
 			return nil
 		}
-		apiSchema, err := validate.GenerateOpenAPISchema(schema.CUE, "")
+		apiSchema, err := openapi.GenerateOpenAPISchema(schema.CUE, "")
 		if err != nil {
 			return cfgcore.WrapError(err, "failed to generate open api schema")
 		}

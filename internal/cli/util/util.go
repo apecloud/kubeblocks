@@ -73,8 +73,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/internal/configuration/openapi"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -548,7 +548,7 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 
 	schema := configConstraint.Spec.ConfigurationSchema.DeepCopy()
 	if schema.Schema == nil {
-		schema.Schema, err = validate.GenerateOpenAPISchema(schema.CUE, configConstraint.Spec.CfgSchemaTopLevelName)
+		schema.Schema, err = openapi.GenerateOpenAPISchema(schema.CUE, configConstraint.Spec.CfgSchemaTopLevelName)
 		if err != nil {
 			return false, err
 		}

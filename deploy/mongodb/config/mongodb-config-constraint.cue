@@ -30,12 +30,59 @@
 	...
 }
 
+#Net: {
+	port:                   int
+	bindIp:                 string
+	bindIpAll:              bool
+	maxIncomingConnections: int
+	wireObjectCheck:        bool
+	tls:                    #Tls
+}
+
+#Tls: {
+	certificateSelector:        string
+	clusterCertificateSelector: string
+	mode:                       string
+	certificateKeyFile:         string
+	certificateKeyFilePassword: string
+	clusterFile:                string
+	clusterPassword:            string
+	CAFile:                     string
+	clusterCAFile:              string
+	...
+}
+
 #Component: {
+	accessControl: {
+		verbosity: int
+	}
+	command: {
+		verbosity: int
+	}
+	replication: {
+		verbosity: int
+		election: {
+			verbosity: int
+		}
+		rollback: {
+			verbosity: int
+		}
+	}
+	storage: #Storage
+	...
+}
+
+#Storage: {
+	verbosity: int
+	journal: {
+		verbosity: int
+	}
 	...
 }
 
 #MongodbParameters: {
 	systemLog: #SystemLog
+	net:       #Net
 }
 
 configuration: #MongodbParameters & {

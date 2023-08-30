@@ -190,27 +190,27 @@ endif
 .PHONY: build-dataprotection-image
 build-dataprotection-image: install-docker-buildx generate ## Build Operator dataprotection container image.
 ifneq ($(BUILDX_ENABLED), true)
-	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --tag ${IMG}:${VERSION} --tag ${IMG}:latest
+	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --tag ${DATAPROTECTION_IMG}:${VERSION} --tag ${DATAPROTECTION_IMG}:latest
 else
 ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${IMG}:latest
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:latest
 else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${IMG}:${VERSION}
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:${VERSION}
 endif
 endif
 
 .PHONY: push-dataprotection-image
-push-dataprotection-image: install-docker-buildx generate ## Push Operator manager container image.
+push-dataprotection-image: install-docker-buildx generate ## Push Operator dataprotection container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
-	$(DOCKER) push ${IMG}:latest
+	$(DOCKER) push ${DATAPROTECTION_IMG}:latest
 else
-	$(DOCKER) push ${IMG}:${VERSION}
+	$(DOCKER) push ${DATAPROTECTION_IMG}:${VERSION}
 endif
 else
 ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${IMG}:latest --push
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:latest --push
 else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${IMG}:${VERSION} --push
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:${VERSION} --push
 endif
 endif

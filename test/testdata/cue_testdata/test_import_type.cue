@@ -38,6 +38,11 @@ import "time"
 		field1: string
 		field2: int
 	}
+
+	...
+
+	// not support AdditionalProperties.AdditionalProperties
+	// x: [Name=_]: #TestSA
 }
 
 [N=string]: #Exemplar & {

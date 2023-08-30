@@ -45,7 +45,7 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 	}{{
 		name: "normal_test",
 		args: args{
-			cueFile:    "/test_import_type.cue",
+			cueFile:    "test_import_type.cue",
 			schemaType: "Exemplar",
 		},
 		want:    "test_import_type.json",

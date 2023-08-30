@@ -106,19 +106,22 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	tpl := &appsv1alpha1.ConfigConstraint{}
+	// process configuration without ConfigConstraints
 	cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]
 	if !ok || cfgConstraintsName == "" {
 		reqCtx.Log.Info("configuration without ConfigConstraints.")
-	} else {
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-			Namespace: config.Namespace,
-			Name:      config.Labels[constant.CMConfigurationConstraintsNameLabelKey],
-		}, tpl); err != nil {
-			return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
-		}
+		return r.sync(reqCtx, config, &appsv1alpha1.ConfigConstraint{})
 	}
 
+	// process configuration with ConfigConstraints
+	key := types.NamespacedName{
+		Namespace: config.Namespace,
+		Name:      config.Labels[constant.CMConfigurationConstraintsNameLabelKey],
+	}
+	tpl := &appsv1alpha1.ConfigConstraint{}
+	if err := r.Client.Get(reqCtx.Ctx, key, tpl); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+	}
 	return r.sync(reqCtx, config, tpl)
 }
 

@@ -146,12 +146,12 @@ func (p *pipeline) doMerge() error {
 	for _, key := range config.Keys {
 		if key.FileContent != "" {
 			updatedFiles[key.Key] = key.FileContent
-			continue
 		}
 		if len(key.Parameters) > 0 {
 			updatedParams = append(updatedParams, cfgcore.ParamPairs{
 				Key:           key.Key,
-				UpdatedParams: fromKeyValuePair(key.Parameters)})
+				UpdatedParams: fromKeyValuePair(key.Parameters),
+			})
 		}
 	}
 

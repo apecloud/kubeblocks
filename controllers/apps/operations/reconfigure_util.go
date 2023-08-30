@@ -79,12 +79,12 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	for _, key := range config.Keys {
 		if key.FileContent != "" {
 			updatedFiles[key.Key] = key.FileContent
-			continue
 		}
 		if len(key.Parameters) > 0 {
 			updatedParams = append(updatedParams, core.ParamPairs{
 				Key:           key.Key,
-				UpdatedParams: fromKeyValuePair(key.Parameters)})
+				UpdatedParams: fromKeyValuePair(key.Parameters),
+			})
 		}
 	}
 

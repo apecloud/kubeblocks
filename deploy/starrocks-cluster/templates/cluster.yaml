@@ -1,0 +1,61 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "starrocks-cluster.name" . }}
+  labels: {{ include "starrocks-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: starrocks
+  clusterVersionRef: starrocks-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: fe
+      componentDefRef: fe
+      replicas: {{ .Values.fe.replicaCount | default 1 }}
+      {{- with  .Values.fe.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if .Values.fe.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: fe-meta # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.fe.persistence.data.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.fe.persistence.data.size }}
+      {{- end }}
+    - name: be
+      componentDefRef: be
+      replicas: {{ .Values.be.replicaCount | default 1 }}
+      {{- with  .Values.be.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: be-storage # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.be.persistence.data.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.be.persistence.data.size }}

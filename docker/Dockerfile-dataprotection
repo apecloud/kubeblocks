@@ -1,4 +1,4 @@
-# Build the manager binary
+# Build the dataprotection binary
 ARG DIST_IMG=gcr.io/distroless/static:nonroot
 
 ARG GO_VERSION=1.20

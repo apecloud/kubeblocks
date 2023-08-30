@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 

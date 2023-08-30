@@ -34,13 +34,12 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 

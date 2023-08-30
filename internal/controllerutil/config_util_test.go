@@ -27,11 +27,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	"github.com/StudioSol/set"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"

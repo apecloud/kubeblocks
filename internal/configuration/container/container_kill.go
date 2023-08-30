@@ -36,7 +36,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )

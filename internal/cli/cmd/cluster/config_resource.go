@@ -24,11 +24,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type configSpecsType []*configSpecMeta

@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )

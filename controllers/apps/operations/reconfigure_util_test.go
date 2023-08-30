@@ -25,13 +25,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -53,7 +52,7 @@ var _ = Describe("Reconfigure util test", func() {
 		return cfgCM, cfgTpl
 	}
 
-	mockUpdate := func(params []cfgcore.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) (err error) {
+	mockUpdate := func(params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) (err error) {
 		if formatter != nil {
 			updateOpsLabelWithReconfigure(&appsv1alpha1.OpsRequest{}, params, orinalData, formatter)
 		}

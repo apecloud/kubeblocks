@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -122,11 +121,9 @@ type ClusterBackup struct {
 	// +optional
 	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
 
-	// backup method, support: snapshot, backupTool.
-	// +kubebuilder:validation:Enum=snapshot;backupTool
+	// backup method name to use, that is defined in backupPolicy.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=snapshot
-	Method dataprotectionv1alpha1.BackupMethod `json:"method"`
+	Method string `json:"method"`
 
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +optional

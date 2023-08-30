@@ -22,31 +22,39 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // BackupPolicySpec defines the desired state of BackupPolicy
 type BackupPolicySpec struct {
-	// retention describe how long the Backup should be retained. if not set, will be retained forever.
+	// backupRepoName is the name of BackupRepo and the backup data will be
+	// stored in this repository. If not set, will be stored in the default
+	// backup repository.
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
-	Retention *RetentionSpec `json:"retention,omitempty"`
+	BackupRepoName *string `json:"backupRepoName,omitempty"`
 
-	// schedule policy for backup.
+	// pathPrefix is the directory inside the backup repository to store the backup content.
+	// It is a relative to the path of the backup repository.
 	// +optional
-	Schedule Schedule `json:"schedule,omitempty"`
+	PathPrefix string `json:"pathPrefix,omitempty"`
 
-	// the policy for snapshot backup.
+	// Specifies the number of retries before marking the backup failed.
 	// +optional
-	Snapshot *SnapshotPolicy `json:"snapshot,omitempty"`
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
+	// +kubebuilder:default=0
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 
-	// the policy for datafile backup.
-	// +optional
-	Datafile *CommonBackupPolicy `json:"datafile,omitempty"`
+	// target specifies the target information to back up.
+	// +kubebuilder:validation:Required
+	Target *BackupTarget `json:"target"`
 
-	// the policy for logfile backup.
-	// +optional
-	Logfile *CommonBackupPolicy `json:"logfile,omitempty"`
+	// backupMethods defines the backup methods.
+	// +kubebuilder:validation:Required
+	BackupMethods []BackupMethod `json:"backupMethods"`
 }
 
 type RetentionSpec struct {
@@ -229,6 +237,157 @@ type BackupPolicyHook struct {
 	// which container can exec command
 	// +optional
 	ContainerName string `json:"containerName,omitempty"`
+}
+
+type BackupTarget struct {
+	// podSelector is used to find matching pods.
+	// +kube:validation:Required
+	PodSelector *PodSelector `json:"podSelector,omitempty"`
+
+	// connectionCredential specifies the connection credential to connect to the
+	// target database cluster.
+	// +optional
+	ConnectionCredential *ConnectionCredential `json:"connectionCredential,omitempty"`
+}
+
+type PodSelector struct {
+	// labelsSelector is used to find matching pods.
+	metav1.LabelSelector `json:",inline"`
+
+	// strategy specifies the strategy to select the target pod when multiple pods
+	// are selected.
+	// Valid values are:
+	// - All: select all pods that match the labelsSelector.
+	// - Any: select any one pod that match the labelsSelector.
+	// +kubebuilder:default=Any
+	Strategy PodSelectionStrategy `json:"strategy,omitempty"`
+}
+
+// PodSelectionStrategy specifies the strategy to select when multiple pods are
+// selected for backup target
+// +kubebuilder:validation:Enum=All;Any
+type PodSelectionStrategy string
+
+const (
+	// PodSelectionStrategyAll selects all pods that match the labelsSelector.
+	PodSelectionStrategyAll PodSelectionStrategy = "All"
+
+	// PodSelectionStrategyAny selects any one pod that match the labelsSelector.
+	PodSelectionStrategyAny PodSelectionStrategy = "Any"
+)
+
+// ConnectionCredential specifies the connection credential to connect to the
+// target database cluster.
+type ConnectionCredential struct {
+	// secretRef refers to the Secret object that contains the connection credential.
+	// +kube:validation:Required
+	SecretRef *SecretReference `json:"secretRef,omitempty"`
+
+	// usernameKey specifies the map key of the user in the connection credential secret.
+	// +kubebuilder:default=username
+	UsernameKey string `json:"usernameKey,omitempty"`
+
+	// passwordKey specifies the map key of the password in the connection credential secret.
+	// +kubebuilder:default=password
+	PasswordKey string `json:"passwordKey,omitempty"`
+
+	// endpointKey specifies the map key of the endpoint in the connection credential secret.
+	// +kubebuilder:default=endpoint
+	EndpointKey string `json:"endpointKey,omitempty"`
+
+	// hostKey specifies the map key of the host in the connection credential secret.
+	// +kubebuilder:default=host
+	HostKey string `json:"hostKey,omitempty"`
+
+	// portKey specifies the map key of the port in the connection credential secret.
+	// +kubebuilder:default=port
+	PortKey string `json:"portKey,omitempty"`
+}
+
+// SecretReference represents a Secret Reference. It has enough information to
+// retrieve secret in any namespace
+type SecretReference struct {
+	// Name is unique within a namespace to reference a secret resource.
+	// +optional
+	Name string `json:"name,omitempty"`
+	// Namespace defines the space within which the secret name must be unique.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type KubeResources struct {
+	// selector is a metav1.LabelSelector to filter the target kubernetes resources
+	// that need to be backed up.
+	// If not set, will do not back up any kubernetes resources.
+	// +kube:validation:Required
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
+	// included is a slice of namespaced-scoped resource type names to include in
+	// the kubernetes resources.
+	// The default value is "*", which means all resource types will be included.
+	// +optional
+	// +kubebuilder:default="*"
+	Included []string `json:"included,omitempty"`
+
+	// excluded is a slice of namespaced-scoped resource type names to exclude in
+	// the kubernetes resources.
+	// The default value is empty.
+	// +optional
+	Excluded []string `json:"excluded,omitempty"`
+}
+
+// BackupMethod defines the backup method.
+type BackupMethod struct {
+	// the name of backup method.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// useVolumeSnapshot defines whether to use volume snapshot to back up volume.
+	// if true, the BackupScript is not required, the controller will use the CSI
+	// volume snapshotter to create the snapshot.
+	// +optional
+	// +kubebuilder:default=false
+	UseVolumeSnapshot *bool `json:"useVolumeSnapshot,omitempty"`
+
+	// backupScriptRef refers to the BackupScript object that defines the backup actions.
+	// For volume snapshot backup, the backupScript is not required, the controller
+	// will use the CSI volume snapshotter to create the snapshot.
+	// +optional
+	BackupScriptRef string `json:"backupScriptRef,omitempty"`
+
+	// targetVolumes specifies which volumes from the target should be mounted in
+	// the backup workload.
+	// +optional
+	TargetVolumes *TargetVolumeInfo `json:"targetVolumes,omitempty"`
+
+	// env specifies the environment variables for the backup workload.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// runtimeSettings specifies runtime settings for the backup workload container.
+	// +optional
+	RuntimeSettings *RuntimeSettings `json:"runtimeSettings,omitempty"`
+}
+
+// TargetVolumeInfo specifies the volumes and their mounts of the targeted application
+// that should be mounted in backup workload.
+type TargetVolumeInfo struct {
+	// Volumes indicates the list of volumes of targeted application that should
+	// be mounted on the backup job.
+	// +optional
+	Volumes []string `json:"volumes,omitempty"`
+
+	// volumeMounts specifies the mount for the volumes specified in `Volumes` section.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+}
+
+type RuntimeSettings struct {
+	// resources specifies the resource required by container.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // BackupStatusUpdateStage defines the stage of backup status update.

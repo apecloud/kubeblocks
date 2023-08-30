@@ -5,11 +5,9 @@ keywords: [kubeblocks, overview, introduction]
 sidebar_position: 1
 ---
 
-# KubeBlocks overview
+# Introduction
 
-## Introduction
-
-KubeBlocks is an open-source, cloud-native data infrastructure designed to help application developers and platform engineers manage database and analytical workloads on Kubernetes. It is cloud-neutral and supports multiple cloud service providers, offering a unified and declarative approach to increase productivity in DevOps practices.
+## What is KubeBlocks
 
 The name KubeBlocks is derived from Kubernetes and LEGO blocks, which indicates that building database and analytical workloads on Kubernetes can be both productive and enjoyable, like playing with construction toys. KubeBlocks combines the large-scale production experiences of top cloud service providers with enhanced usability and stability.
 

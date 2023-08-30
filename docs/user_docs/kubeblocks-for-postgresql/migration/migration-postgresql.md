@@ -109,7 +109,7 @@ It is recommended to prepare data sampling for verification after the migration 
 
    An example of the `--sink` URL:
 
-   ![Sink](../../../img/pgsql-migration-sink.png)
+   ![Sink](./../../../img/pg-migration-sink.png)
 
    :::
 

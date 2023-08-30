@@ -12,16 +12,16 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, providing
 
 | Add-ons        | Description                                                                                                                                                                                                       |
 |----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| apecloud-mysql | ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol.                                                          |
+| kafka          | Apache Kafka is an open-source distributed event streaming platform used by thousands of companies for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications. |
+| mongodb        | MongoDB is a document-oriented NoSQL database used for high volume data storage.                                                                                                                                  |
 | milvus         | Milvus is a flexible, reliable, & blazing-fast cloud-native, open-source vector database.                                                                                                                         |
 | nebula         | NebulaGraph is an open source graph database that can store and process graphs with trillions of edges and vertices.                                                                                              |
+| postgresql     | PostgreSQL is an advanced, enterprise class open source relational database that supports both SQL (relational) and JSON (non-relational) querying.｜                                                             |
 | qdrant         | Qdrant is a vector database & vector similarity search engine.                                                                                                                                                    |
+| redis          | Redis is a fast, open source, in-memory, key-value data store.                                                                                                                                                    |
 | tdengine       | TDengine™ is an industrial data platform purpose-built for the Industrial IoT, combining a time series database with essential features like stream processing, data subscription, and caching.                  |
 | weaviate       | Weaviate is an open-source vector database.                                                                                                                                                                       |
-| apecloud-mysql | ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol.                                                          |
-| mongodb        | MongoDB is a document-oriented NoSQL database used for high volume data storage.                                                                                                                                  |
-| postgresql     | PostgreSQL is an advanced, enterprise class open source relational database that supports both SQL (relational) and JSON (non-relational) querying.｜                                                             |
-| redis          | Redis is a fast, open source, in-memory, key-value data store.                                                                                                                                                    |
-| kafka          | Apache Kafka is an open-source distributed event streaming platform used by thousands of companies for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications. |
 
 To list supported add-ons, run `kbcli addon list` command.
 

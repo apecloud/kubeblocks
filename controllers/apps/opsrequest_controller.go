@@ -29,11 +29,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
@@ -79,6 +83,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
+		Watches(&source.Kind{Type: &appsv1alpha1.Cluster{}}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequest)).
 		Complete(r)
 }
 
@@ -276,6 +281,27 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 		return opsutil.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, &cluster, opsRequestSlice)
 	}
 	return nil
+}
+
+func (r *OpsRequestReconciler) parseAllOpsRequest(object client.Object) []reconcile.Request {
+	cluster := object.(*appsv1alpha1.Cluster)
+	var (
+		opsRequestSlice []appsv1alpha1.OpsRecorder
+		err             error
+		requests        []reconcile.Request
+	)
+	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(cluster); err != nil {
+		return nil
+	}
+	for _, v := range opsRequestSlice {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: cluster.Namespace,
+				Name:      v.Name,
+			},
+		})
+	}
+	return requests
 }
 
 type opsRequestStep func(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error)

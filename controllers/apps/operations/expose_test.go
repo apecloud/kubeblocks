@@ -98,11 +98,6 @@ var _ = Describe("", func() {
 			By("Test OpsManager.MainEnter function")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-
-			By("test GetRealAffectedComponentMap function")
-			h := ExposeOpsHandler{}
-			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
-
 		})
 	})
 })

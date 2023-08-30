@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -80,6 +81,8 @@ func transformPodTemplate(obj client.Object) *corev1.PodTemplateSpec {
 	case *appv1.StatefulSet:
 		return &v.Spec.Template
 	case *appv1.Deployment:
+		return &v.Spec.Template
+	case *workloads.ReplicatedStateMachine:
 		return &v.Spec.Template
 	}
 }

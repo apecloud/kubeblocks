@@ -152,11 +152,6 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	return opsRequestPhase, requeueAfter, err
 }
 
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (ve volumeExpansionOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.Spec.GetVolumeExpansionComponentNameSet())
-}
-
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest

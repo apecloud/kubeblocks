@@ -90,10 +90,6 @@ var _ = Describe("Restart OpsRequest", func() {
 
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
-
-			By("test GetRealAffectedComponentMap function")
-			h := restartOpsHandler{}
-			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(2))
 		})
 
 		It("expect failed when cluster is stopped", func() {

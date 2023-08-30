@@ -44,7 +44,6 @@ func init() {
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
 		OpsHandler:                         restartOpsHandler{},
-		MaintainClusterPhaseBySelf:         true,
 		ProcessingReasonInClusterCondition: ProcessingReasonRestarting,
 	}
 
@@ -73,11 +72,6 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
-}
-
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.Spec.GetRestartComponentNameSet())
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.

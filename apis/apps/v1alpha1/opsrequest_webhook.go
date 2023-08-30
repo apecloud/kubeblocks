@@ -201,6 +201,9 @@ func (r *OpsRequest) validateEntry(isCreate bool) error {
 func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster) error {
+	if webhookMgr == nil {
+		return nil
+	}
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:

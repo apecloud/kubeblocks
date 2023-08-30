@@ -188,7 +188,3 @@ func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	opsResource.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
 }
-
-func (e ExposeOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.Spec.GetExposeComponentNameSet())
-}

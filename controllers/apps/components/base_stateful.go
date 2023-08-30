@@ -35,6 +35,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -199,6 +201,10 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 			return err
 		}
 		delayedRequeueError = err
+	}
+
+	if err := c.statusConfig(reqCtx, cli, statusTxn); err != nil {
+		return err
 	}
 
 	if err := statusTxn.commit(); err != nil {
@@ -437,6 +443,43 @@ func (c *rsmComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx, cli
 			})
 			return nil
 		}
+	}
+	return nil
+}
+
+func (c *rsmComponentBase) statusConfig(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+	checkFinishedReconfigure := func(cm *corev1.ConfigMap) bool {
+		labels := cm.GetLabels()
+		annotations := cm.GetAnnotations()
+		if len(annotations) == 0 || len(labels) == 0 {
+			return false
+		}
+		hash, _ := util.ComputeHash(cm.Data)
+		return labels[constant.CMInsConfigurationHashLabelKey] == hash
+	}
+	proposePhase := func(phase appsv1alpha1.ClusterComponentPhase, phaseTransitionMsg string) {
+		txn.propose(phase, func() {
+			c.SetStatusPhase(phase, nil, phaseTransitionMsg)
+		})
+	}
+	var (
+		cmKey client.ObjectKey
+		cmObj = &corev1.ConfigMap{}
+	)
+	for _, configSpec := range c.Component.ConfigTemplates {
+		cmKey = client.ObjectKey{
+			Namespace: c.GetNamespace(),
+			Name:      cfgcore.GetComponentCfgName(c.GetClusterName(), c.GetName(), configSpec.Name),
+		}
+		if err := cli.Get(reqCtx.Ctx, cmKey, cmObj); err != nil {
+			return err
+		}
+		if checkFinishedReconfigure(cmObj) {
+			proposePhase(appsv1alpha1.RunningClusterCompPhase, "Config reloading succeed")
+		} else {
+			proposePhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Config is reloading")
+		}
+
 	}
 	return nil
 }

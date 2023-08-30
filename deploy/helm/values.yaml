@@ -323,7 +323,7 @@ dataProtection:
 
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/dataprotection
+    repository: apecloud/kubeblocks-dataprotection
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""

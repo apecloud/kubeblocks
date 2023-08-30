@@ -37,7 +37,7 @@ CLI_IMG ?= docker.io/apecloud/kbcli
 CHARTS_IMG ?= docker.io/apecloud/$(APP_NAME)-charts
 CLI_TAG ?= v$(CLI_VERSION)
 DATASCRIPT_IMG ?= docker.io/apecloud/$(APP_NAME)-datascript
-DATAPROTECTION_IMG ?= docker.io/apecloud/dataprotection
+DATAPROTECTION_IMG ?= docker.io/apecloud/$(APP_NAME)-dataprotection
 
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest

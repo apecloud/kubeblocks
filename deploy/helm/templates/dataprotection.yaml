@@ -41,7 +41,7 @@ spec:
           command:
             - /bin/true
       containers:
-        - name: manager
+        - name: dataprotection
           args:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
@@ -55,8 +55,6 @@ spec:
             {{- with .Values.loggerSettings.encoder }}
             - "--zap-encoder={{ . }}"
             {{- end }}
-            - "--dataprotection=true"
-            - "--storage=false"
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}

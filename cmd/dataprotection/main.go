@@ -48,7 +48,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	dpcontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
-	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -69,9 +68,6 @@ const (
 	metricsAddrFlagKey   flagName = "metrics-bind-address"
 	leaderElectFlagKey   flagName = "leader-elect"
 	leaderElectIDFlagKey flagName = "leader-elect-id"
-
-	dataProtectionFlagKey flagName = "dataprotection"
-	storageFlagKey        flagName = "storage"
 )
 
 var (
@@ -124,14 +120,9 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 
-	flag.String(leaderElectIDFlagKey.String(), "001c317f",
+	flag.String(leaderElectIDFlagKey.String(), "abd03fda",
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
-
-	flag.Bool(dataProtectionFlagKey.String(), true,
-		"Enable the dataprotection controller manager. ")
-	flag.Bool(storageFlagKey.String(), false,
-		"Enable the storage controller manager. ")
 
 	opts := zap.Options{
 		Development: true,
@@ -212,72 +203,60 @@ func main() {
 		os.Exit(1)
 	}
 
-	if viper.GetBool(dataProtectionFlagKey.viperName()) {
-		if err = (&dpcontrollers.BackupToolReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
-			os.Exit(1)
-		}
-
-		if err = (&dpcontrollers.BackupPolicyReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
-			os.Exit(1)
-		}
-
-		if err = (&dpcontrollers.CronJobReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "CronJob")
-			os.Exit(1)
-		}
-
-		if err = (&dpcontrollers.BackupReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Backup")
-			os.Exit(1)
-		}
-
-		if err = (&dpcontrollers.RestoreJobReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
-			os.Exit(1)
-		}
-
-		if err = (&dpcontrollers.BackupRepoReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-repo-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
-			os.Exit(1)
-		}
+	if err = (&dpcontrollers.BackupToolReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
+		os.Exit(1)
 	}
 
-	if viper.GetBool(storageFlagKey.viperName()) {
-		if err = (&storagecontrollers.StorageProviderReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
-			os.Exit(1)
-		}
+	if err = (&dpcontrollers.BackupPolicyReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
+		os.Exit(1)
 	}
+
+	if err = (&dpcontrollers.CronJobReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CronJob")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.BackupReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Backup")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.RestoreJobReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.BackupRepoReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-repo-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if viper.GetBool("enable_webhooks") {

@@ -659,7 +659,7 @@ func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Clu
 	}
 
 	for _, member := range rsStatus.Members {
-		if member.State != 1 {
+		if member.Health != 1 {
 			continue
 		}
 		memberName := strings.Split(member.Name, ".")[0]

@@ -19,7 +19,6 @@ package v1alpha1
 
 import (
 	"errors"
-
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -252,8 +251,8 @@ type UpdateStrategy string
 
 const (
 	SerialStrategy             UpdateStrategy = "Serial"
-	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 	ParallelStrategy           UpdateStrategy = "Parallel"
+	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
 var DefaultLeader = ConsensusMember{
@@ -589,4 +588,21 @@ var (
 type StatefulSetWorkload interface {
 	FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy)
 	GetUpdateStrategy() UpdateStrategy
+}
+
+type ConnectionCredential struct {
+	// +optional
+	Endpoint BuiltInString `json:"endpoint,omitempty"`
+
+	// +optional
+	Host BuiltInString `json:"host,omitempty"`
+
+	// +optional
+	Port BuiltInString `json:"port,omitempty"`
+
+	// +optional
+	User BuiltInString `json:"user,omitempty"`
+
+	// +optional
+	Password BuiltInString `json:"password,omitempty"`
 }

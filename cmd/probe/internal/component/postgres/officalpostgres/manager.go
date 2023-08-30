@@ -32,6 +32,7 @@ import (
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 
@@ -48,6 +49,8 @@ type Manager struct {
 }
 
 var Mgr *Manager
+
+var fs = afero.NewOsFs()
 
 func NewManager(logger logger.Logger) (*Manager, error) {
 	Mgr = &Manager{}
@@ -137,8 +140,10 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		primaryInfo := mgr.readRecoveryParams(ctx)
 		if primaryInfo == "" {
 			mgr.Logger.Errorf("get primary info failed")
+			return nil
+		} else {
+			dbState.Extra[postgres.PrimaryInfo] = primaryInfo
 		}
-		dbState.Extra[postgres.PrimaryInfo] = primaryInfo
 	}
 
 	mgr.DBState = dbState
@@ -584,8 +589,8 @@ func (mgr *Manager) getPgControlData() *map[string]string {
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {
-	_, err := os.Stat(mgr.DataDir + "/standby.signal")
-	if os.IsNotExist(err) {
+	_, err := fs.Stat(mgr.DataDir + "/standby.signal")
+	if errors.Is(err, afero.ErrFileNotFound) {
 		return true, true
 	}
 
@@ -719,6 +724,14 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 
 func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		mgr.Logger.Infof("cluster has no leader now, just start if need")
+		if needRestart {
+			return mgr.DBManagerBase.Start(ctx, cluster)
+		}
+		return nil
+	}
+
 	if mgr.CurrentMemberName == leaderMember.Name {
 		mgr.Logger.Infof("i get the leader key, don't need to follow")
 		return nil
@@ -727,7 +740,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
 		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, mgr.Config.Username, mgr.Config.Password)
 
-	pgConf, err := os.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
+	pgConf, err := fs.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
 		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
 		return err

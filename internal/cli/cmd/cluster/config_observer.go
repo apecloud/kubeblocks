@@ -26,7 +26,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/StudioSol/set"
 	"github.com/spf13/cobra"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/openapi"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -177,7 +177,7 @@ func (r *configObserverOptions) printExplainConfigure(configSpecs configSpecsTyp
 			fmt.Printf("\n%s\n", fmt.Sprintf(notConfigSchemaPrompt, printer.BoldYellow(tplName)))
 			return nil
 		}
-		apiSchema, err := openapi.GenerateOpenAPISchema(schema.CUE, "")
+		apiSchema, err := openapi.GenerateOpenAPISchema(schema.CUE, confSpec.CfgSchemaTopLevelName)
 		if err != nil {
 			return cfgcore.WrapError(err, "failed to generate open api schema")
 		}
@@ -187,7 +187,7 @@ func (r *configObserverOptions) printExplainConfigure(configSpecs configSpecsTyp
 		}
 		schema.Schema = apiSchema
 	}
-	return r.printConfigConstraint(schema.Schema, set.NewLinkedHashSetString(confSpec.StaticParameters...), set.NewLinkedHashSetString(confSpec.DynamicParameters...))
+	return r.printConfigConstraint(schema.Schema, cfgutil.NewSet(confSpec.StaticParameters...), cfgutil.NewSet(confSpec.DynamicParameters...))
 }
 
 func (r *configObserverOptions) getReconfigureMeta(configSpecs configSpecsType) ([]types.ConfigTemplateInfo, error) {
@@ -218,7 +218,7 @@ func (r *configObserverOptions) getReconfigureMeta(configSpecs configSpecsType) 
 func (r *configObserverOptions) printConfigureContext(configs []types.ConfigTemplateInfo, component string) {
 	printer.PrintTitle("Configures Context[${component-name}/${config-spec}/${file-name}]")
 
-	keys := set.NewLinkedHashSetString(r.keys...)
+	keys := cfgutil.NewSet(r.keys...)
 	for _, info := range configs {
 		for key, context := range info.CMObj.Data {
 			if keys.Length() != 0 && !keys.InArray(key) {
@@ -286,17 +286,15 @@ func (r *configObserverOptions) isSpecificParam(paramName string) bool {
 }
 
 func (r *configObserverOptions) printConfigConstraint(schema *apiext.JSONSchemaProps,
-	staticParameters *set.LinkedHashSetString,
-	dynamicParameters *set.LinkedHashSetString) error {
+	staticParameters, dynamicParameters *cfgutil.Sets) error {
 	var (
-		index             = 0
 		maxDocumentLength = 100
 		maxEnumLength     = 20
 		spec              = schema.Properties["spec"]
-		params            = make([]*parameterSchema, len(spec.Properties))
+		params            = make([]*parameterSchema, 0)
 	)
 
-	for key, property := range spec.Properties {
+	for key, property := range openapi.FlattenSchema(spec).Properties {
 		if property.Type == "object" {
 			continue
 		}
@@ -318,8 +316,7 @@ func (r *configObserverOptions) printConfigConstraint(schema *apiext.JSONSchemaP
 		if !r.hasSpecificParam() && r.truncDocument && len(pt.description) > maxDocumentLength {
 			pt.description = pt.description[:maxDocumentLength] + "..."
 		}
-		params[index] = pt
-		index++
+		params = append(params, pt)
 	}
 
 	if !r.truncEnum {
@@ -363,7 +360,7 @@ func getValidUpdatedParams(status appsv1alpha1.OpsRequestStatus) string {
 	return string(b)
 }
 
-func isDynamicType(pt *parameterSchema, staticParameters *set.LinkedHashSetString, dynamicParameters *set.LinkedHashSetString) bool {
+func isDynamicType(pt *parameterSchema, staticParameters, dynamicParameters *cfgutil.Sets) bool {
 	switch {
 	case staticParameters.InArray(pt.name):
 		return false

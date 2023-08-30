@@ -25,6 +25,7 @@ import (
 
 const schemaFieldDelim = "."
 
+// FlattenSchema flattens the given schema to a single level.
 func FlattenSchema(src apiextv1.JSONSchemaProps) apiextv1.JSONSchemaProps {
 	flattenMap := make(map[string]apiextv1.JSONSchemaProps)
 	return apiextv1.JSONSchemaProps{
@@ -32,7 +33,6 @@ func FlattenSchema(src apiextv1.JSONSchemaProps) apiextv1.JSONSchemaProps {
 	}
 }
 
-// The resulting set of paths is merged to the given shadow set at the same time.
 func flattenSchemaProps(shadow map[string]apiextv1.JSONSchemaProps, m apiextv1.JSONSchemaProps, prefix string, delim string) map[string]apiextv1.JSONSchemaProps {
 	if prefix != "" {
 		prefix += delim

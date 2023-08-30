@@ -29,7 +29,6 @@ import (
 	"cuelang.org/go/pkg/encoding/yaml"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	yaml2 "k8s.io/apimachinery/pkg/util/yaml"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
@@ -120,8 +119,7 @@ func FromCueAST(rt *Runtime, cueSchema []ast.Decl) (*apiextv1.JSONSchemaProps, e
 
 	jsonProps := apiextv1.JSONSchemaProps{}
 	if err = yaml2.Unmarshal([]byte(yamlStr), &jsonProps); err != nil {
-		log.Log.Error(err, "failed to unmarshal raw OpenAPI schema to JSONSchemaProps")
-		return nil, err
+		return nil, core.WrapError(err, "failed to unmarshal raw OpenAPI schema to JSONSchemaProps")
 	}
 	return &jsonProps, nil
 }

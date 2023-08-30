@@ -45,7 +45,8 @@ const (
 	// BackupTypeLabelKeyKey specifies the backup type label key.
 	BackupTypeLabelKeyKey = "dataprotection.kubeblocks.io/backup-type"
 	// DataProtectionLabelBackupNameKey specifies the backup name label key.
-	DataProtectionLabelBackupNameKey = "dataprotection.kubeblocks.io/backup-name"
+	DataProtectionLabelBackupNameKey   = "dataprotection.kubeblocks.io/backup-name"
+	DataProtectionLabelBackupPolicyKey = "dataprotection.kubeblocks.io/backup-policy"
 )
 
 // env names
@@ -68,7 +69,7 @@ const (
 	// DPLogFileDIR log file dir
 	DPLogFileDIR = "BACKUP_LOGFILE_DIR"
 	// DPBackupName backup CR name
-	DPBackupName = "BACKUP_NAME"
+	DPBackupName = "DP_BACKUP_NAME"
 	// DPTTL backup time to live, reference the backupPolicy.spec.retention.ttl
 	DPTTL = "TTL"
 	// DPLogfileTTL ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
@@ -92,5 +93,5 @@ const (
 	// DPBaseBackupStartTimestamp base backup start timestamp for pitr
 	DPBaseBackupStartTimestamp = "BASE_BACKUP_START_TIMESTAMP" // base backup start timestamp for pitr
 	// DPBackupStopTime backup stop time
-	DPBackupStopTime = "BACKUP_STOP_TIME" // backup stop time
+	DPBackupStopTime = "DP_BACKUP_STOP_TIME" // backup stop time
 )

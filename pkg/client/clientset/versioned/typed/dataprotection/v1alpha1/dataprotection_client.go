@@ -33,6 +33,7 @@ type DataprotectionV1alpha1Interface interface {
 	BackupPoliciesGetter
 	BackupReposGetter
 	BackupSchedulesGetter
+	RestoresGetter
 	RestoreJobsGetter
 }
 
@@ -59,6 +60,10 @@ func (c *DataprotectionV1alpha1Client) BackupRepos() BackupRepoInterface {
 
 func (c *DataprotectionV1alpha1Client) BackupSchedules(namespace string) BackupScheduleInterface {
 	return newBackupSchedules(c, namespace)
+}
+
+func (c *DataprotectionV1alpha1Client) Restores(namespace string) RestoreInterface {
+	return newRestores(c, namespace)
 }
 
 func (c *DataprotectionV1alpha1Client) RestoreJobs(namespace string) RestoreJobInterface {

@@ -22,6 +22,7 @@ package backup
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -204,9 +205,9 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 			Name:      r.Backup.Name,
 			Labels:    BuildBackupWorkloadLabels(r.Backup),
 		},
-		Owner:                    r.Backup,
-		VolumeSnapshotNamePrefix: r.Backup.Name,
-		PersistentVolumeClaims:   pvcs,
+		Owner:                         r.Backup,
+		VolumeSnapshotNamePrefix:      r.Backup.Name,
+		PersistentVolumeClaimWrappers: pvcs,
 	}, nil
 }
 
@@ -264,6 +265,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	// and envs from actionSet. Latter will override former for the same name.
 	// env from backupMethod has the highest priority.
 	buildEnv := func() []corev1.EnvVar {
+		pathPrefix := strings.Trim(r.BackupPolicy.Spec.PathPrefix, "/")
 		envVars := []corev1.EnvVar{
 			{
 				Name:  dptypes.DPBackupName,
@@ -271,7 +273,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			},
 			{
 				Name:  dptypes.DPBackupDIR,
-				Value: backupVolumeMountPath + r.BackupPolicy.Spec.PathPrefix,
+				Value: fmt.Sprintf("%s/%s/%s/%s", backupVolumeMountPath, r.Namespace, pathPrefix, r.Name),
 			},
 			{
 				Name:  dptypes.DPTargetPodName,

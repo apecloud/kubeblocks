@@ -47,9 +47,12 @@ const (
 
 	ErrorTypeRequeue ErrorType = "Requeue" // requeue for reconcile.
 
+	ErrorTypeFatal ErrorType = "Fatal" // fatal error
+
 	// ErrorType for cluster controller
-	ErrorTypeBackupFailed ErrorType = "BackupFailed"
-	ErrorTypeNeedWaiting  ErrorType = "NeedWaiting" // waiting for next reconcile
+	ErrorTypeBackupFailed  ErrorType = "BackupFailed"
+	ErrorTypeRestoreFailed ErrorType = "RestoreFailed"
+	ErrorTypeNeedWaiting   ErrorType = "NeedWaiting" // waiting for next reconcile
 
 	// ErrorType for preflight
 	ErrorTypePreflightCommon = "PreflightCommon"
@@ -99,4 +102,9 @@ func NewNotFound(format string, a ...any) *Error {
 // IsNotFound returns true if the specified error is the error type of ErrorTypeNotFound.
 func IsNotFound(err error) bool {
 	return IsTargetError(err, ErrorTypeNotFound)
+}
+
+// NewFatalError returns a new Error with ErrorTypeFatal
+func NewFatalError(message string) *Error {
+	return NewErrorf(ErrorTypeFatal, message)
 }

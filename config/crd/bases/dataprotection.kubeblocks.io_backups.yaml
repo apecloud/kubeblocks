@@ -37,12 +37,6 @@ spec:
     - jsonPath: .status.completionTimestamp
       name: COMPLETION-TIME
       type: string
-    - jsonPath: .status.timeRange.start
-      name: TIME-RANGE-START
-      type: string
-    - jsonPath: .status.timeRange.end
-      name: TIME-RANGE-END
-      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -86,6 +80,8 @@ spec:
                   "Retain" means that the backup content and its physical snapshot
                   on backup repository are kept. "Delete" means that the backup content
                   and its physical snapshot on backup repository are deleted.
+                type: string
+              formatVersion:
                 type: string
               retentionPeriod:
                 default: 7d

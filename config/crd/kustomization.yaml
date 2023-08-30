@@ -18,6 +18,7 @@ resources:
 - bases/workloads.kubeblocks.io_replicatedstatemachines.yaml
 - bases/storage.kubeblocks.io_storageproviders.yaml
 - bases/dataprotection.kubeblocks.io_backuprepos.yaml
+- bases/dataprotection.kubeblocks.io_restores.yaml
 - bases/apps.kubeblocks.io_configurations.yaml
 - bases/apps.kubeblocks.io_servicedescriptors.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
@@ -44,6 +45,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_replicatedstatemachines.yaml
 #- patches/webhook_in_storageproviders.yaml
 #- patches/webhook_in_backuprepos.yaml
+#- patches/webhook_in_restores.yaml
 #- patches/webhook_in_configurations.yaml
 #- patches/webhook_in_servicedescriptors.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
@@ -69,6 +71,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_replicatedstatemachines.yaml
 #- patches/cainjection_in_storageproviders.yaml
 #- patches/cainjection_in_backuprepos.yaml
+#- patches/cainjection_in_restores.yaml
 #- patches/cainjection_in_configurations.yaml
 #- patches/cainjection_in_servicedescriptors.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch

@@ -22,6 +22,11 @@ import (
 	"time"
 )
 
+// BaseBackupType the base backup type.
+// +enum
+// +kubebuilder:validation:Enum={full,snapshot}
+type BaseBackupType string
+
 // CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
 // +enum
 // +kubebuilder:validation:Enum={IfNotPresent,Never}
@@ -88,3 +93,45 @@ func (r RetentionPeriod) ToDuration() time.Duration {
 func (r RetentionPeriod) String() string {
 	return string(r)
 }
+
+// RestorePhase The current phase. Valid values are Running, Completed, Failed, Deleting.
+// +enum
+// +kubebuilder:validation:Enum={Running,Completed,Failed,Deleting}
+type RestorePhase string
+
+const (
+	RestorePhaseRunning   RestorePhase = "Running"
+	RestorePhaseCompleted RestorePhase = "Completed"
+	RestorePhaseFailed    RestorePhase = "Failed"
+	RestorePhaseDeleting  RestorePhase = "Deleting"
+)
+
+// RestoreActionStatus the status of restore action.
+// +enum
+// +kubebuilder:validation:Enum={Processing,Completed,Failed}
+type RestoreActionStatus string
+
+const (
+	RestoreActionProcessing RestoreActionStatus = "Processing"
+	RestoreActionCompleted  RestoreActionStatus = "Completed"
+	RestoreActionFailed     RestoreActionStatus = "Failed"
+)
+
+type RestoreStage string
+
+const (
+	PrepareData RestoreStage = "prepareData"
+	PostReady   RestoreStage = "postReady"
+)
+
+// VolumeClaimManagementPolicy defines recovery strategy for persistent volume claim. supported policies are as follows:
+// 1. Parallel: parallel recovery of persistent volume claim.
+// 2. OrderedReady: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
+// +enum
+// +kubebuilder:validation:Enum={Parallel,OrderedReady}
+type VolumeClaimManagementPolicy string
+
+const (
+	ParallelManagementPolicy     VolumeClaimManagementPolicy = "Parallel"
+	OrderedReadyManagementPolicy VolumeClaimManagementPolicy = "OrderedReady"
+)

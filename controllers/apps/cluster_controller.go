@@ -185,7 +185,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// create all components objects
 			&ComponentTransformer{Client: r.Client},
 			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
-			&BackupPolicyTPLTransformer{},
+			// &BackupPolicyTPLTransformer{},
 			// handle rbac for pod
 			&RBACTransformer{},
 			// add our finalizer to all objects
@@ -230,6 +230,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
 		Owns(&dataprotectionv1alpha1.Backup{}).
 		Owns(&batchv1.Job{}).
+		Owns(&dataprotectionv1alpha1.Restore{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {

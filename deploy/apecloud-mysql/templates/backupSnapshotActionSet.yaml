@@ -1,0 +1,19 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: apecloud-mysql-volume-snapshot
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+spec:
+  backupType: Full
+  restore:
+    prepareData:
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      command:
+      - bash
+      - -c
+      - |
+        touch /data/mysql/data/.restore_new_cluster; sync
+
+
+  #  touch {{ .Values.mysqlConfigs.dataDir }}/.restore_new_cluster; sync

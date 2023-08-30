@@ -108,8 +108,8 @@ func main() {
 		probeAddr              string
 	)
 
-	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
-	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
+	flag.String(metricsAddrFlagKey.String(), ":8087", "The address the metric endpoint binds to.")
+	flag.String(probeAddrFlagKey.String(), ":8088", "The address the probe endpoint binds to.")
 	flag.Bool(leaderElectFlagKey.String(), false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -231,6 +231,15 @@ func main() {
 		RestConfig: mgr.GetConfig(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.RestoreReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("restore-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Restore")
 		os.Exit(1)
 	}
 

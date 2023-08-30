@@ -19,28 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package apps
 
-import (
-	"fmt"
-
-	"golang.org/x/exp/slices"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
-)
-
 // BackupPolicyTPLTransformer transforms the backup policy template to the backup policy.
-type BackupPolicyTPLTransformer struct {
+/*type BackupPolicyTPLTransformer struct {
 	tplCount          int
 	tplIdentifier     string
 	isDefaultTemplate string
@@ -478,4 +458,4 @@ func DeriveBackupPolicyName(clusterName, componentDef, identifier string) string
 		return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentDef)
 	}
 	return fmt.Sprintf("%s-%s-backup-policy-%s", clusterName, componentDef, identifier)
-}
+}*/

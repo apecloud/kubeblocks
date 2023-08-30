@@ -55,6 +55,9 @@ type BackupSpec struct {
 	// +optional
 	// +kubebuilder:default="7d"
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
+
+	// +optional
+	ParentBackupName string `json:"formatVersion,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup.
@@ -276,4 +279,22 @@ type BackupList struct {
 
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
+}
+
+// GetStartTime gets the backup start time. Default return status.startTime,
+// unless status.timeRange.startTime is not nil.
+func (r *BackupStatus) GetStartTime() *metav1.Time {
+	if r.TimeRange != nil && r.TimeRange.Start != nil {
+		return r.TimeRange.Start
+	}
+	return r.StartTimestamp
+}
+
+// GetEndTime gets the backup end time. Default return status.completionTimestamp,
+// unless status.timeRange.endTime is not nil.
+func (r *BackupStatus) GetEndTime() *metav1.Time {
+	if r.TimeRange != nil && r.TimeRange.End != nil {
+		return r.TimeRange.End
+	}
+	return r.CompletionTimestamp
 }

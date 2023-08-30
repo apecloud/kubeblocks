@@ -30,7 +30,6 @@ import (
 	"github.com/leaanthony/debme"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -334,7 +333,7 @@ func (r *BackupScheduleReconciler) buildCronJob(
 		cronjob.Labels[k] = v
 	}
 	cronjob.Labels[dataProtectionLabelBackupScheduleKey] = backupPolicy.Name
-	cronjob.Labels[dataProtectionLabelBackupTypeKey] = string(backType)
+	cronjob.Labels[dataProtectionLabelBackupTypeKey] = string("")
 	return cronjob, nil
 }
 
@@ -378,7 +377,7 @@ func (r *BackupScheduleReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCt
 		return nil
 	}
 
-	cronjobProto, err := r.buildCronJob(backupSchedule, basePolicy.Target, schedulePolicy.CronExpression, backType, cronJob.Name)
+	/*cronjobProto, err := r.buildCronJob(backupSchedule, basePolicy.Target, schedulePolicy.CronExpression, backType, cronJob.Name)
 	if err != nil {
 		return err
 	}
@@ -397,7 +396,8 @@ func (r *BackupScheduleReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCt
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = &basePolicy.OnFailAttempted
 	cronJob.Spec.JobTemplate.Spec.Template = cronjobProto.Spec.JobTemplate.Spec.Template
 	cronJob.Spec.Schedule = schedulePolicy.CronExpression
-	return r.Client.Patch(reqCtx.Ctx, cronJob, patch)
+	return r.Client.Patch(reqCtx.Ctx, cronJob, patch)*/
+	return nil
 }
 
 // handlePolicy handles backup schedule.
@@ -433,10 +433,11 @@ func (r *BackupScheduleReconciler) handleOneSchedule(
 		return err
 	}
 
-	return r.removeOldestBackups(reqCtx, backupSchedule.Name, backType, basePolicy.BackupsHistoryLimit)
+	// return r.removeOldestBackups(reqCtx, backupSchedule.Name, backType, basePolicy.BackupsHistoryLimit)
+	return nil
 }
 
-// handleSnapshotPolicy handles snapshot policy.
+/*// handleSnapshotPolicy handles snapshot policy.
 func (r *BackupScheduleReconciler) handleSnapshotPolicy(
 	reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dpv1alpha1.BackupPolicy) error {
@@ -473,7 +474,7 @@ func (r *BackupScheduleReconciler) setGlobalPersistentVolumeClaim(backupPolicy *
 	if pvcCfg.InitCapacity.IsZero() && globalInitCapacity != "" {
 		backupPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(globalInitCapacity)
 	}
-}
+}*/
 
 type backupReconfigureRef struct {
 	Name    string         `json:"name"`

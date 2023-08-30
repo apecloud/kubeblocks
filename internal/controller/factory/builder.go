@@ -291,6 +291,16 @@ func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.Synthe
 	return &service, nil
 }
 
+func BuildCommonLabels(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent) map[string]string {
+	return map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppNameLabelKey:        component.ClusterDefName,
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+}
+
 func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, envConfigName string) (*appsv1.StatefulSet, error) {
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
@@ -300,12 +310,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		}
 	}
 
-	commonLabels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppNameLabelKey:        component.ClusterDefName,
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: component.Name,
-	}
+	commonLabels := BuildCommonLabels(cluster, component)
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).

@@ -26,7 +26,6 @@ import (
 	"reflect"
 	"time"
 
-	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/factory"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -353,14 +352,15 @@ func (r *BackupReconciler) handleBackupRepo(request *dpbackup.Request) error {
 	}
 	request.BackupRepo = repo
 
-	pvcName := repo.Status.BackupPVCName
+	// pvcName := repo.Status.BackupPVCName
+	pvcName := "backup-data"
 	if pvcName == "" {
 		return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
-	if err = r.Client.Get(request.Ctx, pvcKey, pvc); client.IgnoreNotFound(err) != nil {
+	if err = r.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
 		return err
 	}
 
@@ -444,11 +444,11 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	// set finalizer
 	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)
 
-	if reflect.DeepEqual(original.ObjectMeta, request.ObjectMeta) {
+	if reflect.DeepEqual(original.ObjectMeta, request.Backup.ObjectMeta) {
 		return wait, nil
 	}
 
-	return true, r.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
+	return true, r.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original.DeepCopy()))
 }
 
 // getBackupRepo returns the backup repo specified by the backup object or the policy.

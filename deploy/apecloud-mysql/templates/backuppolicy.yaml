@@ -7,7 +7,7 @@ metadata:
   annotations:
     dataprotection.kubeblocks.io/is-default-policy-template: "true"
 spec:
-  pathPrefix: /mydata/
+  pathPrefix: /wesql-3d04e268-ed82-42fe-a0af-b2cf162dfbea/mysql
   backoffLimit: 0
   target:
     podSelector:
@@ -30,6 +30,7 @@ spec:
       - name: data
         mountPath: /data/mysql
   - name: volume-snapshot
+    actionSetName: apecloud-mysql-volume-snapshot
     snapshotVolumes: true
     targetVolumes:
       volumes:

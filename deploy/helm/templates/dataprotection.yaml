@@ -27,7 +27,7 @@ spec:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
-      {{- with .Values.image.imagePullSecrets }}
+      {{- with .Values.dataProtection.image.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -94,8 +94,8 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.dataProtection.image.registry | default "docker.io" }}/{{ .Values.dataProtection.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.dataProtection.image.registry | default "docker.io" }}/{{ .Values.dataProtection.image.repository }}:{{ .Values.dataProtection.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.dataProtection.image.pullPolicy }}
           ports:
             - name: webhook-server
               containerPort: 9443

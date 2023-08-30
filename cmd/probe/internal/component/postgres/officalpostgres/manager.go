@@ -141,9 +141,8 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		if primaryInfo == "" {
 			mgr.Logger.Errorf("get primary info failed")
 			return nil
-		} else {
-			dbState.Extra[postgres.PrimaryInfo] = primaryInfo
 		}
+		dbState.Extra[postgres.PrimaryInfo] = primaryInfo
 	}
 
 	mgr.DBState = dbState

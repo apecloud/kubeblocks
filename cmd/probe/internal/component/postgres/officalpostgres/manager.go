@@ -515,9 +515,25 @@ func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64)
 	return inRecovery, timeLine, lsn
 }
 
-// TODO:fill it
 func (mgr *Manager) getCurrentTimeLine(ctx context.Context) int64 {
-	return 2
+	if mgr.DBState != nil && mgr.DBState.Extra[postgres.TimeLine] != "" {
+		return cast.ToInt64(mgr.DBState.Extra[postgres.TimeLine])
+	}
+
+	sql := "SELECT timeline_id FROM pg_control_checkpoint();"
+	resp, err := mgr.Query(ctx, sql)
+	if err != nil || resp == nil {
+		mgr.Logger.Errorf("get current timeline failed, err%v", err)
+		return 0
+	}
+
+	resMap, err := postgres.ParseQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		return 0
+	}
+
+	return cast.ToInt64(resMap[0]["timeline_id"])
 }
 
 func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
@@ -527,10 +543,9 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
 
 	sql := "select case when latest_end_lsn is null then null " +
 		"else received_tli end as received_tli from pg_catalog.pg_stat_get_wal_receiver();"
-
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil || resp == nil {
-		mgr.Logger.Errorf("get received time line failed, err%v", err)
+		mgr.Logger.Errorf("get received timeline failed, err%v", err)
 		return 0
 	}
 

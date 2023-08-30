@@ -600,3 +600,48 @@ func TestIsMemberLagging(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %v", err)
 	}
 }
+
+func TestGetCurrentTimeLine(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("query failed", func(t *testing.T) {
+		mock.ExpectQuery("SELECT timeline_id").
+			WillReturnError(fmt.Errorf("some error"))
+
+		timeline := manager.getCurrentTimeLine(ctx)
+		assert.Equal(t, int64(0), timeline)
+	})
+
+	t.Run("parse query failed", func(t *testing.T) {
+		mock.ExpectQuery("SELECT timeline_id").
+			WillReturnRows(pgxmock.NewRows([]string{"timeline_id"}))
+
+		timeline := manager.getCurrentTimeLine(ctx)
+		assert.Equal(t, int64(0), timeline)
+	})
+
+	t.Run("get current timeline success", func(t *testing.T) {
+		mock.ExpectQuery("SELECT timeline_id").
+			WillReturnRows(pgxmock.NewRows([]string{"timeline_id"}).AddRow(1))
+
+		timeline := manager.getCurrentTimeLine(ctx)
+		assert.Equal(t, int64(1), timeline)
+	})
+
+	t.Run("timeline has been set", func(t *testing.T) {
+		manager.DBState = &dcs.DBState{
+			Extra: map[string]string{
+				postgres.TimeLine: "1",
+			},
+		}
+
+		timeline := manager.getCurrentTimeLine(ctx)
+		assert.Equal(t, int64(1), timeline)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}

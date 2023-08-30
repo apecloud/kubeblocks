@@ -22,14 +22,13 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ServiceConnectionCredentialSpec defines the desired state of ServiceConnectionCredential
 type ServiceConnectionCredentialSpec struct {
 	// endpoint is the endpoint of the service connection credential.
 	// +optional
-	EndPoint string `json:"endpoint,omitempty"`
+	Endpoint *CredentialVar `json:"endpoint,omitempty"`
 
 	// auth is the auth of the service connection credential.
 	// +optional
@@ -37,7 +36,7 @@ type ServiceConnectionCredentialSpec struct {
 
 	// port is the port of the service connection credential.
 	// +optional
-	Port intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,4,opt,name=port"`
+	Port *CredentialVar `json:"port,omitempty" protobuf:"bytes,4,opt,name=port"`
 
 	// extra is the extra information of the service connection credential, and it is a key-value pair.
 	// +optional
@@ -67,11 +66,10 @@ type CredentialVar struct {
 	// exists or not.
 	// Defaults to "".
 	// +optional
-	Value string `json:"value,omitempty"`
-
+	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 	// Source for the environment variable's value. Cannot be used if value is not empty.
 	// +optional
-	ValueFrom *corev1.EnvVarSource `json:"valueFrom,omitempty"`
+	ValueFrom *corev1.EnvVarSource `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
 
 // ServiceConnectionCredentialStatus defines the observed state of ServiceConnectionCredential
@@ -87,6 +85,10 @@ type ServiceConnectionCredentialStatus struct {
 	// generation number
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+func (r ServiceConnectionCredentialStatus) GetTerminalPhases() []Phase {
+	return []Phase{AvailablePhase}
 }
 
 // +genclient

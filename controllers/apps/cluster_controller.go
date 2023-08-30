@@ -180,6 +180,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ValidateEnableLogsTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
+			// handle cluster service reference
+			&ClusterServiceReferenceTransformer{},
 			// handle restore
 			&RestoreTransformer{Client: r.Client},
 			// create all components objects

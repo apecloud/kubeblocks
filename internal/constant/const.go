@@ -114,6 +114,7 @@ const (
 	AddonNameLabelKey                        = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                   = "ops.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
+	ServiceConnectionCredentialNameLabelKey  = "scc.kubeblocks.io/name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -150,12 +151,14 @@ const (
 	LastRoleChangedEventTimestampAnnotationKey  = "apps.kubeblocks.io/last-role-changed-event-timestamp"
 
 	// kubeblocks.io well-known finalizers
-	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
-	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+	DBClusterFinalizerName                   = "cluster.kubeblocks.io/finalizer"
+	ConfigurationTemplateFinalizerName       = "config.kubeblocks.io/finalizer"
+	ServiceConnectionCredentialFinalizerName = "scc.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
+	ServiceReferenceLabelPrefixKey         = "scc.kubeblocks.io/service-reference"
 
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"

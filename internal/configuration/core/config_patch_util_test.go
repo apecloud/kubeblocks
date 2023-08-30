@@ -341,6 +341,29 @@ func TestLoadRawConfigObject(t *testing.T) {
 				Format: v1alpha1.Properties,
 			}},
 		wantErr: false,
+	}, {
+		name: "test",
+		args: args{
+			data: map[string]string{
+				"key":  getFileContentFn("cue_testdata/pg14.conf"),
+				"key2": getFileContentFn("cue_testdata/mysql.cnf"),
+			},
+			keys: []string{"key"},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.Properties,
+			}},
+		wantErr: false,
+	}, {
+		name: "test-failed",
+		args: args{
+			data: map[string]string{
+				"key": getFileContentFn("cue_testdata/pg14.conf"),
+			},
+			keys: []string{"key"},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.XML,
+			}},
+		wantErr: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -23,14 +23,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -123,7 +122,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		)
 		By("Test Reconfigure")
 		{
-			// mock cluster is Running to support reconfigure ops
+			// mock cluster is Running to support reconfiguring ops
 			By("mock cluster status")
 			patch := client.MergeFrom(clusterObject.DeepCopy())
 			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase

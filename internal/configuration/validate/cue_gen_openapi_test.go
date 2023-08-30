@@ -29,7 +29,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 

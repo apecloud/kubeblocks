@@ -107,7 +107,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfigure.")
+		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfiguring.")
 		return intctrlutil.Reconciled()
 	}
 

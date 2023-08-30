@@ -24,13 +24,14 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/spf13/cast"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -44,13 +45,16 @@ type reconfiguringResult struct {
 	err                  error
 }
 
+type updateReconfigureStatus func(params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) error
+
 // updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
 func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
 	ctx context.Context,
 	cli client.Client,
-	opsCrName string) reconfiguringResult {
+	opsCrName string,
+	updater updateReconfigureStatus) reconfiguringResult {
 	var (
 		cm = &corev1.ConfigMap{}
 		cc = &appsv1alpha1.ConfigConstraint{}
@@ -93,6 +97,12 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	if !restart && !configPatch.IsModify {
 		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
 	}
+	if updater != nil {
+		if err := updater(updatedParams, cm.Data, cc.Spec.FormatterConfig); err != nil {
+			return makeReconfiguringResult(err)
+		}
+	}
+
 	return makeReconfiguringResult(
 		syncConfigmap(cm, newCfg, cli, ctx, opsCrName, configSpec, &cc.Spec, config.Policy),
 		withReturned(newCfg, configPatch),
@@ -108,7 +118,7 @@ func mergeUpdatedParams(base map[string]string,
 
 	// merge updated files into configmap
 	if len(updatedFiles) != 0 {
-		updatedConfig = core.MergeUpdatedConfig(base, updatedFiles)
+		return core.MergeUpdatedConfig(base, updatedFiles), nil
 	}
 	if len(updatedParams) == 0 {
 		return updatedConfig, nil
@@ -116,7 +126,16 @@ func mergeUpdatedParams(base map[string]string,
 	return intctrlutil.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
 }
 
-func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec, policy *appsv1alpha1.UpgradePolicy) error {
+func syncConfigmap(
+	cmObj *corev1.ConfigMap,
+	newCfg map[string]string,
+	cli client.Client,
+	ctx context.Context,
+	opsCrName string,
+	configSpec appsv1alpha1.ComponentConfigSpec,
+	cc *appsv1alpha1.ConfigConstraintSpec,
+	policy *appsv1alpha1.UpgradePolicy) error {
+
 	patch := client.MergeFrom(cmObj.DeepCopy())
 	cmObj.Data = newCfg
 	if cmObj.Annotations == nil {
@@ -131,6 +150,61 @@ func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client
 		return err
 	}
 	return cli.Patch(ctx, cmObj, patch)
+}
+
+func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) {
+	var maxLabelCount = 16
+	updateLabel := func(param map[string]interface{}) {
+		if obj.Labels == nil {
+			obj.Labels = make(map[string]string)
+		}
+		for key, val := range param {
+			if maxLabelCount <= 0 {
+				return
+			}
+			maxLabelCount--
+			obj.Labels[key] = cast.ToString(val)
+		}
+	}
+	updateAnnotation := func(keyFile string, param map[string]interface{}) {
+		data, ok := orinalData[keyFile]
+		if !ok {
+			return
+		}
+		if obj.Annotations == nil {
+			obj.Annotations = make(map[string]string)
+		}
+		oldValue, err := fetchOriginalValue(keyFile, data, param, formatter)
+		if err != nil {
+			log.Log.Error(err, "failed to fetch original value")
+			return
+		}
+		obj.Annotations[keyFile] = oldValue
+	}
+
+	for _, param := range params {
+		updateLabel(param.UpdatedParams)
+		if maxLabelCount <= 0 {
+			return
+		}
+		updateAnnotation(param.Key, param.UpdatedParams)
+	}
+}
+
+func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1alpha1.FormatterConfig) (string, error) {
+	baseConfigObj, err := core.FromConfigObject(keyFile, data, formatter)
+	if err != nil {
+		return "", err
+	}
+	r := make(map[string]string, len(params))
+	for key := range params {
+		oldVal := baseConfigObj.Get(key)
+		if oldVal != nil {
+			r[key] = cast.ToString(oldVal)
+		}
+	}
+	b, err := json.Marshal(r)
+	return string(b), err
 }
 
 func fromKeyValuePair(parameters []appsv1alpha1.ParameterPair) map[string]interface{} {

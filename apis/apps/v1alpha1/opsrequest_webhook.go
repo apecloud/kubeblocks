@@ -282,6 +282,9 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
 func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
+	if webhookMgr == nil || webhookMgr.client == nil {
+		return nil
+	}
 	reconfigure := r.Spec.Reconfigure
 	if reconfigure == nil {
 		return notEmptyError("spec.reconfigure")

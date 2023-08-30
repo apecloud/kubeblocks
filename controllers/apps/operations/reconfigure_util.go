@@ -47,6 +47,7 @@ type reconfiguringResult struct {
 
 type updateReconfigureStatus func(params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) error
 
+// Deprecated: use NewPipeline instead
 // updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
 func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	configSpec appsv1alpha1.ComponentConfigSpec,

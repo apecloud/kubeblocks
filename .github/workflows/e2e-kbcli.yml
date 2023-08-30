@@ -6,9 +6,13 @@ on:
       VERSION:
         description: 'kubeblocks release version'
         required: true
-        default: 'latest'
+        default: ''
       PRE_VERSION:
         description: 'kubeblocks previous version of upgrade'
+        required: false
+        default: ''
+      TEST_TYPE:
+        description: 'test type (e.g. mysql|postgres|redis|mongo|kafka|pulsar|weaviate|qdrant|smarte|scale)'
         required: false
         default: ''
       CLOUD_PROVIDER:
@@ -20,7 +24,7 @@ on:
           - eks
           - gke
       CLUSTER_VERSION:
-        description: 'eks cluster version (e.g. 1.25)'
+        description: 'k8s cluster version (e.g. 1.25)'
         required: false
         default: '1.25'
         type: choice
@@ -37,10 +41,6 @@ on:
         options:
           - amd64
           - arm64
-      CLUSTER_REGION:
-        description: 'cluster region (e.g. cn-northwest-1)'
-        required: false
-        default: ''
       BRANCH_NAME:
         description: 'testinfra branch name'
         required: false
@@ -76,7 +76,7 @@ jobs:
               echo release-version=$RELEASE_VERSION >> $GITHUB_OUTPUT
           fi
           
-          CLUSTER_REGION="${{ inputs.CLUSTER_REGION }}"
+          CLUSTER_REGION=""
           if [[ "${{ inputs.CLOUD_PROVIDER }}" == 'eks' && -z "$CLUSTER_REGION" ]]; then
               CLUSTER_REGION="${{ vars.REGION_AWK_EKS }}"
           elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'gke' && -z "$CLUSTER_REGION" ]]; then
@@ -84,9 +84,10 @@ jobs:
           fi
           echo cluster-region=$CLUSTER_REGION >> $GITHUB_OUTPUT
 
-  eks:
+  e2e:
+    name: ${{ inputs.CLOUD_PROVIDER }}
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k8s.yml@provider
+    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k8s.yml@v0.1.18
     with:
       CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"
@@ -95,6 +96,7 @@ jobs:
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       REGION: "${{ needs.check.outputs.cluster-region }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
-      APECD_REF: "provider"
+      APECD_REF: "v0.1.18"
       ARGS: "${{ inputs.ARGS }}"
+      TEST_TYPE: "${{ inputs.TEST_TYPE }}"
     secrets: inherit

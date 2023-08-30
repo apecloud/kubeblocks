@@ -47,7 +47,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
+	dpcontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -213,7 +213,7 @@ func main() {
 	}
 
 	if viper.GetBool(dataProtectionFlagKey.viperName()) {
-		if err = (&dataprotectioncontrollers.BackupToolReconciler{
+		if err = (&dpcontrollers.BackupToolReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
@@ -222,7 +222,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&dataprotectioncontrollers.BackupPolicyReconciler{
+		if err = (&dpcontrollers.BackupPolicyReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
@@ -231,7 +231,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&dataprotectioncontrollers.CronJobReconciler{
+		if err = (&dpcontrollers.CronJobReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
@@ -240,7 +240,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&dataprotectioncontrollers.BackupReconciler{
+		if err = (&dpcontrollers.BackupReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("backup-controller"),
@@ -249,7 +249,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&dataprotectioncontrollers.RestoreJobReconciler{
+		if err = (&dpcontrollers.RestoreJobReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
@@ -258,7 +258,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&dataprotectioncontrollers.BackupRepoReconciler{
+		if err = (&dpcontrollers.BackupRepoReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("backup-repo-controller"),

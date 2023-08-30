@@ -62,7 +62,6 @@ spec:
             - "--apps=true"
             - "--workloads=true"
             - "--storage=true"
-            - "--dataprotection={{- and .Values.dataProtection.enabled (not .Values.separatedDeployment) }}"
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}

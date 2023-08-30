@@ -23,12 +23,6 @@ image:
   datascript:
     repository: apecloud/kubeblocks-datascript
 
-
-## @param separatedDeployment separated the KubeBlocks deployment into two deployments.
-## This switch is used to isolate the apps controller and dataprotection controller
-##
-separatedDeployment: true
-
 ## @param replicaCount
 ##
 replicaCount: 1

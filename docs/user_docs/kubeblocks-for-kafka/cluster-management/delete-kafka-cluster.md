@@ -3,7 +3,7 @@ title: Delete a kafka Cluster
 description: How to delete a kafka Cluster
 keywords: [kafka, delete a cluster, delete protection]
 sidebar_position: 7
-sidebar_label: Delete a Kafka cluster
+sidebar_label: Delete protection
 ---
 
 import Tabs from '@theme/Tabs';

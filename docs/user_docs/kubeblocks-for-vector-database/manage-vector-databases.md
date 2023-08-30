@@ -31,6 +31,7 @@ Before you start, [Install KubeBlocks](./../installation/install-with-helm/) and
 
    ```bash
    kbcli cluster list
+   >
    NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
    qdrant   default     qdrant               qdrant-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```

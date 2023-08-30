@@ -3,7 +3,7 @@ title: Stop/Start a Kafka cluster
 description: How to start/stop a Kafka cluster
 keywords: [mongodb, stop a kafka cluster, start a kafka cluster]
 sidebar_position: 5
-sidebar_label: Stop/Start a Kafka cluster
+sidebar_label: Stop/Start
 ---
 
 # Stop/Start a Kafka Cluster

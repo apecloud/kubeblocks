@@ -3,7 +3,7 @@ title: Restart Pulsar cluster
 description: How to restart a Pulsar cluster
 keywords: [pulsar, restart]
 sidebar_position: 4
-sidebar_label: Restart a Pulsar cluster
+sidebar_label: Restart
 ---
 
 

@@ -5,11 +5,11 @@ keywords: [monitor database, monitor a cluster, monitor]
 sidebar_position: 1
 ---
 
-# Observability of KubeBlocks
+# Monitor a database
 
 With the built-in database observability, you can observe the database health status and track and measure your database in real-time to optimize database performance. This section shows you how database monitoring tools work with KubeBlocks and how to use the function.
 
-## For Playground
+## For Playground/test
 
 KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by add-ons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. All monitoring add-ons are enabled when KubeBlocks Playground is deployed.
 

@@ -2,7 +2,7 @@
 title: Full disk lock
 description: How to configure disk lock when it is about to be full
 sidebar_position: 2
-sidebar_label: Full Disk Lock
+sidebar_label: Full disk lock
 ---
 
 # Full disk lock

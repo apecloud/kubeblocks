@@ -3,7 +3,7 @@ title: Restart Kafka cluster
 description: How to restart a Kafka cluster
 keywords: [kafka, restart]
 sidebar_position: 4
-sidebar_label: Restart a Kafka cluster
+sidebar_label: Restart
 ---
 
 

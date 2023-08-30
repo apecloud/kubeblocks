@@ -1,15 +1,15 @@
 ---
-title: Datafile backup and restore
-description: How to back up databases by datafiles
-keywords: [backup and restore, datafile]
+title: On-demand backup
+description: How to back up databases on-demand by snapshot and backup tool
+keywords: [backup, on-demand backup, snapshot backup, backup tool]
 sidebar_position: 3
-sidebar_label: Datafile
+sidebar_label: On-demand backup
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Datafile backup
+# On-demand backup
 
 ## Before you start
 
@@ -31,7 +31,7 @@ Prepare a cluster for testing the backup and restore function. The following ins
 
 ## Create backup
 
-The datafile backup of KubeBlocks supports two options: backup tool and snapshot backup.
+KubeBlocks supports two backup options: backup tool and snapshot backup.
 
 ### Backup tool
 
@@ -63,7 +63,7 @@ Both kbcli and kubectl are supported.
 
 <TabItem value="kubectl" label="kubectl">
 
-Run the command below to create a datafile backup named `mybackup`.
+Run the command below to create a backup named `mybackup`.
 
 ```bash
 kubectl apply -f - <<-'EOF'

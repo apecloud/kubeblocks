@@ -17,55 +17,59 @@ Before you start, [Install KubeBlocks](./../installation/install-with-helm/) and
 
 1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
 
-```
-kbcli cluster create qdrant --cluster-definition=qdrant
-```
-If you want to create a Qdrant cluster with multiple replicas. Use the following command and set the replica numbers.
-```
-kbcli cluster create qdrant --cluster-definition=qdrant --set replicas=3
-```
+   ```bash
+   kbcli cluster create qdrant --cluster-definition=qdrant
+   ```
+
+   If you want to create a Qdrant cluster with multiple replicas. Use the following command and set the replica numbers.
+
+   ```bash
+   kbcli cluster create qdrant --cluster-definition=qdrant --set replicas=3
+   ```
 
 2. Check whether the cluster is created.
 
-```
-~ kbcli cluster list
-NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-qdrant   default     qdrant               qdrant-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
-```
+   ```bash
+   kbcli cluster list
+   >
+   NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
+   qdrant   default     qdrant               qdrant-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   ```
 
 3. Check the cluster information.
 
-```
-~ kblci cluster describe qdrant
-Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
-NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-default     qdrant               qdrant-1.1.0   Running   Delete
+   ```bash
+   kblci cluster describe qdrant
+   >
+   Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
+   NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
+   default     qdrant               qdrant-1.1.0   Running   Delete
 
-Endpoints:
-COMPONENT   MODE        INTERNAL                                       EXTERNAL
-qdrant      ReadWrite   qdrant-qdrant.default.svc.cluster.local:6333   <none>
-                        qdrant-qdrant.default.svc.cluster.local:6334
+   Endpoints:
+   COMPONENT   MODE        INTERNAL                                       EXTERNAL
+   qdrant      ReadWrite   qdrant-qdrant.default.svc.cluster.local:6333   <none>
+                           qdrant-qdrant.default.svc.cluster.local:6334
 
-Topology:
-COMPONENT   INSTANCE          ROLE     STATUS    AZ       NODE                   CREATED-TIME
-qdrant      qdrant-qdrant-0   <none>   Running   <none>   x-worker3/172.20.0.3   Aug 15,2023 23:03 UTC+0800
-qdrant      qdrant-qdrant-1   <none>   Running   <none>   x-worker2/172.20.0.5   Aug 15,2023 23:03 UTC+0800
-qdrant      qdrant-qdrant-2   <none>   Running   <none>   x-worker/172.20.0.2    Aug 15,2023 23:04 UTC+0800
+   Topology:
+   COMPONENT   INSTANCE          ROLE     STATUS    AZ       NODE                   CREATED-TIME
+   qdrant      qdrant-qdrant-0   <none>   Running   <none>   x-worker3/172.20.0.3   Aug 15,2023 23:03 UTC+0800
+   qdrant      qdrant-qdrant-1   <none>   Running   <none>   x-worker2/172.20.0.5   Aug 15,2023 23:03 UTC+0800
+   qdrant      qdrant-qdrant-2   <none>   Running   <none>   x-worker/172.20.0.2    Aug 15,2023 23:04 UTC+0800
 
-Resources Allocation:
-COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-qdrant      false       1 / 1                1Gi / 1Gi               data:20Gi      standard
+   Resources Allocation:
+   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
+   qdrant      false       1 / 1                1Gi / 1Gi               data:20Gi      standard
 
-Images:
-COMPONENT   TYPE     IMAGE
-qdrant      qdrant   docker.io/qdrant/qdrant:latest
+   Images:
+   COMPONENT   TYPE     IMAGE
+   qdrant      qdrant   docker.io/qdrant/qdrant:latest
 
-Data Protection:
-AUTO-BACKUP   BACKUP-SCHEDULE   TYPE     BACKUP-TTL   LAST-SCHEDULE   RECOVERABLE-TIME
-Disabled      <none>            <none>   7d           <none>          <none>
+   Data Protection:
+   AUTO-BACKUP   BACKUP-SCHEDULE   TYPE     BACKUP-TTL   LAST-SCHEDULE   RECOVERABLE-TIME
+   Disabled      <none>            <none>   7d           <none>          <none>
 
-Show cluster events: kbcli cluster list-events -n default qdrant
-```
+   Show cluster events: kbcli cluster list-events -n default qdrant
+   ```
 
 ## Connect to a vector database cluster
 
@@ -75,68 +79,90 @@ Use the following command to connect to a vector database cluster.
 kbcli cluster connect <clustername>  --namespace <name>
 ```
 
-
 ## Monitor the vector database
 
 Open the grafana monitor web page.
-```
+
+```bash
 kbcli dashboard open kubeblocks-grafana
 ```
+
 When executing this command, browser is opened and you can see the dashboard.
 
-## Scaling 
+## Scaling
+
 Scaling function for vector databases is also supported.
 
 ### Scale horizontally
+
 Use the following command to perform horizontal scaling.
-```
+
+```bash
 kbcli cluster hscale qdrant --replicas=5 --components=qdrant
 ```
-Please wait a few seconds until the scaling process is over.
-The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
-```
-kubectl get ops qdrant-horizontalscaling-xpdwz
 
+Please wait a few seconds until the scaling process is over.
+
+The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
+
+```bash
+kubectl get ops qdrant-horizontalscaling-xpdwz
+>
 NAME                             TYPE                CLUSTER   STATUS    PROGRESS   AGE
 qdrant-horizontalscaling-xpdwz   HorizontalScaling   qdrant    Running   0/2        16s
 ```
+
 To check whether the scaling is done, use the following command.
-```
+
+```bash
 kbcli cluster describe qdrant
 ```
 
 ### Scale vertically
+
 Use the following command to perform vertical scaling.
-```
+
+```bash
 kbcli cluster vscale qdrant --cpu=0.5 --memory=512Mi --components=qdrant 
 ```
 
 Please wait a few seconds until the scaling process is over.
 The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
-```
-~ kubectl get ops qdrant-verticalscaling-rpw2l
 
+```bash
+kubectl get ops qdrant-verticalscaling-rpw2l
+>
 NAME                           TYPE              CLUSTER   STATUS    PROGRESS   AGE
 qdrant-verticalscaling-rpw2l   VerticalScaling   qdrant    Running   1/5        44s
 ```
+
 To check whether the scaling is done, use the following command.
-```
+
+```bash
 kbcli cluster describe qdrant
 ```
+
 ## Volume Expanding
+
 ***Steps:***
-```
+
+```bash
 kbcli cluster volume-expand qdrant --storage=40Gi --components=qdrant -t data
 ```
-The volume expanding may take a few minutes.
-The `kbcli cluster volume-expand` command print the `opsname`, to check the progress of volume expanding, you can use the following command with the `opsname`.
-```
-kubectl get ops qdrant-volumeexpansion-5pbd2
 
+The volume expanding may take a few minutes.
+
+The `kbcli cluster volume-expand` command print the `opsname`, to check the progress of volume expanding, you can use the following command with the `opsname`.
+
+```bash
+kubectl get ops qdrant-volumeexpansion-5pbd2
+>
 NAME                           TYPE              CLUSTER   STATUS   PROGRESS   AGE
 qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  -/-        67s
 ```
+
 To check whether the expanding is done, use the following command.
-```
+
+```bash
 kbcli cluster describe qdrant
 ```

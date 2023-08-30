@@ -15,6 +15,7 @@ This chapter shows how to upgrade to the KubeBlocks 0.6, including notes and tip
 ### Pull images 
 
 KubeBlocks version 0.6 has many image changes from version 0.5. During upgrading, if there are many database instances in the cluster, the instance may be unavailable for a long time if images are pulled at the same time. It is recommended to pull the images required for version 0.6 in advance before upgrading.
+
 ***Steps***
 
 1. Write the following content to a `yaml` file.

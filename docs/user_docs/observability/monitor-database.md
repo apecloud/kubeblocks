@@ -5,11 +5,11 @@ keywords: [monitor database, monitor a cluster, monitor]
 sidebar_position: 1
 ---
 
-# Observability of KubeBlocks
+# Monitor a database
 
 With the built-in database observability, you can observe the database health status and track and measure your database in real-time to optimize database performance. This section shows you how database monitoring tools work with KubeBlocks and how to use the function.
 
-## For Playground
+## For Playground/test
 
 KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by add-ons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. All monitoring add-ons are enabled when KubeBlocks Playground is deployed.
 
@@ -43,7 +43,7 @@ KubeBlock Playground supports the following built-in monitoring add-ons:
    kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
    ```
 
-3. Open the web console of a monitoring dashboard. For example,
+3. Open and view the web console of a monitoring dashboard. For example,
 
    ```bash
    kbcli dashboard open kubeblocks-grafana
@@ -51,53 +51,11 @@ KubeBlock Playground supports the following built-in monitoring add-ons:
 
 ## For production environment
 
-In the production environment, all monitoring add-ons are disabled by default when installing KubeBlocks. You can enable these add-ons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service.
+In the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service.
 
-### Enable monitoring function by kbcli
-
-:::caution
-
-It is not recommended to use this function in the production environment.
-
-:::
-
-1. View all built-in add-ons.
-
-   ```bash
-   kbcli addon list
-   ```
-
-2. Enable the monitoring add-ons.
-
-   ```bash
-   kbcli addon enable prometheus
-   kbcli addon enable grafana
-   kbcli addon enable alertmanager-webhook-adaptor
-   kbcli addon enable apecloud-otel-collector
-   ```
-
-3. View the dashboard list.
-
-   ```bash
-   kbcli dashboard list
-   >
-   NAME                                 NAMESPACE   PORT    CREATED-TIME
-   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
-   ```
-
-4. Open the web console of a monitoring dashboard. For example,
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-### Enable monitoring function by integration
+### Enable monitoring function
 
 KubeBlocks provides an add-on, `victoria-metrics-agent`, to push the monitoring data to a third-party monitoring system compatible with the Prometheus Remote Write protocol. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
-
-***Steps:***
 
 1. Enable data push.
 
@@ -140,17 +98,15 @@ KubeBlocks provides an add-on, `victoria-metrics-agent`, to push the monitoring 
    kbcli addon disable victoria-metrics-agent
    ```
 
-### View the web console by kbcli
-
-### View the web console by Integration
+### Integrate Dashboard and Alert Rules
 
 Kubeblocks provides Grafana Dashboards and Prometheus AlertRules for mainstream engines, which you can obtain from [the repository](https://github.com/apecloud/kubeblocks-mixin), or convert and customize according to your needs.
 
 For the importing method, refer to the tutorials of your third-party monitoring service.
 
-### Enable the monitoring function for a database
+## Enable the monitoring function for a database
 
-The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals.
+The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals. You can change mysql as `postgresql`, `mongodb`, `redis` to create a cluster of other database engines.
 
 * For a new cluster, run the command below to create a database cluster.
 
@@ -162,46 +118,20 @@ The monitoring function is enabled by default when a database is created. The op
     kbcli cluster create mysql <clustername> 
     ```
 
-    ***Example***
-
-    ```bash
-    # View all add-ons supported
-    kbcli addon list
-    ...
-    grafana                        Helm   Enabled                   true                                                                                    
-    alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-    prometheus                     Helm   Enabled    alertmanager   true 
-    ...
-    # Enable prometheus add-on
-    kbcli addon enable prometheus
-
-    # Enable granfana add-on
-    kbcli addon enable granfana
-
-    # Enable alertmanager-webhook-adaptor add-on
-    kbcli addon enable alertmanager-webhook-adaptor
-    ```
-
 :::note
 
-The setting of `monitor` is `true` by default and it is not recommended to disable it. In the cluster definition, you can choose any supported database engine, such as PostgreSQL, MongoDB, and Redis.
+You can change `--monitoring-interval` as `0` to disable the monitoring function but it is not recommended.
 
 ```bash
-kbcli cluster create mysql --monitor=true mysql-cluster
+kbcli cluster create mysql mycluster --monitoring-interval=0
 ```
 
 :::
 
-* For the existing cluster, you can update it to enable the monitor function with the `update` command.
+* For the existing cluster with the monitoring function disabled, you can update it to enable the monitor function by the `update` command.
 
     ```bash
-    kbcli cluster update <name> --monitor=true
-    ```
-
-    ***Example***
-
-    ```bash
-    kbcli cluster update mysql-cluster --monitor=true
+    kbcli cluster update mycluster --monitoring-interval=15s
     ```
 
 You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see the [Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).

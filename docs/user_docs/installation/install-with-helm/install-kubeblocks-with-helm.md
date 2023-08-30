@@ -9,7 +9,8 @@ sidebar_label: Install KubeBlocks
 # Install KubeBlocks with Helm
 
 KubeBlocks is kubernetes-native, you can use Helm to install it.
-:::note:
+:::note
+
 If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
 
 :::
@@ -75,7 +76,7 @@ kubeblocks-846b8878d9-q8g2w                              1/1     Running     0  
 
 If the operator pods are all `Running`, KubeBlocks has been installed successfully. You can cancel the above command by typing `Ctrl+C`.
 
-:::note:
+:::note
 
 Clusters installed through `helm` need to be deleted using `helm` to avoid resource residue.
 

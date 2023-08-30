@@ -44,14 +44,12 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	dpcontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
-	"github.com/apecloud/kubeblocks/internal/webhook"
 )
 
 // added lease.coordination.k8s.io for leader election
@@ -95,12 +93,7 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
-	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
-	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
-	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
-	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
@@ -257,15 +250,6 @@ func main() {
 	}
 
 	// +kubebuilder:scaffold:builder
-
-	if viper.GetBool("enable_webhooks") {
-		appsv1alpha1.RegisterWebhookManager(mgr)
-
-		if err = webhook.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to setup webhook")
-			os.Exit(1)
-		}
-	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

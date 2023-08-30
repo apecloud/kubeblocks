@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/core"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 

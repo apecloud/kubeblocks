@@ -33,6 +33,7 @@ spec:
       configSpecs:
         - name: qdrant-config-template
           templateRef: qdrant-config-template
+          constraintRef: qdrant-config-constraints
           volumeName: qdrant-config
           namespace: {{ .Release.Namespace }}
       service:

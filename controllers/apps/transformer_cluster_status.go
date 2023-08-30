@@ -22,14 +22,11 @@ package apps
 import (
 	"fmt"
 
-	"golang.org/x/exp/slices"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 // phaseSyncLevel defines a phase synchronization level to notify the status synchronizer how to handle cluster phase.
@@ -107,9 +104,6 @@ func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTrans
 	// do analysis of Cluster.Status.component and update the results to status synchronizer.
 	t.doAnalysisAndUpdateSynchronizer(dag, cluster)
 
-	// sync the LatestOpsRequestProcessed condition.
-	t.syncOpsRequestProcessedCondition(cluster)
-
 	// handle the ready condition.
 	t.syncReadyConditionForCluster(cluster)
 
@@ -177,24 +171,6 @@ func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph.DA
 		// cluster is Stopped when cluster is not Running and all components are Stopped or Running
 		t.phaseSyncLevel = clusterIsStopped
 	}
-}
-
-// handleOpsRequestProcessedCondition syncs the condition that OpsRequest has been processed.
-func (t *ClusterStatusTransformer) syncOpsRequestProcessedCondition(cluster *appsv1alpha1.Cluster) {
-	opsCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
-	if opsCondition == nil || opsCondition.Status == metav1.ConditionTrue {
-		return
-	}
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	if len(opsRecords) != 0 {
-		return
-	}
-	processedCondition := newOpsRequestProcessedCondition(opsCondition.Message)
-	oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, processedCondition.Type)
-	if !conditionIsChanged(oldCondition, processedCondition) {
-		return
-	}
-	meta.SetStatusCondition(&cluster.Status.Conditions, processedCondition)
 }
 
 // syncReadyConditionForCluster syncs the cluster conditions with ClusterReady and ReplicasReady type.

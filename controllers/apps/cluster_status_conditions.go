@@ -21,8 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
-	"strings"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -34,7 +32,6 @@ import (
 )
 
 const (
-	ReasonOpsRequestProcessed   = "Processed"             // ReasonOpsRequestProcessed the latest OpsRequest has been processed.
 	ReasonPreCheckSucceed       = "PreCheckSucceed"       // ReasonPreCheckSucceed preChecks succeeded for provisioning started
 	ReasonPreCheckFailed        = "PreCheckFailed"        // ReasonPreCheckFailed preChecks failed for provisioning started
 	ReasonApplyResourcesFailed  = "ApplyResourcesFailed"  // ReasonApplyResourcesFailed applies resources failed to create or change the cluster
@@ -44,15 +41,6 @@ const (
 	ReasonComponentsNotReady    = "ComponentsNotReady"    // ReasonComponentsNotReady the components of cluster are not ready
 	ReasonClusterReady          = "ClusterReady"          // ReasonClusterReady the components of cluster are ready, the component phase is running
 )
-
-// conditionIsChanged checks if the condition is changed.
-func conditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Condition) bool {
-	if newCondition.LastTransitionTime.IsZero() && oldCondition != nil {
-		// assign the old condition's LastTransitionTime to the new condition for "DeepEqual" checking.
-		newCondition.LastTransitionTime = oldCondition.LastTransitionTime
-	}
-	return !reflect.DeepEqual(oldCondition, &newCondition)
-}
 
 func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
 	var condition metav1.Condition
@@ -167,25 +155,5 @@ func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) 
 		Status:  metav1.ConditionFalse,
 		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonComponentsNotReady,
-	}
-}
-
-// newOpsRequestProcessingCondition creates a condition when the latest opsRequest of cluster is processing
-func newOpsRequestProcessingCondition(opsName, opsType, reason string) metav1.Condition {
-	return metav1.Condition{
-		Type:    appsv1alpha1.ConditionTypeLatestOpsRequestProcessed,
-		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("%s opsRequest: %s is processing", opsType, opsName),
-		Reason:  reason,
-	}
-}
-
-// newOpsRequestProcessedCondition creates a condition when the latest opsRequest of cluster has been processed
-func newOpsRequestProcessedCondition(processingMessage string) metav1.Condition {
-	return metav1.Condition{
-		Type:    appsv1alpha1.ConditionTypeLatestOpsRequestProcessed,
-		Status:  metav1.ConditionTrue,
-		Message: strings.Replace(processingMessage, "is processing", "has been processed", 1),
-		Reason:  ReasonOpsRequestProcessed,
 	}
 }

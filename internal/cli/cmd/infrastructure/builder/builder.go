@@ -28,7 +28,7 @@ import (
 	"github.com/leaanthony/debme"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 

@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -98,9 +98,9 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 			}
 			switch param.ReloadType {
 			case appsv1alpha1.TPLScriptType:
-				return cfgcore.IsWatchModuleForTplTrigger(param.ReloadOptions.TPLScriptTrigger)
+				return core.IsWatchModuleForTplTrigger(param.ReloadOptions.TPLScriptTrigger)
 			case appsv1alpha1.ShellType:
-				return cfgcore.IsWatchModuleForShellTrigger(param.ReloadOptions.ShellTrigger)
+				return core.IsWatchModuleForShellTrigger(param.ReloadOptions.ShellTrigger)
 			default:
 				return true
 			}
@@ -389,7 +389,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 		}
 	}
 	if res, _, _ := unstructured.NestedFieldNoCopy(configObject, scriptConfigField); res == nil {
-		return nil, cfgcore.MakeError("reload.yaml required field: %s", scriptConfigField)
+		return nil, core.MakeError("reload.yaml required field: %s", scriptConfigField)
 	}
 
 	formatObject, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(&formatterConfig)

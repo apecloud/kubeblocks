@@ -1318,7 +1318,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	}
 
-	checkClusterRBACResourcesExistence := func(cluster *appsv1alpha1.Cluster, serviceAccountName string, expectExisted bool) {
+	checkClusterRBACResourcesExistence := func(cluster *appsv1alpha1.Cluster, serviceAccountName string, volumeProtectionEnabled, expectExisted bool) {
 		saObjKey := types.NamespacedName{
 			Namespace: cluster.Namespace,
 			Name:      serviceAccountName,
@@ -1329,10 +1329,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, saObjKey, &corev1.ServiceAccount{}, expectExisted)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, rbObjKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
-		Eventually(testapps.CheckObjExists(&testCtx, rbObjKey, &rbacv1.ClusterRoleBinding{}, expectExisted)).Should(Succeed())
+		if volumeProtectionEnabled {
+			Eventually(testapps.CheckObjExists(&testCtx, rbObjKey, &rbacv1.ClusterRoleBinding{}, expectExisted)).Should(Succeed())
+		}
 	}
 
-	testClusterRBAC := func(compName, compDefName string) {
+	testClusterRBAC := func(compName, compDefName string, volumeProtectionEnabled bool) {
 		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
 
 		By("Creating a cluster with target service account name")
@@ -1355,7 +1357,23 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		By("check the RBAC resources created exist")
-		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true)
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, volumeProtectionEnabled, true)
+	}
+
+	testClusterRBACForBackup := func(compName, compDefName string) {
+		// set probes and volumeProtections to nil
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(clusterDef *appsv1alpha1.ClusterDefinition) {
+			for i := range clusterDef.Spec.ComponentDefs {
+				compDef := clusterDef.Spec.ComponentDefs[i]
+				if compDef.Name == compDefName {
+					compDef.Probes = nil
+					compDef.VolumeProtectionSpec = nil
+					clusterDef.Spec.ComponentDefs[i] = compDef
+					break
+				}
+			}
+		})()).Should(Succeed())
+		testClusterRBAC(compName, compDefName, false)
 	}
 
 	testReCreateClusterWithRBAC := func(compName, compDefName string) {
@@ -1377,7 +1395,7 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("check the RBAC resources created exist")
-		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true)
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true, true)
 
 		By("Delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
@@ -1386,7 +1404,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 
 		By("check the RBAC resources deleted")
-		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, false)
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true, false)
 
 		By("re-create cluster with same name")
 		clusterObj = testapps.NewClusterFactory(clusterKey.Namespace, clusterKey.Name,
@@ -1397,7 +1415,7 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		By("check the RBAC resources re-created exist")
-		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true)
+		checkClusterRBACResourcesExistence(clusterObj, serviceAccountName, true, true)
 
 		By("Delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
@@ -2420,6 +2438,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
 		})
 		AfterEach(func() {
 			cleanEnv()
@@ -2443,7 +2462,11 @@ var _ = Describe("Cluster Controller", func() {
 			})
 
 			It(fmt.Sprintf("[comp: %s] should create RBAC resources correctly", compName), func() {
-				testClusterRBAC(compName, compDefName)
+				testClusterRBAC(compName, compDefName, true)
+			})
+
+			It(fmt.Sprintf("[comp: %s] should create RBAC resources correctly if only supports backup", compName), func() {
+				testClusterRBACForBackup(compName, compDefName)
 			})
 
 			It(fmt.Sprintf("[comp: %s] should re-create cluster and RBAC resources correctly", compName), func() {

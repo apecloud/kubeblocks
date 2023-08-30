@@ -33,8 +33,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
 

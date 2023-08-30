@@ -21,8 +21,10 @@ Kafka Server's JVM Heap configuration, production environment can refer to the o
 - Separated mode
     When creating a Kafka Cluster, specify the component parameters with the `--broker-heap`; specify controller with the `--controller-heap` parameter.
 
-:::note:
-    When modifying the Java Heap configuration, attention should be paid to the resources allocated to the Cluster at the same time. For example, `--memory=1Gi`, but `-Xms` in `--broker-heap` is specified as `6g`, the broker service will not start normally due to insufficient memory.
+:::note
+
+When modifying the Java Heap configuration, attention should be paid to the resources allocated to the Cluster at the same time. For example, `--memory=1Gi`, but `-Xms` in `--broker-heap` is specified as `6g`, the broker service will not start normally due to insufficient memory.
+
 :::
 
 ## Hardware resources

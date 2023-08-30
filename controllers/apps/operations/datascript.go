@@ -61,9 +61,8 @@ func init() {
 	// ToClusterPhase is not defined, because 'datascript' does not affect the cluster status.
 	dataScriptOpsHander := DataScriptOpsHandler{}
 	dataScriptBehavior := OpsBehaviour{
-		FromClusterPhases:          []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase},
-		MaintainClusterPhaseBySelf: false,
-		OpsHandler:                 dataScriptOpsHander,
+		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase},
+		OpsHandler:        dataScriptOpsHander,
 	}
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(appsv1alpha1.DataScriptType, dataScriptBehavior)
@@ -154,10 +153,6 @@ func (o DataScriptOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 
 func (o DataScriptOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {
 	return nil
-}
-
-func (o DataScriptOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.Spec.GetDataScriptComponentNameSet())
 }
 
 // getScriptContent will get script content from script or scriptFrom

@@ -31,7 +31,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	kbutils "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/utils"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 const (

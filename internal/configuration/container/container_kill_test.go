@@ -35,8 +35,8 @@ import (
 	"golang.org/x/net/http2"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/container/mocks"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 var zapLog, _ = zap.NewDevelopment()

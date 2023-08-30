@@ -34,8 +34,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/container"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type createOptions struct {

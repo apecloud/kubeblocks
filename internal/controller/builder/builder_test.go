@@ -66,11 +66,6 @@ var _ = Describe("builder", func() {
 	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
 	const proxyCompDefName = "proxy"
-	var requiredKeys = []string{
-		"KB_REPLICA_COUNT",
-		"KB_0_HOSTNAME",
-		"KB_CLUSTER_UID",
-	}
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -320,58 +315,6 @@ var _ = Describe("builder", func() {
 			pdb, err := BuildPDB(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(pdb).ShouldNot(BeNil())
-		})
-
-		It("builds Env Config correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			for _, k := range requiredKeys {
-				_, ok := cfg.Data[k]
-				Expect(ok).Should(BeTrue())
-			}
-		})
-
-		It("builds env config with resources recreate", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-
-			uuid := "12345"
-			By("mock a cluster uuid")
-			cluster.UID = types.UID(uuid)
-
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_CLUSTER_UID"]).Should(Equal(uuid))
-		})
-
-		It("builds Env Config with ConsensusSet status correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				synthesizedComponent.Name: {
-					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
-						Leader: appsv1alpha1.ConsensusMemberStatus{
-							Pod: "pod1",
-						},
-						Followers: []appsv1alpha1.ConsensusMemberStatus{{
-							Pod: "pod2",
-						}, {
-							Pod: "pod3",
-						}},
-					},
-				}}
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			toCheckKeys := append(requiredKeys, []string{
-				"KB_LEADER",
-				"KB_FOLLOWERS",
-			}...)
-			for _, k := range toCheckKeys {
-				_, ok := cfg.Data[k]
-				Expect(ok).Should(BeTrue())
-			}
 		})
 
 		It("builds BackupJob correctly", func() {

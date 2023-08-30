@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -99,15 +99,15 @@ var _ = Describe("Reconfigure Controller", func() {
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+				AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
+					core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponentVersion(statefulCompDefName).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+				AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
+					core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
 			By("Creating a cluster")
@@ -128,7 +128,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				AddAppNameLabel(clusterName).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(statefulCompName).
-				AddAnnotations(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
+				AddAnnotations(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
 				Create(&testCtx).GetObject()
 
 			By("check config constraint")
@@ -144,17 +144,17 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(cm.Labels[constant.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
 				g.Expect(cm.Labels[constant.CMConfigurationTemplateNameLabelKey]).To(Equal(configSpecName))
 				g.Expect(cm.Labels[constant.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
-				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(cfgcore.ReconfigureCreatedPhase))
+				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(core.ReconfigureCreatedPhase))
 				configHash = cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(configHash).NotTo(Equal(""))
-				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).To(BeTrue())
+				g.Expect(core.IsNotUserReconfigureOperation(cm)).To(BeTrue())
 				// g.Expect(cm.Annotations[constant.KBParameterUpdateSourceAnnotationKey]).To(Equal(constant.ReconfigureManagerSource))
 			}).Should(Succeed())
 
 			By("manager changes will not change the phase of configmap.")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data["new_data"] = "###"
-				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+				core.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
@@ -162,13 +162,13 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash).NotTo(Equal(configHash))
-				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).To(BeTrue())
+				g.Expect(core.IsNotUserReconfigureOperation(cm)).To(BeTrue())
 			}).Should(Succeed())
 
 			By("recover normal update parameters")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				delete(cm.Data, "new_data")
-				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+				core.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
@@ -176,14 +176,14 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash).To(Equal(configHash))
-				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).To(BeTrue())
+				g.Expect(core.IsNotUserReconfigureOperation(cm)).To(BeTrue())
 			}).Should(Succeed())
 
 			By("Update config, old version: " + configHash)
 			updatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = updatedCM.Data
-				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
+				core.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
 			})).Should(Succeed())
 
 			By("check config new version")
@@ -192,22 +192,22 @@ var _ = Describe("Reconfigure Controller", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash).NotTo(Equal(configHash))
-				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(cfgcore.ReconfigureAutoReloadPhase))
-				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
+				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(core.ReconfigureAutoReloadPhase))
+				g.Expect(core.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
 			}).Should(Succeed())
 
 			By("invalid Update")
 			invalidUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-invalid-update.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = invalidUpdatedCM.Data
-				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
+				core.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
 			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
+				g.Expect(core.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
 				// g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).Should(BeEquivalentTo(cfgcore.ReconfigureNoChangeType))
 			}).Should(Succeed())
 
@@ -215,15 +215,15 @@ var _ = Describe("Reconfigure Controller", func() {
 			restartUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update-with-restart.yaml", &corev1.ConfigMap{})
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = restartUpdatedCM.Data
-				cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
+				core.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
 			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cfgcore.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
-				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).Should(BeEquivalentTo(cfgcore.ReconfigureSimplePhase))
+				g.Expect(core.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
+				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).Should(BeEquivalentTo(core.ReconfigureSimplePhase))
 			}).Should(Succeed())
 		})
 	})

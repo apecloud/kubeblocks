@@ -27,7 +27,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 var _ = Describe("Handler Util Test", func() {

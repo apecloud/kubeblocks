@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type TemplateMerger interface {
@@ -85,7 +85,7 @@ type configOnlyAddMerger struct {
 
 func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
 	formatter := c.ccSpec.FormatterConfig
-	configPatch, err := cfgcore.TransformConfigPatchFromData(updatedData, formatter.Format, c.configSpec.Keys)
+	configPatch, err := core.TransformConfigPatchFromData(updatedData, formatter.Format, c.configSpec.Keys)
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +94,14 @@ func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string
 	}
 
 	r := make(map[string]string)
-	params := cfgcore.GenerateVisualizedParamsList(configPatch, formatter, nil)
+	params := core.GenerateVisualizedParamsList(configPatch, formatter, nil)
 	for key, patch := range splitParameters(params) {
 		v, ok := baseData[key]
 		if !ok {
 			r[key] = updatedData[key]
 			continue
 		}
-		newConfig, err := cfgcore.ApplyConfigPatch([]byte(v), patch, formatter)
+		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, formatter)
 		if err != nil {
 			return nil, err
 		}
@@ -111,11 +111,11 @@ func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string
 }
 
 func (c *configReplaceMerger) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
-	return cfgcore.MergeUpdatedConfig(baseData, updatedData), nil
+	return core.MergeUpdatedConfig(baseData, updatedData), nil
 }
 
 func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
-	return nil, cfgcore.MakeError("not implemented")
+	return nil, core.MakeError("not implemented")
 }
 
 func NewTemplateMerger(template appsv1alpha1.LazyRenderedTemplateSpec, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1alpha1.ConfigConstraintSpec) (TemplateMerger, error) {
@@ -131,7 +131,7 @@ func NewTemplateMerger(template appsv1alpha1.LazyRenderedTemplateSpec, ctx conte
 	var merger TemplateMerger
 	switch template.Policy {
 	default:
-		return nil, cfgcore.MakeError("unknown template policy: %s", template.Policy)
+		return nil, core.MakeError("unknown template policy: %s", template.Policy)
 	case appsv1alpha1.NoneMergePolicy:
 		merger = &noneOp{templateData}
 	case appsv1alpha1.PatchPolicy:
@@ -150,7 +150,7 @@ func mergerConfigTemplate(template *appsv1alpha1.LazyRenderedTemplateSpec,
 	baseData map[string]string,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
 	if configSpec.ConfigConstraintRef == "" {
-		return nil, cfgcore.MakeError("ConfigConstraintRef require not empty, configSpec[%v]", configSpec.Name)
+		return nil, core.MakeError("ConfigConstraintRef require not empty, configSpec[%v]", configSpec.Name)
 	}
 	ccObj := &appsv1alpha1.ConfigConstraint{}
 	ccKey := client.ObjectKey{
@@ -158,10 +158,10 @@ func mergerConfigTemplate(template *appsv1alpha1.LazyRenderedTemplateSpec,
 		Name:      configSpec.ConfigConstraintRef,
 	}
 	if err := cli.Get(ctx, ccKey, ccObj); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
+		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
 	if ccObj.Spec.FormatterConfig == nil {
-		return nil, cfgcore.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FormatterConfig, configSpec[%v]", configSpec)
+		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FormatterConfig, configSpec[%v]", configSpec)
 	}
 
 	templateMerger, err := NewTemplateMerger(*template, ctx, cli, builder, configSpec, &ccObj.Spec)
@@ -178,7 +178,7 @@ func mergerConfigTemplate(template *appsv1alpha1.LazyRenderedTemplateSpec,
 	return templateMerger.Merge(baseData, data)
 }
 
-func splitParameters(params []cfgcore.VisualizedParam) map[string]map[string]*string {
+func splitParameters(params []core.VisualizedParam) map[string]map[string]*string {
 	r := make(map[string]map[string]*string)
 	for _, param := range params {
 		if _, ok := r[param.Key]; !ok {

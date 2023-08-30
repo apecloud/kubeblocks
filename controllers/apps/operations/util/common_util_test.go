@@ -87,11 +87,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			opsRecordSlice, _ = GetOpsRequestSliceFromCluster(cluster)
 			Expect(len(opsRecordSlice) == 2 && opsRecordSlice[0].Name == testOpsName).Should(BeTrue())
 
-			By("test MarkRunningOpsRequestAnnotation function")
-			Expect(MarkRunningOpsRequestAnnotation(ctx, k8sClient, cluster)).Should(Succeed())
-			opsRecordSlice, _ = GetOpsRequestSliceFromCluster(cluster)
-			Expect(len(opsRecordSlice) == 1).Should(BeTrue())
-
 			By("test no OpsRequest annotation in cluster")
 			Expect(PatchClusterOpsAnnotations(ctx, k8sClient, cluster, nil)).Should(Succeed())
 			opsRecordSlice, _ = GetOpsRequestSliceFromCluster(cluster)

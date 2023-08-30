@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -56,7 +56,7 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	var funcs RollingUpgradeFuncs
 	switch params.WorkloadType() {
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgutil.MakeError("not support component workload type[%s]", params.WorkloadType())
+		return makeReturnedStatus(ESNotSupport), core.MakeError("not support component workload type[%s]", params.WorkloadType())
 	case appsv1alpha1.Stateless:
 		funcs = GetDeploymentRollingUpgradeFuncs()
 	case appsv1alpha1.Consensus:
@@ -79,7 +79,7 @@ func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod
 
 	match, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
-		return nil, cfgutil.WrapError(err, "failed to convert selector: %v", selector)
+		return nil, core.WrapError(err, "failed to convert selector: %v", selector)
 	}
 	for _, pod := range pods {
 		if match.Matches(labels.Set(pod.Labels)) {
@@ -94,7 +94,7 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		r        = ESNone
 		total    = int32(len(pods))
 		replicas = int32(params.getTargetReplicas())
-		progress = cfgutil.NotStarted
+		progress = core.NotStarted
 
 		err         error
 		ctx         = params.Ctx.Ctx
@@ -140,11 +140,11 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func getOnlineUpdateParams(configPatch *cfgutil.ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig) map[string]string {
+func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig) map[string]string {
 	r := make(map[string]string)
-	parameters := cfgutil.GenerateVisualizedParamsList(configPatch, formatConfig, nil)
+	parameters := core.GenerateVisualizedParamsList(configPatch, formatConfig, nil)
 	for _, key := range parameters {
-		if key.UpdateType == cfgutil.UpdatedType {
+		if key.UpdateType == core.UpdatedType {
 			for _, p := range key.Parameters {
 				if p.Value != nil {
 					r[p.Key] = *p.Value

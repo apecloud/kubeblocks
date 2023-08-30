@@ -123,11 +123,6 @@ func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx
 	return nil
 }
 
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (start StartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return getCompMapFromLastConfiguration(opsRequest)
-}
-
 // setOpsAnnotation sets the replicas snapshot of components before stopping the cluster to the annotations of this opsRequest.
 func (start StartOpsHandler) setOpsAnnotation(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentReplicasMap map[string]int32) error {
 	annotations := opsRes.OpsRequest.Annotations

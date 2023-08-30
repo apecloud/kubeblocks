@@ -351,7 +351,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 }
 
 func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	component *component.SynthesizedComponent, envConfigName string) (*workloads.ReplicatedStateMachine, error) {
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
@@ -446,8 +446,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		}
 	}
 
-	// TODO(free6om): refactor out rsm related envs
-	if err := processContainersInjection(reqCtx, cluster, component, "", &rsm.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &rsm.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return rsm, nil
@@ -844,20 +843,6 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 		}
 	}
 
-	// build common env, but not for statelsss workload
-	if component.WorkloadType != appsv1alpha1.Stateless {
-		commonEnv := buildWorkloadCommonEnv(cluster, component)
-		for k, v := range commonEnv {
-			envData[k] = v
-		}
-		// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
-		// build consensus env from cluster.status
-		consensusEnv := buildConsensusSetEnv(cluster, component)
-		for k, v := range consensusEnv {
-			envData[k] = v
-		}
-	}
-
 	config := corev1.ConfigMap{}
 	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":     cluster,
@@ -867,63 +852,6 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 		return nil, err
 	}
 	return &config, nil
-}
-
-// buildWorkloadCommonEnv builds common env for all workload types.
-func buildWorkloadCommonEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
-	prefix := constant.KBPrefix + "_"
-	cnt := strconv.Itoa(int(component.Replicas))
-	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	suffixes := make([]string, 0, 4+component.Replicas)
-	env := map[string]string{
-		prefix + "REPLICA_COUNT": cnt,
-	}
-
-	for j := 0; j < int(component.Replicas); j++ {
-		toA := strconv.Itoa(j)
-		suffix := toA + "_HOSTNAME"
-		value := fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+toA, svcName)
-		env[prefix+suffix] = value
-		suffixes = append(suffixes, suffix)
-	}
-
-	// set cluster uid to let pod know if the cluster is recreated
-	env[prefix+"CLUSTER_UID"] = string(cluster.UID)
-	suffixes = append(suffixes, "CLUSTER_UID")
-
-	// have backward compatible handling for CM key with 'compDefName' being part of the key name
-	// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
-	// and introduce env/cm key naming reference complexity
-	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
-	for _, s := range suffixes {
-		env[prefixWithCompDefName+s] = env[prefix+s]
-	}
-	env[prefixWithCompDefName+"N"] = env[prefix+"REPLICA_COUNT"]
-	return env
-}
-
-// buildConsensusSetEnv builds env for consensus workload.
-func buildConsensusSetEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
-	env := map[string]string{}
-	prefix := constant.KBPrefix + "_"
-	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
-	if v, ok := cluster.Status.Components[component.Name]; ok && v.ConsensusSetStatus != nil {
-		consensusSetStatus := v.ConsensusSetStatus
-		if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
-			env[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
-			env[prefixWithCompDefName+"LEADER"] = env[prefix+"LEADER"]
-		}
-		followers := make([]string, 0, len(consensusSetStatus.Followers))
-		for _, follower := range consensusSetStatus.Followers {
-			if follower.Pod == constant.ComponentStatusDefaultPodName {
-				continue
-			}
-			followers = append(followers, follower.Pod)
-		}
-		env[prefix+"FOLLOWERS"] = strings.Join(followers, ",")
-		env[prefixWithCompDefName+"FOLLOWERS"] = env[prefix+"FOLLOWERS"]
-	}
-	return env
 }
 
 func BuildBackup(cluster *appsv1alpha1.Cluster,

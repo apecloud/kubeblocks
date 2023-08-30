@@ -36,8 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -106,7 +107,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfigure.")
+		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfiguring.")
 		return intctrlutil.Reconciled()
 	}
 
@@ -160,7 +161,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if !configPatch.IsModify {
 		reqCtx.Recorder.Eventf(config, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
 			"nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, config, cfgcore.ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, config, core.ReconfigureNoChangeType)
 	}
 
 	reqCtx.Log.V(1).Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
@@ -184,11 +185,19 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			"related component does not have any configSpecs, skip reconfigure")
 		return intctrlutil.Reconciled()
 	}
-	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 {
+	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 && len(reconcileContext.RSMList) == 0 {
 		reqCtx.Recorder.Eventf(config,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
 		return intctrlutil.Reconciled()
+	}
+	// TODO(free6om): configuration controller needs workload type to do the config reloading job.
+	// it's a rather hacky way converting rsm to sts to make configuration controller works as usual.
+	// should make configuration controller recognizing rsm.
+	if len(reconcileContext.RSMList) > 0 {
+		for _, rsm := range reconcileContext.RSMList {
+			reconcileContext.StatefulSets = append(reconcileContext.StatefulSets, *components.ConvertRSMToSTS(&rsm))
+		}
 	}
 
 	return r.performUpgrade(reconfigureParams{
@@ -229,7 +238,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	}
 
 	returnedStatus, err := policy.Upgrade(params)
-	if err := r.handleConfigEvent(params, cfgcore.PolicyExecStatus{
+	if err := r.handleConfigEvent(params, core.PolicyExecStatus{
 		PolicyName:    policy.GetPolicyName(),
 		ExecStatus:    string(returnedStatus.Status),
 		SucceedCount:  returnedStatus.SucceedCount,
@@ -267,7 +276,7 @@ func getOpsRequestID(cm *corev1.ConfigMap) string {
 	return ""
 }
 
-func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status core.PolicyExecStatus, err error) error {
 	var (
 		cm             = params.ConfigMap
 		lastOpsRequest = ""
@@ -277,7 +286,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
 	}
 
-	eventContext := cfgcore.ConfigEventContext{
+	eventContext := intctrlutil.ConfigEventContext{
 		ConfigSpecName:   params.ConfigSpecName,
 		Client:           params.Client,
 		ReqCtx:           params.Ctx,
@@ -291,7 +300,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		PolicyStatus:     status,
 	}
 
-	for _, handler := range cfgcore.ConfigEventHandlerMap {
+	for _, handler := range intctrlutil.ConfigEventHandlerMap {
 		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(ExecStatus(status.ExecStatus)), err); err != nil {
 			return err
 		}

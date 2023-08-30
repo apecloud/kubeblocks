@@ -23,12 +23,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
@@ -87,7 +88,7 @@ func (w *configWrapper) ValidateRequiredParam(forceReplace bool) error {
 	// step2: check existence of configmap
 	cmObj := corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
-		Name:      cfgcore.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
+		Name:      core.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
 		Namespace: w.Namespace,
 	}
 	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), cmKey, w.Dynamic, &cmObj); err != nil {
@@ -99,7 +100,7 @@ func (w *configWrapper) ValidateRequiredParam(forceReplace bool) error {
 		return makeNotFoundConfigFileErr(w.configFileKey, w.configSpecName, cfgutil.ToSet(cmObj.Data).AsSlice())
 	}
 
-	if !forceReplace && !cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, w.configFileKey) {
+	if !forceReplace && !core.IsSupportConfigFileReconfigure(w.configTemplateSpec, w.configFileKey) {
 		return makeNotSupportConfigFileUpdateErr(w.configFileKey, w.configTemplateSpec)
 	}
 	return nil
@@ -114,7 +115,7 @@ func (w *configWrapper) fillComponent() error {
 		return err
 	}
 	if len(componentNames) != 1 {
-		return cfgcore.MakeError(multiComponentsErrorMessage)
+		return core.MakeError(multiComponentsErrorMessage)
 	}
 	w.componentName = componentNames[0]
 	return nil
@@ -171,7 +172,7 @@ func (w *configWrapper) fillConfigSpec() error {
 		w.configSpecName = supportUpdatedTpl[0].Name
 		return nil
 	}
-	return cfgcore.MakeError(multiConfigTemplateErrorMessage)
+	return core.MakeError(multiConfigTemplateErrorMessage)
 }
 
 func (w *configWrapper) fillConfigFile() error {
@@ -185,14 +186,14 @@ func (w *configWrapper) fillConfigFile() error {
 
 	cmObj := corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
-		Name:      cfgcore.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
+		Name:      core.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
 		Namespace: w.Namespace,
 	}
 	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), cmKey, w.Dynamic, &cmObj); err != nil {
 		return err
 	}
 	if len(cmObj.Data) == 0 {
-		return cfgcore.MakeError("not supported reconfiguring because there is no config file.")
+		return core.MakeError("not supported reconfiguring because there is no config file.")
 	}
 
 	keys := w.filterForReconfiguring(cmObj.Data)
@@ -200,13 +201,13 @@ func (w *configWrapper) fillConfigFile() error {
 		w.configFileKey = keys[0]
 		return nil
 	}
-	return cfgcore.MakeError(multiConfigFileErrorMessage)
+	return core.MakeError(multiConfigFileErrorMessage)
 }
 
 func (w *configWrapper) filterForReconfiguring(data map[string]string) []string {
 	keys := make([]string, 0, len(data))
 	for configFileKey := range data {
-		if cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, configFileKey) {
+		if core.IsSupportConfigFileReconfigure(w.configTemplateSpec, configFileKey) {
 			keys = append(keys, configFileKey)
 		}
 	}

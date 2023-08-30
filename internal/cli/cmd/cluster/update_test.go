@@ -84,10 +84,10 @@ var _ = Describe("cluster update", func() {
 			Expect(o.Patch).Should(ContainSubstring("terminationPolicy"))
 		})
 
-		It("set monitor", func() {
+		It("set monitoring interval", func() {
 			fakeCluster := testing.FakeCluster("c1", "default")
 			tf.FakeDynamicClient = testing.FakeDynamicClient(fakeCluster)
-			Expect(cmd.Flags().Set("monitor", "true")).Should(Succeed())
+			Expect(cmd.Flags().Set("monitoring-interval", "15")).Should(Succeed())
 			Expect(o.complete(cmd, args)).Should(Succeed())
 			Expect(o.Patch).Should(ContainSubstring("\"monitor\":true"))
 		})

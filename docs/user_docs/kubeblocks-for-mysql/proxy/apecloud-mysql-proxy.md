@@ -117,7 +117,7 @@ helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,pr
 
 ## Connect Proxy Cluster
 
-ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the MySQL Client accesses `vtgate` is similar to the way of accessing `mysqld`. The external SQL access address provided by ApeCloud MySQL Proxy is the `vtgate` address and port. The `vtgate` address created by KubeBlocks by default is `myproxy-cluster-vtgate-headless`, and the port number is `15306`. You can visit ApeCloud MySQL Proxy through the MySQL Client in any pod under the same namespace as ApeCloud MySQL Proxy.
+ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the MySQL Server accesses `vtgate` is similar to the way of accessing `mysqld`. The external SQL access address provided by ApeCloud MySQL Proxy is the `vtgate` address and port. The `vtgate` address created by KubeBlocks by default is `myproxy-cluster-vtgate-headless`, and the port number is `15306`. You can visit ApeCloud MySQL Proxy through the MySQL Server in any pod under the same namespace as ApeCloud MySQL Proxy.
 
 ### Connect Proxy Cluster by VTGate
 
@@ -149,13 +149,13 @@ kbcli cluster connect myproxy --component vtgate
 </TabItem>
 </Tabs>
 
-### Connect Proxy Cluster by MySQL Client
+### Connect Proxy Cluster by MySQL Server
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
-Run the command below to connect to the MySQL Client.
+Run the command below to connect to the MySQL Server.
 
 ```bash
 kbcli cluster connect myproxy
@@ -165,7 +165,7 @@ kbcli cluster connect myproxy
 
 <TabItem value="port-forward" label="port-forward">
 
-1. Expose the port of the MySQL client to the localhost so that the localhost can access the MySQL client.
+1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
 
    ```bash
    kubectl port-forward svc/vt-mysql 3306:3306
@@ -190,7 +190,7 @@ For VTGate,
 while true; do date; kubectl port-forward svc/vt-vtgate-headless 15306:15306; sleep 0.5; done
 ```
 
-For the MySQL Client,
+For the MySQL Server,
 
 ```bash
 while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; done
@@ -235,7 +235,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
 ### Reconfigure parameters
 
-1. View the current values in the MySQL client.
+1. View the current values in the MySQL Server.
 
    ```bash
    kbcli cluster connect myproxy --component=vtgate

@@ -201,6 +201,9 @@ func (r *OpsRequest) validateEntry(isCreate bool) error {
 func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster) error {
+	if webhookMgr == nil {
+		return nil
+	}
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -279,6 +282,9 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
 func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
+	if webhookMgr == nil || webhookMgr.client == nil {
+		return nil
+	}
 	reconfigure := r.Spec.Reconfigure
 	if reconfigure == nil {
 		return notEmptyError("spec.reconfigure")

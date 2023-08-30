@@ -65,11 +65,11 @@ When adopting a multi-cloud or hybrid cloud strategy, it is essential to priorit
   
 ## Get started with KubeBlocks
 
-[Quick Start](https://kubeblocks.io/docs/preview/user_docs/quick-start/try-kubeblocks-on-your-laptop) shows you the quickest way to get started with KubeBlocks.
+[Quick Start](https://kubeblocks.io/docs/preview/user_docs/try-out-on-playground/try-kubeblocks-on-your-laptop) shows you the quickest way to get started with KubeBlocks.
 
 ## Community
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-1yyjf0rnn-bdYnuXLmjI_USzshhrWgKg)
+- KubeBlocks [Slack Channel](https://kubeblocks.slack.com/join/shared_invite/zt-22cx5p0y9-~BDNuPqxkdgswI_FSdx_8g)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 
 ## Contributing to KubeBlocks

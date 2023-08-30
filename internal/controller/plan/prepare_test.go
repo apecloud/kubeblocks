@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -446,7 +446,7 @@ var _ = Describe("Cluster Controller", func() {
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
 					podSpec := sts.Spec.Template.Spec
-					Expect(len(podSpec.Containers)).Should(Equal(3))
+					Expect(len(podSpec.Containers)).Should(Equal(4))
 				}
 			}
 			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec

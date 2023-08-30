@@ -26,13 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/generics"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	clitypes "github.com/apecloud/kubeblocks/internal/cli/types"
 	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -115,7 +114,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Get configuration information from cluster")
 		componentName = clusterObj.Spec.ComponentSpecs[0].ComponentDefRef
-		tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs,
+		tpls, err := core.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs,
 			clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)
 		Expect(err).Should(BeNil())
 		Expect(len(tpls) > 0).Should(BeTrue())
@@ -130,7 +129,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		Expect(len(validTpls) > 0).Should(BeTrue())
 
 		cmObj = &corev1.ConfigMap{}
-		cmName := cfgcore.GetComponentCfgName(clusterObj.Name, componentName, tpls[0].Name)
+		cmName := core.GetComponentCfgName(clusterObj.Name, componentName, tpls[0].Name)
 		err = cliutil.GetResourceObjectFromGVR(clitypes.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: testCtx.DefaultNamespace,

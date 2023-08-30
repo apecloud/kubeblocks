@@ -34,7 +34,7 @@ var _ componentWorkloadBuilder = &rsmComponentWorkloadBuilder{}
 func (b *rsmComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		component := b.Comp.GetSynthesizedComponent()
-		obj, err := builder.BuildRSM(b.ReqCtx, b.Comp.GetCluster(), component)
+		obj, err := builder.BuildRSM(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -44,9 +44,4 @@ func (b *rsmComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 		return nil, nil // don't return sts here
 	}
 	return b.BuildWrapper(buildfn)
-}
-
-// BuildEnv overrides internal.ComponentWorkloadBuilderBase as env has been pushed down to rsm
-func (b *rsmComponentWorkloadBuilder) BuildEnv() componentWorkloadBuilder {
-	return b.ConcreteBuilder
 }

@@ -3,7 +3,7 @@ title: Connect to a Kafka cluster
 description: Guide for cluster creation for kafka
 keywords: [kafka, cluster, connect, network]
 sidebar_position: 2
-sidebar_label: Connect to a kafka cluster 
+sidebar_label: Connect
 ---
 ## Overview
 

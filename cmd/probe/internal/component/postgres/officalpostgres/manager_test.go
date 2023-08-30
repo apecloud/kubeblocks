@@ -172,7 +172,7 @@ func TestGetMemberAddrs(t *testing.T) {
 	})
 
 	t.Run("get addrs", func(t *testing.T) {
-		cluster.ClusterCompName = "test"
+		cluster.ClusterCompName = "pg"
 		cluster.Members = append(cluster.Members, dcs.Member{
 			Name:   "test",
 			DBPort: "5432",
@@ -180,7 +180,7 @@ func TestGetMemberAddrs(t *testing.T) {
 		addrs := manager.GetMemberAddrs(ctx, cluster)
 
 		assert.Equal(t, 1, len(addrs))
-		assert.Equal(t, "test.test-headless:5432", addrs[0])
+		assert.Equal(t, "test.pg-headless:5432", addrs[0])
 	})
 }
 

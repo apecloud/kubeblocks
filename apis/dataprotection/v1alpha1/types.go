@@ -27,16 +27,6 @@ const (
 	BackupTypeSnapshot BackupType = "snapshot"
 )
 
-// BackupMethod the backup method
-// +enum
-// +kubebuilder:validation:Enum={snapshot,backupTool}
-type BackupMethod string
-
-const (
-	BackupMethodSnapshot   BackupMethod = "snapshot"
-	BackupMethodBackupTool BackupMethod = "backupTool"
-)
-
 // BaseBackupType the base backup type.
 // +enum
 // +kubebuilder:validation:Enum={full,snapshot}

@@ -38,7 +38,7 @@ type BackupSpec struct {
 
 	// backupMethod specifies the backup method name that is defined in backupPolicy.
 	// +kubebuilder:validation:Required
-	BackupMethod BackupMethod `json:"backupMethod"`
+	BackupMethod string `json:"backupMethod"`
 
 	// parentBackupName specifies the parent backup name. If backup type of BackupMethod
 	// is incremental or differential, ParentBackupName is required.
@@ -101,14 +101,28 @@ type BackupStatus struct {
 	// +optional
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
-	// Backup total size.
-	// A string with capacity units in the form of "1Gi", "1Mi", "1Ki".
+	// totalSize is the total size of backed up data size.
+	// A string with capacity units in the format of "1Gi", "1Mi", "1Ki".
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 
 	// failureReason is an error that caused the backup to fail.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// backupRepoName is the name of the backup repository.
+	// +optional
+	BackupRepoName string `json:"backupRepoName,omitempty"`
+
+	// path is the directory inside the backup repository where the backup data is stored.
+	// It is an absolute path in the backup repository.
+	// +optional
+	Path string `json:"path,omitempty"`
+
+	// timeRange records the time range of backed up data, for PITR, this is the
+	// time range of recoverable data.
+	// +optional
+	TimeRange *BackupTimeRange `json:"timeRange,omitempty"`
 
 	// remoteVolume saves the backup data.
 	// +optional
@@ -204,6 +218,18 @@ type BackupToolManifestsStatus struct {
 	// backup checkpoint, for incremental backup.
 	// +optional
 	Checkpoint string `json:"checkpoint,omitempty"`
+}
+
+// BackupTimeRange records the time range of backed up data, for PITR, this is the
+// time range of recoverable data.
+type BackupTimeRange struct {
+	// start records the start time of backup.
+	// +optional
+	Start *metav1.Time `json:"start,omitempty"`
+
+	// end records the end time of backup.
+	// +optional
+	End *metav1.Time `json:"end,omitempty"`
 }
 
 // BackupDeletionPolicy describes a policy for end-of-life maintenance of backup content.

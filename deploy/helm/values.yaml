@@ -321,6 +321,14 @@ dataProtection:
   backupPVConfigMapName: ""
   backupPVConfigMapNamespace: ""
 
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/dataprotection
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: ""
+    imagePullSecrets: [ ]
+
 ## BackupRepo settings
 ##
 ## @param backupRepo.create - creates a backup repo during installation

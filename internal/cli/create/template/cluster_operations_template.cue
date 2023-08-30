@@ -35,7 +35,7 @@ options: {
 	storage:  string
 	vctNames: [...string]
 	keyValues: [string]: {string | null}
-  fileContent: string
+	fileContent:     string
 	cfgTemplateName: string
 	cfgFile:         string
 	forceRestart:    bool

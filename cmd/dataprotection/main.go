@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -46,17 +45,10 @@ import (
 	// +kubebuilder:scaffold:imports
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
-	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
-	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
-	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -70,6 +62,18 @@ const (
 	appName = "kubeblocks"
 )
 
+type flagName string
+
+const (
+	probeAddrFlagKey     flagName = "health-probe-bind-address"
+	metricsAddrFlagKey   flagName = "metrics-bind-address"
+	leaderElectFlagKey   flagName = "leader-elect"
+	leaderElectIDFlagKey flagName = "leader-elect-id"
+
+	dataProtectionFlagKey flagName = "dataprotection"
+	storageFlagKey        flagName = "storage"
+)
+
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -77,13 +81,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(dpv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
-	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
@@ -107,83 +107,17 @@ func init() {
 	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
-	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, true)
-	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
 
-type flagName string
-
-const (
-	probeAddrFlagKey     flagName = "health-probe-bind-address"
-	metricsAddrFlagKey   flagName = "metrics-bind-address"
-	leaderElectFlagKey   flagName = "leader-elect"
-	leaderElectIDFlagKey flagName = "leader-elect-id"
-
-	// switch flags key for API groups
-	appsFlagKey           flagName = "apps"
-	dataProtectionFlagKey flagName = "dataprotection"
-	extensionsFlagKey     flagName = "extensions"
-	workloadsFlagKey      flagName = "workloads"
-	storageFlagKey        flagName = "storage"
-)
-
-func (r flagName) String() string {
-	return string(r)
-}
-
-func (r flagName) viperName() string {
-	return strings.ReplaceAll(r.String(), "-", "_")
-}
-
-func validateRequiredToParseConfigs() error {
-	validateTolerations := func(val string) error {
-		if val == "" {
-			return nil
-		}
-		var tolerations []corev1.Toleration
-		return json.Unmarshal([]byte(val), &tolerations)
-	}
-
-	validateAffinity := func(val string) error {
-		if val == "" {
-			return nil
-		}
-		affinity := corev1.Affinity{}
-		return json.Unmarshal([]byte(val), &affinity)
-	}
-
-	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {
-		if _, err := time.ParseDuration(jobTTL); err != nil {
-			return err
-		}
-	}
-	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
-		return err
-	}
-	if err := validateAffinity(viper.GetString(constant.CfgKeyCtrlrMgrAffinity)); err != nil {
-		return err
-	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
-		nodeSelector := map[string]string{}
-		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
-			return err
-		}
-	}
-	if err := validateTolerations(viper.GetString(constant.CfgKeyDataPlaneTolerations)); err != nil {
-		return err
-	}
-	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
-		return err
-	}
-	return nil
-}
-
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var enableLeaderElectionID string
-	var probeAddr string
+	var (
+		metricsAddr            string
+		enableLeaderElection   bool
+		enableLeaderElectionID string
+		probeAddr              string
+	)
+
 	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
 	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
 	flag.Bool(leaderElectFlagKey.String(), false,
@@ -194,15 +128,9 @@ func main() {
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
 
-	flag.Bool(appsFlagKey.String(), true,
-		"Enable the apps controller manager.")
-	flag.Bool(dataProtectionFlagKey.String(), false,
+	flag.Bool(dataProtectionFlagKey.String(), true,
 		"Enable the dataprotection controller manager. ")
-	flag.Bool(extensionsFlagKey.String(), true,
-		"Enable the extensions controller manager. ")
-	flag.Bool(workloadsFlagKey.String(), true,
-		"Enable the workloads controller manager. ")
-	flag.Bool(storageFlagKey.String(), true,
+	flag.Bool(storageFlagKey.String(), false,
 		"Enable the storage controller manager. ")
 
 	opts := zap.Options{
@@ -284,98 +212,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if viper.GetBool(appsFlagKey.viperName()) {
-		if err = (&appscontrollers.ClusterReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ClusterDefinitionReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-definition-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ClusterDefinition")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ClusterVersionReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-version-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ClusterVersion")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.OpsRequestReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigConstraintReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ReconfigureRequestReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.SystemAccountReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("system-account-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "SystemAccount")
-			os.Exit(1)
-		}
-
-		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
-		}
-
-		if err = (&k8scorecontrollers.PersistentVolumeClaimReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("pvc-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ComponentClassReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("class-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Class")
-			os.Exit(1)
-		}
-	}
-
 	if viper.GetBool(dataProtectionFlagKey.viperName()) {
 		if err = (&dataprotectioncontrollers.BackupToolReconciler{
 			Client:   mgr.GetClient(),
@@ -432,29 +268,6 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(extensionsFlagKey.viperName()) {
-		if err = (&extensionscontrollers.AddonReconciler{
-			Client:     mgr.GetClient(),
-			Scheme:     mgr.GetScheme(),
-			Recorder:   mgr.GetEventRecorderFor("addon-controller"),
-			RestConfig: mgr.GetConfig(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Addon")
-			os.Exit(1)
-		}
-	}
-
-	if viper.GetBool(workloadsFlagKey.viperName()) {
-		if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
-			os.Exit(1)
-		}
-	}
-
 	if viper.GetBool(storageFlagKey.viperName()) {
 		if err = (&storagecontrollers.StorageProviderReconciler{
 			Client:   mgr.GetClient(),
@@ -468,33 +281,7 @@ func main() {
 	// +kubebuilder:scaffold:builder
 
 	if viper.GetBool("enable_webhooks") {
-
 		appsv1alpha1.RegisterWebhookManager(mgr)
-
-		if err = (&appsv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterVersion")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
-			os.Exit(1)
-		}
-
-		if err = (&workloadsv1alpha1.ReplicatedStateMachine{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ReplicatedStateMachine")
-			os.Exit(1)
-		}
 
 		if err = webhook.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to setup webhook")
@@ -529,4 +316,44 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func (r flagName) String() string {
+	return string(r)
+}
+
+func (r flagName) viperName() string {
+	return strings.ReplaceAll(r.String(), "-", "_")
+}
+
+func validateRequiredToParseConfigs() error {
+	validateTolerations := func(val string) error {
+		if val == "" {
+			return nil
+		}
+		var tolerations []corev1.Toleration
+		return json.Unmarshal([]byte(val), &tolerations)
+	}
+
+	validateAffinity := func(val string) error {
+		if val == "" {
+			return nil
+		}
+		affinity := corev1.Affinity{}
+		return json.Unmarshal([]byte(val), &affinity)
+	}
+
+	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
+		return err
+	}
+	if err := validateAffinity(viper.GetString(constant.CfgKeyCtrlrMgrAffinity)); err != nil {
+		return err
+	}
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
+		nodeSelector := map[string]string{}
+		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
+			return err
+		}
+	}
+	return nil
 }

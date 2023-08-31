@@ -16,7 +16,7 @@ spec:
               - name: MODEL_NAME
                 value: baichuan-inc/Baichuan-13B-Chat
               - name: EXTRA_ARGS
-                value: "--trust-remote-code"
+                value: "--trust-remote-code --gpu-memory-utilization 0.95"
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -94,6 +94,6 @@ spec:
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
             env:
               - name: MODEL_NAME
-                value: TheBloke/Llama-2-70B-chat-GPTQ
+                value: NousResearch/Llama-2-13b-hf
               - name: EXTRA_ARGS
-                value: "--trust-remote-code"
+                value: "--trust-remote-code --swap-space 1 --gpu-memory-utilization 0.95"

@@ -127,12 +127,14 @@ var _ = Describe("replicated_state_machine builder", func() {
 			Command: []string{"bar-2"},
 		}
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
-		service := corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:     "foo",
-					Protocol: corev1.ProtocolTCP,
-					Port:     port,
+		service := &corev1.Service{
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "foo",
+						Protocol: corev1.ProtocolTCP,
+						Port:     port,
+					},
 				},
 			},
 		}

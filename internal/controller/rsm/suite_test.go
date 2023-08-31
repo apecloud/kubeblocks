@@ -21,6 +21,7 @@ package rsm
 
 import (
 	"context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -104,13 +105,24 @@ var (
 		MemberLeaveAction: &workloads.Action{Command: []string{"cmd"}},
 	}
 
-	service = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{
-			{
-				Name:       "svc",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       12345,
-				TargetPort: intstr.FromString("my-svc"),
+	service = &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "foo-cluster-definition",
+				constant.AppInstanceLabelKey:    "foo-cluster",
+				constant.KBAppComponentLabelKey: name,
+				constant.AppComponentLabelKey:   name + "def",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "svc",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromString("my-svc"),
+				},
 			},
 		},
 	}

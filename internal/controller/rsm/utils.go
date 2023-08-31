@@ -535,12 +535,11 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 				labels[key] = value
 			}
 		}
-		labels[workloadsManagedByLabelKey] = kindReplicatedStateMachine
 		return labels
 	}
 	return map[string]string{
-		constant.AppInstanceLabelKey: rsm.Name,
 		workloadsManagedByLabelKey:   kindReplicatedStateMachine,
+		workloadsInstanceLabelKey: rsm.Name,
 	}
 }
 

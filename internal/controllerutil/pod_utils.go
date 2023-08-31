@@ -86,7 +86,7 @@ func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.Co
 // GetPodContainerWithVolumeMount searches for containers mounting the volume
 func GetPodContainerWithVolumeMount(podSpec *corev1.PodSpec, volumeName string) []*corev1.Container {
 	containers := podSpec.Containers
-	if len(containers) == 0 {
+	if len(containers) == 0 || volumeName == "" {
 		return nil
 	}
 	return getContainerWithVolumeMount(containers, volumeName)

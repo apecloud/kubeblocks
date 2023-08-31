@@ -17,14 +17,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package plan
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -59,12 +62,50 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
 					return nil, err
 				}
-				secretRefName := GenerateConnCredential(referencedCluster.Name)
+				secretRefName := component.GenerateConnCredential(referencedCluster.Name)
 				secretRef := &corev1.Secret{}
 				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: secretRefName}, secretRef); err != nil {
 					return nil, err
 				}
-				// TODO: generate service connection credential from secretRef
+				sccBuilder := builder.NewServiceConnectionCredentialBuilder(reqCtx.Req.Namespace, serviceRefDecl.Name)
+				// use cd.Spec.Type as the default Kind and use cluster.Spec.ClusterVersionRef as the default Version
+				sccBuilder.SetKind(clusterDef.Spec.Type)
+				sccBuilder.SetVersion(cluster.Spec.ClusterVersionRef)
+				sccBuilder.SetEndpoint(appsv1alpha1.CredentialVar{
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+							Key:                  "endpoint",
+						},
+					},
+				})
+				sccBuilder.SetAuth(appsv1alpha1.ConnectionCredentialAuth{
+					Username: &appsv1alpha1.CredentialVar{
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+								Key:                  "username",
+							},
+						},
+					},
+					Password: &appsv1alpha1.CredentialVar{
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+								Key:                  "password",
+							},
+						},
+					},
+				})
+				sccBuilder.SetPort(appsv1alpha1.CredentialVar{
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+							Key:                  "port",
+						},
+					},
+				})
+				serviceReferences[serviceRefDecl.Name] = sccBuilder.GetObject()
 			}
 
 			if serviceRef.ConnectionCredential != "" {

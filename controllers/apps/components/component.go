@@ -22,6 +22,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -121,7 +122,7 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	serviceReferences, err := component.GenServiceReferences(reqCtx, cli, cluster, clusterDef, compDef, compSpec)
+	serviceReferences, err := plan.GenServiceReferences(reqCtx, cli, cluster, clusterDef, compDef, compSpec)
 	if err != nil {
 		return nil, err
 	}

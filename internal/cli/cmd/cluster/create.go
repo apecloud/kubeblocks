@@ -35,6 +35,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -212,6 +213,8 @@ type CreateOptions struct {
 	// backup config
 	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`
 
+	Cmd *cobra.Command `json:"-"`
+
 	UpdatableFlags
 	create.CreateOptions `json:"-"`
 }
@@ -254,6 +257,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	// add all subcommands for supported cluster type
 	cmd.AddCommand(buildCreateSubCmds(&o.CreateOptions)...)
+
+	o.Cmd = cmd
 
 	return cmd
 }
@@ -1364,77 +1369,43 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 }
 
 func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
-	// set default value in here
-	// if set in flag, we don't know whether it is set by user or default value
-	defaultRetentionPeriod := "1d"
-	defaultMethod := "snapshot"
+	// set default backup config
+	o.BackupConfig = &appsv1alpha1.ClusterBackup{
+		Method: dataprotectionv1alpha1.BackupMethodSnapshot,
+	}
 
-	// get backup config from cluster
+	// if the cls.Backup isn't nil, use the backup config in cluster
 	if cls != nil && cls.Spec.Backup != nil {
-		backup := cls.Spec.Backup
-		if backup.Enabled != nil && !o.BackupEnabled {
-			o.BackupEnabled = *backup.Enabled
-		}
-		if backup.RetentionPeriod != nil && o.BackupRetentionPeriod == "" {
-			o.BackupRetentionPeriod = *backup.RetentionPeriod
-		}
-		if backup.Method != "" && o.BackupMethod == "" {
-			o.BackupMethod = string(backup.Method)
-		}
-		if backup.CronExpression != "" && o.BackupCronExpression == "" {
-			o.BackupCronExpression = backup.CronExpression
-		}
-		if backup.StartingDeadlineMinutes != nil && o.BackupStartingDeadlineMinutes == 0 {
-			o.BackupStartingDeadlineMinutes = *backup.StartingDeadlineMinutes
-		}
-		if backup.RepoName != "" && o.BackupRepoName == "" {
-			o.BackupRepoName = backup.RepoName
-		}
-		if backup.PITREnabled != nil && !o.BackupPITREnabled {
-			o.BackupPITREnabled = *backup.PITREnabled
-		}
+		o.BackupConfig = cls.Spec.Backup
 	}
 
-	o.BackupConfig = new(appsv1alpha1.ClusterBackup)
-	if o.BackupEnabled {
-		o.BackupConfig.Enabled = &o.BackupEnabled
-	}
+	// check the flag is ser by user or not
+	var flags []*pflag.Flag
+	o.Cmd.Flags().Visit(func(flag *pflag.Flag) {
+		flags = append(flags, flag)
+	})
 
-	if o.BackupRetentionPeriod != "" {
-		// judge whether val end with the 'd'|'D'|'h'|'H' character
-		lastChar := o.BackupRetentionPeriod[len(o.BackupRetentionPeriod)-1]
-		if lastChar != 'd' && lastChar != 'D' && lastChar != 'h' && lastChar != 'H' {
-			return fmt.Errorf("invalid retention period: %s, only support d|D|h|H", o.BackupRetentionPeriod)
+	// if the flag is set by user, use the flag value
+	for _, flag := range flags {
+		switch flag.Name {
+		case "backup-enabled":
+			o.BackupConfig.Enabled = &o.BackupEnabled
+		case "backup-retention-period":
+			o.BackupConfig.RetentionPeriod = &o.BackupRetentionPeriod
+		case "backup-method":
+			o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(o.BackupMethod)
+		case "backup-cron-expression":
+			if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
+				return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+			}
+			o.BackupConfig.CronExpression = o.BackupCronExpression
+		case "backup-starting-deadline-minutes":
+			o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
+		case "backup-repo-name":
+			o.BackupConfig.RepoName = o.BackupRepoName
+		case "pitr-enabled":
+			o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 		}
-		o.BackupConfig.RetentionPeriod = &o.BackupRetentionPeriod
-	} else {
-		// set default retention period
-		o.BackupConfig.RetentionPeriod = &defaultRetentionPeriod
-	}
-
-	if o.BackupCronExpression != "" {
-		// validate the cron expression
-		if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
-			return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
-		}
-		o.BackupConfig.CronExpression = o.BackupCronExpression
-	}
-
-	if o.BackupMethod != "" {
-		o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(o.BackupMethod)
-	} else {
-		// set default backup method
-		o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(defaultMethod)
-	}
-
-	if o.BackupStartingDeadlineMinutes != 0 {
-		o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
-	}
-	if o.BackupRepoName != "" {
-		o.BackupConfig.RepoName = o.BackupRepoName
-	}
-	if o.BackupPITREnabled {
-		o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 	}
 
 	return nil

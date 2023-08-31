@@ -571,7 +571,7 @@ var _ = Describe("pod utils", func() {
 					envFrom:    "test-config-env",
 					filters: []containerNameFilter{
 						func(name string) bool {
-							return name == "mysql"
+							return false
 						},
 					},
 				},

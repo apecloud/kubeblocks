@@ -29,12 +29,15 @@ import (
 	"cuelang.org/go/encoding/openapi"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 const (
 	SchemaFieldName    = "schemas"
 	ComponentFieldName = "components"
+	DefaultSchemaName  = "spec"
+	SchemaStructType   = "object"
 )
 
 // GenerateOpenAPISchema generates openapi schema from cue type Definitions.
@@ -49,11 +52,11 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 		return nil, err
 	}
 
-	var path cue.Value
+	var rootValue cue.Value
 	if schemaType != "" {
-		path = rt.Underlying().LookupPath(cue.MakePath(cue.Def(schemaType)))
-		if path.Err() != nil {
-			return nil, core.MakeError(errors.Details(path.Err(), nil))
+		rootValue = rt.Underlying().LookupPath(cue.MakePath(cue.Def(schemaType)))
+		if rootValue.Err() != nil {
+			return nil, core.MakeError(errors.Details(rootValue.Err(), nil))
 		}
 	} else {
 		defs, err := rt.Underlying().Fields(cue.Definitions(true))
@@ -64,12 +67,12 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 			return nil, core.MakeError("no definitions found")
 		}
 		schemaType = strings.Trim(defs.Label(), "#")
-		path = defs.Value()
+		rootValue = defs.Value()
 	}
 
 	v := rt.Context().CompileString(fmt.Sprintf("#%s", schemaType))
 	defPath := cue.MakePath(cue.Def(schemaType))
-	defSche := v.FillPath(defPath, path)
+	defSche := v.FillPath(defPath, rootValue)
 	openapiOption := &openapi.Config{
 		Version:          openAPIVersion,
 		SelfContained:    true,
@@ -112,38 +115,62 @@ func getSchemas(f *ast.File, schemaType string) ([]ast.Decl, error) {
 	return nil, core.MakeError("not a struct literal")
 }
 
-func transformOpenAPISchema(rt *Runtime, cueSchema []ast.Decl, refFn func(path string) (*apiextv1.JSONSchemaProps, error)) (*apiextv1.JSONSchemaProps, error) {
+func transformOpenAPISchema(rt *Runtime, cueSchema []ast.Decl, resolveFn func(path string) (*apiextv1.JSONSchemaProps, error)) (*apiextv1.JSONSchemaProps, error) {
 	jsonProps, err := FromCueAST(rt, cueSchema)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := deReferenceSchema(jsonProps, refFn); err != nil {
+	if err := deReferenceSchema(jsonProps, resolveFn); err != nil {
 		return nil, err
 	}
 	r := apiextv1.JSONSchemaProps{
-		Type: "object",
+		Type: SchemaStructType,
 		Properties: map[string]apiextv1.JSONSchemaProps{
-			"spec": *jsonProps,
+			DefaultSchemaName: *jsonProps,
 		},
 	}
 	return &r, nil
 }
 
-func deReferenceSchema(props *apiextv1.JSONSchemaProps, fn func(path string) (*apiextv1.JSONSchemaProps, error)) error {
+func deReferenceSchema(props *apiextv1.JSONSchemaProps, resolveFn func(path string) (*apiextv1.JSONSchemaProps, error)) (err error) {
+	resolve := func(props *apiextv1.JSONSchemaProps) (*apiextv1.JSONSchemaProps, error) {
+		if props.Ref == nil {
+			return props, nil
+		}
+		refProps, err := resolveFn(*props.Ref)
+		if err != nil {
+			return nil, err
+		}
+		return refProps, nil
+	}
+
+	oneProps := func(props *apiextv1.JSONSchemaProps) (*apiextv1.JSONSchemaProps, error) {
+		schemaProps, err := resolve(props)
+		if err != nil {
+			return nil, err
+		}
+		// recursively deReference to schemaProps
+		if err = deReferenceSchema(schemaProps, resolveFn); err != nil {
+			return nil, err
+		}
+		return schemaProps, nil
+	}
+
+	// process additionalProperties
+	if props.AdditionalProperties != nil && props.AdditionalProperties.Schema != nil {
+		props.AdditionalProperties.Schema, err = oneProps(props.AdditionalProperties.Schema)
+		if err != nil {
+			return
+		}
+	}
 	for key := range props.Properties {
-		schemaProps := props.Properties[key]
-		if schemaProps.Ref != nil {
-			refProps, err := fn(*schemaProps.Ref)
-			if err != nil {
-				return err
-			}
-			schemaProps = *refProps
+		schemaProps := util.ToPointer(props.Properties[key])
+		schemaProps, err = oneProps(schemaProps)
+		if err != nil {
+			return
 		}
-		if err := deReferenceSchema(&schemaProps, fn); err != nil {
-			return err
-		}
-		props.Properties[key] = schemaProps
+		props.Properties[key] = *schemaProps
 	}
 	return nil
 }

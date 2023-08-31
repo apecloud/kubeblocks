@@ -290,12 +290,12 @@ func (r *configObserverOptions) printConfigConstraint(schema *apiext.JSONSchemaP
 	var (
 		maxDocumentLength = 100
 		maxEnumLength     = 20
-		spec              = schema.Properties["spec"]
+		spec              = schema.Properties[openapi.DefaultSchemaName]
 		params            = make([]*parameterSchema, 0)
 	)
 
 	for key, property := range openapi.FlattenSchema(spec).Properties {
-		if property.Type == "object" {
+		if property.Type == openapi.SchemaStructType {
 			continue
 		}
 		if r.hasSpecificParam() && !r.isSpecificParam(key) {

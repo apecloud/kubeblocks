@@ -383,14 +383,10 @@ spec:
                         KubeBlocks clusters: These services are provided by other
                         KubeBlocks clusters. You can bind to these services by specifying
                         the name of the hosting cluster. It is important to note that
-                        the hosting cluster should be in the same namespace. Service
-                        provided by other components within the current Cluster: It
-                        enables service references between components within the same
-                        cluster. This allows components in the same cluster to interact
-                        and communicate with each other by referencing the services
-                        provided by other components. Each type of service reference
-                        requires specific configurations and bindings to establish
-                        the connection and interaction with the respective services.'
+                        the hosting cluster should be in the same namespace. Each
+                        type of service reference requires specific configurations
+                        and bindings to establish the connection and interaction with
+                        the respective services.'
                       items:
                         properties:
                           cluster:
@@ -401,19 +397,7 @@ spec:
                               KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential
                               corresponding to the referenced Cluster will be used
                               to bind to the current component. If you have specified
-                              a Cluster, please do not simultaneously specify both
-                              a Component and a ConnectionCredential.
-                            type: string
-                          component:
-                            description: When referencing a service provided by other
-                              components within the current Cluster, you need to provide
-                              the name of the component being referenced within the
-                              current Cluster. By default, when other component within
-                              the current Cluster are referenced, the ClusterDefinition.spec.ComponentDefs[name].connectionCredential
-                              corresponding to the referenced component will be used
-                              to bind to the current component. If you have specified
-                              a Component, please do not simultaneously specify both
-                              a Cluster and a ConnectionCredential.
+                              a Cluster, please do not specify a ConnectionCredential.
                             type: string
                           connectionCredential:
                             description: connectionCredential defines the credential
@@ -424,8 +408,7 @@ spec:
                               object should be in the same namespace with the cluster.
                               And connectionCredential is the name of the ServiceConnectionCredential
                               object. If you have specified a ConnectionCredential,
-                              please do not simultaneously specify both a Cluster
-                              and a Component.
+                              please do not specify a Cluster
                             type: string
                           name:
                             description: name of the predefined service reference.

@@ -121,7 +121,11 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, clusterDef, compDef, compSpec, compVer)
+	serviceReferences, err := component.GenServiceReferences(reqCtx, cli, cluster, clusterDef, compDef, compSpec)
+	if err != nil {
+		return nil, err
+	}
+	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, clusterDef, compDef, compSpec, serviceReferences, compVer)
 	if err != nil {
 		return nil, err
 	}

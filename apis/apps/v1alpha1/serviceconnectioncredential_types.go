@@ -26,6 +26,14 @@ import (
 
 // ServiceConnectionCredentialSpec defines the desired state of ServiceConnectionCredential
 type ServiceConnectionCredentialSpec struct {
+	// The type of the service reference.
+	// +kubebuilder:validation:Required
+	Kind string `json:"kind"`
+
+	// The version of the service reference.
+	// +kubebuilder:validation:Required
+	Version string `json:"version"`
+
 	// endpoint is the endpoint of the service connection credential.
 	// +optional
 	Endpoint *CredentialVar `json:"endpoint,omitempty"`

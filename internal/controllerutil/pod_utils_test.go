@@ -233,6 +233,24 @@ var _ = Describe("pod utils", func() {
 		container3 := container.DeepCopy()
 		container3.Name = "mysql3"
 		container3.VolumeMounts[0].Name += "_not_found"
+		container3.EnvFrom = []corev1.EnvFromSource{
+			{
+				ConfigMapRef: &corev1.ConfigMapEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "test-config-env"},
+				},
+			},
+		}
+
+		container4 := container.DeepCopy()
+		container4.Name = "mysql4"
+		container4.VolumeMounts = nil
+		container4.EnvFrom = []corev1.EnvFromSource{
+			{
+				ConfigMapRef: &corev1.ConfigMapEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "test-config-env"},
+				},
+			},
+		}
 
 		statefulSet.Spec.Template.Spec.Containers = []corev1.Container{
 			*container2, *container3, container}
@@ -253,7 +271,7 @@ var _ = Describe("pod utils", func() {
 		pod = &corev1.Pod{}
 		pod.ObjectMeta.Name = "pod_test"
 		pod.ObjectMeta.Namespace = "pod_test_ns"
-		pod.Spec.Containers = []corev1.Container{container, *container2, *container3}
+		pod.Spec.Containers = []corev1.Container{container, *container2, *container3, *container4}
 		pod.Spec.Volumes = []corev1.Volume{
 			{
 				Name: "config1",
@@ -507,6 +525,7 @@ var _ = Describe("pod utils", func() {
 			type args struct {
 				containers []corev1.Container
 				volumeName string
+				envFrom    string
 				filters    []containerNameFilter
 			}
 			tests := []struct {
@@ -544,9 +563,22 @@ var _ = Describe("pod utils", func() {
 					},
 				},
 				want: []string{},
+			}, {
+				name: "test_env",
+				args: args{
+					containers: pod.Spec.Containers,
+					volumeName: "not-config2",
+					envFrom:    "test-config-env",
+					filters: []containerNameFilter{
+						func(name string) bool {
+							return name == "mysql"
+						},
+					},
+				},
+				want: []string{"mysql3", "mysql4"},
 			}}
 			for _, tt := range tests {
-				Expect(GetContainersByConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
+				Expect(GetContainersByConfigmap(tt.args.containers, tt.args.volumeName, tt.args.envFrom, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
 			}
 
 		})

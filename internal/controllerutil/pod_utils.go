@@ -112,10 +112,11 @@ func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Vo
 
 type containerNameFilter func(containerName string) bool
 
-func GetContainersByConfigmap(containers []corev1.Container, volumeName string, filters ...containerNameFilter) []string {
+func GetContainersByConfigmap(containers []corev1.Container, volumeName string, cmName string, filters ...containerNameFilter) []string {
 	containerFilter := func(c corev1.Container) bool {
 		for _, f := range filters {
-			if len(c.VolumeMounts) == 0 || f(c.Name) {
+			if (len(c.VolumeMounts) == 0 && len(c.EnvFrom) == 0) ||
+				f(c.Name) {
 				return true
 			}
 		}
@@ -130,9 +131,19 @@ func GetContainersByConfigmap(containers []corev1.Container, volumeName string, 
 		for _, vm := range c.VolumeMounts {
 			if vm.Name == volumeName {
 				tmpList = append(tmpList, c.Name)
+				goto breakHere
+			}
+		}
+		if cmName == "" {
+			continue
+		}
+		for _, source := range c.EnvFrom {
+			if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
+				tmpList = append(tmpList, c.Name)
 				break
 			}
 		}
+	breakHere:
 	}
 	return tmpList
 }

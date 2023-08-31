@@ -60,7 +60,7 @@ type RSConfig struct {
 	Members                            ConfigMembers `bson:"members" json:"members"`
 	Configsvr                          bool          `bson:"configsvr,omitempty" json:"configsvr,omitempty"`
 	ProtocolVersion                    int           `bson:"protocolVersion,omitempty" json:"protocolVersion,omitempty"`
-	Settings                           Settings      `bson:"settings,omitempty" json:"settings,omitempty"`
+	Settings                           Settings      `bson:"-" json:"settings,omitempty"`
 	WriteConcernMajorityJournalDefault bool          `bson:"writeConcernMajorityJournalDefault,omitempty" json:"writeConcernMajorityJournalDefault,omitempty"`
 }
 

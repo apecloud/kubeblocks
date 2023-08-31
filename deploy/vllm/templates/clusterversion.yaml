@@ -94,6 +94,6 @@ spec:
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
             env:
               - name: MODEL_NAME
-                value: NousResearch/Llama-2-13b-hf
+                value: upstage/SOLAR-0-70b-16bit
               - name: EXTRA_ARGS
                 value: "--trust-remote-code --swap-space 1 --gpu-memory-utilization 0.95"

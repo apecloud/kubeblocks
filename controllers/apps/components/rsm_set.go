@@ -98,14 +98,67 @@ func (r *RSM) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 }
 
 func (r *RSM) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if pod == nil {
+	switch {
+	case pod == nil:
 		return false
+	case !podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()}):
+		return false
+	case r.SynthesizedComponent.WorkloadType == appsv1alpha1.Consensus,
+		r.SynthesizedComponent.WorkloadType == appsv1alpha1.Replication:
+		return intctrlutil.PodIsReadyWithLabel(*pod)
+	default:
+		return true
 	}
-	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
 func (r *RSM) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
-	return "", nil
+	if r.SynthesizedComponent.WorkloadType != appsv1alpha1.Consensus {
+		return "", nil
+	}
+
+	var (
+		isAbnormal     bool
+		isFailed       = true
+		statusMessages appsv1alpha1.ComponentMessageMap
+	)
+	getProbes := func() *appsv1alpha1.ClusterDefinitionProbes {
+		if r.SynthesizedComponent != nil {
+			return r.SynthesizedComponent.Probes
+		}
+		return r.ComponentDef.Probes
+	}
+	getConsensusSpec := func() *appsv1alpha1.ConsensusSetSpec {
+		if r.SynthesizedComponent != nil {
+			return r.SynthesizedComponent.ConsensusSpec
+		}
+		return r.ComponentDef.ConsensusSpec
+	}
+	compStatus, ok := r.Cluster.Status.Components[r.getName()]
+	if !ok || compStatus.PodsReadyTime == nil {
+		return "", nil
+	}
+	if !isProbeTimeout(getProbes(), compStatus.PodsReadyTime) {
+		return "", nil
+	}
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		if role == getConsensusSpec().Leader.Name {
+			isFailed = false
+		}
+		if role == "" {
+			isAbnormal = true
+			statusMessages.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+		}
+		// TODO clear up the message of ready pod in component.message.
+	}
+	switch {
+	case isFailed:
+		return appsv1alpha1.FailedClusterCompPhase, statusMessages
+	case isAbnormal:
+		return appsv1alpha1.AbnormalClusterCompPhase, statusMessages
+	default:
+		return "", statusMessages
+	}
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
@@ -121,6 +174,21 @@ func (r *RSM) GetPhaseWhenPodsNotReady(ctx context.Context,
 	// if the failed pod is not controlled by the latest revision
 	podIsControlledByLatestRevision := func(pod *corev1.Pod, rsm *workloads.ReplicatedStateMachine) bool {
 		return rsm.Status.ObservedGeneration == rsm.Generation && intctrlutil.GetPodRevision(pod) == rsm.Status.UpdateRevision
+	}
+	checkLeaderIsReady := func(pod *corev1.Pod, workload metav1.Object) bool {
+		getLeaderRoleName := func() string {
+			switch r.SynthesizedComponent.WorkloadType {
+			case appsv1alpha1.Consensus:
+				return r.SynthesizedComponent.ConsensusSpec.Learner.Name
+			case appsv1alpha1.Replication:
+				return constant.Primary
+			default:
+				return ""
+			}
+		}
+		leaderRoleName := getLeaderRoleName()
+		labelValue := pod.Labels[constant.RoleLabelKey]
+		return labelValue == leaderRoleName && intctrlutil.PodIsReady(pod)
 	}
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 		rsm := workload.(*workloads.ReplicatedStateMachine)
@@ -139,7 +207,7 @@ func (r *RSM) GetPhaseWhenPodsNotReady(ctx context.Context,
 	}
 	rsmObj := rsmList.Items[0]
 	return getComponentPhaseWhenPodsNotReady(podList, &rsmObj, r.getReplicas(),
-		rsmObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), statusMessages, nil
+		rsmObj.Status.AvailableReplicas, checkLeaderIsReady, checkExistFailedPodOfLatestRevision), statusMessages, nil
 }
 
 func (r *RSM) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {

@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
@@ -247,9 +246,13 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}
+	isMemberOf := func(stsName string, pod *corev1.Pod) bool {
+		parent, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+		return parent == stsName
+	}
 	var pods []corev1.Pod
 	for _, pod := range podList.Items {
-		if components.IsMemberOf(stsObj, &pod) {
+		if isMemberOf(stsObj.Name, &pod) {
 			pods = append(pods, pod)
 		}
 	}

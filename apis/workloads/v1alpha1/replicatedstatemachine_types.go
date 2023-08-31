@@ -56,7 +56,7 @@ type ReplicatedStateMachineSpec struct {
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Service *corev1.ServiceSpec `json:"service,omitempty"`
+	Service *corev1.Service `json:"service,omitempty"`
 
 	// AlternativeServices defines Alternative Services selector pattern specifier.
 	// can be used for creating Readonly service.

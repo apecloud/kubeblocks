@@ -54,7 +54,7 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: commonLabels,
 					},
-					Service: &corev1.ServiceSpec{},
+					Service: &corev1.Service{},
 					RoleProbe: &RoleProbe{
 						ProbeActions: []Action{
 							{
@@ -114,7 +114,7 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 					AccessMode: ReadWriteMode,
 				},
 			}
-			rsm.Spec.Service.Ports = []corev1.ServicePort{
+			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
 				{
 					Name:     "foo",
 					Protocol: "tcp",

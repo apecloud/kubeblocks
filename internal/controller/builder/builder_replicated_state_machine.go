@@ -144,8 +144,8 @@ func (builder *ReplicatedStateMachineBuilder) SetRoleProbe(roleProbe *workloads.
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetService(service corev1.ServiceSpec) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.Service = &service
+func (builder *ReplicatedStateMachineBuilder) SetService(service *corev1.Service) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.Service = service
 	return builder
 }
 

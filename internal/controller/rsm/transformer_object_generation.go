@@ -211,10 +211,11 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, false)
 	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
+		AddLabelsInMap(rsm.Spec.Service.Labels).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
-		AddPorts(rsm.Spec.Service.Ports...).
-		SetType(rsm.Spec.Service.Type).
+		AddPorts(rsm.Spec.Service.Spec.Ports...).
+		SetType(rsm.Spec.Service.Spec.Type).
 		GetObject()
 }
 

@@ -30,6 +30,7 @@ import (
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -104,13 +105,24 @@ var (
 		MemberLeaveAction: &workloads.Action{Command: []string{"cmd"}},
 	}
 
-	service = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{
-			{
-				Name:       "svc",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       12345,
-				TargetPort: intstr.FromString("my-svc"),
+	service = &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "foo-cluster-definition",
+				constant.AppInstanceLabelKey:    "foo-cluster",
+				constant.KBAppComponentLabelKey: name,
+				constant.AppComponentLabelKey:   name + "def",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "svc",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromString("my-svc"),
+				},
 			},
 		},
 	}

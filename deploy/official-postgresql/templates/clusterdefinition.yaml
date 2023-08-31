@@ -79,45 +79,19 @@ spec:
               - name: dshm
                 mountPath: /dev/shm
               - name: data
-                mountPath: /home/postgres/pgdata
+                mountPath: /var/lib/postgresql/data
               - name: postgresql-config
-                mountPath: /home/postgres/conf
+                mountPath: /var/lib/postgresql/conf
               - name: scripts
                 mountPath: /kb-scripts
-              - name: pod-info
-                mountPath: /kb-podinfo
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
-              - name: patroni
-                containerPort: 8008
-            env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
-              - name: DCS_ENABLE_KUBERNETES_API
-                value: "true"
-              - name: KUBERNETES_USE_CONFIGMAPS
-                value: "true"
-              - name: SCOPE
-                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
-              - name: KUBERNETES_SCOPE_LABEL
-                value: "apps.kubeblocks.postgres.patroni/scope"
-              - name: KUBERNETES_ROLE_LABEL
-                value: "apps.kubeblocks.postgres.patroni/role"
-              - name: KUBERNETES_LABELS
-                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
-              - name: RESTORE_DATA_DIR
-                value: /home/postgres/pgdata/kb_restore
+            env:
               - name: KB_PG_CONFIG_PATH
-                value: /home/postgres/conf/postgresql.conf
-              - name: SPILO_CONFIGURATION
-                value: | ## https://github.com/zalando/patroni#yaml-configuration
-                  bootstrap:
-                    initdb:
-                      - auth-host: md5
-                      - auth-local: trust
+                value: /var/lib/postgresql/conf/postgresql.conf
               - name: ALLOW_NOSSL
                 value: "true"
-              - name: PGROOT
-                value: /home/postgres/pgdata/pgroot
               - name: POD_IP
                 valueFrom:
                   fieldRef:
@@ -128,34 +102,6 @@ spec:
                   fieldRef:
                     apiVersion: v1
                     fieldPath: metadata.namespace
-              - name: PGUSER_SUPERUSER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-                    optional: false
-              - name: PGPASSWORD_SUPERUSER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: PGUSER_ADMIN
-                value: superadmin
-              - name: PGPASSWORD_ADMIN
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: PGUSER_STANDBY
-                value: standby
-              - name: PGPASSWORD_STANDBY
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
               - name: PGUSER
                 valueFrom:
                   secretKeyRef:
@@ -168,94 +114,6 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-          - name: pgbouncer
-            image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ default .Values.pgbouncer.image.tag }}
-            imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
-            securityContext:
-              runAsUser: 0
-            ports:
-              - name: tcp-pgbouncer
-                containerPort: 6432
-            volumeMounts:
-              - name: pgbouncer-config
-                mountPath: /home/pgbouncer/conf
-              - name: scripts
-                mountPath: /kb-scripts
-            command:
-              - /kb-scripts/pgbouncer_setup.sh
-            livenessProbe:
-              failureThreshold: 3
-              initialDelaySeconds: 15
-              periodSeconds: 30
-              successThreshold: 1
-              timeoutSeconds: 5
-              tcpSocket:
-                port: tcp-pgbouncer
-            readinessProbe:
-              failureThreshold: 3
-              initialDelaySeconds: 15
-              periodSeconds: 30
-              successThreshold: 1
-              timeoutSeconds: 5
-              tcpSocket:
-                port: tcp-pgbouncer
-            env:
-              - name: PGBOUNCER_AUTH_TYPE
-                value: md5
-              - name: POSTGRESQL_USERNAME
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-                    optional: false
-              - name: POSTGRESQL_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: POSTGRESQL_PORT
-                value: "5432"
-              - name: POSTGRESQL_HOST
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: status.podIP
-              - name: PGBOUNCER_PORT
-                value: "6432"
-              - name: PGBOUNCER_BIND_ADDRESS
-                value: "0.0.0.0"
-          - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
-            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
-            securityContext:
-              runAsUser: 0
-            env:
-              - name: ENDPOINT
-                value: {{ printf "127.0.0.1:5432" }}
-              - name: DATA_SOURCE_PASS
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: DATA_SOURCE_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-                    optional: false
-            command:
-              - "/bin/agamotto"
-              - "--config=/opt/agamotto/agamotto-config.yaml"
-            ports:
-              - name: http-metrics
-                containerPort: {{ .Values.metrics.service.port }}
-            volumeMounts:
-              - name: postgresql-custom-metrics
-                mountPath: /opt/conf
-              - name: agamotto-configuration
-                mountPath: /opt/agamotto
         volumes:
           - name: dshm
             emptyDir:
@@ -263,18 +121,6 @@ spec:
               {{- with .Values.shmVolume.sizeLimit }}
               sizeLimit: {{ . }}
               {{- end }}
-          - name: pod-info
-            downwardAPI:
-              items:
-                - path: "pod-role"
-                  fieldRef:
-                    fieldPath: metadata.labels['kubeblocks.io/role']
-                - path: "primary-pod"
-                  fieldRef:
-                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']
-                - path: "component-replicas"
-                  fieldRef:
-                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}

@@ -20,7 +20,7 @@ data:
         tls:
           insecure: true
           insecure_skip_verify: true
-        collection_interval: 10s
+        collection_interval: 15s
 
     processors:
       memory_limiter:

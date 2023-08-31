@@ -96,7 +96,6 @@ var _ = Describe("Addon controller", func() {
 			cleanEnv()
 			const distro = "kubeblocks"
 			testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
-			viper.Set(constant.KBChartsImage, "apecloud/kubeblocks-charts:latest")
 			Expect(client.IgnoreAlreadyExists(testCtx.CreateNamespace())).To(Not(HaveOccurred()))
 		})
 
@@ -105,7 +104,6 @@ var _ = Describe("Addon controller", func() {
 			viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
 			viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
 			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
-			viper.Set(constant.KBChartsImage, "")
 		})
 
 		doReconcile := func() (ctrl.Result, error) {

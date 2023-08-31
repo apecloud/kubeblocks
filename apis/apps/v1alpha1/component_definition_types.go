@@ -77,7 +77,7 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 
-	// ServiceKind defines what kind of well-known service the component provided (e.g., MySQL, Redis, ETCD).
+	// ServiceKind defines what kind of well-known service the component provided (e.g., MySQL, Redis, ETCD, case insensitive).
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceKind string `json:"serviceKind,omitempty"`
@@ -99,6 +99,7 @@ type ComponentDefinitionSpec struct {
 	// 		- security context
 	//      - probes: startup, liveness, readiness
 	// 		- lifecycle
+	//  - volumes
 	// Resources (cpu & mem) and scheduling setting (affinity, toleration, priority) should not been set here.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required
@@ -135,10 +136,10 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// Credential defines the template to create a default connection credential secret for a component instance.
+	// ConnectionCredential defines the template to create a default connection credential secret for a component instance.
 	// Cannot be updated.
 	// +optional
-	Credential ConnectionCredential `json:"credential,omitempty"`
+	ConnectionCredential ConnectionCredential `json:"connectionCredential,omitempty"`
 
 	// The scriptSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.

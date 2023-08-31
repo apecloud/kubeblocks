@@ -37,6 +37,7 @@ CLI_IMG ?= docker.io/apecloud/kbcli
 CHARTS_IMG ?= docker.io/apecloud/$(APP_NAME)-charts
 CLI_TAG ?= v$(CLI_VERSION)
 DATASCRIPT_IMG ?= docker.io/apecloud/$(APP_NAME)-datascript
+DATAPROTECTION_IMG ?= docker.io/apecloud/$(APP_NAME)-dataprotection
 
 # Update whenever you upgrade dev container image
 DEV_CONTAINER_VERSION_TAG ?= latest
@@ -183,5 +184,33 @@ ifeq ($(TAG_LATEST), true)
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-datascript --platform $(BUILDX_PLATFORMS) --tag ${DATASCRIPT_IMG}:latest --push
 else
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-datascript --platform $(BUILDX_PLATFORMS) --tag ${DATASCRIPT_IMG}:${VERSION} --push
+endif
+endif
+
+.PHONY: build-dataprotection-image
+build-dataprotection-image: install-docker-buildx generate ## Build Operator dataprotection container image.
+ifneq ($(BUILDX_ENABLED), true)
+	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --tag ${DATAPROTECTION_IMG}:${VERSION} --tag ${DATAPROTECTION_IMG}:latest
+else
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:latest
+else
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:${VERSION}
+endif
+endif
+
+.PHONY: push-dataprotection-image
+push-dataprotection-image: install-docker-buildx generate ## Push Operator dataprotection container image.
+ifneq ($(BUILDX_ENABLED), true)
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) push ${DATAPROTECTION_IMG}:latest
+else
+	$(DOCKER) push ${DATAPROTECTION_IMG}:${VERSION}
+endif
+else
+ifeq ($(TAG_LATEST), true)
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:latest --push
+else
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-dataprotection --platform $(BUILDX_PLATFORMS) --tag ${DATAPROTECTION_IMG}:${VERSION} --push
 endif
 endif

@@ -401,7 +401,6 @@ func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs.Cluster) err
 // IsPodReady checks if pod is ready, it can successfully resolve domain
 func (ha *Ha) IsPodReady() (bool, error) {
 	domain := viper.GetString("KB_POD_FQDN")
-
 	pinger, err := probing.NewPinger(domain)
 	if err != nil {
 		ha.logger.Errorf("new pinger failed, err:%v", err)
@@ -409,6 +408,8 @@ func (ha *Ha) IsPodReady() (bool, error) {
 	}
 
 	pinger.Count = 3
+	pinger.Timeout = 3 * time.Second
+	pinger.Interval = 500 * time.Millisecond
 	err = pinger.Run()
 	if err != nil {
 		ha.logger.Errorf("ping domain:%s failed, err:%v", domain, err)

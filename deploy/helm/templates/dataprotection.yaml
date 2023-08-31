@@ -1,10 +1,11 @@
+{{- if .Values.dataProtection.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}
+  name: {{ include "kubeblocks.fullname" . }}-dataprotection
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    app.kubernetes.io/component: "apps"
+    app.kubernetes.io/component: "dataprotection"
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -26,7 +27,7 @@ spec:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
-      {{- with .Values.image.imagePullSecrets }}
+      {{- with .Values.dataProtection.image.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -39,17 +40,13 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - /bin/true
-        - name: datascript
-          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - /bin/true
       containers:
-        - name: manager
+        - name: dataprotection
           args:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
+            - "--leader-elect-id=abd03fda"
             - "--zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
             - "--zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
             {{- with .Values.loggerSettings.level }}
@@ -58,10 +55,6 @@ spec:
             {{- with .Values.loggerSettings.encoder }}
             - "--zap-encoder={{ . }}"
             {{- end }}
-            - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
-            - "--apps=true"
-            - "--workloads=true"
-            - "--storage=true"
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
@@ -78,11 +71,9 @@ spec:
               value: {{ toJson . | quote }}
             {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
-              value: {{ .Values.image.pullPolicy }}
+              value: {{ .Values.dataProtection.image.pullPolicy }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-            - name: KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE
-              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
@@ -97,28 +88,12 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            - name: ENABLE_RBAC_MANAGER
-              value: {{ .Values.rbac.enabled | quote}}
-            {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "true" }}
-            - name: ADDON_JOB_TTL
-              value: {{ .jobTTL | quote }}
-            - name: ADDON_JOB_IMAGE_PULL_POLICY
-              value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
-            - name: KUBEBLOCKS_ADDON_SA_NAME
-              value: {{ include "kubeblocks.addonSAName" . }}
-            - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
-              value: {{ join " " .Values.addonHelmInstallOptions }}
-            {{- end }}
-            {{- if .Values.enabledAlphaFeatureGates.recoverVolumeExpansionFailure }}
-            - name: RECOVER_VOLUME_EXPANSION_FAILURE
-              value: "true"
-            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.dataProtection.image.registry | default "docker.io" }}/{{ .Values.dataProtection.image.repository }}:{{ .Values.dataProtection.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.dataProtection.image.pullPolicy }}
           ports:
             - name: webhook-server
               containerPort: 9443
@@ -144,12 +119,12 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-          - mountPath: /etc/kubeblocks
-            name: manager-config
+            - mountPath: /etc/kubeblocks
+              name: manager-config
           {{- if .Values.admissionWebhooks.enabled }}
-            - mountPath: /tmp/k8s-webhook-server/serving-certs
-              name: cert
-              readOnly: true
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
           {{- end }}
       {{- if .Values.hostNetwork }}
       hostNetwork: {{ .Values.hostNetwork }}
@@ -180,7 +155,8 @@ spec:
             name: {{ include "kubeblocks.fullname" . }}-manager-config
         {{- if .Values.admissionWebhooks.enabled }}
         - name: cert
-          secret:
-            defaultMode: 420
-            secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+        secret:
+          defaultMode: 420
+          secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
         {{- end }}
+{{- end }}

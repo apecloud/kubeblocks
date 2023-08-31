@@ -52,7 +52,6 @@ import (
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
-	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
@@ -100,7 +99,6 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
-	viper.SetDefault(constant.KBChartsImage, "apecloud/kubeblocks-charts:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
@@ -122,11 +120,10 @@ const (
 	leaderElectIDFlagKey flagName = "leader-elect-id"
 
 	// switch flags key for API groups
-	appsFlagKey           flagName = "apps"
-	dataProtectionFlagKey flagName = "dataprotection"
-	extensionsFlagKey     flagName = "extensions"
-	workloadsFlagKey      flagName = "workloads"
-	storageFlagKey        flagName = "storage"
+	appsFlagKey       flagName = "apps"
+	extensionsFlagKey flagName = "extensions"
+	workloadsFlagKey  flagName = "workloads"
+	storageFlagKey    flagName = "storage"
 )
 
 func (r flagName) String() string {
@@ -197,8 +194,6 @@ func main() {
 
 	flag.Bool(appsFlagKey.String(), true,
 		"Enable the apps controller manager.")
-	flag.Bool(dataProtectionFlagKey.String(), true,
-		"Enable the dataprotection controller manager. ")
 	flag.Bool(extensionsFlagKey.String(), true,
 		"Enable the extensions controller manager. ")
 	flag.Bool(workloadsFlagKey.String(), true,
@@ -373,62 +368,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("class-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Class")
-			os.Exit(1)
-		}
-	}
-
-	if viper.GetBool(dataProtectionFlagKey.viperName()) {
-		if err = (&dataprotectioncontrollers.BackupToolReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
-			os.Exit(1)
-		}
-
-		if err = (&dataprotectioncontrollers.BackupPolicyReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
-			os.Exit(1)
-		}
-
-		if err = (&dataprotectioncontrollers.CronJobReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "CronJob")
-			os.Exit(1)
-		}
-
-		if err = (&dataprotectioncontrollers.BackupReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Backup")
-			os.Exit(1)
-		}
-
-		if err = (&dataprotectioncontrollers.RestoreJobReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
-			os.Exit(1)
-		}
-
-		if err = (&dataprotectioncontrollers.BackupRepoReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-repo-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
 			os.Exit(1)
 		}
 	}

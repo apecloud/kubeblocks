@@ -53,7 +53,7 @@ const (
 	KB_COMPONENT_NAME     BuiltInVars = "$(KB_COMPONENT_NAME)"
 	KB_COMPONENT_REPLICAS BuiltInVars = "$(KB_COMPONENT_REPLICAS)"
 
-	KB_HOST_NAME   BuiltInVars = "$(KB_NODE_NAME)"
+	KB_HOST_NAME   BuiltInVars = "$(KB_HOST_NAME)"
 	KB_HOST_IP     BuiltInVars = "$(KB_HOST_IP)"
 	KB_HOST_FQDN   BuiltInVars = "$(KB_HOST_FQDN)"
 	KB_POD_NAME    BuiltInVars = "$(KB_POD_NAME)"

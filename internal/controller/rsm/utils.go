@@ -264,7 +264,7 @@ func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
 	if rsm.Spec.Service == nil {
 		return 0
 	}
-	port := rsm.Spec.Service.Ports[0]
+	port := rsm.Spec.Service.Spec.Ports[0]
 	for _, c := range rsm.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {
 			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
@@ -535,12 +535,11 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 				labels[key] = value
 			}
 		}
-		labels[workloadsManagedByLabelKey] = kindReplicatedStateMachine
 		return labels
 	}
 	return map[string]string{
-		constant.AppInstanceLabelKey: rsm.Name,
-		workloadsManagedByLabelKey:   kindReplicatedStateMachine,
+		workloadsManagedByLabelKey: kindReplicatedStateMachine,
+		workloadsInstanceLabelKey:  rsm.Name,
 	}
 }
 

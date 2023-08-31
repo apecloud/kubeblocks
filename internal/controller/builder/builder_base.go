@@ -65,6 +65,9 @@ func (builder *BaseBuilder[T, PT, B]) AddLabels(keysAndValues ...string) *B {
 }
 
 func (builder *BaseBuilder[T, PT, B]) AddLabelsInMap(labels map[string]string) *B {
+	if len(labels) == 0 {
+		return builder.concreteBuilder
+	}
 	l := builder.object.GetLabels()
 	if l == nil {
 		l = make(map[string]string, 0)

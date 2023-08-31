@@ -365,6 +365,21 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		constant.AppInstanceLabelKey:    cluster.Name,
 		constant.KBAppComponentLabelKey: component.Name,
 	}
+	addCommonLabels := func(service *corev1.Service) {
+		if service == nil {
+			return
+		}
+		labels := service.Labels
+		if labels == nil {
+			labels = make(map[string]string, 0)
+		}
+		for k, v := range commonLabels {
+			labels[k] = v
+		}
+		labels[constant.AppComponentLabelKey] = component.CompDefName
+		service.Labels = labels
+	}
+
 	podBuilder := NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
@@ -397,8 +412,12 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 
 	service, alternativeServices := separateServices(component.Services)
+	addCommonLabels(service)
+	for i := range alternativeServices {
+		addCommonLabels(&alternativeServices[i])
+	}
 	if service != nil {
-		rsmBuilder.SetService(service.Spec)
+		rsmBuilder.SetService(service)
 	}
 	if len(alternativeServices) == 0 {
 		alternativeServices = nil
@@ -598,7 +617,7 @@ func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([
 func buildActionFromCharacterType(characterType string, isConsensus bool) []workloads.Action {
 	kind := strings.ToLower(characterType)
 	switch kind {
-	case "mysql":
+	case "mysql": //nolint:goconst
 		if isConsensus {
 			return []workloads.Action{
 				{

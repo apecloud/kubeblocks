@@ -23,12 +23,6 @@ image:
   datascript:
     repository: apecloud/kubeblocks-datascript
 
-
-## @param separatedDeployment separated the KubeBlocks deployment into two deployments.
-## This switch is used to isolate the apps controller and dataprotection controller
-##
-separatedDeployment: true
-
 ## @param replicaCount
 ##
 replicaCount: 1
@@ -320,6 +314,14 @@ dataProtection:
   backupPVCCreatePolicy: ""
   backupPVConfigMapName: ""
   backupPVConfigMapNamespace: ""
+
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/kubeblocks-dataprotection
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: ""
+    imagePullSecrets: [ ]
 
 ## BackupRepo settings
 ##

@@ -50,13 +50,13 @@
 	// if this flag is true, vttablet will fail to start if a valid tableacl config does not exist
 	enforce_tableacl_config: bool
 
-    // query server read pool size, connection pool is used by regular queries (non streaming, not in a transaction)
+	// query server read pool size, connection pool is used by regular queries (non streaming, not in a transaction)
 	queryserver_config_pool_size: int & >=0
 
-    // query server stream connection pool size, stream pool is used by stream queries: queries that return results to client in a streaming fashion
+	// query server stream connection pool size, stream pool is used by stream queries: queries that return results to client in a streaming fashion
 	queryserver_config_stream_pool_size: int & >=0
 
-    // query server transaction cap is the maximum number of transactions allowed to happen at any given point of a time for a single vttablet. E.g. by setting transaction cap to 100, there are at most 100 transactions will be processed by a vttablet and the 101th transaction will be blocked (and fail if it cannot get connection within specified timeout)
+	// query server transaction cap is the maximum number of transactions allowed to happen at any given point of a time for a single vttablet. E.g. by setting transaction cap to 100, there are at most 100 transactions will be processed by a vttablet and the 101th transaction will be blocked (and fail if it cannot get connection within specified timeout)
 	queryserver_config_transaction_cap: int & >=0
 
 	...

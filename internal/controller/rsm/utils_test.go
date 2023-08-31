@@ -40,7 +40,7 @@ var _ = Describe("utils test", func() {
 
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetService(corev1.ServiceSpec{}).
+			SetService(&corev1.Service{}).
 			SetRoles(roles).
 			GetObject()
 		priorityMap = composeRolePriorityMap(*rsm)
@@ -201,7 +201,7 @@ var _ = Describe("utils test", func() {
 	Context("findSvcPort function", func() {
 		It("should work well", func() {
 			By("set port name")
-			rsm.Spec.Service.Ports = []corev1.ServicePort{
+			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
 				{
 					Name:       "svc-port",
 					Protocol:   corev1.ProtocolTCP,
@@ -230,7 +230,7 @@ var _ = Describe("utils test", func() {
 			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
 
 			By("set port number")
-			rsm.Spec.Service.Ports = []corev1.ServicePort{
+			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
 				{
 					Name:       "svc-port",
 					Protocol:   corev1.ProtocolTCP,
@@ -241,7 +241,7 @@ var _ = Describe("utils test", func() {
 			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
 
 			By("set no matched port")
-			rsm.Spec.Service.Ports = []corev1.ServicePort{
+			rsm.Spec.Service.Spec.Ports = []corev1.ServicePort{
 				{
 					Name:       "svc-port",
 					Protocol:   corev1.ProtocolTCP,

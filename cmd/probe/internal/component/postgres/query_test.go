@@ -40,42 +40,37 @@ func TestQuery(t *testing.T) {
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
-	t.Run("common query success", func(t *testing.T) {
+	t.Run("query success", func(t *testing.T) {
 		sql := queryTest
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"1"}))
 
 		_, err := manager.Query(ctx, sql)
-		if err != nil {
-			t.Errorf("expect query success, but failed, err:%v", err)
-		}
-
-		if err = mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
+		assert.Nil(t, err)
 	})
 
-	t.Run("common query failed", func(t *testing.T) {
+	t.Run("query failed", func(t *testing.T) {
 		sql := queryTest
 		mock.ExpectQuery("select").
 			WillReturnError(fmt.Errorf("some error"))
 
 		_, err := manager.Query(ctx, sql)
-		if err == nil {
-			t.Errorf("expect query failed, but success")
-		}
+		assert.NotNil(t, err)
+	})
 
-		if err = mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
+	t.Run("parse rows failed", func(t *testing.T) {
+		sql := queryTest
+		var val chan string
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"1"}).AddRow(val))
+		_, err := manager.Query(ctx, sql)
+		assert.NotNil(t, err)
 	})
 
 	t.Run("can't connect db", func(t *testing.T) {
 		sql := queryTest
 		resp, err := manager.QueryWithHost(ctx, sql, "localhost")
-		if err == nil {
-			t.Errorf("expect query failed, but success")
-		}
+		assert.NotNil(t, err)
 		assert.Nil(t, resp)
 	})
 
@@ -111,6 +106,10 @@ func TestQuery(t *testing.T) {
 
 		assert.ErrorIs(t, ClusterHasNoLeader, err)
 	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
 }
 
 func TestParseQuery(t *testing.T) {
@@ -136,36 +135,24 @@ func TestExec(t *testing.T) {
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
-	t.Run("common exec success", func(t *testing.T) {
+	t.Run("exec success", func(t *testing.T) {
 		sql := execTest
 
 		mock.ExpectExec("create database").
 			WillReturnResult(pgxmock.NewResult("CREATE DATABASE", 1))
 
 		_, err := manager.Exec(ctx, sql)
-		if err != nil {
-			t.Errorf("expect exec success, but failed, err:%v", err)
-		}
-
-		if err = mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
+		assert.Nil(t, err)
 	})
 
-	t.Run("common exec failed", func(t *testing.T) {
+	t.Run("exec failed", func(t *testing.T) {
 		sql := execTest
 
 		mock.ExpectExec("create database").
 			WillReturnError(fmt.Errorf("some error"))
 
 		_, err := manager.Exec(ctx, sql)
-		if err == nil {
-			t.Errorf("expect exec failed, but success")
-		}
-
-		if err = mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
+		assert.NotNil(t, err)
 	})
 
 	t.Run("can't connect db", func(t *testing.T) {
@@ -194,11 +181,6 @@ func TestExec(t *testing.T) {
 		if err != nil {
 			t.Errorf("expect exec leader success but failed")
 		}
-
-		if err = mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
-
 		assert.Equal(t, int64(1), resp)
 	})
 
@@ -213,4 +195,8 @@ func TestExec(t *testing.T) {
 
 		assert.ErrorIs(t, ClusterHasNoLeader, err)
 	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
 }

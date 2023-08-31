@@ -225,6 +225,9 @@ func generateParameterSchema(paramName string, property apiext.JSONSchemaProps) 
 		}
 		pt.miniNum = b
 	}
+	if property.Format != "" {
+		pt.valueType = property.Format
+	}
 	if property.Maximum != nil {
 		b, err := toString(property.Maximum)
 		if err != nil {

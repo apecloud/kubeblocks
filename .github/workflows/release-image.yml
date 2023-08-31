@@ -72,6 +72,16 @@ jobs:
       DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
     secrets: inherit
 
+  release-dataprotection-image:
+    needs: image-tag
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
+    with:
+      IMG: "apecloud/kubeblocks-dataprotection"
+      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      APECD_REF: "v0.1.12"
+      DOCKERFILE_PATH: "./docker/Dockerfile-dataprotection"
+    secrets: inherit
+
   send-message:
     runs-on: ubuntu-latest
     needs: [ release-image, release-tools-image, release-datascript-image]

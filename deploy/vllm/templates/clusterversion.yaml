@@ -81,7 +81,7 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: vllm-solar-0-70b-16bit
+  name: vllm-llama-70b
   labels:
     {{- include "llm.labels" . | nindent 4 }}
 spec:
@@ -94,6 +94,6 @@ spec:
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
             env:
               - name: MODEL_NAME
-                value: upstage/SOLAR-0-70b-16bit
+                value: TheBloke/Llama-2-70B-chat-GPTQ
               - name: EXTRA_ARGS
                 value: "--trust-remote-code"

@@ -24,6 +24,8 @@ spec:
     - name: DP_TARGET_POD_ROLE
       # TODO input by backup policy
       value: follower
+    - name: DP_DB_PORT
+      value: "3306"
     - name: DP_INTERVAL_SECONDS
       value: "10"
     - name: FLUSH_BINLOG_INTERVAL_SECONDS

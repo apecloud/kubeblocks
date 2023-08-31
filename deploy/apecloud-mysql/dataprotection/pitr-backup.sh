@@ -2,7 +2,7 @@
 
 # export wal-g environments
 backup_binlog_dir=${BACKUP_DIR}/${DP_TARGET_POD_NAME}
-export WALG_MYSQL_DATASOURCE_NAME="${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:3306)/mysql"
+export WALG_MYSQL_DATASOURCE_NAME="${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:${DP_DB_PORT})/mysql"
 export WALG_COMPRESSION_METHOD=zstd
 export WALG_FILE_PREFIX=${backup_binlog_dir}
 export WALG_MYSQL_CHECK_GTIDS=true

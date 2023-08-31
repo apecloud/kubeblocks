@@ -19,10 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package builder
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"github.com/apecloud/kubeblocks/internal/builder"
+	corev1 "k8s.io/api/core/v1"
+)
 
 type SecretBuilder struct {
-	BaseBuilder[corev1.Secret, *corev1.Secret, SecretBuilder]
+	builder.BaseBuilder[corev1.Secret, *corev1.Secret, SecretBuilder]
 }
 
 func NewSecretBuilder(namespace, name string) *SecretBuilder {

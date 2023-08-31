@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type EventBuilder struct {
-	BaseBuilder[corev1.Event, *corev1.Event, EventBuilder]
+	builder.BaseBuilder[corev1.Event, *corev1.Event, EventBuilder]
 }
 
 func NewEventBuilder(namespace, name string) *EventBuilder {

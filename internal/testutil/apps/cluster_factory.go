@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +32,7 @@ import (
 )
 
 type MockClusterFactory struct {
-	BaseFactory[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, MockClusterFactory]
+	builder.BaseFactory[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, MockClusterFactory]
 }
 
 func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory {

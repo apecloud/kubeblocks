@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ import (
 )
 
 type MockStatefulSetFactory struct {
-	BaseFactory[appsv1.StatefulSet, *appsv1.StatefulSet, MockStatefulSetFactory]
+	builder.BaseFactory[appsv1.StatefulSet, *appsv1.StatefulSet, MockStatefulSetFactory]
 }
 
 func NewStatefulSetFactory(namespace, name string, clusterName string, componentName string) *MockStatefulSetFactory {

@@ -20,13 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type JobBuilder struct {
-	BaseBuilder[batchv1.Job, *batchv1.Job, JobBuilder]
+	builder.BaseBuilder[batchv1.Job, *batchv1.Job, JobBuilder]
 }
 
 func NewJobBuilder(namespace, name string) *JobBuilder {

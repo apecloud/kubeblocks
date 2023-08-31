@@ -19,10 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package builder
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"github.com/apecloud/kubeblocks/internal/builder"
+	corev1 "k8s.io/api/core/v1"
+)
 
 type ConfigMapBuilder struct {
-	BaseBuilder[corev1.ConfigMap, *corev1.ConfigMap, ConfigMapBuilder]
+	builder.BaseBuilder[corev1.ConfigMap, *corev1.ConfigMap, ConfigMapBuilder]
 }
 
 func NewConfigMapBuilder(namespace, name string) *ConfigMapBuilder {

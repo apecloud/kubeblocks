@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ import (
 )
 
 type ReplicatedStateMachineBuilder struct {
-	BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, ReplicatedStateMachineBuilder]
+	builder.BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, ReplicatedStateMachineBuilder]
 }
 
 func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMachineBuilder {
@@ -55,7 +56,7 @@ func (builder *ReplicatedStateMachineBuilder) AddMatchLabel(key, value string) *
 }
 
 func (builder *ReplicatedStateMachineBuilder) AddMatchLabels(keyValues ...string) *ReplicatedStateMachineBuilder {
-	return builder.AddMatchLabelsInMap(WithMap(keyValues...))
+	return builder.AddMatchLabelsInMap(builder.WithMap(keyValues...))
 }
 
 func (builder *ReplicatedStateMachineBuilder) AddMatchLabelsInMap(labels map[string]string) *ReplicatedStateMachineBuilder {

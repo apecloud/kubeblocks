@@ -20,13 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type StatefulSetBuilder struct {
-	BaseBuilder[apps.StatefulSet, *apps.StatefulSet, StatefulSetBuilder]
+	builder.BaseBuilder[apps.StatefulSet, *apps.StatefulSet, StatefulSetBuilder]
 }
 
 func NewStatefulSetBuilder(namespace, name string) *StatefulSetBuilder {
@@ -42,7 +43,7 @@ func (builder *StatefulSetBuilder) AddMatchLabel(key, value string) *StatefulSet
 }
 
 func (builder *StatefulSetBuilder) AddMatchLabels(keyValues ...string) *StatefulSetBuilder {
-	return builder.AddMatchLabelsInMap(WithMap(keyValues...))
+	return builder.AddMatchLabelsInMap(builder.WithMap(keyValues...))
 }
 
 func (builder *StatefulSetBuilder) AddMatchLabelsInMap(labels map[string]string) *StatefulSetBuilder {

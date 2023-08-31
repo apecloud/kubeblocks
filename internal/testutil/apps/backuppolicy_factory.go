@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -29,7 +30,7 @@ import (
 )
 
 type MockBackupPolicyFactory struct {
-	BaseFactory[dataprotectionv1alpha1.BackupPolicy, *dataprotectionv1alpha1.BackupPolicy, MockBackupPolicyFactory]
+	builder.BaseFactory[dataprotectionv1alpha1.BackupPolicy, *dataprotectionv1alpha1.BackupPolicy, MockBackupPolicyFactory]
 	backupType dataprotectionv1alpha1.BackupType
 }
 

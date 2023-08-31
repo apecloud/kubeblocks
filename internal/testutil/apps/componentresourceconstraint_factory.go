@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
@@ -90,7 +91,7 @@ const (
 )
 
 type MockComponentResourceConstraintFactory struct {
-	BaseFactory[appsv1alpha1.ComponentResourceConstraint, *appsv1alpha1.ComponentResourceConstraint, MockComponentResourceConstraintFactory]
+	builder.BaseFactory[appsv1alpha1.ComponentResourceConstraint, *appsv1alpha1.ComponentResourceConstraint, MockComponentResourceConstraintFactory]
 }
 
 func NewComponentResourceConstraintFactory(name string) *MockComponentResourceConstraintFactory {

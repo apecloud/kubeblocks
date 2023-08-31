@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +30,7 @@ import (
 )
 
 type MockPersistentVolumeClaimFactory struct {
-	BaseFactory[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, MockPersistentVolumeClaimFactory]
+	builder.BaseFactory[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, MockPersistentVolumeClaimFactory]
 }
 
 func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName, vctName string) *MockPersistentVolumeClaimFactory {

@@ -19,10 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package builder
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"github.com/apecloud/kubeblocks/internal/builder"
+	corev1 "k8s.io/api/core/v1"
+)
 
 type PodBuilder struct {
-	BaseBuilder[corev1.Pod, *corev1.Pod, PodBuilder]
+	builder.BaseBuilder[corev1.Pod, *corev1.Pod, PodBuilder]
 }
 
 func NewPodBuilder(namespace, name string) *PodBuilder {

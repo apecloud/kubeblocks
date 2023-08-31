@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -28,7 +29,7 @@ import (
 )
 
 type MockBackupRepoFactory struct {
-	BaseFactory[dataprotectionv1alpha1.BackupRepo, *dataprotectionv1alpha1.BackupRepo, MockBackupRepoFactory]
+	builder.BaseFactory[dataprotectionv1alpha1.BackupRepo, *dataprotectionv1alpha1.BackupRepo, MockBackupRepoFactory]
 }
 
 func NewBackupRepoFactory(namespace, name string) *MockBackupRepoFactory {

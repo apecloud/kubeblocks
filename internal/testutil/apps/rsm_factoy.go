@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,7 @@ import (
 )
 
 type MockRSMFactory struct {
-	BaseFactory[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, MockRSMFactory]
+	builder.BaseFactory[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, MockRSMFactory]
 }
 
 func NewRSMFactory(namespace, name string, clusterName string, componentName string) *MockRSMFactory {

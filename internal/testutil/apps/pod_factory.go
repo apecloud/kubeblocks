@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	corev1 "k8s.io/api/core/v1"
 )
 
 type MockPodFactory struct {
-	BaseFactory[corev1.Pod, *corev1.Pod, MockPodFactory]
+	builder.BaseFactory[corev1.Pod, *corev1.Pod, MockPodFactory]
 }
 
 func NewPodFactory(namespace, name string) *MockPodFactory {

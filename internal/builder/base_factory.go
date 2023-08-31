@@ -17,10 +17,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package builder
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"reflect"
 
 	"github.com/onsi/gomega"
@@ -58,13 +59,13 @@ func (factory *BaseFactory[T, PT, F]) get() PT {
 }
 
 func (factory *BaseFactory[T, PT, F]) WithRandomName() *F {
-	key := GetRandomizedKey("", factory.object.GetName())
+	key := apps.GetRandomizedKey("", factory.object.GetName())
 	factory.object.SetName(key.Name)
 	return factory.concreteFactory
 }
 
 func (factory *BaseFactory[T, PT, F]) AddLabels(keysAndValues ...string) *F {
-	factory.AddLabelsInMap(WithMap(keysAndValues...))
+	factory.AddLabelsInMap(apps.WithMap(keysAndValues...))
 	return factory.concreteFactory
 }
 
@@ -102,7 +103,7 @@ func (factory *BaseFactory[T, PT, F]) AddRoleLabel(value string) *F {
 }
 
 func (factory *BaseFactory[T, PT, F]) AddAnnotations(keysAndValues ...string) *F {
-	factory.AddAnnotationsInMap(WithMap(keysAndValues...))
+	factory.AddAnnotationsInMap(apps.WithMap(keysAndValues...))
 	return factory.concreteFactory
 }
 func (factory *BaseFactory[T, PT, F]) AddAnnotationsInMap(annotations map[string]string) *F {

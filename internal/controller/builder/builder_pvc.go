@@ -19,10 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package builder
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"github.com/apecloud/kubeblocks/internal/builder"
+	corev1 "k8s.io/api/core/v1"
+)
 
 type PVCBuilder struct {
-	BaseBuilder[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, PVCBuilder]
+	builder.BaseBuilder[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, PVCBuilder]
 }
 
 func NewPVCBuilder(namespace, name string) *PVCBuilder {

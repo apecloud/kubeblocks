@@ -67,16 +67,14 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				// TODO: generate service connection credential from secretRef
 			}
 
-			if serviceRef.Component != "" {
-				return nil, nil
-			}
-
 			if serviceRef.ConnectionCredential != "" {
 				serviceConnCredential := &appsv1alpha1.ServiceConnectionCredential{}
 				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: serviceRef.ConnectionCredential}, serviceConnCredential); err != nil {
 					return nil, err
 				}
-				// TODO: validate kind and version
+				if serviceConnCredential.Spec.Kind != serviceRefDecl.Kind || serviceConnCredential.Spec.Version != serviceRefDecl.Version {
+					return nil, fmt.Errorf("service connection credential %s kind or version is not match with service reference declaration %s", serviceConnCredential.Name, serviceRefDecl.Name)
+				}
 				serviceReferences[serviceRefDecl.Name] = serviceConnCredential
 			}
 		}

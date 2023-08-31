@@ -95,7 +95,7 @@ spec:
         containers:
           - name: mysql
             volumeMounts:
-              - mountPath: /data/mysql
+              - mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
                 name: data
               - mountPath: /opt/mysql
                 name: mysql-config
@@ -204,7 +204,7 @@ spec:
               - name: agamotto-configuration
                 mountPath: /opt/agamotto
               - name: data
-                mountPath: /data/mysql
+                mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
               - name: log-data
                 mountPath: /var/log/kubeblocks
                 readOnly: false

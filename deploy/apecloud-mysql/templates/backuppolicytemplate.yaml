@@ -28,9 +28,9 @@ spec:
       hooks:
         containerName: mysql
         preCommands:
-        - touch /data/mysql/data/.restore_new_cluster; sync
+        - touch {{ .Values.mysqlConfigs.dataDir }}/.restore_new_cluster; sync
         postCommands:
-        - "rm -f /data/mysql/data/.restore_new_cluster; sync"
+        - "rm -f {{ .Values.mysqlConfigs.dataDir }}/.restore_new_cluster; sync"
       target:
         role: leader
     datafile:
@@ -38,8 +38,12 @@ spec:
       backupStatusUpdates:
       - updateStage: post
         useTargetPodServiceAccount: true
+      target:
+        role: follower
     logfile:
       backupToolName: apecloud-mysql-pitr-tool
       backupStatusUpdates:
       - updateStage: post
         useTargetPodServiceAccount: true
+      target:
+        role: follower

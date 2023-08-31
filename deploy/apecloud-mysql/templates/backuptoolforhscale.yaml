@@ -10,7 +10,9 @@ spec:
   deployKind: job
   env:
     - name: DATA_DIR
-      value: /data/mysql/data
+      value: {{ .Values.mysqlConfigs.dataDir }}
+    - name: LOG_BIN
+      value: {{ .Values.mysqlConfigs.logBin }}
   physical:
     restoreCommands:
       - sh
@@ -23,7 +25,7 @@ spec:
         xtrabackup --decompress  --target-dir=/tmp/data/
         xtrabackup --prepare --target-dir=/tmp/data/
         find . -name "*.qp"|xargs rm -f
-        xtrabackup --move-back --target-dir=/tmp/data/ --datadir=${DATA_DIR}/
+        xtrabackup --move-back --target-dir=/tmp/data/ --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
         touch ${DATA_DIR}/.xtrabackup_restore
         rm -rf /tmp/data/
         chmod -R 0777 ${DATA_DIR}

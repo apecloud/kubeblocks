@@ -163,7 +163,7 @@ var _ = Describe("Backup Policy Controller", func() {
 			})
 			It("should success", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
 				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(dpv1alpha1.BackupTypeDataFile), func(g Gomega, fetched *batchv1.CronJob) {
 					g.Expect(fetched.Spec.Schedule).To(Equal(defaultSchedule))
@@ -272,7 +272,7 @@ var _ = Describe("Backup Policy Controller", func() {
 			})
 			It("should success", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
 				})).Should(Succeed())
 			})
 		})
@@ -296,7 +296,7 @@ var _ = Describe("Backup Policy Controller", func() {
 			})
 			It("should failed", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.BackupPolicyAvailable))
 				})).Should(Succeed())
 			})
 		})
@@ -316,7 +316,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
 					g.Expect(fetched.Spec.Datafile.Target.Secret.Name).To(Equal(randomSecretName))
 				})).Should(Succeed())
 			})
@@ -338,7 +338,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
 					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).ToNot(BeNil())
 					g.Expect(*fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
 					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
@@ -372,7 +372,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
 				})).Should(Succeed())
 				By("enable schedule for reconfigure")
 				Eventually(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {

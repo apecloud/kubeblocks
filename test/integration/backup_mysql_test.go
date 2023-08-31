@@ -142,7 +142,7 @@ var _ = Describe("MySQL data protection function", func() {
 
 		By("By check backupPolicy available")
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, backupPolicy *dpv1alpha1.BackupPolicy) {
-			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
 		})).Should(Succeed())
 
 		By("By creating a backup from backupPolicy: " + backupPolicyKey.Name)

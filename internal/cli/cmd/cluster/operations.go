@@ -84,6 +84,7 @@ type OperationsOptions struct {
 	CfgFile         string             `json:"cfgFile"`
 	ForceRestart    bool               `json:"forceRestart"`
 	FileContent     string             `json:"fileContent"`
+	HasPatch        bool               `json:"hasPatch"`
 
 	// VolumeExpansion options.
 	// VCTNames VolumeClaimTemplate names
@@ -112,6 +113,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 	o := &OperationsOptions{
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
 		KeyValues:             map[string]*string{},
+		HasPatch:              true,
 		OpsType:               opsType,
 		HasComponentNamesFlag: hasComponentNamesFlag,
 		autoApprove:           false,

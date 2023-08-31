@@ -47,6 +47,7 @@ type reconfiguringResult struct {
 
 type updateReconfigureStatus func(params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) error
 
+// Deprecated: use NewPipeline instead
 // updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
 func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	configSpec appsv1alpha1.ComponentConfigSpec,
@@ -78,16 +79,16 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	for _, key := range config.Keys {
 		if key.FileContent != "" {
 			updatedFiles[key.Key] = key.FileContent
-			continue
 		}
 		if len(key.Parameters) > 0 {
 			updatedParams = append(updatedParams, core.ParamPairs{
 				Key:           key.Key,
-				UpdatedParams: fromKeyValuePair(key.Parameters)})
+				UpdatedParams: fromKeyValuePair(key.Parameters),
+			})
 		}
 	}
 
-	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc.Spec, configSpec); err != nil {
+	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc, configSpec); err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
 	configPatch, restart, err := core.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, configSpec.Keys, len(updatedFiles) != 0)
@@ -112,7 +113,7 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
 	updatedParams []core.ParamPairs,
-	cc appsv1alpha1.ConfigConstraintSpec,
+	cc *appsv1alpha1.ConfigConstraint,
 	tpl appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
 	updatedConfig := base
 
@@ -120,10 +121,10 @@ func mergeUpdatedParams(base map[string]string,
 	if len(updatedFiles) != 0 {
 		return core.MergeUpdatedConfig(base, updatedFiles), nil
 	}
-	if len(updatedParams) == 0 {
+	if cc == nil {
 		return updatedConfig, nil
 	}
-	return intctrlutil.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
+	return intctrlutil.MergeAndValidateConfigs(cc.Spec, updatedConfig, tpl.Keys, updatedParams)
 }
 
 func syncConfigmap(
@@ -258,7 +259,7 @@ func getConfigSpecName(configSpec []appsv1alpha1.ComponentConfigSpec) []string {
 }
 
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
-	if result.configPatch.IsModify || result.noFormatFilesUpdated {
+	if result.noFormatFilesUpdated || result.configPatch.IsModify {
 		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureMerged,
@@ -311,23 +312,12 @@ func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *c
 	if execStatus != nil {
 		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
 	}
+	if configPatch == nil {
+		return fmt.Sprintf("%supdated full config files.", policyName)
+	}
 	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
 		policyName,
 		configPatch.UpdateConfig,
 		configPatch.AddConfig,
 		configPatch.DeleteConfig)
-}
-
-func getClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, cli client.Client, ctx context.Context) error {
-	if cvName == "" {
-		return nil
-	}
-	clusterVersionKey := client.ObjectKey{
-		Namespace: "",
-		Name:      cvName,
-	}
-	if err := cli.Get(ctx, clusterVersionKey, cv); err != nil {
-		return core.WrapError(err, "failed to get clusterversion[%s]", cvName)
-	}
-	return nil
 }

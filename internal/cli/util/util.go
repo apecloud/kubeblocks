@@ -461,7 +461,7 @@ func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterCompone
 	if err != nil {
 		return nil, err
 	}
-	if !reloadTpl {
+	if !reloadTpl || len(configSpecs) == 1 {
 		return configSpecs, nil
 	}
 
@@ -506,10 +506,16 @@ func GetComponentsFromClusterName(key client.ObjectKey, cli dynamic.Interface) (
 
 // GetComponentsFromResource returns name of component.
 func GetComponentsFromResource(componentSpecs []appsv1alpha1.ClusterComponentSpec, clusterDefObj *appsv1alpha1.ClusterDefinition) ([]string, error) {
+	filter := func(component *appsv1alpha1.ClusterComponentDefinition) bool {
+		if component != nil && len(componentSpecs) == 1 {
+			return true
+		}
+		return enableReconfiguring(component)
+	}
 	componentNames := make([]string, 0, len(componentSpecs))
 	for _, component := range componentSpecs {
 		cdComponent := clusterDefObj.GetComponentDefByName(component.ComponentDefRef)
-		if enableReconfiguring(cdComponent) {
+		if filter(cdComponent) {
 			componentNames = append(componentNames, component.Name)
 		}
 	}

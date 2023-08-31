@@ -42,16 +42,6 @@ const (
 	CreatePVCPolicyIfNotPresent CreatePVCPolicy = "IfNotPresent"
 )
 
-// BackupPolicyPhase defines phases for BackupPolicy CR.
-// +enum
-// +kubebuilder:validation:Enum={Available,Failed}
-type BackupPolicyPhase string
-
-const (
-	PolicyAvailable BackupPolicyPhase = "Available"
-	PolicyFailed    BackupPolicyPhase = "Failed"
-)
-
 // RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.
 // +enum
 // +kubebuilder:validation:Enum={New,InProgressPhy,InProgressLogic,Completed,Failed}

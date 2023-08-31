@@ -222,11 +222,11 @@ func (r *BackupPolicyReconciler) patchStatusAvailable(reqCtx intctrlutil.Request
 		}
 	}
 	// update status phase
-	if backupPolicy.Status.Phase != dataprotectionv1alpha1.PolicyAvailable ||
+	if backupPolicy.Status.Phase != dataprotectionv1alpha1.BackupPolicyAvailable ||
 		backupPolicy.Status.ObservedGeneration != backupPolicy.Generation {
 		patch := client.MergeFrom(backupPolicy.DeepCopy())
 		backupPolicy.Status.ObservedGeneration = backupPolicy.Generation
-		backupPolicy.Status.Phase = dataprotectionv1alpha1.PolicyAvailable
+		backupPolicy.Status.Phase = dataprotectionv1alpha1.BackupPolicyAvailable
 		backupPolicy.Status.FailureReason = ""
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -244,7 +244,7 @@ func (r *BackupPolicyReconciler) patchStatusFailed(reqCtx intctrlutil.RequestCtx
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 	}
 	backupPolicyDeepCopy := backupPolicy.DeepCopy()
-	backupPolicy.Status.Phase = dataprotectionv1alpha1.PolicyFailed
+	backupPolicy.Status.Phase = dataprotectionv1alpha1.BackupPolicyFailed
 	backupPolicy.Status.FailureReason = err.Error()
 	if !reflect.DeepEqual(backupPolicy.Status, backupPolicyDeepCopy.Status) {
 		if patchErr := r.Client.Status().Patch(reqCtx.Ctx, backupPolicy, client.MergeFrom(backupPolicyDeepCopy)); patchErr != nil {

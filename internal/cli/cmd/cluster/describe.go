@@ -236,7 +236,7 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		if policy.Annotations[constant.DefaultBackupPolicyAnnotationKey] != "true" {
 			continue
 		}
-		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
+		if policy.Status.Phase != dpv1alpha1.BackupPolicyAvailable {
 			continue
 		}
 		ttlString := printer.NoneString

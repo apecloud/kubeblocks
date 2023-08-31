@@ -23,7 +23,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,190 +56,9 @@ type BackupPolicySpec struct {
 	BackupMethods []BackupMethod `json:"backupMethods"`
 }
 
-type RetentionSpec struct {
-	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
-	// the Backup should be retained. if not set, will be retained forever.
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
-	// +optional
-	TTL *string `json:"ttl,omitempty"`
-}
-
-type Schedule struct {
-	// startingDeadlineMinutes defines the deadline in minutes for starting the backup job
-	// if it misses scheduled time for any reason.
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=1440
-	StartingDeadlineMinutes *int64 `json:"startingDeadlineMinutes,omitempty"`
-
-	// schedule policy for snapshot backup.
-	// +optional
-	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`
-
-	// schedule policy for datafile backup.
-	// +optional
-	Datafile *SchedulePolicy `json:"datafile,omitempty"`
-
-	// schedule policy for logfile backup.
-	// +optional
-	Logfile *SchedulePolicy `json:"logfile,omitempty"`
-}
-
-type SchedulePolicy struct {
-	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
-	// +kubebuilder:validation:Required
-	CronExpression string `json:"cronExpression"`
-
-	// enable or disable the schedule.
-	// +kubebuilder:validation:Required
-	Enable bool `json:"enable"`
-}
-
-type SnapshotPolicy struct {
-	BasePolicy `json:",inline"`
-
-	// execute hook commands for backup.
-	// +optional
-	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
-}
-
-type CommonBackupPolicy struct {
-	BasePolicy `json:",inline"`
-
-	// refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.
-	// +optional
-	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
-
-	// refer to BackupRepo and the backup data will be stored in the corresponding repo.
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	BackupRepoName *string `json:"backupRepoName,omitempty"`
-
-	// which backup tool to perform database backup, only support one tool.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	BackupToolName string `json:"backupToolName,omitempty"`
-}
-
-type PersistentVolumeClaim struct {
-	// the name of PersistentVolumeClaim to store backup data.
-	// +optional
-	Name *string `json:"name,omitempty"`
-
-	// storageClassName is the name of the StorageClass required by the claim.
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	StorageClassName *string `json:"storageClassName,omitempty"`
-
-	// initCapacity represents the init storage size of the PersistentVolumeClaim which should be created if not exist.
-	// and the default value is 100Gi if it is empty.
-	// +optional
-	InitCapacity resource.Quantity `json:"initCapacity,omitempty"`
-
-	// createPolicy defines the policy for creating the PersistentVolumeClaim, enum values:
-	// - Never: do nothing if the PersistentVolumeClaim not exists.
-	// - IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains 'ReadWriteMany'.
-	// +kubebuilder:default=IfNotPresent
-	// +optional
-	CreatePolicy CreatePVCPolicy `json:"createPolicy,omitempty"`
-
-	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
-	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
-	// support the following built-in Objects:
-	// - $(GENERATE_NAME): generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
-	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
-	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
-	// +optional
-	PersistentVolumeConfigMap *PersistentVolumeConfigMap `json:"persistentVolumeConfigMap,omitempty"`
-}
-
-type PersistentVolumeConfigMap struct {
-	// the name of the persistentVolume ConfigMap.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// the namespace of the persistentVolume ConfigMap.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	Namespace string `json:"namespace"`
-}
-
-type BasePolicy struct {
-	// target database cluster for backup.
-	// +kubebuilder:validation:Required
-	Target TargetCluster `json:"target"`
-
-	// the number of automatic backups to retain. Value must be non-negative integer.
-	// 0 means NO limit on the number of backups.
-	// +kubebuilder:default=7
-	// +optional
-	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
-
-	// count of backup stop retries on fail.
-	// +optional
-	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
-
-	// define how to update metadata for backup status.
-	// +optional
-	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
-}
-
-// TargetCluster TODO (dsj): target cluster need redefined from Cluster API
-type TargetCluster struct {
-	// labelsSelector is used to find matching pods.
-	// Pods that match this label selector are counted to determine the number of pods
-	// in their corresponding topology domain.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:pruning:PreserveUnknownFields
-	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
-
-	// secret is used to connect to the target database cluster.
-	// If not set, secret will be inherited from backup policy template.
-	// if still not set, the controller will check if any system account for dataprotection has been created.
-	// +optional
-	Secret *BackupPolicySecret `json:"secret,omitempty"`
-}
-
-// BackupPolicySecret defines for the target database secret that backup tool can connect.
-type BackupPolicySecret struct {
-	// the secret name
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// usernameKey the map key of the user in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=username
-	UsernameKey string `json:"usernameKey,omitempty"`
-
-	// passwordKey the map key of the password in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=password
-	PasswordKey string `json:"passwordKey,omitempty"`
-}
-
-// BackupPolicyHook defines for the database execute commands before and after backup.
-type BackupPolicyHook struct {
-	// pre backup to perform commands
-	// +optional
-	PreCommands []string `json:"preCommands,omitempty"`
-
-	// post backup to perform commands
-	// +optional
-	PostCommands []string `json:"postCommands,omitempty"`
-
-	// exec command with image
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// which container can exec command
-	// +optional
-	ContainerName string `json:"containerName,omitempty"`
-}
-
 type BackupTarget struct {
-	// podSelector is used to find matching pods.
+	// podSelector is used to find the target pod. The volumes of the target pod
+	// will be backed up.
 	// +kube:validation:Required
 	PodSelector *PodSelector `json:"podSelector,omitempty"`
 
@@ -248,10 +66,18 @@ type BackupTarget struct {
 	// target database cluster.
 	// +optional
 	ConnectionCredential *ConnectionCredential `json:"connectionCredential,omitempty"`
+
+	// resources specifies the kubernetes resources to back up.
+	// +optional
+	Resources *KubeResources `json:"resources,omitempty"`
+
+	// serviceAccountName specifies the service account to run the backup workload.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type PodSelector struct {
-	// labelsSelector is used to find matching pods.
+	// labelsSelector is the label selector to filter the target pods.
 	metav1.LabelSelector `json:",inline"`
 
 	// strategy specifies the strategy to select the target pod when multiple pods
@@ -308,13 +134,14 @@ type ConnectionCredential struct {
 // retrieve secret in any namespace
 type SecretReference struct {
 	// Name is unique within a namespace to reference a secret resource.
-	// +optional
+	// +kubebuilder:validation:Required
 	Name string `json:"name,omitempty"`
 	// Namespace defines the space within which the secret name must be unique.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// KubeResources defines the kubernetes resources to back up.
 type KubeResources struct {
 	// selector is a metav1.LabelSelector to filter the target kubernetes resources
 	// that need to be backed up.
@@ -343,12 +170,12 @@ type BackupMethod struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// useVolumeSnapshot defines whether to use volume snapshot to back up volume.
+	// snapshotVolumes specifies whether to take snapshots of persistent volumes.
 	// if true, the BackupScript is not required, the controller will use the CSI
 	// volume snapshotter to create the snapshot.
 	// +optional
 	// +kubebuilder:default=false
-	UseVolumeSnapshot *bool `json:"useVolumeSnapshot,omitempty"`
+	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
 
 	// backupScriptRef refers to the BackupScript object that defines the backup actions.
 	// For volume snapshot backup, the backupScript is not required, the controller
@@ -390,67 +217,33 @@ type RuntimeSettings struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
-// BackupStatusUpdateStage defines the stage of backup status update.
-// +enum
-// +kubebuilder:validation:Enum={pre,post}
-type BackupStatusUpdateStage string
-
-const (
-	PRE  BackupStatusUpdateStage = "pre"
-	POST BackupStatusUpdateStage = "post"
-)
-
-type BackupStatusUpdate struct {
-	// specify the json path of backup object for patch.
-	// example: manifests.backupLog -- means patch the backup json path of status.manifests.backupLog.
-	// +optional
-	Path string `json:"path,omitempty"`
-
-	// which container name that kubectl can execute.
-	// +optional
-	ContainerName string `json:"containerName,omitempty"`
-
-	// the shell Script commands to collect backup status metadata.
-	// The script must exist in the container of ContainerName and the output format must be set to JSON.
-	// Note that outputting to stderr may cause the result format to not be in JSON.
-	// +optional
-	Script string `json:"script,omitempty"`
-
-	// useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.
-	// if true, will use the service account of the backup target pod. otherwise, will use the system service account.
-	// +optional
-	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
-
-	// when to update the backup status, pre: before backup, post: after backup
-	// +kubebuilder:validation:Required
-	UpdateStage BackupStatusUpdateStage `json:"updateStage"`
-}
-
 // BackupPolicyStatus defines the observed state of BackupPolicy
 type BackupPolicyStatus struct {
-
-	// observedGeneration is the most recent generation observed for this
-	// BackupPolicy. It corresponds to the Cluster's generation, which is
-	// updated on mutation by the API Server.
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
-	// backup policy phase valid value: Available, Failed.
+	// BackupPolicy phase, valid values are: Available, Failed.
 	// +optional
 	Phase BackupPolicyPhase `json:"phase,omitempty"`
 
-	// the reason if backup policy check failed.
+	// A human-readable message indicating details about why the BackupPolicy is
+	// in this phase.
 	// +optional
-	FailureReason string `json:"failureReason,omitempty"`
+	Message string `json:"message,omitempty"`
 
-	// information when was the last time the job was successfully scheduled.
+	// observedGeneration is the most recent generation observed for this
+	// BackupPolicy. It refers to the BackupPolicy's generation, which is
+	// updated on mutation by the API Server.
 	// +optional
-	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
-
-	// information when was the last time the job successfully completed.
-	// +optional
-	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
+
+// BackupPolicyPhase defines phases for BackupPolicy.
+// +enum
+// +kubebuilder:validation:Enum={Available,Failed}
+type BackupPolicyPhase string
+
+const (
+	BackupPolicyAvailable BackupPolicyPhase = "Available"
+	BackupPolicyFailed    BackupPolicyPhase = "Failed"
+)
 
 // +genclient
 // +k8s:openapi-gen=true
@@ -481,28 +274,6 @@ type BackupPolicyList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupPolicy{}, &BackupPolicyList{})
-}
-
-func (r *BackupPolicySpec) GetCommonPolicy(backupType BackupType) *CommonBackupPolicy {
-	switch backupType {
-	case BackupTypeDataFile:
-		return r.Datafile
-	case BackupTypeLogFile:
-		return r.Logfile
-	}
-	return nil
-}
-
-func (r *BackupPolicySpec) GetCommonSchedulePolicy(backupType BackupType) *SchedulePolicy {
-	switch backupType {
-	case BackupTypeSnapshot:
-		return r.Schedule.Snapshot
-	case BackupTypeDataFile:
-		return r.Schedule.Datafile
-	case BackupTypeLogFile:
-		return r.Schedule.Logfile
-	}
-	return nil
 }
 
 // ToDuration converts the ttl string to time.Duration.

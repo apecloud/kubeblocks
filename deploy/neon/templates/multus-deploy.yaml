@@ -1,0 +1,110 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: multus
+    name: multus
+    tier: node
+  name: kube-multus-ds
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: multus
+  template:
+    metadata:
+      labels:
+        app: multus
+        name: multus
+        tier: node
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - args:
+            - -cni-version=0.3.1
+            - -cni-config-dir=/host/etc/cni/net.d
+            - -multus-autoconfig-dir=/host/etc/cni/net.d
+            - -multus-log-to-stderr=true
+            - -multus-log-level=verbose
+          command:
+            - /usr/src/multus-cni/bin/multus-daemon
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:v3.9.2-thick-amd64
+          name: kube-multus
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /host/etc/cni/net.d
+              name: cni
+            - mountPath: /host/opt/cni/bin
+              name: cnibin
+      hostNetwork: true
+      initContainers:
+        - command:
+            - cp
+            - /usr/src/multus-cni/bin/multus
+            - /host/opt/cni/bin/multus
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:v3.9.2-thick-amd64
+          name: install-multus-binary
+          resources:
+            requests:
+              cpu: 10m
+              memory: 15Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              mountPropagation: Bidirectional
+              name: cnibin
+        - args:
+            - -k8s-service-host=$(KUBERNETES_SERVICE_HOST)
+            - -k8s-service-port=$(KUBERNETES_SERVICE_PORT)
+          command:
+            - /usr/src/multus-cni/bin/generate-kubeconfig
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:v3.9.2-thick-amd64
+          name: generate-kubeconfig
+          resources:
+            requests:
+              cpu: 10m
+              memory: 15Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /host/etc/cni/net.d
+              mountPropagation: Bidirectional
+              name: cni
+      serviceAccountName: multus
+      terminationGracePeriodSeconds: 10
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+      volumes:
+        - hostPath:
+            path: /etc/cni/net.d
+          name: cni
+        - hostPath:
+            path: /opt/cni/bin
+          name: cnibin
+  updateStrategy:
+    type: RollingUpdate

@@ -26,6 +26,29 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
+  name: mongodb-4.0
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb
+  componentVersions:
+    - componentDefRef: mongodb
+      versionsContext:
+        containers:
+          - name: mongodb
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.0
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.0
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.0
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
   name: mongodb-4.2
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}

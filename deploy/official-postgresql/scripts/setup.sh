@@ -2,12 +2,12 @@
 set -o errexit
 set -o nounset
 
-. /kb-scripts/libsetup.sh
+. /kb-scripts/libpostgresql.sh
 
 export POSTGRESQL_INIT_MAX_TIMEOUT="${POSTGRESQL_INIT_MAX_TIMEOUT:-60}"
 export POSTGRESQL_DAEMON_USER="postgres"
 export POSTGRESQL_DAEMON_GROUP="postgres"
-export POSTGRESQL_BIN_DIR="/usr/local/bin"
+export POSTGRESQL_BIN_DIR="/usr/bin"
 export POSTGRESQL_CONF_FILE="/kubeblocks/conf/postgresql.conf"
 KB_0_POD_NAME_PREFIX="${KB_0_HOSTNAME%%\.*}"
 
@@ -17,16 +17,12 @@ if [ ! -d "/kubeblocks/conf" ];then
 fi
 
 # default secondary when pgdata is not empty
-if [ -d ${PGDATA} ]; then
+if [ "$(ls -A ${PGDATA})" ]; then
   touch "$PGDATA"/standby.signal
 else
   if [ "$KB_0_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
-    export POSTGRESQL_REPLICATION_USER=$POSTGRES_USER
-    export POSTGRESQL_REPLICATION_PASSWORD=$POSTGRES_PASSWORD
     export POSTGRESQL_MASTER_HOST=$KB_0_HOSTNAME
     export POSTGRESQL_MASTER_PORT_NUMBER="5432"
-    # add permission to daemon user
-    chmod a+w "$POSTGRESQL_VOLUME_DIR"
     # Ensure 'daemon' user exists when running as 'root'
     am_i_root && ensure_user_exists "$POSTGRESQL_DAEMON_USER" --group "$POSTGRESQL_DAEMON_GROUP"
     postgresql_slave_init_db

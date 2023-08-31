@@ -104,13 +104,13 @@ spec:
                     fieldPath: metadata.namespace
               - name: PGDATA
                 value: /var/lib/postgresql/data
-              - name: PGUSER
+              - name: POSTGRES_USER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
                     optional: false
-              - name: PGPASSWORD
+              - name: POSTGRES_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)

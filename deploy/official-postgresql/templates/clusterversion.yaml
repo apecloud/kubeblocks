@@ -2,11 +2,11 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   # major version of the component defined in values.yaml
-  name: postgresql-{{ .Values.image.tag }}
+  name: official-postgresql-{{ .Values.image.tag }}
   labels:
     {{- include "official-postgresql.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: postgresql
+  clusterDefinitionRef: official-postgresql
   componentVersions:
     - componentDefRef: postgresql
       versionsContext:

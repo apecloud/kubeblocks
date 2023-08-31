@@ -22,14 +22,13 @@ package builder
 import (
 	"encoding/json"
 	"fmt"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"golang.org/x/exp/slices"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/leaanthony/debme"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -391,7 +391,7 @@ var _ = Describe("builder", func() {
 
 			// test roles
 			Expect(rsm.Spec.Roles).Should(HaveLen(1))
-			Expect(rsm.Spec.Roles[0].Name).Should(BeEquivalentTo(appsv1alpha1.DefaultLeader))
+			Expect(rsm.Spec.Roles[0].Name).Should(Equal(appsv1alpha1.DefaultLeader.Name))
 
 			// test role probe
 			Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())

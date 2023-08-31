@@ -617,7 +617,7 @@ func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([
 func buildActionFromCharacterType(characterType string, isConsensus bool) []workloads.Action {
 	kind := strings.ToLower(characterType)
 	switch kind {
-	case "mysql":
+	case "mysql": //nolint:goconst
 		if isConsensus {
 			return []workloads.Action{
 				{

@@ -215,7 +215,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*rsm.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(rsm.Spec.Service).ShouldNot(BeNil())
-		Expect(*rsm.Spec.Service).Should(Equal(service))
+		Expect(rsm.Spec.Service).Should(BeEquivalentTo(service))
 		Expect(rsm.Spec.AlternativeServices).ShouldNot(BeNil())
 		Expect(rsm.Spec.AlternativeServices).Should(Equal(alternativeServices))
 		Expect(rsm.Spec.Credential).ShouldNot(BeNil())

@@ -42,7 +42,7 @@ function check_mysql_process() {
         is_ok=true
         break
       fi
-      echo "Waring: target backup pod/${DP_TARGET_POD_NAME} is not OK, target role: ${DP_TARGET_POD_ROLE}, current role: ${role}, retry detection!"
+      echo "Warning: target backup pod/${DP_TARGET_POD_NAME} is not OK, target role: ${DP_TARGET_POD_ROLE}, current role: ${role}, retry detection!"
       sleep 1
     done
     if [[ ${is_ok} == "false" ]];then

@@ -94,7 +94,7 @@ function check_pg_process() {
         is_ok=true
         break
       fi
-      echo "Waring: target backup pod/${DP_TARGET_POD_NAME} is not OK, target role: ${DP_POD_ROLE}, pg_is_in_recovery: ${is_secondary}, retry detection!"
+      echo "Warning: target backup pod/${DP_TARGET_POD_NAME} is not OK, target role: ${DP_POD_ROLE}, pg_is_in_recovery: ${is_secondary}, retry detection!"
       sleep 1
     done
     if [[ ${is_ok} == "false" ]];then

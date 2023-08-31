@@ -128,8 +128,8 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 	}
 	defer client.Disconnect(context.TODO()) //nolint:errcheck
 
-	configJson, _ := json.Marshal(config)
-	mgr.Logger.Infof("Initial Replset Config: %s", string(configJson))
+	configJSON, _ := json.Marshal(config)
+	mgr.Logger.Infof("Initial Replset Config: %s", string(configJSON))
 	response := client.Database("admin").RunCommand(ctx, bson.M{"replSetInitiate": config})
 	if response.Err() != nil {
 		return response.Err()

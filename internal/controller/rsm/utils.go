@@ -648,3 +648,29 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 	}
 	return nil
 }
+
+// IsRSMReady gives rsm level 'ready' state:
+// 1. all replicas exist
+// 2. all members have role set
+func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
+	membersStatus := rsm.Status.MembersStatus
+	if len(membersStatus) != int(*rsm.Spec.Replicas) {
+		return false
+	}
+	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
+		podName := getPodName(rsm.Name, i)
+		if !isMemberReady(podName, membersStatus) {
+			return false
+		}
+	}
+	return true
+}
+
+func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool {
+	for _, memberStatus := range membersStatus {
+		if memberStatus.PodName == podName {
+			return true
+		}
+	}
+	return false
+}

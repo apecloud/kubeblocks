@@ -34,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	rsmcore "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -62,17 +63,26 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
+
 	rsm, ok := obj.(*workloads.ReplicatedStateMachine)
 	if !ok {
 		return false, nil
 	}
 	sts := ConvertRSMToSTS(rsm)
+
+	// whether sts is ready
 	isRevisionConsistent, err := isStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
 	targetReplicas := r.getReplicas()
-	return statefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas), nil
+	stsReady := statefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas)
+	if !stsReady {
+		return stsReady, nil
+	}
+
+	// whether rsm is ready
+	return rsmcore.IsRSMReady(rsm), nil
 }
 
 func (r *RSM) PodsReady(ctx context.Context, obj client.Object) (bool, error) {

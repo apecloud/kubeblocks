@@ -303,5 +303,6 @@ remove_temp_files_after_crash = 'on'
 track_wal_io_timing = 'False'
 vacuum_failsafe_age = '1600000000'
 vacuum_multixact_failsafe_age = '1600000000'
-wal_keep_size = '0'
+// TODO: appropriate value
+wal_keep_size = '2048'
 wal_skip_threshold = '2048'

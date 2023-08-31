@@ -102,6 +102,8 @@ spec:
                   fieldRef:
                     apiVersion: v1
                     fieldPath: metadata.namespace
+              - name: PGDATA
+                value: /var/lib/postgresql/data
               - name: PGUSER
                 valueFrom:
                   secretKeyRef:

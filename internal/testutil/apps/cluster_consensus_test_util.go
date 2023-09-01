@@ -168,8 +168,9 @@ func MockConsensusComponentPods(
 	sts *appsv1.StatefulSet,
 	clusterName,
 	consensusCompName string) []*corev1.Pod {
-	podList := make([]*corev1.Pod, ConsensusReplicas)
-	for i := 0; i < ConsensusReplicas; i++ {
+	replicas := int(*sts.Spec.Replicas)
+	podList := make([]*corev1.Pod, replicas)
+	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
 		podRole := "follower"
 		accessMode := "Readonly"

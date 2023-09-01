@@ -2506,9 +2506,9 @@ var _ = Describe("Cluster Controller", func() {
 
 	When("creating cluster with stateful workloadTypes (being Stateful|Consensus|Replication) component", func() {
 		compNameNDef := map[string]string{
-			//statefulCompName:    statefulCompDefName,
+			statefulCompName:    statefulCompDefName,
 			consensusCompName:   consensusCompDefName,
-			//replicationCompName: replicationCompDefName,
+			replicationCompName: replicationCompDefName,
 		}
 
 		BeforeEach(func() {

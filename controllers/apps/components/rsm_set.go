@@ -22,8 +22,6 @@ package components
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,10 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	rsmcore "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"

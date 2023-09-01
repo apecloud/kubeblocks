@@ -16,5 +16,6 @@ RPL_SET_NAME=${RPL_SET_NAME%-};
 mkdir -p $MONGODB_ROOT/db
 mkdir -p $MONGODB_ROOT/logs
 mkdir -p $MONGODB_ROOT/tmp
+
 MODE=$1
 mongod $MODE --bind_ip_all --port $PORT --replSet $RPL_SET_NAME  --config /etc/mongodb/mongodb.conf

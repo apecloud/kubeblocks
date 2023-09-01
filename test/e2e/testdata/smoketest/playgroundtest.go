@@ -140,16 +140,16 @@ func checkPlaygroundCluster() {
 	clusterName := e2eutil.ExecCommand(commond)
 	Eventually(func(g Gomega) {
 		e2eutil.WaitTime(100000)
-		podStatusResult := e2eutil.CheckPodStatus(clusterName)
+		podStatusResult := e2eutil.CheckPodStatus(clusterName, "default")
 		for _, result := range podStatusResult {
 			g.Expect(result).Should(BeTrue())
 		}
-	}, time.Second*180, time.Second*1).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
 	cmd := "kbcli cluster list | grep " + clusterName + " | awk '{print $6}'"
 	log.Println(cmd)
 	Eventually(func(g Gomega) {
 		clusterStatus := e2eutil.ExecCommand(cmd)
 		log.Println("clusterStatus is " + e2eutil.StringStrip(clusterStatus))
 		g.Expect(e2eutil.StringStrip(clusterStatus)).Should(Equal("Running"))
-	}, time.Second*360, time.Second*1).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
 }

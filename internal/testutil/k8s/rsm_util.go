@@ -22,6 +22,7 @@ package testutil
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,7 +33,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	rsmcore "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -96,11 +96,29 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 	rsm.Status.Replicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyReplicas = *rsm.Spec.Replicas
 	rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
-	var podList []corev1.Pod
-	for i := range pods {
-		podList = append(podList, *pods[i])
+
+	composeRoleMap := func(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
+		roleMap := make(map[string]workloads.ReplicaRole, 0)
+		for _, role := range rsm.Spec.Roles {
+			roleMap[strings.ToLower(role.Name)] = role
+		}
+		return roleMap
 	}
-	rsmcore.SetMembersStatusForTest(rsm, podList)
+	membersStatus := rsm.Status.MembersStatus
+	roleMap := composeRoleMap(*rsm)
+	for _, pod := range pods {
+		roleName := strings.ToLower(pod.Labels[constant.RoleLabelKey])
+		role, ok := roleMap[roleName]
+		if !ok {
+			continue
+		}
+		memberStatus := workloads.MemberStatus{
+			PodName:     pod.Name,
+			ReplicaRole: role,
+		}
+		membersStatus = append(membersStatus, memberStatus)
+	}
+	rsm.Status.MembersStatus = membersStatus
 }
 
 func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.ReplicatedStateMachineList {

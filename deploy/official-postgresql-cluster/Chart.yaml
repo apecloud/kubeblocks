@@ -1,0 +1,34 @@
+annotations:
+  category: Database
+apiVersion: v2
+name: official-postgresql-cluster
+type: application
+version: 0.7.0-alpha.0
+description: A Official PostgreSQL cluster definition Helm chart for Kubernetes
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
+# The helm chart contains multiple kernel versions of Official PostgreSQL,
+# and each PostgreSQL version corresponds to a clusterVersion object.
+# appVersion should be consistent with the highest PostgreSQL kernel version in clusterVersion.
+appVersion: "14.7"
+
+keywords:
+  - postgresql
+  - database
+  - sql
+  - cluster
+
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/apecloud-postgresql-cluster
+icon: https://kubeblocks.io/img/logo.png
+
+maintainers:
+  - name: ApeCloud
+    url: https://kubeblocks.io/
+
+sources:
+  - https://github.com/apecloud/kubeblocks/
+  - https://github.com/apecloud/kubeblocks/tree/main/deploy/apecloud-postgresql

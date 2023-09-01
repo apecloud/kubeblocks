@@ -90,6 +90,8 @@ spec:
             env:
               - name: KB_PG_CONFIG_PATH
                 value: /var/lib/postgresql/conf/postgresql.conf
+              - name: POSTGRESQL_MASTER_PORT_NUMBER
+                value: "5432"
               - name: ALLOW_NOSSL
                 value: "true"
               - name: POD_IP

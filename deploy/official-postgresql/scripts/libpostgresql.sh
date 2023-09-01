@@ -218,7 +218,7 @@ postgresql_slave_init_db() {
     local -r check_args=("-U" "$POSTGRES_USER" "-h" "$POSTGRESQL_MASTER_HOST" "-p" "$POSTGRESQL_MASTER_PORT_NUMBER" "-d" "postgres")
     local check_cmd=()
     if am_i_root; then
-        check_cmd=("gosu" "$POSTGRESQL_DAEMON_USER")
+        check_cmd=("gosu" "$POSTGRES_USER")
     fi
     check_cmd+=("$POSTGRESQL_BIN_DIR"/pg_isready)
     local ready_counter=$POSTGRESQL_INIT_MAX_TIMEOUT
@@ -235,7 +235,7 @@ postgresql_slave_init_db() {
     local -r backup_args=("-D" "$PGDATA" "-U" "$POSTGRES_USER" "-h" "$POSTGRESQL_MASTER_HOST" "-p" "$POSTGRESQL_MASTER_PORT_NUMBER" "-X" "stream" "-w" "-v" "-P")
     local backup_cmd=()
     if am_i_root; then
-        backup_cmd+=("gosu" "$POSTGRESQL_DAEMON_USER")
+        backup_cmd+=("gosu" "$POSTGRES_USER")
     fi
     backup_cmd+=("$POSTGRESQL_BIN_DIR"/pg_basebackup)
     local replication_counter=$POSTGRESQL_INIT_MAX_TIMEOUT

@@ -307,11 +307,13 @@ remove_runner() {
         runner_status=$( echo "$runners_list" | jq ".runners[$i].status" --raw-output )
         runner_busy=$( echo "$runners_list" | jq ".runners[$i].busy" --raw-output )
         runner_id=$( echo "$runners_list" | jq ".runners[$i].id" --raw-output )
-        if [[ "$runner_name" == "$RUNNER_NAME" && "$runner_status" == "online" && "$runner_busy" == "false"  ]]; then
-            echo "runner_name:"$runner_name
-            gh_curl -L -X DELETE $runners_url/$runner_id
-            break
-        fi
+        for runnerName in $( echo "$RUNNER_NAME" | sed 's/|/ /g' ); do
+            if [[ "$runner_name" == "$runnerName" && "$runner_status" == "online" && "$runner_busy" == "false"  ]]; then
+                echo "runner_name:"$runner_name
+                gh_curl -L -X DELETE $runners_url/$runner_id
+                break
+            fi
+        done
     done
 }
 

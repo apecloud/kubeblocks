@@ -186,7 +186,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
 			mysqlRSM = &rsmList.Items[0]
 			Expect(testapps.ChangeObjStatus(&testCtx, mysqlRSM, func() {
-				testk8s.MockRSMReady(mysqlRSM)
+				testk8s.MockRSMReady(mysqlRSM, pod)
 			})).ShouldNot(HaveOccurred())
 			mysqlSts = components.ConvertRSMToSTS(mysqlRSM)
 		} else {
@@ -237,7 +237,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("mock bring Cluster and changed component back to running status")
 		if controllerutil.IsRSMEnabled() {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlRSM), func(tmpRSM *workloads.ReplicatedStateMachine) {
-				testk8s.MockRSMReady(tmpRSM)
+				testk8s.MockRSMReady(tmpRSM, pod)
 			})()).ShouldNot(HaveOccurred())
 		} else {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlSts), func(tmpSts *appsv1.StatefulSet) {
@@ -368,26 +368,22 @@ var _ = Describe("OpsRequest Controller", func() {
 			wl := componentWorkload()
 			if controllerutil.IsRSMEnabled() {
 				rsm, _ := wl.(*workloads.ReplicatedStateMachine)
-				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-					testk8s.MockRSMReady(rsm)
-				})).ShouldNot(HaveOccurred())
 				sts = components.ConvertRSMToSTS(rsm)
 			} else {
 				sts, _ = wl.(*appsv1.StatefulSet)
+			}
+			mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, mysqlCompName)
+			if controllerutil.IsRSMEnabled() {
+				rsm, _ := wl.(*workloads.ReplicatedStateMachine)
+				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+					testk8s.MockRSMReady(rsm, mockPods...)
+				})).ShouldNot(HaveOccurred())
+			} else {
 				Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 					testk8s.MockStatefulSetReady(sts)
 				})).ShouldNot(HaveOccurred())
 			}
-			for i := 0; i < int(replicas); i++ {
-				podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, i)
-				podRole := "follower"
-				accessMode := "Readonly"
-				if i == 0 {
-					podRole = "leader"
-					accessMode = "ReadWrite"
-				}
-				testapps.MockConsensusComponentStsPod(&testCtx, sts, clusterObj.Name, mysqlCompName, podName, podRole, accessMode)
-			}
+
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		}
 

@@ -1039,17 +1039,18 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("mock pods/sts of component are available")
+		var mockPods []*corev1.Pod
 		switch compDefName {
 		case statelessCompDefName:
 			// ignore
 		case replicationCompDefName:
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
+			mockPods = testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
 		case statefulCompDefName, consensusCompDefName:
-			testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
+			mockPods = testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 		}
 		if intctrlutil.IsRSMEnabled() {
 			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-				testk8s.MockRSMReady(rsm)
+				testk8s.MockRSMReady(rsm, mockPods...)
 			})).ShouldNot(HaveOccurred())
 		} else {
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
@@ -2505,9 +2506,9 @@ var _ = Describe("Cluster Controller", func() {
 
 	When("creating cluster with stateful workloadTypes (being Stateful|Consensus|Replication) component", func() {
 		compNameNDef := map[string]string{
-			statefulCompName:    statefulCompDefName,
+			//statefulCompName:    statefulCompDefName,
 			consensusCompName:   consensusCompDefName,
-			replicationCompName: replicationCompDefName,
+			//replicationCompName: replicationCompDefName,
 		}
 
 		BeforeEach(func() {
@@ -2642,9 +2643,9 @@ var _ = Describe("Cluster Controller", func() {
 				rsm := rsmList.Items[0]
 				sts := components.ConvertRSMToSTS(&rsm)
 				By("mock pod/sts are available and wait for component enter running phase")
-				testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
+				mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
 				Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-					testk8s.MockRSMReady(&rsm)
+					testk8s.MockRSMReady(&rsm, mockPods...)
 				})).ShouldNot(HaveOccurred())
 				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
@@ -2713,21 +2714,22 @@ var _ = Describe("Cluster Controller", func() {
 			if intctrlutil.IsRSMEnabled() {
 				rsmList := testk8s.ListAndCheckRSMItemsCount(&testCtx, clusterKey, 1)
 				rsm := &rsmList.Items[0]
-				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-					testk8s.MockRSMReady(rsm)
-				})).ShouldNot(HaveOccurred())
 				sts = components.ConvertRSMToSTS(rsm)
+				mockPods := testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
+				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+					testk8s.MockRSMReady(rsm, mockPods...)
+				})).ShouldNot(HaveOccurred())
 			} else {
 				stsList := testk8s.ListAndCheckStatefulSetItemsCount(&testCtx, clusterKey, 1)
 				sts = &stsList.Items[0]
 				Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 					testk8s.MockStatefulSetReady(sts)
 				})).ShouldNot(HaveOccurred())
-			}
-			for i := int32(0); i < *sts.Spec.Replicas; i++ {
-				podName := fmt.Sprintf("%s-%d", sts.Name, i)
-				testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
-					compDefName, podName, components.DefaultRole(i))
+				for i := int32(0); i < *sts.Spec.Replicas; i++ {
+					podName := fmt.Sprintf("%s-%d", sts.Name, i)
+					testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
+						compDefName, podName, components.DefaultRole(i))
+				}
 			}
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})

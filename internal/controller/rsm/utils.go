@@ -656,6 +656,9 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 // 1. all replicas exist
 // 2. all members have role set
 func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
+	if rsm == nil || rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
+		return true
+	}
 	membersStatus := rsm.Status.MembersStatus
 	if len(membersStatus) != int(*rsm.Spec.Replicas) {
 		return false

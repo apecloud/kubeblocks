@@ -32,6 +32,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	rsmcore "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -87,7 +88,7 @@ func NewFakeRSMPod(rsm *workloads.ReplicatedStateMachine, ordinal int) *corev1.P
 }
 
 // MockRSMReady mocks the RSM workload to ready state.
-func MockRSMReady(rsm *workloads.ReplicatedStateMachine) {
+func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 	rsm.Status.InitReplicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyInitReplicas = *rsm.Spec.Replicas
 	rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
@@ -95,6 +96,11 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine) {
 	rsm.Status.Replicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyReplicas = *rsm.Spec.Replicas
 	rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
+	var podList []corev1.Pod
+	for i := range pods {
+		podList = append(podList, *pods[i])
+	}
+	rsmcore.SetMembersStatusForTest(rsm, podList)
 }
 
 func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.ReplicatedStateMachineList {

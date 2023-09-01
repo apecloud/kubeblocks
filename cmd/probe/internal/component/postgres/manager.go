@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/dapr/kit/logger"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/v3/process"
@@ -138,6 +139,11 @@ func (mgr *Manager) ReadCheck(ctx context.Context, host string) bool {
 	readSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
 	_, err := mgr.QueryWithHost(ctx, readSQL, host)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "42P01" {
+			// no healthy check records, return true
+			return true
+		}
 		mgr.Logger.Errorf("read check failed, err:%v", err)
 		return false
 	}

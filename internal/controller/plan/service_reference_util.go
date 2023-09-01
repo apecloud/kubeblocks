@@ -67,7 +67,8 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: secretRefName}, secretRef); err != nil {
 					return nil, err
 				}
-				sccBuilder := builder.NewServiceConnectionCredentialBuilder(reqCtx.Req.Namespace, serviceRefDecl.Name)
+				sccName := component.GenerateServiceConnCredential(cluster.Name)
+				sccBuilder := builder.NewServiceConnectionCredentialBuilder(reqCtx.Req.Namespace, sccName)
 				// use cd.Spec.Type as the default Kind and use cluster.Spec.ClusterVersionRef as the default Version
 				sccBuilder.SetKind(clusterDef.Spec.Type)
 				sccBuilder.SetVersion(cluster.Spec.ClusterVersionRef)

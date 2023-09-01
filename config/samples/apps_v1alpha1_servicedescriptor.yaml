@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ServiceDescriptor
+metadata:
+  labels:
+    app.kubernetes.io/name: servicedescriptor
+    app.kubernetes.io/instance: servicedescriptor-sample
+    app.kubernetes.io/part-of: kubeblocks
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kubeblocks
+  name: servicedescriptor-sample
+spec:
+  # TODO(user): Add fields here

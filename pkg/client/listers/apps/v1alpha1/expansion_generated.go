@@ -57,3 +57,11 @@ type OpsRequestListerExpansion interface{}
 // OpsRequestNamespaceListerExpansion allows custom methods to be added to
 // OpsRequestNamespaceLister.
 type OpsRequestNamespaceListerExpansion interface{}
+
+// ServiceDescriptorListerExpansion allows custom methods to be added to
+// ServiceDescriptorLister.
+type ServiceDescriptorListerExpansion interface{}
+
+// ServiceDescriptorNamespaceListerExpansion allows custom methods to be added to
+// ServiceDescriptorNamespaceLister.
+type ServiceDescriptorNamespaceListerExpansion interface{}

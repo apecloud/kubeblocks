@@ -111,7 +111,7 @@ spec:
                                       default: ="$POD_FQDN"
                                       description: 'format is the format of each headless
                                         service address. there are three builtin variables
-                                        can be used as placerholder: $POD_ORDINAL,
+                                        can be used as placeholder: $POD_ORDINAL,
                                         $POD_FQDN, $POD_NAME $POD_ORDINAL is the ordinal
                                         of the pod. $POD_FQDN is the fully qualified
                                         domain name of the pod. $POD_NAME is the name
@@ -8435,6 +8435,31 @@ spec:
                           - protocol
                           x-kubernetes-list-type: map
                       type: object
+                    serviceRefDeclarations:
+                      description: serviceRefDeclarations is used to declare the service
+                        reference of the current component.
+                      items:
+                        properties:
+                          kind:
+                            description: The type of the service reference.
+                            type: string
+                          name:
+                            description: The name of the predefined service reference.
+                              The service reference can come from an external service
+                              that is not part of KubeBlocks, or services provided
+                              by other KubeBlocks Cluster objects. The specific type
+                              of service reference depends on the binding declaration
+                              when creates a Cluster.
+                            type: string
+                          version:
+                            description: The version of the service reference.
+                            type: string
+                        required:
+                        - kind
+                        - name
+                        - version
+                        type: object
+                      type: array
                     statefulSpec:
                       description: statefulSpec defines stateful related spec if workloadType
                         is Stateful.

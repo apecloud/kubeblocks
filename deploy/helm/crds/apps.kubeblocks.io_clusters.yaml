@@ -409,7 +409,7 @@ spec:
                           name:
                             description: name of the predefined service reference.
                               references the serviceRefDeclaration name defined in
-                              clusterDefinition.componentDefs[x].serviceRefDeclarations[y].name
+                              clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
                             type: string
                           serviceDescriptor:
                             description: serviceDescriptor defines the service descriptor
@@ -419,8 +419,8 @@ spec:
                               the service binding. The ServiceDescriptor object should
                               be in the same namespace with the cluster. And serviceDescriptor
                               is the name of the ServiceDescriptor object. If you
-                              have specified a ConnectionCredential, please do not
-                              specify a Cluster
+                              have specified a ServiceDescriptor, please do not specify
+                              a Cluster
                             type: string
                         required:
                         - name

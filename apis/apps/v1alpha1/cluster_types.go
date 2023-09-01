@@ -608,7 +608,7 @@ type ClusterNetwork struct {
 }
 
 type ServiceRef struct {
-	// name of the predefined service reference. references the serviceRefDeclaration name defined in clusterDefinition.componentDefs[x].serviceRefDeclarations[y].name
+	// name of the predefined service reference. references the serviceRefDeclaration name defined in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -622,7 +622,7 @@ type ServiceRef struct {
 	// serviceDescriptor defines the service descriptor of the service provided by external sources.
 	// When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding. The ServiceDescriptor object should be in the same namespace with the cluster.
 	// And serviceDescriptor is the name of the ServiceDescriptor object.
-	// If you have specified a ConnectionCredential, please do not specify a Cluster
+	// If you have specified a ServiceDescriptor, please do not specify a Cluster
 	// +optional
 	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`
 

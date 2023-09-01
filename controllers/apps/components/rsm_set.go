@@ -22,6 +22,8 @@ package components
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -179,7 +181,7 @@ func (r *RSM) GetPhaseWhenPodsNotReady(ctx context.Context,
 		getLeaderRoleName := func() string {
 			switch r.SynthesizedComponent.WorkloadType {
 			case appsv1alpha1.Consensus:
-				return r.SynthesizedComponent.ConsensusSpec.Learner.Name
+				return r.SynthesizedComponent.ConsensusSpec.Leader.Name
 			case appsv1alpha1.Replication:
 				return constant.Primary
 			default:
@@ -325,17 +327,19 @@ func setConsensusSetStatusRolesByRSM(newConsensusSetStatus *appsv1alpha1.Consens
 	}
 }
 
-func newRSM(cli client.Client,
+func newRSM(ctx context.Context,
+	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *RSM {
+	reqCtx := intctrlutil.RequestCtx{Log: log.FromContext(ctx).WithValues("rsm-test", def.Name)}
+	synthesizedComponent, _ := component.BuildComponent(reqCtx, nil, cluster, clusterDef, &def, spec)
 	return &RSM{
 		componentSetBase: componentSetBase{
 			Cli:                  cli,
 			Cluster:              cluster,
-			SynthesizedComponent: nil,
-			ComponentSpec:        spec,
-			ComponentDef:         &def,
+			SynthesizedComponent: synthesizedComponent,
 		},
 	}
 }

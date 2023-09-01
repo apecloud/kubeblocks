@@ -197,9 +197,7 @@ func (c *configReconcileContext) rsm() *configReconcileContext {
 		// fix uid mismatch bug: convert rsm to sts
 		for _, rsm := range c.RSMList {
 			var stsObject appv1.StatefulSet
-			sts := components.ConvertRSMToSTS(&rsm)
-			err = c.Client.Get(c.Ctx, client.ObjectKeyFromObject(sts), &stsObject)
-			if err != nil {
+			if err = c.Client.Get(c.Ctx, client.ObjectKeyFromObject(components.ConvertRSMToSTS(&rsm)), &stsObject); err != nil {
 				return
 			}
 			c.StatefulSets = append(c.StatefulSets, stsObject)

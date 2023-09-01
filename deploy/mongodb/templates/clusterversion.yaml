@@ -2,6 +2,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
@@ -19,3 +21,95 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mongodb-4.0
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb
+  componentVersions:
+    - componentDefRef: mongodb
+      versionsContext:
+        containers:
+          - name: mongodb
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.0
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.0
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.0
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mongodb-4.2
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb
+  componentVersions:
+    - componentDefRef: mongodb
+      versionsContext:
+        containers:
+          - name: mongodb
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.2
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.2
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.2
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mongodb-4.4
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb
+  componentVersions:
+    - componentDefRef: mongodb
+      versionsContext:
+        containers:
+          - name: mongodb
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.4
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.4
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.4
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mongodb-6.0
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb
+  componentVersions:
+    - componentDefRef: mongodb
+      versionsContext:
+        containers:
+          - name: mongodb
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:6.0
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:6.0
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:6.0

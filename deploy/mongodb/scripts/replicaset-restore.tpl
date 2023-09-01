@@ -18,11 +18,12 @@ RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
 RPL_SET_NAME=${RPL_SET_NAME%-};
 MODE=$1
 mongod $MODE --bind_ip_all --port $PORT --dbpath $MONGODB_ROOT/db --directoryperdb --logpath $MONGODB_ROOT/logs/mongodb.log  --logappend --pidfilepath $MONGODB_ROOT/tmp/mongodb.pid&
-until mongosh --quiet --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
+export CLIENT=`which mongosh&&echo mongosh||echo mongo`
+until $CLIENT --quiet --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
 PID=`cat $MONGODB_ROOT/tmp/mongodb.pid`
 
-mongosh --quiet --port $PORT local --eval "db.system.replset.deleteOne({})"
-mongosh --quiet --port $PORT local --eval "db.system.replset.find()"
-mongosh --quiet --port $PORT admin --eval 'db.dropUser("root", {w: "majority", wtimeout: 4000})' || true
+$CLIENT --quiet --port $PORT local --eval "db.system.replset.deleteOne({})"
+$CLIENT --quiet --port $PORT local --eval "db.system.replset.find()"
+$CLIENT --quiet --port $PORT admin --eval 'db.dropUser("root", {w: "majority", wtimeout: 4000})' || true
 kill $PID
 wait $PID

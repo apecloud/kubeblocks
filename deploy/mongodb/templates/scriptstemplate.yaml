@@ -29,7 +29,8 @@ data:
 
     # wait main container ready
     PORT=27018
-    until mongosh --quiet --port $PORT --eval "rs.status().ok"; do sleep 1; done
+    export CLIENT=`which mongosh&&echo mongosh||echo mongo`
+    until $CLIENT --quiet --port $PORT --eval "rs.status().ok"; do sleep 1; done
     # add shard to mongos
     SHARD_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
     SHARD_NAME=${SHARD_NAME%-};
@@ -37,14 +38,15 @@ data:
     MONGOS_HOST=$KB_CLUSTER_NAME"-mongos"
     MONGOS_PORT=27017
     SHARD_CONFIG=$SHARD_NAME/$SHARD_NAME"-0."$DOMAIN:$PORT,$SHARD_NAME"-1."$DOMAIN:$PORT,$SHARD_NAME"-2."$DOMAIN:$PORT
-    until mongosh --quiet --host $MONGOS_HOST --port $MONGOS_PORT --eval "print('service is ready')"; do sleep 1; done
-    mongosh --quiet --host $MONGOS_HOST --port $MONGOS_PORT --eval "sh.addShard(\"$SHARD_CONFIG\")"
+    until $CLIENT --quiet --host $MONGOS_HOST --port $MONGOS_PORT --eval "print('service is ready')"; do sleep 1; done
+    $CLIENT --quiet --host $MONGOS_HOST --port $MONGOS_PORT --eval "sh.addShard(\"$SHARD_CONFIG\")"
 
     trap : TERM INT; (while true; do sleep 1000; done) & wait
   switchover-check-role.sh: |-
     #!/bin/sh
     check_role() {
-      local role=$(mongosh --quiet --eval "rs.isMaster().ismaster" "$1" --username "$USERNAME" --password "$PASSWORD")
+      export CLIENT=`which mongosh&&echo mongosh||echo mongo`
+      local role=$($CLIENT --quiet --eval "rs.isMaster().ismaster" "$1" --username "$USERNAME" --password "$PASSWORD")
       if [ "${role}" = "true" ]; then
         echo "Primary"
       else
@@ -89,7 +91,8 @@ data:
           exit 1
       fi
       echo "Switchover to new primary: $CANDIDATE_HOST"
-      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
+      export CLIENT=`which mongosh&&echo mongosh||echo mongo`
+      $CLIENT --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
       echo "Checking candidate instance role after switchover..."
       verify
     }
@@ -102,6 +105,7 @@ data:
     URI="mongodb://$KB_CONSENSUS_LEADER_POD_FQDN:27017"
     USERNAME=$MONGODB_ROOT_USER
     PASSWORD=$MONGODB_ROOT_PASSWORD
+    export CLIENT=`which mongosh&&echo mongosh||echo mongo`
     OLD_LEADER_HOST="$KB_CONSENSUS_LEADER_POD_FQDN.$KB_NAMESPACE.svc.cluster.local:27017"
     . /scripts/switchover-check-role.sh
     . /scripts/switchover-verify.sh
@@ -113,14 +117,14 @@ data:
           exit 1
       fi
       echo "Switchover without candidate, try to select a new primary randomly ..."
-      local CANDIDATE_HOST=$(mongosh --quiet --eval "conf=rs.config();const candidateHost = '$OLD_LEADER_HOST';const member=conf.members.find(member => member.host !== candidateHost);if (member) {console.log(member.host)}" "$URI" --username "$USERNAME" --password "$PASSWORD")
+      local CANDIDATE_HOST=$($CLIENT --quiet --eval "conf=rs.config();const candidateHost = '$OLD_LEADER_HOST';const member=conf.members.find(member => member.host !== candidateHost);if (member) {console.log(member.host)}" "$URI" --username "$USERNAME" --password "$PASSWORD")
       local CANDIDATE_URI="mongodb://$CANDIDATE_HOST"
       if [ -z "$CANDIDATE_HOST" ]; then
           echo "Failed to select a new candidate primary, exit"
           exit 1
       fi
       echo "Switchover to new primary: $CANDIDATE_HOST"
-      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
+      $CLIENT --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
       echo "Checking candidate instance role after switchover..."
       verify
     }

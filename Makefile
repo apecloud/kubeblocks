@@ -300,7 +300,8 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.redis-cluster \
 	build-single-kbcli-embed-chart.postgresql-cluster \
 	build-single-kbcli-embed-chart.kafka-cluster \
-	build-single-kbcli-embed-chart.mongodb-cluster
+	build-single-kbcli-embed-chart.mongodb-cluster \
+	build-single-kbcli-embed-chart.neon-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
 #	build-single-kbcli-embed-chart.milvus-cluster \

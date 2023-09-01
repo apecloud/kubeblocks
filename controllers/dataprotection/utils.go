@@ -35,9 +35,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -46,7 +47,7 @@ var (
 )
 
 // byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
-type byBackupStartTime []dataprotectionv1alpha1.Backup
+type byBackupStartTime []dpv1alpha1.Backup
 
 // Len returns the length of byBackupStartTime, for the sort.Sort
 func (o byBackupStartTime) Len() int { return len(o) }
@@ -69,8 +70,8 @@ func (o byBackupStartTime) Less(i, j int) bool {
 }
 
 // getBackupToolByName gets the backupTool by name.
-func getBackupToolByName(reqCtx intctrlutil.RequestCtx, cli client.Client, backupName string) (*dataprotectionv1alpha1.BackupTool, error) {
-	backupTool := &dataprotectionv1alpha1.BackupTool{}
+func getBackupToolByName(reqCtx intctrlutil.RequestCtx, cli client.Client, backupName string) (*dpv1alpha1.BackupTool, error) {
+	backupTool := &dpv1alpha1.BackupTool{}
 	backupToolNameSpaceName := types.NamespacedName{
 		Name: backupName,
 	}
@@ -82,7 +83,7 @@ func getBackupToolByName(reqCtx intctrlutil.RequestCtx, cli client.Client, backu
 }
 
 // getCreatedCRNameByBackupPolicy gets the CR name which is created by BackupPolicy, such as CronJob/logfile Backup.
-func getCreatedCRNameByBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy, backupType dataprotectionv1alpha1.BackupType) string {
+func getCreatedCRNameByBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy, backupType dpv1alpha1.BackupType) string {
 	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace)
 	if len(name) > 30 {
 		name = strings.TrimRight(name[:30], "-")
@@ -106,7 +107,7 @@ func buildAutoCreationAnnotations(backupPolicyName string) map[string]string {
 }
 
 // getBackupDestinationPath gets the destination path to storage backup datas.
-func getBackupDestinationPath(backup *dataprotectionv1alpha1.Backup, pathPrefix string) string {
+func getBackupDestinationPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 	pathPrefix = strings.TrimRight(pathPrefix, "/")
 	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
 		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
@@ -114,8 +115,8 @@ func getBackupDestinationPath(backup *dataprotectionv1alpha1.Backup, pathPrefix 
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
 }
 
-// buildBackupWorkloadsLabels builds the labels for workloads which owned by backup.
-func buildBackupWorkloadsLabels(backup *dataprotectionv1alpha1.Backup) map[string]string {
+// buildBackupWorkloadLabels builds the labels for workload which owned by backup.
+func buildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 	labels := backup.Labels
 	if labels == nil {
 		labels = map[string]string{}
@@ -124,7 +125,7 @@ func buildBackupWorkloadsLabels(backup *dataprotectionv1alpha1.Backup) map[strin
 			delete(labels, v)
 		}
 	}
-	labels[constant.DataProtectionLabelBackupNameKey] = backup.Name
+	labels[dptypes.DataProtectionLabelBackupNameKey] = backup.Name
 	return labels
 }
 
@@ -150,8 +151,8 @@ func addTolerations(podSpec *corev1.PodSpec) (err error) {
 // getIntervalSecondsForLogfile gets the interval seconds for logfile schedule cronExpression.
 // currently, only the fields of minutes and hours are taken and contain expressions such as '*/'.
 // If there is no such field, the default return is 60s.
-func getIntervalSecondsForLogfile(backupType dataprotectionv1alpha1.BackupType, cronExpression string) string {
-	if backupType != dataprotectionv1alpha1.BackupTypeLogFile {
+func getIntervalSecondsForLogfile(backupType dpv1alpha1.BackupType, cronExpression string) string {
+	if backupType != dpv1alpha1.BackupTypeLogFile {
 		return ""
 	}
 	// move time zone field
@@ -195,7 +196,7 @@ func filterCreatedByPolicy(object client.Object) bool {
 }
 
 // sendWarningEventForError sends warning event for backup controller error
-func sendWarningEventForError(recorder record.EventRecorder, backup *dataprotectionv1alpha1.Backup, err error) {
+func sendWarningEventForError(recorder record.EventRecorder, backup *dpv1alpha1.Backup, err error) {
 	controllerErr := intctrlutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		recorder.Eventf(backup, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
@@ -244,7 +245,7 @@ func buildBackupInfoENV(backupDestinationPath string) string {
 	return backupPathBase + backupDestinationPath + "/backup.info"
 }
 
-func generateUniqueNameWithBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy) string {
+func generateUniqueNameWithBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) string {
 	uniqueName := backupPolicy.Name
 	if len(backupPolicy.OwnerReferences) > 0 {
 		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
@@ -252,11 +253,11 @@ func generateUniqueNameWithBackupPolicy(backupPolicy *dataprotectionv1alpha1.Bac
 	return uniqueName
 }
 
-func generateUniqueJobName(backup *dataprotectionv1alpha1.Backup, prefix string) string {
+func generateUniqueJobName(backup *dpv1alpha1.Backup, prefix string) string {
 	return cropJobName(fmt.Sprintf("%s-%s-%s", prefix, backup.UID[:8], backup.Name))
 }
 
-func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Backup) types.NamespacedName {
+func buildDeleteBackupFilesJobNamespacedName(backup *dpv1alpha1.Backup) types.NamespacedName {
 	jobName := fmt.Sprintf("%s-%s%s", backup.UID[:8], deleteBackupFilesJobNamePrefix, backup.Name)
 	if len(jobName) > 63 {
 		jobName = jobName[:63]
@@ -264,18 +265,18 @@ func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Back
 	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
 }
 
-func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dataprotectionv1alpha1.BackupRepo, error) {
-	backupRepoList := &dataprotectionv1alpha1.BackupRepoList{}
+func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.BackupRepo, error) {
+	backupRepoList := &dpv1alpha1.BackupRepoList{}
 	err := cli.List(ctx, backupRepoList)
 	if err != nil {
 		return nil, err
 	}
-	var defaultRepo *dataprotectionv1alpha1.BackupRepo
+	var defaultRepo *dpv1alpha1.BackupRepo
 	for idx := range backupRepoList.Items {
 		repo := &backupRepoList.Items[idx]
 		// skip non-default repo
 		if !(repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal &&
-			repo.Status.Phase == dataprotectionv1alpha1.BackupRepoReady) {
+			repo.Status.Phase == dpv1alpha1.BackupRepoReady) {
 			continue
 		}
 		if defaultRepo != nil {

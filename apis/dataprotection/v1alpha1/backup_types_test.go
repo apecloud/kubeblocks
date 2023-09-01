@@ -163,8 +163,8 @@ func TestGetStopTime(t *testing.T) {
 		},
 	}
 	g := NewGomegaWithT(t)
-	g.Expect(backup.Status.GetStopTime().Second()).Should(Equal(backTimeRangeStopTime.Second()))
+	g.Expect(backup.Status.GetEndTime().Second()).Should(Equal(backTimeRangeStopTime.Second()))
 
 	backup.Status.Manifests.BackupLog.StopTime = nil
-	g.Expect(backup.Status.GetStopTime().Second()).Should(Equal(stopTimestamp.Second()))
+	g.Expect(backup.Status.GetEndTime().Second()).Should(Equal(stopTimestamp.Second()))
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
 	"sort"
 
 	"golang.org/x/exp/slices"
@@ -210,38 +209,20 @@ func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
 }
 
-// Validate validates the BackupSpec and returns an error if invalid.
-func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
-	notSupportedMessage := "backupPolicy: %s not supports %s backup in backupPolicy"
-	switch r.BackupType {
-	case BackupTypeSnapshot:
-		if backupPolicy.Spec.Snapshot == nil {
-			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeSnapshot)
-		}
-	case BackupTypeDataFile:
-		if backupPolicy.Spec.Datafile == nil {
-			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeDataFile)
-		}
-	case BackupTypeLogFile:
-		if backupPolicy.Spec.Logfile == nil {
-			return fmt.Errorf(notSupportedMessage, r.BackupPolicyName, BackupTypeLogFile)
-		}
-	}
-	return nil
-}
-
-// GetStartTime gets the backup start time. the default return is status.startTime, unless status.manifests.backupLog.startTime is not nil.
+// GetStartTime gets the backup start time. Default return status.startTime,
+// unless status.timeRange.startTime is not nil.
 func (r *BackupStatus) GetStartTime() *metav1.Time {
-	if r.Manifests != nil && r.Manifests.BackupLog != nil && r.Manifests.BackupLog.StartTime != nil {
-		return r.Manifests.BackupLog.StartTime
+	if r.TimeRange != nil && r.TimeRange.Start != nil {
+		return r.TimeRange.Start
 	}
 	return r.StartTimestamp
 }
 
-// GetStopTime gets the backup stop time. the default return is status.completionTimestamp, unless status.manifests.backupLog.stopTime is not nil.
-func (r *BackupStatus) GetStopTime() *metav1.Time {
-	if r.Manifests != nil && r.Manifests.BackupLog != nil && r.Manifests.BackupLog.StopTime != nil {
-		return r.Manifests.BackupLog.StopTime
+// GetEndTime gets the backup end time. Default return status.completionTimestamp,
+// unless status.timeRange.endTime is not nil.
+func (r *BackupStatus) GetEndTime() *metav1.Time {
+	if r.TimeRange != nil && r.TimeRange.End != nil {
+		return r.TimeRange.End
 	}
 	return r.CompletionTimestamp
 }
@@ -270,7 +251,7 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 				continue
 			}
 			startTime = *b.Status.GetStartTime()
-			stopTime = *b.Status.GetStopTime()
+			stopTime = *b.Status.GetEndTime()
 			break
 		}
 		return startTime, stopTime
@@ -286,7 +267,7 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 				b.Status.Phase != BackupPhaseCompleted {
 				continue
 			}
-			backupStopTime := b.Status.GetStopTime()
+			backupStopTime := b.Status.GetEndTime()
 			// checks if the baseBackup stop time is between logfileStartTime and logfileStopTime.
 			if !backupStopTime.Before(&logfileStartTime) &&
 				backupStopTime.Before(&logfileStopTime) {
@@ -301,5 +282,5 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	}
 	// range of recoverable time
 	return []BackupLogStatus{{StopTime: &logfileStopTime,
-		StartTime: firstRecoverableBaseBackup.Status.GetStopTime()}}
+		StartTime: firstRecoverableBaseBackup.Status.GetEndTime()}}
 }

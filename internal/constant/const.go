@@ -108,8 +108,6 @@ const (
 	CMInsConfigurationHashLabelKey           = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey   = "config.kubeblocks.io/config-constraints-name"
 	ConsensusSetAccessModeLabelKey           = "cs.apps.kubeblocks.io/access-mode"
-	BackupTypeLabelKeyKey                    = "dataprotection.kubeblocks.io/backup-type"
-	DataProtectionLabelBackupNameKey         = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                        = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                   = "ops.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
@@ -132,12 +130,6 @@ const (
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
 	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
-	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
-	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
-	DefaultBackupRepoAnnotationKey              = "dataprotection.kubeblocks.io/is-default-repo"            // DefaultBackupRepoAnnotationKey specifies the default backup repo.
-	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
-	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
-	DataProtectionLabelClusterUIDKey            = "dataprotection.kubeblocks.io/cluster-uid"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
@@ -278,29 +270,6 @@ const DefaultBackupPvcInitCapacity = "20Gi"
 
 const (
 	ComponentStatusDefaultPodName = "Unknown"
-)
-
-const (
-	// dataProtection env names
-	DPTargetPodName            = "DP_TARGET_POD_NAME"
-	DPDBHost                   = "DB_HOST"                     // db host for dataProtection
-	DPDBUser                   = "DB_USER"                     // db user for dataProtection
-	DPDBPassword               = "DB_PASSWORD"                 // db password for dataProtection
-	DPBackupDIR                = "BACKUP_DIR"                  // the dest directory for backup data
-	DPLogFileDIR               = "BACKUP_LOGFILE_DIR"          // logfile dir
-	DPBackupName               = "BACKUP_NAME"                 // backup cr name
-	DPTTL                      = "TTL"                         // backup time to live, reference the backupPolicy.spec.retention.ttl
-	DPLogfileTTL               = "LOGFILE_TTL"                 // ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
-	DPLogfileTTLSecond         = "LOGFILE_TTL_SECOND"          // ttl seconds with LOGFILE_TTL, integer format
-	DPArchiveInterval          = "ARCHIVE_INTERVAL"            // archive interval for statefulSet deploy kind, trans from the schedule cronExpression for logfile
-	DPBackupInfoFile           = "BACKUP_INFO_FILE"            // the file name which retains the backup.status info
-	DPTimeFormat               = "TIME_FORMAT"                 // golang time format string
-	DPVolumeDataDIR            = "VOLUME_DATA_DIR"             //
-	DPKBRecoveryTime           = "KB_RECOVERY_TIME"            // recovery time
-	DPKBRecoveryTimestamp      = "KB_RECOVERY_TIMESTAMP"       // recovery timestamp
-	DPBaseBackupStartTime      = "BASE_BACKUP_START_TIME"      // base backup start time for pitr
-	DPBaseBackupStartTimestamp = "BASE_BACKUP_START_TIMESTAMP" // base backup start timestamp for pitr
-	DPBackupStopTime           = "BACKUP_STOP_TIME"            // backup stop time
 )
 
 const (

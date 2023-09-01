@@ -28,7 +28,7 @@ type BackupScheduleSpec struct {
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// startingDeadlineMinutes defines the deadline in minutes for starting the
-	// backup job if it misses scheduled time for any reason.
+	// backup workload if it misses scheduled time for any reason.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1440
@@ -70,7 +70,7 @@ type Schedule struct {
 	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m
 	// +optional
-	// +kubebuilder:default=7d
+	// +kubebuilder:default="7d"
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 }
 
@@ -139,10 +139,9 @@ const (
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bs
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BackupSchedule is the Schema for the backupschedules API (defined by User)
+// BackupSchedule is the Schema for the backupschedules API.
 type BackupSchedule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

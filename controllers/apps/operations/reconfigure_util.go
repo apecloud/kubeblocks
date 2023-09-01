@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 
 	"github.com/spf13/cast"
 	corev1 "k8s.io/api/core/v1"
@@ -156,14 +155,6 @@ func syncConfigmap(
 
 func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) {
 	var maxLabelCount = 16
-	extractValue := func(v interface{}) string {
-		str := cast.ToString(v)
-		regxPattern, _ := regexp.Compile(`^[a-z0-9]([a-z0-9\.\-\_]*[a-z0-9])?$`)
-		if regxPattern.MatchString(str) {
-			return str
-		}
-		return ""
-	}
 	updateLabel := func(param map[string]interface{}) {
 		if obj.Labels == nil {
 			obj.Labels = make(map[string]string)
@@ -173,7 +164,7 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 				return
 			}
 			maxLabelCount--
-			obj.Labels[key] = extractValue(val)
+			obj.Labels[key] = core.FromValueToString(val)
 		}
 	}
 	updateAnnotation := func(keyFile string, param map[string]interface{}) {

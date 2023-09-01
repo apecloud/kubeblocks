@@ -246,3 +246,57 @@ test=test
 		})
 	}
 }
+
+func TestFromValueToString(t *testing.T) {
+	type args struct {
+		val interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{{
+		name: "test",
+		args: args{
+			val: "testTest",
+		},
+		want: "testTest",
+	}, {
+		name: "test",
+		args: args{
+			val: "",
+		},
+		want: "",
+	}, {
+		name: "test",
+		args: args{
+			val: nil,
+		},
+		want: "",
+	}, {
+		name: "test",
+		args: args{
+			val: "/abdet/sds",
+		},
+		want: "",
+	}, {
+		name: "test",
+		args: args{
+			val: "abdet/sds-",
+		},
+		want: "",
+	}, {
+		name: "test",
+		args: args{
+			val: "abcdASls-sda_102.382",
+		},
+		want: "abcdASls-sda_102.382",
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FromValueToString(tt.args.val); got != tt.want {
+				t.Errorf("FromValueToString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

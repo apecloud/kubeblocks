@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package validate
+package openapi
 
 import (
 	"bytes"
@@ -43,6 +43,14 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 		want    string
 		wantErr bool
 	}{{
+		name: "normal_test",
+		args: args{
+			cueFile:    "test_import_type.cue",
+			schemaType: "Exemplar",
+		},
+		want:    "test_import_type.json",
+		wantErr: false,
+	}, {
 		name: "normal_test",
 		args: args{
 			cueFile:    "mysql_openapi.cue",

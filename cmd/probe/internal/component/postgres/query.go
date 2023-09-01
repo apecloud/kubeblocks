@@ -118,12 +118,7 @@ func (mgr *Manager) ExecOthers(ctx context.Context, sql string, host string) (re
 		_ = conn.Close(ctx)
 	}()
 
-	resp, err = conn.Exec(ctx, sql)
-	if err != nil {
-		return resp, err
-	}
-
-	return resp, nil
+	return conn.Exec(ctx, sql)
 }
 
 func (mgr *Manager) ExecLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result int64, err error) {

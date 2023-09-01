@@ -198,7 +198,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 }
 
 func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
-	if !cfgPatch.IsModify {
+	if cfgPatch != nil && !cfgPatch.IsModify {
 		// not walk here
 		return nil, core.MakeError("cfg not modify. [%v]", cfgPatch)
 	}

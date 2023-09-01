@@ -1,0 +1,78 @@
+{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "description": "mysql config validator",
+      "type": "object",
+      "required": [
+        "l",
+        "sa",
+        "ta"
+      ],
+      "properties": {
+        "l": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "sa": {
+          "type": "object",
+          "required": [
+            "field1",
+            "field2",
+            "filed3"
+          ],
+          "properties": {
+            "field1": {
+              "type": "string"
+            },
+            "field2": {
+              "type": "integer"
+            },
+            "filed3": {
+              "type": "object",
+              "required": [
+                "field1",
+                "field2",
+                "field3"
+              ],
+              "properties": {
+                "field1": {
+                  "type": "string"
+                },
+                "field2": {
+                  "type": "integer"
+                },
+                "field3": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        },
+        "ta": {
+          "type": "object",
+          "required": [
+            "field1",
+            "field2"
+          ],
+          "properties": {
+            "field1": {
+              "type": "string"
+            },
+            "field2": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  }
+}

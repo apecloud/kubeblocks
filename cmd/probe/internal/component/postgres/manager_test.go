@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -112,40 +113,37 @@ func TestReadWrite(t *testing.T) {
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
 
-		if ok := manager.WriteCheck(ctx, ""); !ok {
-			t.Errorf("write check failed")
-		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
+		ok := manager.WriteCheck(ctx, "")
+		assert.True(t, ok)
 	})
 
 	t.Run("write check failed", func(t *testing.T) {
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnError(fmt.Errorf("some error"))
 
-		if ok := manager.WriteCheck(ctx, ""); ok {
-			t.Errorf("expect write check failed, but success")
-		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
+		ok := manager.WriteCheck(ctx, "")
+		assert.False(t, ok)
 	})
 
-	t.Run("read check", func(t *testing.T) {
-		row := pgxmock.NewRows([]string{"check_ts"}).AddRow(1)
-		mock.ExpectQuery("select").WillReturnRows(row)
+	t.Run("read check success", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"check_ts"}).AddRow(1))
 
-		if ok := manager.ReadCheck(ctx, ""); !ok {
-			t.Errorf("read check failed")
-		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
+		ok := manager.ReadCheck(ctx, "")
+		assert.True(t, ok)
 	})
+
+	t.Run("read check failed", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnError(fmt.Errorf("some error"))
+
+		ok := manager.ReadCheck(ctx, "")
+		assert.False(t, ok)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
 }
 
 func TestPgIsReady(t *testing.T) {
@@ -159,10 +157,6 @@ func TestPgIsReady(t *testing.T) {
 		if isReady := manager.IsPgReady(ctx); !isReady {
 			t.Errorf("test pg is ready failed")
 		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
 	})
 
 	t.Run("pg is not ready", func(t *testing.T) {
@@ -170,9 +164,178 @@ func TestPgIsReady(t *testing.T) {
 		if isReady := manager.IsPgReady(ctx); isReady {
 			t.Errorf("expect pg is not ready, but get ready")
 		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("there were unfulfilled expectations: %v", err)
-		}
 	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestSetAndUnsetIsLeader(t *testing.T) {
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("set is leader", func(t *testing.T) {
+		manager.SetIsLeader(true)
+		isSet, isLeader := manager.GetIsLeader()
+		assert.True(t, isSet)
+		assert.True(t, isLeader)
+	})
+
+	t.Run("set is not leader", func(t *testing.T) {
+		manager.SetIsLeader(false)
+		isSet, isLeader := manager.GetIsLeader()
+		assert.True(t, isSet)
+		assert.False(t, isLeader)
+	})
+
+	t.Run("unset is leader", func(t *testing.T) {
+		manager.UnsetIsLeader()
+		isSet, isLeader := manager.GetIsLeader()
+		assert.False(t, isSet)
+		assert.False(t, isLeader)
+	})
+}
+
+func TestIsLeaderMember(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	cluster := &dcs.Cluster{}
+	currentMember := dcs.Member{
+		Name: manager.CurrentMemberName,
+	}
+
+	t.Run("member is nil", func(t *testing.T) {
+		isLeaderMember, err := manager.IsLeaderMember(ctx, cluster, nil)
+		assert.False(t, isLeaderMember)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("leader member is nil", func(t *testing.T) {
+		isLeaderMember, err := manager.IsLeaderMember(ctx, cluster, &currentMember)
+		assert.False(t, isLeaderMember)
+		assert.NotNil(t, err)
+	})
+
+	cluster.Leader = &dcs.Leader{
+		Name: manager.CurrentMemberName,
+	}
+	cluster.Members = append(cluster.Members, currentMember)
+	t.Run("is leader member", func(t *testing.T) {
+		isLeaderMember, err := manager.IsLeaderMember(ctx, cluster, &currentMember)
+		assert.True(t, isLeaderMember)
+		assert.Nil(t, err)
+	})
+
+	member := &dcs.Member{
+		Name: "test",
+	}
+	t.Run("is not leader member", func(t *testing.T) {
+		isLeaderMember, err := manager.IsLeaderMember(ctx, cluster, member)
+		assert.False(t, isLeaderMember)
+		assert.Nil(t, err)
+	})
+}
+
+func TestPgReload(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("pg reload success", func(t *testing.T) {
+		mock.ExpectExec("select pg_reload_conf()").
+			WillReturnResult(pgxmock.NewResult("select", 1))
+
+		err := manager.PgReload(ctx)
+		assert.Nil(t, err)
+	})
+
+	t.Run("pg reload failed", func(t *testing.T) {
+		mock.ExpectExec("select pg_reload_conf()").
+			WillReturnError(fmt.Errorf("some error"))
+
+		err := manager.PgReload(ctx)
+		assert.NotNil(t, err)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestLock(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("alter system failed", func(t *testing.T) {
+		mock.ExpectExec("alter system").
+			WillReturnError(fmt.Errorf("alter system failed"))
+
+		err := manager.Lock(ctx, "test")
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "alter system failed")
+	})
+
+	t.Run("pg reload failed", func(t *testing.T) {
+		mock.ExpectExec("alter system").
+			WillReturnResult(pgxmock.NewResult("alter", 1))
+		mock.ExpectExec("select pg_reload_conf()").
+			WillReturnError(fmt.Errorf("pg reload failed"))
+		err := manager.Lock(ctx, "test")
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "pg reload failed")
+	})
+
+	t.Run("lock success", func(t *testing.T) {
+		mock.ExpectExec("alter system").
+			WillReturnResult(pgxmock.NewResult("alter", 1))
+		mock.ExpectExec("select pg_reload_conf()").
+			WillReturnResult(pgxmock.NewResult("select", 1))
+		err := manager.Lock(ctx, "test")
+		assert.Nil(t, err)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestUnlock(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("alter system failed", func(t *testing.T) {
+		mock.ExpectExec("alter system").
+			WillReturnError(fmt.Errorf("alter system failed"))
+
+		err := manager.Unlock(ctx)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "alter system failed")
+	})
+
+	t.Run("pg reload failed", func(t *testing.T) {
+		mock.ExpectExec("alter system").
+			WillReturnResult(pgxmock.NewResult("alter", 1))
+		mock.ExpectExec("select pg_reload_conf()").
+			WillReturnError(fmt.Errorf("pg reload failed"))
+		err := manager.Unlock(ctx)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "pg reload failed")
+	})
+
+	t.Run("unlock success", func(t *testing.T) {
+		mock.ExpectExec("alter system").
+			WillReturnResult(pgxmock.NewResult("alter", 1))
+		mock.ExpectExec("select pg_reload_conf()").
+			WillReturnResult(pgxmock.NewResult("select", 1))
+		err := manager.Unlock(ctx)
+		assert.Nil(t, err)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
 }

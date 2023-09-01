@@ -94,6 +94,15 @@ func (o *editConfigOptions) Run(fn func() error) error {
 		return o.runWithConfigConstraints(cfgEditContext, configSpec, fn)
 	}
 
+	yes, err := o.confirmReconfigure(fmt.Sprintf(fullRestartConfirmPrompt, printer.BoldRed(o.CfgFile)))
+	if err != nil {
+		return err
+	}
+	if !yes {
+		return nil
+	}
+
+	o.HasPatch = false
 	o.FileContent = cfgEditContext.getEdited()
 	return fn()
 }

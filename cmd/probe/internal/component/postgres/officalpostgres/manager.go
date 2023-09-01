@@ -32,6 +32,7 @@ import (
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 
@@ -48,6 +49,8 @@ type Manager struct {
 }
 
 var Mgr *Manager
+
+var fs = afero.NewOsFs()
 
 func NewManager(logger logger.Logger) (*Manager, error) {
 	Mgr = &Manager{}
@@ -137,6 +140,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		primaryInfo := mgr.readRecoveryParams(ctx)
 		if primaryInfo == "" {
 			mgr.Logger.Errorf("get primary info failed")
+			return nil
 		}
 		dbState.Extra[postgres.PrimaryInfo] = primaryInfo
 	}
@@ -246,9 +250,14 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 		return false, 0
 	}
 
-	walPosition, err := mgr.getWalPositionWithHost(ctx, cluster.GetMemberAddr(*member))
+	var host string
+	if member.Name != mgr.CurrentMemberName {
+		host = cluster.GetMemberAddr(*member)
+	}
+	walPosition, err := mgr.getWalPositionWithHost(ctx, host)
 	if err != nil {
 		mgr.Logger.Errorf("check member lagging failed, err:%v", err)
+		return true, cluster.HaConfig.GetMaxLagOnSwitchover() + 1
 	}
 
 	// TODO: check timeLine
@@ -510,9 +519,25 @@ func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64)
 	return inRecovery, timeLine, lsn
 }
 
-// TODO:fill it
 func (mgr *Manager) getCurrentTimeLine(ctx context.Context) int64 {
-	return 2
+	if mgr.DBState != nil && mgr.DBState.Extra[postgres.TimeLine] != "" {
+		return cast.ToInt64(mgr.DBState.Extra[postgres.TimeLine])
+	}
+
+	sql := "SELECT timeline_id FROM pg_control_checkpoint();"
+	resp, err := mgr.Query(ctx, sql)
+	if err != nil || resp == nil {
+		mgr.Logger.Errorf("get current timeline failed, err%v", err)
+		return 0
+	}
+
+	resMap, err := postgres.ParseQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		return 0
+	}
+
+	return cast.ToInt64(resMap[0]["timeline_id"])
 }
 
 func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
@@ -522,10 +547,9 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
 
 	sql := "select case when latest_end_lsn is null then null " +
 		"else received_tli end as received_tli from pg_catalog.pg_stat_get_wal_receiver();"
-
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil || resp == nil {
-		mgr.Logger.Errorf("get received time line failed, err%v", err)
+		mgr.Logger.Errorf("get received timeline failed, err%v", err)
 		return 0
 	}
 
@@ -564,8 +588,8 @@ func (mgr *Manager) getPgControlData() *map[string]string {
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {
-	_, err := os.Stat(mgr.DataDir + "/standby.signal")
-	if os.IsNotExist(err) {
+	_, err := fs.Stat(mgr.DataDir + "/standby.signal")
+	if errors.Is(err, afero.ErrFileNotFound) {
 		return true, true
 	}
 
@@ -699,6 +723,14 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 
 func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
+	if leaderMember == nil {
+		mgr.Logger.Infof("cluster has no leader now, just start if need")
+		if needRestart {
+			return mgr.DBManagerBase.Start(ctx, cluster)
+		}
+		return nil
+	}
+
 	if mgr.CurrentMemberName == leaderMember.Name {
 		mgr.Logger.Infof("i get the leader key, don't need to follow")
 		return nil
@@ -707,7 +739,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
 		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, mgr.Config.Username, mgr.Config.Password)
 
-	pgConf, err := os.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
+	pgConf, err := fs.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
 		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
 		return err

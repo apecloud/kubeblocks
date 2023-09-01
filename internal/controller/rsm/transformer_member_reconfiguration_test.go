@@ -103,6 +103,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			AddMatchLabelsInMap(selectors).
 			SetReplicas(3).
 			SetRoles(roles).
+			SetRoleProbe(roleProbe).
 			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()

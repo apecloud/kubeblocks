@@ -610,7 +610,7 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 			}
 		}
 		timeFormat := p.getTimeFormat(backupTool.Spec.Env)
-		stopTime := backup.Status.GetStopTime()
+		stopTime := backup.Status.GetEndTime()
 		if stopTime != nil {
 			env = append(env, corev1.EnvVar{Name: constant.DPBackupStopTime, Value: stopTime.Format(timeFormat)})
 		}

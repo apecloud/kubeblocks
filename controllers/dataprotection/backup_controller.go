@@ -62,6 +62,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -126,7 +127,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	switch backup.Status.Phase {
 	case "", dpv1alpha1.BackupPhaseNew:
-		return r.doNewPhaseAction(reqCtx, backup)
+		return r.handleNewPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseInProgress:
 		return r.doInProgressPhaseAction(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseRunning:
@@ -136,7 +137,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 		return intctrlutil.Reconciled()
 	case dpv1alpha1.BackupPhaseCompleted:
-		return r.doCompletedPhaseAction(reqCtx, backup)
+		return r.handleCompletedPhase(reqCtx, backup)
 	default:
 		return intctrlutil.Reconciled()
 	}
@@ -144,7 +145,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}).
 		WithOptions(controller.Options{
@@ -168,8 +168,9 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // checkPodsOfStatefulSetHasDeleted checks if the pods of statefulSet have been deleted
 func (r *BackupReconciler) checkPodsOfStatefulSetHasDeleted(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
 	podList := &corev1.PodList{}
-	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(buildBackupWorkloadsLabels(backup))); err != nil {
+	if err := r.Client.List(reqCtx.Ctx, podList,
+		client.InNamespace(backup.Namespace),
+		client.MatchingLabels(buildBackupWorkloadLabels(backup))); err != nil {
 		return false, err
 	}
 	for _, pod := range podList.Items {
@@ -183,16 +184,17 @@ func (r *BackupReconciler) checkPodsOfStatefulSetHasDeleted(reqCtx intctrlutil.R
 	return true, nil
 }
 
-// handleBackupDeleting handles the Deleting phase of backup.
-func (r *BackupReconciler) handleBackupDeleting(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+// deleteBackupFiles deletes the backup files stored in backup repository.
+func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	hasDeleted, err := r.checkPodsOfStatefulSetHasDeleted(reqCtx, backup)
 	if err != nil {
 		return err
 	}
 	// wait for pods of sts clean up successfully
 	if !hasDeleted {
-		return nil
+		return fmt.Errorf("waiting for pods of statefulset %s/%s to be deleted", backup.Namespace, backup.Name)
 	}
+
 	deleteFileJob, err := r.handleDeleteBackupFiles(reqCtx, backup)
 	if err != nil {
 		return err
@@ -225,21 +227,34 @@ func (r *BackupReconciler) handleBackupDeleting(reqCtx intctrlutil.RequestCtx, b
 }
 
 // handleDeletion handles the deletion of backup. It will delete the backup CR
-// and
+// and the backup workload(job/statefulset).
 func (r *BackupReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (*ctrl.Result, error) {
+	// if backup phase is Deleting, delete the backup reference workloads,
+	// backup data stored in backup repository and volume snapshots.
+	// TODO(ldm): if backup is being used by restore, do not delete it.
 	if backup.Status.Phase == dpv1alpha1.BackupPhaseDeleting {
-		// handle deleting
-		if err := r.handleBackupDeleting(reqCtx, backup); err != nil {
+		if err := r.deleteReferenceWorkloads(reqCtx, backup); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
+		}
+
+		if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+			return intctrlutil.ResultToP(intctrlutil.Reconciled())
+		}
+
+		if err := r.deleteVolumeSnapshots(reqCtx, backup); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
+		}
+
+		if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 
+	// if backup CR is being deleted, set backup phase to deleting. The backup
+	// reference workloads, data and volume snapshots will be deleted by controller
+	// later when the backup CR status.phase is deleting.
 	if !backup.GetDeletionTimestamp().IsZero() {
-		if err := r.deleteExternalResources(reqCtx, backup); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
-		}
-		// backup phase to Deleting
 		patch := client.MergeFrom(backup.DeepCopy())
 		backup.Status.Phase = dpv1alpha1.BackupPhaseDeleting
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
@@ -247,6 +262,7 @@ func (r *BackupReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, backup 
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
+
 	return nil, nil
 }
 
@@ -255,7 +271,7 @@ func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Reque
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}
 	}
-	backupName, ok := labels[constant.DataProtectionLabelBackupNameKey]
+	backupName, ok := labels[dptypes.DataProtectionLabelBackupNameKey]
 	if !ok {
 		return []reconcile.Request{}
 	}
@@ -279,31 +295,21 @@ func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Reque
 	}
 }
 
-func (r *BackupReconciler) getBackupPolicyAndValidate(
+func (r *BackupReconciler) getBackupPolicy(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (*dpv1alpha1.BackupPolicy, error) {
-	// get referenced backup policy
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
-	backupPolicyNameSpaceName := types.NamespacedName{
+	key := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
 		Name:      backup.Spec.BackupPolicyName,
 	}
-	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
-		return nil, err
-	}
-
-	if len(backupPolicy.Name) == 0 {
-		return nil, intctrlutil.NewNotFound(`backup policy "%s" not found`, backupPolicyNameSpaceName)
-	}
-
-	// validate backup spec
-	if err := backup.Spec.Validate(backupPolicy); err != nil {
+	if err := r.Get(reqCtx.Ctx, key, backupPolicy); err != nil {
 		return nil, err
 	}
 	return backupPolicy, nil
 }
 
-func (r *BackupReconciler) validateLogfileBackupLegitimacy(backup *dpv1alpha1.Backup,
+func (r *BackupReconciler) validate(backup *dpv1alpha1.Backup,
 	backupPolicy *dpv1alpha1.BackupPolicy) error {
 	backupType := backup.Spec.BackupType
 	if backupType != dpv1alpha1.BackupTypeLogFile {
@@ -321,10 +327,9 @@ func (r *BackupReconciler) validateLogfileBackupLegitimacy(backup *dpv1alpha1.Ba
 	return nil
 }
 
-func (r *BackupReconciler) doNewPhaseAction(
+func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-
 	patch := client.MergeFrom(backup.DeepCopy())
 	// HACK/TODO: ought to move following check to validation webhook
 	if backup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot && !viper.GetBool("VOLUMESNAPSHOT") {
@@ -336,12 +341,12 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.Reconciled()
 	}
 
-	backupPolicy, err := r.getBackupPolicyAndValidate(reqCtx, backup)
+	backupPolicy, err := r.getBackupPolicy(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
-	if err = r.validateLogfileBackupLegitimacy(backup, backupPolicy); err != nil {
+	if err = r.validate(backup, backupPolicy); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
@@ -441,7 +446,7 @@ func (r *BackupReconciler) buildBackupStatusForBackupTool(reqCtx intctrlutil.Req
 	}
 	// save the backup message for restore
 	backup.Status.BackupToolName = backupTool.Name
-	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[dptypes.BackupDataPathPrefixAnnotationKey])
 	backup.Status.Manifests.BackupTool.FilePath = backupDestinationPath
 
 	if backupTool.Spec.Physical.IsRelyOnLogfile() {
@@ -451,7 +456,7 @@ func (r *BackupReconciler) buildBackupStatusForBackupTool(reqCtx intctrlutil.Req
 		logfileBackupName := getCreatedCRNameByBackupPolicy(backupPolicy, dpv1alpha1.BackupTypeLogFile)
 		backup.Status.Manifests.BackupTool.LogFilePath = getBackupDestinationPath(&dpv1alpha1.Backup{
 			ObjectMeta: metav1.ObjectMeta{Namespace: backup.Namespace, Name: logfileBackupName},
-		}, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+		}, backupPolicy.Annotations[dptypes.BackupDataPathPrefixAnnotationKey])
 
 		logFilePvcName, _, err := r.handlePersistentVolumeClaim(reqCtx, backup, backupPolicy.Name, backupPolicy.Spec.Logfile, updateLabels)
 		if err != nil {
@@ -465,7 +470,7 @@ func (r *BackupReconciler) buildBackupStatusForBackupTool(reqCtx intctrlutil.Req
 func (r *BackupReconciler) cleanupFailedJob(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	jobList := batchv1.JobList{}
 	if err := r.Client.List(reqCtx.Ctx, &jobList, client.InNamespace(backup.Namespace),
-		client.MatchingLabels{constant.DataProtectionLabelBackupNameKey: backup.Name}); err != nil {
+		client.MatchingLabels{dptypes.DataProtectionLabelBackupNameKey: backup.Name}); err != nil {
 		return nil
 	}
 
@@ -671,11 +676,11 @@ func (r *BackupReconciler) createPersistentVolumeWithTemplate(reqCtx intctrlutil
 func (r *BackupReconciler) doInProgressPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-	backupPolicy, err := r.getBackupPolicyAndValidate(reqCtx, backup)
+	backupPolicy, err := r.getBackupPolicy(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
-	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[dptypes.BackupDataPathPrefixAnnotationKey])
 	patch := client.MergeFrom(backup.DeepCopy())
 	var res *ctrl.Result
 	switch backup.Spec.BackupType {
@@ -872,7 +877,7 @@ func (r *BackupReconciler) checkBackupIsCompletedDuringRunning(reqCtx intctrluti
 		if err = backup.Spec.Validate(backupPolicy); err != nil {
 			return backupPolicy, false, err
 		}
-		clusterName := backup.Labels[constant.AppInstanceLabelKey]
+		clusterName := backup.Labels[dptypes.AppInstanceLabelKey]
 		targetClusterExists := true
 		if clusterName != "" {
 			cluster := &appsv1alpha1.Cluster{}
@@ -906,7 +911,7 @@ func (r *BackupReconciler) createBackupStatefulSet(reqCtx intctrlutil.RequestCtx
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backup.Name,
 			Namespace: backup.Namespace,
-			Labels:    buildBackupWorkloadsLabels(backup),
+			Labels:    buildBackupWorkloadLabels(backup),
 		},
 		Spec: *stsSpec,
 	}
@@ -952,7 +957,7 @@ func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dpv1alpha1.Bac
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	container.Env = []corev1.EnvVar{
-		{Name: constant.DPBackupInfoFile, Value: buildBackupInfoENV(backupDestinationPath)},
+		{Name: dptypes.DPBackupInfoFile, Value: buildBackupInfoENV(backupDestinationPath)},
 	}
 	return container, nil
 }
@@ -961,7 +966,7 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup,
 	backupPolicy *dpv1alpha1.BackupPolicy,
 	commonPolicy *dpv1alpha1.CommonBackupPolicy) (*appsv1.StatefulSetSpec, error) {
-	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
+	backupDestinationPath := getBackupDestinationPath(backup, backupPolicy.Annotations[dptypes.BackupDataPathPrefixAnnotationKey])
 	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, backupPolicy, commonPolicy, backupDestinationPath)
 	toolPodSpec.RestartPolicy = corev1.RestartPolicyAlways
 	if err != nil {
@@ -977,7 +982,7 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 	interval := getIntervalSecondsForLogfile(backup.Spec.BackupType, schedulePolicy.CronExpression)
 	if interval != "" {
 		toolPodSpec.Containers[0].Env = append(toolPodSpec.Containers[0].Env, corev1.EnvVar{
-			Name:  constant.DPArchiveInterval,
+			Name:  dptypes.DPArchiveInterval,
 			Value: interval,
 		})
 	}
@@ -986,7 +991,7 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 		toolPodSpec.Containers = append(toolPodSpec.Containers, manifestsUpdaterContainer)
 		toolPodSpec.ServiceAccountName = target.Spec.ServiceAccountName
 	}
-	backupLabels := buildBackupWorkloadsLabels(backup)
+	backupLabels := buildBackupWorkloadLabels(backup)
 	defaultReplicas := int32(1)
 	return &appsv1.StatefulSetSpec{
 		Replicas: &defaultReplicas,
@@ -1002,15 +1007,12 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 	}, nil
 }
 
-func (r *BackupReconciler) doCompletedPhaseAction(
+// handleCompletedPhase handles the backup object in completed phase.
+// It will delete the reference workloads.
+func (r *BackupReconciler) handleCompletedPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-
-	if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil && !apierrors.IsNotFound(err) {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	if err := r.deleteReferenceStatefulSet(reqCtx, backup); err != nil && !apierrors.IsNotFound(err) {
+	if err := r.deleteReferenceWorkloads(reqCtx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -1080,7 +1082,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		if err := r.setClusterSnapshotAnnotation(backup, cluster); err != nil {
 			return false, err
 		}
-		backup.Labels[constant.DataProtectionLabelClusterUIDKey] = string(cluster.UID)
+		backup.Labels[dptypes.DataProtectionLabelClusterUIDKey] = string(cluster.UID)
 	}
 	for _, v := range getClusterLabelKeys() {
 		backup.Labels[v] = targetPod.Labels[v]
@@ -1200,7 +1202,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 				return err
 			}
 		}
-		labels := buildBackupWorkloadsLabels(backup)
+		labels := buildBackupWorkloadLabels(backup)
 		labels[constant.VolumeTypeLabelKey] = target.Labels[constant.VolumeTypeLabelKey]
 		if target.Labels[constant.VolumeTypeLabelKey] == string(appsv1alpha1.VolumeTypeLog) {
 			snapshotName += "-log"
@@ -1528,7 +1530,7 @@ func (r *BackupReconciler) createBatchV1Job(
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: key.Namespace,
 			Name:      key.Name,
-			Labels:    buildBackupWorkloadsLabels(backup),
+			Labels:    buildBackupWorkloadLabels(backup),
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -1551,15 +1553,12 @@ func (r *BackupReconciler) createBatchV1Job(
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
-func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+// deleteReferenceJobs deletes the jobs that are referenced by the backup object.
+func (r *BackupReconciler) deleteReferenceJobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	jobs := &batchv1.JobList{}
-	namespace := backup.Namespace
-	if backup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
-		namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	}
 	if err := r.Client.List(reqCtx.Ctx, jobs,
-		client.InNamespace(namespace),
-		client.MatchingLabels(buildBackupWorkloadsLabels(backup))); err != nil {
+		client.InNamespace(backup.Namespace),
+		client.MatchingLabels(buildBackupWorkloadLabels(backup))); err != nil {
 		return err
 	}
 
@@ -1572,6 +1571,7 @@ func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Request
 			}
 		}
 
+		reqCtx.Log.V(1).Info("delete job", "job", job)
 		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &job); err != nil {
 			return err
 		}
@@ -1579,23 +1579,22 @@ func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Request
 	return nil
 }
 
-func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	snaps := &snapshotv1.VolumeSnapshotList{}
-
-	if err := r.vsCli.List(snaps,
-		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(buildBackupWorkloadsLabels(backup))); err != nil {
+	if err := r.vsCli.List(snaps, client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabels(buildBackupWorkloadLabels(backup))); client.IgnoreNotFound(err) != nil {
 		return err
 	}
-	for _, i := range snaps.Items {
-		if controllerutil.ContainsFinalizer(&i, dataProtectionFinalizerName) {
-			patch := i.DeepCopy()
-			controllerutil.RemoveFinalizer(&i, dataProtectionFinalizerName)
-			if err := r.vsCli.Patch(&i, patch); err != nil {
+	for _, snap := range snaps.Items {
+		if controllerutil.ContainsFinalizer(&snap, dataProtectionFinalizerName) {
+			patch := snap.DeepCopy()
+			controllerutil.RemoveFinalizer(&snap, dataProtectionFinalizerName)
+			if err := r.vsCli.Patch(&snap, patch); err != nil {
 				return err
 			}
 		}
-		if err := r.vsCli.Delete(&i); err != nil {
+		reqCtx.Log.V(1).Info("delete volume snapshot", "volume snapshot", snap)
+		if err := r.vsCli.Delete(&snap); err != nil {
 			return err
 		}
 	}
@@ -1603,20 +1602,13 @@ func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.Requ
 }
 
 func (r *BackupReconciler) handleDeleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (*batchv1.Job, error) {
-	if backup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
-		// no file to delete for this type
-		return nil, nil
-	}
-	if backup.Status.Phase == dpv1alpha1.BackupPhaseNew {
-		// nothing to delete
-		return nil, nil
-	}
 	jobKey := buildDeleteBackupFilesJobNamespacedName(backup)
 	job := &batchv1.Job{}
 	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, jobKey, job)
 	if err != nil {
 		return nil, err
 	}
+
 	// create job for deleting backup files
 	if !exists {
 		pvcName := backup.Status.PersistentVolumeClaimName
@@ -1655,32 +1647,32 @@ func (r *BackupReconciler) handleDeleteBackupFiles(reqCtx intctrlutil.RequestCtx
 // deleteReferenceStatefulSet deletes the referenced statefulSet.
 func (r *BackupReconciler) deleteReferenceStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	sts := &appsv1.StatefulSet{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, types.NamespacedName{
-		Namespace: backup.Namespace,
-		Name:      backup.Name,
-	}, sts)
-	if err != nil {
+	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
+		types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name},
+		sts); err != nil {
 		return err
-	}
-	if !exists && !model.IsOwnerOf(backup, sts) {
+	} else if exists && !model.IsOwnerOf(backup, sts) {
 		return nil
 	}
+
 	patch := client.MergeFrom(sts.DeepCopy())
 	controllerutil.RemoveFinalizer(sts, dataProtectionFinalizerName)
-	if err = r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
+	if err := r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
 		return err
 	}
+
+	reqCtx.Log.V(1).Info("delete statefulSet", "statefulSet", sts)
 	return intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, sts)
 }
 
-func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+// deleteReferenceWorkloads deletes the referenced workloads that execute backup.
+// Currently, it only supports two types of workloads: statefulSet and job.
+func (r *BackupReconciler) deleteReferenceWorkloads(
+	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	if err := r.deleteReferenceStatefulSet(reqCtx, backup); err != nil {
 		return err
 	}
-	if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil {
-		return err
-	}
-	if err := r.deleteReferenceVolumeSnapshot(reqCtx, backup); err != nil {
+	if err := r.deleteReferenceJobs(reqCtx, backup); err != nil {
 		return err
 	}
 	return nil
@@ -1811,29 +1803,29 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	envBackupName := corev1.EnvVar{
-		Name:  constant.DPBackupName,
+		Name:  dptypes.DPBackupName,
 		Value: backup.Name,
 	}
 
 	envBackupDir := corev1.EnvVar{
-		Name:  constant.DPBackupDIR,
+		Name:  dptypes.DPBackupDIR,
 		Value: backupPathBase + pathPrefix,
 	}
 
 	envDBHost := corev1.EnvVar{
-		Name:  constant.DPDBHost,
+		Name:  dptypes.DPDBHost,
 		Value: intctrlutil.BuildPodHostDNS(clusterPod),
 	}
 
 	envDPTargetPodName := corev1.EnvVar{
-		Name:  constant.DPTargetPodName,
+		Name:  dptypes.DPTargetPodName,
 		Value: clusterPod.Name,
 	}
 
 	container.Env = []corev1.EnvVar{envDPTargetPodName, envDBHost, envBackupName, envBackupDir}
 	if commonPolicy.Target.Secret != nil {
 		envDBUser := corev1.EnvVar{
-			Name: constant.DPDBUser,
+			Name: dptypes.DPDBUser,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1845,7 +1837,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		}
 
 		envDBPassword := corev1.EnvVar{
-			Name: constant.DPDBPassword,
+			Name: dptypes.DPDBPassword,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1862,17 +1854,17 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
 		ttl := backupPolicy.Spec.Retention.TTL
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  constant.DPTTL,
+			Name:  dptypes.DPTTL,
 			Value: *ttl,
 		})
 		// one more day than the configured TTL for logfile backup
 		logTTL := dpv1alpha1.AddTTL(ttl, 24)
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  constant.DPLogfileTTL,
+			Name:  dptypes.DPLogfileTTL,
 			Value: logTTL,
 		})
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  constant.DPLogfileTTLSecond,
+			Name:  dptypes.DPLogfileTTLSecond,
 			Value: strconv.FormatInt(int64(math.Floor(dpv1alpha1.ToDuration(&logTTL).Seconds())), 10),
 		})
 	}

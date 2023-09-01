@@ -30,11 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -65,7 +66,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 	origCluster := transCtx.OrigCluster
 	backupPolicyNames := map[string]struct{}{}
 	for _, tpl := range backupPolicyTPLs.Items {
-		r.isDefaultTemplate = tpl.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey]
+		r.isDefaultTemplate = tpl.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey]
 		r.tplIdentifier = tpl.Spec.Identifier
 		for _, v := range tpl.Spec.BackupPolicies {
 			compDef := transCtx.ClusterDef.GetComponentDefByName(v.ComponentDefRef)
@@ -101,9 +102,9 @@ func (r *BackupPolicyTPLTransformer) transformBackupPolicy(transCtx *ClusterTran
 	policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
-	tpl *appsv1alpha1.BackupPolicyTemplate) (*dataprotectionv1alpha1.BackupPolicy, *ictrltypes.LifecycleAction) {
+	tpl *appsv1alpha1.BackupPolicyTemplate) (*dpv1alpha1.BackupPolicy, *ictrltypes.LifecycleAction) {
 	backupPolicyName := DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef, r.tplIdentifier)
-	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKey{Namespace: cluster.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
 		return nil, nil
 	}
@@ -117,7 +118,7 @@ func (r *BackupPolicyTPLTransformer) transformBackupPolicy(transCtx *ClusterTran
 }
 
 // syncBackupPolicy syncs labels and annotations of the backup policy with the cluster changes.
-func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy,
+func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	policyTPL appsv1alpha1.BackupPolicy,
 	workloadType appsv1alpha1.WorkloadType,
@@ -126,10 +127,10 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 	if backupPolicy.Annotations == nil {
 		backupPolicy.Annotations = map[string]string{}
 	}
-	backupPolicy.Annotations[constant.DefaultBackupPolicyAnnotationKey] = r.defaultPolicyAnnotationValue()
+	backupPolicy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] = r.defaultPolicyAnnotationValue()
 	backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] = tpl.Name
-	if tpl.Annotations[constant.ReconfigureRefAnnotationKey] != "" {
-		backupPolicy.Annotations[constant.ReconfigureRefAnnotationKey] = tpl.Annotations[constant.ReconfigureRefAnnotationKey]
+	if tpl.Annotations[dptypes.ReconfigureRefAnnotationKey] != "" {
+		backupPolicy.Annotations[dptypes.ReconfigureRefAnnotationKey] = tpl.Annotations[dptypes.ReconfigureRefAnnotationKey]
 	}
 	if backupPolicy.Labels == nil {
 		backupPolicy.Labels = map[string]string{}
@@ -149,8 +150,8 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 		return
 	}
 	// convert role labelSelector based on the replicas of the component automatically.
-	syncTheRoleLabel := func(target dataprotectionv1alpha1.TargetCluster,
-		basePolicy appsv1alpha1.BasePolicy) dataprotectionv1alpha1.TargetCluster {
+	syncTheRoleLabel := func(target dpv1alpha1.TargetCluster,
+		basePolicy appsv1alpha1.BasePolicy) dpv1alpha1.TargetCluster {
 		role := basePolicy.Target.Role
 		if len(role) == 0 {
 			return target
@@ -185,13 +186,13 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
 	tpl *appsv1alpha1.BackupPolicyTemplate,
-	backupPolicyName string) *dataprotectionv1alpha1.BackupPolicy {
+	backupPolicyName string) *dpv1alpha1.BackupPolicy {
 	component := r.getFirstComponent(cluster, policyTPL.ComponentDefRef)
 	if component == nil {
 		return nil
 	}
 
-	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{
+	backupPolicy := &dpv1alpha1.BackupPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backupPolicyName,
 			Namespace: cluster.Namespace,
@@ -201,18 +202,18 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 				constant.AppManagedByLabelKey:         constant.AppName,
 			},
 			Annotations: map[string]string{
-				constant.DefaultBackupPolicyAnnotationKey:  r.defaultPolicyAnnotationValue(),
+				dptypes.DefaultBackupPolicyAnnotationKey:   r.defaultPolicyAnnotationValue(),
 				constant.BackupPolicyTemplateAnnotationKey: tpl.Name,
-				constant.BackupDataPathPrefixAnnotationKey: fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, component.Name),
+				dptypes.BackupDataPathPrefixAnnotationKey:  fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, component.Name),
 			},
 		},
 	}
-	if tpl.Annotations[constant.ReconfigureRefAnnotationKey] != "" {
-		backupPolicy.Annotations[constant.ReconfigureRefAnnotationKey] = tpl.Annotations[constant.ReconfigureRefAnnotationKey]
+	if tpl.Annotations[dptypes.ReconfigureRefAnnotationKey] != "" {
+		backupPolicy.Annotations[dptypes.ReconfigureRefAnnotationKey] = tpl.Annotations[dptypes.ReconfigureRefAnnotationKey]
 	}
 	bpSpec := backupPolicy.Spec
 	if policyTPL.Retention != nil {
-		bpSpec.Retention = &dataprotectionv1alpha1.RetentionSpec{
+		bpSpec.Retention = &dpv1alpha1.RetentionSpec{
 			TTL: policyTPL.Retention.TTL,
 		}
 	}
@@ -229,7 +230,7 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 
 // mergeClusterBackup merges the cluster backup configuration into the backup policy.
 func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransformContext, cluster *appsv1alpha1.Cluster,
-	backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
+	backupPolicy *dpv1alpha1.BackupPolicy) {
 
 	backupEnabled := func() bool {
 		return cluster.Spec.Backup != nil && boolValue(cluster.Spec.Backup.Enabled)
@@ -246,7 +247,7 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 
 	backup := cluster.Spec.Backup
 	spec := &backupPolicy.Spec
-	setSchedulePolicy := func(schedulePolicy *dataprotectionv1alpha1.SchedulePolicy, enable bool) {
+	setSchedulePolicy := func(schedulePolicy *dpv1alpha1.SchedulePolicy, enable bool) {
 		if schedulePolicy == nil {
 			if enable {
 				// failed to find the schedule policy for backup method, so record event and return.
@@ -270,7 +271,7 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 	}
 
 	if backup.RetentionPeriod != nil {
-		spec.Retention = &dataprotectionv1alpha1.RetentionSpec{
+		spec.Retention = &dpv1alpha1.RetentionSpec{
 			TTL: backup.RetentionPeriod,
 		}
 	}
@@ -279,20 +280,20 @@ func (r *BackupPolicyTPLTransformer) mergeClusterBackup(transCtx *ClusterTransfo
 		spec.Schedule.StartingDeadlineMinutes = backup.StartingDeadlineMinutes
 	}
 
-	var commonBackupPolicy *dataprotectionv1alpha1.CommonBackupPolicy
+	var commonBackupPolicy *dpv1alpha1.CommonBackupPolicy
 	switch backup.Method {
-	case dataprotectionv1alpha1.BackupMethodSnapshot:
+	case dpv1alpha1.BackupMethodSnapshot:
 		// enable snapshot and disable datafile
 		setSchedulePolicy(spec.Schedule.Snapshot, true)
 		setSchedulePolicy(spec.Schedule.Datafile, false)
-	case dataprotectionv1alpha1.BackupMethodBackupTool:
+	case dpv1alpha1.BackupMethodBackupTool:
 		// disable snapshot and enable datafile
 		setSchedulePolicy(spec.Schedule.Snapshot, false)
 		setSchedulePolicy(spec.Schedule.Datafile, true)
 		commonBackupPolicy = spec.Datafile
 	}
 
-	setRepoName := func(bp *dataprotectionv1alpha1.CommonBackupPolicy) {
+	setRepoName := func(bp *dpv1alpha1.CommonBackupPolicy) {
 		if backup.RepoName == "" || bp == nil {
 			return
 		}
@@ -327,11 +328,11 @@ func (r *BackupPolicyTPLTransformer) getFirstComponent(cluster *appsv1alpha1.Clu
 }
 
 // convertSchedulePolicy converts the schedulePolicy from backupPolicyTemplate.
-func (r *BackupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.SchedulePolicy) *dataprotectionv1alpha1.SchedulePolicy {
+func (r *BackupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.SchedulePolicy) *dpv1alpha1.SchedulePolicy {
 	if sp == nil {
 		return nil
 	}
-	return &dataprotectionv1alpha1.SchedulePolicy{
+	return &dpv1alpha1.SchedulePolicy{
 		Enable:         sp.Enable,
 		CronExpression: sp.CronExpression,
 	}
@@ -341,9 +342,9 @@ func (r *BackupPolicyTPLTransformer) convertSchedulePolicy(sp *appsv1alpha1.Sche
 func (r *BackupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolicy,
 	clusterName string,
 	component appsv1alpha1.ClusterComponentSpec,
-	workloadType appsv1alpha1.WorkloadType) dataprotectionv1alpha1.BasePolicy {
-	basePolicy := dataprotectionv1alpha1.BasePolicy{
-		Target: dataprotectionv1alpha1.TargetCluster{
+	workloadType appsv1alpha1.WorkloadType) dpv1alpha1.BasePolicy {
+	basePolicy := dpv1alpha1.BasePolicy{
+		Target: dpv1alpha1.TargetCluster{
 			LabelsSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterName,
@@ -356,14 +357,14 @@ func (r *BackupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 		OnFailAttempted:     bp.OnFailAttempted,
 	}
 	if len(bp.BackupStatusUpdates) != 0 {
-		backupStatusUpdates := make([]dataprotectionv1alpha1.BackupStatusUpdate, len(bp.BackupStatusUpdates))
+		backupStatusUpdates := make([]dpv1alpha1.BackupStatusUpdate, len(bp.BackupStatusUpdates))
 		for i, v := range bp.BackupStatusUpdates {
-			backupStatusUpdates[i] = dataprotectionv1alpha1.BackupStatusUpdate{
+			backupStatusUpdates[i] = dpv1alpha1.BackupStatusUpdate{
 				Path:                       v.Path,
 				ContainerName:              v.ContainerName,
 				Script:                     v.Script,
 				UseTargetPodServiceAccount: v.UseTargetPodServiceAccount,
-				UpdateStage:                dataprotectionv1alpha1.BackupStatusUpdateStage(v.UpdateStage),
+				UpdateStage:                dpv1alpha1.BackupStatusUpdateStage(v.UpdateStage),
 			}
 		}
 		basePolicy.BackupStatusUpdates = backupStatusUpdates
@@ -377,13 +378,13 @@ func (r *BackupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 	}
 	// build the target secret.
 	if len(bp.Target.Account) > 0 {
-		basePolicy.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{
+		basePolicy.Target.Secret = &dpv1alpha1.BackupPolicySecret{
 			Name:        fmt.Sprintf("%s-%s-%s", clusterName, component.Name, bp.Target.Account),
 			PasswordKey: constant.AccountPasswdForSecret,
 			UsernameKey: constant.AccountNameForSecret,
 		}
 	} else {
-		basePolicy.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{
+		basePolicy.Target.Secret = &dpv1alpha1.BackupPolicySecret{
 			Name: fmt.Sprintf("%s-conn-credential", clusterName),
 		}
 		connectionCredentialKey := bp.Target.ConnectionCredentialKey
@@ -401,15 +402,15 @@ func (r *BackupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 func (r *BackupPolicyTPLTransformer) convertSnapshotPolicy(sp *appsv1alpha1.SnapshotPolicy,
 	clusterName string,
 	component appsv1alpha1.ClusterComponentSpec,
-	workloadType appsv1alpha1.WorkloadType) *dataprotectionv1alpha1.SnapshotPolicy {
+	workloadType appsv1alpha1.WorkloadType) *dpv1alpha1.SnapshotPolicy {
 	if sp == nil {
 		return nil
 	}
-	snapshotPolicy := &dataprotectionv1alpha1.SnapshotPolicy{
+	snapshotPolicy := &dpv1alpha1.SnapshotPolicy{
 		BasePolicy: r.convertBasePolicy(sp.BasePolicy, clusterName, component, workloadType),
 	}
 	if sp.Hooks != nil {
-		snapshotPolicy.Hooks = &dataprotectionv1alpha1.BackupPolicyHook{
+		snapshotPolicy.Hooks = &dpv1alpha1.BackupPolicyHook{
 			PreCommands:   sp.Hooks.PreCommands,
 			PostCommands:  sp.Hooks.PostCommands,
 			ContainerName: sp.Hooks.ContainerName,
@@ -423,14 +424,14 @@ func (r *BackupPolicyTPLTransformer) convertSnapshotPolicy(sp *appsv1alpha1.Snap
 func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.CommonBackupPolicy,
 	clusterName string,
 	component appsv1alpha1.ClusterComponentSpec,
-	workloadType appsv1alpha1.WorkloadType) *dataprotectionv1alpha1.CommonBackupPolicy {
+	workloadType appsv1alpha1.WorkloadType) *dpv1alpha1.CommonBackupPolicy {
 	if bp == nil {
 		return nil
 	}
-	defaultCreatePolicy := dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent
+	defaultCreatePolicy := dpv1alpha1.CreatePVCPolicyIfNotPresent
 	globalCreatePolicy := viper.GetString(constant.CfgKeyBackupPVCCreatePolicy)
-	if dataprotectionv1alpha1.CreatePVCPolicy(globalCreatePolicy) == dataprotectionv1alpha1.CreatePVCPolicyNever {
-		defaultCreatePolicy = dataprotectionv1alpha1.CreatePVCPolicyNever
+	if dpv1alpha1.CreatePVCPolicy(globalCreatePolicy) == dpv1alpha1.CreatePVCPolicyNever {
+		defaultCreatePolicy = dpv1alpha1.CreatePVCPolicyNever
 	}
 	defaultInitCapacity := constant.DefaultBackupPvcInitCapacity
 	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)
@@ -440,9 +441,9 @@ func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 	// set the persistent volume configmap infos if these variables exist.
 	globalPVConfigMapName := viper.GetString(constant.CfgKeyBackupPVConfigmapName)
 	globalPVConfigMapNamespace := viper.GetString(constant.CfgKeyBackupPVConfigmapNamespace)
-	var persistentVolumeConfigMap *dataprotectionv1alpha1.PersistentVolumeConfigMap
+	var persistentVolumeConfigMap *dpv1alpha1.PersistentVolumeConfigMap
 	if globalPVConfigMapName != "" && globalPVConfigMapNamespace != "" {
-		persistentVolumeConfigMap = &dataprotectionv1alpha1.PersistentVolumeConfigMap{
+		persistentVolumeConfigMap = &dpv1alpha1.PersistentVolumeConfigMap{
 			Name:      globalPVConfigMapName,
 			Namespace: globalPVConfigMapNamespace,
 		}
@@ -452,9 +453,9 @@ func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 	if globalStorageClass != "" {
 		storageClassName = &globalStorageClass
 	}
-	return &dataprotectionv1alpha1.CommonBackupPolicy{
+	return &dpv1alpha1.CommonBackupPolicy{
 		BackupToolName: bp.BackupToolName,
-		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+		PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
 			InitCapacity:              resource.MustParse(defaultInitCapacity),
 			CreatePolicy:              defaultCreatePolicy,
 			PersistentVolumeConfigMap: persistentVolumeConfigMap,

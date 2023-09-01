@@ -28,6 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -189,6 +190,20 @@ func (c *configReconcileContext) rsm() *configReconcileContext {
 			client.ObjectKeyFromObject(c.ConfigMap),
 			client.InNamespace(c.Cluster.Namespace),
 			c.MatchingLabels)
+		if err != nil {
+			return
+		}
+
+		// fix uid mismatch bug: convert rsm to sts
+		for _, rsm := range c.RSMList {
+			var stsObject appv1.StatefulSet
+			sts := components.ConvertRSMToSTS(&rsm)
+			err = c.Client.Get(c.Ctx, client.ObjectKeyFromObject(sts), &stsObject)
+			if err != nil {
+				return
+			}
+			c.StatefulSets = append(c.StatefulSets, stsObject)
+		}
 		return
 	}
 	return c.objectWrapper(stsFn)

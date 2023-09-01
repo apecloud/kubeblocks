@@ -23,10 +23,11 @@ import (
 	"bytes"
 	"io"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +37,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("reconfigure test", func() {
@@ -81,21 +81,21 @@ var _ = Describe("reconfigure test", func() {
 		)
 
 		By("Create configmap and config constraint obj")
-		configmap := testapps.NewCustomizedObj("resources/mysql-config-template.yaml", &corev1.ConfigMap{}, testapps.WithNamespace(ns))
-		constraint := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
+		configmap := apps.NewCustomizedObj("resources/mysql-config-template.yaml", &corev1.ConfigMap{}, apps.WithNamespace(ns))
+		constraint := apps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
-		componentConfig := testapps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configSpecName), testapps.SetConfigMapData("my.cnf", ""))
+		componentConfig := apps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configSpecName), apps.SetConfigMapData("my.cnf", ""))
 		By("Create a clusterDefinition obj")
-		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+		clusterDefObj := apps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(apps.StatefulMySQLComponent, statefulCompDefName).
 			AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, ns, configVolumeName).
 			GetObject()
 		By("Create a clusterVersion obj")
-		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+		clusterVersionObj := apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 			AddComponentVersion(statefulCompDefName).
 			GetObject()
 		By("creating a cluster")
-		clusterObj := testapps.NewClusterFactory(ns, clusterName,
+		clusterObj := apps.NewClusterFactory(ns, clusterName,
 			clusterDefObj.Name, "").
 			AddComponent(statefulCompName, statefulCompDefName).GetObject()
 

@@ -23,6 +23,9 @@ import (
 	"context"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	probeutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,9 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // EventTimeOut timeout of the event

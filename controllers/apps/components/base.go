@@ -27,6 +27,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -42,12 +48,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type componentBase struct {
@@ -173,7 +174,7 @@ func (c *componentBase) ValidateObjectsAction() error {
 }
 
 // ResolveObjectsAction resolves the action of objects in dag to guarantee that all object actions will be determined.
-func (c *componentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *componentBase) ResolveObjectsAction(reqCtx controllerutil.RequestCtx, cli client.Client) error {
 	snapshot, err := readCacheSnapshot(reqCtx, cli, c.GetCluster())
 	if err != nil {
 		return err
@@ -204,7 +205,7 @@ func (c *componentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli 
 	return c.ValidateObjectsAction()
 }
 
-func (c *componentBase) UpdatePDB(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *componentBase) UpdatePDB(reqCtx controllerutil.RequestCtx, cli client.Client) error {
 	pdbObjList, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PodDisruptionBudgetSignature, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -229,7 +230,7 @@ func (c *componentBase) UpdatePDB(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	return nil
 }
 
-func (c *componentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *componentBase) UpdateService(reqCtx controllerutil.RequestCtx, cli client.Client) error {
 	svcObjList, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.ServiceSignature, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return client.IgnoreNotFound(err)
@@ -297,7 +298,7 @@ func (c *componentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 	}
 }
 
-func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object, txn *statusReconciliationTxn) error {
+func (c *componentBase) StatusWorkload(reqCtx controllerutil.RequestCtx, cli client.Client, obj client.Object, txn *statusReconciliationTxn) error {
 	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
 	//	return nil
 	// }
@@ -329,13 +330,13 @@ func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 	if !isRunning && !appsv1alpha1.ComponentPodsAreReady(podsReady) && isLatestWorkload {
 		var requeueAfter time.Duration
 		if hasFailedPodTimedOut, timedOutPodStatusMessage, requeueAfter = hasFailedAndTimedOutPod(pods); requeueAfter != 0 {
-			delayedRequeueError = intctrlutil.NewDelayedRequeueError(requeueAfter, "requeue for workload status to reconcile.")
+			delayedRequeueError = controllerutil.NewDelayedRequeueError(requeueAfter, "requeue for workload status to reconcile.")
 		}
 	}
 
 	phase, statusMessage, err := c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage)
 	if err != nil {
-		if !intctrlutil.IsDelayedRequeueError(err) {
+		if !controllerutil.IsDelayedRequeueError(err) {
 			return err
 		}
 		delayedRequeueError = err
@@ -403,7 +404,7 @@ func (c *componentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 		// if component is not running and probe is not timed out, requeue.
 		if phase == "" {
 			c.Recorder.Event(c.Cluster, corev1.EventTypeNormal, "WaitingForProbeSuccess", "Waiting for probe success")
-			return phase, statusMessage, intctrlutil.NewDelayedRequeueError(time.Second*10, "Waiting for probe success")
+			return phase, statusMessage, controllerutil.NewDelayedRequeueError(time.Second*10, "Waiting for probe success")
 		}
 		return phase, statusMessage, nil
 	}
@@ -531,7 +532,7 @@ func isAnyContainerFailed(containersStatus []corev1.ContainerStatus) (bool, stri
 
 // isContainerFailedAndTimedOut checks whether the failed container has timed out.
 func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodConditionType) bool {
-	containerReadyCondition := intctrlutil.GetPodCondition(&pod.Status, podConditionType)
+	containerReadyCondition := controllerutil.GetPodCondition(&pod.Status, podConditionType)
 	if containerReadyCondition == nil || containerReadyCondition.LastTransitionTime.IsZero() {
 		return false
 	}
@@ -608,7 +609,7 @@ func ownedKinds() []client.ObjectList {
 }
 
 // read all objects owned by component
-func readCacheSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) (clusterSnapshot, error) {
+func readCacheSnapshot(reqCtx controllerutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
 	kinds := ownedKinds()
 	snapshot := make(clusterSnapshot)

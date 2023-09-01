@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package storage
 
 import (
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,10 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("StorageProvider controller", func() {
@@ -46,15 +46,15 @@ var _ = Describe("StorageProvider controller", func() {
 		By("clean resources")
 		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.StorageProviderSignature, true, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.CSIDriverSignature, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.StorageProviderSignature, true, ml)
+		apps.ClearResources(&testCtx, intctrlutil.CSIDriverSignature, ml)
 
 		// namespaced
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
 
 		// delete rest mocked objects
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 
 		// By("deleting the Namespace to perform the tests")
 		// Eventually(func(g Gomega) {
@@ -89,7 +89,7 @@ var _ = Describe("StorageProvider controller", func() {
 			obj := &storagev1alpha1.StorageProvider{}
 			obj.GenerateName = "storageprovider-"
 			obj.Spec.CSIDriverName = driverName
-			provider := testapps.CreateK8sResource(&testCtx, obj)
+			provider := apps.CreateK8sResource(&testCtx, obj)
 			key = types.NamespacedName{
 				Name: provider.GetName(),
 			}
@@ -98,7 +98,7 @@ var _ = Describe("StorageProvider controller", func() {
 		createCSIDriverObjectSpec := func(driverName string) {
 			obj := &storagev1.CSIDriver{}
 			obj.Name = driverName
-			testapps.CreateK8sResource(&testCtx, obj)
+			apps.CreateK8sResource(&testCtx, obj)
 		}
 
 		deleteCSIDriverObject := func(driverName string) {
@@ -187,7 +187,7 @@ var _ = Describe("StorageProvider controller", func() {
 			createStorageProviderSpec("csi3")
 
 			By("checking StorageProvider object")
-			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, provider *storagev1alpha1.StorageProvider) {
+			Eventually(apps.CheckObj(&testCtx, key, func(g Gomega, provider *storagev1alpha1.StorageProvider) {
 				g.Expect(provider.GetFinalizers()).To(ContainElement(storageFinalizerName))
 			})).Should(Succeed())
 

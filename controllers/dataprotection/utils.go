@@ -26,6 +26,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,9 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var (
@@ -69,7 +70,7 @@ func (o byBackupStartTime) Less(i, j int) bool {
 }
 
 // getBackupToolByName gets the backupTool by name.
-func getBackupToolByName(reqCtx intctrlutil.RequestCtx, cli client.Client, backupName string) (*dataprotectionv1alpha1.BackupTool, error) {
+func getBackupToolByName(reqCtx controllerutil.RequestCtx, cli client.Client, backupName string) (*dataprotectionv1alpha1.BackupTool, error) {
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
 	backupToolNameSpaceName := types.NamespacedName{
 		Name: backupName,
@@ -196,7 +197,7 @@ func filterCreatedByPolicy(object client.Object) bool {
 
 // sendWarningEventForError sends warning event for backup controller error
 func sendWarningEventForError(recorder record.EventRecorder, backup *dataprotectionv1alpha1.Backup, err error) {
-	controllerErr := intctrlutil.UnwrapControllerError(err)
+	controllerErr := controllerutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		recorder.Eventf(backup, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
 	} else {

@@ -22,6 +22,8 @@ package kubeblocks
 import (
 	"net/http"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
@@ -35,7 +37,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 

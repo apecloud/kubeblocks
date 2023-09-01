@@ -23,6 +23,10 @@ import (
 	"fmt"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -33,10 +37,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("RSM Component", func() {
@@ -58,14 +59,14 @@ var _ = Describe("RSM Component", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -75,9 +76,9 @@ var _ = Describe("RSM Component", func() {
 	Context("RSM Component test", func() {
 		It("RSM Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
+			clusterDef, _, cluster := apps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, rsmCompDefRef, rsmCompName)
-			_ = testapps.MockRSMComponent(&testCtx, clusterName, rsmCompName)
+			_ = apps.MockRSMComponent(&testCtx, clusterName, rsmCompName)
 			rsmList := &workloads.ReplicatedStateMachineList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, rsmList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
@@ -86,7 +87,7 @@ var _ = Describe("RSM Component", func() {
 				}, client.Limit(1))
 				return len(rsmList.Items) > 0
 			}).Should(BeTrue())
-			_ = testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, rsmCompName)
+			_ = apps.MockConsensusComponentStatefulSet(&testCtx, clusterName, rsmCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
@@ -107,7 +108,7 @@ var _ = Describe("RSM Component", func() {
 			By("test pods are not ready")
 			updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, rsmCompName, "6fdd48d9cd")
 			sts := &stsList.Items[0]
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, sts, func() {
 				availableReplicas := *sts.Spec.Replicas - 1
 				sts.Status.AvailableReplicas = availableReplicas
 				sts.Status.ReadyReplicas = availableReplicas
@@ -115,7 +116,7 @@ var _ = Describe("RSM Component", func() {
 				sts.Status.ObservedGeneration = 1
 				sts.Status.UpdateRevision = updateRevision
 			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, rsm, func() {
 				availableReplicas := *rsm.Spec.Replicas - 1
 				rsm.Status.InitReplicas = *rsm.Spec.Replicas
 				rsm.Status.AvailableReplicas = availableReplicas
@@ -128,15 +129,15 @@ var _ = Describe("RSM Component", func() {
 			Expect(podsReady).Should(BeFalse())
 
 			By("create pods of sts")
-			podList := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, rsmCompName)
+			podList := apps.MockConsensusComponentPods(&testCtx, sts, clusterName, rsmCompName)
 
 			By("test rsm component is abnormal")
 			pod := podList[0]
 			// mock pod is not ready
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, pod, func() {
 				pod.Status.Conditions = []corev1.PodCondition{}
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
 				g.Expect(tmpRSM.Status.AvailableReplicas == *rsm.Spec.Replicas-1).Should(BeTrue())
 			})).Should(Succeed())
 
@@ -149,30 +150,30 @@ var _ = Describe("RSM Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("expect component phase is Abnormal when pod of component is failed")
-			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
+			testutil.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			phase, _, _ = rsmComponent.GetPhaseWhenPodsNotReady(ctx, rsmCompName, false)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
-			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+			Expect(apps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
 				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, rsmCompName, "5wdsd8d9fs")
 			})).Should(Succeed())
 			phase, _, _ = rsmComponent.GetPhaseWhenPodsNotReady(ctx, rsmCompName, false)
 			Expect(string(phase)).Should(Equal(""))
 			// reset updateRevision
-			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+			Expect(apps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
 				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevision
 			})).Should(Succeed())
 
 			By("test pod is available")
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
-			testk8s.MockPodAvailable(pod, lastTransTime)
+			testutil.MockPodAvailable(pod, lastTransTime)
 			Expect(rsmComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())
 
 			By("test pods are ready")
 			// mock sts is ready
-			testk8s.MockStatefulSetReady(sts)
+			testutil.MockStatefulSetReady(sts)
 			mockRSMReady := func(rsm *workloads.ReplicatedStateMachine) {
 				rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
 				rsm.Status.ObservedGeneration = rsm.Generation

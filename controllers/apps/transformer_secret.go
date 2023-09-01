@@ -20,20 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 // SecretTransformer puts all the secrets at the beginning of the DAG
 type SecretTransformer struct{}
 
-var _ graph.Transformer = &SecretTransformer{}
+var _ graph2.Transformer = &SecretTransformer{}
 
-func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	var secretVertices, noneRootVertices []graph.Vertex
+func (c *SecretTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
+	var secretVertices, noneRootVertices []graph2.Vertex
 	secretVertices = ictrltypes.FindAll[*corev1.Secret](dag)
 	noneRootVertices = ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
 	for _, secretVertex := range secretVertices {

@@ -24,11 +24,12 @@ import (
 	"os"
 	"time"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 func kubeconfigMerge(newKubeConfig *clientcmdapi.Config, existingKubeConfig *clientcmdapi.Config, outPath string) error {

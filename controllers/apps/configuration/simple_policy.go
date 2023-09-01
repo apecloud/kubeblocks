@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type simplePolicy struct {
@@ -42,7 +42,7 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 
 	switch params.WorkloadType() {
 	default:
-		return makeReturnedStatus(ESNotSupport), core.MakeError("not supported component workload type:[%s]", params.WorkloadType())
+		return makeReturnedStatus(ESNotSupport), core2.MakeError("not supported component workload type:[%s]", params.WorkloadType())
 	case appsv1alpha1.Consensus:
 		funcs = GetConsensusRollingUpgradeFuncs()
 		compLists = fromStatefulSetObjects(params.ComponentUnits)
@@ -69,7 +69,7 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 		configKey  = param.getConfigKey()
 
 		retStatus = ESRetry
-		progress  = core.NotStarted
+		progress  = core2.NotStarted
 	)
 
 	recordEvent := func(obj client.Object) {

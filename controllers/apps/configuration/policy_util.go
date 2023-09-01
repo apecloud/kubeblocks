@@ -26,16 +26,17 @@ import (
 	"sort"
 	"strconv"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
@@ -70,12 +71,12 @@ func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
 	var (
 		readyPods        int32 = 0
-		cfgAnnotationKey       = core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+		cfgAnnotationKey       = core2.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	)
 
 	for _, pod := range pods {
 		annotations := pod.Annotations
-		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.PodIsReady(&pod) {
+		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && controllerutil.PodIsReady(&pod) {
 			readyPods++
 		}
 	}
@@ -84,7 +85,7 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 
 func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) != 1 {
-		return nil, core.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
+		return nil, core2.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	stsObj := &params.ComponentUnits[0]
@@ -94,8 +95,8 @@ func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	sort.SliceStable(pods, func(i, j int) bool {
-		_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
-		_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+		_, ordinal1 := controllerutil.GetParentNameAndOrdinal(&pods[i])
+		_, ordinal2 := controllerutil.GetParentNameAndOrdinal(&pods[j])
 		return ordinal1 < ordinal2
 	})
 	return pods, nil
@@ -103,7 +104,7 @@ func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 
 func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) > 1 {
-		return nil, core.MakeError("consensus component require only one statefulset, actual %d components", len(params.ComponentUnits))
+		return nil, core2.MakeError("consensus component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	if len(params.ComponentUnits) == 0 {
@@ -146,7 +147,7 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 
 	errMessage := response.GetErrMessage()
 	if errMessage != "" {
-		return core.MakeError(errMessage)
+		return core2.MakeError(errMessage)
 	}
 	return nil
 }
@@ -154,9 +155,9 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerNames []string, createClient createReconfigureClient) error {
 	containerIDs := make([]string, 0, len(containerNames))
 	for _, name := range containerNames {
-		containerID := intctrlutil.GetContainerID(pod, name)
+		containerID := controllerutil.GetContainerID(pod, name)
 		if containerID == "" {
-			return core.MakeError("failed to find container in pod[%s], name=%s", name, pod.Name)
+			return core2.MakeError("failed to find container in pod[%s], name=%s", name, pod.Name)
 		}
 		containerIDs = append(containerIDs, containerID)
 	}
@@ -180,7 +181,7 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 
 	errMessage := response.GetErrMessage()
 	if errMessage != "" {
-		return core.MakeError(errMessage)
+		return core2.MakeError(errMessage)
 	}
 	return nil
 }
@@ -193,7 +194,7 @@ func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
 func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
 	ip := net.ParseIP(pod.Status.PodIP)
 	if ip == nil {
-		return "", core.MakeError("%s is not a valid IP", pod.Status.PodIP)
+		return "", core2.MakeError("%s is not a valid IP", pod.Status.PodIP)
 	}
 
 	// Sanity check PodIP
@@ -203,8 +204,8 @@ func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
 	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
 }
 
-func restartStatelessComponent(client client.Client, ctx intctrlutil.RequestCtx, configKey string, expectedVersion string, deployObjs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
-	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+func restartStatelessComponent(client client.Client, ctx controllerutil.RequestCtx, configKey string, expectedVersion string, deployObjs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+	cfgAnnotationKey := core2.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	deployRestart := func(deploy *appv1.Deployment, expectedVersion string) error {
 		if deploy.Spec.Template.Annotations == nil {
 			deploy.Spec.Template.Annotations = map[string]string{}
@@ -234,8 +235,8 @@ func restartStatelessComponent(client client.Client, ctx intctrlutil.RequestCtx,
 	return nil, nil
 }
 
-func restartStatefulComponent(client client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
-	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+func restartStatefulComponent(client client.Client, ctx controllerutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+	cfgAnnotationKey := core2.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	stsRestart := func(sts *appv1.StatefulSet, expectedVersion string) error {
 		if sts.Spec.Template.Annotations == nil {
 			sts.Spec.Template.Annotations = map[string]string{}

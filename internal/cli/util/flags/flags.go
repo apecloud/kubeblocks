@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/spf13/cobra"
 	"github.com/stoewer/go-strcase"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -30,7 +32,6 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 

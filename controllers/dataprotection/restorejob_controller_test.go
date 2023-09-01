@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,9 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("RestoreJob Controller", func() {
@@ -52,16 +52,16 @@ var _ = Describe("RestoreJob Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS)
-		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
+		apps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS)
+		apps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		apps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		apps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -70,7 +70,7 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureRestoreJobObj := func(backup string) *dataprotectionv1alpha1.RestoreJob {
 		By("By assure an restoreJob obj")
-		return testapps.NewRestoreJobFactory(testCtx.DefaultNamespace, "restore-job-").
+		return apps.NewRestoreJobFactory(testCtx.DefaultNamespace, "restore-job-").
 			WithRandomName().SetBackupJobName(backup).
 			SetTargetSecretName("mycluster-cluster-secret").
 			AddTargetVolumePVC("mysql-restore-storage", "datadir-mycluster-0").
@@ -80,7 +80,7 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureBackupObj := func(backupPolicy string) *dataprotectionv1alpha1.Backup {
 		By("By assure an backup obj")
-		return testapps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
+		return apps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
 			WithRandomName().SetBackupPolicyName(backupPolicy).
 			SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 			Create(&testCtx).GetObject()
@@ -88,7 +88,7 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
 		By("By assure an backupPolicy obj")
-		return testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, "backup-policy-").
+		return apps.NewBackupPolicyFactory(testCtx.DefaultNamespace, "backup-policy-").
 			WithRandomName().
 			AddDataFilePolicy().
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
@@ -102,8 +102,8 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureBackupToolObj := func(withoutResources ...bool) *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
-		return testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-			&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName(),
+		return apps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+			&dataprotectionv1alpha1.BackupTool{}, apps.RandomizedObjName(),
 			func(bt *dataprotectionv1alpha1.BackupTool) {
 				nilResources := false
 				// optional arguments, only use the first one.
@@ -118,24 +118,24 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureStatefulSetObj := func() *appsv1.StatefulSet {
 		By("By assure an stateful obj")
-		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName, clusterName, compName).
+		return apps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName, clusterName, compName).
 			SetReplicas(3).
 			AddAppInstanceLabel(clusterName).
-			AddContainer(corev1.Container{Name: "mysql", Image: testapps.ApeCloudMySQLImage}).
+			AddContainer(corev1.Container{Name: "mysql", Image: apps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
-				Spec:       testapps.NewPVC("1Gi"),
+				ObjectMeta: metav1.ObjectMeta{Name: apps.DataVolumeName},
+				Spec:       apps.NewPVC("1Gi"),
 			}).Create(&testCtx).GetObject()
 	}
 
 	patchBackupStatus := func(phase dataprotectionv1alpha1.BackupPhase, key types.NamespacedName) {
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(backup *dataprotectionv1alpha1.Backup) {
+		Eventually(apps.GetAndChangeObjStatus(&testCtx, key, func(backup *dataprotectionv1alpha1.Backup) {
 			backup.Status.Phase = phase
 		})).Should(Succeed())
 	}
 
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
+		Eventually(apps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
 			found := false
 			for _, cond := range job.Status.Conditions {
 				if cond.Type == jobStatus {
@@ -152,7 +152,7 @@ var _ = Describe("RestoreJob Controller", func() {
 	testRestoreJob := func(withResources ...bool) {
 		By("By creating a statefulset and pod")
 		sts := assureStatefulSetObj()
-		testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, compName)
+		apps.MockConsensusComponentPods(&testCtx, sts, clusterName, compName)
 
 		By("By creating a backupTool")
 		backupTool := assureBackupToolObj(withResources...)
@@ -170,7 +170,7 @@ var _ = Describe("RestoreJob Controller", func() {
 			Namespace: toCreate.Namespace,
 		}
 		backupKey := types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}
-		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+		Eventually(apps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 			g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupInProgress))
 		})).Should(Succeed())
 

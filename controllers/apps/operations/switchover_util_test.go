@@ -22,6 +22,10 @@ package operations
 import (
 	"fmt"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,10 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Switchover Util", func() {
@@ -64,14 +65,14 @@ var _ = Describe("Switchover Util", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
+		apps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -80,31 +81,31 @@ var _ = Describe("Switchover Util", func() {
 
 	testNeedDoSwitchover := func() {
 		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
-			SetReplicas(testapps.DefaultReplicationReplicas).
+			AddComponent(apps.DefaultRedisCompSpecName, apps.DefaultRedisCompDefName).
+			SetReplicas(apps.DefaultReplicationReplicas).
 			Create(&testCtx).GetObject()
 
 		By("Creating a statefulSet of replication workloadType.")
 		container := corev1.Container{
 			Name:            "mock-redis-container",
-			Image:           testapps.DefaultRedisImageName,
+			Image:           apps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
-			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
+		sts := apps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+apps.DefaultRedisCompSpecName, clusterObj.Name, apps.DefaultRedisCompSpecName).
 			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
-			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
+			AddAppComponentLabel(apps.DefaultRedisCompSpecName).
 			AddAppManangedByLabel().
 			SetReplicas(2).
 			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
 		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+			_ = apps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
 				AddRoleLabel(defaultRole(i)).
@@ -112,8 +113,8 @@ var _ = Describe("Switchover Util", func() {
 		}
 
 		opsSwitchover := &appsv1alpha1.Switchover{
-			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: testapps.DefaultRedisCompSpecName},
-			InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 0),
+			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: apps.DefaultRedisCompSpecName},
+			InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, apps.DefaultRedisCompSpecName, 0),
 		}
 		By("Test opsSwitchover.Instance is already primary, and do not need to do switchover.")
 		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.ComponentSpecs[0], opsSwitchover)
@@ -121,7 +122,7 @@ var _ = Describe("Switchover Util", func() {
 		Expect(needSwitchover).Should(BeFalse())
 
 		By("Test opsSwitchover.Instance is not primary, and need to do switchover.")
-		opsSwitchover.InstanceName = fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1)
+		opsSwitchover.InstanceName = fmt.Sprintf("%s-%s-%d", clusterObj.Name, apps.DefaultRedisCompSpecName, 1)
 		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.ComponentSpecs[0], opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
@@ -135,39 +136,39 @@ var _ = Describe("Switchover Util", func() {
 
 	testDoSwitchover := func() {
 		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
-			SetReplicas(testapps.DefaultReplicationReplicas).
+			AddComponent(apps.DefaultRedisCompSpecName, apps.DefaultRedisCompDefName).
+			SetReplicas(apps.DefaultReplicationReplicas).
 			Create(&testCtx).GetObject()
 
 		By("Creating a statefulSet of replication workloadType.")
 		container := corev1.Container{
 			Name:            "mock-redis-container",
-			Image:           testapps.DefaultRedisImageName,
+			Image:           apps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
-			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
+		sts := apps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+apps.DefaultRedisCompSpecName, clusterObj.Name, apps.DefaultRedisCompSpecName).
 			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
-			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
+			AddAppComponentLabel(apps.DefaultRedisCompSpecName).
 			AddAppManangedByLabel().
 			SetReplicas(2).
 			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
 		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+			_ = apps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
 				AddRoleLabel(defaultRole(i)).
 				Create(&testCtx).GetObject()
 		}
 		opsSwitchover := &appsv1alpha1.Switchover{
-			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: testapps.DefaultRedisCompSpecName},
-			InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1),
+			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: apps.DefaultRedisCompSpecName},
+			InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, apps.DefaultRedisCompSpecName, 1),
 		}
 		reqCtx := intctrlutil.RequestCtx{
 			Ctx:      testCtx.Ctx,
@@ -183,7 +184,7 @@ var _ = Describe("Switchover Util", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication workloadType.")
 			commandExecutorEnvItem := &appsv1alpha1.CommandExecutorEnvItem{
-				Image: testapps.DefaultRedisImageName,
+				Image: apps.DefaultRedisImageName,
 			}
 			commandExecutorItem := &appsv1alpha1.CommandExecutorItem{
 				Command: []string{"echo", "hello"},
@@ -213,14 +214,14 @@ var _ = Describe("Switchover Util", func() {
 					ScriptSpecSelectors: scriptSpecSelectors,
 				},
 			}
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
+			clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.ReplicationRedisComponent, apps.DefaultRedisCompDefName).
 				AddSwitchoverSpec(switchoverSpec).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication workloadType.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
+			clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponentVersion(apps.DefaultRedisCompDefName).AddContainerShort(apps.DefaultRedisContainerName, apps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
 		})

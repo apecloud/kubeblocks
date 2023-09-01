@@ -23,15 +23,16 @@ import (
 	"os"
 	"path/filepath"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type renderTPLCmdOpts struct {

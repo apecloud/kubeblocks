@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -28,9 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("cluster plan builder test", func() {
@@ -49,21 +49,21 @@ var _ = Describe("cluster plan builder test", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
+		apps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
+		apps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
-		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		apps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
+		apps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
+		apps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -76,11 +76,11 @@ var _ = Describe("cluster plan builder test", func() {
 
 	Context("test init", func() {
 		It("should init successfully", func() {
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterObj := apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefName, clusterVersionName).WithRandomName().GetObject()
 			Expect(testCtx.Cli.Create(testCtx.Ctx, clusterObj)).Should(Succeed())
 			clusterKey := client.ObjectKeyFromObject(clusterObj)
-			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+			Eventually(apps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 			req := ctrl.Request{
 				NamespacedName: clusterKey,
 			}

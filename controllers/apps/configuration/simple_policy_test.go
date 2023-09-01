@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,9 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Reconfigure simplePolicy", func() {
@@ -51,7 +51,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
-		pod.Annotations[core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)] = configVersion
+		pod.Annotations[core2.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)] = configVersion
 	}
 
 	Context("simple reconfigure policy test", func() {
@@ -71,7 +71,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 					}}}))
 
 			// mock client update caller
-			updateErr := core.MakeError("update failed!")
+			updateErr := core2.MakeError("update failed!")
 			k8sMockClient.MockUpdateMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
@@ -171,7 +171,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			updateErr := core.MakeError("update failed!")
+			updateErr := core2.MakeError("update failed!")
 			k8sMockClient.MockUpdateMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))

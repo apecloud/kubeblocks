@@ -22,13 +22,14 @@ package configuration
 import (
 	"fmt"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type syncPolicy struct {
@@ -56,7 +57,7 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	var funcs RollingUpgradeFuncs
 	switch params.WorkloadType() {
 	default:
-		return makeReturnedStatus(ESNotSupport), core.MakeError("not support component workload type[%s]", params.WorkloadType())
+		return makeReturnedStatus(ESNotSupport), core2.MakeError("not support component workload type[%s]", params.WorkloadType())
 	case appsv1alpha1.Stateless:
 		funcs = GetDeploymentRollingUpgradeFuncs()
 	case appsv1alpha1.Consensus:
@@ -79,7 +80,7 @@ func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod
 
 	match, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
-		return nil, core.WrapError(err, "failed to convert selector: %v", selector)
+		return nil, core2.WrapError(err, "failed to convert selector: %v", selector)
 	}
 	for _, pod := range pods {
 		if match.Matches(labels.Set(pod.Labels)) {
@@ -94,7 +95,7 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		r        = ESNone
 		total    = int32(len(pods))
 		replicas = int32(params.getTargetReplicas())
-		progress = core.NotStarted
+		progress = core2.NotStarted
 
 		err         error
 		ctx         = params.Ctx.Ctx
@@ -140,11 +141,11 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig) map[string]string {
+func getOnlineUpdateParams(configPatch *core2.ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig) map[string]string {
 	r := make(map[string]string)
-	parameters := core.GenerateVisualizedParamsList(configPatch, formatConfig, nil)
+	parameters := core2.GenerateVisualizedParamsList(configPatch, formatConfig, nil)
 	for _, key := range parameters {
-		if key.UpdateType == core.UpdatedType {
+		if key.UpdateType == core2.UpdatedType {
 			for _, p := range key.Parameters {
 				if p.Value != nil {
 					r[p.Key] = *p.Value

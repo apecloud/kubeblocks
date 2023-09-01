@@ -24,6 +24,11 @@ import (
 	"fmt"
 	"reflect"
 
+	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	controllerutil2 "github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,11 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -69,20 +70,20 @@ type clusterPlanBuilder struct {
 	req          ctrl.Request
 	cli          client.Client
 	transCtx     *ClusterTransformContext
-	transformers graph.TransformerChain
+	transformers graph2.TransformerChain
 }
 
 // clusterPlan a graph.Plan implementation for Cluster reconciliation
 type clusterPlan struct {
-	dag      *graph.DAG
-	walkFunc graph.WalkFunc
+	dag      *graph2.DAG
+	walkFunc graph2.WalkFunc
 	cli      client.Client
 	transCtx *ClusterTransformContext
 }
 
-var _ graph.TransformContext = &ClusterTransformContext{}
-var _ graph.PlanBuilder = &clusterPlanBuilder{}
-var _ graph.Plan = &clusterPlan{}
+var _ graph2.TransformContext = &ClusterTransformContext{}
+var _ graph2.PlanBuilder = &clusterPlanBuilder{}
+var _ graph2.Plan = &clusterPlan{}
 
 // TransformContext implementation
 
@@ -119,18 +120,18 @@ func (c *clusterPlanBuilder) Init() error {
 	return nil
 }
 
-func (c *clusterPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (c *clusterPlanBuilder) AddTransformer(transformer ...graph2.Transformer) graph2.PlanBuilder {
 	c.transformers = append(c.transformers, transformer...)
 	return c
 }
 
-func (c *clusterPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (c *clusterPlanBuilder) AddParallelTransformer(transformer ...graph2.Transformer) graph2.PlanBuilder {
 	c.transformers = append(c.transformers, &ParallelTransformers{transformers: transformer})
 	return c
 }
 
 // Build runs all transformers to generate a plan
-func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
+func (c *clusterPlanBuilder) Build() (graph2.Plan, error) {
 	var err error
 	defer func() {
 		// set apply resource condition
@@ -153,7 +154,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	}()
 
 	// new a DAG and apply chain on it
-	dag := graph.NewDAG()
+	dag := graph2.NewDAG()
 	err = c.transformers.ApplyTo(c.transCtx, dag)
 	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 
@@ -170,8 +171,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *clusterPlan) Execute() error {
-	less := func(v1, v2 graph.Vertex) bool {
-		getWeight := func(v graph.Vertex) int {
+	less := func(v1, v2 graph2.Vertex) bool {
+		getWeight := func(v graph2.Vertex) int {
 			lifecycleVertex, ok := v.(*ictrltypes.LifecycleVertex)
 			if !ok {
 				return defaultWeight
@@ -207,7 +208,7 @@ func (p *clusterPlan) handlePlanExecutionError(err error) error {
 // Do the real works
 
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+func NewClusterPlanBuilder(ctx controllerutil2.RequestCtx, cli client.Client, req ctrl.Request) graph2.PlanBuilder {
 	return &clusterPlanBuilder{
 		req: req,
 		cli: cli,
@@ -220,7 +221,7 @@ func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ct
 	}
 }
 
-func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) error {
+func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph2.Vertex) error {
 	node, ok := vertex.(*ictrltypes.LifecycleVertex)
 	err := c.defaultWalkFunc(vertex)
 	if err != nil {
@@ -238,7 +239,7 @@ func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) err
 }
 
 // TODO: retry strategy on error
-func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
+func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph2.Vertex) error {
 	node, ok := vertex.(*ictrltypes.LifecycleVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", vertex)
@@ -286,7 +287,7 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		}
 		// delete secondary objects
 		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
-			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
+			err := controllerutil2.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
 			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err

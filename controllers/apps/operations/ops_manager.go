@@ -23,11 +23,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -46,7 +47,7 @@ func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour
 }
 
 // Do the entry function for handling OpsRequest
-func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*ctrl.Result, error) {
+func (opsMgr *OpsManager) Do(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*ctrl.Result, error) {
 	var (
 		opsBehaviour OpsBehaviour
 		err          error
@@ -68,7 +69,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
 			// check if the error is caused by WaitForClusterPhaseErr  error
 			if _, ok := err.(*WaitForClusterPhaseErr); ok {
-				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
+				return controllerutil.ResultToP(controllerutil.RequeueAfter(time.Second, reqCtx.Log, ""))
 			}
 			if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
 				return nil, patchErr
@@ -108,7 +109,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 
 // Reconcile entry function when OpsRequest.status.phase is Running.
 // loops till the operation is completed.
-func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (time.Duration, error) {
+func (opsMgr *OpsManager) Reconcile(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (time.Duration, error) {
 	var (
 		opsBehaviour    OpsBehaviour
 		ok              bool

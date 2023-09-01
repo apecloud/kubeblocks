@@ -25,14 +25,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch;delete
@@ -165,7 +166,7 @@ func ComposeRolePriorityMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[st
 
 // UpdateConsensusSetRoleLabel updates pod role label when internal container role changed
 func UpdateConsensusSetRoleLabel(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
+	reqCtx controllerutil.RequestCtx,
 	event *corev1.Event,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	pod *corev1.Pod, role string) error {
@@ -176,7 +177,7 @@ func UpdateConsensusSetRoleLabel(cli client.Client,
 }
 
 func updateConsensusSetRoleLabel(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
+	reqCtx controllerutil.RequestCtx,
 	event *corev1.Event,
 	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	pod *corev1.Pod, role string) error {
@@ -309,7 +310,7 @@ func setConsensusSetStatusRoles(
 	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	pods []corev1.Pod) {
 	for _, pod := range pods {
-		if !intctrlutil.PodIsReadyWithLabel(pod) {
+		if !controllerutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
 
@@ -395,7 +396,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 func composeRoleEnv(consensusSpec *appsv1alpha1.ConsensusSetSpec, pods []corev1.Pod) (leader, followers string) {
 	leader, followers = "", ""
 	for _, pod := range pods {
-		if !intctrlutil.PodIsReadyWithLabel(pod) {
+		if !controllerutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
 		role := pod.Labels[constant.RoleLabelKey]

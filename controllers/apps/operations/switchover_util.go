@@ -25,6 +25,9 @@ import (
 	"fmt"
 	"strings"
 
+	intctrlcomputil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
@@ -35,9 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlcomputil "github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -83,7 +84,7 @@ func needDoSwitchover(ctx context.Context,
 }
 
 // createSwitchoverJob creates a switchover job to do switchover.
-func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
+func createSwitchoverJob(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	componentSpec *appsv1alpha1.ClusterComponentSpec,
@@ -95,7 +96,7 @@ func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	}
 	// check the current generation switchoverJob whether exist
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: switchoverJob.Name}
-	exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, key, &batchv1.Job{})
+	exists, _ := controllerutil.CheckResourceExists(reqCtx.Ctx, cli, key, &batchv1.Job{})
 	if !exists {
 		// check the previous generation switchoverJob whether exist
 		ml := getSwitchoverCmdJobLabel(cluster.Name, componentSpec.Name)
@@ -501,7 +502,7 @@ func checkJobSucceed(ctx context.Context,
 	jobName string) error {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
 	currentJob := batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(ctx, cli, key, &currentJob)
+	exists, err := controllerutil.CheckResourceExists(ctx, cli, key, &currentJob)
 	if err != nil {
 		return err
 	}
@@ -516,7 +517,7 @@ func checkJobSucceed(ctx context.Context,
 		case batchv1.JobFailed:
 			return errors.New("job failed, pls check.")
 		default:
-			return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
+			return controllerutil.NewErrorf(controllerutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
 		}
 	} else {
 		return errors.New("job check conditions status failed")

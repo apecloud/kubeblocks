@@ -25,15 +25,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/configuration/container"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/spf13/pflag"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 var logger logr.Logger
 
 func main() {
-	var containerRuntime cfgutil.CRIType
+	var containerRuntime container.CRIType
 	var runtimeEndpoint string
 	var containerID []string
 
@@ -69,7 +69,7 @@ func main() {
 	zapLogger := zap.New(zapcore.NewCore(zaplogfmt.NewEncoder(logCfg), os.Stdout, zap.DebugLevel))
 	logger = zapr.NewLogger(zapLogger)
 
-	killer, err := cfgutil.NewContainerKiller(containerRuntime, runtimeEndpoint, zapLogger.Sugar())
+	killer, err := container.NewContainerKiller(containerRuntime, runtimeEndpoint, zapLogger.Sugar())
 	if err != nil {
 		logger.Error(err, "failed to create container killing process")
 		os.Exit(-1)
@@ -79,7 +79,7 @@ func main() {
 		logger.Error(err, "failed to init killer")
 	}
 
-	if err := killer.Kill(context.Background(), containerID, viper.GetString(cfgutil.KillContainerSignalEnvName), nil); err != nil {
+	if err := killer.Kill(context.Background(), containerID, viper.GetString(container.KillContainerSignalEnvName), nil); err != nil {
 		logger.Error(err, fmt.Sprintf("failed to kill container[%s]", containerID))
 	}
 }

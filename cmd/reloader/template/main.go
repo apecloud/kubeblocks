@@ -27,17 +27,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	configmanager "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/gotemplate"
+
 	"github.com/spf13/pflag"
 	corezap "go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 const (
@@ -109,7 +110,7 @@ func main() {
 		failed(cfgcore.MakeError("output dir is empty"), "")
 	}
 
-	files, err := cfgcm.ScanConfigVolume(configSpecMountPoint)
+	files, err := configmanager.ScanConfigVolume(configSpecMountPoint)
 	if err != nil {
 		failed(err, "failed to scan config volume")
 	}
@@ -118,8 +119,8 @@ func main() {
 		failed(err, "failed to create data map")
 	}
 
-	configRenderMeta := cfgcm.ConfigLazyRenderedMeta{}
-	if err := cfgutil.FromYamlConfig(filepath.Join(lazyRenderedConfig, cfgcm.KBConfigSpecLazyRenderedYamlFile), &configRenderMeta); err != nil {
+	configRenderMeta := configmanager.ConfigLazyRenderedMeta{}
+	if err := cfgutil.FromYamlConfig(filepath.Join(lazyRenderedConfig, configmanager.KBConfigSpecLazyRenderedYamlFile), &configRenderMeta); err != nil {
 		failed(err, "failed to parse config spec")
 	}
 

@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
@@ -38,13 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type stageCtx struct {
-	reqCtx     *intctrlutil.RequestCtx
+	reqCtx     *controllerutil.RequestCtx
 	reconciler *AddonReconciler
 	next       ctrlerihandler.Handler
 }
@@ -68,12 +69,12 @@ func init() {
 }
 
 func (r *stageCtx) setReconciled() {
-	res, err := intctrlutil.Reconciled()
+	res, err := controllerutil.Reconciled()
 	r.updateResultNErr(&res, err)
 }
 
 func (r *stageCtx) setRequeueAfter(duration time.Duration, msg string) {
-	res, err := intctrlutil.RequeueAfter(duration, r.reqCtx.Log, msg)
+	res, err := controllerutil.RequeueAfter(duration, r.reqCtx.Log, msg)
 	r.updateResultNErr(&res, err)
 }
 
@@ -83,7 +84,7 @@ func (r *stageCtx) setRequeueAfter(duration time.Duration, msg string) {
 // }
 
 func (r *stageCtx) setRequeueWithErr(err error, msg string) {
-	res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, msg)
+	res, err := controllerutil.CheckedRequeueWithError(err, r.reqCtx.Log, msg)
 	r.updateResultNErr(&res, err)
 }
 
@@ -164,13 +165,13 @@ type terminalStateStage struct {
 func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 	addon := &extensionsv1alpha1.Addon{}
 	if err := r.reconciler.Client.Get(ctx, r.reqCtx.Req.NamespacedName, addon); err != nil {
-		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
+		res, err := controllerutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
 		r.updateResultNErr(&res, err)
 		return
 	}
 	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
-	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
 		r.deletionStage.Handle(ctx)
 		return r.deletionStage.doReturn()
 	})

@@ -23,16 +23,17 @@ import (
 	"fmt"
 	"time"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type reconfigureAction struct {
@@ -49,20 +50,20 @@ func init() {
 		OpsHandler:                         &reAction,
 		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
 	}
-	intctrlutil.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
+	controllerutil.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
 // ActionStartedCondition the started condition when handle the reconfiguring request.
-func (r *reconfigureAction) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+func (r *reconfigureAction) ActionStartedCondition(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
 	return appsv1alpha1.NewReconfigureCondition(opsRes.OpsRequest), nil
 }
 
-func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+func (r *reconfigureAction) SaveLastConfiguration(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
 
-func (r *reconfigureAction) Handle(eventContext intctrlutil.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {
+func (r *reconfigureAction) Handle(eventContext controllerutil.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {
 	var (
 		opsRequest = &appsv1alpha1.OpsRequest{}
 		cm         = eventContext.ConfigMap
@@ -124,13 +125,13 @@ func (r *reconfigureAction) Handle(eventContext intctrlutil.ConfigEventContext, 
 	}
 }
 
-func handleReconfigureStatusProgress(execStatus core.PolicyExecStatus, phase appsv1alpha1.OpsPhase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
+func handleReconfigureStatusProgress(execStatus core2.PolicyExecStatus, phase appsv1alpha1.OpsPhase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationStatus) (err error) {
 		cmStatus.LastAppliedStatus = execStatus.ExecStatus
 		cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(execStatus.PolicyName)
 		cmStatus.SucceedCount = execStatus.SucceedCount
 		cmStatus.ExpectedCount = execStatus.ExpectedCount
-		if cmStatus.SucceedCount != core.Unconfirmed && cmStatus.ExpectedCount != core.Unconfirmed {
+		if cmStatus.SucceedCount != core2.Unconfirmed && cmStatus.ExpectedCount != core2.Unconfirmed {
 			opsStatus.Progress = getSlowestReconfiguringProgress(opsStatus.ReconfiguringStatus.ConfigurationStatus)
 		}
 		switch phase {
@@ -145,7 +146,7 @@ func handleReconfigureStatusProgress(execStatus core.PolicyExecStatus, phase app
 	}
 }
 
-func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
+func handleNewReconfigureRequest(configPatch *core2.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationStatus) (err error) {
 		cmStatus.Status = appsv1alpha1.ReasonReconfigureMerged
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
@@ -160,7 +161,7 @@ func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedC
 	}
 }
 
-func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+func (r *reconfigureAction) ReconcileAction(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	status := opsRes.OpsRequest.Status
 	if len(status.Conditions) == 0 {
 		return status.Phase, 30 * time.Second, nil
@@ -194,7 +195,7 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 	}
 }
 
-func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, error) {
+func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, error) {
 	var (
 		ops        = &opsRes.OpsRequest.Spec
 		ns         = opsRes.Cluster.Namespace
@@ -203,7 +204,7 @@ func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.Reques
 	)
 
 	cmKey := client.ObjectKey{
-		Name:      core.GetComponentCfgName(ops.ClusterRef, ops.Reconfigure.ComponentName, configSpec.Name),
+		Name:      core2.GetComponentCfgName(ops.ClusterRef, ops.Reconfigure.ComponentName, configSpec.Name),
 		Namespace: ns,
 	}
 	cm := &corev1.ConfigMap{}
@@ -262,7 +263,7 @@ func isRunningPhase(condition metav1.Condition) bool {
 		metav1.ConditionTrue)
 }
 
-func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
+func (r *reconfigureAction) Action(reqCtx controllerutil.RequestCtx, cli client.Client, resource *OpsResource) error {
 	var (
 		opsRequest    = resource.OpsRequest
 		spec          = &opsRequest.Spec

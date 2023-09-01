@@ -27,13 +27,14 @@ import (
 	"sync"
 	"time"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/dapr/kit/logger"
 	probing "github.com/prometheus-community/pro-bing"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type Ha struct {

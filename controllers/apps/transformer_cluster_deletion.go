@@ -24,6 +24,10 @@ import (
 	"strings"
 	"time"
 
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,18 +40,15 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
 type ClusterDeletionTransformer struct{}
 
-var _ graph.Transformer = &ClusterDeletionTransformer{}
+var _ graph2.Transformer = &ClusterDeletionTransformer{}
 
-func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ClusterDeletionTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.OrigCluster
 	if !cluster.IsDeleting() {
@@ -65,7 +66,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	case appsv1alpha1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
-		return graph.ErrPrematureStop
+		return graph2.ErrPrematureStop
 	case appsv1alpha1.Halt:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForHalt()
 		toPreserveKinds = []client.ObjectList{
@@ -181,7 +182,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
-	return graph.ErrPrematureStop
+	return graph2.ErrPrematureStop
 }
 
 func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {

@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -36,8 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("operations", func() {
@@ -60,12 +61,12 @@ var _ = Describe("operations", func() {
 		clusterWithOneComp.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 			clusterWithOneComp.Spec.ComponentSpecs[0],
 		}
-		clusterWithOneComp.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: testapps.Class1c1gName}
-		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
-			AddClasses([]appsv1alpha1.ComponentClass{testapps.Class1c1g}).
+		clusterWithOneComp.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: apps.Class1c1gName}
+		classDef := apps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
+			AddClasses([]appsv1alpha1.ComponentClass{apps.Class1c1g}).
 			GetObject()
-		resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
-			AddConstraints(testapps.ProductionResourceConstraint).
+		resourceConstraint := apps.NewComponentResourceConstraintFactory(apps.DefaultResourceConstraintName).
+			AddConstraints(apps.ProductionResourceConstraint).
 			AddSelector(appsv1alpha1.ClusterResourceConstraintSelector{
 				ClusterDefRef: testing.ClusterDefName,
 				Components: []appsv1alpha1.ComponentResourceConstraintSelector{
@@ -201,7 +202,7 @@ var _ = Describe("operations", func() {
 		Expect(o.Validate()).Should(HaveOccurred())
 
 		By("expect to validate success with class")
-		o.Class = testapps.Class1c1gName
+		o.Class = apps.Class1c1gName
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).ShouldNot(HaveOccurred())
 

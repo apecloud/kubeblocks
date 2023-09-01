@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -37,8 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	kbclidelete "github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Cluster", func() {
@@ -111,8 +112,8 @@ var _ = Describe("Cluster", func() {
 
 		BeforeEach(func() {
 			clusterDef := testing.FakeClusterDef()
-			resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
-				AddConstraints(testapps.ProductionResourceConstraint).
+			resourceConstraint := apps.NewComponentResourceConstraintFactory(apps.DefaultResourceConstraintName).
+				AddConstraints(apps.ProductionResourceConstraint).
 				AddSelector(appsv1alpha1.ClusterResourceConstraintSelector{
 					ClusterDefRef: clusterDef.Name,
 					Components: []appsv1alpha1.ComponentResourceConstraintSelector{
@@ -178,7 +179,7 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("should succeed if component with valid class", func() {
-			o.Values = []string{fmt.Sprintf("type=%s,class=%s", testing.ComponentDefName, testapps.Class1c1gName)}
+			o.Values = []string{fmt.Sprintf("type=%s,class=%s", testing.ComponentDefName, apps.Class1c1gName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 			Run()

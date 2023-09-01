@@ -23,6 +23,10 @@ import (
 	"fmt"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,10 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Consensus Component", func() {
@@ -58,14 +59,14 @@ var _ = Describe("Consensus Component", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -74,7 +75,7 @@ var _ = Describe("Consensus Component", func() {
 
 	mockClusterStatusProbeTimeout := func(cluster *appsv1alpha1.Cluster) {
 		// mock pods ready in component status and probe timed out
-		Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+		Expect(apps.ChangeObjStatus(&testCtx, cluster, func() {
 			podsReady := true
 			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 				consensusCompName: {
@@ -84,7 +85,7 @@ var _ = Describe("Consensus Component", func() {
 			}
 		})).ShouldNot(HaveOccurred())
 
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+		Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 			g.Expect(tmpCluster.Status.Components).ShouldNot(BeEmpty())
 		})).Should(Succeed())
 	}
@@ -92,10 +93,10 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
+			clusterDef, _, cluster := apps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 
-			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+			sts := apps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 			componentName := consensusCompName
 			compDefName := cluster.Spec.GetComponentDefRefName(componentName)
 			componentDef := clusterDef.GetComponentDefByName(compDefName)
@@ -109,7 +110,7 @@ var _ = Describe("Consensus Component", func() {
 
 			By("test pods are ready")
 			// mock sts is ready
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, sts, func() {
 				controllerRevision := fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
 				sts.Status.CurrentRevision = controllerRevision
 				sts.Status.UpdateRevision = controllerRevision
@@ -124,7 +125,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(isRunning).Should(BeFalse())
 
 			podName := sts.Name + "-0"
-			podList := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+			podList := apps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 			By("expect for pod is available")
 			Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 
@@ -141,7 +142,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(isRunning).Should(BeFalse())
 
 			By("should return empty string if pod of component is only not ready when component is not up running")
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, pod, func() {
 				pod.Status.Conditions = []corev1.PodCondition{}
 			})).Should(Succeed())
 			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName, false)
@@ -158,7 +159,7 @@ var _ = Describe("Consensus Component", func() {
 
 			By("unready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, sts, func() {
 				sts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, "6fdd48d9cd1")
 			})).Should(Succeed())
 			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName, false)

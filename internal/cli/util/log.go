@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
-
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 func EnableLogToFile(fs *pflag.FlagSet) error {

@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/cobra"
@@ -37,7 +39,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("Delete", func() {

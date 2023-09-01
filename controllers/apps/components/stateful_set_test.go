@@ -23,6 +23,10 @@ import (
 	"fmt"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -32,10 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Stateful Component", func() {
@@ -57,14 +58,14 @@ var _ = Describe("Stateful Component", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -74,9 +75,9 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateful Component test", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
+			clusterDef, _, cluster := apps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statefulCompDefRef, statefulCompName)
-			_ = testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, statefulCompName)
+			_ = apps.MockConsensusComponentStatefulSet(&testCtx, clusterName, statefulCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
@@ -96,7 +97,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pods are not ready")
 			updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "6fdd48d9cd")
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, sts, func() {
 				availableReplicas := *sts.Spec.Replicas - 1
 				sts.Status.AvailableReplicas = availableReplicas
 				sts.Status.ReadyReplicas = availableReplicas
@@ -108,17 +109,17 @@ var _ = Describe("Stateful Component", func() {
 			Expect(podsReady).Should(BeFalse())
 
 			By("create pods of sts")
-			podList := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, statefulCompName)
+			podList := apps.MockConsensusComponentPods(&testCtx, sts, clusterName, statefulCompName)
 
 			By("test stateful component is abnormal")
 			pod := podList[0]
 			// mock pod is not ready
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, pod, func() {
 				pod.Status.Conditions = []corev1.PodCondition{}
 			})).Should(Succeed())
 			// mock pod scheduled failure
 			// testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Status.AvailableReplicas == *sts.Spec.Replicas-1).Should(BeTrue())
 			})).Should(Succeed())
 
@@ -131,30 +132,30 @@ var _ = Describe("Stateful Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("expect component phase is Abnormal when pod of component is failed")
-			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
+			testutil.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName, false)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
-			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+			Expect(apps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
 				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
 			})).Should(Succeed())
 			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName, false)
 			Expect(string(phase)).Should(Equal(""))
 			// reset updateRevision
-			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+			Expect(apps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
 				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevision
 			})).Should(Succeed())
 
 			By("test pod is available")
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
-			testk8s.MockPodAvailable(pod, lastTransTime)
+			testutil.MockPodAvailable(pod, lastTransTime)
 			Expect(stateful.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())
 
 			By("test pods are ready")
 			// mock sts is ready
-			testk8s.MockStatefulSetReady(sts)
+			testutil.MockStatefulSetReady(sts)
 			podsReady, _ = stateful.PodsReady(ctx, sts)
 			Expect(podsReady).Should(BeTrue())
 

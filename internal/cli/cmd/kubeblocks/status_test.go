@@ -26,6 +26,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -43,9 +45,8 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("kubeblocks status", func() {
@@ -166,7 +167,7 @@ var _ = Describe("kubeblocks status", func() {
 		allErrs := make([]error, 0)
 		o.buildSelectorList(ctx, &allErrs)
 		unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, namespace, kubeBlocksWorkloads, o.selectorList, &allErrs)
-		// will list update to five types of worklaods
+		// will list update to five constant of worklaods
 		Expect(len(unstructuredList)).Should(BeEquivalentTo(5))
 		for _, list := range unstructuredList {
 			if list.GetKind() == constant.DeploymentKind || list.GetKind() == constant.StatefulSetKind || list.GetKind() == constant.JobKind || list.GetKind() == constant.CronJobKind {

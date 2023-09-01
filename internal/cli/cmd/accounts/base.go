@@ -24,6 +24,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	channelutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -36,8 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type AccountBaseOptions struct {
@@ -192,7 +192,7 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 func (o *AccountBaseOptions) Do() (channelutil.SQLChannelResponse, error) {
 	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
 	response := channelutil.SQLChannelResponse{}
-	sqlClient, err := sqlchannel.NewHTTPClientWithChannelPod(o.Pod, o.CharType)
+	sqlClient, err := NewHTTPClientWithChannelPod(o.Pod, o.CharType)
 	if err != nil {
 		return response, err
 	}

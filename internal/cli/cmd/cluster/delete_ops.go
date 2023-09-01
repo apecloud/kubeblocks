@@ -23,6 +23,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +38,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 

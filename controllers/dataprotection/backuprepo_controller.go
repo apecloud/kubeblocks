@@ -30,6 +30,9 @@ import (
 	"strings"
 	"text/template"
 
+	controllerutil2 "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	sprig "github.com/go-task/slim-sprig"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -50,9 +53,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // BackupRepoReconciler reconciles a BackupRepo object
@@ -89,7 +90,7 @@ type BackupRepoReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("backuprepo", req.NamespacedName)
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil2.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      logger,
@@ -101,11 +102,11 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// get repo object
 	repo := &dpv1alpha1.BackupRepo{}
 	if err := r.Get(ctx, req.NamespacedName, repo); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get BackupRepo")
+		return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log, "failed to get BackupRepo")
 	}
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, repo, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil2.HandleCRDeletion(reqCtx, r, repo, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, repo)
 	})
 	if res != nil {
@@ -125,22 +126,22 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	provider, err := r.checkStorageProviderStatus(reqCtx, repo)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "check storage provider status failed")
+		return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log, "check storage provider status failed")
 	}
 	if !meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageProviderReady) {
 		// update status phase to failed
 		if err := r.updateStatus(reqCtx, repo); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "update status phase failed")
+			return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log, "update status phase failed")
 		}
 		// will reconcile again after the storage provider becomes ready
-		return intctrlutil.Reconciled()
+		return controllerutil2.Reconciled()
 	}
 
 	// create StorageClass and Secret for the CSI driver
 	err = r.createStorageClassAndSecret(reqCtx, repo, provider)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+		return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log,
 			"failed to create storage class and secret")
 	}
 
@@ -151,14 +152,14 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// update status phase to ready if all conditions are met
 	if err = r.updateStatus(reqCtx, repo); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+		return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log,
 			"failed to update BackupRepo status")
 	}
 
 	// check associated backups, to create PVC in their namespaces
 	if repo.Status.Phase == dpv1alpha1.BackupRepoReady {
 		if err = r.createPVCForAssociatedBackups(reqCtx, repo); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log,
 				"check associated backups failed")
 		}
 	}
@@ -166,7 +167,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
+func (r *BackupRepoReconciler) updateStatus(reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
 	old := repo.DeepCopy()
 	// not allow to transit to other phase if it is deleting
 	if repo.Status.Phase != dpv1alpha1.BackupRepoDeleting {
@@ -188,7 +189,7 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 }
 
 func (r *BackupRepoReconciler) checkStorageProviderStatus(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (*storagev1alpha1.StorageProvider, error) {
+	reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) (*storagev1alpha1.StorageProvider, error) {
 	var condType = ConditionTypeStorageProviderReady
 	var status metav1.ConditionStatus
 	var reason string
@@ -228,7 +229,7 @@ func (r *BackupRepoReconciler) checkStorageProviderStatus(
 }
 
 func (r *BackupRepoReconciler) createStorageClassAndSecret(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) error {
+	reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) error {
 
 	// collect parameters for rendering templates
 	parameters, err := r.collectParameters(reqCtx, repo)
@@ -289,7 +290,7 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(
 }
 
 func (r *BackupRepoReconciler) createSecretForCSIDriver(
-	reqCtx intctrlutil.RequestCtx, renderCtx renderContext,
+	reqCtx controllerutil2.RequestCtx, renderCtx renderContext,
 	repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) (created bool, err error) {
 
 	secretTemplateMD5 := md5Digest(provider.Spec.CSIDriverSecretTemplate)
@@ -374,7 +375,7 @@ func (r *BackupRepoReconciler) createSecretForCSIDriver(
 }
 
 func (r *BackupRepoReconciler) createStorageClass(
-	reqCtx intctrlutil.RequestCtx, renderCtx renderContext,
+	reqCtx controllerutil2.RequestCtx, renderCtx renderContext,
 	repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) (created bool, err error) {
 
 	storageClass := &storagev1.StorageClass{}
@@ -415,7 +416,7 @@ func (r *BackupRepoReconciler) createStorageClass(
 }
 
 func (r *BackupRepoReconciler) listAssociatedBackups(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo, extraSelector map[string]string) ([]*dpv1alpha1.Backup, error) {
+	reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo, extraSelector map[string]string) ([]*dpv1alpha1.Backup, error) {
 	// list backups associated with the repo
 	backupList := &dpv1alpha1.BackupList{}
 	selectors := client.MatchingLabels{
@@ -437,7 +438,7 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 }
 
 func (r *BackupRepoReconciler) createPVCForAssociatedBackups(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
+	reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
 	backups, err := r.listAssociatedBackups(reqCtx, repo, map[string]string{
 		dataProtectionNeedRepoPVCKey: trueVal,
 	})
@@ -467,7 +468,7 @@ func (r *BackupRepoReconciler) createPVCForAssociatedBackups(
 }
 
 func (r *BackupRepoReconciler) checkOrCreatePVC(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo, namespace string) error {
+	reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo, namespace string) error {
 	pvc := &corev1.PersistentVolumeClaim{}
 	pvc.Name = repo.Status.BackupPVCName
 	pvc.Namespace = namespace
@@ -502,7 +503,7 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 }
 
 func (r *BackupRepoReconciler) collectParameters(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (map[string]string, error) {
+	reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) (map[string]string, error) {
 	values := make(map[string]string)
 	for k, v := range repo.Spec.Config {
 		values[k] = v
@@ -525,7 +526,7 @@ func (r *BackupRepoReconciler) collectParameters(
 }
 
 func (r *BackupRepoReconciler) deleteExternalResources(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
+	reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
 	// set phase to deleting, so no new Backup can reference to this repo
 	if repo.Status.Phase != dpv1alpha1.BackupRepoDeleting {
 		patch := client.MergeFrom(repo.DeepCopy())
@@ -581,7 +582,7 @@ func (r *BackupRepoReconciler) deleteExternalResources(
 	return nil
 }
 
-func (r *BackupRepoReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (clear bool, err error) {
+func (r *BackupRepoReconciler) deletePVCs(reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) (clear bool, err error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := r.Client.List(reqCtx.Ctx, pvcList,
 		client.MatchingLabels(map[string]string{
@@ -595,7 +596,7 @@ func (r *BackupRepoReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, repo *d
 			continue
 		}
 		reqCtx.Log.Info("deleting PVC", "name", pvc.Name, "namespace", pvc.Namespace)
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &pvc); err != nil {
+		if err := controllerutil2.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &pvc); err != nil {
 			return false, err
 		}
 	}
@@ -614,7 +615,7 @@ func (r *BackupRepoReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, repo *d
 	return clear, nil
 }
 
-func (r *BackupRepoReconciler) deleteStorageClasses(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
+func (r *BackupRepoReconciler) deleteStorageClasses(reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
 	scList := &storagev1.StorageClassList{}
 	if err := r.Client.List(reqCtx.Ctx, scList,
 		client.MatchingLabels(map[string]string{
@@ -628,14 +629,14 @@ func (r *BackupRepoReconciler) deleteStorageClasses(reqCtx intctrlutil.RequestCt
 			continue
 		}
 		reqCtx.Log.Info("deleting StorageClass", "storageclass", sc.Name)
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &sc); err != nil {
+		if err := controllerutil2.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &sc); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *BackupRepoReconciler) deleteSecrets(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
+func (r *BackupRepoReconciler) deleteSecrets(reqCtx controllerutil2.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
 	secretList := &corev1.SecretList{}
 	if err := r.Client.List(reqCtx.Ctx, secretList,
 		client.MatchingLabels(map[string]string{
@@ -649,7 +650,7 @@ func (r *BackupRepoReconciler) deleteSecrets(reqCtx intctrlutil.RequestCtx, repo
 			continue
 		}
 		reqCtx.Log.Info("deleting Secret", "secret", client.ObjectKeyFromObject(&secret))
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &secret); err != nil {
+		if err := controllerutil2.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &secret); err != nil {
 			return err
 		}
 	}

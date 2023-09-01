@@ -29,6 +29,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	client2 "github.com/apecloud/kubeblocks/pkg/controller/client"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,16 +48,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var (
@@ -453,8 +454,8 @@ func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) 
 
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
 func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace string) string {
-	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
-	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
+	builtInEnvMap := component.GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
+	return component.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
 
 // getRunningPods gets the running pods of the specified statefulSet.
@@ -661,7 +662,7 @@ func updateComponentInfoToPods(
 	ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *componentutil.SynthesizedComponent,
+	component *component.SynthesizedComponent,
 	dag *graph.DAG) error {
 	if cluster == nil || component == nil {
 		return nil
@@ -715,7 +716,7 @@ func updateComponentInfoToPods(
 func updateCustomLabelToPods(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *componentutil.SynthesizedComponent,
+	component *component.SynthesizedComponent,
 	dag *graph.DAG) error {
 	if cluster == nil || component == nil {
 		return nil

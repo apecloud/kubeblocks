@@ -2,9 +2,9 @@
 .DS_Store
 
 # ignore go generate code files
-internal/testutil/k8s/mocks/*_mocks.go
-internal/configuration/proto/mocks/*_mocks.go
-internal/configuration/container/mocks/*_mocks.go
+pkg/testutil/k8s/mocks/*_mocks.go
+pkg/configuration/proto/mocks/*_mocks.go
+pkg/configuration/container/mocks/*_mocks.go
 # internal/configuration/proto/*.pb.go
 
 # ignore go mock temporary files

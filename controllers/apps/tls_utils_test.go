@@ -23,6 +23,13 @@ import (
 	"context"
 	"strings"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -34,13 +41,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("TLS self-signed cert function", func() {
@@ -66,13 +67,13 @@ var _ = Describe("TLS self-signed cert function", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest configurations
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
+		apps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		apps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -84,27 +85,27 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
-			configMapObj := testapps.CheckedCreateCustomizedObj(&testCtx,
+			configMapObj := apps.CheckedCreateCustomizedObj(&testCtx,
 				"resources/mysql-tls-config-template.yaml",
 				&corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace(),
-				testapps.WithAnnotations(constant.CMInsEnableRerenderTemplateKey, "true"))
+				apps.WithAnnotations(constant.CMInsEnableRerenderTemplateKey, "true"))
 
-			configConstraintObj := testapps.CheckedCreateCustomizedObj(&testCtx,
+			configConstraintObj := apps.CheckedCreateCustomizedObj(&testCtx,
 				"resources/mysql-config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			By("Create a clusterDef obj")
-			testapps.NewClusterDefFactory(clusterDefName).
+			apps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
-				AddComponentDef(testapps.ConsensusMySQLComponent, statefulCompDefName).
-				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
+				AddComponentDef(apps.ConsensusMySQLComponent, statefulCompDefName).
+				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, apps.ConfVolumeName).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(statefulCompDefName).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
+			apps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+				AddComponentVersion(statefulCompDefName).AddContainerShort(mysqlContainerName, apps.ApeCloudMySQLImage).
 				CheckedCreate(&testCtx).GetObject()
 
 		})
@@ -236,7 +237,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := apps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).
@@ -287,7 +288,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		Context("when switch between disabled and enabled", func() {
 			It("should handle tls settings properly", func() {
 				By("create cluster with tls disabled")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := apps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).
@@ -296,21 +297,21 @@ var _ = Describe("TLS self-signed cert function", func() {
 					GetObject()
 				clusterKey := client.ObjectKeyFromObject(clusterObj)
 				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
-				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+				Eventually(apps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+				Eventually(apps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 				var sts appsv1.StatefulSet
 				if controllerutil.IsRSMEnabled() {
-					rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+					rsmList := testutil.ListAndCheckRSM(&testCtx, clusterKey)
 					sts = *components.ConvertRSMToSTS(&rsmList.Items[0])
 				} else {
-					stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+					stsList := testutil.ListAndCheckStatefulSet(&testCtx, clusterKey)
 					sts = stsList.Items[0]
 				}
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
 				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
 				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
-				Eventually(testapps.GetAndChangeObj(&testCtx, cmKey, func(cm *corev1.ConfigMap) {
+				Eventually(apps.GetAndChangeObj(&testCtx, cmKey, func(cm *corev1.ConfigMap) {
 					cm.Annotations[constant.CMInsEnableRerenderTemplateKey] = "true"
 				})).Should(Succeed())
 				hasTLSSettings := func() bool {

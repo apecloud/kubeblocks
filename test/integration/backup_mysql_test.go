@@ -17,6 +17,9 @@ limitations under the License.
 package appstest
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -26,10 +29,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("MySQL data protection function", func() {
@@ -54,17 +54,17 @@ var _ = Describe("MySQL data protection function", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
+		apps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
 
 	}
 
@@ -84,46 +84,46 @@ var _ = Describe("MySQL data protection function", func() {
 
 	createClusterObj := func() {
 		By("Create configmap")
-		_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
-			testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+		_ = apps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
+			apps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 		By("Create a clusterDef obj")
 		mode := int32(0755)
-		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
-			AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+		clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(apps.ConsensusMySQLComponent, mysqlCompDefName).
+			AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, apps.ScriptsVolumeName, &mode).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponentVersion(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+		clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+			AddComponentVersion(mysqlCompDefName).AddContainerShort(apps.DefaultMySQLContainerName, apps.ApeCloudMySQLImage).
 			Create(&testCtx).GetObject()
 
 		By("Create a cluster obj")
 
-		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		pvcSpec := apps.NewPVCSpec("1Gi")
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetReplicas(1).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+			AddVolumeClaimTemplate(apps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(apps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("check cluster running")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+		Eventually(apps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.RunningClusterPhase))
 		})).Should(Succeed())
 	}
 
 	createBackupObj := func() {
 		By("By creating a backupTool")
-		backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-			&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+		backupTool := apps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+			&dpv1alpha1.BackupTool{}, apps.RandomizedObjName())
 
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
-		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+		backupPolicyObj := apps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
 			AddDataFilePolicy().
 			SetBackupToolName(backupTool.Name).
@@ -134,19 +134,19 @@ var _ = Describe("MySQL data protection function", func() {
 		backupPolicyKey := client.ObjectKeyFromObject(backupPolicyObj)
 
 		By("By create remove pvc")
-		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, backupRemotePVCName, clusterKey.Name,
+		apps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, backupRemotePVCName, clusterKey.Name,
 			"none", "remote-volume").
 			SetAnnotations(map[string]string{}).
 			SetStorage("1Gi").
 			Create(&testCtx)
 
 		By("By check backupPolicy available")
-		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, backupPolicy *dpv1alpha1.BackupPolicy) {
+		Eventually(apps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, backupPolicy *dpv1alpha1.BackupPolicy) {
 			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 		})).Should(Succeed())
 
 		By("By creating a backup from backupPolicy: " + backupPolicyKey.Name)
-		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+		backup := apps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
 			SetBackupPolicyName(backupPolicyKey.Name).
 			SetBackupType(dpv1alpha1.BackupTypeDataFile).
@@ -161,7 +161,7 @@ var _ = Describe("MySQL data protection function", func() {
 		})
 
 		It("should be completed", func() {
-			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dpv1alpha1.Backup) {
+			Eventually(apps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dpv1alpha1.Backup) {
 				g.Expect(backup.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
 			})).Should(Succeed())
 		})

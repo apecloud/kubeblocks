@@ -25,6 +25,9 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"strconv"
 	"strings"
 	"text/template"
@@ -44,11 +47,10 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
 
 var clusterUpdateExample = templates.Examples(`

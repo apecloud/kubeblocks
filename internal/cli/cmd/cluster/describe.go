@@ -21,6 +21,9 @@ package cluster
 
 import (
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"io"
 	"strings"
 	"time"
@@ -39,9 +42,8 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var (

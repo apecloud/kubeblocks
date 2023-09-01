@@ -22,6 +22,8 @@ package accounts
 import (
 	"net/http"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/dapr/components-contrib/bindings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,8 +36,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	channelutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
 )
 
 var _ = Describe("Base Account Options", func() {

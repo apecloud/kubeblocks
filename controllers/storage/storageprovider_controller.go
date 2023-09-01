@@ -23,6 +23,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // StorageProviderReconciler reconciles a StorageProvider object
@@ -62,7 +63,7 @@ type StorageProviderReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("storageprovider", req.NamespacedName)
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      logger,
@@ -72,14 +73,14 @@ func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// get provider object
 	provider := &storagev1alpha1.StorageProvider{}
 	if err := r.Get(ctx, req.NamespacedName, provider); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get StorageProvider")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get StorageProvider")
 	}
 
 	// add dependency to CSIDrive
 	r.ensureDependency(provider)
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, provider, storageFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil.HandleCRDeletion(reqCtx, r, provider, storageFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, provider)
 	})
 	if res != nil {
@@ -92,24 +93,24 @@ func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err != nil {
 			// update status for the CSI driver check
 			if updateStatusErr := r.updateStatus(reqCtx, provider, err); updateStatusErr != nil {
-				return intctrlutil.CheckedRequeueWithError(updateStatusErr, reqCtx.Log,
+				return controllerutil.CheckedRequeueWithError(updateStatusErr, reqCtx.Log,
 					"failed to update status")
 			}
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			return controllerutil.CheckedRequeueWithError(err, reqCtx.Log,
 				"failed to check CSIDriver %s", provider.Spec.CSIDriverName)
 		}
 	}
 
 	// update status
 	if updateStatusErr := r.updateStatus(reqCtx, provider, nil); updateStatusErr != nil {
-		return intctrlutil.CheckedRequeueWithError(updateStatusErr, reqCtx.Log,
+		return controllerutil.CheckedRequeueWithError(updateStatusErr, reqCtx.Log,
 			"failed to update status")
 	}
 
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
-func (r *StorageProviderReconciler) updateStatus(reqCtx intctrlutil.RequestCtx,
+func (r *StorageProviderReconciler) updateStatus(reqCtx controllerutil.RequestCtx,
 	provider *storagev1alpha1.StorageProvider,
 	checkErr error) error {
 	var phase storagev1alpha1.StorageProviderPhase
@@ -144,7 +145,7 @@ func (r *StorageProviderReconciler) updateStatus(reqCtx intctrlutil.RequestCtx,
 	return r.Client.Status().Patch(reqCtx.Ctx, provider, patch)
 }
 
-func (r *StorageProviderReconciler) checkCSIDriver(reqCtx intctrlutil.RequestCtx, driverName string) error {
+func (r *StorageProviderReconciler) checkCSIDriver(reqCtx controllerutil.RequestCtx, driverName string) error {
 	// check existence of CSIDriver
 	return r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: driverName}, &storagev1.CSIDriver{})
 }
@@ -185,7 +186,7 @@ func (r *StorageProviderReconciler) removeDependency(provider *storagev1alpha1.S
 }
 
 func (r *StorageProviderReconciler) deleteExternalResources(
-	reqCtx intctrlutil.RequestCtx, provider *storagev1alpha1.StorageProvider) error {
+	reqCtx controllerutil.RequestCtx, provider *storagev1alpha1.StorageProvider) error {
 	r.removeDependency(provider)
 	return nil
 }

@@ -22,6 +22,11 @@ package operations
 import (
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,11 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("VerticalScaling OpsRequest", func() {
@@ -54,13 +55,13 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -75,15 +76,15 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create VerticalScaling ops")
-			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.VerticalScalingType)
 
 			ops.Spec.VerticalScalingList = verticalScaling
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = apps.CreateOpsRequest(ctx, testCtx, ops)
 			By("test save last configuration and OpsRequest phase is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			Eventually(apps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("test vertical scale action function")
 			vsHandler := verticalScalingHandler{}
@@ -116,7 +117,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 					ClassDefRef: &appsv1alpha1.ClassDefRef{
-						Class: testapps.Class1c1gName,
+						Class: apps.Class1c1gName,
 					},
 				},
 			}
@@ -130,7 +131,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
 
 			By("create VerticalScaling ops")
-			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.VerticalScalingType)
 			ops.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
 				{
@@ -143,11 +144,11 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 					},
 				},
 			}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = apps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("mock opsRequest is Running")
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp)
-			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
 				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
 			})).ShouldNot(HaveOccurred())
@@ -157,7 +158,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				pod.Kind = constant.PodKind
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, pod.Name, "leader", "ReadWrite")
+				apps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, pod.Name, "leader", "ReadWrite")
 			}
 
 			By("mock podList[0] rolling update successfully by re-creating it")

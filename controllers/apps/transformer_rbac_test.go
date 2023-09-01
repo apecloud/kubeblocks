@@ -22,6 +22,13 @@ package apps
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -32,13 +39,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("object rbac transformer test.", func() {
@@ -51,11 +52,11 @@ var _ = Describe("object rbac transformer test.", func() {
 		serviceAccountName = "kb-" + clusterName
 	)
 
-	var transCtx graph.TransformContext
+	var transCtx graph2.TransformContext
 	var ctx context.Context
 	var logger logr.Logger
-	var dag *graph.DAG
-	var transformer graph.Transformer
+	var dag *graph2.DAG
+	var transformer graph2.Transformer
 	var cluster *appsv1alpha1.Cluster
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var saKey types.NamespacedName
@@ -65,14 +66,14 @@ var _ = Describe("object rbac transformer test.", func() {
 		ctx = context.Background()
 		logger = logf.FromContext(ctx).WithValues("transformer-rbac-test", "testnamespace")
 		By("Creating a cluster")
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		cluster = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefName, clusterVersionName).WithRandomName().
 			AddComponent(compName, compDefName).
 			SetServiceAccountName(serviceAccountName).GetObject()
 		r := int32(1)
 		cluster.Spec.Replicas = &r
-		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, "sts").
+		clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(apps.StatefulMySQLComponent, "sts").
 			GetObject()
 		clusterDefObj.Spec.ComponentDefs[0].Probes = &appsv1alpha1.ClusterDefinitionProbes{}
 		saKey = types.NamespacedName{
@@ -106,7 +107,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	Context("transformer rbac manager", func() {
 		It("create serviceaccount, rolebinding if not exist", func() {
 			clusterDefObj.Spec.ComponentDefs[0].VolumeProtectionSpec = nil
-			Eventually(testapps.CheckObjExists(&testCtx, saKey,
+			Eventually(apps.CheckObjExists(&testCtx, saKey,
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
@@ -126,7 +127,7 @@ var _ = Describe("object rbac transformer test.", func() {
 
 		It("create clusterrolebinding if volumeprotection enabled", func() {
 			clusterDefObj.Spec.ComponentDefs[0].VolumeProtectionSpec = &appsv1alpha1.VolumeProtectionSpec{}
-			Eventually(testapps.CheckObjExists(&testCtx, saKey,
+			Eventually(apps.CheckObjExists(&testCtx, saKey,
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
@@ -151,8 +152,8 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 })
 
-func mockDAG(cluster *appsv1alpha1.Cluster) *graph.DAG {
-	d := graph.NewDAG()
+func mockDAG(cluster *appsv1alpha1.Cluster) *graph2.DAG {
+	d := graph2.NewDAG()
 	ictrltypes.LifecycleObjectCreate(d, cluster, nil)
 	root, err := ictrltypes.FindRootVertex(d)
 	Expect(err).Should(BeNil())

@@ -23,16 +23,16 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 type ParallelTransformers struct {
-	transformers []graph.Transformer
+	transformers []graph2.Transformer
 }
 
-var _ graph.Transformer = &ParallelTransformers{}
+var _ graph2.Transformer = &ParallelTransformers{}
 
-func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ParallelTransformers) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	var group sync.WaitGroup
 	var errs error
 	for _, transformer := range t.transformers {

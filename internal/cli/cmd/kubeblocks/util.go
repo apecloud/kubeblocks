@@ -26,6 +26,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
@@ -38,11 +40,10 @@ import (
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func getGVRByCRD(crd *unstructured.Unstructured) (*schema.GroupVersionResource, error) {

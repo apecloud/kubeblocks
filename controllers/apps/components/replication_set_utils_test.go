@@ -25,6 +25,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	probeutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -36,13 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("replicationSet Util", func() {
@@ -66,14 +67,14 @@ var _ = Describe("replicationSet Util", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
+		apps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -83,31 +84,31 @@ var _ = Describe("replicationSet Util", func() {
 	testHandleReplicationSet := func() {
 
 		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
-			SetReplicas(testapps.DefaultReplicationReplicas).
+			AddComponent(apps.DefaultRedisCompSpecName, apps.DefaultRedisCompDefName).
+			SetReplicas(apps.DefaultReplicationReplicas).
 			Create(&testCtx).GetObject()
 
 		By("Creating a statefulSet of replication workloadType.")
 		container := corev1.Container{
 			Name:            "mock-redis-container",
-			Image:           testapps.DefaultRedisImageName,
+			Image:           apps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
-			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
+		sts := apps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+apps.DefaultRedisCompSpecName, clusterObj.Name, apps.DefaultRedisCompSpecName).
 			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
-			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
+			AddAppComponentLabel(apps.DefaultRedisCompSpecName).
 			AddAppManangedByLabel().
 			SetReplicas(2).
 			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
 		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+			_ = apps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
 				AddRoleLabel(DefaultRole(i)).
@@ -117,26 +118,26 @@ var _ = Describe("replicationSet Util", func() {
 
 	testNeedUpdateReplicationSetStatus := func() {
 		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).Create(&testCtx).GetObject()
+			AddComponent(apps.DefaultRedisCompSpecName, apps.DefaultRedisCompDefName).Create(&testCtx).GetObject()
 
 		By("init replicationSet cluster status")
 		patch := client.MergeFrom(clusterObj.DeepCopy())
 		clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
 		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-			testapps.DefaultRedisCompSpecName: {
+			apps.DefaultRedisCompSpecName: {
 				Phase: appsv1alpha1.RunningClusterCompPhase,
 				ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
 					Primary: appsv1alpha1.ReplicationMemberStatus{
-						Pod: clusterObj.Name + testapps.DefaultRedisCompSpecName + "-0",
+						Pod: clusterObj.Name + apps.DefaultRedisCompSpecName + "-0",
 					},
 					Secondaries: []appsv1alpha1.ReplicationMemberStatus{
 						{
-							Pod: clusterObj.Name + testapps.DefaultRedisCompSpecName + "-1",
+							Pod: clusterObj.Name + apps.DefaultRedisCompSpecName + "-1",
 						},
 						{
-							Pod: clusterObj.Name + testapps.DefaultRedisCompSpecName + "-2",
+							Pod: clusterObj.Name + apps.DefaultRedisCompSpecName + "-2",
 						},
 					},
 				},
@@ -147,16 +148,16 @@ var _ = Describe("replicationSet Util", func() {
 		By("testing sync cluster status with add pod")
 
 		var podList []corev1.Pod
-		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompSpecName, 4)
+		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+apps.DefaultRedisCompSpecName, 4)
 
 		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
-				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+			pod := apps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+				AddContainer(corev1.Container{Name: apps.DefaultRedisContainerName, Image: apps.DefaultRedisImageName}).
 				AddRoleLabel(DefaultRole(i)).
 				Create(&testCtx).GetObject()
 			podList = append(podList, *pod)
 		}
-		err := genReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
+		err := genReplicationSetStatus(clusterObj.Status.Components[apps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
 		Expect(err).ShouldNot(Succeed())
 		Expect(err.Error()).Should(ContainSubstring("more than one primary pod found"))
 
@@ -190,24 +191,24 @@ var _ = Describe("replicationSet Util", func() {
 		clusterSwitchPolicy := &appsv1alpha1.ClusterSwitchPolicy{
 			Type: appsv1alpha1.Noop,
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
-			SetReplicas(testapps.DefaultReplicationReplicas).
+			AddComponent(apps.DefaultRedisCompSpecName, apps.DefaultRedisCompDefName).
+			SetReplicas(apps.DefaultReplicationReplicas).
 			SetSwitchPolicy(clusterSwitchPolicy).
 			Create(&testCtx).GetObject()
 
 		By("Creating a statefulSet of replication workloadType.")
 		container := corev1.Container{
 			Name:            "mock-redis-container",
-			Image:           testapps.DefaultRedisImageName,
+			Image:           apps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
-			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
+		sts := apps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+apps.DefaultRedisCompSpecName, clusterObj.Name, apps.DefaultRedisCompSpecName).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
-			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
+			AddAppComponentLabel(apps.DefaultRedisCompSpecName).
 			AddAppManangedByLabel().
 			SetReplicas(2).
 			Create(&testCtx).GetObject()
@@ -218,7 +219,7 @@ var _ = Describe("replicationSet Util", func() {
 			secondaryPods []*corev1.Pod
 		)
 		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+			pod := apps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
 				AddRoleLabel(DefaultRole(i)).
@@ -238,12 +239,12 @@ var _ = Describe("replicationSet Util", func() {
 			Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
 		}
 		event := createRoleChangedEvent(secondaryPods[0].Name, constant.Primary, secondaryPods[0].UID)
-		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, event, clusterObj, testapps.DefaultRedisCompSpecName,
+		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, event, clusterObj, apps.DefaultRedisCompSpecName,
 			secondaryPods[0], constant.Primary)).ShouldNot(HaveOccurred())
 
 		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
 		event = createRoleChangedEvent(primaryPod.Name, constant.Secondary, primaryPod.UID)
-		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, event, clusterObj, testapps.DefaultRedisCompSpecName,
+		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, event, clusterObj, apps.DefaultRedisCompSpecName,
 			primaryPod, constant.Secondary)).ShouldNot(HaveOccurred())
 	}
 
@@ -252,13 +253,13 @@ var _ = Describe("replicationSet Util", func() {
 	Context("test replicationSet util", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication workloadType.")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
+			clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.ReplicationRedisComponent, apps.DefaultRedisCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication workloadType.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
+			clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponentVersion(apps.DefaultRedisCompDefName).AddContainerShort(apps.DefaultRedisContainerName, apps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
 		})

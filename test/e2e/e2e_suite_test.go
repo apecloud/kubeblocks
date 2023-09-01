@@ -25,6 +25,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/vmware-tanzu/velero/test/e2e"
@@ -37,7 +39,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
 	. "github.com/apecloud/kubeblocks/test/e2e/installation"

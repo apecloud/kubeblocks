@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -32,11 +34,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/unstructured"
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 type configDiffOptions struct {
@@ -61,7 +62,7 @@ func (o *configDiffOptions) complete(args []string) error {
 	}
 
 	if len(args) != 2 {
-		return core.MakeError("missing opsrequest name")
+		return core2.MakeError("missing opsrequest name")
 	}
 
 	if err := o.baseOptions.complete(args); err != nil {
@@ -74,25 +75,25 @@ func (o *configDiffOptions) complete(args []string) error {
 		Namespace: o.baseOptions.namespace,
 		Name:      args[0],
 	}, o.baseOptions.dynamic, baseVersion); err != nil {
-		return core.WrapError(err, "failed to get ops CR [%s]", args[0])
+		return core2.WrapError(err, "failed to get ops CR [%s]", args[0])
 	}
 	if err := util.GetResourceObjectFromGVR(types.OpsGVR(), client.ObjectKey{
 		Namespace: o.baseOptions.namespace,
 		Name:      args[1],
 	}, o.baseOptions.dynamic, diffVersion); err != nil {
-		return core.WrapError(err, "failed to get ops CR [%s]", args[1])
+		return core2.WrapError(err, "failed to get ops CR [%s]", args[1])
 	}
 
 	if !isValidReconfigureOps(baseVersion) {
-		return core.MakeError("opsrequest is not valid reconfiguring operation [%s]", client.ObjectKeyFromObject(baseVersion))
+		return core2.MakeError("opsrequest is not valid reconfiguring operation [%s]", client.ObjectKeyFromObject(baseVersion))
 	}
 
 	if !isValidReconfigureOps(diffVersion) {
-		return core.MakeError("opsrequest is not valid reconfiguring operation [%s]", client.ObjectKeyFromObject(diffVersion))
+		return core2.MakeError("opsrequest is not valid reconfiguring operation [%s]", client.ObjectKeyFromObject(diffVersion))
 	}
 
 	if !o.maybeCompareOps(baseVersion, diffVersion) {
-		return core.MakeError("failed to diff, not same cluster, or same component, or template.")
+		return core2.MakeError("failed to diff, not same cluster, or same component, or template.")
 	}
 
 	o.baseVersion = baseVersion
@@ -121,27 +122,27 @@ func (o *configDiffOptions) validate() error {
 	)
 
 	if baseStatus.Phase != appsv1alpha1.OpsSucceedPhase {
-		return core.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.baseVersion.Name, baseStatus.Phase)
+		return core2.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.baseVersion.Name, baseStatus.Phase)
 	}
 	if diffStatus.Phase != appsv1alpha1.OpsSucceedPhase {
-		return core.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.diffVersion.Name, diffStatus.Phase)
+		return core2.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.diffVersion.Name, diffStatus.Phase)
 	}
 
 	for _, tplName := range o.templateNames {
 		s1 := findTemplateStatusByName(baseStatus.ReconfiguringStatus, tplName)
 		s2 := findTemplateStatusByName(diffStatus.ReconfiguringStatus, tplName)
 		if s1 == nil || len(s1.LastAppliedConfiguration) == 0 {
-			return core.MakeError("invalid reconfiguring status. CR[%v]", client.ObjectKeyFromObject(o.baseVersion))
+			return core2.MakeError("invalid reconfiguring status. CR[%v]", client.ObjectKeyFromObject(o.baseVersion))
 		}
 		if s2 == nil || len(s2.LastAppliedConfiguration) == 0 {
-			return core.MakeError("invalid reconfiguring status. CR[%v]", client.ObjectKeyFromObject(o.diffVersion))
+			return core2.MakeError("invalid reconfiguring status. CR[%v]", client.ObjectKeyFromObject(o.diffVersion))
 		}
 	}
 	return nil
 }
 
 func (o *configDiffOptions) run() error {
-	configDiffs := make(map[string][]core.VisualizedParam, len(o.templateNames))
+	configDiffs := make(map[string][]core2.VisualizedParam, len(o.templateNames))
 	baseConfigs := make(map[string]map[string]unstructured.ConfigObject)
 	for _, tplName := range o.templateNames {
 		diff, baseObj, err := o.diffConfig(tplName)
@@ -220,7 +221,7 @@ func (o *configDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, diff 
 	return true
 }
 
-func (o *configDiffOptions) diffConfig(tplName string) ([]core.VisualizedParam, map[string]unstructured.ConfigObject, error) {
+func (o *configDiffOptions) diffConfig(tplName string) ([]core2.VisualizedParam, map[string]unstructured.ConfigObject, error) {
 	var (
 		tpl              *appsv1alpha1.ComponentConfigSpec
 		configConstraint = &appsv1alpha1.ConfigConstraint{}
@@ -231,7 +232,7 @@ func (o *configDiffOptions) diffConfig(tplName string) ([]core.VisualizedParam, 
 		return nil, nil, err
 	}
 	if tpl = findTplByName(tplList, tplName); tpl == nil {
-		return nil, nil, core.MakeError("not found template: %s", tplName)
+		return nil, nil, core2.MakeError("not found template: %s", tplName)
 	}
 	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
 		Namespace: "",
@@ -244,16 +245,16 @@ func (o *configDiffOptions) diffConfig(tplName string) ([]core.VisualizedParam, 
 
 	base := findTemplateStatusByName(o.baseVersion.Status.ReconfiguringStatus, tplName)
 	diff := findTemplateStatusByName(o.diffVersion.Status.ReconfiguringStatus, tplName)
-	patch, _, err := core.CreateConfigPatch(base.LastAppliedConfiguration, diff.LastAppliedConfiguration, formatCfg.Format, tpl.Keys, false)
+	patch, _, err := core2.CreateConfigPatch(base.LastAppliedConfiguration, diff.LastAppliedConfiguration, formatCfg.Format, tpl.Keys, false)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	baseConfigObj, err := core.LoadRawConfigObject(base.LastAppliedConfiguration, formatCfg, tpl.Keys)
+	baseConfigObj, err := core2.LoadRawConfigObject(base.LastAppliedConfiguration, formatCfg, tpl.Keys)
 	if err != nil {
 		return nil, nil, err
 	}
-	return core.GenerateVisualizedParamsList(patch, formatCfg, nil), baseConfigObj, nil
+	return core2.GenerateVisualizedParamsList(patch, formatCfg, nil), baseConfigObj, nil
 }
 
 // NewDiffConfigureCmd shows the difference between two configuration version.

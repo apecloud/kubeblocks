@@ -24,6 +24,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -31,9 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func TestIsReady(t *testing.T) {

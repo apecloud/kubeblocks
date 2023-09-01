@@ -26,12 +26,12 @@ import (
 	"strings"
 	"testing"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func TestInit(t *testing.T) {

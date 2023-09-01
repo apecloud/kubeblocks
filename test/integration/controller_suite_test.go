@@ -23,6 +23,12 @@ import (
 	"testing"
 	"time"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
+	apps2 "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -49,12 +55,7 @@ import (
 	dpctrl "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/testutil"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -138,12 +139,12 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 	const mysqlGeneralFilePath = "/data/mysql/log/mysqld.log"
 	const mysqlSlowlogFilePath = "/data/mysql/log/mysqld-slowquery.log"
 
-	mysqlConsensusType := string(testapps.ConsensusMySQLComponent)
+	mysqlConsensusType := string(apps2.ConsensusMySQLComponent)
 
-	configmap := testapps.CreateCustomizedObj(&testCtx,
+	configmap := apps2.CreateCustomizedObj(&testCtx,
 		mysqlConfigTemplatePath, &corev1.ConfigMap{},
 		testCtx.UseDefaultNamespace(),
-		testapps.WithLabels(
+		apps2.WithLabels(
 			constant.AppNameLabelKey, clusterName,
 			constant.AppInstanceLabelKey, clusterName,
 			constant.KBAppComponentLabelKey, mysqlConsensusType,
@@ -153,11 +154,11 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		))
 
-	_ = testapps.CreateCustomizedObj(&testCtx, mysqlScriptsPath, &corev1.ConfigMap{},
-		testapps.WithName(mysqlScriptsConfigName), testCtx.UseDefaultNamespace())
+	_ = apps2.CreateCustomizedObj(&testCtx, mysqlScriptsPath, &corev1.ConfigMap{},
+		apps2.WithName(mysqlScriptsConfigName), testCtx.UseDefaultNamespace())
 
 	By("Create a constraint obj")
-	constraint := testapps.CreateCustomizedObj(&testCtx,
+	constraint := apps2.CreateCustomizedObj(&testCtx,
 		mysqlConfigConstraintPath,
 		&appsv1alpha1.ConfigConstraint{})
 
@@ -178,28 +179,28 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 
 	By("Create a clusterDefinition obj")
 	mode := int32(0755)
-	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+	clusterDefObj := apps2.NewClusterDefFactory(clusterDefName).
 		SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
-		AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
+		AddComponentDef(apps2.ConsensusMySQLComponent, mysqlCompDefName).
 		AddConfigTemplate(mysqlConfigName, configmap.Name, constraint.Name,
 			testCtx.DefaultNamespace, mysqlConfigVolumeName).
 		AddScriptTemplate(mysqlScriptsConfigName, mysqlScriptsConfigName,
 			testCtx.DefaultNamespace, mysqlScriptsVolumeName, &mode).
-		AddContainerVolumeMounts(testapps.DefaultMySQLContainerName, mysqlVolumeMounts).
+		AddContainerVolumeMounts(apps2.DefaultMySQLContainerName, mysqlVolumeMounts).
 		AddLogConfig("error", mysqlErrorFilePath).
 		AddLogConfig("general", mysqlGeneralFilePath).
 		AddLogConfig("slow", mysqlSlowlogFilePath).
 		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
-		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "CLUSTER_START_INDEX", Value: "1"}).
-		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "CLUSTER_ID", Value: "1"}).
+		AddContainerEnv(apps2.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
+		AddContainerEnv(apps2.DefaultMySQLContainerName, corev1.EnvVar{Name: "CLUSTER_START_INDEX", Value: "1"}).
+		AddContainerEnv(apps2.DefaultMySQLContainerName, corev1.EnvVar{Name: "CLUSTER_ID", Value: "1"}).
 		Create(&testCtx).GetObject()
 
 	By("Create a clusterVersion obj")
-	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+	clusterVersionObj := apps2.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 		AddComponentVersion(mysqlCompDefName).
-		AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+		AddContainerShort(apps2.DefaultMySQLContainerName, apps2.ApeCloudMySQLImage).
 		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 		Create(&testCtx).GetObject()
@@ -213,12 +214,12 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 			},
 		},
 	}
-	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+	clusterObj := apps2.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(mysqlCompName, mysqlCompDefName).
 		SetReplicas(3).
 		SetEnabledLogs("error", "general", "slow").
-		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+		AddVolumeClaimTemplate(apps2.DataVolumeName, pvcSpec).
 		Create(&testCtx).GetObject()
 
 	return clusterDefObj, clusterVersionObj, clusterObj

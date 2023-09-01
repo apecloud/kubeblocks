@@ -23,6 +23,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -32,19 +39,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // RBACTransformer puts the rbac at the beginning of the DAG
 type RBACTransformer struct{}
 
-var _ graph.Transformer = &RBACTransformer{}
+var _ graph2.Transformer = &RBACTransformer{}
 
 const (
 	RBACRoleName        = "kubeblocks-cluster-pod-role"
@@ -52,7 +53,7 @@ const (
 	ServiceAccountKind  = "ServiceAccount"
 )
 
-func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *RBACTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 	root, err := ictrltypes.FindRootVertex(dag)
@@ -77,12 +78,12 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		for saName := range serviceAccounts {
 			if !isServiceAccountExist(transCtx, saName) {
 				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
-					string(ictrlutil.ErrorTypeNotFound), saName+" ServiceAccount is not exist")
+					string(controllerutil.ErrorTypeNotFound), saName+" ServiceAccount is not exist")
 				saNotExist = true
 			}
 		}
 		if saNotExist {
-			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabed, but service account is not exist")
+			return controllerutil.NewRequeueError(time.Second, "RBAC manager is disabed, but service account is not exist")
 		}
 		return nil
 	}
@@ -257,7 +258,7 @@ func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.Cluste
 		comps := compSpecMap[compDef.Name]
 		if len(comps) == 0 {
 			// if componentSpecs is empty, it may be generated from the cluster template and cluster.
-			reqCtx := ictrlutil.RequestCtx{
+			reqCtx := controllerutil.RequestCtx{
 				Ctx: transCtx.Context,
 				Log: log.Log.WithName("rbac"),
 			}
@@ -369,7 +370,7 @@ func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[
 	return clusterRoleBinding, nil
 }
 
-func createSaVertex(serviceAccounts map[string]*corev1.ServiceAccount, dag *graph.DAG, parentVertex *ictrltypes.LifecycleVertex) []*ictrltypes.LifecycleVertex {
+func createSaVertex(serviceAccounts map[string]*corev1.ServiceAccount, dag *graph2.DAG, parentVertex *ictrltypes.LifecycleVertex) []*ictrltypes.LifecycleVertex {
 	saVertexs := []*ictrltypes.LifecycleVertex{}
 	for _, sa := range serviceAccounts {
 		// serviceaccount must be created before rolebinding and clusterrolebinding

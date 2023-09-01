@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -36,10 +39,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("BackupRepo controller", func() {
@@ -54,21 +54,21 @@ var _ = Describe("BackupRepo controller", func() {
 		By("clean resources")
 		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupRepoSignature, true, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StorageProviderSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.CSIDriverSignature, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupRepoSignature, true, ml)
+		apps.ClearResources(&testCtx, intctrlutil.StorageProviderSignature, ml)
+		apps.ClearResources(&testCtx, intctrlutil.CSIDriverSignature, ml)
 
 		// namespaced
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 
 		// namespace2
 		inNS2 := client.InNamespace(namespace2)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS2, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS2, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS2, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS2, ml)
 
 		// delete namespace2
 		Eventually(func(g Gomega) {
@@ -136,7 +136,7 @@ var _ = Describe("BackupRepo controller", func() {
 				"cred-key1": "cred-val1",
 				"cred-key2": "cred-val2",
 			}
-			secret := testapps.CreateK8sResource(&testCtx, obj)
+			secret := apps.CreateK8sResource(&testCtx, obj)
 			credentialSecretKey = client.ObjectKeyFromObject(secret)
 		}
 
@@ -159,7 +159,7 @@ var _ = Describe("BackupRepo controller", func() {
 			if mutateFunc != nil {
 				mutateFunc(obj)
 			}
-			repo = testapps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.BackupRepo)
+			repo = apps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.BackupRepo)
 			repoKey = client.ObjectKeyFromObject(repo)
 		}
 
@@ -187,7 +187,7 @@ parameters:
 			if mutateFunc != nil {
 				mutateFunc(obj)
 			}
-			provider := testapps.CreateK8sResource(&testCtx, obj.DeepCopy())
+			provider := apps.CreateK8sResource(&testCtx, obj.DeepCopy())
 			providerKey = client.ObjectKeyFromObject(provider)
 			// update status
 			newObj := provider.(*storagev1alpha1.StorageProvider)
@@ -199,7 +199,7 @@ parameters:
 		createCSIDriverObjectSpec := func(driverName string) {
 			obj := &storagev1.CSIDriver{}
 			obj.Name = driverName
-			testapps.CreateK8sResource(&testCtx, obj)
+			apps.CreateK8sResource(&testCtx, obj)
 		}
 
 		createBackupSpec := func(mutateFunc func(backup *dpv1alpha1.Backup)) *dpv1alpha1.Backup {
@@ -215,7 +215,7 @@ parameters:
 			if mutateFunc != nil {
 				mutateFunc(obj)
 			}
-			return testapps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.Backup)
+			return apps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.Backup)
 		}
 
 		deleteBackup := func(g Gomega, key types.NamespacedName) {
@@ -253,7 +253,7 @@ parameters:
 				repo.Spec.StorageProviderRef = "myprovider" // not exist for now
 			})
 			By("checking the status of the BackupRepo, should be not ready")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
 				g.Expect(cond).ToNot(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionFalse))
@@ -268,7 +268,7 @@ parameters:
 			})
 
 			By("checking the status of the BackupRepo, should become ready")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
 				g.Expect(cond).ToNot(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
@@ -277,11 +277,11 @@ parameters:
 			})).Should(Succeed())
 
 			By("updating the status of the storage provider to not ready")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(apps.GetAndChangeObjStatus(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 				provider.Status.Phase = storagev1alpha1.StorageProviderNotReady
 			})).Should(Succeed())
 			By("checking the status of the BackupRepo, should become failed")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
 				g.Expect(cond).ToNot(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionFalse))
@@ -290,9 +290,9 @@ parameters:
 			})).Should(Succeed())
 
 			By("deleting the storage provider")
-			testapps.DeleteObject(&testCtx, providerKey, &storagev1alpha1.StorageProvider{})
+			apps.DeleteObject(&testCtx, providerKey, &storagev1alpha1.StorageProvider{})
 			By("checking the status of the BackupRepo, condition should become NotFound")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
 				g.Expect(cond).ToNot(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionFalse))
@@ -305,7 +305,7 @@ parameters:
 			var secretRef corev1.SecretReference
 			var storageClassName string
 			By("checking the BackupRepo, should be ready")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
 				g.Expect(repo.Status.GeneratedCSIDriverSecret).NotTo(BeNil())
 				g.Expect(repo.Status.GeneratedStorageClassName).NotTo(BeEmpty())
@@ -316,7 +316,7 @@ parameters:
 
 			By("checking the Secret")
 			secretKey := types.NamespacedName{Name: secretRef.Name, Namespace: secretRef.Namespace}
-			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
+			Eventually(apps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
 					"value-of-key1":      []byte("val1"),
 					"value-of-key2":      []byte("val2"),
@@ -329,7 +329,7 @@ parameters:
 
 			By("checking the StorageClass")
 			storageClassNameKey := types.NamespacedName{Name: storageClassName}
-			Eventually(testapps.CheckObj(&testCtx, storageClassNameKey, func(g Gomega, storageClass *storagev1.StorageClass) {
+			Eventually(apps.CheckObj(&testCtx, storageClassNameKey, func(g Gomega, storageClass *storagev1.StorageClass) {
 				g.Expect(storageClass.Parameters).To(Equal(map[string]string{
 					"value-of-key1":      "val1",
 					"value-of-key2":      "val2",
@@ -350,23 +350,23 @@ parameters:
 			By("checking the Secret")
 			var secretKey types.NamespacedName
 			var reversion string
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.GeneratedCSIDriverSecret).NotTo(BeNil())
 				secretKey = types.NamespacedName{
 					Name:      repo.Status.GeneratedCSIDriverSecret.Name,
 					Namespace: repo.Status.GeneratedCSIDriverSecret.Namespace,
 				}
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
+			Eventually(apps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				reversion = secret.ResourceVersion
 			})).Should(Succeed())
 
 			By("updating the template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(apps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 				provider.Spec.CSIDriverSecretTemplate += "\nnew-item: new-value"
 			})).Should(Succeed())
 			By("checking the Secret again, should have new generation and new content")
-			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
+			Eventually(apps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
 					"value-of-key1":      []byte("val1"),
 					"value-of-key2":      []byte("val2"),
@@ -379,11 +379,11 @@ parameters:
 			})).Should(Succeed())
 
 			By("updating the config")
-			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 				repo.Spec.Config["key1"] = "changed-val1"
 			})).Should(Succeed())
 			By("checking the Secret again, should have new generation and new content")
-			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
+			Eventually(apps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
 					"value-of-key1":      []byte("changed-val1"),
 					"value-of-key2":      []byte("val2"),
@@ -396,11 +396,11 @@ parameters:
 			})).Should(Succeed())
 
 			By("updating the credential")
-			Eventually(testapps.GetAndChangeObj(&testCtx, credentialSecretKey, func(secret *corev1.Secret) {
+			Eventually(apps.GetAndChangeObj(&testCtx, credentialSecretKey, func(secret *corev1.Secret) {
 				secret.Data["cred-key1"] = []byte("changed-cred-val1")
 			})).Should(Succeed())
 			By("checking the Secret again, should have new generation and new content")
-			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
+			Eventually(apps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
 					"value-of-key1":      []byte("changed-val1"),
 					"value-of-key2":      []byte("val2"),
@@ -415,26 +415,26 @@ parameters:
 
 		It("should fail if the secret referenced by the credential secret not found", func() {
 			By("checking the repo object to make sure it's ready")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
 			})).Should(Succeed())
 			By("updating to a non-existing credential")
-			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 				repo.Spec.Credential.Name += "non-existing"
 			})).Should(Succeed())
 			By("checking the repo object again, it should be failed")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
 			})).Should(Succeed())
 		})
 
 		It("should fail if the secret template is invalid", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(apps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 				provider.Spec.CSIDriverSecretTemplate = "{{ bad template }"
 			})).Should(Succeed())
 			By("checking the repo status")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
@@ -446,11 +446,11 @@ parameters:
 
 		It("should fail if the render result of the secret template is not a yaml", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(apps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 				provider.Spec.CSIDriverSecretTemplate = "bad yaml"
 			})).Should(Succeed())
 			By("checking the repo status")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
@@ -462,13 +462,13 @@ parameters:
 
 		It("should fail if the storage class template is invalid", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(apps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 				provider.Spec.StorageClassTemplate = "{{ bad template }"
 			})).Should(Succeed())
 			By("creating a new repo to reference the provider")
 			createBackupRepoSpec(nil)
 			By("checking the repo status")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
@@ -480,13 +480,13 @@ parameters:
 
 		It("should fail if the render result of the storage class template is not a yaml", func() {
 			By("setting a invalid template")
-			Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+			Eventually(apps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 				provider.Spec.StorageClassTemplate = "bad yaml"
 			})).Should(Succeed())
 			By("creating a new repo to reference the provider")
 			createBackupRepoSpec(nil)
 			By("checking the repo status")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
@@ -498,7 +498,7 @@ parameters:
 
 		createBackupAndCheckPVC := func(namespace string) (backup *dpv1alpha1.Backup, pvcName string) {
 			By("making sure the repo is ready")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
 				g.Expect(repo.Status.BackupPVCName).ShouldNot(BeEmpty())
 				pvcName = repo.Status.BackupPVCName
@@ -529,7 +529,7 @@ parameters:
 				Name:      pvcName,
 				Namespace: namespace,
 			}
-			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+			Eventually(apps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 				g.Expect(pvc).ShouldNot(BeNil())
 			})).Should(Succeed())
 			return backup, pvcName
@@ -547,7 +547,7 @@ parameters:
 			backup, pvcName := createBackupAndCheckPVC(namespace2)
 
 			By("deleting the BackupRepo")
-			testapps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
+			apps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
 
 			By("checking the BackupRepo, the deletion should be blocked because there are associated backups")
 			Eventually(func(g Gomega) {
@@ -583,7 +583,7 @@ parameters:
 				Namespace: namespace2,
 				Name:      pvcName,
 			}
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+			Eventually(apps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 				controllerutil.RemoveFinalizer(pvc, pvcProtectionFinalizer)
 			})).Should(Succeed())
 
@@ -626,22 +626,22 @@ parameters:
 
 		It("should update backupRepo.status.isDefault", func() {
 			By("making the repo default")
-			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 				repo.Annotations = map[string]string{
 					constant.DefaultBackupRepoAnnotationKey: trueVal,
 				}
 			})).Should(Succeed())
 			By("checking the repo is default")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.IsDefault).Should(BeTrue())
 			})).Should(Succeed())
 
 			By("making the repo non default")
-			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 				repo.Annotations = nil
 			})).Should(Succeed())
 			By("checking the repo is not default")
-			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+			Eventually(apps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.IsDefault).Should(BeFalse())
 			})).Should(Succeed())
 		})

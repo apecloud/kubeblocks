@@ -23,6 +23,9 @@ import (
 	"context"
 	"time"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -31,9 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // ConfigConstraintReconciler reconciles a ConfigConstraint object
@@ -57,7 +58,7 @@ type ConfigConstraintReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithName("ConfigConstraintReconcile").WithValues("ConfigConstraint", req.NamespacedName.Name),
@@ -66,10 +67,10 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	configConstraint := &appsv1alpha1.ConfigConstraint{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configConstraint); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configConstraint, constant.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil.HandleCRDeletion(reqCtx, r, configConstraint, constant.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(configConstraint, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing of ClusterDefinition or ClusterVersion.")
@@ -82,7 +83,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				return nil, err
 			}
 		}
-		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
+		if res, err := controllerutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configConstraint.GetName()),
 			recordEvent, &appsv1alpha1.ClusterDefinitionList{},
 			&appsv1alpha1.ClusterVersionList{}); res != nil || err != nil {
@@ -95,23 +96,23 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if configConstraint.Status.ObservedGeneration == configConstraint.Generation && configConstraint.Status.IsConfigConstraintTerminalPhases() {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	if ok, err := checkConfigConstraint(reqCtx, configConstraint); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
+		return controllerutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
 	}
 
 	// Automatically convert cue to openAPISchema.
 	if err := updateConfigSchema(configConstraint, r.Client, ctx); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
 	}
 
 	err = updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1alpha1.CCAvailablePhase)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	intctrlutil.RecordCreatedEvent(r.Recorder, configConstraint)
+	controllerutil.RecordCreatedEvent(r.Recorder, configConstraint)
 	return ctrl.Result{}, nil
 }
 

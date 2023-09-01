@@ -22,6 +22,11 @@ package operations
 import (
 	"fmt"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -32,11 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("DataScriptOps", func() {
@@ -63,16 +64,16 @@ var _ = Describe("DataScriptOps", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -81,7 +82,7 @@ var _ = Describe("DataScriptOps", func() {
 
 	createClusterDatascriptOps := func(comp string, ttlBeforeAbort int32) *appsv1alpha1.OpsRequest {
 		opsName := "datascript-ops-" + testCtx.GetRandomStr()
-		ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+		ops := apps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 			clusterObj.Name, appsv1alpha1.DataScriptType)
 		ops.Spec.ScriptSpec = &appsv1alpha1.ScriptSpec{
 			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: comp},
@@ -96,7 +97,7 @@ var _ = Describe("DataScriptOps", func() {
 		ops := &appsv1alpha1.OpsRequest{}
 		Eventually(func(g Gomega) {
 			g.Expect(k8sClient.Get(testCtx.Ctx, opsKey, ops)).Should(Succeed())
-			g.Expect(testapps.ChangeObjStatus(&testCtx, ops, func() {
+			g.Expect(apps.ChangeObjStatus(&testCtx, ops, func() {
 				ops.Status.Phase = phase
 			})).Should(Succeed())
 		}).Should(Succeed())
@@ -119,7 +120,7 @@ var _ = Describe("DataScriptOps", func() {
 			compPhase = appsv1alpha1.SpecReconcilingClusterCompPhase
 		}
 
-		Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
+		Expect(apps.ChangeObjStatus(&testCtx, clusterObj, func() {
 			clusterObj.Status.Phase = phase
 			clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 				consensusComp: {
@@ -138,7 +139,7 @@ var _ = Describe("DataScriptOps", func() {
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("mock cluster")
-			_, _, clusterObj = testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
+			_, _, clusterObj = apps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
 				clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
 
 			By("init opsResource")
@@ -156,11 +157,11 @@ var _ = Describe("DataScriptOps", func() {
 		AfterEach(func() {
 			By("clean resources")
 			inNS := client.InNamespace(testCtx.DefaultNamespace)
-			testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
-			testapps.ClearResources(&testCtx, generics.ServiceSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
-			testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
-			testapps.ClearResources(&testCtx, generics.ServiceSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
-			testapps.ClearResources(&testCtx, generics.JobSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			apps.ClearResources(&testCtx, generics.ClusterSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			apps.ClearResources(&testCtx, generics.ServiceSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			apps.ClearResources(&testCtx, generics.ServiceSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+			apps.ClearResources(&testCtx, generics.JobSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
 		})
 
 		It("create a datascript ops with ttlSecondsBeforeAbort-0, abort immediately", func() {
@@ -292,7 +293,7 @@ var _ = Describe("DataScriptOps", func() {
 
 			By("patch job to succeed")
 			Eventually(func(g Gomega) {
-				g.Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
+				g.Expect(apps.ChangeObjStatus(&testCtx, job, func() {
 					job.Status.Succeeded = 1
 					job.Status.Conditions = append(job.Status.Conditions,
 						batchv1.JobCondition{
@@ -369,7 +370,7 @@ var _ = Describe("DataScriptOps", func() {
 
 			By("patch job to failed")
 			Eventually(func(g Gomega) {
-				g.Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
+				g.Expect(apps.ChangeObjStatus(&testCtx, job, func() {
 					job.Status.Succeeded = 1
 					job.Status.Conditions = append(job.Status.Conditions,
 						batchv1.JobCondition{
@@ -393,7 +394,7 @@ var _ = Describe("DataScriptOps", func() {
 			secretName := "test-secret"
 
 			opsName := "datascript-ops-" + testCtx.GetRandomStr()
-			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 				clusterObj.Name, appsv1alpha1.DataScriptType)
 			ops.Spec.ScriptSpec = &appsv1alpha1.ScriptSpec{
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},

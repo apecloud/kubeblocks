@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Restart OpsRequest", func() {
@@ -47,13 +47,13 @@ var _ = Describe("Restart OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -80,11 +80,11 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			Eventually(apps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("test restart action and reconcile function")
-			testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusComp)
-			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessComp)
+			apps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusComp)
+			apps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessComp)
 			rHandler := restartOpsHandler{}
 			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
 
@@ -94,7 +94,7 @@ var _ = Describe("Restart OpsRequest", func() {
 
 		It("expect failed when cluster is stopped", func() {
 			By("mock cluster is stopped")
-			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
 			})).Should(Succeed())
 			By("create Restart opsRequest")
@@ -102,7 +102,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("OpsRequest.spec.type=Restart is forbidden when Cluster.status.phase=Stopped"))
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
 				func(g Gomega, fetched *appsv1alpha1.OpsRequest) {
 					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.OpsFailedPhase))
 				})).Should(Succeed())
@@ -111,11 +111,11 @@ var _ = Describe("Restart OpsRequest", func() {
 })
 
 func createRestartOpsObj(clusterName, restartOpsName string) *appsv1alpha1.OpsRequest {
-	ops := testapps.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
+	ops := apps.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
 		clusterName, appsv1alpha1.RestartType)
 	ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
 		{ComponentName: consensusComp},
 		{ComponentName: statelessComp},
 	}
-	return testapps.CreateOpsRequest(ctx, testCtx, ops)
+	return apps.CreateOpsRequest(ctx, testCtx, ops)
 }

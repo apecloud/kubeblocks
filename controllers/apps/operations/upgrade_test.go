@@ -20,15 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Upgrade OpsRequest", func() {
@@ -48,13 +48,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -69,15 +69,15 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			By("create Upgrade Ops")
 			newClusterVersionName := "clusterversion-upgrade-" + randomStr
-			_ = testapps.NewClusterVersionFactory(newClusterVersionName, clusterDefinitionName).
-				AddComponentVersion(statelessComp).AddContainerShort(testapps.DefaultNginxContainerName, "nginx:1.14.2").
-				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
-				AddComponentVersion(statefulComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
+			_ = apps.NewClusterVersionFactory(newClusterVersionName, clusterDefinitionName).
+				AddComponentVersion(statelessComp).AddContainerShort(apps.DefaultNginxContainerName, "nginx:1.14.2").
+				AddComponentVersion(consensusComp).AddContainerShort(apps.DefaultMySQLContainerName, mysqlImageForUpdate).
+				AddComponentVersion(statefulComp).AddContainerShort(apps.DefaultMySQLContainerName, mysqlImageForUpdate).
 				Create(&testCtx).GetObject()
-			ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterObject.Name, appsv1alpha1.UpgradeType)
 			ops.Spec.Upgrade = &appsv1alpha1.Upgrade{ClusterVersionRef: newClusterVersionName}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = apps.CreateOpsRequest(ctx, testCtx, ops)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase,
 				consensusComp, statelessComp, statefulComp) // appsv1alpha1.VerticalScalingPhase
 			// TODO: add status condition for VerticalScalingPhase
@@ -85,7 +85,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("mock upgrade OpsRequest phase is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			Eventually(apps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 			// do upgrade
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

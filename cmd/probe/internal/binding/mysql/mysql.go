@@ -26,6 +26,9 @@ import (
 	"strconv"
 	"strings"
 
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
@@ -36,9 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // MysqlOperations represents MySQL output bindings.

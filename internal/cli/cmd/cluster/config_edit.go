@@ -22,6 +22,9 @@ package cluster
 import (
 	"bytes"
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"io"
 	"os"
 	"strings"
@@ -37,12 +40,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/validate"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 )
 
 type editConfigOptions struct {
@@ -125,9 +127,9 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 	}
 	formatterConfig := configConstraint.Spec.FormatterConfig
 	if formatterConfig == nil {
-		return core.MakeError("config spec[%s] not support reconfiguring!", configSpec.Name)
+		return core2.MakeError("config spec[%s] not support reconfiguring!", configSpec.Name)
 	}
-	configPatch, fileUpdated, err := core.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, true)
+	configPatch, fileUpdated, err := core2.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, true)
 	if err != nil {
 		return err
 	}
@@ -138,12 +140,12 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 
 	fmt.Fprintf(o.Out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[o.CfgFile]))
 	if !o.enableDelete {
-		if err := core.ValidateConfigPatch(configPatch, configConstraint.Spec.FormatterConfig); err != nil {
+		if err := core2.ValidateConfigPatch(configPatch, configConstraint.Spec.FormatterConfig); err != nil {
 			return err
 		}
 	}
 
-	params := core.GenerateVisualizedParamsList(configPatch, configConstraint.Spec.FormatterConfig, nil)
+	params := core2.GenerateVisualizedParamsList(configPatch, configConstraint.Spec.FormatterConfig, nil)
 	// check immutable parameters
 	if len(configConstraint.Spec.ImmutableParameters) > 0 {
 		if err = util.ValidateParametersModified2(sets.KeySet(fromKeyValuesToMap(params, o.CfgFile)), configConstraint.Spec); err != nil {
@@ -168,18 +170,18 @@ func (o *editConfigOptions) runWithConfigConstraints(cfgEditContext *configEditC
 	}
 	options := validate.WithKeySelector(configSpec.Keys)
 	if err = validate.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
-		return core.WrapError(err, "failed to validate edited config")
+		return core2.WrapError(err, "failed to validate edited config")
 	}
 	o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
 	return fn()
 }
 
-func generateReconfiguringPrompt(fileUpdated bool, configPatch *core.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, fileName string) (string, error) {
+func generateReconfiguringPrompt(fileUpdated bool, configPatch *core2.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, fileName string) (string, error) {
 	if fileUpdated {
 		return restartConfirmPrompt, nil
 	}
 
-	dynamicUpdated, err := core.IsUpdateDynamicParameters(cc, configPatch)
+	dynamicUpdated, err := core2.IsUpdateDynamicParameters(cc, configPatch)
 	if err != nil {
 		return "", nil
 	}

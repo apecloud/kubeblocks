@@ -23,6 +23,8 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/pkg/errors"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
@@ -32,8 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func EnsureClusterExists(ctx context.Context) error {

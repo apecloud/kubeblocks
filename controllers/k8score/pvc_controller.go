@@ -22,6 +22,8 @@ package k8score
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,11 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type HandlePersistentVolumeClaim func(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error
+type HandlePersistentVolumeClaim func(reqCtx controllerutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error
 
 // PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
 type PersistentVolumeClaimReconciler struct {
@@ -54,7 +54,7 @@ var PersistentVolumeClaimHandlerMap = map[string]HandlePersistentVolumeClaim{}
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
 		Log: log.FromContext(ctx).WithValues("PersistentVolumeClaim", req.NamespacedName),
@@ -64,26 +64,26 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(ctx, req.NamespacedName, pvc); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getPVCError")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "getPVCError")
 	}
 
 	// skip if pvc is being deleted
 	if !pvc.DeletionTimestamp.IsZero() {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	for _, handlePVC := range PersistentVolumeClaimHandlerMap {
 		// ignores the not found error.
 		if err := handlePVC(reqCtx, r.Client, pvc); err != nil && !apierrors.IsNotFound(err) {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handlePVCError")
+			return controllerutil.RequeueWithError(err, reqCtx.Log, "handlePVCError")
 		}
 	}
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.PersistentVolumeClaim{}, builder.WithPredicates(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate))).
+		For(&corev1.PersistentVolumeClaim{}, builder.WithPredicates(predicate.NewPredicateFuncs(controllerutil.WorkloadFilterPredicate))).
 		Complete(r)
 }

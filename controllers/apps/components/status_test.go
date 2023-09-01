@@ -24,6 +24,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -35,12 +41,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("ComponentStatusSynchronizer", func() {
@@ -59,7 +60,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		cluster    *appsv1alpha1.Cluster
 		component  Component
 		rsm        *workloads.ReplicatedStateMachine
-		reqCtx     *intctrlutil.RequestCtx
+		reqCtx     *controllerutil.RequestCtx
 		dag        *graph.DAG
 		err        error
 	)
@@ -76,17 +77,17 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
 		// non-namespaced resources
-		testapps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, inNS, ml)
 
 		// namespaced resources
-		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.DeploymentSignature, inNS, ml)
-		if intctrlutil.IsRSMEnabled() {
-			testapps.ClearResources(&testCtx, generics.RSMSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.DeploymentSignature, inNS, ml)
+		if controllerutil.IsRSMEnabled() {
+			apps.ClearResources(&testCtx, generics.RSMSignature, inNS, ml)
 		}
 
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -95,16 +96,16 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 	Context("with stateless component", func() {
 		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatelessNginxComponent, compDefName).
+			clusterDef = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.StatelessNginxComponent, compDefName).
 				GetObject()
 
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+			cluster = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(compName, compDefName).
 				SetReplicas(1).
 				GetObject()
 
-			reqCtx = &intctrlutil.RequestCtx{
+			reqCtx = &controllerutil.RequestCtx{
 				Ctx: ctx,
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
@@ -127,30 +128,30 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				deploymentName := clusterName + "-" + compName
-				deployment = testapps.NewDeploymentFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
+				deployment = apps.NewDeploymentFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
 					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetMinReadySeconds(int32(10)).
 					SetReplicas(int32(1)).
-					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
+					AddContainer(corev1.Container{Name: apps.DefaultNginxContainerName, Image: apps.NginxImage}).
 					Create(&testCtx).GetObject()
-				if intctrlutil.IsRSMEnabled() {
-					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
+				if controllerutil.IsRSMEnabled() {
+					rsm = apps.NewRSMFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(1)).
-						AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
+						AddContainer(corev1.Container{Name: apps.DefaultNginxContainerName, Image: apps.NginxImage}).
 						Create(&testCtx).GetObject()
 				}
 
 				podName := fmt.Sprintf("%s-%s-%s", clusterName, compName, testCtx.GetRandomStr())
-				if intctrlutil.IsRSMEnabled() {
+				if controllerutil.IsRSMEnabled() {
 					podName = rsm.Name + "-0"
 				}
-				pod = testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
+				pod = apps.NewPodFactory(testCtx.DefaultNamespace, podName).
 					SetOwnerReferences("apps/v1", constant.DeploymentKind, deployment).
 					AddAppInstanceLabel(clusterName).
 					AddAppComponentLabel(compName).
 					AddAppManangedByLabel().
-					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
+					AddContainer(corev1.Container{Name: apps.DefaultNginxContainerName, Image: apps.NginxImage}).
 					Create(&testCtx).GetObject()
 			})
 
@@ -162,12 +163,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			})
 
 			It("should set component status to running if container is ready", func() {
-				Expect(testapps.ChangeObjStatus(&testCtx, deployment, func() {
-					testk8s.MockDeploymentReady(deployment, NewRSAvailableReason, deployment.Name)
+				Expect(apps.ChangeObjStatus(&testCtx, deployment, func() {
+					testutil.MockDeploymentReady(deployment, NewRSAvailableReason, deployment.Name)
 				})).Should(Succeed())
-				if intctrlutil.IsRSMEnabled() {
-					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+				if controllerutil.IsRSMEnabled() {
+					Expect(apps.ChangeObjStatus(&testCtx, rsm, func() {
+						testutil.MockRSMReady(rsm)
 					})).Should(Succeed())
 				}
 
@@ -179,16 +180,16 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 	Context("with statefulset component", func() {
 		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, compDefName).
+			clusterDef = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.StatefulMySQLComponent, compDefName).
 				GetObject()
 
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+			cluster = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				GetObject()
 
-			reqCtx = &intctrlutil.RequestCtx{
+			reqCtx = &controllerutil.RequestCtx{
 				Ctx: ctx,
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
@@ -211,24 +212,24 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
-				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+				statefulset = apps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(3)).
-					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+					AddContainer(corev1.Container{Name: apps.DefaultMySQLContainerName, Image: apps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
 				// init statefulset status
-				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
+				testutil.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < 3; i++ {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
-					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
+					pod := apps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
 						AddControllerRevisionHashLabel(controllerRevision).
-						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						AddContainer(corev1.Container{Name: apps.DefaultMySQLContainerName, Image: apps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
-					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+					Expect(apps.ChangeObjStatus(&testCtx, pod, func() {
 						pod.Status.Conditions = []corev1.PodCondition{{
 							Type:   corev1.PodReady,
 							Status: corev1.ConditionTrue,
@@ -236,14 +237,14 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					})).Should(Succeed())
 					pods = append(pods, pod)
 				}
-				if intctrlutil.IsRSMEnabled() {
-					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+				if controllerutil.IsRSMEnabled() {
+					rsm = apps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(3)).
-						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						AddContainer(corev1.Container{Name: apps.DefaultMySQLContainerName, Image: apps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
 					// init rsm status
-					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
+					testutil.InitRSMStatus(testCtx, rsm, controllerRevision)
 				}
 			})
 
@@ -256,12 +257,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			})
 
 			It("should set component status to running if container is ready", func() {
-				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
-					testk8s.MockStatefulSetReady(statefulset)
+				Expect(apps.ChangeObjStatus(&testCtx, statefulset, func() {
+					testutil.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
-				if intctrlutil.IsRSMEnabled() {
-					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+				if controllerutil.IsRSMEnabled() {
+					Expect(apps.ChangeObjStatus(&testCtx, rsm, func() {
+						testutil.MockRSMReady(rsm)
 					})).Should(Succeed())
 				}
 
@@ -273,16 +274,16 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 	Context("with consensusset component", func() {
 		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, compDefName).
+			clusterDef = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.ConsensusMySQLComponent, compDefName).
 				Create(&testCtx).GetObject()
 
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+			cluster = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
-			reqCtx = &intctrlutil.RequestCtx{
+			reqCtx = &controllerutil.RequestCtx{
 				Ctx: ctx,
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
@@ -305,23 +306,23 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
-				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+				statefulset = apps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(3)).
-					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+					AddContainer(corev1.Container{Name: apps.DefaultMySQLContainerName, Image: apps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
-				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
+				testutil.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < 3; i++ {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
-					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
+					pod := apps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
 						AddControllerRevisionHashLabel(controllerRevision).
-						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						AddContainer(corev1.Container{Name: apps.DefaultMySQLContainerName, Image: apps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
-					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+					Expect(apps.ChangeObjStatus(&testCtx, pod, func() {
 						pod.Status.Conditions = []corev1.PodCondition{{
 							Type:   corev1.PodReady,
 							Status: corev1.ConditionTrue,
@@ -329,13 +330,13 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					})).Should(Succeed())
 					pods = append(pods, pod)
 				}
-				if intctrlutil.IsRSMEnabled() {
-					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+				if controllerutil.IsRSMEnabled() {
+					rsm = apps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(3)).
-						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						AddContainer(corev1.Container{Name: apps.DefaultMySQLContainerName, Image: apps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
-					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
+					testutil.InitRSMStatus(testCtx, rsm, controllerRevision)
 				}
 			})
 
@@ -347,12 +348,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			})
 
 			It("should set component status to running if container is ready", func() {
-				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
-					testk8s.MockStatefulSetReady(statefulset)
+				Expect(apps.ChangeObjStatus(&testCtx, statefulset, func() {
+					testutil.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
-				if intctrlutil.IsRSMEnabled() {
-					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+				if controllerutil.IsRSMEnabled() {
+					Expect(apps.ChangeObjStatus(&testCtx, rsm, func() {
+						testutil.MockRSMReady(rsm)
 					})).Should(Succeed())
 				}
 
@@ -368,16 +369,16 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 	Context("with replicationset component", func() {
 		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
+			clusterDef = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.ReplicationRedisComponent, compDefName).
 				Create(&testCtx).GetObject()
 
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+			cluster = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(compName, compDefName).
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 
-			reqCtx = &intctrlutil.RequestCtx{
+			reqCtx = &controllerutil.RequestCtx{
 				Ctx: ctx,
 				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
 			}
@@ -403,26 +404,26 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
-				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+				statefulset = apps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(replicas)).
-					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+					AddContainer(corev1.Container{Name: apps.DefaultRedisContainerName, Image: apps.DefaultRedisImageName}).
 					Create(&testCtx).GetObject()
-				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
+				testutil.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < replicas; i++ {
 					podName := fmt.Sprintf("%s-%d", stsName, i)
 					podRole := "primary"
 					if i > 0 {
 						podRole = "secondary"
 					}
-					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
+					pod := apps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
 						AddRoleLabel(podRole).
 						AddControllerRevisionHashLabel(controllerRevision).
-						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+						AddContainer(corev1.Container{Name: apps.DefaultRedisContainerName, Image: apps.DefaultRedisImageName}).
 						Create(&testCtx).GetObject()
 					patch := client.MergeFrom(pod.DeepCopy())
 					pod.Status.Conditions = []corev1.PodCondition{
@@ -434,13 +435,13 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					Expect(testCtx.Cli.Status().Patch(testCtx.Ctx, pod, patch)).Should(Succeed())
 					pods = append(pods, pod)
 				}
-				if intctrlutil.IsRSMEnabled() {
-					rsm = testapps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+				if controllerutil.IsRSMEnabled() {
+					rsm = apps.NewRSMFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
 						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 						SetReplicas(int32(replicas)).
-						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+						AddContainer(corev1.Container{Name: apps.DefaultRedisContainerName, Image: apps.DefaultRedisImageName}).
 						Create(&testCtx).GetObject()
-					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
+					testutil.InitRSMStatus(testCtx, rsm, controllerRevision)
 				}
 			})
 
@@ -452,12 +453,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			})
 
 			It("should set component status to running if container is ready", func() {
-				Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
-					testk8s.MockStatefulSetReady(statefulset)
+				Expect(apps.ChangeObjStatus(&testCtx, statefulset, func() {
+					testutil.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
-				if intctrlutil.IsRSMEnabled() {
-					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+				if controllerutil.IsRSMEnabled() {
+					Expect(apps.ChangeObjStatus(&testCtx, rsm, func() {
+						testutil.MockRSMReady(rsm)
 					})).Should(Succeed())
 				}
 
@@ -469,7 +470,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 })
 
 func mockContainerError(pod *corev1.Pod) error {
-	return testapps.ChangeObjStatus(&testCtx, pod, func() {
+	return apps.ChangeObjStatus(&testCtx, pod, func() {
 		pod.Status.ContainerStatuses = []corev1.ContainerStatus{
 			{
 				State: corev1.ContainerState{
@@ -491,7 +492,7 @@ func mockContainerError(pod *corev1.Pod) error {
 }
 
 func setPodRole(pod *corev1.Pod, role string) error {
-	return testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+	return apps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
 		lpod.Labels[constant.RoleLabelKey] = role
 	})
 }

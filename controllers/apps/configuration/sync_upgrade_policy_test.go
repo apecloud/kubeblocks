@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,9 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
-	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
 )
 
 var operatorSyncPolicy = &syncPolicy{}
@@ -59,7 +59,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+				withGRPCClient(func(addr string) (proto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
@@ -92,7 +92,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 			By("mock remote online update caller")
 			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
+				&proto.OnlineUpgradeParamsResponse{}, nil).
 				MinTimes(3)
 
 			status, err := operatorSyncPolicy.Upgrade(mockParam)
@@ -116,7 +116,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+				withGRPCClient(func(addr string) (proto.ReconfigureClient, error) {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
@@ -160,7 +160,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 			By("mock remote online update caller")
 			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
+				&proto.OnlineUpgradeParamsResponse{}, nil).
 				Times(1)
 
 			status, err := operatorSyncPolicy.Upgrade(mockParam)

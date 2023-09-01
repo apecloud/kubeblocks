@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package infrastructure
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 var ReplicaSetSignature = func(_ kubekeyapiv1alpha2.Cluster, _ any) {}

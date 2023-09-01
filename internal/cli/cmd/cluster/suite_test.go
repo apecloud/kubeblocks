@@ -22,11 +22,12 @@ package cluster
 import (
 	"testing"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func TestCluster(t *testing.T) {

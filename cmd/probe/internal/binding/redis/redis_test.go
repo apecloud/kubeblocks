@@ -26,6 +26,9 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -34,8 +37,6 @@ import (
 	"github.com/go-redis/redismock/v9"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

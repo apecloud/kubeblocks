@@ -22,11 +22,12 @@ package postgres
 import (
 	"fmt"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (

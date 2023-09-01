@@ -26,6 +26,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +36,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // componentFailedTimeout when the duration of component failure exceeds this threshold, it is determined that opsRequest has failed
@@ -52,7 +53,7 @@ func (e *WaitForClusterPhaseErr) Error() string {
 	return fmt.Sprintf("wait for cluster %s to reach phase %v, current status is :%s", e.clusterName, e.expectedPhase, e.currentPhase)
 }
 
-type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
+type handleStatusProgressWithComponent func(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes progressResource,
@@ -62,7 +63,7 @@ type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationStatus)
 
 // reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the common function to reconcile opsRequest status when the opsRequest will affect the lifecycle of the components.
-func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
+func reconcileActionWithComponentOps(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	opsMessageKey string,
@@ -130,7 +131,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 			opsIsCompleted:      opsIsCompleted,
 		}, &compStatus)
 		if err != nil {
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
+			if controllerutil.IsTargetError(err, controllerutil.ErrorWaitCacheRefresh) {
 				return opsRequestPhase, time.Second, nil
 			}
 			return opsRequestPhase, 0, err
@@ -263,7 +264,7 @@ func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 }
 
 // patchOpsRequestToCreating patches OpsRequest.status.phase to Running
-func patchOpsRequestToCreating(reqCtx intctrlutil.RequestCtx,
+func patchOpsRequestToCreating(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	opsDeepCoy *appsv1alpha1.OpsRequest,

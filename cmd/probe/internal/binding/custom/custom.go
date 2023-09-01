@@ -33,8 +33,8 @@ import (
 	"github.com/dapr/kit/logger"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // HTTPCustom is a binding for an http url endpoint invocation

@@ -27,11 +27,11 @@ import (
 	"strconv"
 	"testing"
 
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
-
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type fakeOperations struct {

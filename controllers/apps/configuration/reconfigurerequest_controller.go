@@ -26,6 +26,10 @@ import (
 	"strings"
 	"time"
 
+	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,10 +41,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // ReconfigureRequestReconciler reconciles a ReconfigureRequest object
@@ -76,7 +77,7 @@ var ConfigurationRequiredLabels = []string{
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithName("ReconfigureRequestReconcile").WithValues("ConfigMap", req.NamespacedName),
@@ -85,25 +86,25 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	config := &corev1.ConfigMap{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configmap")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configmap")
 	}
 
 	if !checkConfigurationObject(config) {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	reqCtx.Log = reqCtx.Log.
 		WithValues("ClusterName", config.Labels[constant.AppInstanceLabelKey]).
 		WithValues("ComponentName", config.Labels[constant.KBAppComponentLabelKey])
 	if hash, ok := config.Labels[constant.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	isAppliedConfigs, err := checkAndApplyConfigsChanged(r.Client, reqCtx, config)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedConfigs {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	// process configuration without ConfigConstraints
@@ -120,7 +121,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 	tpl := &appsv1alpha1.ConfigConstraint{}
 	if err := r.Client.Get(reqCtx.Ctx, key, tpl); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 	return r.sync(reqCtx, config, tpl)
 }
@@ -137,7 +138,7 @@ func checkConfigurationObject(object client.Object) bool {
 	return checkConfigLabels(object, ConfigurationRequiredLabels)
 }
 
-func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) sync(reqCtx controllerutil.RequestCtx, config *corev1.ConfigMap, tpl *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
 
 	var (
 		componentName  = config.Labels[constant.KBAppComponentLabelKey]
@@ -157,14 +158,14 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig, keySelector)
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// No parameters updated
 	if configPatch != nil && !configPatch.IsModify {
 		reqCtx.Recorder.Eventf(config, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
 			"nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, config, core.ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, config, core2.ReconfigureNoChangeType)
 	}
 
 	if configPatch != nil {
@@ -177,25 +178,25 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	reconcileContext := newConfigReconcileContext(reqCtx.Ctx, r.Client, config, tpl, componentName, configSpecName, componentLabels)
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// Assumption: It is required that the cluster must have a component.
 	if reconcileContext.ClusterComponent == nil {
 		reqCtx.Log.Info("not found component.")
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 	if reconcileContext.ConfigSpec == nil {
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].", configSpecName, componentName))
 		reqCtx.Recorder.Eventf(config, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"related component does not have any configSpecs, skip reconfigure")
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 && len(reconcileContext.RSMList) == 0 {
 		reqCtx.Recorder.Eventf(config,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 	// TODO(free6om): configuration controller needs workload type to do the config reloading job.
 	// it's a rather hacky way converting rsm to sts to make configuration controller works as usual.
@@ -224,41 +225,41 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	})
 }
 
-func (r *ReconfigureRequestReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) updateConfigCMStatus(reqCtx controllerutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
 	configData, err := json.Marshal(cfg.Data)
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
 	if ok, err := updateAppliedConfigs(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
-		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
+		return controllerutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
 func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) (ctrl.Result, error) {
 	policy, err := NewReconfigurePolicy(params.ConfigConstraint, params.ConfigPatch, getUpgradePolicy(params.ConfigMap), params.Restart)
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
 	}
 
 	returnedStatus, err := policy.Upgrade(params)
-	if err := r.handleConfigEvent(params, core.PolicyExecStatus{
+	if err := r.handleConfigEvent(params, core2.PolicyExecStatus{
 		PolicyName:    policy.GetPolicyName(),
 		ExecStatus:    string(returnedStatus.Status),
 		SucceedCount:  returnedStatus.SucceedCount,
 		ExpectedCount: returnedStatus.ExpectedCount,
 	}, err); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
 	}
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
 	}
 
 	switch returnedStatus.Status {
 	case ESRetry, ESAndRetryFailed:
-		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
+		return controllerutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
 		params.Ctx.Recorder.Eventf(params.ConfigMap,
 			corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureSucceed,
@@ -267,11 +268,11 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
 	case ESFailed:
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
+			return controllerutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	default:
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 }
 
@@ -282,7 +283,7 @@ func getOpsRequestID(cm *corev1.ConfigMap) string {
 	return ""
 }
 
-func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status core.PolicyExecStatus, err error) error {
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status core2.PolicyExecStatus, err error) error {
 	var (
 		cm             = params.ConfigMap
 		lastOpsRequest = ""
@@ -292,7 +293,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
 	}
 
-	eventContext := intctrlutil.ConfigEventContext{
+	eventContext := controllerutil.ConfigEventContext{
 		ConfigSpecName:   params.ConfigSpecName,
 		Client:           params.Client,
 		ReqCtx:           params.Ctx,
@@ -306,7 +307,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		PolicyStatus:     status,
 	}
 
-	for _, handler := range intctrlutil.ConfigEventHandlerMap {
+	for _, handler := range controllerutil.ConfigEventHandlerMap {
 		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(ExecStatus(status.ExecStatus)), err); err != nil {
 			return err
 		}

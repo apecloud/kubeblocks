@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package tasks
 
 import (
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/task"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/utils"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type AddonsInstaller struct {

@@ -22,6 +22,8 @@ package k8score
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,8 +31,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // EventReconciler reconciles an Event object
@@ -49,7 +49,7 @@ type EventReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
 		Log: log.FromContext(ctx).WithValues("event", req.NamespacedName),
@@ -59,17 +59,17 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	event := &corev1.Event{}
 	if err := r.Client.Get(ctx, req.NamespacedName, event); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
 	for _, handler := range EventHandlerMap {
 		// ignores the not found error.
 		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
+			return controllerutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
 		}
 	}
 
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.

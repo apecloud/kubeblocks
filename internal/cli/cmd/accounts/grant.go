@@ -22,14 +22,14 @@ package accounts
 import (
 	"strings"
 
+	channelutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type GrantOptions struct {

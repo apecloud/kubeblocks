@@ -26,12 +26,13 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	v3 "go.etcd.io/etcd/client/v3"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type Etcd struct {

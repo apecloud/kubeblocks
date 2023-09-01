@@ -20,22 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	component2 "github.com/apecloud/kubeblocks/pkg/controller/component"
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ClusterCredentialTransformer creates the connection credential secret
 type ClusterCredentialTransformer struct{}
 
-var _ graph.Transformer = &ClusterCredentialTransformer{}
+var _ graph2.Transformer = &ClusterCredentialTransformer{}
 
-func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *ClusterCredentialTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 
@@ -44,7 +43,7 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 
-	var synthesizedComponent *component.SynthesizedComponent
+	var synthesizedComponent *component2.SynthesizedComponent
 	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
 	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
 		if compDef.Service == nil {
@@ -56,11 +55,11 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		}
 		comps := compSpecMap[compDef.Name]
 		if len(comps) > 0 {
-			synthesizedComponent = &component.SynthesizedComponent{
+			synthesizedComponent = &component2.SynthesizedComponent{
 				Name: comps[0].Name,
 			}
 		} else {
-			synthesizedComponent, err = component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil)
+			synthesizedComponent, err = component2.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil)
 			if err != nil {
 				return err
 			}

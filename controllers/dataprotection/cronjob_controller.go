@@ -22,6 +22,8 @@ package dataprotection
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // CronJobReconciler reconciles a cronjob object
@@ -58,14 +59,14 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err          error
 	)
 
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx: ctx,
 		Req: req,
 		Log: log.FromContext(ctx).WithValues("cronJob", req.NamespacedName),
 	}
 
 	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cronJob); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	backupPolicyKey := types.NamespacedName{
@@ -73,17 +74,17 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Name:      cronJob.Labels[dataProtectionLabelBackupPolicyKey],
 	}
 	if err = r.Client.Get(reqCtx.Ctx, backupPolicyKey, backupPolicy); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	patch := client.MergeFrom(backupPolicy.DeepCopy())
 	if cronJob.Status.LastScheduleTime != nil {
 		backupPolicy.Status.LastScheduleTime = cronJob.Status.LastScheduleTime
 		backupPolicy.Status.LastSuccessfulTime = cronJob.Status.LastSuccessfulTime
 		if err := r.Client.Status().Patch(ctx, backupPolicy, patch); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 	}
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -91,6 +92,6 @@ func (r *CronJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&batchv1.CronJob{}).
 		Owns(&batchv1.Job{}).
-		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.ManagedByKubeBlocksFilterPredicate)).
+		WithEventFilter(predicate.NewPredicateFuncs(controllerutil.ManagedByKubeBlocksFilterPredicate)).
 		Complete(r)
 }

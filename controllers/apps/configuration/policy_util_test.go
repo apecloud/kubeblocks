@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"time"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,8 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -183,11 +184,11 @@ func withConfigPatch(patch map[string]string) ParamsOps {
 	}
 	return func(params *reconfigureParams) {
 		cc := params.ConfigConstraint
-		newConfigData, _ := intctrlutil.MergeAndValidateConfigs(*cc, map[string]string{"for_test": ""}, nil, []core.ParamPairs{{
+		newConfigData, _ := controllerutil.MergeAndValidateConfigs(*cc, map[string]string{"for_test": ""}, nil, []core2.ParamPairs{{
 			Key:           "for_test",
 			UpdatedParams: transKeyPair(patch),
 		}})
-		configPatch, _, _ := core.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FormatterConfig.Format, nil, false)
+		configPatch, _, _ := core2.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FormatterConfig.Format, nil, false)
 		params.ConfigPatch = configPatch
 	}
 }
@@ -218,7 +219,7 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 	params := reconfigureParams{
 		Restart: true,
 		Client:  cli,
-		Ctx: intctrlutil.RequestCtx{
+		Ctx: controllerutil.RequestCtx{
 			Ctx:      ctx,
 			Log:      log.FromContext(ctx).WithValues("policy_test", testName),
 			Recorder: record.NewFakeRecorder(100),

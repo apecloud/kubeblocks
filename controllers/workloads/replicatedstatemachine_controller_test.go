@@ -20,16 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
+	builder2 "github.com/apecloud/kubeblocks/pkg/controller/builder"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("ReplicatedStateMachine Controller", func() {
@@ -55,7 +55,7 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				constant.AppInstanceLabelKey:    "clusterName",
 				constant.KBAppComponentLabelKey: "componentName",
 			}
-			pod := builder.NewPodBuilder(testCtx.DefaultNamespace, "foo").
+			pod := builder2.NewPodBuilder(testCtx.DefaultNamespace, "foo").
 				AddLabelsInMap(commonLabels).
 				AddContainer(corev1.Container{
 					Name:  "foo",
@@ -76,7 +76,7 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				Image:   "foo",
 				Command: []string{"bar"},
 			}
-			rsm := builder.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
+			rsm := builder2.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
 				AddMatchLabelsInMap(commonLabels).
 				SetService(service).
 				SetTemplate(template).

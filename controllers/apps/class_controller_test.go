@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("", func() {
@@ -46,8 +46,8 @@ var _ = Describe("", func() {
 
 		// delete rest mocked objects
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, intctrlutil.ComponentResourceConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ComponentClassDefinitionSignature, ml)
+		apps.ClearResources(&testCtx, intctrlutil.ComponentResourceConstraintSignature, ml)
+		apps.ClearResources(&testCtx, intctrlutil.ComponentClassDefinitionSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -55,8 +55,8 @@ var _ = Describe("", func() {
 	AfterEach(cleanEnv)
 
 	It("Class should exist in status", func() {
-		testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
-			AddConstraints(testapps.GeneralResourceConstraint).
+		apps.NewComponentResourceConstraintFactory(apps.DefaultResourceConstraintName).
+			AddConstraints(apps.GeneralResourceConstraint).
 			AddSelector(v1alpha1.ClusterResourceConstraintSelector{
 				ClusterDefRef: clusterDefRef,
 				Components: []v1alpha1.ComponentResourceConstraintSelector{
@@ -68,14 +68,14 @@ var _ = Describe("", func() {
 			}).
 			Create(&testCtx).GetObject()
 
-		componentClassDefinition = testapps.NewComponentClassDefinitionFactory("custom", clusterDefRef, componentDefRef).
-			AddClasses([]v1alpha1.ComponentClass{testapps.Class1c1g}).
+		componentClassDefinition = apps.NewComponentClassDefinitionFactory("custom", clusterDefRef, componentDefRef).
+			AddClasses([]v1alpha1.ComponentClass{apps.Class1c1g}).
 			Create(&testCtx).GetObject()
 
 		key := client.ObjectKeyFromObject(componentClassDefinition)
-		Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.ComponentClassDefinition) {
+		Eventually(apps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.ComponentClassDefinition) {
 			g.Expect(pobj.Status.Classes).ShouldNot(BeEmpty())
-			g.Expect(pobj.Status.Classes[0].Name).Should(Equal(testapps.Class1c1gName))
+			g.Expect(pobj.Status.Classes[0].Name).Should(Equal(apps.Class1c1gName))
 		})).Should(Succeed())
 	})
 })

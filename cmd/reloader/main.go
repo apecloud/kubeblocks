@@ -27,10 +27,11 @@ import (
 	"path/filepath"
 	"syscall"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/cmd/reloader/app"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // Reload configuration

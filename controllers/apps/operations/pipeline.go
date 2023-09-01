@@ -20,12 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type reconfigureContext struct {
@@ -44,9 +44,9 @@ type pipeline struct {
 	err      error
 	isFailed bool
 
-	updatedParameters []cfgcore.ParamPairs
+	updatedParameters []core.ParamPairs
 	mergedConfig      map[string]string
-	configPatch       *cfgcore.ConfigPatchInfo
+	configPatch       *core.ConfigPatchInfo
 	isFileUpdated     bool
 
 	configMap        *corev1.ConfigMap
@@ -87,7 +87,7 @@ func (p *pipeline) Validate() *pipeline {
 		if p.clusterVer != nil {
 			components = p.clusterVer.Spec.ComponentVersions
 		}
-		configSpecs, err = cfgcore.GetConfigTemplatesFromComponent(
+		configSpecs, err = core.GetConfigTemplatesFromComponent(
 			p.resource.Cluster.Spec.ComponentSpecs,
 			p.clusterDef.Spec.ComponentDefs,
 			components,
@@ -102,7 +102,7 @@ func (p *pipeline) Validate() *pipeline {
 			p.configSpec = configSpec
 			return
 		}
-		err = cfgcore.MakeError(
+		err = core.MakeError(
 			"failed to reconfigure, not existed config[%s], all configs: %v",
 			p.config.Name, getConfigSpecName(configSpecs))
 		p.isFailed = true
@@ -139,7 +139,7 @@ func (p *pipeline) ClusterVersion() *pipeline {
 
 func (p *pipeline) ConfigMap() *pipeline {
 	cmKey := client.ObjectKey{
-		Name:      cfgcore.GetComponentCfgName(p.clusterName, p.componentName, p.configSpec.Name),
+		Name:      core.GetComponentCfgName(p.clusterName, p.componentName, p.configSpec.Name),
 		Namespace: p.resource.Cluster.Namespace,
 	}
 
@@ -153,7 +153,7 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 	validateFn := func() (err error) {
 		if !hasFileUpdate(p.config) {
 			p.isFailed = true
-			err = cfgcore.MakeError(
+			err = core.MakeError(
 				"current configSpec not support reconfigure, configSpec: %v",
 				p.configSpec.Name)
 		}
@@ -186,13 +186,13 @@ func (p *pipeline) doMerge() error {
 	config := p.config
 
 	updatedFiles := make(map[string]string, len(config.Keys))
-	updatedParams := make([]cfgcore.ParamPairs, 0, len(config.Keys))
+	updatedParams := make([]core.ParamPairs, 0, len(config.Keys))
 	for _, key := range config.Keys {
 		if key.FileContent != "" {
 			updatedFiles[key.Key] = key.FileContent
 		}
 		if len(key.Parameters) > 0 {
-			updatedParams = append(updatedParams, cfgcore.ParamPairs{
+			updatedParams = append(updatedParams, core.ParamPairs{
 				Key:           key.Key,
 				UpdatedParams: fromKeyValuePair(key.Parameters),
 			})
@@ -213,7 +213,7 @@ func (p *pipeline) doMerge() error {
 	}
 
 	// for patch update
-	configPatch, restart, err := cfgcore.CreateConfigPatch(cm.Data,
+	configPatch, restart, err := core.CreateConfigPatch(cm.Data,
 		newCfg,
 		cc.Spec.FormatterConfig.Format,
 		p.configSpec.Keys,

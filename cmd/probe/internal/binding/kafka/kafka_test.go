@@ -22,12 +22,12 @@ package kafka
 import (
 	"testing"
 
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/components-contrib/metadata"
 	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
-
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // Test case for Init() function

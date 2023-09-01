@@ -20,6 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -28,11 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("ConfigWrapper util test", func() {
@@ -71,11 +71,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ClusterVersionSignature, ml)
-		testapps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, ml)
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		apps.ClearResources(&testCtx, generics.ClusterVersionSignature, ml)
+		apps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, ml)
+		apps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -85,22 +85,22 @@ var _ = Describe("ConfigWrapper util test", func() {
 		k8sMockClient = testutil.NewK8sMockClient()
 
 		By("creating a cluster")
-		configMapObj = testapps.CreateCustomizedObj(&testCtx,
+		configMapObj = apps.CreateCustomizedObj(&testCtx,
 			"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 			testCtx.UseDefaultNamespace())
 
-		configConstraintObj = testapps.CreateCustomizedObj(&testCtx,
+		configConstraintObj = apps.CreateCustomizedObj(&testCtx,
 			"resources/mysql-config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
 
 		By("Create a clusterDefinition obj")
-		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+		clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(apps.StatefulMySQLComponent, statefulCompDefName).
 			AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+		clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 			AddComponentVersion(statefulCompDefName).
 			Create(&testCtx).GetObject()
 	})

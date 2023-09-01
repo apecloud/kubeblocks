@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
-
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func TestQuery(t *testing.T) {

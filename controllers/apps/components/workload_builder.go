@@ -22,17 +22,18 @@ package components
 import (
 	"fmt"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	plan2 "github.com/apecloud/kubeblocks/pkg/controller/plan"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // TODO(impl): define a custom workload to encapsulate all the resources.
@@ -53,7 +54,7 @@ type componentWorkloadBuilder interface {
 }
 
 type componentWorkloadBuilderBase struct {
-	ReqCtx          intctrlutil.RequestCtx
+	ReqCtx          controllerutil.RequestCtx
 	Client          client.Client
 	Comp            Component
 	DefaultAction   *ictrltypes.LifecycleAction
@@ -80,7 +81,7 @@ func (b *componentWorkloadBuilderBase) BuildConfig() componentWorkloadBuilder {
 			return nil, fmt.Errorf("build config but workload is nil, cluster: %s, component: %s",
 				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
-		err := plan.RenderConfigNScriptFiles(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
+		err := plan2.RenderConfigNScriptFiles(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
 			b.Comp.GetSynthesizedComponent(), b.Workload, b.getRuntime(), b.LocalObjs, b.ReqCtx.Ctx, b.Client)
 		return nil, err
 	}
@@ -144,7 +145,7 @@ func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuild
 							},
 						}
 					}
-					volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, createfn, nil)
+					volumes, _ = controllerutil.CreateOrUpdateVolume(volumes, v.Name, createfn, nil)
 				}
 			}
 			podSpec.Volumes = volumes
@@ -191,11 +192,11 @@ func (b *componentWorkloadBuilderBase) BuildTLSCert() componentWorkloadBuilder {
 		objs := make([]client.Object, 0)
 		switch component.Issuer.Name {
 		case appsv1alpha1.IssuerUserProvided:
-			if err := plan.CheckTLSSecretRef(b.ReqCtx.Ctx, b.Client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
+			if err := plan2.CheckTLSSecretRef(b.ReqCtx.Ctx, b.Client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
 				return nil, err
 			}
 		case appsv1alpha1.IssuerKubeBlocks:
-			secret, err := plan.ComposeTLSSecret(cluster.Namespace, cluster.Name, component.Name)
+			secret, err := plan2.ComposeTLSSecret(cluster.Namespace, cluster.Name, component.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -303,7 +304,7 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 	var secretName, ca, cert, key string
 	switch component.Issuer.Name {
 	case appsv1alpha1.IssuerKubeBlocks:
-		secretName = plan.GenerateTLSSecretName(clusterName, component.Name)
+		secretName = plan2.GenerateTLSSecretName(clusterName, component.Name)
 		ca = builder.CAName
 		cert = builder.CertName
 		key = builder.KeyName

@@ -19,6 +19,8 @@ package appstest
 import (
 	"fmt"
 
+	types2 "github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -28,12 +30,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	clitypes "github.com/apecloud/kubeblocks/internal/cli/types"
 	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("MySQL Reconfigure function", func() {
@@ -60,16 +61,16 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest configurations
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
+		apps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		apps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -89,7 +90,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		configName string, configFile string,
 		parameterKey string, parameterValue *string) (opsRequest *appsv1alpha1.OpsRequest) {
 		randomOpsName := "reconfigure-ops-" + testCtx.GetRandomStr()
-		opsRequest = testapps.NewOpsRequestObj(randomOpsName, testCtx.DefaultNamespace,
+		opsRequest = apps.NewOpsRequestObj(randomOpsName, testCtx.DefaultNamespace,
 			clusterName, appsv1alpha1.ReconfiguringType)
 		opsRequest.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
 			Configurations: []appsv1alpha1.Configuration{{
@@ -114,7 +115,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Get configuration information from cluster")
 		componentName = clusterObj.Spec.ComponentSpecs[0].ComponentDefRef
-		tpls, err := core.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs,
+		tpls, err := core2.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs,
 			clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)
 		Expect(err).Should(BeNil())
 		Expect(len(tpls) > 0).Should(BeTrue())
@@ -129,8 +130,8 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		Expect(len(validTpls) > 0).Should(BeTrue())
 
 		cmObj = &corev1.ConfigMap{}
-		cmName := core.GetComponentCfgName(clusterObj.Name, componentName, tpls[0].Name)
-		err = cliutil.GetResourceObjectFromGVR(clitypes.ConfigmapGVR(), client.ObjectKey{
+		cmName := core2.GetComponentCfgName(clusterObj.Name, componentName, tpls[0].Name)
+		err = cliutil.GetResourceObjectFromGVR(types2.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: testCtx.DefaultNamespace,
 		}, dynamicClient, cmObj)
@@ -141,14 +142,14 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 	testReconfigureThreeReplicas := func() {
 		By("Create a cluster obj")
-		clusterName := testapps.GetRandomizedKey("", clusterNamePrefix).Name
+		clusterName := apps.GetRandomizedKey("", clusterNamePrefix).Name
 		clusterDefObj, clusterVersionObj, clusterObj = CreateSimpleConsensusMySQLClusterWithConfig(
 			testCtx, clusterDefName, clusterVersionName, clusterName, mysqlConfigTemplatePath, mysqlConfigConstraintPath, mysqlScriptsPath)
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		fmt.Printf("ClusterDefinition:%s ClusterVersion:%s Cluster:%s \n", clusterDefObj.Name, clusterVersionObj.Name, clusterObj.Name)
 
 		By("Waiting the cluster is created")
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+		Eventually(apps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 
 		By("Checking pods' role label")
 		sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey).Items[0]
@@ -180,10 +181,10 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Checking ReconfigureOpsRequest is running")
 		opsKey := types.NamespacedName{Name: reconfigureOpsRequest.Name, Namespace: testCtx.DefaultNamespace}
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
+		Eventually(apps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
 		By("Checking Cluster and changed component phase is Reconfiguring")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+		Eventually(apps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))                               // appsv1alpha1.ReconfiguringPhase
 			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
 			// TODO: add status condition check

@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	chaosmeshv1alpha1 "github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
@@ -42,9 +44,8 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 const (
@@ -330,12 +331,12 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 }
 
 func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef string) *appsv1alpha1.ComponentClassDefinition {
-	testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
-		AddConstraints(testapps.GeneralResourceConstraint).
+	apps.NewComponentResourceConstraintFactory(apps.DefaultResourceConstraintName).
+		AddConstraints(apps.GeneralResourceConstraint).
 		GetObject()
 
-	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
-		AddClasses([]appsv1alpha1.ComponentClass{testapps.Class1c1g, testapps.Class2c4g}).
+	componentClassDefinition := apps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
+		AddClasses([]appsv1alpha1.ComponentClass{apps.Class1c1g, apps.Class2c4g}).
 		GetObject()
 
 	return componentClassDefinition

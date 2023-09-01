@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +39,6 @@ import (
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	migrationv1 "github.com/apecloud/kubeblocks/internal/cli/types/migrationapi"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )

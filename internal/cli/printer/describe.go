@@ -22,6 +22,9 @@ package printer
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"io"
 	"reflect"
 
@@ -31,9 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
 const NoneString = "<none>"

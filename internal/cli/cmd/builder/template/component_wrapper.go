@@ -27,6 +27,13 @@ import (
 	"reflect"
 	"strings"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,13 +43,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type templateRenderWorkflow struct {
@@ -76,7 +77,7 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 	if w.renderedOpts.ConfigSpec != "" {
 		comp := w.getComponentWithConfigSpec(w.renderedOpts.ConfigSpec)
 		if comp == nil {
-			return core.MakeError("config spec[%s] is not found", w.renderedOpts.ConfigSpec)
+			return core2.MakeError("config spec[%s] is not found", w.renderedOpts.ConfigSpec)
 		}
 		components = []appsv1alpha1.ClusterComponentDefinition{*comp}
 	}
@@ -99,7 +100,7 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 func (w *templateRenderWorkflow) getComponentName(componentType string, cluster *appsv1alpha1.Cluster) (string, error) {
 	clusterCompSpec := cluster.Spec.GetDefNameMappingComponents()[componentType]
 	if len(clusterCompSpec) == 0 {
-		return "", core.MakeError("component[%s] is not defined in cluster definition", componentType)
+		return "", core2.MakeError("component[%s] is not defined in cluster definition", componentType)
 	}
 	return clusterCompSpec[0].Name, nil
 }
@@ -171,7 +172,7 @@ func (w *templateRenderWorkflow) dumpRenderedTemplates(outputDir string, objects
 			continue
 		}
 		comName, _ := w.getComponentName(componentDef.Name, cluster)
-		cfgName := core.GetComponentCfgName(cluster.Name, comName, template.Name)
+		cfgName := core2.GetComponentCfgName(cluster.Name, comName, template.Name)
 		if err := dumpTemplate(template, outputDir, objects, componentDef.Name, cfgName, foundConfigSpec(synthesizedComponent, template.Name)); err != nil {
 			return err
 		}
@@ -230,7 +231,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions, clu
 
 	clusterDefObj := GetTypedResourceObjectBySignature(allObjects, generics.ClusterDefinitionSignature, WithResourceName(clusterDef))
 	if clusterDefObj == nil {
-		return nil, core.MakeError("cluster definition object is not found in helm template directory[%s]", helmTemplateDir)
+		return nil, core2.MakeError("cluster definition object is not found in helm template directory[%s]", helmTemplateDir)
 	}
 
 	// hack apiserver auto filefield
@@ -238,7 +239,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions, clu
 
 	var cdComponents []appsv1alpha1.ClusterComponentDefinition
 	if cdComponents = getClusterDefComponents(clusterDefObj, opts.ComponentName); cdComponents == nil {
-		return nil, core.MakeError("component[%s] is not defined in cluster definition", opts.ComponentName)
+		return nil, core2.MakeError("component[%s] is not defined in cluster definition", opts.ComponentName)
 	}
 	clusterVersionObj := foundCVResource(allObjects)
 	return &templateRenderWorkflow{

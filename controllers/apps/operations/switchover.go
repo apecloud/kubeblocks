@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type switchoverOpsHandler struct{}
@@ -59,7 +60,7 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handle the switchover request.
-func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+func (r switchoverOpsHandler) ActionStartedCondition(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
 	switchoverMessageMap := make(map[string]SwitchoverMessage)
 	for _, switchover := range opsRes.OpsRequest.Spec.SwitchoverList {
 		pod, err := getPrimaryOrLeaderPod(reqCtx.Ctx, cli, *opsRes.Cluster, switchover.ComponentName, opsRes.Cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
@@ -80,13 +81,13 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 }
 
 // Action to do the switchover operation.
-func (r switchoverOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+func (r switchoverOpsHandler) Action(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return doSwitchoverComponents(reqCtx, cli, opsRes, opsRes.OpsRequest.Spec.SwitchoverList)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for switchover opsRequest.
-func (r switchoverOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+func (r switchoverOpsHandler) ReconcileAction(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	var (
 		opsRequestPhase = appsv1alpha1.OpsRunningPhase
 	)
@@ -105,12 +106,12 @@ func (r switchoverOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
 // empty implementation here.
-func (r switchoverOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+func (r switchoverOpsHandler) SaveLastConfiguration(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
 
 // doSwitchoverComponents creates the switchover job for each component.
-func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, switchoverList []appsv1alpha1.Switchover) error {
+func doSwitchoverComponents(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource, switchoverList []appsv1alpha1.Switchover) error {
 	var (
 		opsRequest          = opsRes.OpsRequest
 		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
@@ -159,7 +160,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 // - expectCount: the expected count of switchover operations
 // - completedCount: the number of completed switchover operations
 // - error: any error that occurred during the handling
-func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, error) {
+func handleSwitchoverProgress(reqCtx controllerutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, error) {
 	var (
 		expectCount         = int32(len(opsRes.OpsRequest.Spec.SwitchoverList))
 		completedCount      int32
@@ -222,7 +223,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		}
 
 		if !consistency {
-			err = intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for pod role label consistency.")
+			err = controllerutil.NewErrorf(controllerutil.ErrorWaitCacheRefresh, "requeue to waiting for pod role label consistency.")
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		} else {

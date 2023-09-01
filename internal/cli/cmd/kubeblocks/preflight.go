@@ -27,6 +27,9 @@ import (
 	"os/signal"
 	"strings"
 
+	preflight2 "github.com/apecloud/kubeblocks/internal/cli/preflight"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
@@ -41,8 +44,6 @@ import (
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	kbpreflight "github.com/apecloud/kubeblocks/internal/preflight"
 )
 
 const (
@@ -225,12 +226,12 @@ func (p *PreflightOptions) run() error {
 	progressCollections, ctx := errgroup.WithContext(ctx)
 	progressCollections.Go(CollectProgress(ctx, progressCh, p.verbose))
 	// 1. load yaml
-	if kbPreflight, kbHostPreflight, preflightName, err = kbpreflight.LoadPreflightSpec(p.checkFileList, p.checkYamlData); err != nil {
+	if kbPreflight, kbHostPreflight, preflightName, err = preflight2.LoadPreflightSpec(p.checkFileList, p.checkYamlData); err != nil {
 		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	// 2. collect data
 	s := spinner.New(p.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Collecting data from cluster")))
-	collectResults, err = kbpreflight.CollectPreflight(p.factory, &p.ValueOpts, ctx, kbPreflight, kbHostPreflight, progressCh)
+	collectResults, err = preflight2.CollectPreflight(p.factory, &p.ValueOpts, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
 		s.Fail()
 		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
@@ -250,7 +251,7 @@ func (p *PreflightOptions) run() error {
 		fmt.Fprintln(p.Out, "no data has been collected")
 		return nil
 	}
-	if err = kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose, p.Out); err != nil {
+	if err = preflight2.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose, p.Out); err != nil {
 		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	return nil

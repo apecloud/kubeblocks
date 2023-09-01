@@ -34,12 +34,12 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/class"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func generateComponents(component appsv1alpha1.ClusterComponentSpec, count int) []map[string]interface{} {

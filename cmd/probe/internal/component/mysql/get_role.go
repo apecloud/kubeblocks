@@ -23,12 +23,13 @@ import (
 	"context"
 	"strings"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/pkg/errors"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func (mgr *Manager) GetRole(ctx context.Context) (string, error) {

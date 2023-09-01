@@ -25,6 +25,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -35,15 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func TestIsFailedOrAbnormal(t *testing.T) {
@@ -161,14 +162,14 @@ var _ = Describe("Consensus Component", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -178,11 +179,11 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+			_, _, cluster := apps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
-			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
-			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+			sts := apps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+			apps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
+			_ = apps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
 			componentDef, _ := appsv1alpha1.GetComponentDefByCluster(ctx, k8sClient, *cluster, consensusCompDefRef)
@@ -259,7 +260,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			// mock available replicas to component replicas
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)
 			})).Should(Succeed())
 			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
@@ -268,10 +269,10 @@ var _ = Describe("Consensus Component", func() {
 
 			// mock component is abnormal
 			pod := &podList.Items[0]
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, pod, func() {
 				pod.Status.Conditions = nil
 			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, sts, func() {
 				sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
 			})).Should(Succeed())
 			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
@@ -281,7 +282,7 @@ var _ = Describe("Consensus Component", func() {
 		})
 
 		It("test GetComponentInfoByPod with no cluster componentSpec", func() {
-			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+			_, _, cluster := apps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
 			By("set componentSpec to nil")
 			cluster.Spec.ComponentSpecs = nil
@@ -336,10 +337,10 @@ var _ = Describe("Consensus Component", func() {
 
 		Context("updateCustomLabelToPods func", func() {
 			It("should work well", func() {
-				_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+				_, _, cluster := apps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 					clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-				sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
-				pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
+				sts := apps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+				pods := apps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
 				customLabelSpec := appsv1alpha1.CustomLabelSpec{
 					Key:       "custom-label-key",
@@ -397,8 +398,8 @@ var _ = Describe("Component utils test", func() {
 				role        = "leader"
 				mode        = "ReadWrite"
 			)
-			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
-			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
+			pod := apps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			ppod := apps.NewPodFactory(testCtx.DefaultNamespace, "pod").
 				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
@@ -407,8 +408,8 @@ var _ = Describe("Component utils test", func() {
 				AddConsensusSetAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
 				AddContainer(corev1.Container{
-					Name:  testapps.DefaultMySQLContainerName,
-					Image: testapps.ApeCloudMySQLImage,
+					Name:  apps.DefaultMySQLContainerName,
+					Image: apps.ApeCloudMySQLImage,
 					LivenessProbe: &corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{

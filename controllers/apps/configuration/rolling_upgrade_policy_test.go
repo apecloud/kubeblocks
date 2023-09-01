@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,10 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
-	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Reconfigure RollingPolicy", func() {
@@ -64,7 +64,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			withConfigSpec("for_test", map[string]string{
 				"key": "value",
 			}),
-			withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
+			withGRPCClient(func(addr string) (proto.ReconfigureClient, error) {
 				return reconfigureClient, nil
 			}),
 			withClusterComponent(replicas),
@@ -127,7 +127,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			}, testutil.WithAnyTimes()))
 
 			reconfigureClient.EXPECT().StopContainer(gomock.Any(), gomock.Any()).
-				Return(&cfgproto.StopContainerResponse{}, nil).
+				Return(&proto.StopContainerResponse{}, nil).
 				AnyTimes()
 
 			// mock wait the number of pods to target replicas
@@ -196,7 +196,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			}, testutil.WithTimes(defaultReplica)))
 
 			reconfigureClient.EXPECT().StopContainer(gomock.Any(), gomock.Any()).
-				Return(&cfgproto.StopContainerResponse{}, nil).
+				Return(&proto.StopContainerResponse{}, nil).
 				Times(defaultReplica)
 
 			// mock wait the number of pods to target replicas

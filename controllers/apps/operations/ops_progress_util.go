@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // getProgressObjectKey gets progress object key from the client.Object.
@@ -164,7 +165,7 @@ func removeStatelessExpiredPods(podList *corev1.PodList,
 // handleComponentStatusProgress handles the component status progressDetails.
 // if all the pods of the component are affected, use this function to reconcile the progressDetails.
 func handleComponentStatusProgress(
-	reqCtx intctrlutil.RequestCtx,
+	reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes progressResource,
@@ -196,14 +197,14 @@ func handleComponentStatusProgress(
 
 // handleStatelessProgress handles the stateless component progressDetails.
 // For stateless component changes, it applies the Deployment updating policy.
-func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
+func handleStatelessProgress(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
-		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
+		return 0, controllerutil.NewError(controllerutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
 	minReadySeconds, err := components.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
 	if err != nil {
@@ -215,7 +216,7 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 }
 
 // handleStatefulSetProgress handles the component progressDetails which using statefulSet workloads.
-func handleStatefulSetProgress(reqCtx intctrlutil.RequestCtx,
+func handleStatefulSetProgress(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	podList *corev1.PodList,
@@ -422,7 +423,7 @@ func getComponentLastReplicas(opsRequest *appsv1alpha1.OpsRequest, componentName
 // @return expectProgressCount,
 // @return completedCount
 // @return error
-func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
+func handleComponentProgressForScalingReplicas(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes progressResource,
@@ -454,7 +455,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	}
 	actualPodsLen := int32(len(podList.Items))
 	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != actualPodsLen {
-		return 0, 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of component to be synchronized")
+		return 0, 0, controllerutil.NewError(controllerutil.ErrorWaitCacheRefresh, "wait for the pods of component to be synchronized")
 	}
 	if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
 		expectReplicas = opsRequest.Status.LastConfiguration.Components[clusterComponent.Name].Replicas
@@ -485,7 +486,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 }
 
 // handleScaleOutProgress handles the progressDetails of scaled out replicas.
-func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
+func handleScaleOutProgress(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes progressResource,
@@ -518,7 +519,7 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 
 // handleScaleDownProgress handles the progressDetails of scaled down replicas.
 func handleScaleDownProgress(
-	reqCtx intctrlutil.RequestCtx,
+	reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes progressResource,

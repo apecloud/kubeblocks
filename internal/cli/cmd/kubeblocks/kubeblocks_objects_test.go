@@ -22,6 +22,8 @@ package kubeblocks
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,8 +37,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("kubeblocks objects", func() {
@@ -53,8 +54,8 @@ var _ = Describe("kubeblocks objects", func() {
 		}
 
 		labels := map[string]string{
-			"types.InstanceLabelKey": types.KubeBlocksChartName,
-			"release":                types.KubeBlocksChartName,
+			"constant.InstanceLabelKey": types.KubeBlocksChartName,
+			"release":                   types.KubeBlocksChartName,
 		}
 		for k, v := range labels {
 			dynamic = testing.FakeDynamicClient(mockDeploy(map[string]string{

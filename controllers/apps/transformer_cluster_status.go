@@ -22,9 +22,10 @@ package apps
 import (
 	"fmt"
 
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/api/meta"
 )
@@ -50,9 +51,9 @@ type ClusterStatusTransformer struct {
 	replicasNotReadyCompNames map[string]struct{}
 }
 
-var _ graph.Transformer = &ClusterStatusTransformer{}
+var _ graph2.Transformer = &ClusterStatusTransformer{}
 
-func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ClusterStatusTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	origCluster := transCtx.OrigCluster
 	cluster := transCtx.Cluster
@@ -94,7 +95,7 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 }
 
 // reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
-func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTransformContext, dag *graph.DAG, cluster *appsv1alpha1.Cluster) error {
+func (t *ClusterStatusTransformer) reconcileClusterStatus(transCtx *ClusterTransformContext, dag *graph2.DAG, cluster *appsv1alpha1.Cluster) error {
 	if len(cluster.Status.Components) == 0 {
 		return nil
 	}
@@ -138,7 +139,7 @@ func (t *ClusterStatusTransformer) removeInvalidCompStatus(cluster *appsv1alpha1
 }
 
 // doAnalysisAndUpdateSynchronizer analyzes the Cluster.Status.Components and updates the results to the synchronizer.
-func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph.DAG, cluster *appsv1alpha1.Cluster) {
+func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph2.DAG, cluster *appsv1alpha1.Cluster) {
 	var (
 		runningCompCount int
 		stoppedCompCount int

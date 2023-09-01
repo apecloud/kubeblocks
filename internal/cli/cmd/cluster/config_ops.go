@@ -24,6 +24,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -31,16 +33,14 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type configOpsOptions struct {
@@ -91,7 +91,7 @@ func (o *configOpsOptions) Complete() error {
 
 func (o *configOpsOptions) validateReconfigureOptions() error {
 	if o.LocalFilePath != "" && o.CfgFile == "" {
-		return core.MakeError("config file is required when using --local-file")
+		return core2.MakeError("config file is required when using --local-file")
 	}
 	if o.LocalFilePath != "" {
 		b, err := os.ReadFile(o.LocalFilePath)
@@ -104,7 +104,7 @@ func (o *configOpsOptions) validateReconfigureOptions() error {
 		if err != nil {
 			return err
 		}
-		o.KeyValues = core.FromStringPointerMap(kvs)
+		o.KeyValues = core2.FromStringPointerMap(kvs)
 	}
 	return nil
 }
@@ -147,9 +147,9 @@ func (o *configOpsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfi
 	if o.FileContent != "" {
 		newConfigData = map[string]string{o.CfgFile: o.FileContent}
 	} else {
-		newConfigData, err = controllerutil.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []core.ParamPairs{{
+		newConfigData, err = controllerutil.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []core2.ParamPairs{{
 			Key:           o.CfgFile,
-			UpdatedParams: core.FromStringMap(o.KeyValues),
+			UpdatedParams: core2.FromStringMap(o.KeyValues),
 		}})
 	}
 	if err != nil {
@@ -171,7 +171,7 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 		return o.confirmReconfigureWithRestart()
 	}
 
-	configPatch, restart, err := core.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, o.FileContent != "")
+	configPatch, restart, err := core2.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, o.FileContent != "")
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 		return o.confirmReconfigureWithRestart()
 	}
 
-	dynamicUpdated, err := core.IsUpdateDynamicParameters(cc, configPatch)
+	dynamicUpdated, err := core2.IsUpdateDynamicParameters(cc, configPatch)
 	if err != nil {
 		return nil
 	}
@@ -207,7 +207,7 @@ func (o *configOpsOptions) confirmReconfigureWithRestart() error {
 
 func (o *configOpsOptions) parseUpdatedParams() (map[string]string, error) {
 	if len(o.Parameters) == 0 && len(o.LocalFilePath) == 0 {
-		return nil, core.MakeError(missingUpdatedParametersErrMessage)
+		return nil, core2.MakeError(missingUpdatedParametersErrMessage)
 	}
 
 	keyValues := make(map[string]string)
@@ -216,7 +216,7 @@ func (o *configOpsOptions) parseUpdatedParams() (map[string]string, error) {
 		for _, p := range pp {
 			fields := strings.SplitN(p, "=", 2)
 			if len(fields) != 2 {
-				return nil, core.MakeError("updated parameter format: key=value")
+				return nil, core2.MakeError("updated parameter format: key=value")
 			}
 			keyValues[fields[0]] = fields[1]
 		}

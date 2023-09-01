@@ -23,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	probeutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -30,9 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // RoleChangeEventHandler is the event handler for the role change event

@@ -26,6 +26,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/spf13/cobra"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,13 +38,12 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/openapi"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	openapi2 "github.com/apecloud/kubeblocks/pkg/configuration/openapi"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type configObserverOptions struct {
@@ -177,7 +178,7 @@ func (r *configObserverOptions) printExplainConfigure(configSpecs configSpecsTyp
 			fmt.Printf("\n%s\n", fmt.Sprintf(notConfigSchemaPrompt, printer.BoldYellow(tplName)))
 			return nil
 		}
-		apiSchema, err := openapi.GenerateOpenAPISchema(schema.CUE, confSpec.CfgSchemaTopLevelName)
+		apiSchema, err := openapi2.GenerateOpenAPISchema(schema.CUE, confSpec.CfgSchemaTopLevelName)
 		if err != nil {
 			return cfgcore.WrapError(err, "failed to generate open api schema")
 		}
@@ -290,12 +291,12 @@ func (r *configObserverOptions) printConfigConstraint(schema *apiext.JSONSchemaP
 	var (
 		maxDocumentLength = 100
 		maxEnumLength     = 20
-		spec              = schema.Properties[openapi.DefaultSchemaName]
+		spec              = schema.Properties[openapi2.DefaultSchemaName]
 		params            = make([]*parameterSchema, 0)
 	)
 
-	for key, property := range openapi.FlattenSchema(spec).Properties {
-		if property.Type == openapi.SchemaStructType {
+	for key, property := range openapi2.FlattenSchema(spec).Properties {
+		if property.Type == openapi2.SchemaStructType {
 			continue
 		}
 		if r.hasSpecificParam() && !r.isSpecificParam(key) {

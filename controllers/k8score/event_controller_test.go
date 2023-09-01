@@ -24,6 +24,12 @@ import (
 	"strings"
 	"time"
 
+	builder2 "github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	probeutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -35,12 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Event Controller", func() {
@@ -51,14 +52,14 @@ var _ = Describe("Event Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.EventSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.EventSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 	}
 
 	var (
@@ -77,7 +78,7 @@ var _ = Describe("Event Controller", func() {
 			UID:        podUid,
 		}
 		eventName := strings.Join([]string{podName, seq}, ".")
-		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
+		return builder2.NewEventBuilder(testCtx.DefaultNamespace, eventName).
 			SetInvolvedObject(objectRef).
 			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
 			SetReason(string(probeutil.CheckRoleOperation)).
@@ -88,7 +89,7 @@ var _ = Describe("Event Controller", func() {
 	}
 
 	createInvolvedPod := func(name, clusterName, componentName string) *corev1.Pod {
-		return builder.NewPodBuilder(testCtx.DefaultNamespace, name).
+		return builder2.NewPodBuilder(testCtx.DefaultNamespace, name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddLabels(constant.KBAppComponentLabelKey, componentName).
 			SetContainers([]corev1.Container{
@@ -110,14 +111,14 @@ var _ = Describe("Event Controller", func() {
 			clusterDefName := "foo"
 			consensusCompName := "consensus"
 			consensusCompDefName := "consensus"
-			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
+			clusterDefObj := apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.ConsensusMySQLComponent, consensusCompDefName).
 				Create(&testCtx).GetObject()
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "",
+			clusterObj := apps.NewClusterFactory(testCtx.DefaultNamespace, "",
 				clusterDefObj.Name, "").WithRandomName().
 				AddComponent(consensusCompName, consensusCompDefName).
 				Create(&testCtx).GetObject()
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+			Eventually(apps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 			By("create involved pod")
 			var uid types.UID
@@ -151,14 +152,14 @@ var _ = Describe("Event Controller", func() {
 				return event.InvolvedObject.Name
 			}).Should(Equal(sndEvent.InvolvedObject.Name))
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
 				g.Expect(p.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]).Should(Equal(sndEvent.LastTimestamp.Time.Format(time.RFC3339)))
 			})).Should(Succeed())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
 				g.Expect(e).ShouldNot(BeNil())
 				g.Expect(e.Annotations).ShouldNot(BeNil())
 				g.Expect(e.Annotations[roleChangedAnnotKey]).Should(Equal(trueStr))
@@ -182,7 +183,7 @@ var _ = Describe("Event Controller", func() {
 				}
 				return event.InvolvedObject.Name
 			}).Should(Equal(sndInvalidEvent.InvolvedObject.Name))
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).ShouldNot(Equal(role))
@@ -204,7 +205,7 @@ var _ = Describe("Event Controller", func() {
 				}
 				return event.InvolvedObject.Name
 			}).Should(Equal(sndValidEvent.InvolvedObject.Name))
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))

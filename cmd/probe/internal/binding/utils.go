@@ -39,8 +39,8 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
 )
 
 type RedisEntry struct {

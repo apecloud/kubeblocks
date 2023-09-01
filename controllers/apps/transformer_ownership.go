@@ -20,22 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // OwnershipTransformer adds finalizer to all none cluster objects
 type OwnershipTransformer struct{}
 
-var _ graph.Transformer = &OwnershipTransformer{}
+var _ graph2.Transformer = &OwnershipTransformer{}
 
-func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (f *OwnershipTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err

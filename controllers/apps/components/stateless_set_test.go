@@ -23,6 +23,10 @@ import (
 	"fmt"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -32,9 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("Stateful Component", func() {
@@ -61,9 +62,9 @@ var _ = Describe("Stateful Component", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -73,12 +74,12 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateless Component test", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
-			clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
+			clusterDef := apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.StatelessNginxComponent, statelessCompDefName).
 				Create(&testCtx).GetObject()
-			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+			cluster := apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(2).Create(&testCtx).GetObject()
-			deploy := testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
+			deploy := apps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.Spec.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			statelessComponent := newStateless(k8sClient, cluster, clusterComponent, *componentDef)
@@ -88,18 +89,18 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pod is ready")
 			rsName := deploy.Name + "-5847cb795c"
-			pod := testapps.MockStatelessPod(&testCtx, deploy, clusterName, statelessCompName, rsName+randomStr)
+			pod := apps.MockStatelessPod(&testCtx, deploy, clusterName, statelessCompName, rsName+randomStr)
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
-			testk8s.MockPodAvailable(pod, lastTransTime)
+			testutil.MockPodAvailable(pod, lastTransTime)
 			Expect(statelessComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())
 
 			By("test a part pods of deploy are not ready")
 			// mock pod is not ready
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, pod, func() {
 				pod.Status.Conditions = []corev1.PodCondition{}
 			})).Should(Succeed())
 			// mock deployment is processing rs
-			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, deploy, func() {
 				deploy.Status.Conditions = []appsv1.DeploymentCondition{
 					{
 						Type:    appsv1.DeploymentProgressing,
@@ -110,7 +111,7 @@ var _ = Describe("Stateful Component", func() {
 				}
 				deploy.Status.ObservedGeneration = 1
 			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, deploy, func() {
 				availableReplicas := *deploy.Spec.Replicas - 1
 				deploy.Status.AvailableReplicas = availableReplicas
 				deploy.Status.ReadyReplicas = availableReplicas
@@ -127,12 +128,12 @@ var _ = Describe("Stateful Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("expect component phase is Abnormal when pod of component is failed")
-			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
+			testutil.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, false)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("test pods of deployment are ready")
-			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason, rsName)
+			testutil.MockDeploymentReady(deploy, NewRSAvailableReason, rsName)
 			podsReady, _ = statelessComponent.PodsReady(ctx, deploy)
 			Expect(podsReady).Should(BeTrue())
 
@@ -155,7 +156,7 @@ var _ = Describe("Stateful Component", func() {
 			// Expect(requeue == false).Should(BeTrue())
 
 			By("test pod is not failed and not controlled by new ReplicaSet of deployment")
-			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, deploy, func() {
 				deploy.Status.Conditions = []appsv1.DeploymentCondition{
 					{
 						Type:    appsv1.DeploymentProgressing,

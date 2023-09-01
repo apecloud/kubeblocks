@@ -23,16 +23,17 @@ import (
 	"context"
 	"reflect"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func retrieveRelatedComponentsByConfigmap[T generics.Object, L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, configSpecName string, _ func(T, L), cfg client.ObjectKey, opts ...client.ListOption) ([]T, []string, error) {
@@ -43,12 +44,12 @@ func retrieveRelatedComponentsByConfigmap[T generics.Object, L generics.ObjList[
 
 	objs := make([]T, 0)
 	containers := cfgutil.NewSet()
-	configSpecKey := core.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
+	configSpecKey := core2.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
 	items := toObjects[T, L, PL](&objList)
 	for i := range items {
 		obj := toResourceObject(&items[i])
 		if objs == nil {
-			return nil, nil, core.MakeError("failed to convert to resource object")
+			return nil, nil, core2.MakeError("failed to convert to resource object")
 		}
 		if !foundComponentConfigSpec(obj.GetAnnotations(), configSpecKey, cfg.Name) {
 			continue

@@ -22,6 +22,10 @@ package operations
 import (
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -34,10 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
@@ -64,15 +65,15 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		apps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -81,9 +82,9 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 	createPVC := func(clusterName, scName, vctName, pvcName string) {
 		// Note: in real k8s cluster, it maybe fails when pvc created by k8s controller.
-		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-			consensusCompName, testapps.DataVolumeName).AddLabels(constant.AppInstanceLabelKey, clusterName,
-			constant.VolumeClaimTemplateNameLabelKey, testapps.DataVolumeName,
+		apps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+			consensusCompName, apps.DataVolumeName).AddLabels(constant.AppInstanceLabelKey, clusterName,
+			constant.VolumeClaimTemplateNameLabelKey, apps.DataVolumeName,
 			constant.KBAppComponentLabelKey, consensusCompName).SetStorage("2Gi").SetStorageClass(storageClassName).CheckedCreate(&testCtx)
 	}
 
@@ -92,13 +93,13 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		for _, pvcName := range pvcNames {
 			createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 			// mock pvc is Bound
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, func(pvc *corev1.PersistentVolumeClaim) {
+			Expect(apps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Status.Phase = corev1.ClaimBound
 			})()).ShouldNot(HaveOccurred())
 
 		}
 		currRandomStr := testCtx.GetRandomStr()
-		ops := testapps.NewOpsRequestObj("volumeexpansion-ops-"+currRandomStr, testCtx.DefaultNamespace,
+		ops := apps.NewOpsRequestObj("volumeexpansion-ops-"+currRandomStr, testCtx.DefaultNamespace,
 			clusterObject.Name, appsv1alpha1.VolumeExpansionType)
 		ops.Spec.VolumeExpansionList = []appsv1alpha1.VolumeExpansion{
 			{
@@ -114,7 +115,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		opsRes.OpsRequest = ops
 
 		// create opsRequest
-		ops = testapps.CreateOpsRequest(ctx, testCtx, ops)
+		ops = apps.CreateOpsRequest(ctx, testCtx, ops)
 		return ops, pvcNames
 	}
 
@@ -129,13 +130,13 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 		By("mock pvc.spec.resources.request.storage has applied by cluster controller")
 		for _, pvcName := range pvcNames {
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, func(pvc *corev1.PersistentVolumeClaim) {
+			Expect(apps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = newOps.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Storage
 			})()).ShouldNot(HaveOccurred())
 		}
 
 		By("mock opsRequest is Running")
-		Expect(testapps.ChangeObjStatus(&testCtx, newOps, func() {
+		Expect(apps.ChangeObjStatus(&testCtx, newOps, func() {
 			newOps.Status.Phase = appsv1alpha1.OpsRunningPhase
 			newOps.Status.StartTimestamp = metav1.Time{Time: time.Now()}
 		})).ShouldNot(HaveOccurred())
@@ -176,7 +177,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		event.FirstTimestamp = metav1.Time{Time: time.Now()}
 		event.LastTimestamp = metav1.Time{Time: time.Now().Add(61 * time.Second)}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
+		Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 			g.Expect(len(progressDetails) > 0).Should(BeTrue())
 			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcNames[0]))
@@ -186,7 +187,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
 		// mock cluster is Running to support volume expansion ops
-		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+		Expect(apps.ChangeObjStatus(&testCtx, clusterObject, func() {
 			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 		})).ShouldNot(HaveOccurred())
 
@@ -200,7 +201,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		By("mock pvc is resizing")
 		for _, pvcName := range pvcNames {
 			pvcKey := client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+			Expect(apps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 					Type:               corev1.PersistentVolumeClaimResizing,
 					Status:             corev1.ConditionTrue,
@@ -210,14 +211,14 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				pvc.Status.Phase = corev1.ClaimBound
 			})()).ShouldNot(HaveOccurred())
 
-			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+			Eventually(apps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
 				conditions := tmpPVC.Status.Conditions
 				g.Expect(len(conditions) > 0 && conditions[0].Type == corev1.PersistentVolumeClaimResizing).Should(BeTrue())
 			})).Should(Succeed())
 
 			// waiting OpsRequest.status.components["consensus"].vct["data"] is running
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 				progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 				progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
 				g.Expect(progressDetail != nil && progressDetail.Status == appsv1alpha1.ProcessingProgressStatus).Should(BeTrue())
@@ -225,11 +226,11 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 			By("mock pvc resizing succeed")
 			// mock pvc volumeExpansion succeed
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+			Expect(apps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}
 			})()).ShouldNot(HaveOccurred())
 
-			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+			Eventually(apps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
 				g.Expect(tmpPVC.Status.Capacity[corev1.ResourceStorage] == resource.MustParse("3Gi")).Should(BeTrue())
 			})).Should(Succeed())
 		}
@@ -253,17 +254,17 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcNames[0], Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 
-		Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningClusterPhase))
+		Eventually(apps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
 
 	Context("Test VolumeExpansion", func() {
 		It("VolumeExpansion should work", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			_, _, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterDefinitionName,
+			_, _, clusterObject := apps.InitConsensusMysql(&testCtx, clusterDefinitionName,
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 			// init storageClass
-			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
-			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
+			sc := apps.CreateStorageClass(&testCtx, storageClassName, true)
+			Expect(apps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
 				lsc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
 			})).ShouldNot(HaveOccurred())
 
@@ -273,7 +274,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			}
 
 			By("Test OpsManager.MainEnter function with ClusterOps")
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, clusterObject, func() {
 				clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusCompName: {

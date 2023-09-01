@@ -22,6 +22,12 @@ package workloads
 import (
 	"context"
 
+	handler2 "github.com/apecloud/kubeblocks/pkg/controller/handler"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	rsm2 "github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,12 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/handler"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controller/rsm"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // ReplicatedStateMachineReconciler reconciles a ReplicatedStateMachine object
@@ -62,7 +63,7 @@ type ReplicatedStateMachineReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName),
@@ -73,16 +74,16 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(model.RequeueError); ok {
-			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
+			return controllerutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// the RSM reconciliation loop is a two-phase model: plan Build and plan Execute
 	// Init stage
-	planBuilder := rsm.NewRSMPlanBuilder(reqCtx, r.Client, req)
+	planBuilder := rsm2.NewRSMPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// Build stage
@@ -101,18 +102,18 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 	plan, err := planBuilder.
 		AddTransformer(
 			// fix meta
-			&rsm.FixMetaTransformer{},
+			&rsm2.FixMetaTransformer{},
 			// handle deletion
 			// handle cluster deletion first
-			&rsm.ObjectDeletionTransformer{},
+			&rsm2.ObjectDeletionTransformer{},
 			// handle secondary objects generation
-			&rsm.ObjectGenerationTransformer{},
+			&rsm2.ObjectGenerationTransformer{},
 			// handle status
-			&rsm.ObjectStatusTransformer{},
+			&rsm2.ObjectStatusTransformer{},
 			// handle MemberUpdateStrategy
-			&rsm.UpdateStrategyTransformer{},
+			&rsm2.UpdateStrategyTransformer{},
 			// handle member reconfiguration
-			&rsm.MemberReconfigurationTransformer{},
+			&rsm2.MemberReconfigurationTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
@@ -130,24 +131,24 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 		return requeueError(err)
 	}
 
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	ctx := &handler.FinderContext{
+	ctx := &handler2.FinderContext{
 		Context: context.Background(),
 		Reader:  r.Client,
 		Scheme:  *r.Scheme,
 	}
 
-	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
+	if viper.GetBool(rsm2.FeatureGateRSMCompatibilityMode) {
 		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
-		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-		stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		podHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
+		delegatorFinder := handler2.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
+		ownerFinder := handler2.NewOwnerFinder(&appsv1.StatefulSet{})
+		stsHandler := handler2.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+		jobHandler := handler2.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+		podHandler := handler2.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
 
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
@@ -157,9 +158,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 			Complete(r)
 	}
 
-	stsOwnerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-	rsmOwnerFinder := handler.NewOwnerFinder(&workloads.ReplicatedStateMachine{})
-	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(rsmOwnerFinder).Build()
+	stsOwnerFinder := handler2.NewOwnerFinder(&appsv1.StatefulSet{})
+	rsmOwnerFinder := handler2.NewOwnerFinder(&workloads.ReplicatedStateMachine{})
+	podHandler := handler2.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(rsmOwnerFinder).Build()
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&workloads.ReplicatedStateMachine{}).
 		Owns(&appsv1.StatefulSet{}).

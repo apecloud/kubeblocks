@@ -23,14 +23,15 @@ import (
 	"encoding/json"
 	"strconv"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/util"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func checkEnableCfgUpgrade(object client.Object) bool {
@@ -75,7 +76,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 
 	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotationKey]
 	if !ok {
-		return updateAppliedConfigs(client, ctx, cm, configData, core.ReconfigureCreatedPhase)
+		return updateAppliedConfigs(client, ctx, cm, configData, core2.ReconfigureCreatedPhase)
 	}
 
 	return lastConfig == string(configData), nil
@@ -98,9 +99,9 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 	newReconfigurePhase := config.ObjectMeta.Labels[constant.CMInsLastReconfigurePhaseKey]
 	if newReconfigurePhase == "" {
-		newReconfigurePhase = core.ReconfigureCreatedPhase
+		newReconfigurePhase = core2.ReconfigureCreatedPhase
 	}
-	if core.ReconfigureNoChangeType != reconfigurePhase && !core.IsParametersUpdateFromManager(config) {
+	if core2.ReconfigureNoChangeType != reconfigurePhase && !core2.IsParametersUpdateFromManager(config) {
 		newReconfigurePhase = reconfigurePhase
 	}
 	config.ObjectMeta.Labels[constant.CMInsLastReconfigurePhaseKey] = newReconfigurePhase

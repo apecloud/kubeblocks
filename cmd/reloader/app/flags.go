@@ -22,12 +22,13 @@ package app
 import (
 	"os"
 
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/container"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/spf13/pflag"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type NotifyEventType int

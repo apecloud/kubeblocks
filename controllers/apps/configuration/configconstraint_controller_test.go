@@ -22,6 +22,10 @@ package configuration
 import (
 	"time"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,10 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("ConfigConstraint Controller", func() {
@@ -51,15 +52,15 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		apps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -70,32 +71,32 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		It("Should ready", func() {
 			By("creating a configmap and a config constraint")
 
-			configmap := testapps.CreateCustomizedObj(&testCtx,
+			configmap := apps.CreateCustomizedObj(&testCtx,
 				"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			constraint := testapps.CreateCustomizedObj(&testCtx,
+			constraint := apps.CreateCustomizedObj(&testCtx,
 				"resources/mysql-config-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 			constraintKey := client.ObjectKeyFromObject(constraint)
 
 			By("Create a clusterDefinition obj")
-			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+			clusterDefObj := apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj := apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponentVersion(statefulCompDefName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
 
 			By("check ConfigConstraint(template) status and finalizer")
-			Eventually(testapps.CheckObj(&testCtx, constraintKey,
+			Eventually(apps.CheckObj(&testCtx, constraintKey,
 				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1alpha1.AvailablePhase))
 					g.Expect(tpl.Finalizers).To(ContainElement(constant.ConfigurationTemplateFinalizerName))
@@ -106,10 +107,10 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 			By("check ConfigConstraint should not be deleted")
 			log.Log.Info("expect that ConfigConstraint is not deleted.")
-			Consistently(testapps.CheckObjExists(&testCtx, constraintKey, &appsv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
+			Consistently(apps.CheckObjExists(&testCtx, constraintKey, &appsv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
 
 			By("check ConfigConstraint status should be deleting")
-			Eventually(testapps.CheckObj(&testCtx, constraintKey,
+			Eventually(apps.CheckObj(&testCtx, constraintKey,
 				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1alpha1.CCDeletingPhase))
 				})).Should(Succeed())
@@ -119,7 +120,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			Expect(k8sClient.Delete(testCtx.Ctx, clusterDefObj)).Should(Succeed())
 
 			By("check ConfigConstraint should be deleted")
-			Eventually(testapps.CheckObjExists(&testCtx, constraintKey, &appsv1alpha1.ConfigConstraint{}, false), time.Second*60, time.Second*1).Should(Succeed())
+			Eventually(apps.CheckObjExists(&testCtx, constraintKey, &appsv1alpha1.ConfigConstraint{}, false), time.Second*60, time.Second*1).Should(Succeed())
 		})
 	})
 
@@ -127,14 +128,14 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		It("Should ready", func() {
 			By("creating a configmap and a config constraint")
 
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-config-template.yaml", &corev1.ConfigMap{},
+			_ = apps.CreateCustomizedObj(&testCtx, "resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			constraint := testapps.CreateCustomizedObj(&testCtx, "resources/mysql-config-constraint-not-validate.yaml",
+			constraint := apps.CreateCustomizedObj(&testCtx, "resources/mysql-config-constraint-not-validate.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
 			By("check config constraint status")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint),
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint),
 				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.AvailablePhase))
 				})).Should(Succeed())

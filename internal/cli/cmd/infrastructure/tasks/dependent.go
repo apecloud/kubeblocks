@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package tasks
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/confirm"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
@@ -34,7 +35,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 type InstallDependenciesModule struct {

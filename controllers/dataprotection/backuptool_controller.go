@@ -22,6 +22,9 @@ package dataprotection
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,8 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // BackupToolReconciler reconciles a BackupTool object
@@ -58,7 +59,7 @@ func (r *BackupToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	_ = log.FromContext(ctx)
 	// NOTES:
 	// setup common request context
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("backupTool", req.NamespacedName),
@@ -67,11 +68,11 @@ func (r *BackupToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backupTool); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupTool, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil.HandleCRDeletion(reqCtx, r, backupTool, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, backupTool)
 	})
 	if res != nil {
@@ -92,7 +93,7 @@ func (r *BackupToolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *BackupToolReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backupTool *dataprotectionv1alpha1.BackupTool) error {
+func (r *BackupToolReconciler) deleteExternalResources(reqCtx controllerutil.RequestCtx, backupTool *dataprotectionv1alpha1.BackupTool) error {
 	//
 	// delete any external resources associated with the cronJob
 	//

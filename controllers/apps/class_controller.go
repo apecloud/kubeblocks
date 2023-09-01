@@ -23,6 +23,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,10 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/class"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/class"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentclassdefinitions,verbs=get;list;watch;create;update;patch;delete
@@ -48,7 +49,7 @@ type ComponentClassReconciler struct {
 }
 
 func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("classDefinition", req.NamespacedName),
@@ -57,10 +58,10 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 
 	classDefinition := &appsv1alpha1.ComponentClassDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, classDefinition); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, classDefinition, constant.DBClusterFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil.HandleCRDeletion(reqCtx, r, classDefinition, constant.DBClusterFinalizerName, func() (*ctrl.Result, error) {
 		// TODO validate if existing cluster reference classes being deleted
 		return nil, nil
 	})
@@ -73,7 +74,7 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 	}
 	constraintsList := &appsv1alpha1.ComponentResourceConstraintList{}
 	if err := r.Client.List(reqCtx.Ctx, constraintsList, ml...); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	constraintsMap := make(map[string]appsv1alpha1.ComponentResourceConstraint)
 	for idx := range constraintsList.Items {
@@ -85,12 +86,12 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 	}
 
 	if classDefinition.Status.ObservedGeneration == classDefinition.Generation {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	classes, err := class.ParseComponentClasses(*classDefinition)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "parse component classes failed")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "parse component classes failed")
 	}
 
 	patch := client.MergeFrom(classDefinition.DeepCopy())
@@ -114,7 +115,7 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 			}
 		}
 		if !match {
-			return intctrlutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("class %s does not conform to any constraints", v.Name))
+			return controllerutil.CheckedRequeueWithError(nil, reqCtx.Log, fmt.Sprintf("class %s does not conform to any constraints", v.Name))
 		}
 		classList = append(classList, *v)
 	}
@@ -122,10 +123,10 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 	classDefinition.Status.Classes = classList
 	classDefinition.Status.ObservedGeneration = classDefinition.Generation
 	if err = r.Client.Status().Patch(ctx, classDefinition, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "patch component class status failed")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "patch component class status failed")
 	}
 
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.

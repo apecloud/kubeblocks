@@ -25,6 +25,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,12 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // statefulComponentBase as a base class for single stateful-set based component (stateful & replication & consensus).
@@ -49,7 +50,7 @@ type statefulComponentBase struct {
 	runningWorkload *appsv1.StatefulSet
 }
 
-func (c *statefulComponentBase) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
+func (c *statefulComponentBase) init(reqCtx controllerutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
 	var err error
 	if builder != nil {
 		if err = builder.BuildEnv().
@@ -74,7 +75,7 @@ func (c *statefulComponentBase) init(reqCtx intctrlutil.RequestCtx, cli client.C
 	return nil
 }
 
-func (c *statefulComponentBase) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
+func (c *statefulComponentBase) loadRunningWorkload(reqCtx controllerutil.RequestCtx, cli client.Client) (*appsv1.StatefulSet, error) {
 	stsList, err := listStsOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func (c *statefulComponentBase) GetBuiltObjects(builder componentWorkloadBuilder
 	}()
 
 	c.Dag = graph.NewDAG()
-	if err := c.init(intctrlutil.RequestCtx{}, nil, builder, false); err != nil {
+	if err := c.init(controllerutil.RequestCtx{}, nil, builder, false); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +112,7 @@ func (c *statefulComponentBase) GetBuiltObjects(builder componentWorkloadBuilder
 	return objs, nil
 }
 
-func (c *statefulComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {
+func (c *statefulComponentBase) Create(reqCtx controllerutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {
 	if err := c.init(reqCtx, cli, builder, false); err != nil {
 		return err
 	}
@@ -125,12 +126,12 @@ func (c *statefulComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client
 	return nil
 }
 
-func (c *statefulComponentBase) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *statefulComponentBase) Delete(reqCtx controllerutil.RequestCtx, cli client.Client) error {
 	// TODO(impl): delete component owned resources
 	return nil
 }
 
-func (c *statefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {
+func (c *statefulComponentBase) Update(reqCtx controllerutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {
 	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
@@ -158,7 +159,7 @@ func (c *statefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 	return c.ResolveObjectsAction(reqCtx, cli)
 }
 
-func (c *statefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {
+func (c *statefulComponentBase) Status(reqCtx controllerutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {
 	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
@@ -195,7 +196,7 @@ func (c *statefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 
 	var delayedRequeueError error
 	if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
-		if !intctrlutil.IsDelayedRequeueError(err) {
+		if !controllerutil.IsDelayedRequeueError(err) {
 			return err
 		}
 		delayedRequeueError = err
@@ -221,11 +222,11 @@ func (c *statefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 	return delayedRequeueError
 }
 
-func (c *statefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *statefulComponentBase) Restart(reqCtx controllerutil.RequestCtx, cli client.Client) error {
 	return restartPod(&c.runningWorkload.Spec.Template)
 }
 
-func (c *statefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *statefulComponentBase) ExpandVolume(reqCtx controllerutil.RequestCtx, cli client.Client) error {
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimTemplate
 		for _, v := range c.Component.VolumeClaimTemplates {
@@ -246,7 +247,7 @@ func (c *statefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli 
 	return nil
 }
 
-func (c *statefulComponentBase) expandVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client,
+func (c *statefulComponentBase) expandVolumes(reqCtx controllerutil.RequestCtx, cli client.Client,
 	vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
 	pvcNotFound := false
 	for i := *c.runningWorkload.Spec.Replicas - 1; i >= 0; i-- {
@@ -269,7 +270,7 @@ func (c *statefulComponentBase) expandVolumes(reqCtx intctrlutil.RequestCtx, cli
 	return nil
 }
 
-func (c *statefulComponentBase) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.Client, pvcKey types.NamespacedName,
+func (c *statefulComponentBase) updatePVCSize(reqCtx controllerutil.RequestCtx, cli client.Client, pvcKey types.NamespacedName,
 	pvc *corev1.PersistentVolumeClaim, pvcNotFound bool, vctProto *corev1.PersistentVolumeClaimTemplate) error {
 	// reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#recovering-from-failure-when-expanding-volumes
 	// 1. Mark the PersistentVolume(PV) that is bound to the PersistentVolumeClaim(PVC) with Retain reclaim policy.
@@ -419,7 +420,7 @@ func (c *statefulComponentBase) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli
 	return nil
 }
 
-func (c *statefulComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *statefulComponentBase) statusExpandVolume(reqCtx controllerutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		running, failed, err := c.hasVolumeExpansionRunning(reqCtx, cli, vct.Name)
 		if err != nil {
@@ -441,7 +442,7 @@ func (c *statefulComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx
 	return nil
 }
 
-func (c *statefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string) (bool, bool, error) {
+func (c *statefulComponentBase) hasVolumeExpansionRunning(reqCtx controllerutil.RequestCtx, cli client.Client, vctName string) (bool, bool, error) {
 	var (
 		running bool
 		failed  bool
@@ -460,11 +461,11 @@ func (c *statefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.Req
 	return running, failed, nil
 }
 
-func (c *statefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *statefulComponentBase) HorizontalScale(reqCtx controllerutil.RequestCtx, cli client.Client) error {
 	return c.horizontalScale(reqCtx, cli, nil)
 }
 
-func (c *statefulComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *statefulComponentBase) horizontalScale(reqCtx controllerutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	sts := c.runningWorkload
 	if sts.Status.ReadyReplicas == c.Component.Replicas {
 		return nil
@@ -521,7 +522,7 @@ func (c *statefulComponentBase) updatePodEnvConfig() {
 	}
 }
 
-func (c *statefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {
+func (c *statefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx controllerutil.RequestCtx, cli client.Client, replicas int32) error {
 	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return err
@@ -537,7 +538,7 @@ func (c *statefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil
 	return nil
 }
 
-func (c *statefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+func (c *statefulComponentBase) scaleIn(reqCtx controllerutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	// if scale in to 0, do not delete pvcs
 	if c.Component.Replicas == 0 {
 		return nil
@@ -562,11 +563,11 @@ func (c *statefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli clien
 	return nil
 }
 
-func (c *statefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *statefulComponentBase) postScaleIn(reqCtx controllerutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	return nil
 }
 
-func (c *statefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+func (c *statefulComponentBase) scaleOut(reqCtx controllerutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	var (
 		backupKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
@@ -612,7 +613,7 @@ func (c *statefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	}
 }
 
-func (c *statefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+func (c *statefulComponentBase) postScaleOut(reqCtx controllerutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	var (
 		snapshotKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
@@ -639,7 +640,7 @@ func (c *statefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 	return nil
 }
 
-func (c *statefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+func (c *statefulComponentBase) updateUnderlyingResources(reqCtx controllerutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	if stsObj == nil {
 		c.createWorkload()
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
@@ -710,7 +711,7 @@ func (c *statefulComponentBase) updateUpdateStrategy(stsObj, stsProto *appsv1.St
 	}
 }
 
-func (c *statefulComponentBase) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+func (c *statefulComponentBase) updateVolumes(reqCtx controllerutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
 	for _, v := range ictrltypes.FindAll[*corev1.PersistentVolumeClaim](c.Dag) {
@@ -732,7 +733,7 @@ func (c *statefulComponentBase) updateVolumes(reqCtx intctrlutil.RequestCtx, cli
 	return nil
 }
 
-func (c *statefulComponentBase) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
+func (c *statefulComponentBase) getRunningVolumes(reqCtx controllerutil.RequestCtx, cli client.Client, vctName string,
 	stsObj *appsv1.StatefulSet) ([]*corev1.PersistentVolumeClaim, error) {
 	pvcs, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {

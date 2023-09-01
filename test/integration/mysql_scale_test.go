@@ -19,6 +19,10 @@ package appstest
 import (
 	"fmt"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,10 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("MySQL Scaling function", func() {
@@ -54,13 +55,13 @@ var _ = Describe("MySQL Scaling function", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanAll)
@@ -90,22 +91,22 @@ var _ = Describe("MySQL Scaling function", func() {
 				"memory": resource.MustParse("256Mi"),
 			},
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetResources(resources).SetReplicas(1).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(apps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("check cluster running")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+		Eventually(apps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.RunningClusterPhase))
 		})).Should(Succeed())
 
 		By("send VerticalScalingOpsRequest successfully")
 		opsKey := types.NamespacedName{Name: opsName, Namespace: testCtx.DefaultNamespace}
-		verticalScalingOpsRequest := testapps.NewOpsRequestObj(opsKey.Name, opsKey.Namespace,
+		verticalScalingOpsRequest := apps.NewOpsRequestObj(opsKey.Name, opsKey.Namespace,
 			clusterObj.Name, appsv1alpha1.VerticalScalingType)
 		verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 0
 		verticalScalingOpsRequest.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
@@ -122,19 +123,19 @@ var _ = Describe("MySQL Scaling function", func() {
 		Expect(testCtx.CreateObj(testCtx.Ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 		By("check VerticalScalingOpsRequest succeed")
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
+		Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
 			func(g Gomega, ops *appsv1alpha1.OpsRequest) {
 				g.Expect(ops.Status.Phase == appsv1alpha1.OpsSucceedPhase).To(BeTrue())
 			})).Should(Succeed())
 
 		By("check cluster resource requirements changed")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+		Eventually(apps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 			g.Expect(fetched.Spec.ComponentSpecs[0].Resources.Requests).To(Equal(
 				verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 		})).Should(Succeed())
 
 		By("check OpsRequest reclaimed after ttl")
-		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
+		Expect(apps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
 			lopsReq.Spec.TTLSecondsAfterSucceed = 1
 		})).Should(Succeed())
 
@@ -149,7 +150,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		newStorageValue := resource.MustParse("2Gi")
 
 		By("Check StorageClass")
-		defaultStorageClass := testk8s.GetDefaultStorageClass(&testCtx)
+		defaultStorageClass := testutil.GetDefaultStorageClass(&testCtx)
 		if defaultStorageClass == nil {
 			Skip("No default StorageClass found")
 		} else if !(defaultStorageClass.AllowVolumeExpansion != nil && *defaultStorageClass.AllowVolumeExpansion) {
@@ -157,18 +158,18 @@ var _ = Describe("MySQL Scaling function", func() {
 		}
 
 		By("Create a cluster obj with both log and data volume of 1GB size")
-		dataPvcSpec := testapps.NewPVCSpec(oldStorageValue.String())
+		dataPvcSpec := apps.NewPVCSpec(oldStorageValue.String())
 		logPvcSpec := dataPvcSpec
 		logPvcSpec.StorageClassName = &defaultStorageClass.Name
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, dataPvcSpec).
-			AddVolumeClaimTemplate(testapps.LogVolumeName, logPvcSpec).
+			AddVolumeClaimTemplate(apps.DataVolumeName, dataPvcSpec).
+			AddVolumeClaimTemplate(apps.LogVolumeName, logPvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(apps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Check the replicas")
 		Eventually(func(g Gomega) {
@@ -190,16 +191,16 @@ var _ = Describe("MySQL Scaling function", func() {
 		}).Should(BeTrue())
 
 		By("Update volume size")
-		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(fetched *appsv1alpha1.Cluster) {
+		Eventually(apps.GetAndChangeObj(&testCtx, clusterKey, func(fetched *appsv1alpha1.Cluster) {
 			comp := &fetched.Spec.ComponentSpecs[0]
 			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 			comp.VolumeClaimTemplates[1].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 		})).Should(Succeed())
 
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+		Eventually(apps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 		By("Checking the PVC")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+		stsList := testutil.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		for _, sts := range stsList.Items {
 			for _, vct := range sts.Spec.VolumeClaimTemplates {
 				for i := *sts.Spec.Replicas - 1; i >= 0; i-- {
@@ -219,19 +220,19 @@ var _ = Describe("MySQL Scaling function", func() {
 
 	Context("with MySQL defined as a stateful component", func() {
 		BeforeEach(func() {
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
-				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+			_ = apps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
+				apps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")
 			mode := int32(0755)
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+			clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.StatefulMySQLComponent, mysqlCompDefName).
+				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, apps.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponentVersion(mysqlCompDefName).AddContainerShort(apps.DefaultMySQLContainerName, apps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -247,19 +248,19 @@ var _ = Describe("MySQL Scaling function", func() {
 	Context("with MySQL defined as a consensus component", func() {
 		BeforeEach(func() {
 			By("Create configmap")
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
-				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+			_ = apps.CreateCustomizedObj(&testCtx, "resources/mysql-scripts.yaml", &corev1.ConfigMap{},
+				apps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")
 			mode := int32(0755)
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
-				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+			clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.ConsensusMySQLComponent, mysqlCompDefName).
+				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, apps.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponentVersion(mysqlCompDefName).AddContainerShort(apps.DefaultMySQLContainerName, apps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 

@@ -23,6 +23,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+
 	"github.com/authzed/controller-idioms/hash"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -30,13 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type HaltRecoveryTransformer struct{}
 
-func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *HaltRecoveryTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 
@@ -73,7 +74,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 			*oldCondition = newCondition
 		}
 		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, newCondition.Reason, newCondition.Message)
-		return graph.ErrPrematureStop
+		return graph2.ErrPrematureStop
 	}
 
 	// halt recovering from last applied record stored in pvc's annotation
@@ -211,4 +212,4 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-var _ graph.Transformer = &HaltRecoveryTransformer{}
+var _ graph2.Transformer = &HaltRecoveryTransformer{}

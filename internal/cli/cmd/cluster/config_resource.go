@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
 type configSpecsType []*configSpecMeta
@@ -97,7 +97,7 @@ func (w *configObjectsWrapper) configMap(specName string, component string, out 
 	fn := func() error {
 		key := client.ObjectKey{
 			Namespace: w.namespace,
-			Name:      core.GetComponentCfgName(w.clusterName, component, specName),
+			Name:      core2.GetComponentCfgName(w.clusterName, component, specName),
 		}
 		out.ConfigMap = &corev1.ConfigMap{}
 		return util.GetResourceObjectFromGVR(types.ConfigmapGVR(), key, w.cli, out.ConfigMap)
@@ -194,11 +194,11 @@ func (w *configObjectsWrapper) finish() error {
 func (w *configObjectsWrapper) genScriptsSpecs(objects *ConfigRelatedObjects, component string) ([]*configSpecMeta, error) {
 	cComponent := objects.Cluster.Spec.GetComponentByName(component)
 	if cComponent == nil {
-		return nil, core.MakeError("not found component %s in cluster %s", component, objects.Cluster.Name)
+		return nil, core2.MakeError("not found component %s in cluster %s", component, objects.Cluster.Name)
 	}
 	dComponent := objects.ClusterDef.GetComponentDefByName(cComponent.ComponentDefRef)
 	if dComponent == nil {
-		return nil, core.MakeError("not found component %s in cluster definition %s", component, objects.ClusterDef.Name)
+		return nil, core2.MakeError("not found component %s in cluster definition %s", component, objects.ClusterDef.Name)
 	}
 	configSpecMetas := make([]*configSpecMeta, 0)
 	for _, spec := range dComponent.ScriptSpecs {
@@ -257,7 +257,7 @@ func (w *configObjectsWrapper) genConfigSpecs(objects *ConfigRelatedObjects, com
 	if objects.ClusterVersion != nil {
 		vComponents = objects.ClusterVersion.Spec.ComponentVersions
 	}
-	configSpecs, err := core.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, component)
+	configSpecs, err := core2.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, component)
 	if err != nil {
 		return nil, err
 	}

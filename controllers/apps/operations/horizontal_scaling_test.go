@@ -23,6 +23,11 @@ import (
 	"fmt"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -31,11 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("HorizontalScaling OpsRequest", func() {
@@ -55,15 +56,15 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		// default GracePeriod is 30s
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanEnv)
@@ -72,7 +73,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 	initClusterAnnotationAndPhaseForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+		Expect(apps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 		})).ShouldNot(HaveOccurred())
 	}
@@ -92,12 +93,12 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			Eventually(apps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By(fmt.Sprintf("expect for the replicas of consensus component is %d after doing action again when opsRequest phase is Creating", replicas))
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(replicas))
 			})).Should(Succeed())
 
@@ -145,7 +146,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("mock two pods are created")
 			for i := 3; i < 5; i++ {
 				podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, i)
-				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
+				apps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
 			}
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
@@ -165,7 +166,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("re-create the deleted pod")
 			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 0)
-			testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "leader", "ReadWrite")
+			apps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "leader", "ReadWrite")
 
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			mockConsensusCompToRunning(opsRes)
@@ -178,7 +179,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("mock one pod is created")
 			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 3)
-			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
+			pod := apps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
 
 			By("cancel HScale opsRequest after pne pod is created")
 			cancelOpsRequest(reqCtx, opsRes, time.Now().Add(-1*time.Second))
@@ -197,7 +198,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 func createHorizontalScaling(clusterName string, replicas int) *appsv1alpha1.OpsRequest {
 	horizontalOpsName := "horizontal-scaling-ops-" + testCtx.GetRandomStr()
-	ops := testapps.NewOpsRequestObj(horizontalOpsName, testCtx.DefaultNamespace,
+	ops := apps.NewOpsRequestObj(horizontalOpsName, testCtx.DefaultNamespace,
 		clusterName, appsv1alpha1.HorizontalScalingType)
 	ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 		{
@@ -205,14 +206,14 @@ func createHorizontalScaling(clusterName string, replicas int) *appsv1alpha1.Ops
 			Replicas:     int32(replicas),
 		},
 	}
-	return testapps.CreateOpsRequest(ctx, testCtx, ops)
+	return apps.CreateOpsRequest(ctx, testCtx, ops)
 }
 
 func cancelOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, cancelTime time.Time) {
 	opsRequest := opsRes.OpsRequest
 	opsRequest.Spec.Cancel = true
 	opsBehaviour := GetOpsManager().OpsMap[opsRequest.Spec.Type]
-	Expect(testapps.ChangeObjStatus(&testCtx, opsRequest, func() {
+	Expect(apps.ChangeObjStatus(&testCtx, opsRequest, func() {
 		opsRequest.Status.CancelTimestamp = metav1.Time{Time: cancelTime}
 		opsRequest.Status.Phase = appsv1alpha1.OpsCancellingPhase
 	})).Should(Succeed())

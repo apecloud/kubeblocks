@@ -22,14 +22,14 @@ package template
 import (
 	"context"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 type ResourceMatcher = func(obj runtime.Object) bool

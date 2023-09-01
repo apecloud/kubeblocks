@@ -42,6 +42,8 @@ import (
 	"text/template"
 	"time"
 
+	types2 "github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -72,11 +74,11 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/openapi"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // CloseQuietly closes `io.Closer` quietly. Very handy and helpful for code
@@ -88,14 +90,14 @@ func CloseQuietly(d io.Closer) {
 // GetCliHomeDir returns kbcli home dir
 func GetCliHomeDir() (string, error) {
 	var cliHome string
-	if custom := os.Getenv(types.CliHomeEnv); custom != "" {
+	if custom := os.Getenv(types2.CliHomeEnv); custom != "" {
 		cliHome = custom
 	} else {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", err
 		}
-		cliHome = filepath.Join(home, types.CliDefaultHome)
+		cliHome = filepath.Join(home, types2.CliDefaultHome)
 	}
 	if _, err := os.Stat(cliHome); err != nil && os.IsNotExist(err) {
 		if err = os.MkdirAll(cliHome, 0750); err != nil {
@@ -109,9 +111,9 @@ func GetCliHomeDir() (string, error) {
 func GetKubeconfigDir() string {
 	var kubeconfigDir string
 	switch runtime.GOOS {
-	case types.GoosDarwin, types.GoosLinux:
+	case types2.GoosDarwin, types2.GoosLinux:
 		kubeconfigDir = filepath.Join(os.Getenv("HOME"), ".kube")
-	case types.GoosWindows:
+	case types2.GoosWindows:
 		kubeconfigDir = filepath.Join(os.Getenv("USERPROFILE"), ".kube")
 	}
 	return kubeconfigDir
@@ -367,7 +369,7 @@ func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string
 // CheckEmpty checks if string is empty, if yes, returns <none> for displaying
 func CheckEmpty(str string) string {
 	if len(str) == 0 {
-		return types.None
+		return types2.None
 	}
 	return str
 }
@@ -429,14 +431,14 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		Namespace: namespace,
 		Name:      clusterName,
 	}
-	if err := GetResourceObjectFromGVR(types.ClusterGVR(), clusterKey, cli, &clusterObj); err != nil {
+	if err := GetResourceObjectFromGVR(types2.ClusterGVR(), clusterKey, cli, &clusterObj); err != nil {
 		return nil, err
 	}
 	clusterDefKey := client.ObjectKey{
 		Namespace: "",
 		Name:      clusterObj.Spec.ClusterDefRef,
 	}
-	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), clusterDefKey, cli, &clusterDefObj); err != nil {
+	if err := GetResourceObjectFromGVR(types2.ClusterDefGVR(), clusterDefKey, cli, &clusterDefObj); err != nil {
 		return nil, err
 	}
 	clusterVerKey := client.ObjectKey{
@@ -444,7 +446,7 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		Name:      clusterObj.Spec.ClusterVersionRef,
 	}
 	if clusterVerKey.Name != "" {
-		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), clusterVerKey, cli, &clusterVersionObj); err != nil {
+		if err := GetResourceObjectFromGVR(types2.ClusterVersionGVR(), clusterVerKey, cli, &clusterVersionObj); err != nil {
 			return nil, err
 		}
 	}
@@ -457,7 +459,7 @@ func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterCompone
 	componentName string,
 	reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
 
-	configSpecs, err := core.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, componentName)
+	configSpecs, err := core2.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, componentName)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +483,7 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 		Namespace(key.Namespace).
 		Get(context.TODO(), key.Name, metav1.GetOptions{})
 	if err != nil {
-		return core.WrapError(err, "failed to get resource[%v]", key)
+		return core2.WrapError(err, "failed to get resource[%v]", key)
 	}
 	return apiruntime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, k8sObj)
 }
@@ -490,11 +492,11 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 func GetComponentsFromClusterName(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
 	clusterObj := appsv1alpha1.Cluster{}
 	clusterDefObj := appsv1alpha1.ClusterDefinition{}
-	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, cli, &clusterObj); err != nil {
+	if err := GetResourceObjectFromGVR(types2.ClusterGVR(), key, cli, &clusterObj); err != nil {
 		return nil, err
 	}
 
-	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+	if err := GetResourceObjectFromGVR(types2.ClusterDefGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      clusterObj.Spec.ClusterDefRef,
 	}, cli, &clusterDefObj); err != nil {
@@ -541,7 +543,7 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 		configConstraint = appsv1alpha1.ConfigConstraint{}
 	)
 
-	if err := GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+	if err := GetResourceObjectFromGVR(types2.ConfigConstraintGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
 	}, cli, &configConstraint); err != nil {
@@ -578,7 +580,7 @@ func ValidateParametersModified(tpl *appsv1alpha1.ComponentConfigSpec, parameter
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
 	}
-	if err = GetResourceObjectFromGVR(types.ConfigConstraintGVR(), ccKey, cli, &cc); err != nil {
+	if err = GetResourceObjectFromGVR(types2.ConfigConstraintGVR(), ccKey, cli, &cc); err != nil {
 		return
 	}
 	return ValidateParametersModified2(parameters, cc.Spec)
@@ -594,7 +596,7 @@ func ValidateParametersModified2(parameters sets.Set[string], cc appsv1alpha1.Co
 	if uniqueParameters.Len() == 0 {
 		return nil
 	}
-	return core.MakeError("parameter[%v] is immutable, cannot be modified!", cfgutil.ToSet(uniqueParameters).AsSlice())
+	return core2.MakeError("parameter[%v] is immutable, cannot be modified!", cfgutil.ToSet(uniqueParameters).AsSlice())
 }
 
 func GetIPLocation() (string, error) {
@@ -619,7 +621,7 @@ func GetIPLocation() (string, error) {
 
 // GetHelmChartRepoURL gets helm chart repo, chooses one from GitHub and GitLab based on the IP location
 func GetHelmChartRepoURL() string {
-	if types.KubeBlocksChartURL == testing.KubeBlocksChartURL {
+	if types2.KubeBlocksChartURL == testing.KubeBlocksChartURL {
 		return testing.KubeBlocksChartURL
 	}
 
@@ -632,10 +634,10 @@ func GetHelmChartRepoURL() string {
 
 	// if helm repo url is not specified, choose one from GitHub and GitLab based on the IP location
 	// if location is CN, or we can not get location, use GitLab helm chart repo
-	repo := types.KubeBlocksChartURL
+	repo := types2.KubeBlocksChartURL
 	location, _ := GetIPLocation()
 	if location == "CN" || location == "" {
-		repo = types.GitLabHelmChartRepo
+		repo = types2.GitLabHelmChartRepo
 	}
 	klog.V(1).Infof("Using helm repo url: %s", repo)
 	return repo
@@ -643,7 +645,7 @@ func GetHelmChartRepoURL() string {
 
 // GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
 func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
-	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.KubeBlocksHelmLabel})
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types2.KubeBlocksHelmLabel})
 	// if KubeBlocks is upgraded, there will be multiple secrets
 	if err == nil && len(secrets.Items) >= 1 {
 		return secrets.Items[0].Namespace, nil
@@ -653,7 +655,7 @@ func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
 
 // GetKubeBlocksNamespaceByDynamic gets namespace of KubeBlocks installation, infer namespace from helm secrets
 func GetKubeBlocksNamespaceByDynamic(dynamic dynamic.Interface) (string, error) {
-	list, err := dynamic.Resource(types.SecretGVR()).List(context.TODO(), metav1.ListOptions{LabelSelector: types.KubeBlocksHelmLabel})
+	list, err := dynamic.Resource(types2.SecretGVR()).List(context.TODO(), metav1.ListOptions{LabelSelector: types2.KubeBlocksHelmLabel})
 	if err == nil && len(list.Items) >= 1 {
 		return list.Items[0].GetNamespace(), nil
 	}
@@ -724,7 +726,7 @@ func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[stri
 
 // BuildAddonReleaseName returns the release name of addon, its f
 func BuildAddonReleaseName(addon string) string {
-	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
+	return fmt.Sprintf("%s-%s", types2.AddonReleasePrefix, addon)
 }
 
 // CombineLabels combines labels into a string
@@ -763,8 +765,8 @@ func buildLabelSelectors(prefix string, key string, names []string) string {
 func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *appsv1alpha1.OpsRequest {
 	return &appsv1alpha1.OpsRequest{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
-			Kind:       types.KindOps,
+			APIVersion: fmt.Sprintf("%s/%s", types2.AppsAPIGroup, types2.AppsAPIVersion),
+			Kind:       types2.KindOps,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      opsName,
@@ -827,7 +829,7 @@ func BuildClusterDefinitionRefLabel(prefix string, clusterDef []string) string {
 
 // IsWindows returns true if the kbcli runtime situation is windows
 func IsWindows() bool {
-	return runtime.GOOS == types.GoosWindows
+	return runtime.GOOS == types2.GoosWindows
 }
 
 func GetUnifiedDiffString(original, edited string, from, to string, contextLine int) (string, error) {

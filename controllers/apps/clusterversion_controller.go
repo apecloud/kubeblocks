@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,9 +43,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
@@ -67,7 +68,7 @@ func init() {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
@@ -76,15 +77,15 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	clusterVersion := &appsv1alpha1.ClusterVersion{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, clusterVersion); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
 				"cannot be deleted because of existing referencing Cluster.")
 		}
-		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
+		if res, err := controllerutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
 			constant.ClusterVerLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
@@ -96,7 +97,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if clusterVersion.Status.ObservedGeneration == clusterVersion.Generation &&
 		slices.Contains(clusterVersion.Status.GetTerminalPhases(), clusterVersion.Status.Phase) {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
@@ -108,11 +109,11 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return *res, patchErr
 			}
 			if err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error()); err != nil {
-				return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
+				return controllerutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 			}
-			return intctrlutil.Reconciled()
+			return controllerutil.Reconciled()
 		}
-		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
+		return controllerutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}
 
 	patchStatus := func(phase appsv1alpha1.Phase, message string) error {
@@ -126,13 +127,13 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if statusMsg := validateClusterVersion(clusterVersion, clusterdefinition); statusMsg != "" {
 		if err := patchStatus(appsv1alpha1.UnavailablePhase, statusMsg); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	if err = appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
+		return controllerutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
 	if res, err = r.patchClusterDefLabel(reqCtx, clusterVersion); res != nil {
@@ -140,10 +141,10 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if err = patchStatus(appsv1alpha1.AvailablePhase, ""); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	intctrlutil.RecordCreatedEvent(r.Recorder, clusterVersion)
-	return intctrlutil.Reconciled()
+	controllerutil.RecordCreatedEvent(r.Recorder, clusterVersion)
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -156,7 +157,7 @@ func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ClusterVersionReconciler) patchClusterDefLabel(reqCtx intctrlutil.RequestCtx,
+func (r *ClusterVersionReconciler) patchClusterDefLabel(reqCtx controllerutil.RequestCtx,
 	clusterVersion *appsv1alpha1.ClusterVersion) (*ctrl.Result, error) {
 	if v, ok := clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey]; !ok || v != clusterVersion.Spec.ClusterDefinitionRef {
 		patch := client.MergeFrom(clusterVersion.DeepCopy())
@@ -165,15 +166,15 @@ func (r *ClusterVersionReconciler) patchClusterDefLabel(reqCtx intctrlutil.Reque
 		}
 		clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey] = clusterVersion.Spec.ClusterDefinitionRef
 		if err := r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+			return controllerutil.ResultToP(controllerutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
-		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+		return controllerutil.ResultToP(controllerutil.Reconciled())
 	}
 	return nil, nil
 }
 
 // handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.
-func (r *ClusterVersionReconciler) handleClusterDefNotFound(reqCtx intctrlutil.RequestCtx,
+func (r *ClusterVersionReconciler) handleClusterDefNotFound(reqCtx controllerutil.RequestCtx,
 	clusterVersion *appsv1alpha1.ClusterVersion, message string) error {
 	if clusterVersion.Status.Message == message {
 		return nil
@@ -195,7 +196,7 @@ func validateClusterVersion(clusterVersion *appsv1alpha1.ClusterVersion, cluster
 	return strings.Join(statusMsgs, ";")
 }
 
-func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) error {
+func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx controllerutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) error {
 	//
 	// delete any external resources associated with the cronJob
 	//

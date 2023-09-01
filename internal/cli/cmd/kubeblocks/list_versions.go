@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -30,7 +32,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 

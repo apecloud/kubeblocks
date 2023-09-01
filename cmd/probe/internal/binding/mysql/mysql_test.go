@@ -39,9 +39,9 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (

@@ -22,17 +22,17 @@ package components
 import (
 	"testing"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	apps2 "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func TestGetParentNameAndOrdinal(t *testing.T) {
@@ -107,13 +107,13 @@ var _ = Describe("StatefulSet utils test", func() {
 	cleanAll := func() {
 		By("Cleaning resources")
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps2.ClearClusterResources(&testCtx)
 		// clear rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
 		// testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		apps2.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -122,17 +122,17 @@ var _ = Describe("StatefulSet utils test", func() {
 	When("Updating a StatefulSet with `OnDelete` UpdateStrategy", func() {
 		It("will not update pods of the StatefulSet util the pods have been manually deleted", func() {
 			By("Creating a StatefulSet")
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompSpecName).
-				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+			sts := apps2.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, apps2.DefaultRedisCompSpecName).
+				AddContainer(corev1.Container{Name: apps2.DefaultRedisContainerName, Image: apps2.DefaultRedisImageName}).
 				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
+				AddAppComponentLabel(apps2.DefaultRedisCompSpecName).
 				AddAppManangedByLabel().
 				AddRoleLabel(role).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
 
 			By("Creating pods by the StatefulSet")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
+			apps2.MockReplicationComponentPods(nil, testCtx, sts, clusterName, apps2.DefaultRedisCompSpecName, nil)
 			Expect(isStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 
 			By("Updating the StatefulSet's UpdateRevision")
@@ -154,7 +154,7 @@ var _ = Describe("StatefulSet utils test", func() {
 			Expect(len(podList)).To(Equal(0))
 
 			By("Creating new pods by StatefulSet with new UpdateRevision")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
+			apps2.MockReplicationComponentPods(nil, testCtx, sts, clusterName, apps2.DefaultRedisCompSpecName, nil)
 			Expect(isStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 		})
 	})

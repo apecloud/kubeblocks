@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/dapr/kit/logger"
 	"github.com/pashagolub/pgxmock/v2"
 	"github.com/shirou/gopsutil/v3/process"
@@ -33,8 +35,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {

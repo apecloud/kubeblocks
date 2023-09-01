@@ -25,6 +25,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -40,10 +42,9 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/class"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/class"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type CreateOptions struct {
@@ -244,7 +245,7 @@ func (o *CreateOptions) run() error {
 				Name: class.GetCustomClassObjectName(o.ClusterDefRef, o.ComponentType),
 				Labels: map[string]string{
 					constant.ClusterDefLabelKey:           o.ClusterDefRef,
-					types.ClassProviderLabelKey:           "user",
+					constant.ClassProviderLabelKey:        "user",
 					constant.KBAppComponentDefRefLabelKey: o.ComponentType,
 				},
 			},
@@ -287,7 +288,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 
 			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
 			if err == nil && clusterDefinition != "" {
-				selector = fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, clusterDefinition, types.ClassProviderLabelKey)
+				selector = fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, clusterDefinition, constant.ClassProviderLabelKey)
 			}
 			objs, err := client.Resource(types.ComponentClassDefinitionGVR()).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 			if err != nil {

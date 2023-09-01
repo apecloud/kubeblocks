@@ -24,12 +24,13 @@ import (
 	"strings"
 	"sync"
 
+	. "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/kafka"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (

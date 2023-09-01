@@ -26,16 +26,16 @@ import (
 	"os"
 	"time"
 
+	configmanager "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
-
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
 
 var logger *zap.SugaredLogger
@@ -63,7 +63,7 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 	}()
 
 	logger = zapLog.Sugar()
-	cfgcore.SetLogger(zapLog)
+	configmanager.SetLogger(zapLog)
 
 	if err := checkOptions(opt); err != nil {
 		return err
@@ -82,11 +82,11 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 	var (
 		err           error
-		volumeWatcher *cfgcore.ConfigMapVolumeWatcher
-		configHandler cfgcore.ConfigHandler
+		volumeWatcher *configmanager.ConfigMapVolumeWatcher
+		configHandler configmanager.ConfigHandler
 	)
 
-	if configHandler, err = cfgcore.CreateCombinedHandler(opt.CombConfig, opt.BackupPath); err != nil {
+	if configHandler, err = configmanager.CreateCombinedHandler(opt.CombConfig, opt.BackupPath); err != nil {
 		return err
 	}
 	if len(opt.VolumeDirs) > 0 {
@@ -106,7 +106,7 @@ func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 	return nil
 }
 
-func checkAndCreateService(ctx context.Context, opt *VolumeWatcherOpts, handler cfgcore.ConfigHandler) error {
+func checkAndCreateService(ctx context.Context, opt *VolumeWatcherOpts, handler configmanager.ConfigHandler) error {
 	serviceOpt := opt.ServiceOpt
 	if !serviceOpt.ContainerRuntimeEnable && !serviceOpt.RemoteOnlineUpdateEnable {
 		return nil
@@ -117,12 +117,12 @@ func checkAndCreateService(ctx context.Context, opt *VolumeWatcherOpts, handler 
 	return nil
 }
 
-func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts, handler cfgcore.ConfigHandler) (*cfgcore.ConfigMapVolumeWatcher, error) {
+func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts, handler configmanager.ConfigHandler) (*configmanager.ConfigMapVolumeWatcher, error) {
 	eventHandler := func(ctx context.Context, event fsnotify.Event) error {
 		return handler.VolumeHandle(ctx, event)
 	}
 	logger.Info("starting fsnotify VolumeWatcher.")
-	volumeWatcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
+	volumeWatcher := configmanager.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
 	err := volumeWatcher.AddHandler(eventHandler).Run()
 	if err != nil {
 		logger.Error(err, "failed to handle VolumeWatcher.")
@@ -132,7 +132,7 @@ func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts, handler cfg
 	return volumeWatcher, nil
 }
 
-func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context, handler cfgcore.ConfigHandler) error {
+func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context, handler configmanager.ConfigHandler) error {
 	var (
 		server *grpc.Server
 		proxy  = &reconfigureProxy{opt: opt.ServiceOpt, ctx: ctx, logger: logger.Named("grpcProxy")}

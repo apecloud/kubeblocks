@@ -26,6 +26,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	// Register all components
 	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
 	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
@@ -58,8 +60,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var (

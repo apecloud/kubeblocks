@@ -22,6 +22,8 @@ package operations
 import (
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -30,8 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type PersistentVolumeClaimEventHandler struct {
@@ -54,7 +55,7 @@ func init() {
 
 // handleVolumeExpansionOperation handles the pvc for the volume expansion OpsRequest.
 // it will be triggered when the PersistentVolumeClaim has changed.
-func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
+func handleVolumeExpansionWithPVC(reqCtx controllerutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
 	opsRequestList, err := appsv1alpha1.GetRunningOpsByOpsType(reqCtx.Ctx, cli,
 		pvc.Labels[constant.AppInstanceLabelKey], pvc.Namespace, string(appsv1alpha1.VolumeExpansionType))
 	if err != nil {
@@ -74,7 +75,7 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 // Handle the warning events of PVCs. if the events are resize-failed events, update the OpsRequest.status.
 func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
+	reqCtx controllerutil.RequestCtx,
 	recorder record.EventRecorder,
 	event *corev1.Event) error {
 	if !pvcEventHandler.isTargetResizeFailedEvents(event) {
@@ -96,7 +97,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 	}
 
 	// check if the pvc is managed by kubeblocks
-	if !intctrlutil.WorkloadFilterPredicate(pvc) {
+	if !controllerutil.WorkloadFilterPredicate(pvc) {
 		return nil
 	}
 
@@ -113,7 +114,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEve
 
 // handlePVCFailedStatusOnOpsRequest if the volume expansion ops is running, changes the pvc status to Failed on the OpsRequest,
 func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOnRunningOpsRequests(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
+	reqCtx controllerutil.RequestCtx,
 	recorder record.EventRecorder,
 	event *corev1.Event,
 	pvc *corev1.PersistentVolumeClaim) error {
@@ -145,7 +146,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 }
 
 func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatus(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
+	reqCtx controllerutil.RequestCtx,
 	recorder record.EventRecorder,
 	event *corev1.Event,
 	pvc *corev1.PersistentVolumeClaim,

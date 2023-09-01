@@ -26,13 +26,14 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	gv "github.com/hashicorp/go-version"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/version"
 )
 

@@ -20,6 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,11 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Reconfigure OpsRequest", func() {
@@ -53,16 +53,16 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		apps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -76,10 +76,10 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 		By("Assuring an cm obj")
-		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
-			&corev1.ConfigMap{}, testapps.WithNamespacedName(cmName, ns))
-		cfgTpl := testapps.NewCustomizedObj("operations_config/config-constraint.yaml",
-			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(tplName, ns))
+		cfgCM := apps.NewCustomizedObj("operations_config/config-template.yaml",
+			&corev1.ConfigMap{}, apps.WithNamespacedName(cmName, ns))
+		cfgTpl := apps.NewCustomizedObj("operations_config/config-constraint.yaml",
+			&appsv1alpha1.ConfigConstraint{}, apps.WithNamespacedName(tplName, ns))
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 
@@ -92,11 +92,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		}
 		var cmObj *corev1.ConfigMap
 		for _, configSpec := range cdComponent.ConfigSpecs {
-			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
-			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
+			cmInsName := core2.GetComponentCfgName(clusterName, componentName, configSpec.Name)
+			cfgCM := apps.NewCustomizedObj("operations_config/config-template.yaml",
 				&corev1.ConfigMap{},
-				testapps.WithNamespacedName(cmInsName, ns),
-				testapps.WithLabels(
+				apps.WithNamespacedName(cmInsName, ns),
+				apps.WithLabels(
 					constant.AppNameLabelKey, clusterName,
 					constant.AppInstanceLabelKey, clusterName,
 					constant.KBAppComponentLabelKey, componentName,
@@ -112,7 +112,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cmObj
 	}
 
-	assureMockReconfigureData := func(policyName string) (*OpsResource, intctrlutil.ConfigEventContext) {
+	assureMockReconfigureData := func(policyName string) (*OpsResource, controllerutil.ConfigEventContext) {
 		By("init operations resources ")
 		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
@@ -157,23 +157,23 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		}
 
 		By("mock event context")
-		eventContext := intctrlutil.ConfigEventContext{
+		eventContext := controllerutil.ConfigEventContext{
 			ConfigMap: cfgObj,
 			Component: &clusterDef.Spec.ComponentDefs[0],
 			Client:    k8sClient,
-			ReqCtx: intctrlutil.RequestCtx{
+			ReqCtx: controllerutil.RequestCtx{
 				Ctx:      ctx,
 				Log:      log.FromContext(ctx),
 				Recorder: opsRes.Recorder,
 			},
 			Cluster:        clusterObject,
 			ConfigSpecName: "mysql-test",
-			ConfigPatch: &core.ConfigPatchInfo{
+			ConfigPatch: &core2.ConfigPatchInfo{
 				AddConfig:    map[string]interface{}{},
 				UpdateConfig: map[string][]byte{},
 				DeleteConfig: map[string]interface{}{},
 			},
-			PolicyStatus: core.PolicyExecStatus{
+			PolicyStatus: core2.PolicyExecStatus{
 				PolicyName:    policyName,
 				SucceedCount:  2,
 				ExpectedCount: 3,
@@ -185,14 +185,14 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	Context("Test Reconfigure", func() {
 		It("Test Reconfigure OpsRequest with restart", func() {
 			opsRes, eventContext := assureMockReconfigureData("simple")
-			reqCtx := intctrlutil.RequestCtx{
+			reqCtx := controllerutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
 				Recorder: opsRes.Recorder,
 			}
 
 			By("mock reconfigure success")
-			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
 				Configurations: []appsv1alpha1.Configuration{{
@@ -247,14 +247,14 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 		It("Test Reconfigure OpsRequest with autoReload", func() {
 			opsRes, eventContext := assureMockReconfigureData("autoReload")
-			reqCtx := intctrlutil.RequestCtx{
+			reqCtx := controllerutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
 				Recorder: opsRes.Recorder,
 			}
 
 			By("mock reconfigure success")
-			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
 				Configurations: []appsv1alpha1.Configuration{{
@@ -281,7 +281,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			By("Reconfigure configure")
 			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			Eventually(apps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 			// do reconfigure
 			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

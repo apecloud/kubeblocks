@@ -25,14 +25,15 @@ import (
 	"fmt"
 	"strings"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (

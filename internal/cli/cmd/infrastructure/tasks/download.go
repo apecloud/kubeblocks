@@ -24,6 +24,8 @@ import (
 	"os"
 	"os/exec"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/logger"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/util"
@@ -31,7 +33,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	kbutils "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/utils"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 const (

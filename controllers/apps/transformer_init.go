@@ -21,8 +21,8 @@ package apps
 
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
 )
 
 type initTransformer struct {
@@ -30,9 +30,9 @@ type initTransformer struct {
 	originCluster *appsv1alpha1.Cluster
 }
 
-var _ graph.Transformer = &initTransformer{}
+var _ graph2.Transformer = &initTransformer{}
 
-func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *initTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
 	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.cluster, ObjCopy: t.originCluster, Action: ictrltypes.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)

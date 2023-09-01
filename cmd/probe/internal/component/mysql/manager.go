@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/dapr/kit/logger"
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
@@ -33,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type Manager struct {

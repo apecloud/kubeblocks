@@ -24,18 +24,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/class"
+	types2 "github.com/apecloud/kubeblocks/pkg/controller/client"
+	component2 "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/class"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // PodIsAvailable checks whether a pod is available with respect to the workload type.
@@ -46,7 +47,7 @@ func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, min
 	}
 	switch workloadType {
 	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
-		return intctrlutil.PodIsReadyWithLabel(*pod)
+		return controllerutil.PodIsReadyWithLabel(*pod)
 	case appsv1alpha1.Stateful, appsv1alpha1.Stateless:
 		return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 	default:
@@ -54,7 +55,7 @@ func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, min
 	}
 }
 
-func NewComponent(reqCtx intctrlutil.RequestCtx,
+func NewComponent(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	definition *appsv1alpha1.ClusterDefinition,
 	version *appsv1alpha1.ClusterVersion,
@@ -92,7 +93,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, nil
 	}
 
-	if intctrlutil.IsRSMEnabled() {
+	if controllerutil.IsRSMEnabled() {
 		return newRSMComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	}
 
@@ -110,18 +111,18 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef))
 }
 
-func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+func composeSynthesizedComponent(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
-	compVer *appsv1alpha1.ClusterComponentVersion) (*component.SynthesizedComponent, error) {
+	compVer *appsv1alpha1.ClusterComponentVersion) (*component2.SynthesizedComponent, error) {
 	clsMgr, err := getClassManager(reqCtx.Ctx, cli, cluster)
 	if err != nil {
 		return nil, err
 	}
-	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, clusterDef, compDef, compSpec, compVer)
+	synthesizedComp, err := component2.BuildComponent(reqCtx, clsMgr, cluster, clusterDef, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
 	}

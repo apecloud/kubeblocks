@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	// testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 

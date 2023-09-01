@@ -23,6 +23,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,9 +44,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -127,7 +128,7 @@ type ClusterReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
@@ -137,17 +138,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
-		if re, ok := err.(intctrlutil.RequeueError); ok {
-			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
+		if re, ok := err.(controllerutil.RequeueError); ok {
+			return controllerutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
 	// Init stage
 	planBuilder := NewClusterPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// Build stage
@@ -207,7 +208,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errBuild != nil {
 		return requeueError(errBuild)
 	}
-	return intctrlutil.Reconciled()
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.

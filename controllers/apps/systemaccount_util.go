@@ -23,6 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,9 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // customizedEngine helps render jobs.
@@ -78,11 +79,11 @@ func newCustomizedEngine(execConfig *appsv1alpha1.CmdExecutorConfig, dbcluster *
 }
 
 func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccountSpec) {
-	namedValuesMap := componetutil.GetEnvReplacementMapForConnCredential(clusterName)
+	namedValuesMap := component.GetEnvReplacementMapForConnCredential(clusterName)
 	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
 	cmdConfig := sysAccounts.CmdExecutorConfig
 	if cmdConfig != nil {
-		cmdConfig.Env = componetutil.ReplaceSecretEnvVars(namedValuesMap, cmdConfig.Env)
+		cmdConfig.Env = component.ReplaceSecretEnvVars(namedValuesMap, cmdConfig.Env)
 	}
 
 	accounts := sysAccounts.Accounts
@@ -90,7 +91,7 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 		if acc.ProvisionPolicy.Type == appsv1alpha1.ReferToExisting {
 			// replace systemAccounts.accounts[*].provisionPolicy.secretRef.name variables
 			secretRef := acc.ProvisionPolicy.SecretRef
-			name := componetutil.ReplaceNamedVars(namedValuesMap, secretRef.Name, 1, false)
+			name := component.ReplaceNamedVars(namedValuesMap, secretRef.Name, 1, false)
 			if name != secretRef.Name {
 				secretRef.Name = name
 			}
@@ -266,15 +267,15 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 
 	if strategy == inPlaceUpdate {
 		// use update statement
-		stmt := componetutil.ReplaceNamedVars(namedVars, statements.UpdateStatement, -1, true)
+		stmt := component.ReplaceNamedVars(namedVars, statements.UpdateStatement, -1, true)
 		execStmts = append(execStmts, stmt)
 	} else {
 		// drop if exists + create if not exists
 		if len(statements.DeletionStatement) > 0 {
-			stmt := componetutil.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+			stmt := component.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
 			execStmts = append(execStmts, stmt)
 		}
-		stmt := componetutil.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
+		stmt := component.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
 		execStmts = append(execStmts, stmt)
 	}
 	// secret := renderSecretWithPwd(key, userName, passwd)
@@ -321,7 +322,7 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 
 	// add toleration
 	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
-	tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
+	tolerations, err := component.BuildTolerations(cluster, clusterComp)
 	if err != nil {
 		return err
 	}

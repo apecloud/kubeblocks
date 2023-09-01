@@ -22,13 +22,14 @@ package apps
 import (
 	"fmt"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
@@ -67,7 +68,7 @@ func getConditionReasonWithError(defaultReason string, err error) string {
 	if err == nil {
 		return defaultReason
 	}
-	controllerErr := intctrlutil.UnwrapControllerError(err)
+	controllerErr := controllerutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		defaultReason = string(controllerErr.Type)
 	}
@@ -87,7 +88,7 @@ func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 func setApplyResourceCondition(conditions *[]metav1.Condition, clusterGeneration int64, err error) {
 	condition := newApplyResourcesCondition(clusterGeneration)
 	// ignore requeue error
-	if err != nil && !intctrlutil.IsRequeueError(err) {
+	if err != nil && !controllerutil.IsRequeueError(err) {
 		condition = newFailedApplyResourcesCondition(err)
 	}
 	meta.SetStatusCondition(conditions, condition)

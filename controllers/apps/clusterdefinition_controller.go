@@ -24,6 +24,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -35,9 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=get;list;watch;create;update;patch;delete
@@ -63,7 +64,7 @@ func init() {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
@@ -72,15 +73,15 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	dbClusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, dbClusterDef); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, dbClusterDef, dbClusterDefFinalizerName, func() (*ctrl.Result, error) {
+	res, err := controllerutil.HandleCRDeletion(reqCtx, r, dbClusterDef, dbClusterDefFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(dbClusterDef, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing Cluster or ClusterVersion.")
 		}
-		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, dbClusterDef,
+		if res, err := controllerutil.ValidateReferenceCR(reqCtx, r.Client, dbClusterDef,
 			constant.ClusterDefLabelKey, recordEvent, &appsv1alpha1.ClusterList{},
 			&appsv1alpha1.ClusterVersionList{}); res != nil || err != nil {
 			return res, err
@@ -93,16 +94,16 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if dbClusterDef.Status.ObservedGeneration == dbClusterDef.Generation &&
 		slices.Contains(dbClusterDef.Status.GetTerminalPhases(), dbClusterDef.Status.Phase) {
-		return intctrlutil.Reconciled()
+		return controllerutil.Reconciled()
 	}
 
 	if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, reqCtx, dbClusterDef); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
+		return controllerutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
 	for _, handler := range clusterDefUpdateHandlers {
 		if err := handler(r.Client, reqCtx.Ctx, dbClusterDef); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 	}
 
@@ -110,10 +111,10 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	dbClusterDef.Status.ObservedGeneration = dbClusterDef.Generation
 	dbClusterDef.Status.Phase = appsv1alpha1.AvailablePhase
 	if err = r.Client.Status().Patch(reqCtx.Ctx, dbClusterDef, statusPatch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	intctrlutil.RecordCreatedEvent(r.Recorder, dbClusterDef)
-	return intctrlutil.Reconciled()
+	controllerutil.RecordCreatedEvent(r.Recorder, dbClusterDef)
+	return controllerutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -126,7 +127,7 @@ func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ClusterDefinitionReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) error {
+func (r *ClusterDefinitionReconciler) deleteExternalResources(reqCtx controllerutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) error {
 	//
 	// delete any external resources associated with the cronJob
 	//

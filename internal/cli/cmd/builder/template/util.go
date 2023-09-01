@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	"github.com/sethvargo/go-password/password"
 	"helm.sh/helm/v3/pkg/cli/values"
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +33,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/version"
 )
 
@@ -55,7 +56,7 @@ func mockClusterObject(clusterDefObj *appsv1alpha1.ClusterDefinition, renderedOp
 	if clusterVersion != nil {
 		cvReference = clusterVersion.Name
 	}
-	factory := testapps.NewClusterFactory(renderedOpts.Namespace, renderedOpts.Name, clusterDefObj.Name, cvReference)
+	factory := apps.NewClusterFactory(renderedOpts.Namespace, renderedOpts.Name, clusterDefObj.Name, cvReference)
 	for _, component := range clusterDefObj.Spec.ComponentDefs {
 		factory.AddComponent(component.CharacterType+"-"+RandomString(3), component.Name)
 		factory.SetReplicas(renderedOpts.Replicas)
@@ -64,7 +65,7 @@ func mockClusterObject(clusterDefObj *appsv1alpha1.ClusterDefinition, renderedOp
 			if len(fields) == 1 {
 				fields = append(fields, "10Gi")
 			}
-			pvcSpec := testapps.NewPVCSpec(fields[1])
+			pvcSpec := apps.NewPVCSpec(fields[1])
 			factory.AddVolumeClaimTemplate(fields[0], pvcSpec)
 		}
 		if renderedOpts.CPU != "" || renderedOpts.Memory != "" {

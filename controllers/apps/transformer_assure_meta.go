@@ -20,17 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type AssureMetaTransformer struct{}
 
-var _ graph.Transformer = &AssureMetaTransformer{}
+var _ graph2.Transformer = &AssureMetaTransformer{}
 
-func (t *AssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *AssureMetaTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 

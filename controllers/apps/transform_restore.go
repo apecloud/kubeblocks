@@ -20,36 +20,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type RestoreTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &RestoreTransformer{}
+var _ graph2.Transformer = &RestoreTransformer{}
 
-func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *RestoreTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 	clusterDef := transCtx.ClusterDef
 	clusterVer := transCtx.ClusterVer
-	reqCtx := ictrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
 	commitError := func(err error) error {
-		if ictrlutil.IsTargetError(err, ictrlutil.ErrorTypeNeedWaiting) {
-			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(ictrlutil.ErrorTypeNeedWaiting), err.Error())
-			return graph.ErrPrematureStop
+		if controllerutil.IsTargetError(err, controllerutil.ErrorTypeNeedWaiting) {
+			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(controllerutil.ErrorTypeNeedWaiting), err.Error())
+			return graph2.ErrPrematureStop
 		}
 		return err
 	}

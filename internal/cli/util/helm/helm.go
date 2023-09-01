@@ -31,6 +31,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
@@ -53,8 +55,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 const defaultTimeout = time.Second * 600

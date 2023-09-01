@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -35,8 +37,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type mockVolumeStatsRequester struct {

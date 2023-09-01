@@ -23,13 +23,13 @@ import (
 	"fmt"
 	"io"
 
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/cache"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/ending"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/module"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/pipeline"
-
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type PipelineWrapper struct {

@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -30,12 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func newRequeueError(after time.Duration, reason string) error {
-	return intctrlutil.NewRequeueError(after, reason)
+	return controllerutil.NewRequeueError(after, reason)
 }
 
 func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {
@@ -108,10 +109,10 @@ func sendWarningEventWithError(
 	reason string,
 	err error) {
 	// ignore requeue error
-	if err == nil || intctrlutil.IsRequeueError(err) {
+	if err == nil || controllerutil.IsRequeueError(err) {
 		return
 	}
-	controllerErr := intctrlutil.UnwrapControllerError(err)
+	controllerErr := controllerutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		reason = string(controllerErr.Type)
 	}

@@ -22,6 +22,10 @@ package accounts
 import (
 	"net/http"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	channelutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,10 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-
-	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 var _ = Describe("Describe Account Options", func() {

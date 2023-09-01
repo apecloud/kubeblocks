@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	graph2 "github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/pkg/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ComponentTransformer transforms all components to a K8s objects DAG
@@ -35,22 +35,22 @@ type ComponentTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &ComponentTransformer{}
+var _ graph2.Transformer = &ComponentTransformer{}
 
-func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *ComponentTransformer) Transform(ctx graph2.TransformContext, dag *graph2.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 
 	clusterDef := transCtx.ClusterDef
 	clusterVer := transCtx.ClusterVer
-	reqCtx := ictrlutil.RequestCtx{
+	reqCtx := controllerutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
 
 	var err error
-	dags4Component := make([]*graph.DAG, 0)
+	dags4Component := make([]*graph2.DAG, 0)
 	if cluster.IsStatusUpdating() {
 		// status existed components
 		err = c.transform4StatusUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
@@ -58,7 +58,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 		// create new components or update existed components
 		err = c.transform4SpecUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
 	}
-	if err != nil && !ictrlutil.IsDelayedRequeueError(err) {
+	if err != nil && !controllerutil.IsDelayedRequeueError(err) {
 		return err
 	}
 
@@ -77,8 +77,8 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	return err
 }
 
-func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
+func (c *ComponentTransformer) transform4SpecUpdate(reqCtx controllerutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph2.DAG) error {
 	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	compDefMap := make(map[string]*appsv1alpha1.ClusterComponentDefinition)
 	for _, spec := range cluster.Spec.ComponentSpecs {
@@ -100,7 +100,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	deleteSet := compStatus.Difference(compProto)
 
 	for compName := range createSet {
-		dag := graph.NewDAG()
+		dag := graph2.NewDAG()
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -115,7 +115,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	}
 
 	for compName := range deleteSet {
-		dag := graph.NewDAG()
+		dag := graph2.NewDAG()
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -129,7 +129,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	}
 
 	for compName := range updateSet {
-		dag := graph.NewDAG()
+		dag := graph2.NewDAG()
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -143,17 +143,17 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	return nil
 }
 
-func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
+func (c *ComponentTransformer) transform4StatusUpdate(reqCtx controllerutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph2.DAG) error {
 	var delayedError error
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		dag := graph.NewDAG()
+		dag := graph2.NewDAG()
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
 		}
 		if err := comp.Status(reqCtx, c.Client); err != nil {
-			if !ictrlutil.IsDelayedRequeueError(err) {
+			if !controllerutil.IsDelayedRequeueError(err) {
 				return err
 			}
 			if delayedError == nil {

@@ -20,11 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package accounts
 
 import (
+	channelutil "github.com/apecloud/kubeblocks/pkg/sqlchannel/util"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type DescribeUserOptions struct {

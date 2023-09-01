@@ -22,6 +22,12 @@ package components
 import (
 	"fmt"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
@@ -32,12 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type dataClone interface {
@@ -63,7 +64,7 @@ const (
 	backupStatusFailed     backupStatus = "Failed"
 )
 
-func newDataClone(reqCtx intctrlutil.RequestCtx,
+func newDataClone(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
@@ -117,7 +118,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 }
 
 type baseDataClone struct {
-	reqCtx    intctrlutil.RequestCtx
+	reqCtx    controllerutil.RequestCtx
 	cli       client.Client
 	cluster   *appsv1alpha1.Cluster
 	component *component.SynthesizedComponent
@@ -370,7 +371,7 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 		return nil, err
 	}
 	if backupPolicy == nil {
-		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
+		return nil, controllerutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
 	backup, err := builder.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "snapshot")
 	if err != nil {
@@ -397,7 +398,7 @@ func (d *snapshotDataClone) checkBackupStatus() (backupStatus, error) {
 		}
 	}
 	if backup.Status.Phase == dataprotectionv1alpha1.BackupFailed {
-		return backupStatusFailed, intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
+		return backupStatusFailed, controllerutil.NewErrorf(controllerutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
 			backup.Status.FailureReason)
 	}
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
@@ -433,7 +434,7 @@ func (d *snapshotDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (bac
 }
 
 func (d *snapshotDataClone) listVolumeSnapshotByLabels(vsList *snapshotv1.VolumeSnapshotList, ml client.MatchingLabels) error {
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
+	compatClient := controllerutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
 	// get vs from backup.
 	backupList := dataprotectionv1alpha1.BackupList{}
 	if err := d.cli.List(d.reqCtx.Ctx, &backupList, client.InNamespace(d.cluster.Namespace), ml); err != nil {
@@ -595,7 +596,7 @@ func (d *backupDataClone) backup() ([]client.Object, error) {
 		return nil, err
 	}
 	if backupPolicy == nil {
-		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
+		return nil, controllerutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
 	backup, err := builder.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "datafile")
 	if err != nil {
@@ -665,7 +666,7 @@ func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backu
 }
 
 // getBackupPolicyFromTemplate gets backup policy from template policy template.
-func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
+func getBackupPolicyFromTemplate(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	componentDef, backupPolicyTemplateName string) (*dataprotectionv1alpha1.BackupPolicy, error) {

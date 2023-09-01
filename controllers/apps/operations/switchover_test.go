@@ -22,6 +22,10 @@ package operations
 import (
 	"fmt"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,10 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var (
@@ -59,7 +60,7 @@ var _ = Describe("", func() {
 	}
 
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
+		Eventually(apps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
 			found := false
 			for _, cond := range job.Status.Conditions {
 				if cond.Type == jobStatus {
@@ -81,13 +82,13 @@ var _ = Describe("", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		apps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -98,7 +99,7 @@ var _ = Describe("", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with switchoverSpec.")
 			commandExecutorEnvItem := &appsv1alpha1.CommandExecutorEnvItem{
-				Image: testapps.ApeCloudMySQLImage,
+				Image: apps.ApeCloudMySQLImage,
 			}
 			commandExecutorItem := &appsv1alpha1.CommandExecutorItem{
 				Command: []string{"echo", "hello"},
@@ -118,14 +119,14 @@ var _ = Describe("", func() {
 					},
 				},
 			}
-			clusterDefObj = testapps.NewClusterDefFactory(consensusComp).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusComp).
+			clusterDefObj = apps.NewClusterDefFactory(consensusComp).
+				AddComponentDef(apps.ConsensusMySQLComponent, consensusComp).
 				AddSwitchoverSpec(switchoverSpec).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication workloadType.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponentVersion(consensusComp).AddContainerShort(apps.DefaultMySQLContainerName, apps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -135,7 +136,7 @@ var _ = Describe("", func() {
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
 			By("Creating a cluster with consensus .")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterObj = apps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(consensusComp, consensusComp).
 				SetReplicas(2).
@@ -144,10 +145,10 @@ var _ = Describe("", func() {
 			By("Creating a statefulSet.")
 			container := corev1.Container{
 				Name:            "mock-container-name",
-				Image:           testapps.ApeCloudMySQLImage,
+				Image:           apps.ApeCloudMySQLImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			}
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			sts := apps.NewStatefulSetFactory(testCtx.DefaultNamespace,
 				clusterObj.Name+"-"+consensusComp, clusterObj.Name, consensusComp).
 				AddFinalizers([]string{constant.DBClusterFinalizerName}).
 				AddContainer(container).
@@ -163,7 +164,7 @@ var _ = Describe("", func() {
 				followerPod *corev1.Pod
 			)
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
-				pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+				pod := apps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
 					AddContainer(container).
 					AddLabelsInMap(sts.Labels).
 					AddRoleLabel(defaultRole(i)).
@@ -180,7 +181,7 @@ var _ = Describe("", func() {
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
 			By("mock cluster is Running and the status operations")
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
+			Expect(apps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
 				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusComp: {
@@ -191,7 +192,7 @@ var _ = Describe("", func() {
 			opsRes.Cluster = clusterObj
 
 			By("create switchover opsRequest")
-			ops := testapps.NewOpsRequestObj("ops-switchover-"+randomStr, testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj("ops-switchover-"+randomStr, testCtx.DefaultNamespace,
 				clusterObj.Name, appsv1alpha1.SwitchoverType)
 			ops.Spec.SwitchoverList = []appsv1alpha1.Switchover{
 				{
@@ -199,12 +200,12 @@ var _ = Describe("", func() {
 					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, consensusComp, 1),
 				},
 			}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = apps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("mock switchover OpsRequest phase is Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			Eventually(apps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			// do switchover action
 			By("do switchover action")
@@ -230,10 +231,10 @@ var _ = Describe("", func() {
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for pod role label consistency"))
 
 			By("mock pod role label changed.")
-			Expect(testapps.ChangeObj(&testCtx, leaderPod, func(pod *corev1.Pod) {
+			Expect(apps.ChangeObj(&testCtx, leaderPod, func(pod *corev1.Pod) {
 				pod.Labels[constant.RoleLabelKey] = constant.Follower
 			})).Should(Succeed())
-			Expect(testapps.ChangeObj(&testCtx, followerPod, func(pod *corev1.Pod) {
+			Expect(apps.ChangeObj(&testCtx, followerPod, func(pod *corev1.Pod) {
 				pod.Labels[constant.RoleLabelKey] = constant.Leader
 			})).Should(Succeed())
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

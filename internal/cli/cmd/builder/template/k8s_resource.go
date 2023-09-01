@@ -24,10 +24,10 @@ import (
 	"bytes"
 	"os"
 
+	"github.com/apecloud/kubeblocks/pkg/generics"
+
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type MatchResourceFunc func(object client.Object) bool

@@ -25,6 +25,11 @@ import (
 	"testing"
 	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
@@ -41,11 +46,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/testutil"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -146,14 +147,14 @@ var _ = AfterSuite(func() {
 func initOperationsResources(clusterDefinitionName,
 	clusterVersionName,
 	clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
-	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
+	clusterDef, _, clusterObject := apps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
 		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
 		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 	}
 	By("mock cluster is Running and the status operations")
-	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+	Expect(apps.ChangeObjStatus(&testCtx, clusterObject, func() {
 		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 			consensusComp: {
@@ -173,7 +174,7 @@ func initOperationsResources(clusterDefinitionName,
 
 func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
-	testapps.MockConsensusComponentPods(&testCtx, nil, clusterName, consensusComp)
+	apps.MockConsensusComponentPods(&testCtx, nil, clusterName, consensusComp)
 	podList, err := components.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
@@ -183,7 +184,7 @@ func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResour
 }
 
 func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.ClusterComponentPhase, compNames ...string) {
-	Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+	Expect(apps.ChangeObjStatus(&testCtx, cluster, func() {
 		for _, v := range compNames {
 			compStatus := cluster.Status.Components[v]
 			compStatus.Phase = expectPhase

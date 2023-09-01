@@ -22,6 +22,12 @@ package configuration
 import (
 	"math"
 
+	core2 "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	util2 "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,12 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // ExecStatus defines running result for Reconfiguring policy (fsm).
@@ -78,7 +79,7 @@ type reconfigureParams struct {
 	ConfigSpecName string
 
 	// Configuration files patch.
-	ConfigPatch *core.ConfigPatchInfo
+	ConfigPatch *core2.ConfigPatchInfo
 
 	// Configmap object of the configuration template instance in the component.
 	ConfigMap *corev1.ConfigMap
@@ -93,7 +94,7 @@ type reconfigureParams struct {
 	ContainerNames []string
 
 	Client client.Client
-	Ctx    intctrlutil.RequestCtx
+	Ctx    controllerutil.RequestCtx
 
 	Cluster *appsv1alpha1.Cluster
 
@@ -141,7 +142,7 @@ func (param *reconfigureParams) getConfigKey() string {
 }
 
 func (param *reconfigureParams) getTargetVersionHash() string {
-	hash, err := util.ComputeHash(param.ConfigMap.Data)
+	hash, err := util2.ComputeHash(param.ConfigMap.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to get configuration version!")
 		return ""
@@ -161,7 +162,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		return defaultRolling
 	}
 
-	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(param.Component.GetMaxUnavailable())
+	v, isPercentage, err := controllerutil.GetIntOrPercentValue(param.Component.GetMaxUnavailable())
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to get maxUnavailable!")
 		return defaultRolling
@@ -170,9 +171,9 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	if isPercentage {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = util.Safe2Int32(util.Min(v, param.getTargetReplicas()))
+		r = util2.Safe2Int32(util2.Min(v, param.getTargetReplicas()))
 	}
-	return util.Max(r, defaultRolling)
+	return util2.Max(r, defaultRolling)
 }
 
 func (param *reconfigureParams) getTargetReplicas() int {
@@ -181,7 +182,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
-	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
+	return util2.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func RegisterPolicy(policy appsv1alpha1.UpgradePolicy, action reconfigurePolicy) {
@@ -197,14 +198,14 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(appsv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core2.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if cfgPatch != nil && !cfgPatch.IsModify {
 		// not walk here
-		return nil, core.MakeError("cfg not modify. [%v]", cfgPatch)
+		return nil, core2.MakeError("cfg not modify. [%v]", cfgPatch)
 	}
 
 	if enableAutoDecision(restart, policy) {
-		if dynamicUpdate, err := core.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
+		if dynamicUpdate, err := core2.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
 			policy = appsv1alpha1.AutoReload
@@ -219,7 +220,7 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil
 	}
-	return nil, core.MakeError("not supported upgrade policy:[%s]", policy)
+	return nil, core2.MakeError("not supported upgrade policy:[%s]", policy)
 }
 
 func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
@@ -236,11 +237,11 @@ func enableSyncTrigger(options *appsv1alpha1.ReloadOptions) bool {
 	}
 
 	if options.TPLScriptTrigger != nil {
-		return !core.IsWatchModuleForTplTrigger(options.TPLScriptTrigger)
+		return !core2.IsWatchModuleForTplTrigger(options.TPLScriptTrigger)
 	}
 
 	if options.ShellTrigger != nil {
-		return !core.IsWatchModuleForShellTrigger(options.ShellTrigger)
+		return !core2.IsWatchModuleForShellTrigger(options.ShellTrigger)
 	}
 	return false
 }
@@ -260,8 +261,8 @@ func withExpected(expectedCount int32) func(status *ReturnedStatus) {
 func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) ReturnedStatus {
 	ret := ReturnedStatus{
 		Status:        status,
-		SucceedCount:  core.Unconfirmed,
-		ExpectedCount: core.Unconfirmed,
+		SucceedCount:  core2.Unconfirmed,
+		ExpectedCount: core2.Unconfirmed,
 	}
 	for _, o := range ops {
 		o(&ret)

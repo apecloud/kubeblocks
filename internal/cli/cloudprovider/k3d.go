@@ -29,6 +29,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/docker/go-connections/nat"
 	"github.com/k3d-io/k3d/v5/pkg/actions"
 	k3dClient "github.com/k3d-io/k3d/v5/pkg/client"
@@ -42,7 +44,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/version"
 )

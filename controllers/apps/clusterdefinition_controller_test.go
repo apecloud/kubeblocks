@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,10 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
@@ -57,12 +57,12 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 		// resources should be released in following order
 		// non-namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterVersionSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterDefinitionSignature, true, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterVersionSignature, true, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterDefinitionSignature, true, ml)
+		apps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
+		apps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -82,20 +82,20 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	Context("with no ConfigSpec", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+			clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.StatefulMySQLComponent, statefulCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", apps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
 		It("should update status of clusterVersion at the same time when updating clusterDefinition", func() {
 			By("Check reconciled finalizer and status of ClusterDefinition")
 			var cdGen int64
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
 					g.Expect(cd.Finalizers).NotTo(BeEmpty())
 					g.Expect(cd.Status.ObservedGeneration).To(BeEquivalentTo(1))
@@ -103,7 +103,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				})).Should(Succeed())
 
 			By("Check reconciled finalizer and status of ClusterVersion")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
 				func(g Gomega, cv *appsv1alpha1.ClusterVersion) {
 					g.Expect(cv.Finalizers).NotTo(BeEmpty())
 					g.Expect(cv.Status.ObservedGeneration).To(BeEquivalentTo(1))
@@ -111,13 +111,13 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				})).Should(Succeed())
 
 			By("updating clusterDefinition's spec which then update clusterVersion's status")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			Eventually(apps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(cd *appsv1alpha1.ClusterDefinition) {
 					cd.Spec.ConnectionCredential["root"] = "password"
 				})).Should(Succeed())
 
 			By("Check ClusterVersion.Status as updated")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
 				func(g Gomega, cv *appsv1alpha1.ClusterVersion) {
 					g.Expect(cv.Status.Phase).To(Equal(appsv1alpha1.AvailablePhase))
 					g.Expect(cv.Status.Message).To(Equal(""))
@@ -130,12 +130,12 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
 		By("Create a configmap and config template obj")
-		cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
+		cm := apps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
 			testCtx.UseDefaultNamespace())
 
-		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
+		cfgTpl := apps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
 			&appsv1alpha1.ConfigConstraint{})
-		Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
+		Expect(apps.ChangeObjStatus(&testCtx, cfgTpl, func() {
 			cfgTpl.Status.Phase = appsv1alpha1.CCAvailablePhase
 		})).Should(Succeed())
 		return cm
@@ -144,14 +144,14 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	Context("with ConfigSpec", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+			clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(apps.StatefulMySQLComponent, statefulCompDefName).
 				AddConfigTemplate(cmName, cmName, cmName, testCtx.DefaultNamespace, configVolumeName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+			clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", apps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -159,7 +159,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			By("check the reconciler won't update Status.ObservedGeneration if configmap doesn't exist.")
 			// should use Consistently here, since cd.Status.ObservedGeneration is initialized to be zero,
 			// we must watch the value for a while to tell it's not changed by the reconciler.
-			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			Consistently(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
 					g.Expect(cd.Status.ObservedGeneration).To(BeEquivalentTo(0))
 				})).Should(Succeed())
@@ -167,7 +167,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			assureCfgTplConfigMapObj()
 
 			By("check the reconciler update Status.ObservedGeneration after configmap is created.")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			Eventually(apps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
 					g.Expect(cd.Status.ObservedGeneration).To(BeEquivalentTo(1))
 
@@ -184,7 +184,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				Namespace: testCtx.DefaultNamespace,
 				Name:      cmName,
 			}
-			Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cmObj *corev1.ConfigMap) {
+			Eventually(apps.CheckObj(&testCtx, cmKey, func(g Gomega, cmObj *corev1.ConfigMap) {
 				g.Expect(controllerutil.ContainsFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName)).To(BeTrue())
 			})).Should(Succeed())
 		})

@@ -32,6 +32,8 @@ import (
 	"strings"
 	"time"
 
+	types2 "github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -52,14 +54,14 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/class"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var clusterCreateExample = templates.Examples(`
@@ -247,7 +249,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 		Factory:         f,
 		IOStreams:       streams,
 		CueTemplateName: CueTemplateName,
-		GVR:             types.ClusterGVR(),
+		GVR:             types2.ClusterGVR(),
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
@@ -289,7 +291,7 @@ func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1a
 
 func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1alpha1.Backup) error {
 	if o.Backup != "" {
-		if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+		if err := cluster.GetK8SClientObject(o.Dynamic, backup, types2.BackupGVR(), o.Namespace, o.Backup); err != nil {
 			return err
 		}
 	} else if o.RestoreTime != "" {
@@ -302,7 +304,7 @@ func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1al
 		if err := createRestoreOptions.validateRestoreTime(); err != nil {
 			return err
 		}
-		objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
+		objs, err := o.Dynamic.Resource(types2.BackupGVR()).Namespace(o.Namespace).
 			List(context.TODO(), metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s",
 					constant.AppInstanceLabelKey, o.SourceCluster),
@@ -365,7 +367,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 		return nil
 	}
 	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types2.BackupGVR(), o.Namespace, backupName); err != nil {
 		return err
 	}
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
@@ -809,7 +811,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-definition",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types2.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
@@ -817,10 +819,10 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 			var clusterVersion []string
 			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
 			if clusterDefinition == "" || err != nil {
-				clusterVersion = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+				clusterVersion = utilcomp.CompGetResource(f, cmd, util.GVRToString(types2.ClusterVersionGVR()), toComplete)
 			} else {
 				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefinition)
-				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
+				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types2.ClusterVersionGVR()), []string{label}, toComplete)
 			}
 			return clusterVersion, cobra.ShellCompDirectiveNoFileComp
 		}))
@@ -1155,7 +1157,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 	for i := 0; i < 10; i++ {
 		name = cluster.GenerateName()
 		// check whether the cluster exists, if not found, return it
-		_, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		_, err := dynamic.Resource(types2.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return name, nil
 		}
@@ -1235,7 +1237,7 @@ func validateStorageClass(dynamic dynamic.Interface, components []map[string]int
 
 // getStorageClasses returns all StorageClasses in K8S and return true if the cluster have a default StorageClasses
 func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, error) {
-	gvr := types.StorageClassGVR()
+	gvr := types2.StorageClassGVR()
 	allStorageClasses := make(map[string]struct{})
 	existedDefault := false
 	list, err := dynamic.Resource(gvr).List(context.Background(), metav1.ListOptions{})
@@ -1371,12 +1373,12 @@ func setKeys() []string {
 // When we install Kubeblocks, certain configurations will be rendered in a ConfigMap named kubeblocks-manager-config.
 // You can find the details in deploy/helm/template/configmap.yaml.
 func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
-	// todo:  types.KubeBlocksManagerConfigMapName almost is hard code, add a unique label for kubeblocks-manager-config
+	// todo:  constant.KubeBlocksManagerConfigMapName almost is hard code, add a unique label for kubeblocks-manager-config
 	namespace, err := util.GetKubeBlocksNamespaceByDynamic(dynamic)
 	if err != nil {
 		return false, err
 	}
-	cfg, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(namespace).Get(context.Background(), types.KubeBlocksManagerConfigMapName, metav1.GetOptions{})
+	cfg, err := dynamic.Resource(types2.ConfigmapGVR()).Namespace(namespace).Get(context.Background(), types2.KubeBlocksManagerConfigMapName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}

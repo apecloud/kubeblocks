@@ -22,6 +22,8 @@ package playground
 import (
 	"os"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,7 +32,6 @@ import (
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )

@@ -24,6 +24,8 @@ import (
 	"sort"
 	"strings"
 
+	class2 "github.com/apecloud/kubeblocks/pkg/class"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -31,7 +33,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
@@ -72,7 +73,7 @@ func (o *ListOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *ListOptions) run() error {
-	clsMgr, err := class.GetManager(o.dynamic, o.ClusterDefRef)
+	clsMgr, err := class2.GetManager(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
@@ -82,10 +83,10 @@ func (o *ListOptions) run() error {
 	return nil
 }
 
-func (o *ListOptions) printClass(compName string, classes []*class.ComponentClassWithRef) {
+func (o *ListOptions) printClass(compName string, classes []*class2.ComponentClassWithRef) {
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY")
-	sort.Sort(class.ByClassResource(classes))
+	sort.Sort(class2.ByClassResource(classes))
 	for _, cls := range classes {
 		tbl.AddRow(compName, cls.Name, cls.CPU.String(), normalizeMemory(cls.Memory))
 	}

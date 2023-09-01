@@ -25,13 +25,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func mockSystemAccountsSpec() *appsv1alpha1.SystemAccountSpec {
@@ -155,14 +156,14 @@ func TestRenderJob(t *testing.T) {
 	)
 
 	systemAccount := mockSystemAccountsSpec()
-	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+	clusterDef := apps.NewClusterDefFactory(clusterDefName).
+		AddComponentDef(apps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 	assert.NotNil(t, clusterDef.Spec.ComponentDefs[0].SystemAccounts)
 
-	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
+	cluster := apps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
 		AddComponent(mysqlCompDefName, mysqlCompName).GetObject()
 	assert.NotNil(t, cluster)
 	if cluster.Annotations == nil {
@@ -318,8 +319,8 @@ func TestRenderCreationStmt(t *testing.T) {
 	)
 
 	systemAccount := mockSystemAccountsSpec()
-	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+	clusterDef := apps.NewClusterDefFactory(clusterDefName).
+		AddComponentDef(apps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)

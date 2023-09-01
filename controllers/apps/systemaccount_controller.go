@@ -24,6 +24,10 @@ import (
 	"fmt"
 	"strings"
 
+	controllerutil2 "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/sqlchannel"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,10 +46,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // SystemAccountReconciler reconciles a SystemAccount object.
@@ -121,7 +122,7 @@ func init() {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := intctrlutil.RequestCtx{
+	reqCtx := controllerutil2.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
@@ -131,7 +132,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	cluster := &appsv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	// cluster is under deletion, do nothing
 	if !cluster.GetDeletionTimestamp().IsZero() {
@@ -145,7 +146,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		client.HasLabels{constant.ClusterAccountLabelKey}.ApplyToList(&options)
 
 		if err := r.Client.List(reqCtx.Ctx, jobs, &options); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return controllerutil2.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 
 		for _, job := range jobs.Items {
@@ -153,24 +154,24 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			controllerutil.RemoveFinalizer(&job, constant.DBClusterFinalizerName)
 			_ = r.Client.Patch(context.Background(), &job, patch)
 		}
-		return intctrlutil.Reconciled()
+		return controllerutil2.Reconciled()
 	}
 
 	// wait till the cluster is running
 	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 		reqCtx.Log.V(1).Info("Cluster is not ready yet", "cluster", req.NamespacedName)
-		return intctrlutil.Reconciled()
+		return controllerutil2.Reconciled()
 	}
 
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
 	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
 	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+		return controllerutil2.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 
 	clusterVersion := &appsv1alpha1.ClusterVersion{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+		return controllerutil2.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 
 	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
@@ -265,7 +266,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			isReady, svcEP, headlessEP, err := r.isComponentReady(reqCtx, cluster.Name, compName)
 			if err != nil {
-				return intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, "failed to get service")
+				return controllerutil2.RequeueAfter(requeueDuration, reqCtx.Log, "failed to get service")
 			}
 
 			// either service or endpoint is not ready, increase counter and continue to process next component
@@ -282,7 +283,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if reconcileCounter > 0 {
-		return intctrlutil.Requeue(reqCtx.Log, "Not all components have been reconciled. Requeue request.")
+		return controllerutil2.Requeue(reqCtx.Log, "Not all components have been reconciled. Requeue request.")
 	}
 	return ctrl.Result{}, nil
 }
@@ -296,7 +297,7 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
+func (r *SystemAccountReconciler) createByStmt(reqCtx controllerutil2.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compKey componentUniqueKey,
@@ -343,7 +344,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func (r *SystemAccountReconciler) createByReferringToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
+func (r *SystemAccountReconciler) createByReferringToExisting(reqCtx controllerutil2.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
 	// get secret
 	secret := &corev1.Secret{}
 	secretRef := account.ProvisionPolicy.SecretRef
@@ -364,7 +365,7 @@ func (r *SystemAccountReconciler) createByReferringToExisting(reqCtx intctrlutil
 	return nil
 }
 
-func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx, clusterName string, compName string) (bool, *corev1.Endpoints, *corev1.Endpoints, error) {
+func (r *SystemAccountReconciler) isComponentReady(reqCtx controllerutil2.RequestCtx, clusterName string, compName string) (bool, *corev1.Endpoints, *corev1.Endpoints, error) {
 	svcEP := &corev1.Endpoints{}
 	serviceName := clusterName + "-" + compName
 
@@ -395,7 +396,7 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 
 // getAccountFacts parses secrets for given cluster as facts, i.e., accounts created
 // TODO: @shanshan, should verify accounts on database cluster as well.
-func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
+func (r *SystemAccountReconciler) getAccountFacts(reqCtx controllerutil2.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
 	// get account facts, i.e., secrets created
 	ml := getLabelsForSecretsAndJobs(key)
 
@@ -415,7 +416,7 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 	return detectedFacts, nil
 }
 
-func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
+func (r *SystemAccountReconciler) getEngineFacts(reqCtx controllerutil2.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
 	// get pods for this cluster-component, by label
 	ml := getLabelsForSecretsAndJobs(key)
 	pods := &corev1.PodList{}

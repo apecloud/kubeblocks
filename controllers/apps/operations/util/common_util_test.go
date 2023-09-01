@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -58,16 +58,16 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			cluster := testapps.CreateConsensusMysqlCluster(&testCtx, clusterDefinitionName,
+			cluster := apps.CreateConsensusMysqlCluster(&testCtx, clusterDefinitionName,
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr
-			ops := testapps.NewOpsRequestObj(testOpsName, testCtx.DefaultNamespace,
+			ops := apps.NewOpsRequestObj(testOpsName, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.RestartType)
 			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
 				{ComponentName: consensusCompName},
 			}
-			testapps.CreateOpsRequest(ctx, testCtx, ops)
+			apps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test PatchOpsRequestReconcileAnnotation function")
 			Expect(PatchOpsRequestReconcileAnnotation(ctx, k8sClient, cluster.Namespace, testOpsName)).Should(Succeed())

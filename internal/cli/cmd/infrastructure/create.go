@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/apecloud/kubeblocks/pkg/configuration/container"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/spf13/cobra"
@@ -34,8 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/configuration/container"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type createOptions struct {

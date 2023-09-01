@@ -22,6 +22,10 @@ package apps
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil/apps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -33,10 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("SystemAccount Controller", func() {
@@ -91,14 +92,14 @@ var _ = Describe("SystemAccount Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
+		apps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// namespaced resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, generics.EndpointsSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.EndpointsSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
+		apps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 	}
 
 	/**
@@ -176,7 +177,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		_ = assureEndpoint(objectKey.Namespace, headlessServiceName, ips[0:clusterEndPointsSize])
 
 		By("Patching Cluster to running phase")
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, objectKey, func(cluster *appsv1alpha1.Cluster) {
+		Eventually(apps.GetAndChangeObjStatus(&testCtx, objectKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 		})).Should(Succeed())
 	}
@@ -185,16 +186,16 @@ var _ = Describe("SystemAccount Controller", func() {
 		// create clusterdef and cluster versions, but not clusters
 		By("Create a clusterDefinition obj")
 		systemAccount := mockSystemAccountsSpec()
-		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+		clusterDefObj = apps.NewClusterDefFactory(clusterDefName).
+			AddComponentDef(apps.StatefulMySQLComponent, mysqlCompDefName).
 			AddSystemAccountSpec(systemAccount).
-			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompTypeWOSysAcctDefName).
+			AddComponentDef(apps.StatefulMySQLComponent, mysqlCompTypeWOSysAcctDefName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponentVersion(mysqlCompNameWOSysAcct).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+		clusterVersionObj = apps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+			AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", apps.ApeCloudMySQLImage).
+			AddComponentVersion(mysqlCompNameWOSysAcct).AddContainerShort("mysql", apps.ApeCloudMySQLImage).
 			Create(&testCtx).GetObject()
 
 		Expect(clusterDefObj).NotTo(BeNil())
@@ -237,7 +238,7 @@ var _ = Describe("SystemAccount Controller", func() {
 
 		// create cluster defined in each testcase
 		for testName, testCase := range testCases {
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterObj := apps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testCase.componentName, testCase.componentDefRef).
 				SetReplicas(1).
@@ -399,7 +400,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
 					for _, job := range jobs.Items {
-						g.Expect(testapps.ChangeObjStatus(&testCtx, &job, func() {
+						g.Expect(apps.ChangeObjStatus(&testCtx, &job, func() {
 							job.Status.Conditions = []batchv1.JobCondition{{
 								Type:   batchv1.JobComplete,
 								Status: corev1.ConditionTrue,
@@ -634,7 +635,7 @@ var _ = Describe("SystemAccount Controller", func() {
 
 				By("Enable monitor, no more jobs or secrets should be created")
 				// patch cluster, flip comp.Monitor
-				Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+				Eventually(apps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 					for _, comp := range cluster.Spec.ComponentSpecs {
 						comp.Monitor = !comp.Monitor
 					}
@@ -660,7 +661,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
 				}).Should(Succeed())
 
-				Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
+				Expect(apps.ChangeObjStatus(&testCtx, tmpJob, func() {
 					tmpJob.Status.Conditions = []batchv1.JobCondition{{
 						Type:   batchv1.JobFailed,
 						Status: corev1.ConditionTrue,
@@ -686,7 +687,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
 				}).Should(Succeed())
-				Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
+				Expect(apps.ChangeObjStatus(&testCtx, tmpJob, func() {
 					tmpJob.Status.Conditions = []batchv1.JobCondition{{
 						Type:   batchv1.JobComplete,
 						Status: corev1.ConditionTrue,

@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes"
@@ -44,9 +46,8 @@ import (
 
 	kbclischeme "github.com/apecloud/kubeblocks/internal/cli/scheme"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	kbclientset "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/fake"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("report", func() {

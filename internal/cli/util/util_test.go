@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant/types"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -41,10 +43,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -263,11 +264,11 @@ var _ = Describe("util", func() {
 				updatedParams: testapps.WithMap("automatic_sp_privileges", "1"),
 			},
 			expected: false,
-			err:      cfgcore.MakeError("field not found:"),
+			err:      core.MakeError("field not found:"),
 		}}
 
 		for _, tt := range tests {
-			ret, err := IsSupportReconfigureParams(tt.args.configSpec, cfgcore.FromStringPointerMap(tt.args.updatedParams), mockClient)
+			ret, err := IsSupportReconfigureParams(tt.args.configSpec, core.FromStringPointerMap(tt.args.updatedParams), mockClient)
 			Expect(ret).Should(BeEquivalentTo(tt.expected))
 			Expect(err != nil).Should(BeEquivalentTo(tt.err != nil))
 			if err != nil {

@@ -22,6 +22,8 @@ package components
 import (
 	"context"
 	"fmt"
+	apps "k8s.io/api/apps/v1"
+	"strconv"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -70,9 +72,29 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	sts := ConvertRSMToSTS(rsm)
+	sts := &apps.StatefulSet{}
+	if err := r.Cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		return false, err
+	}
 
-	// whether sts is ready
+	// whether sts level is ready
+	rsmNStsGenerationMatched := func() bool {
+		if len(sts.Annotations) == 0 {
+			return true
+		}
+		genStr, ok := sts.Annotations[rsmcore.GenerationAnnotationKey]
+		if !ok {
+			return true
+		}
+		gen, err := strconv.ParseInt(genStr, 10, 64)
+		if err != nil {
+			return true
+		}
+		return gen == rsm.Generation
+	}
+	if !rsmNStsGenerationMatched() {
+		return false, nil
+	}
 	isRevisionConsistent, err := isStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
@@ -83,7 +105,7 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 		return stsReady, nil
 	}
 
-	// whether rsm is ready
+	// whether rsm level is ready
 	return rsmcore.IsRSMReady(rsm), nil
 }
 

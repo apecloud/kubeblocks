@@ -51,6 +51,10 @@ const (
 	roleLabelKey          = "kubeblocks.io/role"
 	rsmAccessModeLabelKey = "rsm.workloads.kubeblocks.io/access-mode"
 
+	// GenerationAnnotationKey marks the rsm.generation the current underlying sts is corresponding to
+	// TODO(free6om): remove this after cluster phase refactored
+	GenerationAnnotationKey = "rsm.workloads.kubeblocks.io/generation"
+
 	defaultPodName = "Unknown"
 
 	rsmFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"

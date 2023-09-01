@@ -119,15 +119,7 @@ spec:
                     description: enabled defines whether to enable automated backup.
                     type: boolean
                   method:
-                    allOf:
-                    - enum:
-                      - snapshot
-                      - backupTool
-                    - enum:
-                      - snapshot
-                      - backupTool
-                    default: snapshot
-                    description: 'backup method, support: snapshot, backupTool.'
+                    description: backup method name to use, that is defined in backupPolicy.
                     type: string
                   pitrEnabled:
                     default: false

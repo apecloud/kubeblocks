@@ -38,6 +38,14 @@ type BackupPolicyNamespaceListerExpansion interface{}
 // BackupRepoLister.
 type BackupRepoListerExpansion interface{}
 
+// BackupScheduleListerExpansion allows custom methods to be added to
+// BackupScheduleLister.
+type BackupScheduleListerExpansion interface{}
+
+// BackupScheduleNamespaceListerExpansion allows custom methods to be added to
+// BackupScheduleNamespaceLister.
+type BackupScheduleNamespaceListerExpansion interface{}
+
 // BackupToolListerExpansion allows custom methods to be added to
 // BackupToolLister.
 type BackupToolListerExpansion interface{}

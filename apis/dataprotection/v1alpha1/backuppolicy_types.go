@@ -254,7 +254,7 @@ const (
 // +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BackupPolicy is the Schema for the backuppolicies API (defined by User)
+// BackupPolicy is the Schema for the backuppolicies API.
 type BackupPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

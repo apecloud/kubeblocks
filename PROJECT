@@ -40,7 +40,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: apps
-  kind: BackupTool
+  kind: ActionSet
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
 - api:
@@ -166,6 +166,14 @@ resources:
   domain: kubeblocks.io
   group: dataprotection
   kind: BackupRepo
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: dataprotection
+  kind: BackupSchedule
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
 version: "3"

@@ -35,11 +35,6 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Required
 	BackupMethod string `json:"backupMethod"`
 
-	// parentBackupName specifies the parent backup name. If backup type of BackupMethod
-	// is incremental or differential, ParentBackupName is required.
-	// +optional
-	ParentBackupName string `json:"parentBackupName,omitempty"`
-
 	// deletionPolicy determines whether the backup contents stored in backup repository
 	// should be deleted when the backup custom resource is deleted.
 	// Supported values are "Retain" and "Delete".
@@ -61,7 +56,7 @@ type BackupSpec struct {
 	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m
 	// +optional
-	// +kubebuilder:default=7d
+	// +kubebuilder:default="7d"
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 }
 
@@ -186,13 +181,14 @@ const (
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.backupType`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="SOURCE-CLUSTER",type=string,JSONPath=`.status.sourceCluster`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 // +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=`.status.completionTimestamp`
+// +kubebuilder:printcolumn:name="TIME-RANGE-START",type=string,JSONPath=`.status.timeRange.start`
+// +kubebuilder:printcolumn:name="TIME-RANGE-END",type=string,JSONPath=`.status.timeRange.end`
 
-// Backup is the Schema for the backups API (defined by User).
+// Backup is the Schema for the backups API.
 type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

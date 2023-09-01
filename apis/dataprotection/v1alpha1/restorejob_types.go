@@ -27,10 +27,6 @@ type RestoreJobSpec struct {
 	// +kubebuilder:validation:Required
 	BackupJobName string `json:"backupJobName"`
 
-	// the target database workload to restore
-	// +kubebuilder:validation:Required
-	Target TargetCluster `json:"target"`
-
 	// array of restore volumes .
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:pruning:PreserveUnknownFields

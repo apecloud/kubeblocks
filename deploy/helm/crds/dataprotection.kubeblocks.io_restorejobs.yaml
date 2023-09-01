@@ -56,82 +56,6 @@ spec:
                 description: count of backup stop retries on fail.
                 format: int32
                 type: integer
-              target:
-                description: the target database workload to restore
-                properties:
-                  labelsSelector:
-                    description: labelsSelector is used to find matching pods. Pods
-                      that match this label selector are counted to determine the
-                      number of pods in their corresponding topology domain.
-                    properties:
-                      matchExpressions:
-                        description: matchExpressions is a list of label selector
-                          requirements. The requirements are ANDed.
-                        items:
-                          description: A label selector requirement is a selector
-                            that contains values, a key, and an operator that relates
-                            the key and values.
-                          properties:
-                            key:
-                              description: key is the label key that the selector
-                                applies to.
-                              type: string
-                            operator:
-                              description: operator represents a key's relationship
-                                to a set of values. Valid operators are In, NotIn,
-                                Exists and DoesNotExist.
-                              type: string
-                            values:
-                              description: values is an array of string values. If
-                                the operator is In or NotIn, the values array must
-                                be non-empty. If the operator is Exists or DoesNotExist,
-                                the values array must be empty. This array is replaced
-                                during a strategic merge patch.
-                              items:
-                                type: string
-                              type: array
-                          required:
-                          - key
-                          - operator
-                          type: object
-                        type: array
-                      matchLabels:
-                        additionalProperties:
-                          type: string
-                        description: matchLabels is a map of {key,value} pairs. A
-                          single {key,value} in the matchLabels map is equivalent
-                          to an element of matchExpressions, whose key field is "key",
-                          the operator is "In", and the values array contains only
-                          "value". The requirements are ANDed.
-                        type: object
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                  secret:
-                    description: secret is used to connect to the target database
-                      cluster. If not set, secret will be inherited from backup policy
-                      template. if still not set, the controller will check if any
-                      system account for dataprotection has been created.
-                    properties:
-                      name:
-                        description: the secret name
-                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                        type: string
-                      passwordKey:
-                        default: password
-                        description: passwordKey the map key of the password in the
-                          connection credential secret
-                        type: string
-                      usernameKey:
-                        default: username
-                        description: usernameKey the map key of the user in the connection
-                          credential secret
-                        type: string
-                    required:
-                    - name
-                    type: object
-                required:
-                - labelsSelector
-                type: object
               targetVolumeMounts:
                 description: array of restore volume mounts .
                 items:
@@ -1736,7 +1660,6 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
             required:
             - backupJobName
-            - target
             - targetVolumeMounts
             - targetVolumes
             type: object

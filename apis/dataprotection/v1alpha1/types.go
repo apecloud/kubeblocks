@@ -16,15 +16,14 @@ limitations under the License.
 
 package v1alpha1
 
-// BackupType the backup type, marked backup set is datafile or logfile or snapshot.
+// BackupType the backup type.
 // +enum
-// +kubebuilder:validation:Enum={datafile,logfile,snapshot}
+// +kubebuilder:validation:Enum={Full,Continuous}
 type BackupType string
 
 const (
-	BackupTypeDataFile BackupType = "datafile"
-	BackupTypeLogFile  BackupType = "logfile"
-	BackupTypeSnapshot BackupType = "snapshot"
+	BackupTypeFull       BackupType = "Full"
+	BackupTypeContinuous BackupType = "Continuous"
 )
 
 // BaseBackupType the base backup type.
@@ -53,16 +52,6 @@ const (
 	RestoreJobInProgressLogic RestoreJobPhase = "InProgressLogic"
 	RestoreJobCompleted       RestoreJobPhase = "Completed"
 	RestoreJobFailed          RestoreJobPhase = "Failed"
-)
-
-// DeployKind which kind for run a backup tool.
-// +enum
-// +kubebuilder:validation:Enum={job,statefulSet}
-type DeployKind string
-
-const (
-	DeployKindJob         DeployKind = "job"
-	DeployKindStatefulSet DeployKind = "statefulSet"
 )
 
 // PodRestoreScope defines the scope pod for restore from backup.

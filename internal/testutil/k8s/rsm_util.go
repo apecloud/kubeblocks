@@ -104,7 +104,7 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 		}
 		return roleMap
 	}
-	membersStatus := rsm.Status.MembersStatus
+	var membersStatus []workloads.MemberStatus
 	roleMap := composeRoleMap(*rsm)
 	for _, pod := range pods {
 		roleName := strings.ToLower(pod.Labels[constant.RoleLabelKey])

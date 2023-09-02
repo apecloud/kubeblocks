@@ -58,7 +58,7 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
 
-type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationStatus) error
+type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
 
 // reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the common function to reconcile opsRequest status when the opsRequest will affect the lifecycle of the components.
@@ -340,7 +340,7 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 		}
 	}
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)
-	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationStatus{
+	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationItemStatus{
 		Name:   tplName,
 		Status: appsv1alpha1.ReasonReconfigureMerging,
 	})
@@ -362,7 +362,7 @@ func patchReconfigureOpsStatus(
 	var opsRequest = opsRes.OpsRequest
 	if opsRequest.Status.ReconfiguringStatus == nil {
 		opsRequest.Status.ReconfiguringStatus = &appsv1alpha1.ReconfiguringStatus{
-			ConfigurationStatus: make([]appsv1alpha1.ConfigurationStatus, 0),
+			ConfigurationStatus: make([]appsv1alpha1.ConfigurationItemStatus, 0),
 		}
 	}
 
@@ -371,8 +371,8 @@ func patchReconfigureOpsStatus(
 }
 
 // getSlowestReconfiguringProgress gets the progress of the reconfiguring operations.
-func getSlowestReconfiguringProgress(status []appsv1alpha1.ConfigurationStatus) string {
-	slowest := appsv1alpha1.ConfigurationStatus{
+func getSlowestReconfiguringProgress(status []appsv1alpha1.ConfigurationItemStatus) string {
+	slowest := appsv1alpha1.ConfigurationItemStatus{
 		SucceedCount:  math.MaxInt32,
 		ExpectedCount: -1,
 	}

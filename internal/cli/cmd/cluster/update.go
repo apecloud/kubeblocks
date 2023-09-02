@@ -440,8 +440,8 @@ func buildLogsReconfiguringOps(clusterName, namespace, compName, configName, key
 		Key:        keyName,
 		Parameters: parameterPairs,
 	})
-	var configurations []appsv1alpha1.Configuration
-	configurations = append(configurations, appsv1alpha1.Configuration{
+	var configurations []appsv1alpha1.ConfigurationItem
+	configurations = append(configurations, appsv1alpha1.ConfigurationItem{
 		Keys: keys,
 		Name: configName,
 	})

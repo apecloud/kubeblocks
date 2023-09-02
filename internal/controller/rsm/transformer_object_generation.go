@@ -164,8 +164,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
-		mergeAnnotations(oldSts.Annotations, &newSts.Annotations)
-		oldSts.Annotations = newSts.Annotations
 		// if annotations exist and are replaced, the StatefulSet will be updated.
 		mergeAnnotations(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
@@ -283,7 +281,6 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
 		AddAnnotationsInMap(rsm.Annotations).
-		AddAnnotations(GenerationAnnotationKey, strconv.FormatInt(rsm.Generation, 10)).
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
 		SetReplicas(*rsm.Spec.Replicas).

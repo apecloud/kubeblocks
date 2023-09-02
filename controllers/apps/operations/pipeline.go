@@ -30,7 +30,7 @@ import (
 
 type reconfigureContext struct {
 	// reconfiguring request
-	config appsv1alpha1.Configuration
+	config appsv1alpha1.ConfigurationItem
 
 	cli      client.Client
 	reqCtx   intctrlutil.RequestCtx
@@ -283,7 +283,7 @@ func newPipeline(context reconfigureContext) *pipeline {
 	return &pipeline{reconfigureContext: context}
 }
 
-func hasFileUpdate(config appsv1alpha1.Configuration) bool {
+func hasFileUpdate(config appsv1alpha1.ConfigurationItem) bool {
 	for _, key := range config.Keys {
 		if key.FileContent != "" {
 			return true

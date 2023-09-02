@@ -530,7 +530,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		createReconfigureObj := func(compName string) *Reconfigure {
 			return &Reconfigure{
 				ComponentOps: ComponentOps{ComponentName: compName},
-				Configurations: []Configuration{{Name: "for-test",
+				Configurations: []ConfigurationItem{{Name: "for-test",
 					Keys: []ParameterConfig{{
 						Key: "test",
 						Parameters: []ParameterPair{{

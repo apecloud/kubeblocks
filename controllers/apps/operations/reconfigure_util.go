@@ -49,7 +49,7 @@ type updateReconfigureStatus func(params []core.ParamPairs, orinalData map[strin
 
 // Deprecated: use NewPipeline instead
 // updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
-func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
+func updateConfigConfigmapResource(config appsv1alpha1.ConfigurationItem,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
 	ctx context.Context,

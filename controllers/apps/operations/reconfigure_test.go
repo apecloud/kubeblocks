@@ -195,7 +195,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
-				Configurations: []appsv1alpha1.Configuration{{
+				Configurations: []appsv1alpha1.ConfigurationItem{{
 					Name: "mysql-test",
 					Keys: []appsv1alpha1.ParameterConfig{{
 						Key: "my.cnf",
@@ -260,7 +260,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
-				Configurations: []appsv1alpha1.Configuration{{
+				Configurations: []appsv1alpha1.ConfigurationItem{{
 					Name: "mysql-test",
 					Keys: []appsv1alpha1.ParameterConfig{{
 						Key: "my.cnf",

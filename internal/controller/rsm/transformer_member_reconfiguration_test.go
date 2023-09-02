@@ -59,6 +59,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		rsm.Status.Replicas = *rsm.Spec.Replicas
 		rsm.Status.ReadyReplicas = rsm.Status.Replicas
 		rsm.Status.AvailableReplicas = rsm.Status.Replicas
+		rsm.Status.UpdatedReplicas = rsm.Status.Replicas
 	}
 	mockAction := func(ordinal int, actionType string, succeed bool) *batchv1.Job {
 		actionName := getActionName(rsm.Name, int(rsm.Generation), ordinal, actionType)
@@ -137,6 +138,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			By("all members initialized")
 			membersStatus = buildMembersStatus(int(*rsm.Spec.Replicas))
 			rsm.Status.MembersStatus = membersStatus
+			rsm.Status.UpdatedReplicas = *rsm.Spec.Replicas
 			k8sMock.EXPECT().
 				List(gomock.Any(), &batchv1.JobList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *batchv1.JobList, _ ...client.ListOption) error {
@@ -213,6 +215,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 				rsm.Status.InitReplicas = 3
 				rsm.Status.ReadyInitReplicas = rsm.Status.InitReplicas
 				rsm.Status.MembersStatus = membersStatus
+				rsm.Status.UpdatedReplicas = int32(replicas)
 			}
 			By("make rsm ready for scale-in")
 			setRSMStatus(int(*rsm.Spec.Replicas))

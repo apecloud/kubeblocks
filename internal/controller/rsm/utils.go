@@ -659,6 +659,9 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	if rsm == nil || rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
 		return true
 	}
+	if rsm.Spec.Replicas != nil && rsm.Status.UpdatedReplicas != *rsm.Spec.Replicas {
+		return false
+	}
 	membersStatus := rsm.Status.MembersStatus
 	if len(membersStatus) != int(*rsm.Spec.Replicas) {
 		return false

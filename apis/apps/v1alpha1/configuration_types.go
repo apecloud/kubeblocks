@@ -35,7 +35,7 @@ type ConfigurationItemDetail struct {
 
 	// Specify the configuration template.
 	// +optional
-	ImportTemplateRef *LazyRenderedTemplateSpec `json:"importTemplateRef,omitempty"`
+	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef,omitempty"`
 
 	// configFileParams is used to set the parameters to be updated.
 	// +optional

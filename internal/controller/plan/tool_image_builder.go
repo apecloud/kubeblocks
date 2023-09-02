@@ -75,7 +75,7 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 
 func checkAndInstallToolsImageVolume(toolContainers []appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1alpha1.ToolConfig {
 	for _, buildParam := range buildParams {
-		if buildParam.ToolsImageSpec != nil && buildParam.ConfigSpec.LazyRenderedConfigSpec != nil {
+		if buildParam.ToolsImageSpec != nil && buildParam.ConfigSpec.LegacyRenderedConfigSpec != nil {
 			// auto install config_render tool
 			toolContainers = checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolsImageSpec.MountPoint)
 		}

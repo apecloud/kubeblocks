@@ -96,6 +96,7 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 	rsm.Status.Replicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyReplicas = *rsm.Spec.Replicas
 	rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
+	rsm.Status.UpdatedReplicas = rsm.Status.Replicas
 
 	composeRoleMap := func(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
 		roleMap := make(map[string]workloads.ReplicaRole, 0)

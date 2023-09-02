@@ -55,7 +55,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	rsmpkg "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
@@ -1664,16 +1663,13 @@ var _ = Describe("Cluster Controller", func() {
 			rsmPatch := client.MergeFrom(rsm.DeepCopy())
 			By("Updating RSM's status")
 			rsm.Status.UpdateRevision = "mock-version"
-			rsm.Status.InitReplicas = int32(replicas)
-			rsm.Status.ReadyInitReplicas = int32(replicas)
-			rsm.Status.Replicas = int32(replicas)
-			rsm.Status.AvailableReplicas = int32(replicas)
-			rsm.Status.CurrentReplicas = int32(replicas)
-			rsm.Status.ReadyReplicas = int32(replicas)
-			rsm.Status.ObservedGeneration = rsm.Generation
 			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			Expect(err).Should(BeNil())
-			rsmpkg.SetMembersStatusForTest(rsm, pods)
+			var podList []*corev1.Pod
+			for i := range pods {
+				podList = append(podList, &pods[i])
+			}
+			testk8s.MockRSMReady(rsm, podList...)
 			Expect(k8sClient.Status().Patch(ctx, rsm, rsmPatch)).Should(Succeed())
 		} else {
 			stsPatch := client.MergeFrom(sts.DeepCopy())

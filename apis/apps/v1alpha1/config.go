@@ -21,12 +21,13 @@ package v1alpha1
 
 // ConfigurationPhase defines the Configuration FSM phase
 // +enum
-// +kubebuilder:validation:Enum={CInitPhase,CRunningPhase,CFailedPhase,CDeletingPhase,CFinishedPhase}
+// +kubebuilder:validation:Enum={CInitPhase,CRunningPhase,CFailedPhase,CDeletingPhase,CFinishedPhase,CPendingPhase}
 type ConfigurationPhase string
 
 const (
 	CInitPhase     ConfigurationPhase = "Init"
 	CRunningPhase  ConfigurationPhase = "Running"
+	CPendingPhase  ConfigurationPhase = "Pending"
 	CFailedPhase   ConfigurationPhase = "Failed"
 	CDeletingPhase ConfigurationPhase = "Deleting"
 	CFinishedPhase ConfigurationPhase = "Finished"
@@ -37,6 +38,11 @@ type ConfigParams struct {
 	// This field exists to work around https://github.com/kubernetes-sigs/kubebuilder/issues/528
 	// https://github.com/kubernetes/code-generator/issues/50
 
+	// fileContent indicates the configuration file content.
+	// +optional
+	Content *string `json:"content"`
+
+	// updated parameters for a single configuration file.
 	// +optional
 	Parameters map[string]*string `json:"parameters,omitempty"`
 }

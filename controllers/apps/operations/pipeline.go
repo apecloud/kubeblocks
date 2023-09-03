@@ -50,6 +50,7 @@ type pipeline struct {
 	isFileUpdated     bool
 
 	configMap        *corev1.ConfigMap
+	configuration    *appsv1alpha1.Configuration
 	clusterVer       *appsv1alpha1.ClusterVersion
 	clusterDef       *appsv1alpha1.ClusterDefinition
 	configConstraint *appsv1alpha1.ConfigConstraint
@@ -110,6 +111,22 @@ func (p *pipeline) Validate() *pipeline {
 	}
 
 	return p.wrapper(validateFn)
+}
+
+func (p *pipeline) Configuration() *pipeline {
+	configKey := client.ObjectKey{
+		Name:      cfgcore.GenerateComponentConfigurationName(p.clusterName, p.componentName),
+		Namespace: p.resource.Cluster.Namespace,
+	}
+
+	return p.wrapper(func() error {
+		configuration := appsv1alpha1.Configuration{}
+		err := p.cli.Get(p.reqCtx.Ctx, configKey, &configuration)
+		if err == nil {
+			p.configuration = &configuration
+		}
+		return client.IgnoreNotFound(err)
+	})
 }
 
 func (p *pipeline) ClusterDefinition() *pipeline {

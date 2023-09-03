@@ -140,6 +140,10 @@ func FromConfigData(data map[string]string, cmKeys *set.LinkedHashSetString) *Co
 	}
 }
 
+func GenerateComponentConfigurationName(clusterName, componentName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, componentName)
+}
+
 // GenerateTPLUniqLabelKeyWithConfig generates uniq key for configuration template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {

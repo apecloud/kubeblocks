@@ -289,6 +289,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		ClusterDefinition().
 		ClusterVersion().
 		Validate().
+		Configuration(). // for new configuration
 		ConfigMap().
 		ConfigConstraints().
 		Merge().

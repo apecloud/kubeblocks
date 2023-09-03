@@ -44,9 +44,15 @@ spec:
                     configFileParams:
                       additionalProperties:
                         properties:
+                          content:
+                            description: fileContent indicates the configuration file
+                              content.
+                            type: string
                           parameters:
                             additionalProperties:
                               type: string
+                            description: updated parameters for a single configuration
+                              file.
                             type: object
                         type: object
                       description: configFileParams is used to set the parameters
@@ -216,6 +222,7 @@ spec:
                       - CFailedPhase
                       - CDeletingPhase
                       - CFinishedPhase
+                      - CPendingPhase
                       type: string
                   required:
                   - name

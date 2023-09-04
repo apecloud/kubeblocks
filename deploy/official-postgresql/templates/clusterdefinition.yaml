@@ -21,11 +21,6 @@ spec:
           failureThreshold: {{ .Values.roleProbe.failureThreshold }}
           periodSeconds: {{ .Values.roleProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
-      logConfigs:
-        {{- range $name,$pattern := .Values.logConfigs }}
-        - name: {{ $name }}
-          filePathPattern: {{ $pattern }}
-        {{- end }}
       configSpecs:
         - name: official-postgresql-configuration
           templateRef: official-postgresql14-configuration

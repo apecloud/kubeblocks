@@ -57,6 +57,7 @@ type AddonSelectorKey string
 const (
 	KubeGitVersion AddonSelectorKey = "KubeGitVersion"
 	KubeVersion    AddonSelectorKey = "KubeVersion"
+	KubeProvider   AddonSelectorKey = "KubeProvider"
 )
 
 const (

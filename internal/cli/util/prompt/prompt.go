@@ -56,14 +56,17 @@ func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *prom
 
 // Confirm let user double-check for the cluster ops
 // use customMessage to display more information
-func Confirm(names []string, in io.Reader, customMessage string) error {
+func Confirm(names []string, in io.Reader, customMessage string, prompt string) error {
 	if len(names) == 0 {
 		return nil
 	}
 	if len(customMessage) != 0 {
 		fmt.Println(customMessage)
 	}
-	_, err := NewPrompt("Please type the name again(separate with white space when more than one):",
+	if prompt == "" {
+		prompt = "Please type the name again(separate with white space when more than one):"
+	}
+	_, err := NewPrompt(prompt,
 		func(entered string) error {
 			enteredNames := strings.Split(entered, " ")
 			sort.Strings(names)

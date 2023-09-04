@@ -54,6 +54,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
@@ -84,6 +85,9 @@ type Option func(*cli.EnvSettings)
 
 // AddRepo adds a repo
 func AddRepo(r *repo.Entry) error {
+	if r.Name == testing.KubeBlocksChartName {
+		return nil
+	}
 	settings := cli.New()
 	repoFile := settings.RepositoryConfig
 	b, err := os.ReadFile(repoFile)
@@ -455,6 +459,9 @@ func fakeActionConfig() *action.Configuration {
 
 // Upgrade will upgrade a Chart
 func (i *InstallOpts) Upgrade(cfg *Config) error {
+	if i.Name == testing.KubeBlocksChartName {
+		return nil
+	}
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
@@ -571,6 +578,9 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (*release.Release, e
 }
 
 func GetChartVersions(chartName string) ([]*semver.Version, error) {
+	if chartName == testing.KubeBlocksChartName {
+		return nil, nil
+	}
 	settings := cli.New()
 	rf, err := repo.LoadFile(settings.RepositoryConfig)
 	if err != nil {

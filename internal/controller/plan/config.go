@@ -26,23 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-type reconcileCtx struct {
-	context.Context
-
-	cli        client.Client
-	cluster    *appsv1alpha1.Cluster
-	clusterVer *appsv1alpha1.ClusterVersion
-	component  *component.SynthesizedComponent
-
-	obj     client.Object
-	cache   []client.Object
-	podSpec *corev1.PodSpec
-}
 
 type configOperator struct {
 	reconcileCtx
@@ -72,11 +57,7 @@ func NewConfigReconcileTask(cli client.Client,
 }
 
 func (c *configOperator) Reconcile() error {
-	var (
-		cli       = c.cli
-		cluster   = c.cluster
-		component = c.component
-	)
+	var component = c.component
 
 	// Need to Merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
@@ -84,40 +65,19 @@ func (c *configOperator) Reconcile() error {
 		return c.UpdateConfiguration()
 	}
 
-	templateBuilder := newTemplateBuilder(cluster.Name, cluster.Namespace, cluster, c.clusterVer, c, cli)
-	// Prepare built-in objects and built-in functions
-	if err := templateBuilder.injectBuiltInObjectsAndFunctions(c.podSpec, component.ConfigTemplates, component, c.cache); err != nil {
-		return err
-	}
-
-	renderWrapper := newTemplateRenderWrapper(templateBuilder, cluster, c, cli)
-	if err := renderWrapper.renderConfigTemplate(cluster, component, c.cache); err != nil {
-		return err
-	}
-	if err := renderWrapper.renderScriptTemplate(cluster, component, c.cache); err != nil {
-		return err
-	}
-
-	if len(renderWrapper.templateAnnotations) > 0 {
-		updateResourceAnnotationsWithTemplate(c.obj, renderWrapper.templateAnnotations)
-	}
-
-	// Generate Pod Volumes for ConfigMap objects
-	if err := intctrlutil.CreateOrUpdatePodVolumes(c.podSpec, renderWrapper.volumes); err != nil {
-		return core.WrapError(err, "failed to generate pod volume")
-	}
-
-	if err := buildConfigManagerWithComponent(c.podSpec, component.ConfigTemplates, c, cli, cluster, component); err != nil {
-		return core.WrapError(err, "failed to generate sidecar for configmap's reloader")
-	}
-
-	if err := injectTemplateEnvFrom(cluster, component, c.podSpec, cli, c, renderWrapper.renderedObjs); err != nil {
-		return err
-	}
-	return createConfigObjects(cli, c, renderWrapper.renderedObjs)
+	return newPipeline(c.reconcileCtx).
+		Prepare().
+		RenderScriptTemplate().
+		Configuration().
+		CreateConfigTemplate().
+		UpdateConfigurationStatus().
+		UpdatePodVolumes().
+		BuildConfigManagerSidecar().
+		Complete()
 }
 
 func (c *configOperator) UpdateConfiguration() error {
-	// TODO update configuration
-	return nil
+	return newPipeline(c.reconcileCtx).
+		Configuration().
+		Complete()
 }

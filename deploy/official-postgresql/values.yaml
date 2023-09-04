@@ -55,6 +55,3 @@ roleProbe:
   failureThreshold: 2
   periodSeconds: 1
   timeoutSeconds: 1
-
-logConfigs:
-  running: /home/postgres/pgdata/pgroot/data/log/postgresql-*

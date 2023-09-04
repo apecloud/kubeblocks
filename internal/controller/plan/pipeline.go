@@ -117,9 +117,34 @@ func (p *pipeline) UpdateConfigurationStatus() *pipeline {
 			return nil
 		}
 
-		// TODO update configuration status
-		return nil
+		patch := client.MergeFrom(p.configuration)
+		updated := p.configuration.DeepCopy()
+		for _, item := range p.configuration.Spec.ConfigItemDetails {
+			checkAndUpdateItemStatus(updated, item)
+		}
+		return p.cli.Status().Patch(p, updated, patch)
 	})
+}
+
+func checkAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1alpha1.ConfigurationItemDetail) {
+	foundStatus := func(name string) *appsv1alpha1.ConfigurationItemDetailStatus {
+		for i := range updated.Status.ConfigurationItemStatus {
+			status := &updated.Status.ConfigurationItemStatus[i]
+			if status.Name == name {
+				return status
+			}
+		}
+		return nil
+	}
+
+	status := foundStatus(item.Name)
+	if status == nil {
+		updated.Status.ConfigurationItemStatus = append(updated.Status.ConfigurationItemStatus,
+			appsv1alpha1.ConfigurationItemDetailStatus{
+				Name:  item.Name,
+				Phase: appsv1alpha1.CInitPhase,
+			})
+	}
 }
 
 func (p *pipeline) UpdatePodVolumes() *pipeline {
@@ -175,6 +200,7 @@ func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, exi
 
 	addSets := cfgutil.Difference(newSets, oldSets)
 	delSets := cfgutil.Difference(oldSets, newSets)
+
 	newConfigItems := make([]appsv1alpha1.ConfigurationItemDetail, 0)
 	for _, item := range existing.Spec.ConfigItemDetails {
 		if !delSets.InArray(item.Name) {

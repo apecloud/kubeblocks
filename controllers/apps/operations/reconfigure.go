@@ -271,8 +271,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		reconfigure   = spec.Reconfigure
 	)
 
-	// Update params to configmap
-	if len(reconfigure.Configurations) == 0 {
+	if !needReconcile(opsRequest) {
 		return nil
 	}
 
@@ -314,4 +313,21 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	condition := constructReconfiguringConditions(result, resource, pipeline.configSpec)
 	resource.OpsRequest.SetStatusCondition(*condition)
 	return nil
+}
+
+func needReconcile(request *appsv1alpha1.OpsRequest) bool {
+	// Update params to configmap
+	if request.Spec.Type != appsv1alpha1.ReconfiguringType ||
+		request.Spec.Reconfigure == nil ||
+		len(request.Spec.Reconfigure.Configurations) == 0 {
+		return false
+	}
+
+	// Check if the reconfiguring operation has been processed.
+	for _, condition := range request.Status.Conditions {
+		if isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureMerged, appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
+			return false
+		}
+	}
+	return true
 }

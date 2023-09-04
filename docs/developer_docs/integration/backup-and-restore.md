@@ -2,7 +2,7 @@
 title: Backup and restore
 description: Create backup and restore
 keywords: [add-on, backup, restore]
-sidebar_position: 2
+sidebar_position: 3
 sidebar_label: Backup and restore
 ---
 
@@ -36,7 +36,7 @@ Now take a quick look at the basic concepts of KubeBlocks in the table below, wh
 - Finish the configuration in [Add an add-on to KubeBlocks](./how-to-add-an-add-on.md).
 - Grasp the basics of K8s concepts, such as Pod, PVC, PV, VolumeSnapshot, etc.
 
-## Step 1. Prepare environment
+## Step 1. Prepare environment.
 
 1. Install CSI Driver.
 
@@ -59,23 +59,23 @@ Now take a quick look at the basic concepts of KubeBlocks in the table below, wh
    csi-hostpath-sc (default)   hostpath.csi.k8s.io     Delete          WaitForFirstConsumer   true                   35s
    ```
 
-## Step 2. Specify volume type
+## Step 2. Specify a volume type.
 
 Specify a volume type in the ClusterDefinition and it is required.
 
 ```yaml
-componentDefs:
-  - name: mysql-compdef
-    characterType: mysql
-    workloadType: Stateful
-    service:
-      ports:
-      - name: mysql
-        port: 3306
-        targetPort: mysql
-    volumeTypes:
-      - name: data
-        type: data
+  componentDefs:
+    - name: mysql-compdef
+      characterType: mysql
+      workloadType: Stateful
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+      volumeTypes:
+        - name: data
+          type: data
 ```
 
 `volumeTypes` is used to specify volume type and name.
@@ -87,11 +87,11 @@ There are mainly two kinds of volume types (`volumeTypes.type`):
 
 KubeBlocks supports different backup methods for data and logs. In this tutorial, only data volume information is configured.
 
-## Step 3. Add backup configuration
+## Step 3. Add backup configuration.
 
 Prepare `BackupPolicyTemplate.yml` and `BackupTool.yml` to add the backup configuration.
 
-### BackupPolicy Template
+### BackupPolicy template
 
 It is a template of backup policy, and covers:
 
@@ -137,8 +137,8 @@ If you have added `BackupPolicyTemplate` but there is no default BackupPolicy fo
 3. Whether there are multiple BackupPolicyTemplates. If yes, mark one as the default template using annotations.
 
    ```yaml
-   annotations:
-   dataprotection.kubeblocks.io/is-default-policy-template: "true"
+     annotations:
+      dataprotection.kubeblocks.io/is-default-policy-template: "true"
    ```
 
 :::
@@ -183,11 +183,11 @@ The configuration of `BackupTool` is closely related to the tools used.
 
 For example, if you back up via Percona Xtrabackup, you need to fill in scripts in `backupCommands` and `restoreCommands`.
 
-## Step 4. How to restore data from backups
+## Step 4. Restore data from backups.
 
 With everything ready, try to back up a cluster and restore data to a new cluster.
 
-### 4.1 Create a Cluster
+### 4.1 Create a cluster
 
 Since `BackupPolicyTemplate` has been added, after a cluster is created, KubeBlocks can discover the backup policy and create a `BackupPolicy` for this cluster.
 
@@ -219,7 +219,7 @@ Since `BackupPolicyTemplate` has been added, after a cluster is created, KubeBlo
    kbcli cluster list-backup-policy mycluster
    ```
 
-### 4.2 Snapshot Backups
+### 4.2 Snapshot backups
 
 ```bash
 kbcli cluster backup mycluster --type snapshot
@@ -229,23 +229,23 @@ kbcli cluster backup mycluster --type snapshot
 
 If there are multiple backup policies, specify it with the `--policy` flag.
 
-### 4.3 File Backups
+### 4.3 File backups
 
 KubeBlocks supports backup to local storage and cloud object storage. The following is an example of backing up to your localhost.
 
 1. Modify BackupPolicy and specify the PVC name.
 
-   As shown below in `spec.persistentVolumeClaim.name`, specify the PVC name.
+   As shown below in `spec.datafile.persistentVolumeClaim.name`, specify the PVC name.
 
    ```yaml
-   spec:
-     datafile:
-       backupToolName: oracle-mysql-xtrabackup
-       backupsHistoryLimit: 7
-       persistentVolumeClaim:
-         name: mycluster-backup-pvc
-         createPolicy: IfNotPresent
-         initCapacity: 20Gi
+     spec:
+       datafile:
+         backupToolName: oracle-mysql-xtrabackup
+         backupsHistoryLimit: 7
+         persistentVolumeClaim:
+           name: mycluster-backup-pvc
+           createPolicy: IfNotPresent
+           initCapacity: 20Gi
    ```
 
 2. Set `--type` to `datafile`.
@@ -254,7 +254,7 @@ KubeBlocks supports backup to local storage and cloud object storage. The follow
    kbcli cluster backup mycluster  --type datafile
    ```
 
-### 4.4 Create a Cluster from Backups
+### 4.4 Create a cluster from backups
 
 1. Check the backups.
 
@@ -278,17 +278,13 @@ Therefore, although a new root account and password are created when restoring a
 
 :::
 
-## Summary
-
-This tutorial demonstrates the configuration of backup policies in KubeBlocks and provides you with a basic understanding of how to utilize its backup and restore functionalities.
-
 ## Reference
 
 [Backup in KubeBlocks](./../../user_docs/backup-and-restore/introduction.md)
 
 ## Appendix
 
-### A.1 Cluster Data Protection Policies
+### A.1 Cluster data protection policies
 
 KubeBlocks provides various data protection policies for stateful clusters, each offering various data options. Try the following scenarios:
 
@@ -302,7 +298,7 @@ Refer to the data protection policies of KubeBlocks via [Termination Policy](./.
 
 :::
 
-### A.2 Monitor Backup Progress
+### A.2 Monitor backup progress
 
 In [Step 4](#step-4-how-to-back-uprestore-a-cluster), you have created a backup using the backup subcommand.
 

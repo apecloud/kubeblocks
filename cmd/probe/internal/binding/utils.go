@@ -285,6 +285,9 @@ source:
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()
 	event.EventTime = metav1.NowMicro()
+	event.ReportingController = "lorry"
+	event.ReportingInstance = podName
+	event.Action = string(opsResult["operation"].(bindings.OperationKind))
 
 	return event, nil
 }

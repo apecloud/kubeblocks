@@ -26,8 +26,8 @@ spec:
       jsonPath: .spec.kind
       name: KIND
       type: string
-    - description: status phase
-      jsonPath: .status.phase
+    - description: service version
+      jsonPath: .spec.version
       name: VERSION
       type: string
     - description: status phase

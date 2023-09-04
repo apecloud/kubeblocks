@@ -53,6 +53,9 @@ func (t *ClusterServiceDescriptorTransformer) Transform(ctx graph.TransformConte
 
 	// TODO: check every service reference declaration in the clusterDefinition has a mapping service reference binding in the cluster.spec.componentSpecs[*].serviceRefs
 	for _, compDef := range clusterDef.Spec.ComponentDefs {
+		if compDef.ServiceRefDeclarations == nil {
+			continue
+		}
 		for _, compSpec := range cluster.Spec.ComponentSpecs {
 			if compDef.Name != compSpec.ComponentDefRef {
 				continue

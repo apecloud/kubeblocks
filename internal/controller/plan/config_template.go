@@ -163,6 +163,9 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 	if err = json.Unmarshal(b, &tplValue); err != nil {
 		return nil, err
 	}
+
+	// TODO: replace the valueFrom with specify value
+
 	return &tplValue, nil
 }
 

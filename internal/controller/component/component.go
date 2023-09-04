@@ -448,7 +448,7 @@ func GenerateConnCredential(clusterName string) string {
 }
 
 func GenerateDefaultServiceDescriptorName(clusterName string) string {
-	return fmt.Sprintf("kbsd-%s-conn-credential", GenerateConnCredential(clusterName))
+	return fmt.Sprintf("kbsd-%s", GenerateConnCredential(clusterName))
 }
 
 func GenerateCustomServiceDescriptorName(connectCredentialName string) string {

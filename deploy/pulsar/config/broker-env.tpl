@@ -6,3 +6,31 @@ PULSAR_GC: -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:
   {{- $MaxDirectMemorySize = printf "-XX:MaxDirectMemorySize=%dm" (mul (div $phy_memory ( mul 1024 1024 10)) 6) }}
 {{- end }}
 PULSAR_MEM: -XX:MinRAMPercentage=30 -XX:MaxRAMPercentage=30 {{ $MaxDirectMemorySize }}
+
+{{- $clusterName := $.cluster.metadata.name }}
+{{- $namespace := $.cluster.metadata.namespace }}
+{{- $pulsar_zk_from_service_ref := fromJson "{}" }}
+{{- $pulsar_zk_from_component := fromJson "{}" }}
+
+{{- if index $.component "serviceReferences" }}
+  {{- range $i, $e := $.component.serviceReferences }}
+    {{- if eq $e.name "pulsarZookeeper" }}
+      {{- $pulsar_zk_from_service_ref = $e }}
+      {{- break }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- range $i, $e := $.cluster.spec.componentSpecs }}
+  {{- if eq $e.componentDefRef "zookeeper" }}
+    {{- $pulsar_zk_from_component = $e }}
+  {{- end }}
+{{- end }}
+
+# Try to get zookeeper from service reference first, if zookeeper service reference is empty, get default zookeeper componentDef in ClusterDefinition
+{{- $zk_server := "" }}
+{{- if and (index $pulsar_zk_from_service_ref "endpoint") (index $pulsar_zk_from_service_ref "port") }}
+   {{- $zk_server = printf "%s:%s" $pulsar_zk_from_service_ref.endpoint $pulsar_zk_from_service_ref.port }}
+{{- else }}
+  {{- $zk_server = printf "%s-%s.%s.svc:2181" $clusterName $pulsar_zk_from_component.name $namespace }}
+{{- end }}
+zkServers: {{ $zk_server }}

@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -60,7 +61,11 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 					return nil, fmt.Errorf("cluster %s cannot reference itself", cluster.Name)
 				}
 				referencedCluster := &appsv1alpha1.Cluster{}
-				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
+				if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
+					return nil, err
+				}
+				referencedClusterDef := &appsv1alpha1.ClusterDefinition{}
+				if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: referencedCluster.Spec.ClusterDefRef}, referencedClusterDef); err != nil {
 					return nil, err
 				}
 
@@ -69,21 +74,21 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				secretRef := &corev1.Secret{}
 				if serviceRef.ConnectionCredential != "" {
 					sdName = component.GenerateCustomServiceDescriptorName(serviceRef.ConnectionCredential)
-					if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: serviceRef.ConnectionCredential}, secretRef); err != nil {
+					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: referencedCluster.Namespace, Name: serviceRef.ConnectionCredential}, secretRef); err != nil {
 						return nil, err
 					}
 				} else {
 					sdName = component.GenerateDefaultServiceDescriptorName(cluster.Name)
 					secretRefName := component.GenerateConnCredential(referencedCluster.Name)
-					if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: secretRefName}, secretRef); err != nil {
+					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: referencedCluster.Namespace, Name: secretRefName}, secretRef); err != nil {
 						return nil, err
 					}
 				}
 
-				sdBuilder := builder.NewServiceDescriptorBuilder(reqCtx.Req.Namespace, sdName)
+				sdBuilder := builder.NewServiceDescriptorBuilder(referencedCluster.Namespace, sdName)
 				// use cd.Spec.Type as the default Kind and use cluster.Spec.ClusterVersionRef as the default Version
-				sdBuilder.SetKind(clusterDef.Spec.Type)
-				sdBuilder.SetVersion(cluster.Spec.ClusterVersionRef)
+				sdBuilder.SetKind(referencedClusterDef.Spec.Type)
+				sdBuilder.SetVersion(referencedCluster.Spec.ClusterVersionRef)
 				sdBuilder.SetEndpoint(appsv1alpha1.CredentialVar{
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{

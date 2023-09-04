@@ -105,7 +105,7 @@ func (r ServiceDescriptorStatus) GetTerminalPhases() []Phase {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=sd
 // +kubebuilder:printcolumn:name="KIND",type="string",JSONPath=".spec.kind",description="service kind"
-// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.version",description="service version"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

@@ -467,8 +467,8 @@ prometheus:
     ##
     resources: { }
       # limits:
-      #   cpu: 10m
-      #   memory: 32Mi
+    #   cpu: 10m
+    #   memory: 32Mi
     # requests:
     #   cpu: 10m
     #   memory: 32Mi
@@ -681,8 +681,8 @@ prometheus:
     ##
     resources: { }
       # limits:
-      #   cpu: 500m
-      #   memory: 512Mi
+    #   cpu: 500m
+    #   memory: 512Mi
     # requests:
     #   cpu: 500m
     #   memory: 512Mi
@@ -1485,8 +1485,8 @@ grafana:
   ##
   resources: { }
     # limits:
-    #   cpu: 100m
-    #   memory: 128Mi
+  #   cpu: 100m
+  #   memory: 128Mi
   # requests:
   #   cpu: 100m
   #   memory: 128Mi
@@ -1753,7 +1753,7 @@ agamotto:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
 
-provider: "" # cloud be aws gcp aliyun tencentCloud huaweiCloud azure
+provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
 
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:
@@ -1771,21 +1771,21 @@ storageClass:
     - noatime
     - nobarrier
   provider:
-    eks:
+    aws:
       volumeType: gp3
       fsType: xfs
-    gke:
+    gcp:
       volumeType: pd-balanced
       fsType: xfs
     aliyun:
       volumeType: cloud_essd
       fsType: xfs
-    aks:
+    azure:
       volumeType: managed
       fsType: xfs
-    tke:
+    tencentCloud:
       volumeType: CLOUD_SSD
-    cce: # Huawei Cloud
+    huaweiCloud: # Huawei Cloud
       volumeType: SAS
       fsType: ext4
 

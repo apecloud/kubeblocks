@@ -284,6 +284,7 @@ source:
 	event.Reason = string(opsResult["operation"].(bindings.OperationKind))
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()
+	event.EventTime = metav1.NowMicro()
 
 	return event, nil
 }

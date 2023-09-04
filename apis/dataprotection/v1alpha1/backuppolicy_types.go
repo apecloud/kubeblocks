@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -274,20 +273,6 @@ type BackupPolicyList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupPolicy{}, &BackupPolicyList{})
-}
-
-// ToDuration converts the ttl string to time.Duration.
-func ToDuration(ttl *string) time.Duration {
-	if ttl == nil {
-		return time.Duration(0)
-	}
-	ttlLower := strings.ToLower(*ttl)
-	if strings.HasSuffix(ttlLower, "d") {
-		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
-		return time.Hour * 24 * time.Duration(days)
-	}
-	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
-	return time.Hour * time.Duration(hours)
 }
 
 // AddTTL adds tll with hours

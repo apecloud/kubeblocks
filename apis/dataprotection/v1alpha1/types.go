@@ -16,6 +16,12 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	"strconv"
+	"strings"
+	"time"
+)
+
 // BackupType the backup type.
 // +enum
 // +kubebuilder:validation:Enum={Full,Continuous}
@@ -79,3 +85,21 @@ const (
 // RetentionPeriod represents a duration in the format "1y2mo3w4d5h6m", where
 // y=year, mo=month, w=week, d=day, h=hour, m=minute.
 type RetentionPeriod string
+
+// ToDuration converts the RetentionPeriod to time.Duration.
+func (r RetentionPeriod) ToDuration() time.Duration {
+	if len(r.String()) == 0 {
+		return time.Duration(0)
+	}
+	l := strings.ToLower(r.String())
+	if strings.HasSuffix(l, "d") {
+		days, _ := strconv.Atoi(strings.ReplaceAll(l, "d", ""))
+		return time.Hour * 24 * time.Duration(days)
+	}
+	hours, _ := strconv.Atoi(strings.ReplaceAll(l, "h", ""))
+	return time.Hour * time.Duration(hours)
+}
+
+func (r RetentionPeriod) String() string {
+	return string(r)
+}

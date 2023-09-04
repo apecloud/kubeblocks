@@ -1,9 +1,9 @@
 name: MERGE-E2E-SMOKE
 
 on:
-  pull_request:
-    types:
-      - closed
+  push:
+    branches:
+      - 'main'
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -13,7 +13,6 @@ env:
 
 jobs:
   trigger-mode:
-    if: ${{ github.event.pull_request.merged == true &&  github.base_ref == 'main' }}
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
@@ -26,9 +25,8 @@ jobs:
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
-          git checkout -b ${{ github.event.pull_request.head.ref }} --track origin/${{ github.event.pull_request.head.ref }}
           TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
-              --branch-name "${{ github.event.pull_request.head.ref }}" \
+              --branch-name "${{ github.ref_name }}" \
               --base-branch "${{ env.BASE_BRANCH }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT

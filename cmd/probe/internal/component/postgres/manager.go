@@ -37,10 +37,11 @@ import (
 
 type Manager struct {
 	component.DBManagerBase
-	Pool     PgxPoolIFace
-	Proc     *process.Process
-	Config   *Config
-	isLeader int
+	MajorVersion int
+	Pool         PgxPoolIFace
+	Proc         *process.Process
+	Config       *Config
+	isLeader     int
 }
 
 func NewManager(logger logger.Logger) (*Manager, error) {
@@ -58,8 +59,9 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 			DataDir:           viper.GetString(PGDATA),
 			DBState:           nil,
 		},
-		Pool:   pool,
-		Config: config,
+		Pool:         pool,
+		Config:       config,
+		MajorVersion: viper.GetInt(PGMAJOR),
 	}
 
 	return mgr, nil

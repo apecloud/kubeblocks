@@ -46,7 +46,8 @@ var (
 var fs = afero.NewOsFs()
 
 const (
-	PGDATA = "PGDATA"
+	PGDATA  = "PGDATA"
+	PGMAJOR = "PG_MAJOR"
 )
 
 const (

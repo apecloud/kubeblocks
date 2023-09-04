@@ -276,15 +276,15 @@ type Role struct {
 	// +optional
 	Writable bool `json:"writable,omitempty"`
 
-	// Votable indicates whether a replica with this role can vote at leader election.
-	// +kubebuilder:default=true
-	// +optional
-	Votable bool `json:"votable,omitempty"`
-
-	// Leaderable indicates whether a replica with this role can be elected as a leader.
-	// +kubebuilder:default=true
-	// +optional
-	Leaderable bool `json:"leaderable,omitempty"`
+	// // Votable indicates whether a replica with this role can vote at leader election.
+	// // +kubebuilder:default=true
+	// // +optional
+	// Votable bool `json:"votable,omitempty"`
+	//
+	// // Leaderable indicates whether a replica with this role can be elected as a leader.
+	// // +kubebuilder:default=true
+	// // +optional
+	// Leaderable bool `json:"leaderable,omitempty"`
 }
 
 type ActionHandler struct {
@@ -307,31 +307,11 @@ const (
 	OrdinalSelector TargetPodSelector = "Ordinal"
 )
 
-// ReplicaAction defines actions that will be executed within the Pod of target replica.
 // There are some pre-defined env vars (BuiltInVars) can be used in the action, check @BuiltInVars for reference.
-type ReplicaAction struct {
+type Action struct {
 	ActionHandler `json:"inline"`
 
-	// Container specifies which container the action will be executed in.
-	// If specified, it must be one of container declared in @Runtime.
-	// +optional
-	Container string `json:"container,omitempty"`
-
-	// Timeout
-	// +optional
-	Timeout int32 `json:"timeout:omitempty"`
-
-	//// +optional
-	// Preconditions Preconditions `json:"preconditions:omitempty"`
-}
-
-// ComponentAction defines actions that may not have a target replica to execute. If this is the case, it needs
-// to select replica(s) to execute according to the specified strategy.
-// There are some pre-defined env vars (BuiltInVars) can be used in the action, check @BuiltInVars for reference.
-type ComponentAction struct {
-	ActionHandler `json:"inline"`
-
-	// PodSelector specifies the way that how to select pod(s) to execute the action.
+	// PodSelector specifies the way that how to select pod(s) to execute the action if there may not have a target replica.
 	// +optional
 	PodSelector TargetPodSelector `json:"podSelector,omitempty"`
 
@@ -348,6 +328,7 @@ type ComponentAction struct {
 	Container string `json:"container,omitempty"`
 
 	// Timeout
+	// +kubebuilder:default=0
 	// +optional
 	Timeout int32 `json:"timeout:omitempty"`
 
@@ -371,26 +352,26 @@ type ComponentActionSet struct {
 	//  - KB_SWITCHOVER_CANDIDATE_NAME: the pod name of new candidate replica, it may be empty.
 	//  - KB_SWITCHOVER_CANDIDATE_FQDN: the FQDN of new candidate replica, it may be empty.
 	// +optional
-	Switchover *ComponentAction `json:"switchover,omitempty"`
+	Switchover *Action `json:"switchover,omitempty"`
 
 	// MemberJoin defines how to add a new replica into the replication membership.
 	// It's typically called when a new replica to be added (e.g., scale-out).
 	// +optional
-	MemberJoin *ReplicaAction `json:"memberJoin,omitempty"`
+	MemberJoin *Action `json:"memberJoin,omitempty"`
 
 	// MemberLeave defines how to remove a new replica from the replication membership.
 	// It's typically called when a replica to be removed (e.g., scale-in).
 	// +optional
-	MemberLeave *ReplicaAction `json:"memberLeave,omitempty"`
+	MemberLeave *Action `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set the replica service as read-only.
 	// It will be used to protect the replica in case of volume space exhaustion or too heavy traffic.
 	// +optional
-	Readonly *ReplicaAction `json:"readonly,omitempty"`
+	Readonly *Action `json:"readonly,omitempty"`
 
 	// Readwrite defines how to set the replica service back to read-write, the opposite operation of @Readonly.
 	// +optional
-	Readwrite *ReplicaAction `json:"readwrite,omitempty"`
+	Readwrite *Action `json:"readwrite,omitempty"`
 
 	// Backup defines how to set up an endpoint from which data can be replicated out an existed replica.
 	// It's typically used when a new replica to be built, such as:
@@ -402,7 +383,7 @@ type ComponentActionSet struct {
 	// Out:
 	//  - xxx
 	// +optional
-	Backup *ComponentAction `json:"backup,omitempty"`
+	Backup *Action `json:"backup,omitempty"`
 
 	// Restore defines how to set up an endpoint from which data can be replicated in a new replica.
 	// It's typically used when a new replica to be built, such as:
@@ -414,12 +395,12 @@ type ComponentActionSet struct {
 	// Out:
 	//  - xxx
 	// +optional
-	Restore *ComponentAction `json:"restore,omitempty"`
+	Restore *Action `json:"restore,omitempty"`
 
 	// Reload defines how to notify the replica service that there is a configuration update.
 	// +optional
-	Reload *ReplicaAction `json:"reload,omitempty"`
+	Reload *Action `json:"reload,omitempty"`
 
 	// +optional
-	MetaResourceProvision map[MetaResourceKind]*ComponentAction `json:"metaResourceProvision,omitempty"`
+	MetaResourceProvision map[MetaResourceKind]*Action `json:"metaResourceProvision,omitempty"`
 }

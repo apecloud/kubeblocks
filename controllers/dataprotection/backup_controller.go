@@ -233,7 +233,7 @@ func (r *BackupReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, backup 
 	// backup data stored in backup repository and volume snapshots.
 	// TODO(ldm): if backup is being used by restore, do not delete it.
 	if backup.Status.Phase == dpv1alpha1.BackupPhaseDeleting {
-		if err := r.deleteReferenceWorkloads(reqCtx, backup); err != nil {
+		if err := r.deleteExternalResources(reqCtx, backup); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
 
@@ -400,14 +400,10 @@ func (r *BackupReconciler) handleNewPhase(
 		}
 	}
 
-	// update Phase to InProgress/Running
-	if isStatefulSetKind {
-		backup.Status.Phase = dpv1alpha1.BackupPhaseRunning
-	} else {
-		backup.Status.Phase = dpv1alpha1.BackupPhaseInProgress
-	}
+	// update phase to running
+	backup.Status.Phase = dpv1alpha1.BackupPhaseRunning
 	backup.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
+	if backup.Spec.RetentionPeriod != nil && backupPolicy.Spec.Retention.TTL != nil {
 		backup.Status.Expiration = &metav1.Time{
 			Time: backup.Status.StartTimestamp.Add(dpv1alpha1.ToDuration(backupPolicy.Spec.Retention.TTL)),
 		}
@@ -1012,7 +1008,7 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 func (r *BackupReconciler) handleCompletedPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-	if err := r.deleteReferenceWorkloads(reqCtx, backup); err != nil {
+	if err := r.deleteExternalResources(reqCtx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -1553,26 +1549,35 @@ func (r *BackupReconciler) createBatchV1Job(
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
-// deleteReferenceJobs deletes the jobs that are referenced by the backup object.
-func (r *BackupReconciler) deleteReferenceJobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+// deleteExternalJobs deletes the external jobs.
+func (r *BackupReconciler) deleteExternalJobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	jobs := &batchv1.JobList{}
 	if err := r.Client.List(reqCtx.Ctx, jobs,
 		client.InNamespace(backup.Namespace),
 		client.MatchingLabels(buildBackupWorkloadLabels(backup))); err != nil {
-		return err
+		return client.IgnoreNotFound(err)
 	}
 
-	for _, job := range jobs.Items {
-		if controllerutil.ContainsFinalizer(&job, dataProtectionFinalizerName) {
+	deleteJob := func(job *batchv1.Job) error {
+		if controllerutil.ContainsFinalizer(job, dataProtectionFinalizerName) {
 			patch := client.MergeFrom(job.DeepCopy())
-			controllerutil.RemoveFinalizer(&job, dataProtectionFinalizerName)
-			if err := r.Patch(reqCtx.Ctx, &job, patch); err != nil {
+			controllerutil.RemoveFinalizer(job, dataProtectionFinalizerName)
+			if err := r.Patch(reqCtx.Ctx, job, patch); err != nil {
 				return err
 			}
 		}
-
+		if !job.DeletionTimestamp.IsZero() {
+			return nil
+		}
 		reqCtx.Log.V(1).Info("delete job", "job", job)
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &job); err != nil {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, job); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	for i := range jobs.Items {
+		if err := deleteJob(&jobs.Items[i]); err != nil {
 			return err
 		}
 	}
@@ -1582,19 +1587,30 @@ func (r *BackupReconciler) deleteReferenceJobs(reqCtx intctrlutil.RequestCtx, ba
 func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	snaps := &snapshotv1.VolumeSnapshotList{}
 	if err := r.vsCli.List(snaps, client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(buildBackupWorkloadLabels(backup))); client.IgnoreNotFound(err) != nil {
-		return err
+		client.MatchingLabels(buildBackupWorkloadLabels(backup))); err != nil {
+		return client.IgnoreNotFound(err)
 	}
-	for _, snap := range snaps.Items {
-		if controllerutil.ContainsFinalizer(&snap, dataProtectionFinalizerName) {
-			patch := snap.DeepCopy()
-			controllerutil.RemoveFinalizer(&snap, dataProtectionFinalizerName)
-			if err := r.vsCli.Patch(&snap, patch); err != nil {
+
+	deleteVolumeSnapshot := func(vs *snapshotv1.VolumeSnapshot) error {
+		if controllerutil.ContainsFinalizer(vs, dataProtectionFinalizerName) {
+			patch := vs.DeepCopy()
+			controllerutil.RemoveFinalizer(vs, dataProtectionFinalizerName)
+			if err := r.vsCli.Patch(vs, patch); err != nil {
 				return err
 			}
 		}
-		reqCtx.Log.V(1).Info("delete volume snapshot", "volume snapshot", snap)
-		if err := r.vsCli.Delete(&snap); err != nil {
+		if !vs.DeletionTimestamp.IsZero() {
+			return nil
+		}
+		reqCtx.Log.V(1).Info("delete volume snapshot", "volume snapshot", vs)
+		if err := r.vsCli.Delete(vs); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	for i := range snaps.Items {
+		if err := deleteVolumeSnapshot(&snaps.Items[i]); err != nil {
 			return err
 		}
 	}
@@ -1644,14 +1660,16 @@ func (r *BackupReconciler) handleDeleteBackupFiles(reqCtx intctrlutil.RequestCtx
 	return job, nil
 }
 
-// deleteReferenceStatefulSet deletes the referenced statefulSet.
-func (r *BackupReconciler) deleteReferenceStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+// deleteExternalStatefulSet deletes the external statefulSet.
+func (r *BackupReconciler) deleteExternalStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+	key := client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Name,
+	}
 	sts := &appsv1.StatefulSet{}
-	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
-		types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name},
-		sts); err != nil {
-		return err
-	} else if exists && !model.IsOwnerOf(backup, sts) {
+	if err := r.Client.Get(reqCtx.Ctx, key, sts); err != nil {
+		return client.IgnoreNotFound(err)
+	} else if !model.IsOwnerOf(backup, sts) {
 		return nil
 	}
 
@@ -1661,21 +1679,22 @@ func (r *BackupReconciler) deleteReferenceStatefulSet(reqCtx intctrlutil.Request
 		return err
 	}
 
+	if !sts.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	reqCtx.Log.V(1).Info("delete statefulSet", "statefulSet", sts)
 	return intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, sts)
 }
 
-// deleteReferenceWorkloads deletes the referenced workloads that execute backup.
+// deleteExternalResources deletes the external workloads that execute backup.
 // Currently, it only supports two types of workloads: statefulSet and job.
-func (r *BackupReconciler) deleteReferenceWorkloads(
+func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	if err := r.deleteReferenceStatefulSet(reqCtx, backup); err != nil {
+	if err := r.deleteExternalStatefulSet(reqCtx, backup); err != nil {
 		return err
 	}
-	if err := r.deleteReferenceJobs(reqCtx, backup); err != nil {
-		return err
-	}
-	return nil
+	return r.deleteExternalJobs(reqCtx, backup)
 }
 
 // getTargetPod gets the target pod by label selector.

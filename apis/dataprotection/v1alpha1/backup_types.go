@@ -122,6 +122,10 @@ type BackupStatus struct {
 	// +optional
 	BackupMethod *BackupMethod `json:"backupMethod,omitempty"`
 
+	// actions records the actions information for this backup.
+	// +optional
+	Actions []ActionStatus `json:"actions,omitempty"`
+
 	// availableReplicas available replicas for statefulSet which created by backup.
 	// +optional
 	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
@@ -171,6 +175,44 @@ const (
 
 	// BackupPhaseDeleting means the backup and all its associated data are being deleted.
 	BackupPhaseDeleting BackupPhase = "Deleting"
+)
+
+type ActionStatus struct {
+	// name is the name of the action.
+	Name string `json:"name,omitempty"`
+
+	// phase is the current state of the action.
+	// +optional
+	Phase ActionPhase `json:"phase,omitempty"`
+
+	// startTimestamp records the time an action was started.
+	// +optional
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+
+	// completionTimestamp records the time an action was completed.
+	// +optional
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// failureReason is an error that caused the backup to fail.
+	// +optional
+	FailureReason string `json:"failureReason,omitempty"`
+}
+
+type ActionPhase string
+
+const (
+	// ActionPhaseNew means the action has been created but not yet processed by
+	// the BackupController.
+	ActionPhaseNew ActionPhase = "New"
+
+	// ActionPhaseRunning means the action is currently executing.
+	ActionPhaseRunning ActionPhase = "Running"
+
+	// ActionPhaseCompleted means the action has run successfully without errors.
+	ActionPhaseCompleted ActionPhase = "Completed"
+
+	// ActionPhaseFailed means the action ran but encountered an error that
+	ActionPhaseFailed ActionPhase = "Failed"
 )
 
 // +genclient

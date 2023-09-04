@@ -532,7 +532,7 @@ func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 	}
 
-	if err := c.updatePodReplicaLabel4Scaling(reqCtx, cli, c.Component.Replicas); err != nil {
+	if err := c.updatePodReplicaLabel4Scaling(reqCtx, cli, c.Component.Replicas, *sts.Spec.Replicas); err != nil {
 		return err
 	}
 
@@ -564,7 +564,7 @@ func (c *rsmComponentBase) updatePodEnvConfig() {
 	}
 }
 
-func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {
+func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas, lastReplicas int32) error {
 	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return err
@@ -575,6 +575,7 @@ func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.Requ
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
+		obj.Annotations[constant.LastComponentReplicasAnnotationKey] = strconv.Itoa(int(lastReplicas))
 		c.UpdateResource(obj, c.WorkloadVertex)
 	}
 	return nil
@@ -647,76 +648,10 @@ func (c *rsmComponentBase) deletePVCs4ScaleIn(reqCtx intctrlutil.RequestCtx, cli
 }
 
 func (c *rsmComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	var (
-		backupKey = types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      stsObj.Name + "-scaling",
-		}
-	)
-
-	// sts's replicas=0 means it's starting not scaling, skip all the scaling work.
-	if *stsObj.Spec.Replicas == 0 {
-		return nil
-	}
-
-	c.WorkloadVertex.Immutable = true
-	rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
-	stsProto := ConvertRSMToSTS(rsmProto)
-	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
-	if err != nil {
-		return err
-	}
-	var succeed bool
-	if d == nil {
-		succeed = true
-	} else {
-		succeed, err = d.succeed()
-		if err != nil {
-			return err
-		}
-	}
-	if succeed {
-		// pvcs are ready, rsm.replicas should be updated
-		c.WorkloadVertex.Immutable = false
-		return c.postScaleOut(reqCtx, cli, stsObj)
-	} else {
-		c.WorkloadVertex.Immutable = true
-		// update objs will trigger cluster reconcile, no need to requeue error
-		objs, err := d.cloneData(d)
-		if err != nil {
-			return err
-		}
-		for _, obj := range objs {
-			c.CreateResource(obj, nil)
-		}
-		return nil
-	}
+	return nil
 }
 
 func (c *rsmComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	var (
-		snapshotKey = types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      stsObj.Name + "-scaling",
-		}
-	)
-
-	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey)
-	if err != nil {
-		return err
-	}
-	if d != nil {
-		// clean backup resources.
-		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.clearTmpResources()
-		if err != nil {
-			return err
-		}
-		for _, obj := range tmpObjs {
-			c.DeleteResource(obj, nil)
-		}
-	}
-
 	return nil
 }
 

@@ -145,31 +145,6 @@ spec:
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
               - name: KB_EMBEDDED_WESQL
                 value: {{ .Values.cluster.kbWeSQLImage | default "1" | quote }}
-              # - name: KB_MYSQL_LEADER
-              #   valueFrom:
-              #     configMapKeyRef:
-              #       name: $(COMP_ENV_CM_NAME)
-              #       key: KB_LEADER
-              #       optional: false
-              # - name: KB_MYSQL_FOLLOWERS
-              #   valueFrom:
-              #     configMapKeyRef:
-              #       name: $(COMP_ENV_CM_NAME)
-              #       key: KB_FOLLOWERS
-              #       optional: false
-              # - name: KB_MYSQL_N
-              #   valueFrom:
-              #     configMapKeyRef:
-              #       name: $(COMP_ENV_CM_NAME)
-              #       key: KB_REPLICA_COUNT
-              #       optional: false
-              # - name: KB_MYSQL_CLUSTER_UID
-              #   valueFrom:
-              #     configMapKeyRef:
-              #       name: $(COMP_ENV_CM_NAME)
-              #       key: KB_CLUSTER_UID
-              #       optional: false
-
             command: ["/scripts/setup.sh"]
             lifecycle:
               preStop:
@@ -486,6 +461,24 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
+          - name: streaming-restore
+            imagePullPolicy: IfNotPresent
+            image: busybox:1.35
+            env:
+              - name: DATA_VOLUME
+                value: {{ .Values.mysqlConfigs.dataMountPath }}
+              - name: DATA_DIR
+                value: {{ .Values.mysqlConfigs.dataDir }}
+              - name: LOG_BIN
+                value: {{ .Values.mysqlConfigs.logBin }}
+            command: [ "/scripts/streaming-restore.sh" ]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - name: data
+                mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
+              - name: annotations
+                mountPath: /etc/annotations
         containers:
           - name: vtgate
             imagePullPolicy: IfNotPresent

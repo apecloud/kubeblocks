@@ -105,10 +105,11 @@ func streamingBackup(host, user, password, dataDir string, writer io.Writer) err
 
 func streamingRestore(req *bindings.InvokeRequest) error {
 	var (
-		srcIP     = req.Metadata["SRC_POD_IP"]
-		dataDir   = req.Metadata["DATA_DIR"]
-		logBinDir = req.Metadata["LOG_BIN"]
-		tmpDir    = fmt.Sprintf("%s/temp", req.Metadata["DATA_VOLUME"])
+		srcIP      = req.Metadata["SRC_POD_IP"]
+		dataDir    = req.Metadata["DATA_DIR"]
+		logBinDir  = req.Metadata["LOG_BIN"]
+		dataVolume = req.Metadata["DATA_VOLUME"]
+		tmpDir     = fmt.Sprintf("%s/tmp", dataVolume)
 	)
 
 	if err := setup4Restore(dataDir, tmpDir); err != nil {
@@ -131,10 +132,10 @@ func streamingRestore(req *bindings.InvokeRequest) error {
 	}
 	for _, action := range postActions {
 		if err := action(dataDir, logBinDir, tmpDir); err != nil {
-			return xtrabackupPostRestore(dataDir, tmpDir, err)
+			return xtrabackupPostRestore(dataVolume, dataDir, tmpDir, err)
 		}
 	}
-	return xtrabackupPostRestore(dataDir, tmpDir, nil)
+	return xtrabackupPostRestore(dataVolume, dataDir, tmpDir, nil)
 }
 
 func setup4Restore(dataDir, tmpDir string) error {
@@ -201,11 +202,20 @@ func xtrabackupCleanup(dataDir, logBinDir, tmpDir string) error {
 	return nil
 }
 
-func xtrabackupPostRestore(dataDir, tmpDir string, err error) error {
+func xtrabackupPostRestore(dataVolume, dataDir, tmpDir string, err error) error {
 	if err1 := os.RemoveAll(tmpDir); err1 != nil {
 		return err1
 	}
-	if err != nil {
+	if err == nil { // restore succeed
+		for _, file := range []string{
+			fmt.Sprintf("%s/.xtrabackup_restore", dataDir),
+			fmt.Sprintf("%s/.xtrabackup_restore_done", dataVolume),
+		} {
+			_, err1 := os.Create(file)
+			if err1 != nil && !os.IsExist(err1) {
+				return err1
+			}
+		}
 		if err1 := os.Chmod(dataDir, 0777); err1 != nil {
 			return err1
 		}

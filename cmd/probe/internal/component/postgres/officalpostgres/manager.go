@@ -137,9 +137,9 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	dbState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
 
 	if !isLeader {
-		primaryInfo := mgr.readRecoveryParams(ctx)
-		if primaryInfo == "" {
-			mgr.Logger.Errorf("get primary info failed")
+		primaryInfo, err := mgr.readRecoveryParams(ctx)
+		if err != nil {
+			mgr.Logger.Errorf("get primary info failed, err:%v", err)
 			return nil
 		}
 		dbState.Extra[postgres.PrimaryInfo] = primaryInfo
@@ -593,8 +593,8 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 		return true, true
 	}
 
-	primaryInfo := mgr.readRecoveryParams(ctx)
-	if primaryInfo == "" {
+	primaryInfo, err := mgr.readRecoveryParams(ctx)
+	if err != nil {
 		return true, true
 	}
 
@@ -606,25 +606,23 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 	return false, false
 }
 
-func (mgr *Manager) readRecoveryParams(ctx context.Context) string {
+func (mgr *Manager) readRecoveryParams(ctx context.Context) (string, error) {
 	if mgr.DBState != nil && mgr.DBState.Extra[postgres.PrimaryInfo] != "" {
-		return mgr.DBState.Extra[postgres.PrimaryInfo]
+		return mgr.DBState.Extra[postgres.PrimaryInfo], nil
 	}
 
 	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("get primary conn info failed, err:%v", err)
-		return ""
+		return "", err
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
-		return ""
+		return "", err
 	}
 
-	return postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))["host"]
+	return postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))["host"], nil
 }
 
 // TODO: Parse history file

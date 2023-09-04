@@ -511,7 +511,8 @@ func TestReadRecoveryParams(t *testing.T) {
 				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application"))
 
 		leaderName := "maple72-postgresql-0"
-		primaryInfo := manager.readRecoveryParams(ctx)
+		primaryInfo, err := manager.readRecoveryParams(ctx)
+		assert.Nil(t, err)
 		assert.True(t, strings.HasPrefix(primaryInfo, leaderName))
 	})
 
@@ -521,7 +522,8 @@ func TestReadRecoveryParams(t *testing.T) {
 				AddRow("primary_conninfo", "host=test port=5432 user=postgres application_name=my-application"))
 
 		leaderName := "a"
-		primaryInfo := manager.readRecoveryParams(ctx)
+		primaryInfo, err := manager.readRecoveryParams(ctx)
+		assert.Nil(t, err)
 		assert.False(t, strings.HasPrefix(primaryInfo, leaderName))
 	})
 
@@ -529,7 +531,8 @@ func TestReadRecoveryParams(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
 			WillReturnError(fmt.Errorf("some error"))
 
-		primaryInfo := manager.readRecoveryParams(ctx)
+		primaryInfo, err := manager.readRecoveryParams(ctx)
+		assert.NotNil(t, err)
 		assert.Equal(t, "", primaryInfo)
 	})
 
@@ -537,7 +540,8 @@ func TestReadRecoveryParams(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
 			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}))
 
-		primaryInfo := manager.readRecoveryParams(ctx)
+		primaryInfo, err := manager.readRecoveryParams(ctx)
+		assert.NotNil(t, err)
 		assert.Equal(t, "", primaryInfo)
 	})
 
@@ -548,7 +552,8 @@ func TestReadRecoveryParams(t *testing.T) {
 			},
 		}
 
-		primaryInfo := manager.readRecoveryParams(ctx)
+		primaryInfo, err := manager.readRecoveryParams(ctx)
+		assert.Nil(t, err)
 		assert.Equal(t, "test", primaryInfo)
 	})
 
@@ -572,7 +577,7 @@ func TestCheckRecoveryConf(t *testing.T) {
 	_, err := fs.Create(manager.DataDir + "/standby.signal")
 	assert.Nil(t, err)
 
-	t.Run("primaryInfo empty", func(t *testing.T) {
+	t.Run("query primaryInfo failed", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
 			WillReturnError(fmt.Errorf("some error"))
 

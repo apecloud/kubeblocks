@@ -86,5 +86,24 @@ provisioner: kubernetes.io/azure-disk
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
+{{- else if eq $cloudProvider "huaweiCloud" }} # huawei cloud
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ $scName }}
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+parameters:
+  # parameters references: https://support.huaweicloud.com/usermanual-cce/cce_10_0380.html#section3
+  csi.storage.k8s.io/csi-driver-name: disk.csi.everest.io
+  csi.storage.k8s.io/fstype: {{ .Values.storageClass.provider.cce.fsType | default "xfs" }}
+  everest.io/disk-volume-type: {{ .Values.storageClass.provider.cce.volumeType }}
+  everest.io/passthrough: "true"
+provisioner: everest-csi-provisioner
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
 {{- end }}
 {{- end }}

@@ -294,7 +294,7 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 {{- else if contains "-aks" $kubeVersion }}
 {{- "azure" -}}
 {{- else }}
-{{- "" -}}
+{{- $.Values.provider }}
 {{- end }}
 {{- end }}
 

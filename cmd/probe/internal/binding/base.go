@@ -116,6 +116,7 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		UnlockOperation:       ops.UnlockOps,
 		JoinMemberOperation:   ops.JoinMemberOps,
 		LeaveMemberOperation:  ops.LeaveMemberOps,
+		StreamingReplication:  ops.StreamingReplicationOps,
 	}
 
 	ops.DBAddress = ops.getAddress()

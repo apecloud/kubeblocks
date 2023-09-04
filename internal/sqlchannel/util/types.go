@@ -59,6 +59,8 @@ const (
 	JoinMemberOperation  bindings.OperationKind = "joinMember"
 	LeaveMemberOperation bindings.OperationKind = "leaveMember"
 
+	StreamingReplication bindings.OperationKind = "streamingReplication"
+
 	OperationNotImplemented = "NotImplemented"
 	OperationInvalid        = "Invalid"
 	OperationSuccess        = "Success"

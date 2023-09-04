@@ -171,17 +171,28 @@ func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 
 // JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
 func (cli *OperationClient) JoinMember(ctx context.Context) error {
-	_, err := cli.Request(ctx, string(JoinMemberOperation))
+	_, err := cli.Request(ctx, string(JoinMemberOperation), nil)
 	return err
 }
 
 // LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
 func (cli *OperationClient) LeaveMember(ctx context.Context) error {
-	_, err := cli.Request(ctx, string(LeaveMemberOperation))
+	_, err := cli.Request(ctx, string(LeaveMemberOperation), nil)
 	return err
 }
 
-func (cli *OperationClient) Request(ctx context.Context, operation string) (map[string]any, error) {
+func (cli *OperationClient) SynchronizeData4NewReplica(ctx context.Context, src *corev1.Pod, dataVolume, dataDir, logBin string) error {
+	meta := map[string]string{
+		"SRC_POD_IP":  src.Status.PodIP,
+		"DATA_VOLUME": dataVolume,
+		"DATA_DIR":    dataDir,
+		"LOG_BIN":     logBin,
+	}
+	_, err := cli.Request(ctx, string(StreamingReplication), meta)
+	return err
+}
+
+func (cli *OperationClient) Request(ctx context.Context, operation string, meta map[string]string) (map[string]any, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 

@@ -6,15 +6,17 @@ There are altogether 3 steps to integrate an add-on:
 2. Prepare cluster templates.
 3. Add an `addon.yaml` file.
 
-***Steps***
-1. Design a blueprint for cluster.
+## Step 1.Design a blueprint for cluster.
 
 Before getting started, make sure to design your cluster blueprint. Think about what you want your cluster to look like. For example:
+
 - What components it has
 - What format each component takes
   - stateful/stateless
   - Standalone/Replication/RaftGroup
+
 In this tutorial you will learn how to deploy a cluster with one Stateful component which has only one node. The design configuration of the cluster is shown in the following table.
+Cluster Format: Deploying a MySQL 8.0 Standalone.
 
 | Term              | Planning                                                                                                     |
 |-------------------|--------------------------------------------------------------------------------------------------------------|
@@ -22,15 +24,16 @@ In this tutorial you will learn how to deploy a cluster with one Stateful compon
 | ClusterVersion    | Image: docker.io/mysql:8.0.34                                                                                |
 | Cluster.yaml      | Specified by the user during creation                                                                        |
 | Mongo             | Full backup and restore                                                                                      |
-Cluster Format: Deploying a MySQL 8.0 Standalone.
 
-2. Prepare cluster templates.
-    1). Create a Helm chart.
-    Opt 1.`helm create oracle-mysql`
-    Opt 2. Directly create `mkdir oracle-mysql`
+## Step 2. Prepare cluster templates.
 
-    It should contain the following information:
-    ```
+1). Create a Helm chart.
+
+ Opt 1.`helm create oracle-mysql`
+ Opt 2. Directly create `mkdir oracle-mysql`
+
+It should contain the following information:
+```
     > tree oracle-mysql
     .
     ├── Chart.yaml        #  A YAML file containing information about the chart
@@ -40,10 +43,10 @@ Cluster Format: Deploying a MySQL 8.0 Standalone.
     │   ├── clusterdefinition.yaml  
     │   └── clusterversion.yaml
     └── values.yaml       # The default configuration values for this chart
-
     2 directories, 6 files
-    ```
-    There are two YAML files under `templates`, `clusterDefintion.yaml` and `clusterVersion.yaml`, which is about the component topology and version.
+```
+
+There are two YAML files under `templates`, `clusterDefintion.yaml` and `clusterVersion.yaml`, which is about the component topology and version.
     (For more information about each file, please refer to https://helm.sh/docs/topics/charts/)
 
     - `clusterDefinition.yaml`
@@ -240,7 +243,7 @@ Stopping the cluster releases all computing resources.
 kbcli cluster stop mycluster
 ```
 
-3. Add an `addon.yaml` file.
+## Step 3. Add an `addon.yaml` file.
 
 This is the last step to integrate an add-on to KubeBlocks. After creating this addon.yaml file, this add-on is in the KubeBlocks add-on family. Please refer to `tutorial-1-create-an-addon/oracle-mysql-addon.yaml`.
 ```
@@ -261,7 +264,7 @@ spec:
 ```
 And then configure your Helm chart remote repository address with `chartsImage`.
 
-4. Publish to Kubeblocks community(Optional)
+## Step 4. Publish to Kubeblocks community(Optional)
 You can contribute the Helm chart and `addon.yam`l to the KubeBlocks community at https://github.com/apecloud/kubeblocks.
 
 - Helm chart is in the `kubeblocks/deploy` directory.

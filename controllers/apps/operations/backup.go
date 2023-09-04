@@ -33,6 +33,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const backupTimeLayout = "20060102150405"
+
 type BackupOpsHandler struct{}
 
 var _ OpsHandler = BackupOpsHandler{}
@@ -116,7 +118,7 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 	}
 
 	if len(backupSpec.BackupName) == 0 {
-		backupSpec.BackupName = strings.Join([]string{"backup", cluster.Namespace, cluster.Name, time.Now().Format("20060102150405")}, "-")
+		backupSpec.BackupName = strings.Join([]string{"backup", cluster.Namespace, cluster.Name, time.Now().Format(backupTimeLayout)}, "-")
 	}
 
 	backupSpec.BackupPolicyName, err = getDefaultBackupPolicy(reqCtx, cli, cluster, backupSpec.BackupPolicyName)

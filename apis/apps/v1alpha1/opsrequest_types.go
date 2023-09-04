@@ -367,7 +367,7 @@ type BackupSpec struct {
 
 	// Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.
 	// +kubebuilder:default=datafile
-	// +kubeBuilder:validation:Enum=datafile;logfile;snapshot
+	// +kubeBuilder:validation:Enum={datafile,logfile,snapshot}
 	// +optional
 	BackupType string `json:"backupType"`
 

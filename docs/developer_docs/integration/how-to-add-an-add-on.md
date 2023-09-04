@@ -46,7 +46,7 @@ It should contain the following information:
     2 directories, 6 files
 ```
 
-There are two YAML files under `templates`, `clusterDefintion.yaml` and `clusterVersion.yaml`, which is about the component topology and version.
+There are two YAML files under `templates`, `clusterDefinition.yaml` and `clusterVersion.yaml`, which is about the component topology and version.
     (For more information about each file, please refer to https://helm.sh/docs/topics/charts/)
 
     - `clusterDefinition.yaml`

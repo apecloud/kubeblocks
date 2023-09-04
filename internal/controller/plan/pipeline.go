@@ -34,17 +34,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type reconcileCtx struct {
+type ReconcileCtx struct {
 	context.Context
 
-	cli        client.Client
-	cluster    *appsv1alpha1.Cluster
-	clusterVer *appsv1alpha1.ClusterVersion
-	component  *component.SynthesizedComponent
+	Client     client.Client
+	Cluster    *appsv1alpha1.Cluster
+	ClusterVer *appsv1alpha1.ClusterVersion
+	Component  *component.SynthesizedComponent
+	PodSpec    *corev1.PodSpec
 
-	obj     client.Object
-	cache   []client.Object
-	podSpec *corev1.PodSpec
+	obj   client.Object
+	cache []client.Object
 }
 
 type pipeline struct {
@@ -52,11 +52,11 @@ type pipeline struct {
 
 	configuration *appsv1alpha1.Configuration
 	renderWrapper renderWrapper
-	reconcileCtx
+	ReconcileCtx
 }
 
-func newPipeline(ctx reconcileCtx) *pipeline {
-	return &pipeline{reconcileCtx: ctx}
+func NewPipeline(ctx ReconcileCtx) *pipeline {
+	return &pipeline{ReconcileCtx: ctx}
 }
 
 func (p *pipeline) wrap(fn func() error) (ret *pipeline) {
@@ -70,12 +70,12 @@ func (p *pipeline) wrap(fn func() error) (ret *pipeline) {
 
 func (p *pipeline) Prepare() *pipeline {
 	buildTemplate := func() (err error) {
-		templateBuilder := newTemplateBuilder(p.cluster.Name, p.cluster.Namespace, p.cluster, p.clusterVer, p, p.cli)
+		templateBuilder := newTemplateBuilder(p.Cluster.Name, p.Cluster.Namespace, p.Cluster, p.ClusterVer, p, p.Client)
 		// Prepare built-in objects and built-in functions
-		if err = templateBuilder.injectBuiltInObjectsAndFunctions(p.podSpec, p.component.ConfigTemplates, p.component, p.cache); err != nil {
+		if err = templateBuilder.injectBuiltInObjectsAndFunctions(p.PodSpec, p.Component.ConfigTemplates, p.Component, p.cache); err != nil {
 			return
 		}
-		p.renderWrapper = newTemplateRenderWrapper(templateBuilder, p.cluster, p, p.cli)
+		p.renderWrapper = newTemplateRenderWrapper(templateBuilder, p.Cluster, p, p.Client)
 		return
 	}
 
@@ -84,7 +84,7 @@ func (p *pipeline) Prepare() *pipeline {
 
 func (p *pipeline) RenderScriptTemplate() *pipeline {
 	return p.wrap(func() error {
-		return p.renderWrapper.renderScriptTemplate(p.cluster, p.component, p.cache)
+		return p.renderWrapper.renderScriptTemplate(p.Cluster, p.Component, p.cache)
 	})
 }
 
@@ -92,12 +92,12 @@ func (p *pipeline) Configuration() *pipeline {
 	buildConfiguration := func() (err error) {
 		expectConfiguration := p.createConfiguration()
 		configuration := appsv1alpha1.Configuration{}
-		err = p.cli.Get(p, client.ObjectKeyFromObject(expectConfiguration), &configuration)
+		err = p.Client.Get(p, client.ObjectKeyFromObject(expectConfiguration), &configuration)
 		switch {
 		case err == nil:
 			return p.updateConfiguration(&configuration, expectConfiguration)
 		case !apierrors.IsNotFound(err):
-			return p.cli.Create(p, expectConfiguration)
+			return p.Client.Create(p, expectConfiguration)
 		default:
 			return err
 		}
@@ -107,7 +107,29 @@ func (p *pipeline) Configuration() *pipeline {
 
 func (p *pipeline) CreateConfigTemplate() *pipeline {
 	return p.wrap(func() error {
-		return p.renderWrapper.renderConfigTemplate(p.cluster, p.component, p.cache)
+		return p.renderWrapper.renderConfigTemplate(p.Cluster, p.Component, p.cache)
+	})
+}
+
+func (p *pipeline) RerenderTemplate(string) *pipeline {
+	return p.wrap(func() error {
+		return p.renderWrapper.renderConfigTemplate(p.Cluster, p.Component, p.cache)
+	})
+}
+
+func (p *pipeline) UpdateConfigTemplate(configSpec string, status *appsv1alpha1.ConfigurationItemDetailStatus) *pipeline {
+	return p.wrap(func() error {
+		var i int
+		templates := p.Component.ConfigTemplates
+		for i = 0; i < len(templates); i++ {
+			if templates[i].Name == configSpec {
+				break
+			}
+		}
+		if i >= len(templates) {
+			return core.MakeError("not found config spec: %s", configSpec)
+		}
+		return p.renderWrapper.updateConfigTemplate(p.Cluster, p.Component, templates[i], status)
 	})
 }
 
@@ -122,7 +144,7 @@ func (p *pipeline) UpdateConfigurationStatus() *pipeline {
 		for _, item := range p.configuration.Spec.ConfigItemDetails {
 			checkAndUpdateItemStatus(updated, item)
 		}
-		return p.cli.Status().Patch(p, updated, patch)
+		return p.Client.Status().Patch(p, updated, patch)
 	})
 }
 
@@ -149,40 +171,44 @@ func checkAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1al
 
 func (p *pipeline) UpdatePodVolumes() *pipeline {
 	return p.wrap(func() error {
-		return intctrlutil.CreateOrUpdatePodVolumes(p.podSpec, p.renderWrapper.volumes)
+		return intctrlutil.CreateOrUpdatePodVolumes(p.PodSpec, p.renderWrapper.volumes)
 	})
 }
 
 func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
 	return p.wrap(func() error {
-		return buildConfigManagerWithComponent(p.podSpec, p.component.ConfigTemplates, p, p.cli, p.cluster, p.component)
+		return buildConfigManagerWithComponent(p.PodSpec, p.Component.ConfigTemplates, p, p.Client, p.Cluster, p.Component)
 	})
 }
 
-func (p *pipeline) Complete() error {
-	if p.err != nil {
-		return p.err
+func (p *pipeline) UpdateConfigMeta() *pipeline {
+	updateMeta := func() error {
+		updateResourceAnnotationsWithTemplate(p.obj, p.renderWrapper.templateAnnotations)
+		if err := injectTemplateEnvFrom(p.Cluster, p.Component, p.PodSpec, p.Client, p, p.renderWrapper.renderedObjs); err != nil {
+			return err
+		}
+		return createConfigObjects(p.Client, p, p.renderWrapper.renderedObjs)
 	}
 
-	updateResourceAnnotationsWithTemplate(p.obj, p.renderWrapper.templateAnnotations)
-	if err := injectTemplateEnvFrom(p.cluster, p.component, p.podSpec, p.cli, p, p.renderWrapper.renderedObjs); err != nil {
-		return err
-	}
-	return createConfigObjects(p.cli, p, p.renderWrapper.renderedObjs)
+	return p.wrap(updateMeta)
+}
+
+func (p *pipeline) Complete() error {
+	return p.err
 }
 
 func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
-	builder := builder.NewConfigurationBuilder(p.cluster.Namespace,
-		core.GenerateComponentConfigurationName(p.cluster.Name, p.component.Name),
+	builder := builder.NewConfigurationBuilder(p.Cluster.Namespace,
+		core.GenerateComponentConfigurationName(p.Cluster.Name, p.Component.Name),
 	)
 
-	for _, template := range p.component.ConfigTemplates {
+	for _, template := range p.Component.ConfigTemplates {
 		builder.AddConfigurationItem(template.Name)
 	}
-	return builder.Component(p.component.Name).
-		ClusterRef(p.cluster.Name).
-		ClusterVerRef(p.clusterVer.Name).
-		ClusterDefRef(p.component.ClusterDefName).
+	return builder.Component(p.Component.Name).
+		ClusterRef(p.Cluster.Name).
+		ClusterVerRef(p.ClusterVer.Name).
+		ClusterDefRef(p.Component.ClusterDefName).
 		GetObject()
 }
 
@@ -216,5 +242,5 @@ func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, exi
 	patch := client.MergeFrom(existing)
 	updated := existing.DeepCopy()
 	updated.Spec.ConfigItemDetails = newConfigItems
-	return p.cli.Patch(p, updated, patch)
+	return p.Client.Patch(p, updated, patch)
 }

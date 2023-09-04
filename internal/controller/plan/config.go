@@ -30,7 +30,7 @@ import (
 )
 
 type configOperator struct {
-	reconcileCtx
+	ReconcileCtx
 }
 
 func NewConfigReconcileTask(cli client.Client,
@@ -43,21 +43,21 @@ func NewConfigReconcileTask(cli client.Client,
 	localObjs []client.Object,
 ) *configOperator {
 	return &configOperator{
-		reconcileCtx{
+		ReconcileCtx{
 			Context:    ctx,
-			cli:        cli,
-			cluster:    cluster,
-			clusterVer: clusterVersion,
-			component:  component,
+			Client:     cli,
+			Cluster:    cluster,
+			ClusterVer: clusterVersion,
+			Component:  component,
 			obj:        obj,
-			podSpec:    podSpec,
+			PodSpec:    podSpec,
 			cache:      localObjs,
 		},
 	}
 }
 
 func (c *configOperator) Reconcile() error {
-	var component = c.component
+	var component = c.Component
 
 	// Need to Merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
@@ -65,7 +65,7 @@ func (c *configOperator) Reconcile() error {
 		return c.UpdateConfiguration()
 	}
 
-	return newPipeline(c.reconcileCtx).
+	return NewPipeline(c.ReconcileCtx).
 		Prepare().
 		RenderScriptTemplate().
 		Configuration().
@@ -73,11 +73,13 @@ func (c *configOperator) Reconcile() error {
 		UpdateConfigurationStatus().
 		UpdatePodVolumes().
 		BuildConfigManagerSidecar().
+		UpdateConfigMeta().
 		Complete()
 }
 
 func (c *configOperator) UpdateConfiguration() error {
-	return newPipeline(c.reconcileCtx).
+	return NewPipeline(c.ReconcileCtx).
 		Configuration().
+		UpdateConfigMeta().
 		Complete()
 }

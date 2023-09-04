@@ -22,13 +22,16 @@ package configuration
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -60,10 +63,62 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Recorder: r.Recorder,
 	}
 
-	_ = reqCtx
-	// TODO(user): your logic here
+	configuration := &appsv1alpha1.Configuration{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configuration); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
+	}
 
-	return ctrl.Result{}, nil
+	fetcher := intctrlutil.NewResourceFetcher(intctrlutil.ResourceCtx{
+		Context:       ctx,
+		Client:        r.Client,
+		Namespace:     configuration.Namespace,
+		ClusterName:   configuration.Spec.ClusterRef,
+		ComponentName: configuration.Spec.ComponentName,
+	})
+	err := fetcher.Cluster().
+		ClusterDef().
+		ClusterVer().
+		ClusterComponent().
+		ClusterDefComponent().
+		Complete()
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
+	}
+
+	tasks := make([]Task, len(configuration.Spec.ConfigItemDetails))
+	for i, item := range configuration.Spec.ConfigItemDetails {
+		if status := fromItemStatus(reqCtx, &configuration.Status, item); status != nil {
+			tasks[i] = NewTask(item, status)
+		}
+	}
+
+	if err := r.runTasks(reqCtx, configuration, fetcher, tasks); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
+	for i := range status.ConfigurationItemStatus {
+		itemStatus := &status.ConfigurationItemStatus[i]
+		switch {
+		case itemStatus.Name != item.Name:
+		case isReconcileStatus(itemStatus.Phase):
+			return itemStatus
+		default:
+			ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", itemStatus), "")
+			return nil
+		}
+	}
+	ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", item), "")
+	return nil
+}
+
+func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
+	return phase == appsv1alpha1.CRunningPhase ||
+		phase == appsv1alpha1.CPendingPhase ||
+		phase == appsv1alpha1.CFailedPhase ||
+		phase == appsv1alpha1.CFinishedPhase
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -71,4 +126,23 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Configuration{}).
 		Complete(r)
+}
+
+func (r *ConfigurationReconciler) runTasks(reqCtx intctrlutil.RequestCtx, configuration *appsv1alpha1.Configuration, fetcher *intctrlutil.ResourceFetcher, tasks []Task) (err error) {
+	synthesizedComp, err := component.BuildComponent(reqCtx, nil, fetcher.ClusterObj, fetcher.ClusterDefObj, fetcher.ClusterDefComObj, fetcher.ClusterComObj, fetcher.ClusterVerComObj)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for _, task := range tasks {
+		if err := task.Do(fetcher, configuration, synthesizedComp); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		err = utilerrors.NewAggregate(errs)
+	}
+
+	return
 }

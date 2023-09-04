@@ -174,13 +174,21 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			configPatch.UpdateConfig))
 	}
 
-	reconcileContext := newConfigReconcileContext(reqCtx.Ctx, r.Client, config, tpl, componentName, configSpecName, componentLabels)
+	reconcileContext := newConfigReconcileContext(reqCtx.Ctx,
+		r.Client,
+		config,
+		tpl,
+		componentName,
+		configSpecName,
+		componentLabels,
+		config.Labels[constant.AppInstanceLabelKey],
+		config.Namespace)
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// Assumption: It is required that the cluster must have a component.
-	if reconcileContext.ClusterComponent == nil {
+	if reconcileContext.ClusterComObj == nil {
 		reqCtx.Log.Info("not found component.")
 		return intctrlutil.Reconciled()
 	}
@@ -204,12 +212,12 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		ConfigConstraint:         &tpl.Spec,
 		Client:                   r.Client,
 		Ctx:                      reqCtx,
-		Cluster:                  reconcileContext.Cluster,
+		Cluster:                  reconcileContext.ClusterObj,
 		ContainerNames:           reconcileContext.Containers,
 		ComponentUnits:           reconcileContext.StatefulSets,
 		DeploymentUnits:          reconcileContext.Deployments,
-		Component:                reconcileContext.ClusterDefComponent,
-		ClusterComponent:         reconcileContext.ClusterComponent,
+		Component:                reconcileContext.ClusterDefComObj,
+		ClusterComponent:         reconcileContext.ClusterComObj,
 		Restart:                  forceRestart || !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
 		ReconfigureClientFactory: GetClientFactory(),
 	})

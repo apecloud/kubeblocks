@@ -1,4 +1,3 @@
-{{- $cc := .Files.Get "config/pg14-config-effect-scope.yaml" | fromYaml }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:

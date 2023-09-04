@@ -104,7 +104,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		if err != nil {
 			return err
 		}
-		if !enableRerender {
+		if !enableRerender || origCMObj != nil {
 			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false)
 			continue
 		}
@@ -116,10 +116,10 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		if err != nil {
 			return err
 		}
-		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
-			return err
-		}
-		updateCMConfigSpecLabels(newCMObj, configSpec)
+		// if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
+		//	return err
+		// }
+		// updateCMConfigSpecLabels(newCMObj, configSpec)
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.Compo
 	wrapper.templateAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
 }
 
-func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
+func (wrapper *renderWrapper) CheckAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
 	if origCMObj == nil {
 		return nil
 	}
@@ -206,7 +206,7 @@ func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, 
 	return nil
 }
 
-func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {
+func UpdateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
 	}

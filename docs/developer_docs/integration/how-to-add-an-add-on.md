@@ -399,7 +399,7 @@ Take MySQL as an example.
 
 ### A.2 What if kbcli cannot meet your needs?
 
-While kbcli provides a convenient and generic way to create clusters, it may not meet the specific needs of every engine, especially when a cluster contains multiple components and needs to be used according to differnt requirements.
+While kbcli provides a convenient and generic way to create clusters, it may not meet the specific needs of every engine, especially when a cluster contains multiple components and needs to be used according to different requirements.
 
 In that case, try to use a Helm chart to render the cluster, or create it through a cluster.yaml file.
 

@@ -45,6 +45,7 @@ func TestNewAllCondition(t *testing.T) {
 	NewStopCondition(opsRequest)
 	NewReconfigureFailedCondition(opsRequest, nil)
 	NewReconfigureFailedCondition(opsRequest, errors.New("reconfigure opsRequest failed"))
+	NewBackupCondition(opsRequest)
 
 	opsRequest.Spec.Reconfigure = &Reconfigure{
 		ComponentOps: ComponentOps{

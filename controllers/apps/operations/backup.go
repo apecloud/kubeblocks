@@ -119,7 +119,7 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 		backupSpec.BackupName = strings.Join([]string{"backup", cluster.Namespace, cluster.Name, time.Now().Format("20060102150405")}, "-")
 	}
 
-	backupSpec.BackupPolicyName, err = getDefaultBackupPolicy(reqCtx, cli, opsRequest, cluster, backupSpec.BackupPolicyName)
+	backupSpec.BackupPolicyName, err = getDefaultBackupPolicy(reqCtx, cli, cluster, backupSpec.BackupPolicyName)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 	return backup, nil
 }
 
-func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, ops *appsv1alpha1.OpsRequest, cluster *appsv1alpha1.Cluster, backupPolicy string) (string, error) {
+func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, backupPolicy string) (string, error) {
 	// if backupPolicy is not empty, return it directly
 	if backupPolicy != "" {
 		return backupPolicy, nil

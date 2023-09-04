@@ -26,7 +26,7 @@ spec:
     memorySlotSize: 1Gi
     memorySlots: { min: 1, use: 1, max: 5 }
     rootDisk:
-      image: huyongqi/pg14-disk-test:test
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/pg14-disk-test:test
       size: 12Gi
       imagePullPolicy: IfNotPresent
     command: 

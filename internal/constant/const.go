@@ -213,6 +213,7 @@ const (
 	// Container port name
 	ProbeHTTPPortName                  = "probe-http-port"
 	ProbeGRPCPortName                  = "probe-grpc-port"
+	ProbeDataPortName                  = "probe-data-port"
 	ProbeInitContainerName             = "kb-initprobe"
 	RoleProbeContainerName             = "kb-checkrole"
 	StatusProbeContainerName           = "kb-checkstatus"

@@ -183,7 +183,13 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 			ContainerPort: int32(probeSvcGRPCPort),
 			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
-		}}
+		},
+		{
+			ContainerPort: int32(probeSvcHTTPPort + 1),
+			Name:          constant.ProbeDataPortName,
+			Protocol:      "TCP",
+		},
+	}
 
 	// pass the volume protection spec to probe container through env.
 	if volumeProtectionEnabled(component) {

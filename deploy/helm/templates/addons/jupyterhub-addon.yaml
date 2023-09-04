@@ -14,8 +14,7 @@ spec:
   type: Helm
 
   helm:
-    #  chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/jupyterhub-0.1.0.tgz
-    chartLocationURL: https://jupyterhub.github.io/helm-chart/jupyterhub-3.0.2-0.dev.git.6297.h3f5cb91f.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/jupyterhub-0.1.0.tgz
     installValues:
       setValues:
         - proxy.service.type=ClusterIP

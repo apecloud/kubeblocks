@@ -183,7 +183,7 @@ The configuration of `BackupTool` is closely related to the tools used.
 
 For example, if you back up via Percona Xtrabackup, you need to fill in scripts in `backupCommands` and `restoreCommands`.
 
-## Step 4. Restore data from backups.
+## Step 4. Back up and restore a cluster.
 
 With everything ready, try to back up a cluster and restore data to a new cluster.
 
@@ -229,7 +229,7 @@ kbcli cluster backup mycluster --type snapshot
 
 If there are multiple backup policies, specify it with the `--policy` flag.
 
-### 4.3 File backups
+### 4.3 Datafile backups
 
 KubeBlocks supports backup to local storage and cloud object storage. The following is an example of backing up to your localhost.
 

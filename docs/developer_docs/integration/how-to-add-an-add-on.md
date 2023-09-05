@@ -29,177 +29,177 @@ In this tutorial you will learn how to deploy a cluster with one Stateful compon
 
 Cluster Format: Deploying a MySQL 8.0 Standalone.
 
-| Term              | Planning                                                                                                     |
+:paperclip: Table 1. Blueprint for Oracle MySQL Cluster
+
+| Term              | Settings                                                                                                     |
 |-------------------|--------------------------------------------------------------------------------------------------------------|
 | CLusterDefinition | Startup Scripts: Default Configuration Files: Default Service Port: 3306 Number of Components: 1, i.e. MySQL |
 | ClusterVersion    | Image: docker.io/mysql:8.0.34                                                                                |
 | Cluster.yaml      | Specified by the user during creation                                                                        |
-| Mongo             | Full backup and restore                                                                                      |
 
 ## Step 2. Prepare cluster templates.
 
-1. Create a Helm chart.
+### 2.1 Create a Helm chart.
 
-   Opt 1.`helm create oracle-mysql`
+Opt 1.`helm create oracle-mysql`
 
-   Opt 2. Directly create `mkdir oracle-mysql`
+Opt 2. Directly create `mkdir oracle-mysql`
 
-   It should contain the following information:
+It should contain the following information:
 
-   ```bash
-      > tree oracle-mysql
-      .
-      ├── Chart.yaml        #  A YAML file containing information about the chart
-      ├── templates         # A directory of templates that, when combined with values, will generate valid Kubernetes manifest files.
-      │  ├── NOTES.txt     # OPTIONAL: A plain text file containing short usage notes
-      │  ├── _helpers.tpl  # A place to put template helpers that you can re-use throughout the chart
-      │  ├── clusterdefinition.yaml  
-      │  └── clusterversion.yaml
-      └── values.yaml       # The default configuration values for this chart
-    2 directories, 6 files
-   ```
+```bash
+> tree oracle-mysql
+.
+├── Chart.yaml        #  A YAML file containing information about the chart
+├── templates         # A directory of templates that, when combined with values, will generate valid Kubernetes manifest files.
+│   ├── NOTES.txt     # OPTIONAL: A plain text file containing short usage notes
+│   ├── _helpers.tpl  # A place to put template helpers that you can re-use throughout the chart
+│   ├── clusterdefinition.yaml  
+│   └── clusterversion.yaml
+└── values.yaml       # The default configuration values for this chart
 
-   There are two YAML files under `templates`, `clusterDefinition.yaml` and `clusterVersion.yaml`, which is about the component topology and version.
+2 directories, 6 files
+```
 
-   For more information about each file, please refer to [Charts](https://helm.sh/docs/topics/charts/).
+There are two YAML files under `templates`, `clusterDefinition.yaml` and `clusterVersion.yaml`, which is about the component topology and version.
 
-  - `clusterDefinition.yaml`
+- `clusterDefinition.yaml`
 
-    This YAML file is very long, and each field is explained as follows.
+  This YAML file is very long, and each field is explained as follows.
 
-    - `ConnectionCredential`
+  - `ConnectionCredential`
 
-       ```yaml
-         connectionCredential:
-           username: root
-           password: "$(RANDOM_PASSWD)"
-           endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
-           host: "$(SVC_FQDN)"
-           port: "$(SVC_PORT_mysql)"
-       ```
+    ```yaml
+      connectionCredential:
+        username: root
+        password: "$(RANDOM_PASSWD)"
+        endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+        host: "$(SVC_FQDN)"
+        port: "$(SVC_PORT_mysql)"
+    ```
 
-       It generates a secret, whose naming convention is `{clusterName}-conn-credential`.
+    It generates a secret, whose naming convention is `{clusterName}-conn-credential`.
 
-       The field contains general information such as username, password, endpoint and port, and will be used when other services access the cluster (The secret is created before other resources, which can be used elsewhere).
+    The field contains general information such as username, password, endpoint and port, and will be used when other services access the cluster (The secret is created before other resources, which can be used elsewhere).
 
-       `$(RANDOM_PASSWD)` will be replaced with a random password when created.
+    `$(RANDOM_PASSWD)` will be replaced with a random password when created.
 
-       `$(SVC_PORT_mysql)` specifies the port number to be exposed by selecting the port name. Here the port name is mysql.
+    `$(SVC_PORT_mysql)` specifies the port number to be exposed by selecting the port name. Here the port name is mysql.
 
-       For more information, please refer to KubeBlocks Environment Variables.
+    For more information, please refer to KubeBlocks Environment Variables (this doc is under developing and will be published soon).
 
-    - `ComponentDefs`
+  - `ComponentDefs`
 
-       ```yaml
-         componentDefs:
-           - name: mysql-compdef       
-             characterType: mysql      
-             workloadType: Stateful
-             service:
-               ports:
-                 - name: mysql
-                   port: 3306
-                   targetPort: mysql
-             podSpec:
-               containers:
-               ...            
-       ```
+      ```yaml
+        componentDefs:
+          - name: mysql-compdef
+            characterType: mysql
+            workloadType: Stateful
+            service:
+              ports:
+                - name: mysql
+                  port: 3306
+                  targetPort: mysql
+            podSpec:
+              containers:
+              ...
+      ```
 
-       `componentDefs` (Component Definitions) defines the basic information required for each component, including startup scripts, configurations and ports.
+    `componentDefs` (Component Definitions) defines the basic information required for each component, including startup scripts, configurations and ports.
 
-       Since there is only one MySQL component, you can just name it `mysql-compdef`, which stands for a component definition for MySQL.
+    Since there is only one MySQL component, you can just name it `mysql-compdef`, which stands for a component definition for MySQL.
 
-    - `name` [Required]
+  - `name` [Required]
 
-       It is the name of the component. As there are no specific criteria, you can just choose a distinguishable and expressive one.
+    It is the name of the component. As there are no specific criteria, you can just choose a distinguishable and expressive one.
 
-       Remember the equation in the previous article?
+    Remember the equation in the previous article?
 
-       $$Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join ...$$
+    $$Cluster = ClusterDefinition.yaml \Join ClusterVersion.yaml \Join ...$$
 
-       `name` here is the join key.
+    `name` here is the join key.
 
-       Remember the `name`; it will be useful.
+    Remember the `name`; it will be useful.
 
-     - `characterType` [Optional]
+  - `characterType` [Optional]
 
-       `characterType` is a string type used to identify the engine. For example, `mysql`, `postgresql` and `redis` are several predefined engine types used for database connection. When operating a database, it helps to quickly recognize the engine type and find the matching operation command.
+    `characterType` is a string type used to identify the engine. For example, `mysql`, `postgresql` and `redis` are several predefined engine types used for database connection. When operating a database, it helps to quickly recognize the engine type and find the matching operation command.
 
-       It can be an arbitrary string, or a unique name as you define. The fact is that people seldom have engine-related operations in the early stage, so you can just leave it blank.
+    It can be an arbitrary string, or a unique name as you define. The fact is that people seldom have engine-related operations in the early stage, so you can just leave it blank.
 
-     - `workloadType` [Required]
+  - `workloadType` [Required]
 
-       It is the type of workload. Kubernetes is equipped with several basic workload types, such as Deployment and StatefulSet.
+    It is the type of workload. Kubernetes is equipped with several basic workload types, such as Deployment and StatefulSet.
 
-       On top of that, KubeBlocks makes abstractions and provides more choices, such as:
+    On top of that, KubeBlocks makes abstractions and provides more choices, such as:
 
-       - Stateless, meaning it has no stateful services
-       - Stateful, meaning it has stateful services
-       - Consensus, meaning it has stateful services with self-election capabilities and roles.
+    - Stateless, meaning it has no stateful services
+    - Stateful, meaning it has stateful services
+    - Consensus, meaning it has stateful services with self-election capabilities and roles.
 
-       A more in-depth introduction to workloads will be presented later (including design, implementation, usage, etc.).
+    A more in-depth introduction to workloads will be presented later (including design, implementation, usage, etc.).
 
-       For a MySQL Standalone, `Stateful` will do.
+    For a MySQL Standalone, `Stateful` will do.
 
-     - `service` [Optional]
+  - `service` [Optional]
 
-       ```yaml
-             service:
-               ports:
-                 - name: mysql  #The port name is mysql, so connectionCredential will look for it to find the corresponding port
-                   port: 3306
-                   targetPort: mysql
-       ```
+    ```yaml
+          service:
+            ports:
+              - name: mysql  #The port name is mysql, so connectionCredential will look for it to find the corresponding port
+                port: 3306
+                targetPort: mysql
+    ```
 
-       It defines how to create a service for a component and which ports to expose.
+    It defines how to create a service for a component and which ports to expose.
 
-       Remember that in the `ConnectionCredential` section, it is mentioned that a cluster will expose ports and endpoints?
+    Remember that in the `ConnectionCredential` section, it is mentioned that a cluster will expose ports and endpoints?
 
-       You can invoke `$(SVC_PORT_mysql)$` to select a port, where `mysql` is the `service.ports[0].name` here.
+    You can invoke `$(SVC_PORT_mysql)$` to select a port, where `mysql` is the `service.ports[0].name` here.
 
-       :::note
+:::note
 
-       If the `connectionCredential` is filled with a port name, make sure the port name appears here.
+If the `connectionCredential` is filled with a port name, make sure the port name appears here.
 
-       :::
+:::
 
-    - `podSpec`
+  - `podSpec`
 
-       The definition of podSpec is the same as that of the Kubernetes.
+    The definition of podSpec is the same as that of the Kubernetes.
 
-       ```yaml
-             podSpec:
-               containers:
-                 - name: mysql-container
-                   imagePullPolicy: IfNotPresent
-                   volumeMounts:
-                     - mountPath: /var/lib/mysql
-                       name: data
-                   ports:
-                     - containerPort: 3306
-                       name: mysql
-                   env:
-                     - name: MYSQL_ROOT_HOST
-                       value: {{ .Values.auth.rootHost | default "%" | quote }}
-                     - name: MYSQL_ROOT_USER
-                       valueFrom:
-                         secretKeyRef:
-                           name: $(CONN_CREDENTIAL_SECRET_NAME)
-                           key: username
-                     - name: MYSQL_ROOT_PASSWORD
-                       valueFrom:
-                         secretKeyRef:
-                           name: $(CONN_CREDENTIAL_SECRET_NAME)
-                           key: password
-       ```
+    ```yaml
+          podSpec:
+            containers:
+              - name: mysql-container
+                imagePullPolicy: IfNotPresent
+                volumeMounts:
+                  - mountPath: /var/lib/mysql
+                    name: data
+                ports:
+                  - containerPort: 3306
+                    name: mysql
+                env:
+                  - name: MYSQL_ROOT_HOST
+                    value: {{ .Values.auth.rootHost | default "%" | quote }}
+                  - name: MYSQL_ROOT_USER
+                    valueFrom:
+                      secretKeyRef:
+                        name: $(CONN_CREDENTIAL_SECRET_NAME)
+                        key: username
+                  - name: MYSQL_ROOT_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: $(CONN_CREDENTIAL_SECRET_NAME)
+                        key: password
+    ```
 
-      As is shown above, a pod is defined with a single container named `mysql-container`, along with other essential information, such as environment variables and ports.
+    As is shown above, a pod is defined with a single container named `mysql-container`, along with other essential information, such as environment variables and ports.
 
-      Yet here is something worth noting: $(CONN_CREDENTIAL_SECRET_NAME).
+    Yet here is something worth noting: `$(CONN_CREDENTIAL_SECRET_NAME)`.
 
-      The username and password are obtained as pod environment variables from the secret in `$(CONN_CREDENTIAL_SECRET_NAME)`.
+    The username and password are obtained as pod environment variables from the secret in `$(CONN_CREDENTIAL_SECRET_NAME)`.
 
-      This is a placeholder for ConnectionCredential Secret mentioned earlier.
+    This is a placeholder for ConnectionCredential Secret mentioned earlier.
 
 - ClusterVersion
 
@@ -220,43 +220,43 @@ Cluster Format: Deploying a MySQL 8.0 Standalone.
 
    Remember the ComponentDef Name used in ClusterDefinition? Yes, `mysql-compdef`, fill in the image information here.
 
-   :::note
+:::note
 
-   Now you've finished with ClusterDefinition and ClusterVersion, try to do a quick test by installing them locally.
+Now you've finished with ClusterDefinition and ClusterVersion, try to do a quick test by installing them locally.
 
-   :::
+:::
 
-2. Install Helm chart.
+### 2.2 Install Helm chart.
 
-   Install Helm.
+Install Helm.
 
-   ```bash
-   helm install oracle-mysql ./oracle-mysql
-   ```
+```bash
+helm install oracle-mysql ./oracle-mysql
+```
 
-   After successful installation, you can see the following information:
+After successful installation, you can see the following information:
 
-   ```yaml
-   NAME: oracle-mysql
-   LAST DEPLOYED: Wed Aug  2 20:50:33 2023
-   NAMESPACE: default
-   STATUS: deployed
-   REVISION: 1
-   TEST SUITE: None
-   ```
+```yaml
+NAME: oracle-mysql
+LAST DEPLOYED: Wed Aug  2 20:50:33 2023
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+```
 
-3. Create a cluster.
+### 2.3 Create a cluster.
 
-    Create a MySQL cluster with `kbcli cluster create`.
+Create a MySQL cluster with `kbcli cluster create`.
 
-    ```bash
-    kbcli cluster create mycluster --cluster-definition oracle-mysql
-    >
-    Info: --cluster-version is not specified, ClusterVersion oracle-mysql-8.0.34 is applied by default
-    Cluster mycluster created
-    ```
+```bash
+kbcli cluster create mycluster --cluster-definition oracle-mysql
+>
+Info: --cluster-version is not specified, ClusterVersion oracle-mysql-8.0.34 is applied by default
+Cluster mycluster created
+```
 
-    You can specify the name of ClusterDefinition by using `--cluster-definition`.
+You can specify the name of ClusterDefinition by using `--cluster-definition`.
 
 :::note
 
@@ -313,7 +313,7 @@ After the creating, you can:
    kbcli cluster stop mycluster
    ```
 
-## Step 3. Add an `addon.yaml` file.
+## Step 3. Add an addon.yaml file.
 
 This is the last step to integrate an add-on to KubeBlocks. After creating this addon.yaml file, this add-on is in the KubeBlocks add-on family. Please refer to `tutorial-1-create-an-addon/oracle-mysql-addon.yaml`.
 
@@ -345,7 +345,7 @@ You can contribute the Helm chart and `addon.yaml` to the [KubeBlocks community]
 
 ## Appendix
 
-### A.1 How to configure multiple versions for the same engine? 
+### A.1 How to configure multiple versions for the same engine?
 
 To support multiple versions is one of the common problems in the daily production environment. And the problem can be solved by **associating multiple ClusterVersions with the same ClusterDefinition**.
 

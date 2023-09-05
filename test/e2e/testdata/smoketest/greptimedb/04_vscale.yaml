@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: mongodb-cluster-vscale-
+spec:
+  clusterRef: mongodb-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: frontend
+      requests:
+        cpu: "500m"
+        memory: 500Mi

@@ -123,7 +123,7 @@ func main() {
 		failed(err, "failed to parse config spec")
 	}
 
-	mergePolicy, err := plan.NewTemplateMerger(*configRenderMeta.LegacyRenderedConfigSpec,
+	mergePolicy, err := plan.NewTemplateMerger(configRenderMeta.LegacyRenderedConfigSpec.ConfigTemplateExtension,
 		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1alpha1.ConfigConstraintSpec{
 			FormatterConfig: &configRenderMeta.FormatterConfig,
 		})

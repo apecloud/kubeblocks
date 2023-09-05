@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -140,7 +141,56 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 	})
 }
 
+func (p *pipeline) doMergeV2(parameters appsv1alpha1.ConfigurationItem) error {
+	newConfigObj := p.ConfigurationObj.DeepCopy()
+
+	item := newConfigObj.Spec.GetConfigurationItem(p.config.Name)
+	if item == nil {
+		return cfgcore.MakeError("not found config item: %s", parameters.Name)
+	}
+
+	configSpec := p.configSpec
+	if item.ConfigFileParams == nil {
+		item.ConfigFileParams = make(map[string]appsv1alpha1.ConfigParams)
+	}
+	filter := validate.WithKeySelector(configSpec.Keys)
+	for _, key := range parameters.Keys {
+		if configSpec.ConfigConstraintRef != "" && filter(key.Key) {
+			if key.FileContent != "" && len(key.Parameters) == 0 {
+				return cfgcore.MakeError("not allowed to update file content: %s", key.Key)
+			}
+			updateParameters(item, key.Key, key.Parameters)
+			continue
+		}
+		if key.FileContent != "" {
+			return cfgcore.MakeError("not allowed to patch parameters: %s", key.Key)
+		}
+		updateFileContent(item, key.Key, key.FileContent)
+	}
+	return nil
+}
+
+func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, content string) {
+	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+		Content: &content,
+	}
+}
+
+func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, parameters []appsv1alpha1.ParameterPair) {
+	updatedParams := make(map[string]*string, len(parameters))
+	for _, parameter := range parameters {
+		updatedParams[parameter.Key] = parameter.Value
+	}
+	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+		Parameters: updatedParams,
+	}
+}
+
 func (p *pipeline) doMerge() error {
+	if p.ConfigurationObj != nil {
+		return p.doMergeV2(p.config)
+	}
+
 	var err error
 	var newCfg map[string]string
 

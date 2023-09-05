@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -49,23 +48,23 @@ type pipeline struct {
 	configPatch       *cfgcore.ConfigPatchInfo
 	isFileUpdated     bool
 
-	configMap        *corev1.ConfigMap
-	configuration    *appsv1alpha1.Configuration
-	clusterVer       *appsv1alpha1.ClusterVersion
-	clusterDef       *appsv1alpha1.ClusterDefinition
 	configConstraint *appsv1alpha1.ConfigConstraint
 	configSpec       *appsv1alpha1.ComponentConfigSpec
 
 	reconfigureContext
+	intctrlutil.ResourceFetcher[pipeline]
 }
 
-func (p *pipeline) wrapper(fn func() error) (ret *pipeline) {
-	ret = p
-	if ret.err != nil {
-		return
-	}
-	ret.err = fn()
-	return
+func newPipeline(ctx reconfigureContext) *pipeline {
+	pipeline := &pipeline{reconfigureContext: ctx}
+	pipeline.Init(&intctrlutil.ResourceCtx{
+		Context:       ctx.reqCtx.Ctx,
+		Namespace:     ctx.resource.OpsRequest.Namespace,
+		ClusterName:   ctx.clusterName,
+		ComponentName: ctx.componentName,
+	}, pipeline)
+	pipeline.ClusterObj = ctx.resource.Cluster
+	return pipeline
 }
 
 func (p pipeline) foundConfigSpec(name string, configSpecs []appsv1alpha1.ComponentConfigSpec) *appsv1alpha1.ComponentConfigSpec {
@@ -85,12 +84,12 @@ func (p *pipeline) Validate() *pipeline {
 		var components []appsv1alpha1.ClusterComponentVersion
 		var configSpecs []appsv1alpha1.ComponentConfigSpec
 
-		if p.clusterVer != nil {
-			components = p.clusterVer.Spec.ComponentVersions
+		if p.ClusterVerObj != nil {
+			components = p.ClusterVerObj.Spec.ComponentVersions
 		}
 		configSpecs, err = cfgcore.GetConfigTemplatesFromComponent(
 			p.resource.Cluster.Spec.ComponentSpecs,
-			p.clusterDef.Spec.ComponentDefs,
+			p.ClusterDefObj.Spec.ComponentDefs,
 			components,
 			p.componentName)
 		if err != nil {
@@ -110,60 +109,7 @@ func (p *pipeline) Validate() *pipeline {
 		return
 	}
 
-	return p.wrapper(validateFn)
-}
-
-func (p *pipeline) Configuration() *pipeline {
-	configKey := client.ObjectKey{
-		Name:      cfgcore.GenerateComponentConfigurationName(p.clusterName, p.componentName),
-		Namespace: p.resource.Cluster.Namespace,
-	}
-
-	return p.wrapper(func() error {
-		configuration := appsv1alpha1.Configuration{}
-		err := p.cli.Get(p.reqCtx.Ctx, configKey, &configuration)
-		if err == nil {
-			p.configuration = &configuration
-		}
-		return client.IgnoreNotFound(err)
-	})
-}
-
-func (p *pipeline) ClusterDefinition() *pipeline {
-	cdKey := client.ObjectKey{
-		Name: p.resource.Cluster.Spec.ClusterDefRef,
-	}
-
-	return p.wrapper(func() error {
-		p.clusterDef = &appsv1alpha1.ClusterDefinition{}
-		return p.cli.Get(p.reqCtx.Ctx, cdKey, p.clusterDef)
-	})
-}
-
-func (p *pipeline) ClusterVersion() *pipeline {
-	cvKey := client.ObjectKey{
-		Name: p.resource.Cluster.Spec.ClusterVersionRef,
-	}
-
-	return p.wrapper(func() error {
-		if cvKey.Name == "" {
-			return nil
-		}
-		p.clusterVer = &appsv1alpha1.ClusterVersion{}
-		return p.cli.Get(p.reqCtx.Ctx, cvKey, p.clusterVer)
-	})
-}
-
-func (p *pipeline) ConfigMap() *pipeline {
-	cmKey := client.ObjectKey{
-		Name:      cfgcore.GetComponentCfgName(p.clusterName, p.componentName, p.configSpec.Name),
-		Namespace: p.resource.Cluster.Namespace,
-	}
-
-	return p.wrapper(func() error {
-		p.configMap = &corev1.ConfigMap{}
-		return p.cli.Get(p.reqCtx.Ctx, cmKey, p.configMap)
-	})
+	return p.Wrap(validateFn)
 }
 
 func (p *pipeline) ConfigConstraints() *pipeline {
@@ -185,7 +131,7 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 		return p.cli.Get(p.reqCtx.Ctx, ccKey, p.configConstraint)
 	}
 
-	return p.wrapper(func() error {
+	return p.Wrap(func() error {
 		if p.configSpec.ConfigConstraintRef == "" {
 			return validateFn()
 		} else {
@@ -198,7 +144,7 @@ func (p *pipeline) doMerge() error {
 	var err error
 	var newCfg map[string]string
 
-	cm := p.configMap
+	cm := p.ConfigMapObj
 	cc := p.configConstraint
 	config := p.config
 
@@ -245,7 +191,7 @@ func (p *pipeline) doMerge() error {
 }
 
 func (p *pipeline) Merge() *pipeline {
-	return p.wrapper(p.doMerge)
+	return p.Wrap(p.doMerge)
 }
 
 func (p *pipeline) UpdateOpsLabel() *pipeline {
@@ -259,22 +205,22 @@ func (p *pipeline) UpdateOpsLabel() *pipeline {
 		request := p.resource.OpsRequest
 		deepObject := request.DeepCopy()
 		formatter := p.configConstraint.Spec.FormatterConfig
-		updateOpsLabelWithReconfigure(request, p.updatedParameters, p.configMap.Data, formatter)
+		updateOpsLabelWithReconfigure(request, p.updatedParameters, p.ConfigMapObj.Data, formatter)
 		return p.cli.Patch(p.reqCtx.Ctx, request, client.MergeFrom(deepObject))
 	}
 
-	return p.wrapper(updateFn)
+	return p.Wrap(updateFn)
 }
 
 func (p *pipeline) Sync() *pipeline {
-	return p.wrapper(func() error {
+	return p.Wrap(func() error {
 		var cc *appsv1alpha1.ConfigConstraintSpec
 		var configSpec = *p.configSpec
 
 		if p.configConstraint != nil {
 			cc = &p.configConstraint.Spec
 		}
-		return syncConfigmap(p.configMap,
+		return syncConfigmap(p.ConfigMapObj,
 			p.mergedConfig,
 			p.cli,
 			p.reqCtx.Ctx,
@@ -294,10 +240,6 @@ func (p *pipeline) Complete() reconfiguringResult {
 		withReturned(p.mergedConfig, p.configPatch),
 		withNoFormatFilesUpdated(p.isFileUpdated),
 	)
-}
-
-func newPipeline(context reconfigureContext) *pipeline {
-	return &pipeline{reconfigureContext: context}
 }
 
 func hasFileUpdate(config appsv1alpha1.ConfigurationItem) bool {

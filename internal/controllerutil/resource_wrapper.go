@@ -22,6 +22,8 @@ package controllerutil
 import (
 	"context"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,35 +38,43 @@ type ResourceCtx struct {
 	Namespace     string
 	ClusterName   string
 	ComponentName string
+
+	ConfigConstraint string
 }
 
-type ResourceFetcher struct {
-	ResourceCtx
+type ResourceFetcher[T any] struct {
+	obj *T
+	*ResourceCtx
 
 	ClusterObj       *appsv1alpha1.Cluster
 	ClusterDefObj    *appsv1alpha1.ClusterDefinition
 	ClusterVerObj    *appsv1alpha1.ClusterVersion
 	ConfigurationObj *appsv1alpha1.Configuration
 
+	ConfigMapObj        *corev1.ConfigMap
+	ConfigConstraintObj *appsv1alpha1.ConfigConstraint
+
 	ClusterComObj    *appsv1alpha1.ClusterComponentSpec
 	ClusterDefComObj *appsv1alpha1.ClusterComponentDefinition
 	ClusterVerComObj *appsv1alpha1.ClusterComponentVersion
 }
 
-func NewResourceFetcher(ctx ResourceCtx) *ResourceFetcher {
-	return &ResourceFetcher{ResourceCtx: ctx}
+func (r *ResourceFetcher[T]) Init(ctx *ResourceCtx, object *T) *T {
+	r.obj = object
+	r.ResourceCtx = ctx
+	return r.obj
 }
 
-func (r *ResourceFetcher) Wrap(fn func() error) (ret *ResourceFetcher) {
-	ret = r
-	if ret.Err != nil {
+func (r *ResourceFetcher[T]) Wrap(fn func() error) (ret *T) {
+	ret = r.obj
+	if r.Err != nil {
 		return
 	}
-	ret.Err = fn()
+	r.Err = fn()
 	return
 }
 
-func (r *ResourceFetcher) Cluster() *ResourceFetcher {
+func (r *ResourceFetcher[T]) Cluster() *T {
 	clusterKey := client.ObjectKey{
 		Namespace: r.Namespace,
 		Name:      r.ClusterName,
@@ -75,7 +85,7 @@ func (r *ResourceFetcher) Cluster() *ResourceFetcher {
 	})
 }
 
-func (r *ResourceFetcher) ClusterDef() *ResourceFetcher {
+func (r *ResourceFetcher[T]) ClusterDef() *T {
 	clusterDefKey := client.ObjectKey{
 		Namespace: "",
 		Name:      r.ClusterObj.Spec.ClusterDefRef,
@@ -86,7 +96,7 @@ func (r *ResourceFetcher) ClusterDef() *ResourceFetcher {
 	})
 }
 
-func (r *ResourceFetcher) ClusterVer() *ResourceFetcher {
+func (r *ResourceFetcher[T]) ClusterVer() *T {
 	clusterVerKey := client.ObjectKey{
 		Namespace: "",
 		Name:      r.ClusterObj.Spec.ClusterVersionRef,
@@ -99,7 +109,7 @@ func (r *ResourceFetcher) ClusterVer() *ResourceFetcher {
 		return r.Client.Get(r.Context, clusterVerKey, r.ClusterVerObj)
 	})
 }
-func (r *ResourceFetcher) ClusterDefComponent() *ResourceFetcher {
+func (r *ResourceFetcher[T]) ClusterDefComponent() *T {
 	foundFn := func() (err error) {
 		if r.ClusterComObj == nil {
 			return
@@ -110,13 +120,55 @@ func (r *ResourceFetcher) ClusterDefComponent() *ResourceFetcher {
 	return r.Wrap(foundFn)
 }
 
-func (r *ResourceFetcher) ClusterComponent() *ResourceFetcher {
+func (r *ResourceFetcher[T]) ClusterComponent() *T {
 	return r.Wrap(func() (err error) {
 		r.ClusterComObj = r.ClusterObj.Spec.GetComponentByName(r.ComponentName)
 		return
 	})
 }
 
-func (r *ResourceFetcher) Complete() error {
+func (r *ResourceFetcher[T]) Configuration() *T {
+	configKey := client.ObjectKey{
+		Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
+		Namespace: r.Namespace,
+	}
+
+	return r.Wrap(func() error {
+		configuration := appsv1alpha1.Configuration{}
+		err := r.Client.Get(r.Context, configKey, &configuration)
+		if err == nil {
+			r.ConfigurationObj = &configuration
+		}
+		return client.IgnoreNotFound(err)
+	})
+}
+
+func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
+	cmKey := client.ObjectKey{
+		Name:      cfgcore.GetComponentCfgName(r.ClusterName, r.ComponentName, configSpec),
+		Namespace: r.Namespace,
+	}
+
+	return r.Wrap(func() error {
+		r.ConfigMapObj = &corev1.ConfigMap{}
+		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj)
+	})
+}
+
+func (r *ResourceFetcher[T]) ConfigConstraints() *T {
+	ccKey := client.ObjectKey{
+		Name: r.ConfigConstraint,
+	}
+
+	return r.Wrap(func() error {
+		if r.ConfigConstraint != "" {
+			r.ConfigConstraintObj = &appsv1alpha1.ConfigConstraint{}
+			return r.Client.Get(r.Context, ccKey, r.ConfigConstraintObj)
+		}
+		return nil
+	})
+}
+
+func (r *ResourceFetcher[T]) Complete() error {
 	return r.Err
 }

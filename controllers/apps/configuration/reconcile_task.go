@@ -27,25 +27,32 @@ import (
 )
 
 type Task struct {
-	Do     func(fetcher *intctrlutil.ResourceFetcher, configuration *appsv1alpha1.Configuration, component *component.SynthesizedComponent) error
+	intctrlutil.ResourceFetcher[Task]
+
 	Status *appsv1alpha1.ConfigurationItemDetailStatus
 	Name   string
+
+	Do func(task *Task, component *component.SynthesizedComponent) error
 }
 
 func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
-		Do: func(fetcher *intctrlutil.ResourceFetcher, configuration *appsv1alpha1.Configuration, component *component.SynthesizedComponent) error {
-			return plan.NewPipeline(plan.ReconcileCtx{
-				Context:    fetcher.Context,
-				Client:     fetcher.Client,
-				Cluster:    fetcher.ClusterObj,
-				ClusterVer: fetcher.ClusterVerObj,
-				Component:  component,
-				PodSpec:    component.PodSpec,
-			}).Prepare().
-				RerenderTemplate(item.Name).
-				UpdateConfigTemplate(item.Name, status).
+		Do: func(fetcher *Task, component *component.SynthesizedComponent) error {
+			return plan.NewReconcilePipeline(plan.ReconcileCtx{
+				ResourceCtx: fetcher.ResourceCtx,
+				Cluster:     fetcher.ClusterObj,
+				ClusterVer:  fetcher.ClusterVerObj,
+				Component:   component,
+				PodSpec:     component.PodSpec,
+			}, item, status).ConfigMap().
+				Prepare().
+				// ConfigMap().
+				RerenderTemplate().
+				ApplyParameters().
+				UpdateConfigVersion().
+				Sync().
+				SyncStatus().
 				Complete()
 		},
 		Status: status,

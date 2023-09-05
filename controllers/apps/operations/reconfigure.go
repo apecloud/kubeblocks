@@ -277,7 +277,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	}
 
 	// TODO support multi tpl conditions merge
-	pipeline := newPipeline(reconfigureContext{
+	opsPipeline := newPipeline(reconfigureContext{
 		cli:           cli,
 		reqCtx:        reqCtx,
 		resource:      resource,
@@ -286,12 +286,12 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		componentName: componentName,
 	})
 
-	result := pipeline.
-		ClusterDefinition().
-		ClusterVersion().
+	result := opsPipeline.
+		ClusterDef().
+		ClusterVer().
 		Validate().
 		Configuration(). // for new configuration
-		ConfigMap().
+		ConfigMap(opsPipeline.config.Name).
 		ConfigConstraints().
 		Merge().
 		UpdateOpsLabel().
@@ -308,11 +308,11 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
 
 	// merged successfully
-	if err := patchReconfigureOpsStatus(resource, pipeline.configSpec.Name,
+	if err := patchReconfigureOpsStatus(resource, opsPipeline.configSpec.Name,
 		handleNewReconfigureRequest(result.configPatch, result.lastAppliedConfigs)); err != nil {
 		return err
 	}
-	condition := constructReconfiguringConditions(result, resource, pipeline.configSpec)
+	condition := constructReconfiguringConditions(result, resource, opsPipeline.configSpec)
 	resource.OpsRequest.SetStatusCondition(*condition)
 	return nil
 }

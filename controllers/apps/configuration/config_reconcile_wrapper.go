@@ -37,16 +37,12 @@ import (
 type configSpecList []appsv1alpha1.ComponentConfigSpec
 
 type configReconcileContext struct {
-	*intctrlutil.ResourceFetcher
+	intctrlutil.ResourceFetcher[configReconcileContext]
 
 	Name           string
 	MatchingLabels client.MatchingLabels
 	ConfigSpec     *appsv1alpha1.ComponentConfigSpec
 	ConfigMap      *corev1.ConfigMap
-
-	// Cluster    *appsv1alpha1.Cluster
-	// ClusterDef *appsv1alpha1.ClusterDefinition
-	// ClusterVer *appsv1alpha1.ClusterVersion
 
 	Containers   []string
 	StatefulSets []appv1.StatefulSet
@@ -54,24 +50,22 @@ type configReconcileContext struct {
 	Deployments  []appv1.Deployment
 
 	ConfigConstraint *appsv1alpha1.ConfigConstraint
-	// ClusterDefComponent *appsv1alpha1.ClusterComponentDefinition
-	// ClusterComponent    *appsv1alpha1.ClusterComponentSpec
 }
 
 func newConfigReconcileContext(ctx context.Context, cli client.Client, cm *corev1.ConfigMap, cc *appsv1alpha1.ConfigConstraint, componentName string, configSpecName string, matchingLabels client.MatchingLabels, clusterName, ns string) *configReconcileContext {
-	return &configReconcileContext{
-		ResourceFetcher: intctrlutil.NewResourceFetcher(intctrlutil.ResourceCtx{
-			Context:       ctx,
-			Client:        cli,
-			Namespace:     ns,
-			ClusterName:   clusterName,
-			ComponentName: componentName,
-		}),
+	configContext := configReconcileContext{
 		ConfigMap:        cm,
 		ConfigConstraint: cc,
 		Name:             configSpecName,
 		MatchingLabels:   matchingLabels,
 	}
+	return configContext.Init(&intctrlutil.ResourceCtx{
+		Context:       ctx,
+		Client:        cli,
+		Namespace:     ns,
+		ClusterName:   clusterName,
+		ComponentName: componentName,
+	}, &configContext)
 }
 
 func (l configSpecList) findByName(name string) *appsv1alpha1.ComponentConfigSpec {
@@ -85,30 +79,18 @@ func (l configSpecList) findByName(name string) *appsv1alpha1.ComponentConfigSpe
 }
 
 func (c *configReconcileContext) GetRelatedObjects() error {
-	return c.baseObject().
-		statefulSet().
-		rsm().
-		deployment().
-		complete()
+	return c.Cluster().
+		ClusterDef().
+		ClusterVer().
+		ClusterComponent().
+		ClusterDefComponent().
+		StatefulSet().
+		RSM().
+		Deployment().
+		Complete()
 }
 
-func (c *configReconcileContext) objectWrapper(fn func() error) *configReconcileContext {
-	c.Wrap(fn)
-	return c
-}
-
-func (c *configReconcileContext) baseObject() *configReconcileContext {
-	return c.objectWrapper(func() error {
-		return c.Cluster().
-			ClusterDef().
-			ClusterVer().
-			ClusterComponent().
-			ClusterDefComponent().
-			Complete()
-	})
-}
-
-func (c *configReconcileContext) statefulSet() *configReconcileContext {
+func (c *configReconcileContext) StatefulSet() *configReconcileContext {
 	stsFn := func() (err error) {
 		dComp := c.ClusterDefComObj
 		if dComp == nil || dComp.WorkloadType == appsv1alpha1.Stateless {
@@ -124,10 +106,10 @@ func (c *configReconcileContext) statefulSet() *configReconcileContext {
 			c.MatchingLabels)
 		return
 	}
-	return c.objectWrapper(stsFn)
+	return c.Wrap(stsFn)
 }
 
-func (c *configReconcileContext) rsm() *configReconcileContext {
+func (c *configReconcileContext) RSM() *configReconcileContext {
 	stsFn := func() (err error) {
 		dComp := c.ClusterDefComObj
 		if dComp == nil {
@@ -155,10 +137,10 @@ func (c *configReconcileContext) rsm() *configReconcileContext {
 		}
 		return
 	}
-	return c.objectWrapper(stsFn)
+	return c.Wrap(stsFn)
 }
 
-func (c *configReconcileContext) deployment() *configReconcileContext {
+func (c *configReconcileContext) Deployment() *configReconcileContext {
 	deployFn := func() (err error) {
 		dComp := c.ClusterDefComObj
 		if dComp == nil || dComp.WorkloadType != appsv1alpha1.Stateless {
@@ -174,10 +156,10 @@ func (c *configReconcileContext) deployment() *configReconcileContext {
 			c.MatchingLabels)
 		return
 	}
-	return c.objectWrapper(deployFn)
+	return c.Wrap(deployFn)
 }
 
-func (c *configReconcileContext) complete() (err error) {
+func (c *configReconcileContext) Complete() (err error) {
 	err = c.Err
 	if err != nil {
 		return

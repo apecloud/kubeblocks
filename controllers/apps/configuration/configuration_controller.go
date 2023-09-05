@@ -22,7 +22,7 @@ package configuration
 import (
 	"context"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
@@ -31,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -68,14 +70,14 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
 	}
 
-	fetcher := intctrlutil.NewResourceFetcher(intctrlutil.ResourceCtx{
+	fetcherTask := &Task{}
+	err := fetcherTask.Init(&intctrlutil.ResourceCtx{
 		Context:       ctx,
 		Client:        r.Client,
 		Namespace:     configuration.Namespace,
 		ClusterName:   configuration.Spec.ClusterRef,
 		ComponentName: configuration.Spec.ComponentName,
-	})
-	err := fetcher.Cluster().
+	}, fetcherTask).Cluster().
 		ClusterDef().
 		ClusterVer().
 		ClusterComponent().
@@ -92,10 +94,56 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	if err := r.runTasks(reqCtx, configuration, fetcher, tasks); err != nil {
+	if err := r.runTasks(reqCtx, configuration, fetcherTask, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *ConfigurationReconciler) runTasks(
+	reqCtx intctrlutil.RequestCtx,
+	configuration *appsv1alpha1.Configuration,
+	fetcher *Task,
+	tasks []Task) (err error) {
+	var errs []error
+	var synthesizedComp *component.SynthesizedComponent
+
+	synthesizedComp, err = component.BuildComponent(reqCtx, nil,
+		fetcher.ClusterObj,
+		fetcher.ClusterDefObj,
+		fetcher.ClusterDefComObj,
+		fetcher.ClusterComObj,
+		fetcher.ClusterVerComObj)
+	if err != nil {
+		return
+	}
+
+	patch := client.MergeFrom(configuration.DeepCopy())
+	for _, task := range tasks {
+		if err := task.Do(fetcher, synthesizedComp); err != nil {
+			task.Status.Message = cfgutil.ToPointer(err.Error())
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
+	}
+	if err := r.Client.Status().Patch(reqCtx.Ctx, configuration, patch); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) == 0 {
+		return
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&appsv1alpha1.Configuration{}).
+		Owns(&corev1.ConfigMap{}).
+		Complete(r)
 }
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
@@ -119,30 +167,4 @@ func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 		phase == appsv1alpha1.CPendingPhase ||
 		phase == appsv1alpha1.CFailedPhase ||
 		phase == appsv1alpha1.CFinishedPhase
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Configuration{}).
-		Complete(r)
-}
-
-func (r *ConfigurationReconciler) runTasks(reqCtx intctrlutil.RequestCtx, configuration *appsv1alpha1.Configuration, fetcher *intctrlutil.ResourceFetcher, tasks []Task) (err error) {
-	synthesizedComp, err := component.BuildComponent(reqCtx, nil, fetcher.ClusterObj, fetcher.ClusterDefObj, fetcher.ClusterDefComObj, fetcher.ClusterComObj, fetcher.ClusterVerComObj)
-	if err != nil {
-		return err
-	}
-
-	var errs []error
-	for _, task := range tasks {
-		if err := task.Do(fetcher, configuration, synthesizedComp); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) > 0 {
-		err = utilerrors.NewAggregate(errs)
-	}
-
-	return
 }

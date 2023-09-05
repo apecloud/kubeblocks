@@ -92,8 +92,6 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 	}
 
 	return cmObj, nil
-	// Config is exists
-	// return core.IsNotUserReconfigureOperation(cmObj), cmObj, nil
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
@@ -120,12 +118,48 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		// if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
 		//	return err
 		// }
-		// updateCMConfigSpecLabels(newCMObj, configSpec)
+		UpdateCMConfigSpecLabels(newCMObj, configSpec)
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	configSpec appsv1alpha1.ComponentConfigSpec,
+	item appsv1alpha1.ConfigurationItemDetail,
+) (*corev1.ConfigMap, error) {
+	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
+	// TODO
+	// step1: rerender
+	// step2: import template merge for policy
+	// step3: apply reconfiguring parameters
+	// Generate ConfigMap objects for config files
+	newCMObj, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
+		configSpec.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
+			return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
+		})
+	if err != nil {
+		return nil, err
+	}
+	return newCMObj, nil
+}
+
+func needRerender(obj *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
+	if obj == nil {
+		return true
+	}
+	if item.Version == "" {
+		return false
+	}
+
+	version, ok := obj.Annotations[constant.CMConfigurationTemplateVersion]
+	if ok && version != item.Version {
+		return true
+	}
+	return false
 }
 
 func (wrapper *renderWrapper) updateConfigTemplate(cluster *appsv1alpha1.Cluster,

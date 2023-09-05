@@ -22,6 +22,7 @@ package plan
 import (
 	"context"
 
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,14 +45,19 @@ func NewConfigReconcileTask(cli client.Client,
 ) *configOperator {
 	return &configOperator{
 		ReconcileCtx{
-			Context:    ctx,
-			Client:     cli,
+			ResourceCtx: &intctrlutil.ResourceCtx{
+				Context:       ctx,
+				Client:        cli,
+				Namespace:     cluster.Namespace,
+				ClusterName:   cluster.Name,
+				ComponentName: component.Name,
+			},
 			Cluster:    cluster,
 			ClusterVer: clusterVersion,
 			Component:  component,
-			obj:        obj,
+			Object:     obj,
 			PodSpec:    podSpec,
-			cache:      localObjs,
+			Cache:      localObjs,
 		},
 	}
 }
@@ -65,7 +71,7 @@ func (c *configOperator) Reconcile() error {
 		return c.UpdateConfiguration()
 	}
 
-	return NewPipeline(c.ReconcileCtx).
+	return NewCreatePipeline(c.ReconcileCtx).
 		Prepare().
 		RenderScriptTemplate().
 		Configuration().
@@ -78,7 +84,7 @@ func (c *configOperator) Reconcile() error {
 }
 
 func (c *configOperator) UpdateConfiguration() error {
-	return NewPipeline(c.ReconcileCtx).
+	return NewCreatePipeline(c.ReconcileCtx).
 		Configuration().
 		UpdateConfigMeta().
 		Complete()

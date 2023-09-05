@@ -43,15 +43,15 @@ func (c *ConfigurationBuilder) Component(component string) *ConfigurationBuilder
 	return c
 }
 
-func (c *ConfigurationBuilder) ClusterVerRef(clusterVer string) *ConfigurationBuilder {
-	c.get().Spec.ClusterVersionRef = clusterVer
-	return c
-}
-
-func (c *ConfigurationBuilder) ClusterDefRef(clusterDef string) *ConfigurationBuilder {
-	c.get().Spec.ClusterDefRef = clusterDef
-	return c
-}
+// func (c *ConfigurationBuilder) ClusterVerRef(clusterVer string) *ConfigurationBuilder {
+//	c.get().Spec.ClusterVersionRef = clusterVer
+//	return c
+// }
+//
+// func (c *ConfigurationBuilder) ClusterDefRef(clusterDef string) *ConfigurationBuilder {
+//	c.get().Spec.ClusterDefRef = clusterDef
+//	return c
+// }
 
 func (c *ConfigurationBuilder) AddConfigurationItem(name string) *ConfigurationBuilder {
 	c.get().Spec.ConfigItemDetails = append(c.get().Spec.ConfigItemDetails, v1alpha1.ConfigurationItemDetail{Name: name})

@@ -33,6 +33,10 @@ type ConfigurationItemDetail struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
+	// version is the version of configuration template.
+	// +optional
+	Version string `json:"version,omitempty"`
+
 	// Specify the configuration template.
 	// +optional
 	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef,omitempty"`
@@ -60,12 +64,12 @@ type ConfigurationSpec struct {
 	// clusterDefRef referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ClusterDefRef string `json:"clusterDefRef"`
+	// ClusterDefRef string `json:"clusterDefRef"`
 
 	// clusterVerRef referencing ClusterVersion name.
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
-	ClusterVersionRef string `json:"clusterVerRef,omitempty"`
+	// ClusterVersionRef string `json:"clusterVerRef,omitempty"`
 
 	// customConfigurationItems describes user-defined config template.
 	// +optional

@@ -64,12 +64,12 @@ type ConfigurationSpec struct {
 	// clusterDefRef referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// ClusterDefRef string `json:"clusterDefRef"`
+	ClusterDefRef string `json:"clusterDefRef"`
 
 	// clusterVerRef referencing ClusterVersion name.
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
-	// ClusterVersionRef string `json:"clusterVerRef,omitempty"`
+	ClusterVersionRef string `json:"clusterVerRef,omitempty"`
 
 	// customConfigurationItems describes user-defined config template.
 	// +optional
@@ -77,7 +77,7 @@ type ConfigurationSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ConfigItemDetails []ConfigurationItemDetail `json:"ConfigItemDetails,omitempty"`
+	ConfigItemDetails []ConfigurationItemDetail `json:"configItemDetails,omitempty"`
 }
 
 type ConfigurationItemDetailStatus struct {

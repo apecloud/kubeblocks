@@ -89,9 +89,8 @@ func (mgr *Manager) IsClusterInitialized(context.Context, *dcs.Cluster) (bool, e
 }
 
 func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
-	mgr.DBState = nil
 	mgr.UnsetIsLeader()
-	dbState := &dcs.DBState{
+	mgr.DBState = &dcs.DBState{
 		Extra: map[string]string{},
 	}
 
@@ -107,13 +106,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("get replication mode failed, err:%v", err)
 		return nil
 	}
-	dbState.Extra[postgres.ReplicationMode] = replicationMode
+	mgr.DBState.Extra[postgres.ReplicationMode] = replicationMode
 
 	if replicationMode == postgres.Synchronous && cluster.Leader != nil && cluster.Leader.Name == mgr.CurrentMemberName {
 		syncStandbys := mgr.getSyncStandbys(ctx)
 		if syncStandbys != nil {
 			mgr.syncStandbys = syncStandbys
-			dbState.Extra[postgres.SyncStandBys] = strings.Join(syncStandbys.Members.ToSlice(), ",")
+			mgr.DBState.Extra[postgres.SyncStandBys] = strings.Join(syncStandbys.Members.ToSlice(), ",")
 		}
 	}
 
@@ -122,7 +121,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("get wal position failed, err:%v", err)
 		return nil
 	}
-	dbState.OpTimestamp = walPosition
+	mgr.DBState.OpTimestamp = walPosition
 
 	var timeLine int64
 	if isLeader {
@@ -134,7 +133,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("get received timeLine failed, err:%v", err)
 		return nil
 	}
-	dbState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
+	mgr.DBState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
 
 	if !isLeader {
 		primaryInfo, err := mgr.readRecoveryParams(ctx)
@@ -142,10 +141,9 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 			mgr.Logger.Errorf("get primary info failed, err:%v", err)
 			return nil
 		}
-		dbState.Extra[postgres.PrimaryInfo] = primaryInfo
+		mgr.DBState.Extra[postgres.PrimaryInfo] = primaryInfo
 	}
 
-	mgr.DBState = dbState
 	return mgr.DBState
 }
 
@@ -357,7 +355,7 @@ func (mgr *Manager) getLsnWithHost(ctx context.Context, types string, host strin
 
 // only the leader has this information.
 func (mgr *Manager) getSyncStandbys(ctx context.Context) *postgres.PGStandby {
-	if mgr.syncStandbys != nil {
+	if mgr.syncStandbys != nil && mgr.DBState != nil && mgr.DBState.Extra[postgres.SyncStandBys] != "" {
 		return mgr.syncStandbys
 	}
 

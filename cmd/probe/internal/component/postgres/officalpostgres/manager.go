@@ -624,7 +624,7 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) (map[string]map[stri
 		return mgr.recoveryParams, nil
 	}
 
-	sql := fmt.Sprintf("SELECT name, setting, context FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = %s;", postgres.PrimaryConnInfo)
+	sql := fmt.Sprintf(`SELECT name, setting, context FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = '%s';`, postgres.PrimaryConnInfo)
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
 		return nil, err

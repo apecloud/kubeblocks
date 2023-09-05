@@ -157,7 +157,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 			}), testutil.WithAnyTimes()))
 
 			tplWrapper := mockTemplateWrapper()
-			Expect(tplWrapper.renderConfigTemplate(clusterObj, clusterComponent, nil)).ShouldNot(Succeed())
+			Expect(tplWrapper.renderConfigTemplate(clusterObj, clusterComponent, nil, nil)).ShouldNot(Succeed())
 		})
 
 		It("TestConfigSpec with exist configmap", func() {
@@ -174,7 +174,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 			}), testutil.WithAnyTimes()))
 
 			tplWrapper := mockTemplateWrapper()
-			Expect(tplWrapper.renderConfigTemplate(clusterObj, clusterComponent, nil)).Should(Succeed())
+			Expect(tplWrapper.renderConfigTemplate(clusterObj, clusterComponent, nil, nil)).Should(Succeed())
 		})
 
 		It("TestConfigSpec update", func() {
@@ -220,7 +220,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 			}, testutil.WithAnyTimes()))
 
 			tplWrapper := mockTemplateWrapper()
-			Expect(tplWrapper.renderConfigTemplate(clusterObj, clusterComponent, nil)).Should(Succeed())
+			Expect(tplWrapper.renderConfigTemplate(clusterObj, clusterComponent, nil, nil)).Should(Succeed())
 		})
 
 	})

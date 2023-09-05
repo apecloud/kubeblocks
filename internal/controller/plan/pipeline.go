@@ -60,11 +60,12 @@ type updatePipeline struct {
 	reconcile     bool
 	renderWrapper renderWrapper
 
-	item       appsv1alpha1.ConfigurationItemDetail
-	itemStatus *appsv1alpha1.ConfigurationItemDetailStatus
-	configSpec *appsv1alpha1.ComponentConfigSpec
-	originalCM *corev1.ConfigMap
-	newCM      *corev1.ConfigMap
+	item        appsv1alpha1.ConfigurationItemDetail
+	itemStatus  *appsv1alpha1.ConfigurationItemDetailStatus
+	configSpec  *appsv1alpha1.ComponentConfigSpec
+	originalCM  *corev1.ConfigMap
+	newCM       *corev1.ConfigMap
+	configPatch *core.ConfigPatchInfo
 
 	ctx ReconcileCtx
 	intctrlutil.ResourceFetcher[updatePipeline]
@@ -127,7 +128,7 @@ func (p *pipeline) Configuration() *pipeline {
 func (p *pipeline) CreateConfigTemplate() *pipeline {
 	return p.Wrap(func() error {
 		ctx := p.ctx
-		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.Component, ctx.Cache)
+		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.Component, ctx.Cache, p.configuration)
 	})
 }
 
@@ -305,26 +306,47 @@ func (p *updatePipeline) foundConfigSpec(configSpec string) (*appsv1alpha1.Compo
 	return &templates[i], nil
 }
 
-// step1: doRerender
 func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 	return p.Wrap(func() (err error) {
 		if p.isDone() {
 			return
 		}
 		if needRerender(p.originalCM, p.item) {
-			p.newCM, err = p.renderWrapper.rerenderConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, p.item)
+			p.newCM, err = p.renderWrapper.rerenderConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, &p.item)
+		} else {
+			p.newCM = p.originalCM
 		}
 		return
 	})
 }
 
-// step1: doMerge
 func (p *updatePipeline) ApplyParameters() *updatePipeline {
+	patchMerge := func(p *updatePipeline, spec appsv1alpha1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) error {
+		newData, err := DoMerge(cm.Data, item.ConfigFileParams, p.ConfigConstraintObj, spec)
+		if err != nil {
+			return err
+		}
+		if p.ConfigConstraintObj == nil {
+			cm.Data = newData
+			return nil
+		}
+
+		p.configPatch, _, err = core.CreateConfigPatch(cm.Data,
+			newData,
+			p.ConfigConstraintObj.Spec.FormatterConfig.Format,
+			p.configSpec.Keys,
+			false)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
 	return p.Wrap(func() error {
 		if p.isDone() {
 			return nil
 		}
-		return p.renderWrapper.updateConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, p.itemStatus)
+		return patchMerge(p, *p.configSpec, p.newCM, p.item)
 	})
 }
 
@@ -333,18 +355,30 @@ func (p *updatePipeline) UpdateConfigVersion() *updatePipeline {
 		if p.isDone() {
 			return nil
 		}
-		return p.renderWrapper.updateConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, p.itemStatus)
+		if p.newCM.Annotations == nil {
+			p.newCM.Annotations = make(map[string]string)
+		}
+		b, err := json.Marshal(p.item)
+		if err != nil {
+			return err
+		}
+		p.newCM.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+		return nil
 	})
 }
 
-// step1: doSync
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
-		if p.isDone() {
+		switch {
+		case p.isDone():
 			return nil
+		case p.originalCM == nil && p.newCM != nil:
+			return p.Client.Create(p.Context, p.newCM)
+		case p.originalCM != nil:
+			patch := client.MergeFrom(p.originalCM)
+			return p.Client.Patch(p.Context, p.newCM, patch)
 		}
-		// TODO merge and sync
-		return nil
+		return core.MakeError("unexpected condition")
 	})
 }
 

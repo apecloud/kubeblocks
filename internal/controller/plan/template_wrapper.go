@@ -95,9 +95,10 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent, localObjs []client.Object) error {
+	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.Configuration) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range component.ConfigTemplates {
+		var item *appsv1alpha1.ConfigurationItemDetail
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 		origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
 		if err != nil {
@@ -107,18 +108,29 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false)
 			continue
 		}
-		// Generate ConfigMap objects for config files
-		newCMObj, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
-			configSpec.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
-				return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
-			})
+		if configuration != nil {
+			item = configuration.Spec.GetConfigurationItem(configSpec.Name)
+		}
+		newCMObj, err := wrapper.rerenderConfigTemplate(cluster, component, configSpec, item)
 		if err != nil {
 			return err
 		}
-		// if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
+		//// Generate ConfigMap objects for config files
+		// newCMObj, err := generateConfigMapFromTpl(cluster,
+		//	component,
+		//	wrapper.templateBuilder,
+		//	cmName,
+		//	configSpec.ConfigConstraintRef,
+		//	configSpec.ComponentTemplateSpec,
+		//	wrapper.ctx,
+		//	wrapper.cli,
+		//	func(m map[string]string) error {
+		//		return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
+		//	})
+		// if err != nil {
 		//	return err
 		// }
-		UpdateCMConfigSpecLabels(newCMObj, configSpec)
+		// UpdateCMConfigSpecLabels(newCMObj, configSpec)
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
@@ -129,21 +141,40 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	configSpec appsv1alpha1.ComponentConfigSpec,
-	item appsv1alpha1.ConfigurationItemDetail,
+	item *appsv1alpha1.ConfigurationItemDetail,
 ) (*corev1.ConfigMap, error) {
 	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
-	// TODO
-	// step1: rerender
-	// step2: import template merge for policy
-	// step3: apply reconfiguring parameters
-	// Generate ConfigMap objects for config files
-	newCMObj, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
-		configSpec.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
+	newCMObj, err := generateConfigMapFromTpl(cluster,
+		component,
+		wrapper.templateBuilder,
+		cmName,
+		configSpec.ConfigConstraintRef,
+		configSpec.ComponentTemplateSpec,
+		wrapper.ctx,
+		wrapper.cli,
+		func(m map[string]string) error {
 			return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
 		})
 	if err != nil {
 		return nil, err
 	}
+	// render user specified template
+	if item != nil && item.ImportTemplateRef != nil {
+		newData, err := mergerConfigTemplate(
+			&appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: *item.ImportTemplateRef,
+			},
+			wrapper.templateBuilder,
+			configSpec,
+			newCMObj.Data,
+			wrapper.ctx,
+			wrapper.cli)
+		if err != nil {
+			return nil, err
+		}
+		newCMObj.Data = newData
+	}
+	UpdateCMConfigSpecLabels(newCMObj, configSpec)
 	return newCMObj, nil
 }
 
@@ -160,35 +191,6 @@ func needRerender(obj *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDeta
 		return true
 	}
 	return false
-}
-
-func (wrapper *renderWrapper) updateConfigTemplate(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent, configSpec appsv1alpha1.ComponentConfigSpec, status *appsv1alpha1.ConfigurationItemDetailStatus) error {
-	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
-	origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, nil)
-	if err != nil {
-		return err
-	}
-	// TODO
-	// step1: rerender
-	// step2: import template merge for policy
-	// step3: apply reconfiguring parameters
-	// Generate ConfigMap objects for config files
-	newCMObj, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
-		configSpec.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
-			return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
-		})
-	if err != nil {
-		return err
-	}
-	if err := wrapper.CheckAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
-		return err
-	}
-	UpdateCMConfigSpecLabels(newCMObj, configSpec)
-	// if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
-	//	return err
-	// }
-	return nil
 }
 
 func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,

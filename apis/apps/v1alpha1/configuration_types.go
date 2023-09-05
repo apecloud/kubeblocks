@@ -80,6 +80,16 @@ type ConfigurationSpec struct {
 	ConfigItemDetails []ConfigurationItemDetail `json:"configItemDetails,omitempty"`
 }
 
+func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *ConfigurationItemDetail {
+	for i := range configuration.ConfigItemDetails {
+		configItem := &configuration.ConfigItemDetails[i]
+		if configItem.Name == name {
+			return configItem
+		}
+	}
+	return nil
+}
+
 type ConfigurationItemDetailStatus struct {
 	// name is a config template name.
 	// +kubebuilder:validation:Required

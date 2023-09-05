@@ -220,12 +220,12 @@ spec:
                     phase:
                       description: phase is status of configurationItem.
                       enum:
-                      - CInitPhase
-                      - CRunningPhase
-                      - CFailedPhase
-                      - CDeletingPhase
-                      - CFinishedPhase
-                      - CPendingPhase
+                      - Init
+                      - Running
+                      - Pending
+                      - Failed
+                      - Deleting
+                      - Finished
                       type: string
                   required:
                   - name

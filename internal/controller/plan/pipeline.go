@@ -49,7 +49,7 @@ type ReconcileCtx struct {
 }
 
 type pipeline struct {
-	configuration *appsv1alpha1.Configuration
+	// configuration *appsv1alpha1.Configuration
 	renderWrapper renderWrapper
 
 	ctx ReconcileCtx
@@ -108,7 +108,7 @@ func (p *pipeline) RenderScriptTemplate() *pipeline {
 	})
 }
 
-func (p *pipeline) Configuration() *pipeline {
+func (p *pipeline) UpdateConfiguration() *pipeline {
 	buildConfiguration := func() (err error) {
 		expectConfiguration := p.createConfiguration()
 		configuration := appsv1alpha1.Configuration{}
@@ -116,7 +116,10 @@ func (p *pipeline) Configuration() *pipeline {
 		switch {
 		case err == nil:
 			return p.updateConfiguration(&configuration, expectConfiguration)
-		case !apierrors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
+			if len(expectConfiguration.Spec.ConfigItemDetails) == 0 {
+				return nil
+			}
 			return p.ResourceFetcher.Client.Create(p.Context, expectConfiguration)
 		default:
 			return err
@@ -128,19 +131,20 @@ func (p *pipeline) Configuration() *pipeline {
 func (p *pipeline) CreateConfigTemplate() *pipeline {
 	return p.Wrap(func() error {
 		ctx := p.ctx
-		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.Component, ctx.Cache, p.configuration)
+		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.Component, ctx.Cache, p.ConfigurationObj)
 	})
 }
 
 func (p *pipeline) UpdateConfigurationStatus() *pipeline {
 	return p.Wrap(func() error {
-		if p.configuration != nil {
+		if p.ConfigurationObj == nil {
 			return nil
 		}
 
-		patch := client.MergeFrom(p.configuration)
-		updated := p.configuration.DeepCopy()
-		for _, item := range p.configuration.Spec.ConfigItemDetails {
+		existing := p.ConfigurationObj
+		patch := client.MergeFrom(existing)
+		updated := existing.DeepCopy()
+		for _, item := range existing.Spec.ConfigItemDetails {
 			checkAndUpdateItemStatus(updated, item)
 		}
 		return p.ResourceFetcher.Client.Status().Patch(p.Context, updated, patch)
@@ -202,6 +206,8 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
 	}
 	return builder.Component(p.ComponentName).
 		ClusterRef(p.ClusterName).
+		ClusterDefRef(p.ctx.Cluster.Spec.ClusterDefRef).
+		ClusterVerRef(p.ctx.Cluster.Spec.ClusterVersionRef).
 		GetObject()
 }
 

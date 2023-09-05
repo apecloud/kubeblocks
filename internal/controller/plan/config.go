@@ -44,14 +44,13 @@ func NewConfigReconcileTask(cli client.Client,
 	localObjs []client.Object,
 ) *configOperator {
 	return &configOperator{
-		ReconcileCtx{
-			ResourceCtx: &intctrlutil.ResourceCtx{
-				Context:       ctx,
-				Client:        cli,
-				Namespace:     cluster.Namespace,
-				ClusterName:   cluster.Name,
-				ComponentName: component.Name,
-			},
+		ReconcileCtx{ResourceCtx: &intctrlutil.ResourceCtx{
+			Context:       ctx,
+			Client:        cli,
+			Namespace:     cluster.Namespace,
+			ClusterName:   cluster.Name,
+			ComponentName: component.Name,
+		},
 			Cluster:    cluster,
 			ClusterVer: clusterVersion,
 			Component:  component,
@@ -74,18 +73,19 @@ func (c *configOperator) Reconcile() error {
 	return NewCreatePipeline(c.ReconcileCtx).
 		Prepare().
 		RenderScriptTemplate().
-		Configuration().
+		UpdateConfiguration(). // reconcile Configuration
+		Configuration(). // sync remote Configuration
 		CreateConfigTemplate().
-		UpdateConfigurationStatus().
 		UpdatePodVolumes().
 		BuildConfigManagerSidecar().
 		UpdateConfigMeta().
+		UpdateConfigurationStatus().
 		Complete()
 }
 
 func (c *configOperator) UpdateConfiguration() error {
 	return NewCreatePipeline(c.ReconcileCtx).
-		Configuration().
+		UpdateConfiguration().
 		UpdateConfigMeta().
 		Complete()
 }

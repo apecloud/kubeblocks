@@ -537,7 +537,14 @@ func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 
 	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
-	c.updatePodEnvConfig(c.Component.Replicas, *sts.Spec.Replicas)
+	leaderPod, err := c.getLeaderPod(reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	if leaderPod == nil {
+		return fmt.Errorf("there is no leader for the component instance, retry later")
+	}
+	c.updatePodEnvConfig(c.Component.Replicas, *sts.Spec.Replicas, leaderPod)
 
 	reqCtx.Recorder.Eventf(c.Cluster,
 		corev1.EventTypeNormal,
@@ -553,7 +560,7 @@ func (c *rsmComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) int {
 	return int(c.Component.Replicas - *stsObj.Spec.Replicas)
 }
 
-func (c *rsmComponentBase) updatePodEnvConfig(replicas, lastReplicas int32) {
+func (c *rsmComponentBase) updatePodEnvConfig(replicas, lastReplicas int32, pod *corev1.Pod) {
 	for _, v := range ictrltypes.FindAll[*corev1.ConfigMap](c.Dag) {
 		node := v.(*ictrltypes.LifecycleVertex)
 		// TODO: need a way to reference the env config.
@@ -565,10 +572,30 @@ func (c *rsmComponentBase) updatePodEnvConfig(replicas, lastReplicas int32) {
 		if cm.Data == nil {
 			cm.Data = make(map[string]string)
 		}
+		// HACK: to work around the problem that role env is missing.
+		cm.Data["KB_LEADER"] = pod.GetName()
 		cm.Data["KB_COMPONENT_REPLICAS"] = strconv.Itoa(int(replicas))
 		cm.Data["KB_LAST_COMPONENT_REPLICAS"] = strconv.Itoa(int(lastReplicas))
 		node.Action = ictrltypes.ActionUpdatePtr()
 	}
+}
+
+func (c *rsmComponentBase) getLeaderPod(reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.Pod, error) {
+	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		return nil, err
+	}
+	for i, pod := range pods {
+		if pod.Labels == nil {
+			continue
+		}
+		if role, ok := pod.Labels[constant.RoleLabelKey]; ok {
+			if strings.ToLower(role) == "leader" || strings.ToLower(role) == "primary" {
+				return pods[i], nil
+			}
+		}
+	}
+	return nil, nil
 }
 
 func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {

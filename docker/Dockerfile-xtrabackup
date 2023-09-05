@@ -1,0 +1,112 @@
+FROM centos:8 as builder
+
+LABEL org.opencontainers.image.authors="info@percona.com"
+
+RUN set -ex; \
+    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*; \
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*;
+
+
+ENV XTRABACKUP_VERSION 8.0.32-25.1
+ENV PS_VERSION 8.0.31-23.1
+ENV OS_VER el8
+ENV FULL_PERCONA_VERSION "$PS_VERSION.$OS_VER"
+ENV FULL_PERCONA_XTRABACKUP_VERSION "$XTRABACKUP_VERSION.$OS_VER"
+
+# check repository package signature in secure way
+RUN set -ex; \
+    export GNUPGHOME="$(mktemp -d)"; \
+    gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 430BDF5C56E7C94E848EE60C1C4CBDCDCD2EFD2A 99DB70FAE1D7CE227FB6488205B555B38483C65D; \
+    gpg --batch --export --armor 430BDF5C56E7C94E848EE60C1C4CBDCDCD2EFD2A > ${GNUPGHOME}/RPM-GPG-KEY-Percona; \
+    gpg --batch --export --armor 99DB70FAE1D7CE227FB6488205B555B38483C65D > ${GNUPGHOME}/RPM-GPG-KEY-centosofficial; \
+    rpmkeys --import ${GNUPGHOME}/RPM-GPG-KEY-Percona ${GNUPGHOME}/RPM-GPG-KEY-centosofficial; \
+    yum install -y findutils; \
+    curl -Lf -o /tmp/percona-release.rpm https://repo.percona.com/yum/percona-release-latest.noarch.rpm; \
+    rpmkeys --checksig /tmp/percona-release.rpm; \
+    rpm -i /tmp/percona-release.rpm; \
+    rm -rf "$GNUPGHOME" /tmp/percona-release.rpm; \
+    rpm --import /etc/pki/rpm-gpg/PERCONA-PACKAGING-KEY; \
+    #yum -y module disable mysql perl-DBD-MySQL; \
+    percona-release disable all; \
+    #percona-release setup -y ps-80; \
+    percona-release enable ps-80 testing; \
+    percona-release enable tools testing
+
+RUN set -ex; \
+    yum -y install \
+        tar \
+        shadow-utils
+
+# create mysql user/group before mysql installation
+RUN groupadd -g 1001 mysql; \
+    useradd -u 1001 -r -g 1001 -s /sbin/nologin \
+        -c "Default Application User" mysql
+
+RUN set -eu; \
+    . /etc/os-release; \
+    { \
+        echo '[wesql-tsinghua]'; \
+        echo 'name=WeSQL Server Tsinghua'; \
+        echo 'enabled=1'; \
+        echo "baseurl=https://mirrors.tuna.tsinghua.edu.cn/centos/8-stream/BaseOS/\$basearch/os/"; \
+        echo 'gpgcheck=0'; \
+        echo ''; \
+        echo '[wesql-tsinghua-another]'; \
+        echo 'name=WeSQL Server Tsinghua another'; \
+        echo 'enabled=1'; \
+        echo "baseurl=https://mirrors.tuna.tsinghua.edu.cn/centos/8-stream/PowerTools/\$basearch/os/"; \
+        echo 'gpgcheck=0'; \
+    } | tee /etc/yum.repos.d/wesql-tsinghua.repo
+
+RUN set -eux; \
+	yum install -y procps-ng-devel; \
+	yum clean all; \
+    rm -rf /etc/yum.repos.d/wesql-tsinghua.repo;
+
+RUN set -eu; \
+    . /etc/os-release; \
+    { \
+        echo '[wesql-server]'; \
+        echo 'name=WeSQL Server'; \
+        echo 'enabled=1'; \
+        echo "baseurl=http://apecloud:apecloud@69.235.169.234:8088/centos/\$releasever/os/\$basearch"; \
+        echo 'gpgcheck=0'; \
+    } | tee /etc/yum.repos.d/wesql.repo
+
+RUN set -eux; \
+	yum install -y apecloud-xtrabackup-80; \
+	yum clean all; \
+    rm -rf /etc/yum.repos.d/wesql.repo;
+
+RUN set -eu; \
+    . /etc/os-release; \
+    { \
+        echo '[wesql-fedoraproject]'; \
+        echo 'name=WeSQL Server Fedoraproject'; \
+        echo 'enabled=1'; \
+        echo "baseurl=https://dl.fedoraproject.org/pub/epel/8/Everything/\$basearch"; \
+        echo 'gpgcheck=0'; \
+    } | tee /etc/yum.repos.d/wesql-fedoraproject.repo
+
+RUN set -ex; \
+    yum -y install \
+        #percona-xtrabackup-80-${FULL_PERCONA_XTRABACKUP_VERSION} \
+        libev \
+        libaio \
+        rsync \
+        socat \
+        procps-ng \
+        qpress \
+        lz4 \
+        zstd \
+        nc; \
+    \
+    yum clean all; \
+    rm -rf /var/cache/yum
+
+RUN install -d -o 1001 -g 0 -m 0775 /backup
+
+VOLUME [ "/backup" ]
+USER 1001
+
+CMD ["/usr/bin/xtrabackup"]

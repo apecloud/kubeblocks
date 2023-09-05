@@ -228,6 +228,27 @@ spec:
                 mountPath: /conf
               - name: data
                 mountPath: /vtdataroot
+        initContainers:
+        - command:
+            - /bin/sh
+            - /scripts/streaming-restore.sh
+          env:
+            - name: DATA_VOLUME
+              value: {{ .Values.mysqlConfigs.dataMountPath }}
+            - name: DATA_DIR
+              value: {{ .Values.mysqlConfigs.dataDir }}
+            - name: LOG_BIN
+              value: {{ .Values.mysqlConfigs.logBin }}
+          image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+          imagePullPolicy: IfNotPresent
+          name: streaming-restore
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts
+            - mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
+              name: data
+            - mountPath: /etc/annotations
+              name: annotations
         volumes:
           - name: log-data
             hostPath:
@@ -461,24 +482,6 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
-          - name: streaming-restore
-            imagePullPolicy: IfNotPresent
-            image: busybox:1.35
-            env:
-              - name: DATA_VOLUME
-                value: {{ .Values.mysqlConfigs.dataMountPath }}
-              - name: DATA_DIR
-                value: {{ .Values.mysqlConfigs.dataDir }}
-              - name: LOG_BIN
-                value: {{ .Values.mysqlConfigs.logBin }}
-            command: [ "/scripts/streaming-restore.sh" ]
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts
-              - name: data
-                mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
-              - name: annotations
-                mountPath: /etc/annotations
         containers:
           - name: vtgate
             imagePullPolicy: IfNotPresent

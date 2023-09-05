@@ -25,20 +25,26 @@ fi
 #    sleep 1
 #done
 
+checkrun() {
+  "$@"
+  local ret=$?
+  if [ $ret -ne 0 ]; then
+    exit $ret
+  fi
+}
+
 RESTORE_TMP_DIR=${DATA_VOLUME}/restore-tmp
+rm -rf ${RESTORE_TMP_DIR}
 mkdir -p ${DATA_DIR} ${RESTORE_TMP_DIR}
 
 cd ${RESTORE_TMP_DIR}
-leader=${KB_LEADER}-0.${KB_CLUSTER_COMP_NAME}-headless
-nc ${leader} 3502 | xbstream -x
-if [ $? -ne 0 ]; then
-  exit -1
-fi
+leader=${KB_LEADER}.${KB_CLUSTER_COMP_NAME}-headless
+checkrun nc ${leader} 3502 | xbstream -x
 
-xtrabackup --decompress  --target-dir=${RESTORE_TMP_DIR}
-xtrabackup --prepare --target-dir=${RESTORE_TMP_DIR}
+checkrun xtrabackup --decompress  --target-dir=${RESTORE_TMP_DIR}
+checkrun xtrabackup --prepare --target-dir=${RESTORE_TMP_DIR}
 find . -name "*.qp" | xargs rm -f
-xtrabackup --move-back --target-dir=${RESTORE_TMP_DIR} --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
+checkrun xtrabackup --move-back --target-dir=${RESTORE_TMP_DIR} --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
 
 cd ${DATA_VOLUME}
 rm -rf ${RESTORE_TMP_DIR}

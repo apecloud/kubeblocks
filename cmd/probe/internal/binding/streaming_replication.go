@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -87,6 +88,12 @@ func streamingReplicator(listener net.Listener) {
 }
 
 func streamingBackup(host, user, password, dataDir string, writer io.Writer) error {
+	stderr, err := os.Create(fmt.Sprintf("/var/log/streaming-replication-backup-%d", time.Now().Unix()))
+	if err != nil {
+		return err
+	}
+	defer stderr.Close()
+
 	args := []string{
 		"--compress",
 		"--backup",
@@ -100,8 +107,9 @@ func streamingBackup(host, user, password, dataDir string, writer io.Writer) err
 	}
 	cmd := exec.Command("xtrabackup", args...)
 	cmd.Stdout = writer
+	cmd.Stderr = stderr
 	logReplicator.Info(fmt.Sprintf("exec backup commond: %s", cmd.String()))
-	if err := cmd.Run(); err != nil {
+	if err = cmd.Run(); err != nil {
 		return err
 	}
 	return nil

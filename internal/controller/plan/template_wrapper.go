@@ -195,7 +195,7 @@ func needRerender(obj *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDeta
 	}
 
 	version, ok := obj.Annotations[constant.CMConfigurationTemplateVersion]
-	if ok && version != item.Version {
+	if !ok || version != item.Version {
 		return true
 	}
 	return false

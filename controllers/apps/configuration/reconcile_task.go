@@ -47,6 +47,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 				PodSpec:     component.PodSpec,
 			}, item, status).ConfigMap().
 				Prepare().
+				ConfigConstraints().
 				// ConfigMap().
 				RerenderTemplate().
 				ApplyParameters().

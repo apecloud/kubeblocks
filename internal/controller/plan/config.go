@@ -74,7 +74,7 @@ func (c *configOperator) Reconcile() error {
 		Prepare().
 		RenderScriptTemplate().
 		UpdateConfiguration(). // reconcile Configuration
-		Configuration(). // sync remote Configuration
+		Configuration().
 		CreateConfigTemplate().
 		UpdatePodVolumes().
 		BuildConfigManagerSidecar().

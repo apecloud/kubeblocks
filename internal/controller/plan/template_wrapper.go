@@ -115,27 +115,35 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		if err != nil {
 			return err
 		}
-		//// Generate ConfigMap objects for config files
-		// newCMObj, err := generateConfigMapFromTpl(cluster,
-		//	component,
-		//	wrapper.templateBuilder,
-		//	cmName,
-		//	configSpec.ConfigConstraintRef,
-		//	configSpec.ComponentTemplateSpec,
-		//	wrapper.ctx,
-		//	wrapper.cli,
-		//	func(m map[string]string) error {
-		//		return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
-		//	})
-		// if err != nil {
-		//	return err
-		// }
-		// UpdateCMConfigSpecLabels(newCMObj, configSpec)
+		if err := applyUpdatedParameters(item, newCMObj, configSpec, wrapper.cli, wrapper.ctx); err != nil {
+			return err
+		}
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
+	var newData map[string]string
+	var configConstraint *appsv1alpha1.ConfigConstraint
+
+	if item == nil || len(item.ConfigFileParams) == 0 {
+		return
+	}
+	if configSpec.ConfigConstraintRef != "" {
+		configConstraint, err = fetchConfigConstraint(configSpec.ConfigConstraintRef, ctx, cli)
+	}
+	if err != nil {
+		return
+	}
+	newData, err = DoMerge(cm.Data, item.ConfigFileParams, configConstraint, configSpec)
+	if err != nil {
+		return
+	}
+	cm.Data = newData
+	return
 }
 
 func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Cluster,
@@ -341,21 +349,29 @@ func renderConfigMapTemplate(
 	return renderedData, nil
 }
 
+func fetchConfigConstraint(ccName string, ctx context.Context, cli client.Client) (*appsv1alpha1.ConfigConstraint, error) {
+	ccKey := client.ObjectKey{
+		Name: ccName,
+	}
+	configConstraint := &appsv1alpha1.ConfigConstraint{}
+	if err := cli.Get(ctx, ccKey, configConstraint); err != nil {
+		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%s]", ccName)
+	}
+	return configConstraint, nil
+}
+
 // validateRenderedData validates config file against constraint
 func validateRenderedData(
 	renderedData map[string]string,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	ctx context.Context,
 	cli client.Client) error {
-	configConstraint := &appsv1alpha1.ConfigConstraint{}
 	if configSpec.ConfigConstraintRef == "" {
 		return nil
 	}
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: "",
-		Name:      configSpec.ConfigConstraintRef,
-	}, configConstraint); err != nil {
-		return core.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
+	configConstraint, err := fetchConfigConstraint(configSpec.ConfigConstraintRef, ctx, cli)
+	if err != nil {
+		return err
 	}
 	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
 }

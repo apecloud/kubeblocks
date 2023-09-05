@@ -1,16 +1,16 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: apecloud-postgresql12-cc
+  name: official-postgresql12-cc
   labels:
-    {{- include "apecloud-postgresql.labels" . | nindent 4 }}
+    {{- include "official-postgresql.labels" . | nindent 4 }}
 spec:
-  # top level mysql configuration type
+  # top level pg configuration type
   cfgSchemaTopLevelName: PGParameter
 
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configurationSchema:
-    # schema: auto generate from mmmcue scripts
+    # schema: auto generate from cue scripts
     # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
       {{- .Files.Get "config/pg12-config-constraint.cue" | nindent 6 }}

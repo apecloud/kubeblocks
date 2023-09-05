@@ -70,6 +70,16 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
 	}
 
+	tasks := make([]Task, 0, len(configuration.Spec.ConfigItemDetails))
+	for _, item := range configuration.Spec.ConfigItemDetails {
+		if status := fromItemStatus(reqCtx, &configuration.Status, item); status != nil {
+			tasks = append(tasks, NewTask(item, status))
+		}
+	}
+	if len(tasks) == 0 {
+		return intctrlutil.Reconciled()
+	}
+
 	fetcherTask := &Task{}
 	err := fetcherTask.Init(&intctrlutil.ResourceCtx{
 		Context:       ctx,
@@ -85,13 +95,6 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Complete()
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
-	}
-
-	tasks := make([]Task, len(configuration.Spec.ConfigItemDetails))
-	for i, item := range configuration.Spec.ConfigItemDetails {
-		if status := fromItemStatus(reqCtx, &configuration.Status, item); status != nil {
-			tasks[i] = NewTask(item, status)
-		}
 	}
 
 	if err := r.runTasks(reqCtx, configuration, fetcherTask, tasks); err != nil {
@@ -164,6 +167,7 @@ func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.Configurati
 
 func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 	return phase == appsv1alpha1.CRunningPhase ||
+		phase == appsv1alpha1.CInitPhase ||
 		phase == appsv1alpha1.CPendingPhase ||
 		phase == appsv1alpha1.CFailedPhase ||
 		phase == appsv1alpha1.CFinishedPhase

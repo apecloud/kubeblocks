@@ -251,7 +251,7 @@ func (p *updatePipeline) isDone() bool {
 func (p *updatePipeline) Prepare() *updatePipeline {
 	buildTemplate := func() (err error) {
 		p.reconcile = !isFinish(p.originalCM, p.item)
-		if !p.isDone() {
+		if p.isDone() {
 			return
 		}
 		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.ctx.Cluster, p.ctx.ClusterVer, p.Context, p.Client)
@@ -294,6 +294,7 @@ func (p *updatePipeline) ConfigMap() *updatePipeline {
 		}
 		p.configSpec = configSpec
 		p.originalCM = &corev1.ConfigMap{}
+		p.ConfigConstraint = configSpec.ConfigConstraintRef
 		return p.Client.Get(p.Context, cmKey, p.originalCM)
 	})
 }
@@ -328,6 +329,9 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 
 func (p *updatePipeline) ApplyParameters() *updatePipeline {
 	patchMerge := func(p *updatePipeline, spec appsv1alpha1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) error {
+		if p.isDone() || len(item.ConfigFileParams) == 0 {
+			return nil
+		}
 		newData, err := DoMerge(cm.Data, item.ConfigFileParams, p.ConfigConstraintObj, spec)
 		if err != nil {
 			return err

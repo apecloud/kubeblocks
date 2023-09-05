@@ -59,6 +59,7 @@ type pipeline struct {
 func newPipeline(ctx reconfigureContext) *pipeline {
 	pipeline := &pipeline{reconfigureContext: ctx}
 	pipeline.Init(&intctrlutil.ResourceCtx{
+		Client:        ctx.cli,
 		Context:       ctx.reqCtx.Ctx,
 		Namespace:     ctx.resource.OpsRequest.Namespace,
 		ClusterName:   ctx.clusterName,

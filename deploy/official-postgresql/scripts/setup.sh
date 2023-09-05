@@ -24,6 +24,8 @@ else
     # Ensure 'daemon' user exists when running as 'root'
     am_i_root && ensure_user_exists "$POSTGRES_USER"
     postgresql_slave_init_db
+    primary_conninfo="host=$KB_0_HOSTNAME port=$POSTGRESQL_MASTER_PORT_NUMBER user=$PGUSER password=$PGPASSWORD application_name=$KB_POD_NAME"
+    postgresql_set_property "primary_conninfo" "$primary_conninfo" "$POSTGRESQL_CONF_FILE"
     touch "$PGDATA"/standby.signal
   fi
 fi

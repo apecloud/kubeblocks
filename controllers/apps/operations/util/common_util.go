@@ -22,12 +22,12 @@ package util
 import (
 	"context"
 	"encoding/json"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -99,8 +99,8 @@ func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha
 	return opsRequestSlice, nil
 }
 
-// GetOpsRequestSliceFromBackup gets OpsRequest slice from cluster annotations.
-func GetOpsRequestSliceFromBackup(backup *dataprotectionv1alpha1.Backup) ([]appsv1alpha1.OpsRecorder, error) {
+// GetOpsRequestFromBackup gets OpsRequest slice from cluster annotations.
+func GetOpsRequestFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.OpsRecorder, error) {
 	var (
 		opsRequestName string
 		opsRequestType string
@@ -115,10 +115,8 @@ func GetOpsRequestSliceFromBackup(backup *dataprotectionv1alpha1.Backup) ([]apps
 	if opsRequestType, ok = backup.Labels[intctrlutil.OpsRequestTypeLabelKey]; !ok {
 		return nil, nil
 	}
-	return []appsv1alpha1.OpsRecorder{
-		{
-			Name: opsRequestName,
-			Type: appsv1alpha1.OpsType(opsRequestType),
-		},
+	return &appsv1alpha1.OpsRecorder{
+		Name: opsRequestName,
+		Type: appsv1alpha1.OpsType(opsRequestType),
 	}, nil
 }

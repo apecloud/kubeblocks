@@ -309,18 +309,18 @@ func (r *OpsRequestReconciler) parseAllOpsRequest(object client.Object) []reconc
 func (r *OpsRequestReconciler) parseBackupOpsRequest(object client.Object) []reconcile.Request {
 	backup := object.(*dataprotectionv1alpha1.Backup)
 	var (
-		opsRequestSlice []appsv1alpha1.OpsRecorder
-		err             error
-		requests        []reconcile.Request
+		opsRequestRecorder *appsv1alpha1.OpsRecorder
+		err                error
+		requests           []reconcile.Request
 	)
-	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromBackup(backup); err != nil {
+	if opsRequestRecorder, err = opsutil.GetOpsRequestFromBackup(backup); err != nil {
 		return nil
 	}
-	for _, v := range opsRequestSlice {
+	if opsRequestRecorder != nil {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: backup.Namespace,
-				Name:      v.Name,
+				Name:      opsRequestRecorder.Name,
 			},
 		})
 	}

@@ -53,7 +53,7 @@ const (
 const (
 	ReplicationMode = "replication_mode"
 	SyncStandBys    = "sync_standbys"
-	PrimaryInfo     = "primary_info"
+	PrimaryConnInfo = "primary_conninfo"
 	TimeLine        = "timeline"
 )
 

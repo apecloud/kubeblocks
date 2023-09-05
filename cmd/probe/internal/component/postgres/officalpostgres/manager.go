@@ -45,7 +45,8 @@ import (
 
 type Manager struct {
 	postgres.Manager
-	syncStandbys *postgres.PGStandby
+	syncStandbys   *postgres.PGStandby
+	recoveryParams map[string]map[string]string
 }
 
 var Mgr *Manager
@@ -88,11 +89,17 @@ func (mgr *Manager) IsClusterInitialized(context.Context, *dcs.Cluster) (bool, e
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+func (mgr *Manager) cleanDBState() {
 	mgr.UnsetIsLeader()
+	mgr.recoveryParams = nil
+	mgr.syncStandbys = nil
 	mgr.DBState = &dcs.DBState{
 		Extra: map[string]string{},
 	}
+}
+
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	mgr.cleanDBState()
 
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err != nil {
@@ -136,12 +143,12 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	mgr.DBState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
 
 	if !isLeader {
-		primaryInfo, err := mgr.readRecoveryParams(ctx)
+		recoveryParams, err := mgr.readRecoveryParams(ctx)
 		if err != nil {
-			mgr.Logger.Errorf("get primary info failed, err:%v", err)
+			mgr.Logger.Errorf("get recoveryParams failed, err:%v", err)
 			return nil
 		}
-		mgr.DBState.Extra[postgres.PrimaryInfo] = primaryInfo
+		mgr.recoveryParams = recoveryParams
 	}
 
 	return mgr.DBState
@@ -355,7 +362,7 @@ func (mgr *Manager) getLsnWithHost(ctx context.Context, types string, host strin
 
 // only the leader has this information.
 func (mgr *Manager) getSyncStandbys(ctx context.Context) *postgres.PGStandby {
-	if mgr.syncStandbys != nil && mgr.DBState != nil && mgr.DBState.Extra[postgres.SyncStandBys] != "" {
+	if mgr.syncStandbys != nil {
 		return mgr.syncStandbys
 	}
 
@@ -585,41 +592,55 @@ func (mgr *Manager) getPgControlData() *map[string]string {
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {
-	_, err := fs.Stat(mgr.DataDir + "/standby.signal")
-	if errors.Is(err, afero.ErrFileNotFound) {
-		return true, true
+	if mgr.MajorVersion >= 12 {
+		_, err := fs.Stat(mgr.DataDir + "/standby.signal")
+		if errors.Is(err, afero.ErrFileNotFound) {
+			return true, true
+		}
+	} else {
+		// TODO: support check recovery.conf
 	}
 
-	primaryInfo, err := mgr.readRecoveryParams(ctx)
+	recoveryParams, err := mgr.readRecoveryParams(ctx)
 	if err != nil {
 		return true, true
 	}
 
-	if !strings.HasPrefix(primaryInfo, leaderName) {
-		mgr.Logger.Warnf("host not match, need to reload")
-		return true, false
+	if !strings.HasPrefix(recoveryParams[postgres.PrimaryConnInfo]["host"], leaderName) {
+		if recoveryParams[postgres.PrimaryConnInfo]["context"] == "postmaster" {
+			mgr.Logger.Warnf("host not match, need to restart")
+			return true, true
+		} else {
+			mgr.Logger.Warnf("host not match, need to reload")
+			return true, false
+		}
 	}
 
 	return false, false
 }
 
-func (mgr *Manager) readRecoveryParams(ctx context.Context) (string, error) {
-	if mgr.DBState != nil && mgr.DBState.Extra[postgres.PrimaryInfo] != "" {
-		return mgr.DBState.Extra[postgres.PrimaryInfo], nil
+func (mgr *Manager) readRecoveryParams(ctx context.Context) (map[string]map[string]string, error) {
+	if mgr.recoveryParams != nil {
+		return mgr.recoveryParams, nil
 	}
 
-	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
+	sql := fmt.Sprintf("SELECT name, setting, context FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = %s;", postgres.PrimaryConnInfo)
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))["host"], nil
+	primaryConnInfo := postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))
+	primaryConnInfo["context"] = cast.ToString(resMap[0]["context"])
+
+	return map[string]map[string]string{
+		postgres.PrimaryConnInfo: primaryConnInfo,
+	}, nil
 }
 
 // TODO: Parse history file

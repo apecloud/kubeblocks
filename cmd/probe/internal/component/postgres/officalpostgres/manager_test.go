@@ -49,6 +49,7 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 	viper.Set(constant.KBEnvClusterCompName, "test")
 	viper.Set(constant.KBEnvNamespace, "default")
 	viper.Set(postgres.PGDATA, "test")
+	viper.Set(postgres.PGMAJOR, 14)
 	mock, err := pgxmock.NewPool(pgxmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatal(err)
@@ -507,54 +508,54 @@ func TestReadRecoveryParams(t *testing.T) {
 
 	t.Run("host match", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
-			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}).
-				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application"))
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application", "signup"))
 
 		leaderName := "maple72-postgresql-0"
-		primaryInfo, err := manager.readRecoveryParams(ctx)
+		recoveryParams, err := manager.readRecoveryParams(ctx)
 		assert.Nil(t, err)
-		assert.True(t, strings.HasPrefix(primaryInfo, leaderName))
+		assert.True(t, strings.HasPrefix(recoveryParams[postgres.PrimaryConnInfo]["host"], leaderName))
 	})
 
 	t.Run("host not match", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
-			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}).
-				AddRow("primary_conninfo", "host=test port=5432 user=postgres application_name=my-application"))
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=test port=5432 user=postgres application_name=my-application", "signup"))
 
 		leaderName := "a"
-		primaryInfo, err := manager.readRecoveryParams(ctx)
+		recoveryParams, err := manager.readRecoveryParams(ctx)
 		assert.Nil(t, err)
-		assert.False(t, strings.HasPrefix(primaryInfo, leaderName))
+		assert.False(t, strings.HasPrefix(recoveryParams[postgres.PrimaryConnInfo]["host"], leaderName))
 	})
 
 	t.Run("query failed", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
 			WillReturnError(fmt.Errorf("some error"))
 
-		primaryInfo, err := manager.readRecoveryParams(ctx)
+		recoveryParams, err := manager.readRecoveryParams(ctx)
 		assert.NotNil(t, err)
-		assert.Equal(t, "", primaryInfo)
+		assert.Equal(t, "", recoveryParams[postgres.PrimaryConnInfo]["host"])
 	})
 
 	t.Run("parse query failed", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
-			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}))
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}))
 
-		primaryInfo, err := manager.readRecoveryParams(ctx)
+		recoveryParams, err := manager.readRecoveryParams(ctx)
 		assert.NotNil(t, err)
-		assert.Equal(t, "", primaryInfo)
+		assert.Equal(t, "", recoveryParams[postgres.PrimaryConnInfo]["host"])
 	})
 
 	t.Run("primary info has been set", func(t *testing.T) {
-		manager.DBState = &dcs.DBState{
-			Extra: map[string]string{
-				postgres.PrimaryInfo: "test",
+		manager.recoveryParams = map[string]map[string]string{
+			postgres.PrimaryConnInfo: {
+				"host": "test",
 			},
 		}
 
-		primaryInfo, err := manager.readRecoveryParams(ctx)
+		recoveryParams, err := manager.readRecoveryParams(ctx)
 		assert.Nil(t, err)
-		assert.Equal(t, "test", primaryInfo)
+		assert.Equal(t, "test", recoveryParams[postgres.PrimaryConnInfo]["host"])
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -586,10 +587,20 @@ func TestCheckRecoveryConf(t *testing.T) {
 		assert.True(t, needRestart)
 	})
 
-	t.Run("host not match", func(t *testing.T) {
+	t.Run("host not match and restart", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
-			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}).
-				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application"))
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application", "postmaster"))
+
+		needChange, needRestart := manager.checkRecoveryConf(ctx, manager.CurrentMemberName)
+		assert.True(t, needChange)
+		assert.True(t, needRestart)
+	})
+
+	t.Run("host not match and reload", func(t *testing.T) {
+		mock.ExpectQuery("pg_catalog.pg_settings").
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application", "signup"))
 
 		needChange, needRestart := manager.checkRecoveryConf(ctx, manager.CurrentMemberName)
 		assert.True(t, needChange)
@@ -598,8 +609,8 @@ func TestCheckRecoveryConf(t *testing.T) {
 
 	t.Run("host match", func(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
-			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}).
-				AddRow("primary_conninfo", "host=test-pod-0.maple72-postgresql-headless port=5432 application_name=my-application"))
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=test-pod-0.maple72-postgresql-headless port=5432 application_name=my-application", "signup"))
 
 		needChange, needRestart := manager.checkRecoveryConf(ctx, manager.CurrentMemberName)
 		assert.False(t, needChange)
@@ -823,8 +834,8 @@ func TestGetDBState(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"received_tli"}).AddRow(1))
 		mock.ExpectQuery("pg_catalog.pg_settings").
-			WillReturnRows(pgxmock.NewRows([]string{"name", "setting"}).
-				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application"))
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application", "postmaster"))
 
 		dbState := manager.GetDBState(ctx, cluster)
 		isSet, isLeader := manager.GetIsLeader()
@@ -834,7 +845,8 @@ func TestGetDBState(t *testing.T) {
 		assert.Equal(t, postgres.Asynchronous, dbState.Extra[postgres.ReplicationMode])
 		assert.Equal(t, int64(23454273), dbState.OpTimestamp)
 		assert.Equal(t, "1", dbState.Extra[postgres.TimeLine])
-		assert.Equal(t, "maple72-postgresql-0.maple72-postgresql-headless", dbState.Extra[postgres.PrimaryInfo])
+		assert.Equal(t, "maple72-postgresql-0.maple72-postgresql-headless", manager.recoveryParams[postgres.PrimaryConnInfo]["host"])
+		assert.Equal(t, "postmaster", manager.recoveryParams[postgres.PrimaryConnInfo]["context"])
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {

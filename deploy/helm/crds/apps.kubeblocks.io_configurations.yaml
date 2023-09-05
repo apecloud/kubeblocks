@@ -36,7 +36,28 @@ spec:
           spec:
             description: ConfigurationSpec defines the desired state of Configuration
             properties:
-              ConfigItemDetails:
+              clusterDefRef:
+                description: clusterDefRef referencing ClusterDefinition name. This
+                  is an immutable attribute.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              clusterRef:
+                description: clusterRef references Cluster name.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
+              clusterVerRef:
+                description: clusterVerRef referencing ClusterVersion name.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              componentName:
+                description: componentName is cluster component name.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
+              configItemDetails:
                 description: customConfigurationItems describes user-defined config
                   template.
                 items:
@@ -92,6 +113,9 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    version:
+                      description: version is the version of configuration template.
+                      type: string
                   required:
                   - name
                   type: object
@@ -99,27 +123,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              clusterDefRef:
-                description: clusterDefRef referencing ClusterDefinition name. This
-                  is an immutable attribute.
-                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                type: string
-              clusterRef:
-                description: clusterRef references Cluster name.
-                type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.clusterRef
-                  rule: self == oldSelf
-              clusterVerRef:
-                description: clusterVerRef referencing ClusterVersion name.
-                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                type: string
-              componentName:
-                description: componentName is cluster component name.
-                type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.clusterRef
-                  rule: self == oldSelf
             required:
             - clusterDefRef
             - clusterRef

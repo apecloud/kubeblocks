@@ -42,6 +42,8 @@ const (
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
+
+	dataVolume = "data"
 )
 
 var (
@@ -142,15 +144,35 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		"--config", "/config/probe/config.yaml",
 		"--components-path", "/config/probe/components"}
 
-	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
+	if len(component.PodSpec.Containers) > 0 {
 		mainContainer := component.PodSpec.Containers[0]
-		port := mainContainer.Ports[0]
-		dbPort := port.ContainerPort
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      constant.KBEnvServicePort,
-			Value:     strconv.Itoa(int(dbPort)),
-			ValueFrom: nil,
-		})
+		if len(mainContainer.Ports) > 0 {
+			port := mainContainer.Ports[0]
+			dbPort := port.ContainerPort
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:      constant.KBEnvServicePort,
+				Value:     strconv.Itoa(int(dbPort)),
+				ValueFrom: nil,
+			})
+		}
+
+		for _, volumeMount := range mainContainer.VolumeMounts {
+			if volumeMount.Name != dataVolume {
+				continue
+			}
+			vm := volumeMount.DeepCopy()
+			container.VolumeMounts = []corev1.VolumeMount{*vm}
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:      constant.KBEnvDataPath,
+				Value:     vm.MountPath,
+				ValueFrom: nil,
+			})
+
+			root := int64(0)
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser: &root,
+			}
+		}
 	}
 
 	roles := getComponentRoles(component)

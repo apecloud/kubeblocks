@@ -53,6 +53,7 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("streaming replicator listen error: %s", err.Error()))
 	}
+	logReplicator.Info(fmt.Sprintf("streaming replicator is listening at %s...", listener.Addr().String()))
 	go streamingReplicator(listener)
 }
 
@@ -76,9 +77,11 @@ func streamingReplicator(listener net.Listener) {
 			logReplicator.Info("streaming replicator accept new connection error: %s", err.Error())
 			continue
 		}
+		logReplicator.Info(fmt.Sprintf("accept new connection, remote: %s", conn.RemoteAddr().String()))
 		if err := streamingBackup(dbHost, dbUser, dbPassword, dataDir, conn); err != nil {
-			logReplicator.Info("streaming replication error: %s, remote: %s", err.Error(), conn.RemoteAddr().String())
+			logReplicator.Info(fmt.Sprintf("streaming replication error: %s, remote: %s", err.Error(), conn.RemoteAddr().String()))
 		}
+		logReplicator.Info(fmt.Sprintf("close connection, remote: %s", conn.RemoteAddr().String()))
 		conn.Close()
 	}
 }
@@ -97,6 +100,7 @@ func streamingBackup(host, user, password, dataDir string, writer io.Writer) err
 	}
 	cmd := exec.Command("xtrabackup", args...)
 	cmd.Stdout = writer
+	logReplicator.Info(fmt.Sprintf("exec backup commond: %s", cmd.String()))
 	if err := cmd.Run(); err != nil {
 		return err
 	}

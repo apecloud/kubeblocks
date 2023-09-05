@@ -532,12 +532,12 @@ func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 	}
 
-	if err := c.updatePodReplicaLabel4Scaling(reqCtx, cli, c.Component.Replicas, *sts.Spec.Replicas); err != nil {
+	if err := c.updatePodReplicaLabel4Scaling(reqCtx, cli, c.Component.Replicas); err != nil {
 		return err
 	}
 
 	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
-	c.updatePodEnvConfig()
+	c.updatePodEnvConfig(c.Component.Replicas, *sts.Spec.Replicas)
 
 	reqCtx.Recorder.Eventf(c.Cluster,
 		corev1.EventTypeNormal,
@@ -553,18 +553,25 @@ func (c *rsmComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) int {
 	return int(c.Component.Replicas - *stsObj.Spec.Replicas)
 }
 
-func (c *rsmComponentBase) updatePodEnvConfig() {
+func (c *rsmComponentBase) updatePodEnvConfig(replicas, lastReplicas int32) {
 	for _, v := range ictrltypes.FindAll[*corev1.ConfigMap](c.Dag) {
 		node := v.(*ictrltypes.LifecycleVertex)
 		// TODO: need a way to reference the env config.
 		envConfigName := fmt.Sprintf("%s-%s-env", c.GetClusterName(), c.GetName())
-		if node.Obj.GetName() == envConfigName {
-			node.Action = ictrltypes.ActionUpdatePtr()
+		if node.Obj.GetName() != envConfigName {
+			continue
 		}
+		cm := node.Obj.(*corev1.ConfigMap)
+		if cm.Data == nil {
+			cm.Data = make(map[string]string)
+		}
+		cm.Data["KB_COMPONENT_REPLICAS"] = strconv.Itoa(int(replicas))
+		cm.Data["KB_LAST_COMPONENT_REPLICAS"] = strconv.Itoa(int(lastReplicas))
+		node.Action = ictrltypes.ActionUpdatePtr()
 	}
 }
 
-func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas, lastReplicas int32) error {
+func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {
 	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return err
@@ -575,7 +582,6 @@ func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.Requ
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		obj.Annotations[constant.LastComponentReplicasAnnotationKey] = strconv.Itoa(int(lastReplicas))
 		c.UpdateResource(obj, c.WorkloadVertex)
 	}
 	return nil
@@ -605,9 +611,11 @@ func (c *rsmComponentBase) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cl
 	if err != nil {
 		return err
 	}
-	basePodName := fmt.Sprintf("%s-%d", stsObj.Name, c.Component.Replicas)
 	for _, pod := range pods {
-		if strings.TrimSpace(pod.Name) < basePodName {
+		subs := strings.Split(pod.Name, "-")
+		if ordinal, err := strconv.Atoi(subs[len(subs)-1]); err != nil {
+			return err
+		} else if int32(ordinal) < c.Component.Replicas {
 			continue
 		}
 		lorryCli, err1 := lorry.NewClient(c.Component.CharacterType, *pod)

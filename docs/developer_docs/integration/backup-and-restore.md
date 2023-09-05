@@ -36,7 +36,7 @@ Now take a quick look at the basic concepts of KubeBlocks in the table below, wh
 - Finish the configuration in [Add an add-on to KubeBlocks](./how-to-add-an-add-on.md).
 - Grasp the basics of K8s concepts, such as Pod, PVC, PV, VolumeSnapshot, etc.
 
-## Step 1. Prepare environment.
+## Step 1. Prepare environment
 
 1. Install CSI Driver.
 
@@ -59,7 +59,7 @@ Now take a quick look at the basic concepts of KubeBlocks in the table below, wh
    csi-hostpath-sc (default)   hostpath.csi.k8s.io     Delete          WaitForFirstConsumer   true                   35s
    ```
 
-## Step 2. Specify a volume type.
+## Step 2. Specify a volume type
 
 Specify a volume type in the ClusterDefinition and it is required.
 
@@ -87,7 +87,7 @@ There are mainly two kinds of volume types (`volumeTypes.type`):
 
 KubeBlocks supports different backup methods for data and logs. In this tutorial, only data volume information is configured.
 
-## Step 3. Add backup configuration.
+## Step 3. Add backup configuration
 
 Prepare `BackupPolicyTemplate.yml` and `BackupTool.yml` to add the backup configuration.
 
@@ -183,7 +183,7 @@ The configuration of `BackupTool` is closely related to the tools used.
 
 For example, if you back up via Percona Xtrabackup, you need to fill in scripts in `backupCommands` and `restoreCommands`.
 
-## Step 4. Back up and restore a cluster.
+## Step 4. Back up and restore a cluster
 
 With everything ready, try to back up a cluster and restore data to a new cluster.
 
@@ -280,7 +280,7 @@ Therefore, although a new root account and password are created when restoring a
 
 ## Reference
 
-[Backup in KubeBlocks](./../../user_docs/backup-and-restore/introduction.md)
+- For more details on the backup and restore function of KubeBlocks, refer to [Backup and Restore](./../../user_docs/backup-and-restore/introduction.md).
 
 ## Appendix
 

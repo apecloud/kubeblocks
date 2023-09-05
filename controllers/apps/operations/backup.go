@@ -94,16 +94,11 @@ func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	} else if phase == dataprotectionv1alpha1.BackupFailed {
 		return appsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("backup failed")
 	}
-	return appsv1alpha1.OpsRunningPhase, time.Second, nil
+	return appsv1alpha1.OpsRunningPhase, 0, nil
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (b BackupOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	return nil
-}
-
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (b BackupOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	return nil
 }
 

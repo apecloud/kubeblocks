@@ -45,6 +45,16 @@ func NewServiceDescriptorFactory(namespace, name string) *MockServiceDescriptorF
 	return f
 }
 
+func (factory *MockServiceDescriptorFactory) SetKind(kind string) *MockServiceDescriptorFactory {
+	factory.get().Spec.Kind = kind
+	return factory
+}
+
+func (factory *MockServiceDescriptorFactory) SetVersion(version string) *MockServiceDescriptorFactory {
+	factory.get().Spec.Version = version
+	return factory
+}
+
 func (factory *MockServiceDescriptorFactory) SetEndpoint(endpoint appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
 	factory.get().Spec.Endpoint = &endpoint
 	return factory

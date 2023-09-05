@@ -127,7 +127,7 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 
 			if serviceRef.ServiceDescriptor != "" {
 				serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
-				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: serviceRef.ConnectionCredential}, serviceDescriptor); err != nil {
+				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: serviceRef.ServiceDescriptor}, serviceDescriptor); err != nil {
 					return nil, err
 				}
 				if serviceDescriptor.Spec.Kind != serviceRefDecl.Kind || serviceDescriptor.Spec.Version != serviceRefDecl.Version {

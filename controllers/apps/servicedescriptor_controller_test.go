@@ -130,7 +130,7 @@ var _ = Describe("test clusterVersion controller", func() {
 					"mock-secret-password-key": []byte("mock-password"),
 				},
 			}
-			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(HaveOccurred())
+			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
 			By("wait for ServiceDescriptor phase is available because serviceDescriptor secretRef found")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(invalidServiceDescriptor),
 				func(g Gomega, tmpSCC *appsv1alpha1.ServiceDescriptor) {

@@ -100,23 +100,23 @@ func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha
 }
 
 // GetOpsRequestFromBackup gets OpsRequest slice from cluster annotations.
-func GetOpsRequestFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.OpsRecorder, error) {
+func GetOpsRequestFromBackup(backup *dataprotectionv1alpha1.Backup) *appsv1alpha1.OpsRecorder {
 	var (
 		opsRequestName string
 		opsRequestType string
 		ok             bool
 	)
 	if backup == nil || backup.Labels == nil {
-		return nil, nil
+		return nil
 	}
 	if opsRequestName, ok = backup.Labels[intctrlutil.OpsRequestNameLabelKey]; !ok {
-		return nil, nil
+		return nil
 	}
 	if opsRequestType, ok = backup.Labels[intctrlutil.OpsRequestTypeLabelKey]; !ok {
-		return nil, nil
+		return nil
 	}
 	return &appsv1alpha1.OpsRecorder{
 		Name: opsRequestName,
 		Type: appsv1alpha1.OpsType(opsRequestType),
-	}, nil
+	}
 }

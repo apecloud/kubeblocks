@@ -106,7 +106,6 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
 	}
 
-	mgr.Logger.Infof("get member:%s role:%s", host, role)
 	return role == binding.LEADER, nil
 }
 

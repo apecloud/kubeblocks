@@ -60,7 +60,7 @@ func (t *ClusterServiceDescriptorTransformer) Transform(ctx graph.TransformConte
 			if compDef.Name != compSpec.ComponentDefRef {
 				continue
 			}
-			serviceRefsMap, err := plan.GenServiceReferences(reqCtx, t.Client, cluster, clusterDef, &compDef, &compSpec)
+			serviceRefsMap, err := plan.GenServiceReferences(reqCtx, t.Client, cluster, &compDef, &compSpec)
 			if err != nil {
 				return err
 			}

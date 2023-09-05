@@ -89,7 +89,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	serviceReferences, err := plan.GenServiceReferences(reqCtx, cli, cluster, definition, compDef, compSpec)
+	serviceReferences, err := plan.GenServiceReferences(reqCtx, cli, cluster, compDef, compSpec)
 	if err != nil {
 		return nil, err
 	}

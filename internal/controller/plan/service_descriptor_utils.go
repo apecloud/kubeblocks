@@ -36,7 +36,6 @@ import (
 func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 ) (map[string]*appsv1alpha1.ServiceDescriptor, error) {

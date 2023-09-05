@@ -353,9 +353,6 @@ spec:
         containers:
           - name: etcd
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
-            securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:

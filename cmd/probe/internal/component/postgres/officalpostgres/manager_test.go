@@ -749,6 +749,23 @@ func TestGetLocalTimeLineAndLsn(t *testing.T) {
 	}
 }
 
+func TestCleanDBState(t *testing.T) {
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("clean db state", func(t *testing.T) {
+		manager.cleanDBState()
+		isSet, isLeader := manager.GetIsLeader()
+		assert.False(t, isSet)
+		assert.False(t, isLeader)
+		assert.Nil(t, manager.recoveryParams)
+		assert.Nil(t, manager.syncStandbys)
+		assert.Equal(t, &dcs.DBState{
+			Extra: map[string]string{},
+		}, manager.DBState)
+	})
+}
+
 func TestGetDBState(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)

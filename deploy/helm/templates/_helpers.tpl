@@ -304,7 +304,9 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 {{- else if $valid }}
 {{- $provider }}
 {{- else}}
-{{- fail "Warning：Your provider is invalid" }}
+{{- $invalidProvider := join ", " .Values.validProviders }}
+{{- $errorMessage := printf "Warning: Your provider is invalid. Please use one of the following: %s" $invalidProvider | trimSuffix ", " }}
+{{- fail $errorMessage}}
 {{- end }}
 {{- end }}
 

@@ -1733,13 +1733,13 @@ aws-load-balancer-controller:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
-              matchExpressions:
-                - key: kb-controller
-                  operator: In
-                  values:
-                    - "true"
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
 
 ## k8s cluster feature gates, ref: https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
 enabledAlphaFeatureGates:

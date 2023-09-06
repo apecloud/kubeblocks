@@ -92,9 +92,9 @@ kbcli cluster create [NAME] [flags]
       --backup string                          Set a source backup to restore data
       --backup-cron-expression string          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
       --backup-enabled                         Specify whether enabled automated backup
-      --backup-method string                   the backup method, support: snapshot, backupTool
+      --backup-method string                   the backup method, support: snapshot, backupTool (default "snapshot")
       --backup-repo-name string                the backup repository name
-      --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained
+      --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
       --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
       --cluster-definition string              Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
       --cluster-version string                 Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified

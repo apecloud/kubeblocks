@@ -55,6 +55,7 @@ const (
 	pyroscopeServer        = "kubeblocks-pyroscope-server"
 	jupyterHubAddon        = "jupyter-hub"
 	jupyterNoteBookAddon   = "jupyter-notebook"
+	minio                  = "minio"
 )
 
 const (
@@ -150,6 +151,13 @@ var (
 			AddonName:  "jupyter-notebook",
 			Label:      " app.kubernetes.io/instance=kb-addon-jupyter-notebook",
 			TargetPort: "18888",
+		},
+		{
+			Name:       minio,
+			AddonName:  "kb-addon-minio",
+			Label:      "app.kubernetes.io/instance=kb-addon-minio",
+			TargetPort: "9001",
+			Port:       "9001",
 		},
 	}
 )
@@ -384,7 +392,8 @@ func getDashboardInfo(client *kubernetes.Clientset) error {
 		// fill dashboard information
 		d.Namespace = svc.Namespace
 		d.CreationTime = util.TimeFormat(&svc.CreationTimestamp)
-		if len(svc.Spec.Ports) > 0 {
+		// if port is not specified, use the first port of the service
+		if len(svc.Spec.Ports) > 0 && d.Port == "" {
 			d.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
 			if d.TargetPort == "" {
 				d.TargetPort = svc.Spec.Ports[0].TargetPort.String()

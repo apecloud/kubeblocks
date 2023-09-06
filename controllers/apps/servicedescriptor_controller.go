@@ -146,7 +146,7 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 			return fmt.Errorf("auth.Password.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef.Name)
 		}
 	}
-	
+
 	if serviceDescriptor.Spec.Port != nil && !secretRefExistFn(serviceDescriptor.Spec.Port.ValueFrom) {
 		return fmt.Errorf("port.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Port.ValueFrom.SecretKeyRef.Name)
 	}

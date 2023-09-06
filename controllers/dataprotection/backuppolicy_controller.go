@@ -53,6 +53,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -308,7 +309,7 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 	if numToDelete <= 0 {
 		return nil
 	}
-	sort.Sort(byBackupStartTime(backupItems))
+	sort.Sort(dpbackup.ByBackupStartTime(backupItems))
 	for i := 0; i < numToDelete; i++ {
 		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {
 			// failed delete backups, return error info.

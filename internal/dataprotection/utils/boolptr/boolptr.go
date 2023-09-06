@@ -17,27 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package action
+package boolptr
 
-import (
-	"context"
-
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-type Action interface {
-	// Execute executes the action.
-	Execute(ctx Context) error
-
-	// GetName returns the name of the action.
-	GetName() string
+// IsSetToTrue returns true if and only if the bool pointer is non-nil and set to true.
+func IsSetToTrue(b *bool) bool {
+	return b != nil && *b == true
 }
 
-type Context struct {
-	Ctx    context.Context
-	Client client.Client
+// IsSetToFalse returns true if and only if the bool pointer is non-nil and set to false.
+func IsSetToFalse(b *bool) bool {
+	return b != nil && *b == false
+}
 
-	RestClient       rest.Interface
-	RestClientConfig *rest.Config
+// True returns a *bool whose underlying value is true.
+func True() *bool {
+	t := true
+	return &t
+}
+
+// False returns a *bool whose underlying value is false.
+func False() *bool {
+	t := false
+	return &t
 }

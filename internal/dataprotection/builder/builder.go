@@ -17,27 +17,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package action
+package builder
 
-import (
-	"context"
-
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-type Action interface {
-	// Execute executes the action.
-	Execute(ctx Context) error
-
-	// GetName returns the name of the action.
-	GetName() string
-}
-
-type Context struct {
-	Ctx    context.Context
-	Client client.Client
-
-	RestClient       rest.Interface
-	RestClientConfig *rest.Config
+type Builder interface {
+	Build() interface{}
 }

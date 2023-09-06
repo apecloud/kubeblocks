@@ -77,7 +77,7 @@ type BackupTarget struct {
 
 type PodSelector struct {
 	// labelsSelector is the label selector to filter the target pods.
-	metav1.LabelSelector `json:",inline"`
+	*metav1.LabelSelector `json:",inline"`
 
 	// strategy specifies the strategy to select the target pod when multiple pods
 	// are selected.
@@ -176,11 +176,11 @@ type BackupMethod struct {
 	// +kubebuilder:default=false
 	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
 
-	// backupScriptRef refers to the BackupScript object that defines the backup actions.
-	// For volume snapshot backup, the backupScript is not required, the controller
+	// actionSetName refers to the ActionSet object that defines the backup actions.
+	// For volume snapshot backup, the actionSet is not required, the controller
 	// will use the CSI volume snapshotter to create the snapshot.
 	// +optional
-	BackupScriptRef string `json:"backupScriptRef,omitempty"`
+	ActionSetName string `json:"actionSetName,omitempty"`
 
 	// targetVolumes specifies which volumes from the target should be mounted in
 	// the backup workload.

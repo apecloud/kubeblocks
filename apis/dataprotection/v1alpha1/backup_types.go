@@ -108,6 +108,11 @@ type BackupStatus struct {
 	// +optional
 	Path string `json:"path,omitempty"`
 
+	// persistentVolumeClaimName is the name of the persistent volume claim that
+	// is used to store the backup data.
+	// +optional
+	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
+
 	// timeRange records the time range of backed up data, for PITR, this is the
 	// time range of recoverable data.
 	// +optional

@@ -147,7 +147,7 @@ securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
-      - ALL
+    - ALL
 
 ## Pod security context settings
 ##
@@ -217,7 +217,7 @@ resources: {}
   #   memory: 128Mi
   # requests:
   #   cpu: 10m
-#   memory: 64Mi
+  #   memory: 64Mi
 
 ## @param priorityClassName
 ##
@@ -346,10 +346,10 @@ backupRepo:
     accessKeyId: ""
     secretAccessKey: ""
 
-  ## Addon controller settings, this will require cluster-admin clusterrole.
-  ##
-  ## @param addonController.enabled
-  ## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.
+## Addon controller settings, this will require cluster-admin clusterrole.
+##
+## @param addonController.enabled
+## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.
   ## default value is "5m" if not provided.
 ## @param addonController.jobImagePullPolicy - addon install job image pull policy.
 addonController:
@@ -471,7 +471,7 @@ prometheus:
       #   memory: 32Mi
       # requests:
       #   cpu: 10m
-    #   memory: 32Mi
+      #   memory: 32Mi
 
     ## Security context to be added to alertmanager pods
     ##
@@ -685,7 +685,7 @@ prometheus:
       #   memory: 512Mi
       # requests:
       #   cpu: 500m
-    #   memory: 512Mi
+      #   memory: 512Mi
 
     ## Prometheus' data retention period (default if not specified is 15 days)
     ##
@@ -1489,7 +1489,7 @@ grafana:
     #   memory: 128Mi
     # requests:
     #   cpu: 100m
-  #   memory: 128Mi
+    #   memory: 128Mi
 
   ## Node tolerations for grafana scheduling to nodes with taints
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
@@ -1631,10 +1631,10 @@ snapshot-controller:
     tag: v6.2.1
 
   tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
   volumeSnapshotClasses:
     - name: default-vsc
@@ -1644,13 +1644,13 @@ snapshot-controller:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
 
 kubeblocks-csi-driver:
   enabled: false

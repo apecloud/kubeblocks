@@ -85,7 +85,7 @@ roleProbe:
   periodSeconds: 1
   timeoutSeconds: 1
 
-log:
+logCollector:
   enabled: false
 
 metrics:

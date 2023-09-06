@@ -78,7 +78,7 @@ receivers:
     database:
     collection_interval: 15s
     transport: tcp
-  {{- if .Values.log.enabled }}
+  {{- if .Values.logCollector.enabled }}
   filelog/error:
     include: [/data/mysql/log/mysqld-error.log]
     include_file_name: false
@@ -103,7 +103,7 @@ exporters:
     enable_open_metrics: false
     resource_to_telemetry_conversion:
       enabled: true
-  {{- if .Values.log.enabled }}
+  {{- if .Values.logCollector.enabled }}
   apecloudfile/error:
     path: /var/log/kubeblocks/${env:KB_NAMESPACE}_${env:DB_TYPE}_${env:KB_CLUSTER_NAME}/${env:KB_POD_NAME}/error.log
     format: raw
@@ -132,7 +132,7 @@ service:
       receivers: [ apecloudmysql ]
       processors: [ memory_limiter ]
       exporters: [ prometheus ]
-    {{- if .Values.log.enabled }}
+    {{- if .Values.logCollector.enabled }}
     logs/error:
       receivers: [filelog/error]
       exporters: [apecloudfile/error]

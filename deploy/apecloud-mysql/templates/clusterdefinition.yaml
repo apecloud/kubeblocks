@@ -205,7 +205,7 @@ spec:
                 mountPath: /opt/agamotto
               - name: data
                 mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
-              {{- if .Values.log.enabled }}
+              {{- if .Values.logCollector.enabled }}
               - name: log-data
                 mountPath: /var/log/kubeblocks
                 readOnly: false
@@ -256,7 +256,7 @@ spec:
               - name: data
                 mountPath: /vtdataroot
         volumes:
-          {{- if .Values.log.enabled }}
+          {{- if .Values.logCollector.enabled }}
           - name: log-data
             hostPath:
               path: /var/log/kubeblocks

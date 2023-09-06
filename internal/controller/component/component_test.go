@@ -374,14 +374,15 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
-				nil,
+				&cluster.Spec.ComponentSpecs[0],
 				serviceReferenceMap,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 			Expect(component.ServiceReferences[testapps.NginxImage].Name).Should(Equal(name))
-			Expect(component.ServiceReferences[testapps.NginxImage].Kind).Should(Equal(kind))
+			Expect(component.ServiceReferences[testapps.NginxImage].Spec.Kind).Should(Equal(kind))
+			Expect(component.ServiceReferences[testapps.NginxImage].Spec.Version).Should(Equal(version))
 		})
 	})
 })

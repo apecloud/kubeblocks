@@ -35,6 +35,7 @@ var _ = Describe("test clusterVersion controller", func() {
 
 	var (
 		randomStr = testCtx.GetRandomStr()
+		namespace = "default"
 	)
 
 	const statefulCompDefName = "stateful"
@@ -72,7 +73,9 @@ var _ = Describe("test clusterVersion controller", func() {
 				},
 			}
 			validSDName := "service-descriptor-valid-" + randomStr
-			validServiceDescriptor := testapps.NewServiceDescriptorFactory(testCtx.DefaultNamespace, validSDName).
+			validServiceDescriptor := testapps.NewServiceDescriptorFactory(namespace, validSDName).
+				SetKind("mock-kind").
+				SetVersion("mock-version").
 				SetEndpoint(endpoint).
 				SetPort(port).
 				SetAuth(auth).
@@ -110,6 +113,8 @@ var _ = Describe("test clusterVersion controller", func() {
 				},
 			}
 			invalidServiceDescriptor := testapps.NewServiceDescriptorFactory(testCtx.DefaultNamespace, invalidSDName).
+				SetKind("mock-kind").
+				SetVersion("mock-version").
 				SetEndpoint(endpoint).
 				SetPort(port).
 				SetAuth(authValueFrom).
@@ -123,7 +128,8 @@ var _ = Describe("test clusterVersion controller", func() {
 
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: mockSecretRefName,
+					Name:      mockSecretRefName,
+					Namespace: namespace,
 				},
 				Data: map[string][]byte{
 					"mock-secret-username-key": []byte("mock-username"),

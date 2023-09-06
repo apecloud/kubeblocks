@@ -90,6 +90,9 @@ func (r *ServiceDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if err := r.checkServiceDescriptor(reqCtx, serviceDescriptor); err != nil {
+		if err := r.updateServiceDescriptorStatus(r.Client, reqCtx, serviceDescriptor, appsv1alpha1.UnavailablePhase); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "InvalidServiceDescriptor update unavailable status failed")
+		}
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "InvalidServiceDescriptor")
 	}
 
@@ -119,34 +122,34 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 		if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace, Name: envFrom.SecretKeyRef.Name}, secret); err != nil {
 			return false
 		}
+		// TODO: check secret data key exist
 		return true
 	}
 
-	if serviceDescriptor.Spec.Endpoint != nil {
-		if !secretRefExistFn(serviceDescriptor.Spec.Endpoint.ValueFrom) {
-			return fmt.Errorf("endpoint.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Endpoint.ValueFrom.SecretKeyRef.Name)
-		}
+	if serviceDescriptor.Spec.Kind == "" {
+		return fmt.Errorf("serviceDescriptor %s kind is empty", serviceDescriptor.Name)
+	}
+
+	if serviceDescriptor.Spec.Version == "" {
+		return fmt.Errorf("serviceDescriptor %s version is empty", serviceDescriptor.Name)
+	}
+
+	if serviceDescriptor.Spec.Endpoint != nil && !secretRefExistFn(serviceDescriptor.Spec.Endpoint.ValueFrom) {
+		return fmt.Errorf("endpoint.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Endpoint.ValueFrom.SecretKeyRef.Name)
 	}
 
 	if serviceDescriptor.Spec.Auth != nil {
-		if serviceDescriptor.Spec.Auth.Username != nil {
-			if !secretRefExistFn(serviceDescriptor.Spec.Auth.Username.ValueFrom) {
-				return fmt.Errorf("auth.username.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef.Name)
-			}
+		if serviceDescriptor.Spec.Auth.Username != nil && !secretRefExistFn(serviceDescriptor.Spec.Auth.Username.ValueFrom) {
+			return fmt.Errorf("auth.username.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef.Name)
 		}
-		if serviceDescriptor.Spec.Auth.Password != nil {
-			if !secretRefExistFn(serviceDescriptor.Spec.Auth.Password.ValueFrom) {
-				return fmt.Errorf("auth.Password.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef.Name)
-			}
+		if serviceDescriptor.Spec.Auth.Password != nil && !secretRefExistFn(serviceDescriptor.Spec.Auth.Password.ValueFrom) {
+			return fmt.Errorf("auth.Password.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef.Name)
 		}
 	}
-
-	if serviceDescriptor.Spec.Port != nil {
-		if !secretRefExistFn(serviceDescriptor.Spec.Port.ValueFrom) {
-			return fmt.Errorf("port.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Port.ValueFrom.SecretKeyRef.Name)
-		}
+	
+	if serviceDescriptor.Spec.Port != nil && !secretRefExistFn(serviceDescriptor.Spec.Port.ValueFrom) {
+		return fmt.Errorf("port.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Port.ValueFrom.SecretKeyRef.Name)
 	}
-
 	return nil
 }
 

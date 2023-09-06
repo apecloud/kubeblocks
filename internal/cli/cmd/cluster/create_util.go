@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster/register"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -122,7 +123,7 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, c *cluster.Char
 }
 
 // buildCreateSubCmdsExamples builds the creation examples for the specified clusterType type.
-func buildCreateSubCmdsExamples(t cluster.ClusterType) string {
+func buildCreateSubCmdsExamples(t register.ClusterType) string {
 	exampleTpl := `
 	# Create a cluster with the default values
 	kbcli cluster create {{ .ClusterType }}

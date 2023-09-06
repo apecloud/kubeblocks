@@ -21,7 +21,6 @@ package cluster
 
 import (
 	"compress/gzip"
-	"embed"
 	"fmt"
 	"strings"
 
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cluster/register"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
@@ -74,34 +74,7 @@ type ChartInfo struct {
 	Alias string
 }
 
-type (
-	// ClusterType is the type of the cluster
-	ClusterType string
-
-	// chartConfig is the helm chart config
-	chartConfig struct {
-		chartFS embed.FS
-
-		// chart file name, include the extension
-		name string
-
-		// chart alias, this alias will be used as the command alias
-		alias string
-	}
-)
-
-var clusterTypeCharts = map[ClusterType]chartConfig{}
-
-// registerClusterType registers the cluster type, the ClusterType t will be used as
-// the command name, the alias will be used as the command alias.
-func registerClusterType(t ClusterType, chartFS embed.FS, name string, alias string) {
-	if _, ok := clusterTypeCharts[t]; ok {
-		panic(fmt.Sprintf("cluster type %s already registered", t))
-	}
-	clusterTypeCharts[t] = chartConfig{chartFS: chartFS, name: name, alias: alias}
-}
-
-func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
+func BuildChartInfo(t register.ClusterType) (*ChartInfo, error) {
 	var err error
 
 	c := &ChartInfo{}
@@ -247,22 +220,23 @@ func ValidateValues(c *ChartInfo, values map[string]interface{}) error {
 	return validateFn(c.SubSchema, values)
 }
 
-func loadHelmChart(ci *ChartInfo, t ClusterType) error {
-	cf, ok := clusterTypeCharts[t]
+func loadHelmChart(ci *ChartInfo, t register.ClusterType) error {
+	cf, ok := register.ClusterTypeCharts[t]
 	if !ok {
 		return fmt.Errorf("failed to find the helm chart of %s", t)
 	}
-
-	file, err := cf.chartFS.Open(fmt.Sprintf("charts/%s", cf.name))
+	file, err := cf.LoadChart()
+	//file, err := cf.chartFS.Open(fmt.Sprintf("charts/%s", cf.name))
 	if err != nil {
 		return err
 	}
 	defer file.Close()
+	//defer
 
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {
-			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.name, err)
+			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.GetName(), err)
 		}
 	}
 
@@ -271,20 +245,16 @@ func loadHelmChart(ci *ChartInfo, t ClusterType) error {
 	}
 
 	ci.Chart = c
-	ci.Alias = cf.alias
+	ci.Alias = cf.GetAlias()
 	return nil
 }
 
-func SupportedTypes() []ClusterType {
-	types := maps.Keys(clusterTypeCharts)
-	slices.SortFunc(maps.Keys(clusterTypeCharts), func(i, j ClusterType) bool {
-		return i < j
+func SupportedTypes() []register.ClusterType {
+	types := maps.Keys(register.ClusterTypeCharts)
+	slices.SortFunc(types, func(i, j register.ClusterType) bool {
+		return i.String() < j.String()
 	})
 	return types
-}
-
-func (t ClusterType) String() string {
-	return string(t)
 }
 
 func (s SchemaPropName) String() string {

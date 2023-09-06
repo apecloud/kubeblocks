@@ -22,6 +22,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster/register"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +44,7 @@ type objectInfo struct {
 
 type createSubCmdsOptions struct {
 	// clusterType is the type of the cluster to create.
-	clusterType cluster.ClusterType
+	clusterType register.ClusterType
 
 	// values is used to render the cluster helm chartInfo.
 	values map[string]interface{}
@@ -55,7 +56,7 @@ type createSubCmdsOptions struct {
 	*create.CreateOptions
 }
 
-func newSubCmdsOptions(createOptions *create.CreateOptions, t cluster.ClusterType) (*createSubCmdsOptions, error) {
+func newSubCmdsOptions(createOptions *create.CreateOptions, t register.ClusterType) (*createSubCmdsOptions, error) {
 	var err error
 	o := &createSubCmdsOptions{
 		CreateOptions: createOptions,

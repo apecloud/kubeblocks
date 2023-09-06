@@ -226,6 +226,7 @@ type ClusterComponentSpec struct {
 	// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
 	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster. It is important to note that the hosting cluster should be in the same namespace.
 	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
+	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
@@ -621,8 +622,9 @@ type ServiceRef struct {
 
 	// serviceDescriptor defines the service descriptor of the service provided by external sources.
 	// When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding. The ServiceDescriptor object should be in the same namespace with the cluster.
-	// And serviceDescriptor is the name of the ServiceDescriptor object.
-	// If you have specified a ServiceDescriptor, please do not specify a Cluster
+	// And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the ServiceDescriptor.Spec.kind and ServiceDescriptor.Spec.Version
+	// should match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].kind and clusterDefinition.componentDefs[*].serviceRefDeclarations[*].version respectively.
+	// If you have specified a ServiceDescriptor, please do not specify a Cluster.
 	// +optional
 	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`
 

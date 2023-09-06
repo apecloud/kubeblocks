@@ -8441,7 +8441,10 @@ spec:
                       items:
                         properties:
                           kind:
-                            description: The type of the service reference.
+                            description: service kind, indicating the type or nature
+                              of the service. It should be well-known application
+                              cluster type, e.g. {mysql, redis, mongodb}.
+                            pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           name:
                             description: The name of the predefined service reference.
@@ -8452,7 +8455,10 @@ spec:
                               when creates a Cluster.
                             type: string
                           version:
-                            description: The version of the service reference.
+                            description: The version of the service reference. If
+                              version is set to "*", it means that no specific version
+                              is specified for the service reference and any version
+                              is matched.
                             type: string
                         required:
                         - kind

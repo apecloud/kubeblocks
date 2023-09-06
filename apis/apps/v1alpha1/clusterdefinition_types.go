@@ -277,11 +277,13 @@ type ServiceRefDeclaration struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// The type of the service reference.
+	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Kind string `json:"kind"`
 
 	// The version of the service reference.
+	// If version is set to "*", it means that no specific version is specified for the service reference and any version is matched.
 	// +kubebuilder:validation:Required
 	Version string `json:"version"`
 }

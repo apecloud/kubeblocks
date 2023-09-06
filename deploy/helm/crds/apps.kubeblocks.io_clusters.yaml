@@ -386,7 +386,11 @@ spec:
                         the hosting cluster should be in the same namespace. Each
                         type of service reference requires specific configurations
                         and bindings to establish the connection and interaction with
-                        the respective services.'
+                        the respective services. It should be noted that the ServiceRef
+                        has cluster-level semantic consistency, meaning that within
+                        the same Cluster, service references with the same ServiceRef.Name
+                        are considered to be the same service. It is only allowed
+                        to bind to the same Cluster or ServiceDescriptor.'
                       items:
                         properties:
                           cluster:
@@ -418,9 +422,12 @@ spec:
                               provide the ServiceDescriptor object name to establish
                               the service binding. The ServiceDescriptor object should
                               be in the same namespace with the cluster. And serviceDescriptor
-                              is the name of the ServiceDescriptor object. If you
-                              have specified a ServiceDescriptor, please do not specify
-                              a Cluster
+                              is the name of the ServiceDescriptor object, furthermore,
+                              the ServiceDescriptor.Spec.kind and ServiceDescriptor.Spec.Version
+                              should match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].kind
+                              and clusterDefinition.componentDefs[*].serviceRefDeclarations[*].version
+                              respectively. If you have specified a ServiceDescriptor,
+                              please do not specify a Cluster.
                             type: string
                         required:
                         - name

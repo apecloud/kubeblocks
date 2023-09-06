@@ -52,6 +52,9 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		if rsm.Status.Replicas == 0 {
 			rsm.Status.Replicas = *rsm.Spec.Replicas
 		}
+		// hack for mismatch between new version of rsm spec and old version of the underlying sts spec
+		// TODO(free6om): review this when cluster phase refactoring. should reset all sts status fields?
+		rsm.Status.UpdatedReplicas = 0
 	case model.IsObjectStatusUpdating(rsmOrig):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}

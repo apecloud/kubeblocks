@@ -1381,9 +1381,11 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 
 	// check the flag is ser by user or not
 	var flags []*pflag.Flag
-	o.Cmd.Flags().Visit(func(flag *pflag.Flag) {
-		flags = append(flags, flag)
-	})
+	if o.Cmd != nil {
+		o.Cmd.Flags().Visit(func(flag *pflag.Flag) {
+			flags = append(flags, flag)
+		})
+	}
 
 	// if the flag is set by user, use the flag value
 	for _, flag := range flags {

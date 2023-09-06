@@ -1631,10 +1631,10 @@ snapshot-controller:
     tag: v6.2.1
 
   tolerations:
-  - key: kb-controller
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
 
   volumeSnapshotClasses:
     - name: default-vsc
@@ -1644,13 +1644,13 @@ snapshot-controller:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: kb-controller
-              operator: In
-              values:
-                - "true"
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
 kubeblocks-csi-driver:
   enabled: false
@@ -1723,23 +1723,23 @@ aws-load-balancer-controller:
   enabled: false
   replicaCount: 1
   tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
   serviceAccount:
     create: true
     name: kubeblocks-service-account-aws-load-balancer-controller
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kb-controller
+                  operator: In
+                  values:
+                    - "true"
 
 ## k8s cluster feature gates, ref: https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
 enabledAlphaFeatureGates:
@@ -1799,7 +1799,7 @@ external-dns:
   enabled: false
   domain: kubeblocks.io
   tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule

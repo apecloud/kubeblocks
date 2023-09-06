@@ -20,7 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package action
 
 import (
+	"bytes"
+	"time"
+
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 // KubeExec is an action that executes a command on a pod.
@@ -40,17 +47,80 @@ type KubeExec struct {
 	// Container is the container to execute the command on.
 	Container string
 
-	// ErrorMode is the error mode to use. If set to Fail, the action will fail
-	// if the command fails.
-	ErrorMode ErrorMode
-
 	// Timeout is the timeout for the command.
 	Timeout metav1.Duration
 }
 
-func (e *KubeExec) Execute() error {
-	//TODO implement me
-	panic("implement me")
+func (e *KubeExec) GetName() string {
+	return e.Name
+}
+
+func (e *KubeExec) Execute(ctx Context) error {
+	if err := e.validate(); err != nil {
+		return err
+	}
+
+	req := ctx.RestClient.Post().
+		Resource("pods").
+		Namespace(e.Namespace).
+		Name(e.PodName).
+		SubResource("exec")
+
+	if e.Container != "" {
+		req.Param("container", e.Container)
+	}
+
+	req.VersionedParams(&corev1.PodExecOptions{
+		Container: e.Container,
+		Command:   e.Command,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(ctx.RestClientConfig, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+
+	var stdout, stderr bytes.Buffer
+	streamOptions := remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	errCh := make(chan error)
+	go func() {
+		err = executor.StreamWithContext(ctx.Ctx, streamOptions)
+		errCh <- err
+	}()
+
+	var timeoutCh <-chan time.Time
+	if e.Timeout.Duration > 0 {
+		timer := time.NewTimer(e.Timeout.Duration)
+		defer timer.Stop()
+		timeoutCh = timer.C
+	}
+
+	select {
+	case err = <-errCh:
+	case <-timeoutCh:
+		return errors.Errorf("timed out after %v", e.Timeout.Duration)
+	}
+	return err
+}
+
+func (e *KubeExec) validate() error {
+	if e.PodName == "" {
+		return errors.New("pod name is required")
+	}
+	if e.Namespace == "" {
+		return errors.New("namespace is required")
+	}
+	if len(e.Command) == 0 {
+		return errors.New("command is required")
+	}
+	return nil
 }
 
 var _ Action = &KubeExec{}

@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,12 +30,14 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -46,40 +49,118 @@ var (
 	errNoDefaultBackupRepo = fmt.Errorf("no default BackupRepo found")
 )
 
-// byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
-type byBackupStartTime []dpv1alpha1.Backup
-
-// Len returns the length of byBackupStartTime, for the sort.Sort
-func (o byBackupStartTime) Len() int { return len(o) }
-
-// Swap the items, for the sort.Sort
-func (o byBackupStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-// Less defines how to compare items, for the sort.Sort
-func (o byBackupStartTime) Less(i, j int) bool {
-	if o[i].Status.StartTimestamp == nil && o[j].Status.StartTimestamp != nil {
-		return false
+func getBackupPolicyByName(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	name string) (*dpv1alpha1.BackupPolicy, error) {
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
+	key := client.ObjectKey{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      name,
 	}
-	if o[i].Status.StartTimestamp != nil && o[j].Status.StartTimestamp == nil {
-		return true
-	}
-	if o[i].Status.StartTimestamp.Equal(o[j].Status.StartTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].Status.StartTimestamp.Before(o[j].Status.StartTimestamp)
-}
-
-// getBackupToolByName gets the backupTool by name.
-func getBackupToolByName(reqCtx intctrlutil.RequestCtx, cli client.Client, backupName string) (*dpv1alpha1.BackupTool, error) {
-	backupTool := &dpv1alpha1.BackupTool{}
-	backupToolNameSpaceName := types.NamespacedName{
-		Name: backupName,
-	}
-	if err := cli.Get(reqCtx.Ctx, backupToolNameSpaceName, backupTool); err != nil {
-		reqCtx.Log.Error(err, "Unable to get backupTool for backup.", "BackupTool", backupToolNameSpaceName)
+	if err := cli.Get(reqCtx.Ctx, key, backupPolicy); err != nil {
 		return nil, err
 	}
-	return backupTool, nil
+	return backupPolicy, nil
+}
+
+// getActionSetByName gets the ActionSet by name.
+func getActionSetByName(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, name string) (*dpv1alpha1.ActionSet, error) {
+	if name == "" {
+		return nil, nil
+	}
+	as := &dpv1alpha1.ActionSet{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: name}, as); err != nil {
+		reqCtx.Log.Error(err, "failed to get ActionSet for backup.", "ActionSet", name)
+		return nil, err
+	}
+	return as, nil
+}
+
+func getBackupMethodByName(name string, backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupMethod {
+	for _, m := range backupPolicy.Spec.BackupMethods {
+		if m.Name == name {
+			return &m
+		}
+	}
+	return nil
+}
+
+// getTargetPods gets the target pods by BackupPolicy. If podName is not empty,
+// it will return the pod which name is podName. Otherwise, it will return the
+// pods which are selected by BackupPolicy selector and strategy.
+func getTargetPods(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, podName string,
+	backupPolicy *dpv1alpha1.BackupPolicy) ([]*corev1.Pod, error) {
+	selector := backupPolicy.Spec.Target.PodSelector
+	if selector == nil || selector.LabelSelector == nil {
+		return nil, nil
+	}
+
+	labelSelector, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	pods := &corev1.PodList{}
+	if err = cli.List(reqCtx.Ctx, pods,
+		client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
+		return nil, err
+	}
+
+	if len(pods.Items) == 0 {
+		return nil, fmt.Errorf("failed to find target pods by backup policy %s/%s",
+			backupPolicy.Namespace, backupPolicy.Name)
+	}
+
+	var targetPods []*corev1.Pod
+	if podName != "" {
+		for _, pod := range pods.Items {
+			if pod.Name == podName {
+				targetPods = append(targetPods, &pod)
+				break
+			}
+		}
+		if len(targetPods) > 0 {
+			return targetPods, nil
+		}
+	}
+
+	strategy := selector.Strategy
+	sort.Sort(intctrlutil.ByPodName(pods.Items))
+	// if pod selection strategy is Any, always return first pod
+	switch strategy {
+	case dpv1alpha1.PodSelectionStrategyAny:
+		if len(pods.Items) > 0 {
+			targetPods = append(targetPods, &pods.Items[0])
+		}
+	case dpv1alpha1.PodSelectionStrategyAll:
+		for i := range pods.Items {
+			targetPods = append(targetPods, &pods.Items[i])
+		}
+	}
+
+	return targetPods, nil
+}
+
+// getCluster gets the cluster and will ignore the error.
+func getCluster(ctx context.Context,
+	cli client.Client,
+	targetPod *corev1.Pod) *appsv1alpha1.Cluster {
+	clusterName := targetPod.Labels[constant.AppInstanceLabelKey]
+	if len(clusterName) == 0 {
+		return nil
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: targetPod.Namespace,
+		Name:      clusterName,
+	}, cluster); err != nil {
+		// should not affect the backup status
+		return nil
+	}
+	return cluster
 }
 
 // getCreatedCRNameByBackupPolicy gets the CR name which is created by BackupPolicy, such as CronJob/logfile Backup.
@@ -106,8 +187,8 @@ func buildAutoCreationAnnotations(backupPolicyName string) map[string]string {
 	}
 }
 
-// getBackupDestinationPath gets the destination path to storage backup datas.
-func getBackupDestinationPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
+// getBackupPath gets the path to storage backup datas.
+func getBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 	pathPrefix = strings.TrimRight(pathPrefix, "/")
 	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
 		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
@@ -267,15 +348,14 @@ func buildDeleteBackupFilesJobNamespacedName(backup *dpv1alpha1.Backup) types.Na
 
 func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.BackupRepo, error) {
 	backupRepoList := &dpv1alpha1.BackupRepoList{}
-	err := cli.List(ctx, backupRepoList)
-	if err != nil {
+	if err := cli.List(ctx, backupRepoList); err != nil {
 		return nil, err
 	}
 	var defaultRepo *dpv1alpha1.BackupRepo
 	for idx := range backupRepoList.Items {
 		repo := &backupRepoList.Items[idx]
 		// skip non-default repo
-		if !(repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal &&
+		if !(repo.Annotations[dptypes.DefaultBackupRepoAnnotationKey] == trueVal &&
 			repo.Status.Phase == dpv1alpha1.BackupRepoReady) {
 			continue
 		}

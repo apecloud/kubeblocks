@@ -45,7 +45,7 @@ data:
   switchover-check-role.sh: |-
     #!/bin/sh
     check_role() {
-      export CLIENT=`which mongosh&&echo mongosh||echo mongo`
+      CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`
       local role=$($CLIENT --quiet --eval "rs.isMaster().ismaster" "$1" --username "$USERNAME" --password "$PASSWORD")
       if [ "${role}" = "true" ]; then
         echo "Primary"
@@ -80,6 +80,7 @@ data:
     CANDIDATE_URI="mongodb://$KB_SWITCHOVER_CANDIDATE_FQDN:27017"
     USERNAME=$MONGODB_ROOT_USER
     PASSWORD=$MONGODB_ROOT_PASSWORD
+    CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`
     CANDIDATE_HOST="$KB_SWITCHOVER_CANDIDATE_FQDN.$KB_NAMESPACE.svc.cluster.local:27017"
     . /scripts/switchover-check-role.sh
     . /scripts/switchover-verify.sh
@@ -91,7 +92,6 @@ data:
           exit 1
       fi
       echo "Switchover to new primary: $CANDIDATE_HOST"
-      export CLIENT=`which mongosh&&echo mongosh||echo mongo`
       $CLIENT --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
       echo "Checking candidate instance role after switchover..."
       verify
@@ -105,7 +105,7 @@ data:
     URI="mongodb://$KB_CONSENSUS_LEADER_POD_FQDN:27017"
     USERNAME=$MONGODB_ROOT_USER
     PASSWORD=$MONGODB_ROOT_PASSWORD
-    export CLIENT=`which mongosh&&echo mongosh||echo mongo`
+    CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`
     OLD_LEADER_HOST="$KB_CONSENSUS_LEADER_POD_FQDN.$KB_NAMESPACE.svc.cluster.local:27017"
     . /scripts/switchover-check-role.sh
     . /scripts/switchover-verify.sh

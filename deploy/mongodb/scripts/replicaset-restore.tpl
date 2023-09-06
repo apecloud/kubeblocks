@@ -18,7 +18,7 @@ RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
 RPL_SET_NAME=${RPL_SET_NAME%-};
 MODE=$1
 mongod $MODE --bind_ip_all --port $PORT --dbpath $MONGODB_ROOT/db --directoryperdb --logpath $MONGODB_ROOT/logs/mongodb.log  --logappend --pidfilepath $MONGODB_ROOT/tmp/mongodb.pid&
-export CLIENT=`which mongosh&&echo mongosh||echo mongo`
+export CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`
 until $CLIENT --quiet --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
 PID=`cat $MONGODB_ROOT/tmp/mongodb.pid`
 

@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -75,5 +78,35 @@ func (r *ServiceDescriptor) ValidateDelete() error {
 }
 
 func (r *ServiceDescriptor) validate() error {
+	var allErrs field.ErrorList
+
+	checkValueAndValueFrom := func(filed string, cvs ...*CredentialVar) {
+		if len(cvs) == 0 {
+			return
+		}
+		for _, cv := range cvs {
+			if cv == nil {
+				continue
+			}
+			if cv.Value != "" && cv.ValueFrom != nil {
+				allErrs = append(allErrs,
+					field.Forbidden(field.NewPath("ServiceDescriptor filed").Child(filed),
+						"value and valueFrom cannot be specified at the same time"))
+			}
+		}
+	}
+
+	checkValueAndValueFrom("auth", r.Spec.Auth.Username, r.Spec.Auth.Password)
+	checkValueAndValueFrom("endpoint", r.Spec.Endpoint)
+	checkValueAndValueFrom("port", r.Spec.Port)
+
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{
+				Group: "apps.kubeblocks.io/v1alpha1",
+				Kind:  "ServiceDescriptor",
+			},
+			r.Name, allErrs)
+	}
 	return nil
 }

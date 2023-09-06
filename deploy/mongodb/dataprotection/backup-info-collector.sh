@@ -1,5 +1,5 @@
 function get_current_time() {
-  CLIENT=`which mongosh&&echo mongosh||echo mongo`
+  CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`
   curr_time=$(${CLIENT} -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
   curr_time=$(date -d "@${curr_time}" -u '+%Y-%m-%dT%H:%M:%SZ')
   echo $curr_time

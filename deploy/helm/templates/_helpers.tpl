@@ -283,7 +283,14 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 */}}
 {{- define "kubeblocks.cloudProvider" }}
 {{- $kubeVersion := .Capabilities.KubeVersion.GitVersion }}
-{{- $defaultProvider := include "kubeblocks.defaultProvider" . }}
+{{- $validProviders := .Values.validProviders}}
+{{- $provider := .Values.provider }}
+{{- $valid := false }}
+{{- range $validProviders }}
+    {{- if eq . $provider }}
+        {{- $valid = true }}
+    {{- end }}
+{{- end }}
 {{- if contains "-eks" $kubeVersion }}
 {{- "aws" -}}
 {{- else if contains "-gke" $kubeVersion }}
@@ -294,10 +301,13 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 {{- "tencentCloud" -}}
 {{- else if contains "-aks" $kubeVersion }}
 {{- "azure" -}}
-{{- else }}
-{{-  $defaultProvider }}
+{{- else if $valid }}
+{{- $provider }}
+{{- else}}
+{{- fail "Warning：Your provider is invalid" }}
 {{- end }}
 {{- end }}
+
 
 {{/*
 Define default storage class name, if cloud provider is known, specify a default storage class name.
@@ -308,17 +318,6 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- .Values.storageClass.name }}
 {{- else if $cloudProvider }}
 {{- "kb-default-sc"  }}
-{{- else }}
-{{- "" }}
-{{- end }}
-{{- end }}
-
-{{/*
-defaultProvider could be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
-*/}}
-{{- define "kubeblocks.defaultProvider" -}}
-{{- if or (eq .Values.provider "aws") (eq .Values.provider "gcp") (eq .Values.provider "aliyun") (eq .Values.provider "tencentCloud") (eq .Values.provider "huaweiCloud") (eq .Values.provider "azure") }}
-{{- .Values.provider }}
 {{- else }}
 {{- "" }}
 {{- end }}

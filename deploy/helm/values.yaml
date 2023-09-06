@@ -1755,7 +1755,14 @@ agamotto:
 
 
 provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
-
+validProviders:
+ - "aws"
+ - "gcp"
+ - "aliyun"
+ - "tencentCloud"
+ - "huaweiCloud"
+ - "azure"
+ - ""
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:
   ## @param storageClass.name -- Specifies the name of the default storage class.

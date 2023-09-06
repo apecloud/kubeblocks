@@ -21,7 +21,7 @@ package plan
 
 import (
 	"context"
-	
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -35,11 +35,31 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("generate service descriptor", func() {
+	cleanEnv := func() {
+		// must wait till resources deleted and no longer existed before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+
+		// resources should be released in following order
+		// non-namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+
+		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
+	}
 
 	var (
 		mockClient          *testutil.K8sClientMockHelper
@@ -51,10 +71,10 @@ var _ = Describe("generate service descriptor", func() {
 
 	var (
 		namespace                        = "default"
-		clusterName                      = "mycluster"
-		beReferencedClusterName          = "mycluster-be-referenced"
-		clusterDefName                   = "test-clusterdef"
-		clusterVersionName               = "test-clusterversion"
+		clusterName                      = "cluster"
+		beReferencedClusterName          = "cluster-be-referenced"
+		clusterDefName                   = "test-cd"
+		clusterVersionName               = "test-cv"
 		nginxCompName                    = "nginx"
 		nginxCompDefName                 = "nginx"
 		mysqlCompName                    = "mysql"
@@ -70,6 +90,7 @@ var _ = Describe("generate service descriptor", func() {
 	)
 
 	BeforeEach(func() {
+		cleanEnv()
 		mockClient = testutil.NewK8sMockClient()
 		serviceRefDeclarations := []appsv1alpha1.ServiceRefDeclaration{
 			{
@@ -116,6 +137,7 @@ var _ = Describe("generate service descriptor", func() {
 
 	AfterEach(func() {
 		mockClient.Finish()
+		cleanEnv()
 	})
 
 	// for test GetContainerWithVolumeMount

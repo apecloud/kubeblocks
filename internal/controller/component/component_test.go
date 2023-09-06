@@ -25,12 +25,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -354,10 +354,16 @@ var _ = Describe("component module", func() {
 				version = "mock-version"
 			)
 			By("generate serviceReference")
-			serviceDescriptor := builder.NewServiceDescriptorBuilder(ns, name).
-				SetKind(kind).
-				SetVersion(version).
-				GetObject()
+			serviceDescriptor := &appsv1alpha1.ServiceDescriptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: ns,
+				},
+				Spec: appsv1alpha1.ServiceDescriptorSpec{
+					Kind:    kind,
+					Version: version,
+				},
+			}
 			serviceReferenceMap := map[string]*appsv1alpha1.ServiceDescriptor{
 				testapps.NginxImage: serviceDescriptor,
 			}

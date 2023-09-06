@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	"github.com/apecloud/kubeblocks/internal/builder"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type ServiceBuilder struct {
-	builder.BaseBuilder[corev1.Service, *corev1.Service, ServiceBuilder]
+	BaseBuilder[corev1.Service, *corev1.Service, ServiceBuilder]
 }
 
 func NewServiceBuilder(namespace, name string) *ServiceBuilder {

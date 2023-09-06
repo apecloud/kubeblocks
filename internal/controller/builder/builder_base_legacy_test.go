@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,11 +44,11 @@ var _ = Describe("base builder", func() {
 		annotations := map[string]string{annotationKey3: annotationValue3}
 		controllerRevision := "wer-23e23-sedfwe--34r23"
 		finalizer := "foo-bar"
-		owner := builder.NewReplicatedStateMachineBuilder(ns, name).GetObject()
+		owner := NewReplicatedStateMachineBuilder(ns, name).GetObject()
 		owner.UID = "sdfwsedqw-swed-sdswe"
 		ownerAPIVersion := "workloads.kubeblocks.io/v1alpha1"
 		ownerKind := "ReplicatedStateMachine"
-		obj := builder.NewConfigMapBuilder(ns, name).
+		obj := NewConfigMapBuilder(ns, name).
 			SetUID(uid).
 			AddLabels(labelKey1, labelValue1, labelKey2, labelValue2).
 			AddLabelsInMap(labels).

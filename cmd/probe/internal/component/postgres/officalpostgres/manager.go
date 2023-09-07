@@ -598,6 +598,7 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 			return true, true
 		}
 	} else {
+		mgr.Logger.Infof("check recovery conf")
 		// TODO: support check recovery.conf
 	}
 

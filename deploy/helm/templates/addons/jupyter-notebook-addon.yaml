@@ -18,9 +18,9 @@ spec:
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
-          {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: {{ default .Chart.Version .Values.versionOverride }}
-          {{- end }}
+      {{- end }}
 
   installable:
     autoInstall: false

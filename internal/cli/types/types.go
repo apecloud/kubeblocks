@@ -36,7 +36,7 @@ const (
 	CliDefaultHome = ".kbcli"
 
 	// CliClusterTypeConfigs defines kbcli cluster-type config file name
-	CliConfigName = "config"
+	CliClusterTypeConfigs = "clusterTypes"
 
 	//	CliChartsCache defines kbcli charts cache dir name
 	CliChartsCache = "charts"

@@ -2,54 +2,50 @@ package cluster
 
 import (
 	"fmt"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 
+	"gopkg.in/yaml.v3"
 	"helm.sh/helm/v3/pkg/downloader"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
-type externalConfig struct {
-	Instances []clusterTypes `yaml:"clusterTypes"`
-}
+var ClusterList []*ClusterTypes
 
 var chartsCacheDir string
 var cacheFiles []fs.DirEntry
 
 var chartsDownloaders *downloader.ChartDownloader
 
-// clusterTypes gets the helm chart from the url and
-type clusterTypes struct {
+// ClusterTypes gets the helm chart from the url and
+type ClusterTypes struct {
 	Name  ClusterType `yaml:"name"`
 	Url   string      `yaml:"helmChartUrl"`
 	Alias string      `yaml:"alias"`
-
-	fileName string
 }
 
-func (h *clusterTypes) getCMD() ClusterType {
+func (h *ClusterTypes) getCMD() ClusterType {
 	return h.Name
 }
 
-func (h *clusterTypes) loadChart() (io.ReadCloser, error) {
-	return os.Open(filepath.Join(chartsCacheDir, h.Name.String()))
+func (h *ClusterTypes) loadChart() (io.ReadCloser, error) {
+	return os.Open(filepath.Join(chartsCacheDir, h.getChartFileName()))
 }
 
-func (h *clusterTypes) getChartFileName() string {
-	panic("imp")
+func (h *ClusterTypes) getChartFileName() string {
+	return path.Base(h.Url)
 }
 
-func (h *clusterTypes) getAlias() string {
+func (h *ClusterTypes) getAlias() string {
 	return h.Alias
 }
 
-func (h *clusterTypes) register(subcmd ClusterType) error {
+func (h *ClusterTypes) register(subcmd ClusterType) error {
 	if _, ok := ClusterTypeCharts[subcmd]; ok {
 		panic(fmt.Sprintf("cluster type %s already registered", subcmd))
 	}
@@ -61,44 +57,34 @@ func (h *clusterTypes) register(subcmd ClusterType) error {
 		}
 	}
 
-	_, _, err := chartsDownloaders.DownloadTo(h.Url, "", chartsCacheDir)
-	if err != nil {
-		return err
-	}
-	//fmt.Println(to)
+	fmt.Printf("can't find the %s in config, please use 'kbcli cluster pull %s --url %s' first", h.Name.String(), h.Name.String(), h.Url)
 	return nil
 }
 
-var _ chartConfigInterface = &clusterTypes{}
+var _ chartConfigInterface = &ClusterTypes{}
 
-// fixme: there are so many panics in this file in the init function, which will cause the whole program to crash
-func initt() {
+func init() {
 
-	var ecc externalConfig
-	viper.Unmarshal(&ecc)
 	homeDir, err := util.GetCliHomeDir()
-	//if err != nil {
-	//	fmt.Printf("Failed to get cli home dir")
-	//	return
-	//}
-	////configFile := "external_chart.yaml"
-	//data, err := os.ReadFile(filepath.Join(homeDir, types.CliConfigName))
-	//if err != nil {
-	//	fmt.Printf("Failed to read config file %s: %s", filepath.Join(homeDir, types.CliConfigName), err.Error())
-	//	return
-	//}
+	contents, err := os.ReadFile(filepath.Join(homeDir, types.CliClusterTypeConfigs))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Printf(err.Error())
+			return
+		}
+	}
+	err = yaml.Unmarshal(contents, &ClusterList)
+	if err != nil {
+		fmt.Printf(err.Error())
+		return
+	}
 
-	//if err = yaml.Unmarshal(data, &econfigs); err != nil {
-	//	fmt.Printf("Failed to unmarshal config file %s: %s", filepath.Join(homeDir, types.CliConfigName), err.Error())
-	//	return
-	//}
 	chartsCacheDir = filepath.Join(homeDir, types.CliChartsCache)
 	dirFS := os.DirFS(homeDir)
 	cacheFiles, err = fs.ReadDir(dirFS, "charts")
-	//_, err := fs.Stat(dirFS, "charts")
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(chartsCacheDir, 0755)
+			err = os.MkdirAll(chartsCacheDir, 0777)
 			if err != nil {
 				fmt.Printf("Failed to create charts cache dir %s: %s", chartsCacheDir, err.Error())
 				return
@@ -109,12 +95,7 @@ func initt() {
 			return
 		}
 	}
-	chartsDownloaders, err = helm.NewDownloader(helm.NewConfig("default", "", "", false))
-	if err != nil {
-		fmt.Printf("Failed to create downloader: %s", err.Error())
-		return
-	}
-	for _, chart := range ecc.Instances {
+	for _, chart := range ClusterList {
 		err = chart.register(chart.getCMD())
 		if err != nil {
 			fmt.Printf("Failed to register chart %s: %s", chart.Name, err.Error())

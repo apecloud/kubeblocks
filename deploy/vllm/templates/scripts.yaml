@@ -15,7 +15,7 @@ data:
     if [ $ordinal -eq 0 ]; then
       while true; do
         ray start --head
-        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8080 --model ${MODEL_NAME} --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS}
+        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8080 --model ${MODEL_NAME} --gpu-memory-utilization 0.95 --max-num-seqs 512 --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS}
         code=$?
         if [ $code -eq 0 ]; then
           break

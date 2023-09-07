@@ -180,8 +180,14 @@ create_release() {
 
 upload_asset() {
     request_url=$API_URL/$PROJECT_ID/packages/generic/$PACKAGE_NAME/$TAG_NAME/
-
-    gitlab_api_curl $request_url --upload-file $ASSET_PATH
+    for i in {1..10}; do
+        ret_msg=$(gitlab_api_curl $request_url --upload-file $ASSET_PATH)
+        echo "return message:$ret_msg"
+        if [[ "$ret_msg" == *"201 Created"* ]]; then
+            break
+        fi
+        sleep 1
+    done
 }
 
 download_asset() {

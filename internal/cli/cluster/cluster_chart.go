@@ -225,12 +225,10 @@ func loadHelmChart(ci *ChartInfo, t ClusterType) error {
 		return fmt.Errorf("failed to find the helm chart of %s", t)
 	}
 	file, err := cf.loadChart()
-	//file, err := cf.chartFS.Open(fmt.Sprintf("charts/%s", cf.name))
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	//defer
 
 	c, err := loader.LoadArchive(file)
 	if err != nil {

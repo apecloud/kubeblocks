@@ -22,6 +22,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -76,7 +77,6 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 			fmt.Printf("Failed add '%s' to 'create' sub command due to %s\n", t.String(), err.Error())
 			continue
 		}
-		//util.CheckErr(err)
 
 		cmd := &cobra.Command{
 			Use:     t.String() + " NAME",

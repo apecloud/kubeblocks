@@ -1,12 +1,13 @@
 package helm
 
 import (
+	"io"
+	"strings"
+
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/downloader"
 	"helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/registry"
-	"io"
-	"strings"
 )
 
 func NewDownloader(cfg *Config) (*downloader.ChartDownloader, error) {

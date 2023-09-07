@@ -16,7 +16,7 @@ import (
 )
 
 var clusterRegisterExample = templates.Examples(`
-	# Pull a cluster type to local and register it to "kbcli cluster create" sub-cmd from specified Url
+	# Pull a cluster type to local and register it to "kbcli cluster create" sub-cmd from specified URL
 	kbcli cluster register orioledb --url https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
 `)
 
@@ -62,9 +62,9 @@ func (o *registerOption) validate() error {
 		return fmt.Errorf("cluster type %s is too long as a sub command", o.clusterType.String())
 	}
 
-	for key, _ := range cluster.ClusterTypeCharts {
+	for key := range cluster.ClusterTypeCharts {
 		if key == o.clusterType {
-			return fmt.Errorf("cluster type %s is already exsited", o.clusterType.String())
+			return fmt.Errorf("cluster type %s is already existed", o.clusterType.String())
 		}
 	}
 
@@ -87,7 +87,7 @@ func (o *registerOption) run() error {
 	}
 	cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
 		Name:  o.clusterType,
-		Url:   o.url,
+		URL:   o.url,
 		Alias: o.alias,
 	})
 	return cluster.GlobalClusterChartConfig.WriteConfigs()

@@ -8,7 +8,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -85,14 +85,14 @@ func (c *clusterConfig) RegisterCMD() {
 		c.RemoveConfig(name)
 	}
 	if err := c.WriteConfigs(); err != nil {
-		fmt.Printf("Warning: auto clear kbcli cluster chart config failed %s", err.Error())
+		fmt.Printf("Warning: auto clear kbcli cluster chart config failed %s\n", err.Error())
 	}
 }
 
 // TypeInstance reference to a cluster type instance in config
 type TypeInstance struct {
 	Name  ClusterType `yaml:"name"`
-	Url   string      `yaml:"helmChartUrl"`
+	URL   string      `yaml:"helmChartUrl"`
 	Alias string      `yaml:"alias"`
 }
 
@@ -101,7 +101,7 @@ func (h *TypeInstance) loadChart() (io.ReadCloser, error) {
 }
 
 func (h *TypeInstance) getChartFileName() string {
-	return path.Base(h.Url)
+	return path.Base(h.URL)
 }
 
 func (h *TypeInstance) getAlias() string {
@@ -119,7 +119,7 @@ func (h *TypeInstance) register(subcmd ClusterType) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Can't find the %s in config, please use 'kbcli cluster pull %s --url %s' first\n", h.Name.String(), h.Name.String(), h.Url)
+	return fmt.Errorf("can't find the %s in config, please use 'kbcli cluster pull %s --url %s' first", h.Name.String(), h.Name.String(), h.URL)
 }
 
 var _ chartConfigInterface = &TypeInstance{}

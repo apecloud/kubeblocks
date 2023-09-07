@@ -19,7 +19,7 @@ var _ chartConfigInterface = &embedConfig{}
 
 func (e *embedConfig) register(subcmd ClusterType) error {
 	if _, ok := ClusterTypeCharts[subcmd]; ok {
-		panic(fmt.Sprintf("cluster type %s already registered", subcmd))
+		return fmt.Errorf("cluster type %s already registered", subcmd)
 	}
 	ClusterTypeCharts[subcmd] = e
 	return nil
@@ -38,7 +38,7 @@ func (e *embedConfig) getChartFileName() string {
 }
 
 var (
-	//run `make generate` to generate this embed file
+	// run `make generate` to generate this embed file
 	//go:embed charts/apecloud-mysql-cluster.tgz
 	mysqlChart embed.FS
 	//go:embed charts/postgresql-cluster.tgz
@@ -49,8 +49,8 @@ var (
 	redisChart embed.FS
 	//go:embed charts/neon-cluster.tgz
 	neonChart embed.FS
-	////go:embed charts/mongodb-cluster.tgz
-	//mongodbChart embed.FS
+	//go:embed charts/mongodb-cluster.tgz
+	mongodbChart embed.FS
 )
 
 // internal_chart registers embed chart
@@ -62,41 +62,53 @@ func init() {
 		name:    "apecloud-mysql-cluster.tgz",
 		alias:   "",
 	}
-	mysql.register("mysql")
+	if err := mysql.register("mysql"); err != nil {
+		fmt.Println(err.Error())
+	}
 
 	postgresql := &embedConfig{
 		chartFS: postgresqlChart,
 		name:    "postgresql-cluster.tgz",
 		alias:   "",
 	}
-	postgresql.register("postgresql")
+	if err := postgresql.register("mysql"); err != nil {
+		fmt.Println(err.Error())
+	}
 
 	kafka := &embedConfig{
 		chartFS: kafkaChart,
 		name:    "kafka-cluster.tgz",
 		alias:   "",
 	}
-	kafka.register("kafka")
+	if err := kafka.register("mysql"); err != nil {
+		fmt.Println(err.Error())
+	}
 
 	redis := &embedConfig{
 		chartFS: redisChart,
 		name:    "redis-cluster.tgz",
 		alias:   "",
 	}
-	redis.register("redis")
+	if err := redis.register("mysql"); err != nil {
+		fmt.Println(err.Error())
+	}
 
 	neon := &embedConfig{
 		chartFS: neonChart,
 		name:    "neon-cluster.tgz",
 		alias:   "",
 	}
-	neon.register("neon")
+	if err := neon.register("mysql"); err != nil {
+		fmt.Println(err.Error())
+	}
 
-	//mongodb := &embedConfig{
-	//	chartFS: mongodbChart,
-	//	name:    "mongodb-cluster.tgz",
-	//	alias:   "",
-	//}
-	//mongodb.register("mongodb")
+	mongodb := &embedConfig{
+		chartFS: mongodbChart,
+		name:    "mongodb-cluster.tgz",
+		alias:   "",
+	}
+	if err := mongodb.register("mysql"); err != nil {
+		fmt.Println(err.Error())
+	}
 
 }

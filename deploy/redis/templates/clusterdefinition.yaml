@@ -120,14 +120,6 @@ spec:
             ports:
               - name: metrics
                 containerPort: 9121
-            livenessProbe:
-              httpGet:
-                path: /
-                port: metrics
-            readinessProbe:
-              httpGet:
-                path: /
-                port: metrics
       systemAccounts:
 # Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.

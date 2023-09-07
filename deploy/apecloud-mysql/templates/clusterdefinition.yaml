@@ -147,24 +147,6 @@ spec:
             ports:
               - name: http-metrics
                 containerPort: 9104
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
         volumes:
           - name: annotations
             downwardAPI:

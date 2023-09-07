@@ -271,7 +271,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		reconfigure   = spec.Reconfigure
 	)
 
-	if !needReconcile(opsRequest) {
+	if !needReconfigure(opsRequest) {
 		return nil
 	}
 
@@ -315,7 +315,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	return nil
 }
 
-func needReconcile(request *appsv1alpha1.OpsRequest) bool {
+func needReconfigure(request *appsv1alpha1.OpsRequest) bool {
 	// Update params to configmap
 	if request.Spec.Type != appsv1alpha1.ReconfiguringType ||
 		request.Spec.Reconfigure == nil ||

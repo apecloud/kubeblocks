@@ -140,7 +140,7 @@ func (r *consensusSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) 
 		return appsv1alpha1.FailedClusterCompPhase, statusMessages
 	}
 	if isAbnormal {
-		return appsv1alpha1.AbnormalClusterCompPhase, statusMessages
+		return appsv1alpha1.UnknownClusterCompPhase, statusMessages
 	}
 	return "", statusMessages
 }

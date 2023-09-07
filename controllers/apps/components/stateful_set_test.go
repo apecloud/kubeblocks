@@ -128,12 +128,12 @@ var _ = Describe("Stateful Component", func() {
 
 			By("expect component phase is Failed when pod of component is not ready and component is up running")
 			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName, true)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.UnknownClusterCompPhase))
 
 			By("expect component phase is Abnormal when pod of component is failed")
 			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName, false)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.UnknownClusterCompPhase))
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision

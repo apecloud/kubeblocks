@@ -53,6 +53,9 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if !cluster.IsDeleting() {
 		return nil
 	}
+
+	transCtx.Cluster.Status.Phase = appsv1alpha1.DeletingClusterPhase
+
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err

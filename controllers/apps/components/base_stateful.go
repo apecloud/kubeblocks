@@ -122,8 +122,6 @@ func (c *rsmComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
-
 	return nil
 }
 
@@ -168,13 +166,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 
-	statusTxn := &statusReconciliationTxn{}
-
-	if err := c.statusExpandVolume(reqCtx, cli, statusTxn); err != nil {
-		return err
-	}
-
-	if err := c.horizontalScale(reqCtx, cli, statusTxn); err != nil {
+	if err := c.horizontalScale(reqCtx, cli); err != nil {
 		return err
 	}
 
@@ -186,30 +178,68 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}
 	}
 
-	// TODO(impl): restart pod if needed, move it to @Update and restart pod directly.
-	if vertexes, err := c.ComponentSet.HandleRestart(reqCtx.Ctx, c.runningWorkload); err != nil {
-		return err
-	} else {
-		for _, v := range vertexes {
-			c.Dag.AddVertex(v)
-		}
+	isFirstGeneration := func() bool {
+		return c.runningWorkload.Generation == 1
 	}
-
-	var delayedRequeueError error
-	if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
-		if !intctrlutil.IsDelayedRequeueError(err) {
-			return err
-		}
-		delayedRequeueError = err
+	isZeroReplica := func() bool {
+		return c.runningWorkload.Spec.Replicas == nil || *c.runningWorkload.Spec.Replicas == 0
 	}
-
-	if err := c.statusConfig(reqCtx, cli, statusTxn); err != nil {
+	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
 		return err
 	}
-
-	if err := statusTxn.commit(); err != nil {
+	hasComponentPod := func() bool {
+		return len(pods) == 0
+	}
+	hasFailedPod, _, _ := hasFailedAndTimedOutPod(pods)
+	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, c.runningWorkload)
+	if err != nil {
 		return err
 	}
+	isDeleting := func() bool {
+		return !c.runningWorkload.DeletionTimestamp.IsZero()
+	}
+
+	switch {
+	case isDeleting():
+		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
+	case isRunning:
+		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
+	case isZeroReplica() && hasComponentPod():
+		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
+	case isZeroReplica():
+		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
+	case hasFailedPod:
+		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, nil, "Component is Failed")
+	case isFirstGeneration():
+		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
+	case !isFirstGeneration():
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component is Updating")
+	default:
+		c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "unknown")
+	}
+
+	//statusTxn := &statusReconciliationTxn{}
+	//
+	//if err := c.statusExpandVolume(reqCtx, cli, statusTxn); err != nil {
+	//	return err
+	//}
+	//
+	//var delayedRequeueError error
+	//if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
+	//	if !intctrlutil.IsDelayedRequeueError(err) {
+	//		return err
+	//	}
+	//	delayedRequeueError = err
+	//}
+	//
+	//if err := c.statusConfig(reqCtx, cli, statusTxn); err != nil {
+	//	return err
+	//}
+	//
+	//if err := statusTxn.commit(); err != nil {
+	//	return err
+	//}
 
 	c.updateWorkload(c.runningWorkload)
 
@@ -224,7 +254,8 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 
-	return delayedRequeueError
+	//return delayedRequeueError
+	return nil
 }
 
 func (c *rsmComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -432,8 +463,8 @@ func (c *rsmComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx, cli
 			return err
 		}
 		if failed {
-			txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "Volume Expansion failed")
+			txn.propose(appsv1alpha1.UnknownClusterCompPhase, func() {
+				c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "Volume Expansion failed")
 			})
 			return nil
 		}
@@ -504,17 +535,17 @@ func (c *rsmComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.RequestC
 }
 
 func (c *rsmComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.horizontalScale(reqCtx, cli, nil)
+	return c.horizontalScale(reqCtx, cli)
 }
 
-func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	sts := ConvertRSMToSTS(c.runningWorkload)
 	if sts.Status.ReadyReplicas == c.Component.Replicas {
 		return nil
 	}
 	ret := c.horizontalScaling(sts)
 	if ret == 0 {
-		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
+		if err := c.postScaleIn(reqCtx, cli); err != nil {
 			return err
 		}
 		if err := c.postScaleOut(reqCtx, cli, sts); err != nil {
@@ -595,7 +626,7 @@ func (c *rsmComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	return c.deletePVCs4ScaleIn(reqCtx, cli, stsObj)
 }
 
-func (c *rsmComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *rsmComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return nil
 }
 

@@ -426,8 +426,8 @@ func (c *statefulComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx
 			return err
 		}
 		if failed {
-			txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "Volume Expansion failed")
+			txn.propose(appsv1alpha1.UnknownClusterCompPhase, func() {
+				c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "Volume Expansion failed")
 			})
 			return nil
 		}

@@ -29,7 +29,7 @@ import (
 
 var componentPhasePriority = map[appsv1alpha1.ClusterComponentPhase]int{
 	appsv1alpha1.FailedClusterCompPhase:          1,
-	appsv1alpha1.AbnormalClusterCompPhase:        2,
+	appsv1alpha1.UnknownClusterCompPhase:         2,
 	appsv1alpha1.SpecReconcilingClusterCompPhase: 3,
 	appsv1alpha1.StoppedClusterCompPhase:         4,
 	appsv1alpha1.RunningClusterCompPhase:         5,

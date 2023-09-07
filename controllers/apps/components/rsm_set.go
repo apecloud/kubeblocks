@@ -157,7 +157,7 @@ func (r *RSM) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1al
 	case isFailed:
 		return appsv1alpha1.FailedClusterCompPhase, statusMessages
 	case isAbnormal:
-		return appsv1alpha1.AbnormalClusterCompPhase, statusMessages
+		return appsv1alpha1.UnknownClusterCompPhase, statusMessages
 	default:
 		return "", statusMessages
 	}

@@ -176,12 +176,14 @@ type ClusterStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// phase describes the phase of the Cluster, the detail information of the phases are as following:
-	// Running: cluster is running, all its components are available. [terminal state]
-	// Stopped: cluster has stopped, all its components are stopped. [terminal state]
-	// Failed: cluster is unavailable. [terminal state]
-	// Abnormal: Cluster is still running, but part of its components are Abnormal/Failed. [terminal state]
 	// Creating: Cluster has entered creating process.
-	// Updating: Cluster has entered updating process, triggered by Spec. updated.
+	// Running: Cluster is running, all its components are available.
+	// Updating: Cluster has entered updating process, triggered by Spec update.
+	// Stopping: Cluster is stopping, means at least one of its components is stopping.
+	// Stopped: Cluster has stopped, all its components are stopped.
+	// Deleting: Cluster is being deleted.
+	// Failed: Cluster is unavailable.
+	// Unknown: Cluster is still running, but part of its components are Unknown/Failed.
 	// +optional
 	Phase ClusterPhase `json:"phase,omitempty"`
 
@@ -312,14 +314,14 @@ type ComponentMessageMap map[string]string
 // ClusterComponentStatus records components status.
 type ClusterComponentStatus struct {
 	// phase describes the phase of the component and the detail information of the phases are as following:
-	// Running: the component is running. [terminal state]
-	// Stopped: the component is stopped, as no running pod. [terminal state]
-	// Failed: the component is unavailable, i.e. all pods are not ready for Stateless/Stateful component and
-	// Leader/Primary pod is not ready for Consensus/Replication component. [terminal state]
-	// Abnormal: the component is running but part of its pods are not ready.
-	// Leader/Primary pod is ready for Consensus/Replication component. [terminal state]
 	// Creating: the component has entered creating process.
+	// Running: the component is running.
 	// Updating: the component has entered updating process, triggered by Spec. updated.
+	// Stopping: the component is stopping.
+	// Stopped: the component is stopped, as no running pod.
+	// Deleting: the component is being deleted.
+	// Failed: the component is unavailable, i.e. all pods are not ready.
+	// Unknown: the component is running but part of its pods are not ready.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
@@ -819,7 +821,7 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
-		AbnormalClusterPhase,
+		UnknownClusterPhase,
 		FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
 	}
 }
@@ -829,7 +831,7 @@ func GetReconfiguringRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
 		SpecReconcilingClusterPhase, // enable partial running for reconfiguring
-		AbnormalClusterPhase,
+		UnknownClusterPhase,
 		FailedClusterPhase,
 	}
 }
@@ -840,7 +842,7 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		RunningClusterCompPhase,
 		StoppedClusterCompPhase,
 		FailedClusterCompPhase,
-		AbnormalClusterCompPhase,
+		UnknownClusterCompPhase,
 	}
 }
 
@@ -848,7 +850,7 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 func GetComponentUpRunningPhase() []ClusterComponentPhase {
 	return []ClusterComponentPhase{
 		RunningClusterCompPhase,
-		AbnormalClusterCompPhase,
+		UnknownClusterCompPhase,
 		FailedClusterCompPhase,
 	}
 }

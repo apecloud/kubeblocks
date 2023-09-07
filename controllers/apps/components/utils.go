@@ -149,7 +149,7 @@ func GetClusterByObject(ctx context.Context,
 func IsFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
 	return slices.Index([]appsv1alpha1.ClusterComponentPhase{
 		appsv1alpha1.FailedClusterCompPhase,
-		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
+		appsv1alpha1.UnknownClusterCompPhase}, phase) != -1
 }
 
 // getComponentMatchLabels gets the labels for matching the cluster component
@@ -417,7 +417,7 @@ func getCompPhaseByConditions(existLatestRevisionFailedPod bool,
 	}
 	// checks if expected replicas number of component is consistent with the number of available workload replicas.
 	if !availableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
-		return appsv1alpha1.AbnormalClusterCompPhase
+		return appsv1alpha1.UnknownClusterCompPhase
 	}
 	return ""
 }

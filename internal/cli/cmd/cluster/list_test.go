@@ -75,7 +75,7 @@ var _ = Describe("list", func() {
 		})
 		clusterWithVerticalScaling.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
 		clusterWithAbnormalPhase := testing.FakeCluster(clusterName2, namespace)
-		clusterWithAbnormalPhase.Status.Phase = appsv1alpha1.AbnormalClusterPhase
+		clusterWithAbnormalPhase.Status.Phase = appsv1alpha1.UnknownClusterPhase
 		pods := testing.FakePods(3, namespace, clusterName)
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
@@ -117,7 +117,7 @@ var _ = Describe("list", func() {
 		Expect(out.String()).Should(ContainSubstring(testing.ClusterDefName))
 		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.SpecReconcilingClusterPhase)))
 		Expect(out.String()).Should(ContainSubstring(cluster.ConditionsError))
-		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.AbnormalClusterPhase)))
+		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.UnknownClusterPhase)))
 	})
 
 	It("list instances", func() {

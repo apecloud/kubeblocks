@@ -1,6 +1,41 @@
-package register
+package cluster
 
-import "embed"
+import (
+	"embed"
+	"fmt"
+	"io"
+)
+
+// embedConfig is the interface for the go embed chart
+type embedConfig struct {
+	chartFS embed.FS
+	// chart file name, include the extension
+	name string
+	// chart alias, this alias will be used as the command alias
+	alias string
+}
+
+var _ chartConfigInterface = &embedConfig{}
+
+func (e *embedConfig) register(subcmd ClusterType) error {
+	if _, ok := ClusterTypeCharts[subcmd]; ok {
+		panic(fmt.Sprintf("cluster type %s already registered", subcmd))
+	}
+	ClusterTypeCharts[subcmd] = e
+	return nil
+}
+
+func (e *embedConfig) getAlias() string {
+	return e.alias
+}
+
+func (e *embedConfig) loadChart() (io.ReadCloser, error) {
+	return e.chartFS.Open(fmt.Sprintf("charts/%s", e.name))
+}
+
+func (e *embedConfig) getChartFileName() string {
+	return e.name
+}
 
 var (
 	//run `make generate` to generate this embed file
@@ -14,8 +49,8 @@ var (
 	redisChart embed.FS
 	//go:embed charts/neon-cluster.tgz
 	neonChart embed.FS
-	//go:embed charts/mongodb-cluster.tgz
-	mongodbChart embed.FS
+	////go:embed charts/mongodb-cluster.tgz
+	//mongodbChart embed.FS
 )
 
 // internal_chart registers embed chart
@@ -57,11 +92,11 @@ func init() {
 	}
 	neon.register("neon")
 
-	mongodb := &embedConfig{
-		chartFS: mongodbChart,
-		name:    "mongodb-cluster.tgz",
-		alias:   "",
-	}
-	mongodb.register("mongodb")
+	//mongodb := &embedConfig{
+	//	chartFS: mongodbChart,
+	//	name:    "mongodb-cluster.tgz",
+	//	alias:   "",
+	//}
+	//mongodb.register("mongodb")
 
 }

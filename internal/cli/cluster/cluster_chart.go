@@ -37,7 +37,6 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cluster/register"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
@@ -74,7 +73,7 @@ type ChartInfo struct {
 	Alias string
 }
 
-func BuildChartInfo(t register.ClusterType) (*ChartInfo, error) {
+func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 	var err error
 
 	c := &ChartInfo{}
@@ -220,12 +219,12 @@ func ValidateValues(c *ChartInfo, values map[string]interface{}) error {
 	return validateFn(c.SubSchema, values)
 }
 
-func loadHelmChart(ci *ChartInfo, t register.ClusterType) error {
-	cf, ok := register.ClusterTypeCharts[t]
+func loadHelmChart(ci *ChartInfo, t ClusterType) error {
+	cf, ok := ClusterTypeCharts[t]
 	if !ok {
 		return fmt.Errorf("failed to find the helm chart of %s", t)
 	}
-	file, err := cf.LoadChart()
+	file, err := cf.loadChart()
 	//file, err := cf.chartFS.Open(fmt.Sprintf("charts/%s", cf.name))
 	if err != nil {
 		return err
@@ -236,7 +235,7 @@ func loadHelmChart(ci *ChartInfo, t register.ClusterType) error {
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {
-			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.GetName(), err)
+			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.getChartFileName(), err)
 		}
 	}
 
@@ -245,13 +244,13 @@ func loadHelmChart(ci *ChartInfo, t register.ClusterType) error {
 	}
 
 	ci.Chart = c
-	ci.Alias = cf.GetAlias()
+	ci.Alias = cf.getAlias()
 	return nil
 }
 
-func SupportedTypes() []register.ClusterType {
-	types := maps.Keys(register.ClusterTypeCharts)
-	slices.SortFunc(types, func(i, j register.ClusterType) bool {
+func SupportedTypes() []ClusterType {
+	types := maps.Keys(ClusterTypeCharts)
+	slices.SortFunc(types, func(i, j ClusterType) bool {
 		return i.String() < j.String()
 	})
 	return types

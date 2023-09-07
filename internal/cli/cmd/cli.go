@@ -252,6 +252,7 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+	fmt.Fprintln(os.Stdout, "here is config init")
 }
 
 func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory) {

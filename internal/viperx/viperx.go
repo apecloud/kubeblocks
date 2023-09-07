@@ -152,3 +152,8 @@ func WatchConfig() {
 func Reset() {
 	viper.Reset()
 }
+
+func Unmarshal(rawVal interface{}) error {
+	v := GetViper()
+	return v.Unmarshal(rawVal)
+}

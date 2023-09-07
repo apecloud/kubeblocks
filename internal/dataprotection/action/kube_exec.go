@@ -32,13 +32,13 @@ import (
 
 // KubeExec is an action that executes a command on a pod.
 type KubeExec struct {
-	// Name is the name of the action.
+	// Name is the Name of the action.
 	Name string
 
-	// PodName is the name of the pod to execute the command on.
+	// PodName is the Name of the pod to execute the command on.
 	PodName string
 
-	// Namespace is the namespace of the pod to execute the command on.
+	// Namespace is the Namespace of the pod to execute the command on.
 	Namespace string
 
 	// Command is the command to execute.
@@ -55,6 +55,10 @@ func (e *KubeExec) GetName() string {
 	return e.Name
 }
 
+func (e *KubeExec) Type() ActionType {
+	return ActionTypeExec
+}
+
 func (e *KubeExec) Execute(ctx Context) error {
 	if err := e.validate(); err != nil {
 		return err
@@ -64,7 +68,7 @@ func (e *KubeExec) Execute(ctx Context) error {
 		Resource("pods").
 		Namespace(e.Namespace).
 		Name(e.PodName).
-		SubResource("exec")
+		SubResource("Exec")
 
 	if e.Container != "" {
 		req.Param("container", e.Container)
@@ -112,10 +116,10 @@ func (e *KubeExec) Execute(ctx Context) error {
 
 func (e *KubeExec) validate() error {
 	if e.PodName == "" {
-		return errors.New("pod name is required")
+		return errors.New("pod Name is required")
 	}
 	if e.Namespace == "" {
-		return errors.New("namespace is required")
+		return errors.New("Namespace is required")
 	}
 	if len(e.Command) == 0 {
 		return errors.New("command is required")

@@ -296,25 +296,6 @@ func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Reque
 	}
 }
 
-// TODO(ldm): validata user can not create continuous backup
-func (r *BackupReconciler) validate(backup *dpv1alpha1.Backup,
-	backupPolicy *dpv1alpha1.BackupPolicy) error {
-	backupType := backup.Spec.BackupType
-	if backupType != dpv1alpha1.BackupTypeLogFile {
-		return nil
-	}
-	if backup.Name != getCreatedCRNameByBackupPolicy(backupPolicy, backupType) {
-		return dperrors.NewInvalidLogfileBackupName(backupPolicy.Name)
-	}
-	if backupPolicy.Spec.Schedule.Logfile == nil {
-		return dperrors.NewBackupNotSupported(string(backupType), backupPolicy.Name)
-	}
-	if !backupPolicy.Spec.Schedule.Logfile.Enable {
-		return dperrors.NewBackupScheduleDisabled(string(backupType), backupPolicy.Name)
-	}
-	return nil
-}
-
 func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
@@ -897,24 +878,6 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
 	}
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-}
-
-// patchBackupObjectLabels add missed labels to the backup object.
-func (r *BackupReconciler) patchBackupObjectLabels(
-	ctx context.Context,
-	backup *dpv1alpha1.Backup,
-	labels map[string]string) (bool, error) {
-	oldBackup := backup.DeepCopy()
-	if backup.Labels == nil {
-		backup.Labels = make(map[string]string)
-	}
-	for k, v := range labels {
-		backup.Labels[k] = v
-	}
-	if reflect.DeepEqual(oldBackup.ObjectMeta, backup.ObjectMeta) {
-		return false, nil
-	}
-	return true, r.Client.Patch(ctx, backup, client.MergeFrom(oldBackup))
 }
 
 func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,

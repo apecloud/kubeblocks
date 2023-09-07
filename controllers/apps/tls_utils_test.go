@@ -256,7 +256,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			// It("should not create the cluster when secret referenced not exist", func() {
 			// 	tlsIssuer := &appsv1alpha1.Issuer{
 			// 		Name: appsv1alpha1.IssuerUserProvided,
-			// 		SecretRef: &appsv1alpha1.TLSSecretRef{
+			// 		SecretName: &appsv1alpha1.TLSSecretRef{
 			// 			Name: "secret-name-not-exist",
 			// 			CA:   "ca.crt",
 			// 			Cert: "tls.crt",

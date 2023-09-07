@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -84,6 +85,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
 		Watches(&source.Kind{Type: &appsv1alpha1.Cluster{}}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequest)).
+		Watches(&source.Kind{Type: &dataprotectionv1alpha1.Backup{}}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Complete(r)
 }
 
@@ -298,6 +300,23 @@ func (r *OpsRequestReconciler) parseAllOpsRequest(object client.Object) []reconc
 			NamespacedName: types.NamespacedName{
 				Namespace: cluster.Namespace,
 				Name:      v.Name,
+			},
+		})
+	}
+	return requests
+}
+
+func (r *OpsRequestReconciler) parseBackupOpsRequest(object client.Object) []reconcile.Request {
+	backup := object.(*dataprotectionv1alpha1.Backup)
+	var (
+		requests []reconcile.Request
+	)
+	opsRequestRecorder := opsutil.GetOpsRequestFromBackup(backup)
+	if opsRequestRecorder != nil {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: backup.Namespace,
+				Name:      opsRequestRecorder.Name,
 			},
 		})
 	}

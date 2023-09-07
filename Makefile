@@ -615,6 +615,22 @@ else ifeq ($(TEST_TYPE), mongodb)
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
 	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
+else ifeq ($(TEST_TYPE), nebula)
+	$(HELM) dependency build deploy/nebula-cluster --skip-refresh
+	$(HELM) upgrade --install nebula deploy/nebula
+	$(HELM) template nebula-cluster deploy/nebula-cluster > test/e2e/testdata/smoketest/nebula/00_nebulacluster.yaml
+else ifeq ($(TEST_TYPE), greptimedb)
+	$(HELM) dependency build deploy/greptimedb-cluster --skip-refresh
+	$(HELM) upgrade --install greptimedb deploy/greptimedb
+	$(HELM) template greptimedb-cluster deploy/greptimedb-cluster > test/e2e/testdata/smoketest/greptimedb/00_greptimedbcluster.yaml
+else ifeq ($(TEST_TYPE), starrocks)
+	$(HELM) dependency build deploy/starrocks-cluster --skip-refresh
+	$(HELM) upgrade --install starrocks deploy/starrocks
+	$(HELM) template starrocks-cluster deploy/starrocks-cluster > test/e2e/testdata/smoketest/starrocks/00_starrocksbcluster.yaml
+else ifeq ($(TEST_TYPE), risingwave)
+	$(HELM) dependency build deploy/risingwave-cluster --skip-refresh
+	$(HELM) upgrade --install risingwave deploy/risingwave
+	$(HELM) template risingwave-cluster deploy/risingwave-cluster > test/e2e/testdata/smoketest/risingwave/00_risingwavecluster.yaml
 else ifeq ($(TEST_TYPE), kafka)
 	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
 else
@@ -637,6 +653,14 @@ else ifeq ($(TEST_TYPE), redis)
 	$(HELM) upgrade --install redis deploy/redis
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) upgrade --install pulsar deploy/pulsar
+else ifeq ($(TEST_TYPE), nebula)
+	$(HELM) upgrade --install nebula deploy/nebula
+else ifeq ($(TEST_TYPE), greptimedb)
+	$(HELM) upgrade --install greptimedb deploy/greptimedb
+else ifeq ($(TEST_TYPE), starrocks)
+	$(HELM) upgrade --install starrocks deploy/starrocks
+else ifeq ($(TEST_TYPE), risingwave)
+	$(HELM) upgrade --install risingwave deploy/risingwave
 else
 	$(error "test type does not exist")
 endif

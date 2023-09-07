@@ -61,6 +61,25 @@ spec:
           spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
+              backupSpec:
+                description: backupSpec defines how to backup the cluster.
+                properties:
+                  backupName:
+                    description: backupName is the name of the backup.
+                    type: string
+                  backupPolicyName:
+                    description: Which backupPolicy is applied to perform this backup
+                    type: string
+                  backupType:
+                    default: datafile
+                    description: Backup Type. datafile or logfile or snapshot. If
+                      not set, datafile is the default type.
+                    type: string
+                  parentBackupName:
+                    description: if backupType is incremental, parentBackupName is
+                      required.
+                    type: string
+                type: object
               cancel:
                 description: 'cancel defines the action to cancel the Pending/Creating/Running
                   opsRequest, supported types: [VerticalScaling, HorizontalScaling].
@@ -462,6 +481,7 @@ spec:
                 - Expose
                 - Switchover
                 - DataScript
+                - Backup
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type

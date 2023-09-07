@@ -21,6 +21,7 @@ package rsm
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,13 +34,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
 var _ = Describe("object deletion transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
 			AddMatchLabelsInMap(selectors).
 			SetServiceName(headlessSvcName).

@@ -29,7 +29,7 @@ import (
 )
 
 type MockDeploymentFactory struct {
-	builder.BaseFactory[appsv1.Deployment, *appsv1.Deployment, MockDeploymentFactory]
+	builder.BaseBuilder[appsv1.Deployment, *appsv1.Deployment, MockDeploymentFactory]
 }
 
 func NewDeploymentFactory(namespace, name, clusterName, componentName string) *MockDeploymentFactory {

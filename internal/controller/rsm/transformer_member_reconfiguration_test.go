@@ -21,6 +21,8 @@ package rsm
 
 import (
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,7 +34,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
@@ -62,7 +63,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	}
 	mockAction := func(ordinal int, actionType string, succeed bool) *batchv1.Job {
 		actionName := getActionName(rsm.Name, int(rsm.Generation), ordinal, actionType)
-		action := builder.NewJobBuilder(name, actionName).
+		action := builder2.NewJobBuilder(name, actionName).
 			AddLabelsInMap(map[string]string{
 				constant.AppInstanceLabelKey: rsm.Name,
 				constant.KBManagedByKey:      kindReplicatedStateMachine,
@@ -97,7 +98,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	}
 
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
 			SetServiceName(headlessSvcName).
 			AddMatchLabelsInMap(selectors).

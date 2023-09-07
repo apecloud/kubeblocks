@@ -31,7 +31,7 @@ type StatefulSetBuilder struct {
 
 func NewStatefulSetBuilder(namespace, name string) *StatefulSetBuilder {
 	builder := &StatefulSetBuilder{}
-	builder.init(namespace, name, &apps.StatefulSet{}, builder)
+	builder.Init(namespace, name, &apps.StatefulSet{}, builder)
 	return builder
 }
 
@@ -42,74 +42,105 @@ func (builder *StatefulSetBuilder) AddMatchLabel(key, value string) *StatefulSet
 }
 
 func (builder *StatefulSetBuilder) AddMatchLabels(keyValues ...string) *StatefulSetBuilder {
-	return builder.AddMatchLabelsInMap(builder.WithMap(keyValues...))
+	return builder.AddMatchLabelsInMap(WithMap(keyValues...))
 }
 
 func (builder *StatefulSetBuilder) AddMatchLabelsInMap(labels map[string]string) *StatefulSetBuilder {
-	selector := builder.get().Spec.Selector
+	selector := builder.GetObject().Spec.Selector
 	if selector == nil {
 		selector = &metav1.LabelSelector{}
-		builder.get().Spec.Selector = selector
+		builder.GetObject().Spec.Selector = selector
 	}
-	matchLabels := builder.get().Spec.Selector.MatchLabels
+	matchLabels := builder.GetObject().Spec.Selector.MatchLabels
 	if matchLabels == nil {
 		matchLabels = make(map[string]string, len(labels))
 	}
 	for k, v := range labels {
 		matchLabels[k] = v
 	}
-	builder.get().Spec.Selector.MatchLabels = matchLabels
+	builder.GetObject().Spec.Selector.MatchLabels = matchLabels
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetSelector(selector *metav1.LabelSelector) *StatefulSetBuilder {
-	builder.get().Spec.Selector = selector
+	builder.GetObject().Spec.Selector = selector
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetServiceName(serviceName string) *StatefulSetBuilder {
-	builder.get().Spec.ServiceName = serviceName
+	builder.GetObject().Spec.ServiceName = serviceName
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetReplicas(replicas int32) *StatefulSetBuilder {
-	builder.get().Spec.Replicas = &replicas
+	builder.GetObject().Spec.Replicas = &replicas
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetMinReadySeconds(minReadySeconds int32) *StatefulSetBuilder {
-	builder.get().Spec.MinReadySeconds = minReadySeconds
+	builder.GetObject().Spec.MinReadySeconds = minReadySeconds
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetPodManagementPolicy(policy apps.PodManagementPolicyType) *StatefulSetBuilder {
-	builder.get().Spec.PodManagementPolicy = policy
+	builder.GetObject().Spec.PodManagementPolicy = policy
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetTemplate(template corev1.PodTemplateSpec) *StatefulSetBuilder {
-	builder.get().Spec.Template = template
+	builder.GetObject().Spec.Template = template
 	return builder
 }
 
 func (builder *StatefulSetBuilder) AddVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *StatefulSetBuilder {
-	templateList := builder.get().Spec.VolumeClaimTemplates
+	templateList := builder.GetObject().Spec.VolumeClaimTemplates
 	templateList = append(templateList, templates...)
-	builder.get().Spec.VolumeClaimTemplates = templateList
+	builder.GetObject().Spec.VolumeClaimTemplates = templateList
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *StatefulSetBuilder {
-	builder.get().Spec.VolumeClaimTemplates = templates
+	builder.GetObject().Spec.VolumeClaimTemplates = templates
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *StatefulSetBuilder {
-	builder.get().Spec.UpdateStrategy = strategy
+	builder.GetObject().Spec.UpdateStrategy = strategy
 	return builder
 }
 
 func (builder *StatefulSetBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *StatefulSetBuilder {
-	builder.get().Spec.UpdateStrategy.Type = strategyType
+	builder.GetObject().Spec.UpdateStrategy.Type = strategyType
+	return builder
+}
+
+
+func (builder *StatefulSetBuilder) AddVolume(volume corev1.Volume) *StatefulSetBuilder {
+	volumes := &builder.GetObject().Spec.Template.Spec.Volumes
+	*volumes = append(*volumes, volume)
+	return builder
+}
+
+func (builder *StatefulSetBuilder) AddConfigmapVolume(volumeName string, configmapName string) *StatefulSetBuilder {
+	volume := corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: configmapName},
+			},
+		},
+	}
+	return builder.AddVolume(volume)
+}
+
+func (builder *StatefulSetBuilder) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *StatefulSetBuilder {
+	volumeClaimTpls := &builder.GetObject().Spec.VolumeClaimTemplates
+	*volumeClaimTpls = append(*volumeClaimTpls, pvc)
+	return builder
+}
+
+func (builder *StatefulSetBuilder) AddContainer(container corev1.Container) *StatefulSetBuilder {
+	containers := &builder.GetObject().Spec.Template.Spec.Containers
+	*containers = append(*containers, container)
 	return builder
 }

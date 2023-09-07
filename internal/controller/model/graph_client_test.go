@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package model
 
 import (
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
@@ -36,7 +36,7 @@ var _ = Describe("graph client test.", func() {
 			By("create without root vertex")
 			namespace := "foo"
 			name := "bar"
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
+			root := builder2.NewStatefulSetBuilder(namespace, name).GetObject()
 			graphCli.Create(dag, root)
 			dagExpected := graph.NewDAG()
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
@@ -47,9 +47,9 @@ var _ = Describe("graph client test.", func() {
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("create object")
-			obj0 := builder.NewPodBuilder(namespace, name+"0").GetObject()
-			obj1 := builder.NewPodBuilder(namespace, name+"1").GetObject()
-			obj2 := builder.NewPodBuilder(namespace, name+"2").GetObject()
+			obj0 := builder2.NewPodBuilder(namespace, name+"0").GetObject()
+			obj1 := builder2.NewPodBuilder(namespace, name+"1").GetObject()
+			obj2 := builder2.NewPodBuilder(namespace, name+"2").GetObject()
 			graphCli.Create(dag, obj0)
 			graphCli.Create(dag, obj1)
 			graphCli.Create(dag, obj2)

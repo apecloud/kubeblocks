@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builderx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +45,7 @@ var _ = Describe("base builder", func() {
 		annotations := map[string]string{annotationKey3: annotationValue3}
 		controllerRevision := "wer-23e23-sedfwe--34r23"
 		finalizer := "foo-bar"
-		owner := NewReplicatedStateMachineBuilder(ns, name).GetObject()
+		owner := builderx.NewReplicatedStateMachineBuilder(ns, name).GetObject()
 		owner.UID = "sdfwsedqw-swed-sdswe"
 		ownerAPIVersion := "workloads.kubeblocks.io/v1alpha1"
 		ownerKind := "ReplicatedStateMachine"
@@ -78,5 +79,12 @@ var _ = Describe("base builder", func() {
 		Expect(obj.OwnerReferences[0].Kind).Should(Equal(ownerKind))
 		Expect(obj.OwnerReferences[0].Name).Should(Equal(owner.Name))
 		Expect(obj.OwnerReferences[0].UID).Should(Equal(owner.UID))
+
+		obj = NewConfigMapBuilder(ns, "").SetName(name).GetObject()
+		Expect(obj.Name).Should(Equal(name))
+
+		obj = NewConfigMapBuilder(ns, "").WithRandomName().GetObject()
+		Expect(obj.Name).ShouldNot(BeNil())
+
 	})
 })

@@ -30,7 +30,7 @@ import (
 )
 
 type MockBackupPolicyFactory struct {
-	builder.BaseFactory[dataprotectionv1alpha1.BackupPolicy, *dataprotectionv1alpha1.BackupPolicy, MockBackupPolicyFactory]
+	builder.BaseBuilder[dataprotectionv1alpha1.BackupPolicy, *dataprotectionv1alpha1.BackupPolicy, MockBackupPolicyFactory]
 	backupType dataprotectionv1alpha1.BackupType
 }
 

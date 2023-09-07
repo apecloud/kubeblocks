@@ -20,143 +20,146 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	"context"
-	"github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"reflect"
 
-	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	"github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 // Manipulate common attributes here to save boilerplate code
 
-type BaseFactory[T intctrlutil.Object, PT intctrlutil.PObject[T], F any] struct {
+type BaseBuilder[T intctrlutil.Object, PT intctrlutil.PObject[T], B any] struct {
 	object          PT
-	concreteFactory *F
+	concreteBuilder *B
 }
 
-func (factory *BaseFactory[T, PT, F]) init(namespace, name string, obj PT, f *F) {
+func (builder *BaseBuilder[T, PT, B]) Init(namespace, name string, obj PT, b *B) {
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
-	if obj.GetLabels() == nil {
-		obj.SetLabels(map[string]string{})
+	builder.object = obj
+	builder.concreteBuilder = b
+}
+
+func (builder *BaseBuilder[T, PT, B]) WithRandomName() *B {
+	key := apps.GetRandomizedKey("", builder.object.GetName())
+	builder.object.SetName(key.Name)
+	return builder.concreteBuilder
+}
+
+func (builder *BaseBuilder[T, PT, B]) SetName(name string) *B {
+	builder.object.SetName(name)
+	return builder.concreteBuilder
+}
+
+func (builder *BaseBuilder[T, PT, B]) SetUID(uid types.UID) *B {
+	builder.object.SetUID(uid)
+	return builder.concreteBuilder
+}
+
+func (builder *BaseBuilder[T, PT, B]) AddLabels(keysAndValues ...string) *B {
+	builder.AddLabelsInMap(WithMap(keysAndValues...))
+	return builder.concreteBuilder
+}
+
+func (builder *BaseBuilder[T, PT, B]) AddLabelsInMap(labels map[string]string) *B {
+	if len(labels) == 0 {
+		return builder.concreteBuilder
 	}
-	if obj.GetAnnotations() == nil {
-		obj.SetAnnotations(map[string]string{})
+	l := builder.object.GetLabels()
+	if l == nil {
+		l = make(map[string]string, 0)
 	}
-	factory.object = obj
-	factory.concreteFactory = f
-}
-
-func (factory *BaseFactory[T, PT, F]) get() PT {
-	return factory.object
-}
-
-func (factory *BaseFactory[T, PT, F]) WithRandomName() *F {
-	key := apps.GetRandomizedKey("", factory.object.GetName())
-	factory.object.SetName(key.Name)
-	return factory.concreteFactory
-}
-
-func (factory *BaseFactory[T, PT, F]) AddLabels(keysAndValues ...string) *F {
-	factory.AddLabelsInMap(apps.WithMap(keysAndValues...))
-	return factory.concreteFactory
-}
-
-func (factory *BaseFactory[T, PT, F]) AddLabelsInMap(labels map[string]string) *F {
-	l := factory.object.GetLabels()
 	for k, v := range labels {
 		l[k] = v
 	}
-	factory.object.SetLabels(l)
-	return factory.concreteFactory
+	builder.object.SetLabels(l)
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddAppNameLabel(value string) *F {
-	return factory.AddLabels(constant.AppNameLabelKey, value)
+func (builder *BaseBuilder[T, PT, B]) AddAnnotations(keysAndValues ...string) *B {
+	builder.AddAnnotationsInMap(WithMap(keysAndValues...))
+	return builder.concreteBuilder
 }
-
-func (factory *BaseFactory[T, PT, F]) AddAppInstanceLabel(value string) *F {
-	return factory.AddLabels(constant.AppInstanceLabelKey, value)
-}
-
-func (factory *BaseFactory[T, PT, F]) AddAppComponentLabel(value string) *F {
-	return factory.AddLabels(constant.KBAppComponentLabelKey, value)
-}
-
-func (factory *BaseFactory[T, PT, F]) AddAppManangedByLabel() *F {
-	return factory.AddLabels(constant.AppManagedByLabelKey, constant.AppName)
-}
-
-func (factory *BaseFactory[T, PT, F]) AddConsensusSetAccessModeLabel(value string) *F {
-	return factory.AddLabels(constant.ConsensusSetAccessModeLabelKey, value)
-}
-
-func (factory *BaseFactory[T, PT, F]) AddRoleLabel(value string) *F {
-	return factory.AddLabels(constant.RoleLabelKey, value)
-}
-
-func (factory *BaseFactory[T, PT, F]) AddAnnotations(keysAndValues ...string) *F {
-	factory.AddAnnotationsInMap(apps.WithMap(keysAndValues...))
-	return factory.concreteFactory
-}
-func (factory *BaseFactory[T, PT, F]) AddAnnotationsInMap(annotations map[string]string) *F {
-	a := factory.object.GetAnnotations()
+func (builder *BaseBuilder[T, PT, B]) AddAnnotationsInMap(annotations map[string]string) *B {
+	a := builder.object.GetAnnotations()
+	if a == nil {
+		a = make(map[string]string, 0)
+	}
 	for k, v := range annotations {
 		a[k] = v
 	}
-	factory.object.SetAnnotations(a)
-	return factory.concreteFactory
+	builder.object.SetAnnotations(a)
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddControllerRevisionHashLabel(value string) *F {
-	return factory.AddLabels(appsv1.ControllerRevisionHashLabelKey, value)
+func (builder *BaseBuilder[T, PT, B]) AddControllerRevisionHashLabel(value string) *B {
+	return builder.AddLabels(appsv1.ControllerRevisionHashLabelKey, value)
 }
 
-func (factory *BaseFactory[T, PT, F]) SetOwnerReferences(ownerAPIVersion string, ownerKind string, owner client.Object) *F {
+func (builder *BaseBuilder[T, PT, B]) SetOwnerReferences(ownerAPIVersion string, ownerKind string, owner client.Object) *B {
 	// interface object needs to determine whether the value is nil.
 	// otherwise, nil pointer error may be reported.
 	if owner != nil && !reflect.ValueOf(owner).IsNil() {
 		t := true
-		factory.object.SetOwnerReferences([]metav1.OwnerReference{
+		builder.object.SetOwnerReferences([]metav1.OwnerReference{
 			{APIVersion: ownerAPIVersion, Kind: ownerKind, Controller: &t,
 				BlockOwnerDeletion: &t, Name: owner.GetName(), UID: owner.GetUID()},
 		})
 	}
-	return factory.concreteFactory
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) AddFinalizers(finalizers []string) *F {
-	factory.object.SetFinalizers(finalizers)
-	return factory.concreteFactory
+func (builder *BaseBuilder[T, PT, B]) AddFinalizers(finalizers []string) *B {
+	builder.object.SetFinalizers(finalizers)
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) Apply(changeFn func(PT)) *F {
-	changeFn(factory.object)
-	return factory.concreteFactory
+func (builder *BaseBuilder[T, PT, B]) Builder() *B {
+	return builder.concreteBuilder
 }
 
-func (factory *BaseFactory[T, PT, F]) Create(testCtx *testutil.TestContext) *F {
-	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
-	return factory.concreteFactory
+func (builder *BaseBuilder[T, PT, B]) GetObject() PT {
+	return builder.object
 }
 
-func (factory *BaseFactory[T, PT, F]) CheckedCreate(testCtx *testutil.TestContext) *F {
-	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
-	return factory.concreteFactory
+func WithMap(keysAndValues ...string) map[string]string {
+	// ignore mismatching for kvs
+	m := make(map[string]string, len(keysAndValues)/2)
+	for i := 0; i+1 < len(keysAndValues); i += 2 {
+		m[keysAndValues[i]] = keysAndValues[i+1]
+	}
+	return m
 }
 
-func (factory *BaseFactory[T, PT, F]) CreateCli(ctx context.Context, cli client.Client) *F {
-	gomega.Expect(cli.Create(ctx, factory.get())).Should(gomega.Succeed())
-	return factory.concreteFactory
+// TODO(free6om): following funcs should not in BaseBuilder as not all kinds have these labels, move them to the right place
+
+func (builder *BaseBuilder[T, PT, B]) AddAppNameLabel(value string) *B {
+	return builder.AddLabels(constant.AppNameLabelKey, value)
 }
 
-func (factory *BaseFactory[T, PT, F]) GetObject() PT {
-	return factory.object
+func (builder *BaseBuilder[T, PT, B]) AddAppInstanceLabel(value string) *B {
+	return builder.AddLabels(constant.AppInstanceLabelKey, value)
 }
+
+func (builder *BaseBuilder[T, PT, B]) AddAppComponentLabel(value string) *B {
+	return builder.AddLabels(constant.KBAppComponentLabelKey, value)
+}
+
+func (builder *BaseBuilder[T, PT, B]) AddAppManangedByLabel() *B {
+	return builder.AddLabels(constant.AppManagedByLabelKey, constant.AppName)
+}
+
+func (builder *BaseBuilder[T, PT, B]) AddConsensusSetAccessModeLabel(value string) *B {
+	return builder.AddLabels(constant.ConsensusSetAccessModeLabelKey, value)
+}
+
+func (builder *BaseBuilder[T, PT, B]) AddRoleLabel(value string) *B {
+	return builder.AddLabels(constant.RoleLabelKey, value)
+}
+

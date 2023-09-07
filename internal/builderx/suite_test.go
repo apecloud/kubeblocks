@@ -17,30 +17,32 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package builder
+package builderx
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-type PodBuilder struct {
-	BaseBuilder[corev1.Pod, *corev1.Pod, PodBuilder]
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+func init() {
 }
 
-func NewPodBuilder(namespace, name string) *PodBuilder {
-	builder := &PodBuilder{}
-	builder.init(namespace, name, &corev1.Pod{}, builder)
-	return builder
+func TestAPIs(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Builder Suite")
 }
 
-func (builder *PodBuilder) SetContainers(containers []corev1.Container) *PodBuilder {
-	builder.get().Spec.Containers = containers
-	return builder
-}
+var _ = BeforeSuite(func() {
+	go func() {
+		defer GinkgoRecover()
+	}()
+})
 
-func (builder *PodBuilder) AddContainer(container corev1.Container) *PodBuilder {
-	containers := builder.get().Spec.Containers
-	containers = append(containers, container)
-	builder.get().Spec.Containers = containers
-	return builder
-}
+var _ = AfterSuite(func() {
+})

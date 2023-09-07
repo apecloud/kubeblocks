@@ -20,20 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builderx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/utils/strings/slices"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("fix meta transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
 			GetObject()

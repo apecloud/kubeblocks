@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -28,7 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -55,7 +56,7 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				constant.AppInstanceLabelKey:    "clusterName",
 				constant.KBAppComponentLabelKey: "componentName",
 			}
-			pod := builder.NewPodBuilder(testCtx.DefaultNamespace, "foo").
+			pod := builder2.NewPodBuilder(testCtx.DefaultNamespace, "foo").
 				AddLabelsInMap(commonLabels).
 				AddContainer(corev1.Container{
 					Name:  "foo",
@@ -76,7 +77,7 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				Image:   "foo",
 				Command: []string{"bar"},
 			}
-			rsm := builder.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
+			rsm := builderx.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
 				AddMatchLabelsInMap(commonLabels).
 				SetService(service).
 				SetTemplate(template).

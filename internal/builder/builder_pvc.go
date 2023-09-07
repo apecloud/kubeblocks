@@ -17,27 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package model
+package builder
 
 import (
-	"github.com/apecloud/kubeblocks/internal/builder"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 )
 
-var _ = Describe("transform types test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
+type PVCBuilder struct {
+	BaseBuilder[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, PVCBuilder]
+}
 
-	Context("FindX function", func() {
-		It("should work well", func() {
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			vertex := &ObjectVertex{Obj: root}
-			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: nil}"))
-			vertex.Action = ActionPtr(CREATE)
-			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: CREATE}"))
-		})
-	})
-})
+func NewPVCBuilder(namespace, name string) *PVCBuilder {
+	builder := &PVCBuilder{}
+	builder.Init(namespace, name, &corev1.PersistentVolumeClaim{}, builder)
+	return builder
+}
+
+func (builder *PVCBuilder) SetResources(resources corev1.ResourceRequirements) *PVCBuilder {
+	builder.GetObject().Spec.Resources = resources
+	return builder
+}

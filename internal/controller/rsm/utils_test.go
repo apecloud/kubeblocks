@@ -21,6 +21,8 @@ package rsm
 
 import (
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,14 +34,13 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 var _ = Describe("utils test", func() {
 	var priorityMap map[string]int
 
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 			SetService(&corev1.Service{}).
 			SetRoles(roles).
 			GetObject()
@@ -65,13 +66,13 @@ var _ = Describe("utils test", func() {
 	Context("sortPods function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
-				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "logger").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-2").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-3").AddLabels(roleLabelKey, "learner").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-4").AddLabels(roleLabelKey, "candidate").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-5").AddLabels(roleLabelKey, "leader").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-6").AddLabels(roleLabelKey, "learner").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "logger").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-2").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-3").AddLabels(roleLabelKey, "learner").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-4").AddLabels(roleLabelKey, "candidate").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-5").AddLabels(roleLabelKey, "leader").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-6").AddLabels(roleLabelKey, "learner").GetObject(),
 			}
 			expectedOrder := []string{"pod-4", "pod-2", "pod-3", "pod-6", "pod-1", "pod-0", "pod-5"}
 
@@ -119,9 +120,9 @@ var _ = Describe("utils test", func() {
 	Context("setMembersStatus function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
-				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "leader").GetObject(),
-				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(roleLabelKey, "follower").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "leader").GetObject(),
+				*builder2.NewPodBuilder(namespace, "pod-2").AddLabels(roleLabelKey, "follower").GetObject(),
 			}
 			readyCondition := corev1.PodCondition{
 				Type:   corev1.PodReady,
@@ -160,7 +161,7 @@ var _ = Describe("utils test", func() {
 
 	Context("getRoleName function", func() {
 		It("should work well", func() {
-			pod := builder.NewPodBuilder(namespace, name).AddLabels(roleLabelKey, "LEADER").GetObject()
+			pod := builder2.NewPodBuilder(namespace, name).AddLabels(roleLabelKey, "LEADER").GetObject()
 			role := getRoleName(*pod)
 			Expect(role).Should(Equal("leader"))
 		})
@@ -168,11 +169,11 @@ var _ = Describe("utils test", func() {
 
 	Context("getPodsOfStatefulSet function", func() {
 		It("should work well", func() {
-			sts := builder.NewStatefulSetBuilder(namespace, name).
+			sts := builder2.NewStatefulSetBuilder(namespace, name).
 				AddMatchLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
 				AddMatchLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
-			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+			pod := builder2.NewPodBuilder(namespace, getPodName(name, 0)).
 				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
 				AddLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
@@ -220,7 +221,7 @@ var _ = Describe("utils test", func() {
 					},
 				},
 			}
-			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+			pod := builder2.NewPodBuilder(namespace, getPodName(name, 0)).
 				SetContainers([]corev1.Container{container}).
 				GetObject()
 			rsm.Spec.Template = corev1.PodTemplateSpec{

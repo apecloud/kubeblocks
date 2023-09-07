@@ -22,6 +22,7 @@ package plan
 import (
 	"bytes"
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
 	"strings"
 	"text/template"
 
@@ -43,7 +44,7 @@ import (
 //     should just call underlying registered Go template function.
 func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
 	name := GenerateTLSSecretName(clusterName, componentName)
-	secret := builder.NewSecretBuilder(namespace, name).
+	secret := builder2.NewSecretBuilder(namespace, name).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
 		AddLabels(constant.KBManagedByKey, constant.AppName).
 		SetStringData(map[string]string{}).

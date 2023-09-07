@@ -22,6 +22,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"strings"
 	"time"
 
@@ -37,7 +38,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"

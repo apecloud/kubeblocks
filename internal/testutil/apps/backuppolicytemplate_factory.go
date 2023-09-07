@@ -26,7 +26,7 @@ import (
 )
 
 type MockBackupPolicyTemplateFactory struct {
-	builder.BaseFactory[appsv1alpha1.BackupPolicyTemplate, *appsv1alpha1.BackupPolicyTemplate, MockBackupPolicyTemplateFactory]
+	builder.BaseBuilder[appsv1alpha1.BackupPolicyTemplate, *appsv1alpha1.BackupPolicyTemplate, MockBackupPolicyTemplateFactory]
 	backupType dataprotectionv1alpha1.BackupType
 }
 

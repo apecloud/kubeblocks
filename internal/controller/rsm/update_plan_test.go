@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -28,12 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 var _ = Describe("update plan test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).SetRoles(roles).GetObject()
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).SetRoles(roles).GetObject()
 		rsm.Status.UpdateRevision = newRevision
 	})
 
@@ -41,36 +42,36 @@ var _ = Describe("update plan test.", func() {
 		var pod0, pod1, pod2, pod3, pod4, pod5, pod6 *corev1.Pod
 
 		resetPods := func() {
-			pod0 = builder.NewPodBuilder(namespace, getPodName(name, 0)).
+			pod0 = builder2.NewPodBuilder(namespace, getPodName(name, 0)).
 				AddLabels(roleLabelKey, "follower").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
-			pod1 = builder.NewPodBuilder(namespace, getPodName(name, 1)).
+			pod1 = builder2.NewPodBuilder(namespace, getPodName(name, 1)).
 				AddLabels(roleLabelKey, "logger").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
-			pod2 = builder.NewPodBuilder(namespace, getPodName(name, 2)).
+			pod2 = builder2.NewPodBuilder(namespace, getPodName(name, 2)).
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
-			pod3 = builder.NewPodBuilder(namespace, getPodName(name, 3)).
+			pod3 = builder2.NewPodBuilder(namespace, getPodName(name, 3)).
 				AddLabels(roleLabelKey, "learner").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
-			pod4 = builder.NewPodBuilder(namespace, getPodName(name, 4)).
+			pod4 = builder2.NewPodBuilder(namespace, getPodName(name, 4)).
 				AddLabels(roleLabelKey, "candidate").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
-			pod5 = builder.NewPodBuilder(namespace, getPodName(name, 5)).
+			pod5 = builder2.NewPodBuilder(namespace, getPodName(name, 5)).
 				AddLabels(roleLabelKey, "leader").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
 
-			pod6 = builder.NewPodBuilder(namespace, getPodName(name, 6)).
+			pod6 = builder2.NewPodBuilder(namespace, getPodName(name, 6)).
 				AddLabels(roleLabelKey, "learner").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()

@@ -28,7 +28,7 @@ import (
 )
 
 type MockRestoreJobFactory struct {
-	builder.BaseFactory[dataprotectionv1alpha1.RestoreJob, *dataprotectionv1alpha1.RestoreJob, MockRestoreJobFactory]
+	builder.BaseBuilder[dataprotectionv1alpha1.RestoreJob, *dataprotectionv1alpha1.RestoreJob, MockRestoreJobFactory]
 }
 
 func NewRestoreJobFactory(namespace, name string) *MockRestoreJobFactory {

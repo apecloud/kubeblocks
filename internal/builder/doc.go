@@ -17,23 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+Package builder is a K8s object generation library in a builder-pattern fashion.
+ */
 package builder
-
-import (
-	corev1 "k8s.io/api/core/v1"
-)
-
-type PVCBuilder struct {
-	BaseBuilder[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, PVCBuilder]
-}
-
-func NewPVCBuilder(namespace, name string) *PVCBuilder {
-	builder := &PVCBuilder{}
-	builder.init(namespace, name, &corev1.PersistentVolumeClaim{}, builder)
-	return builder
-}
-
-func (builder *PVCBuilder) SetResources(resources corev1.ResourceRequirements) *PVCBuilder {
-	builder.get().Spec.Resources = resources
-	return builder
-}

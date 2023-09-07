@@ -32,7 +32,7 @@ import (
 )
 
 type MockClusterFactory struct {
-	builder.BaseFactory[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, MockClusterFactory]
+	builder.BaseBuilder[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, MockClusterFactory]
 }
 
 func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory {

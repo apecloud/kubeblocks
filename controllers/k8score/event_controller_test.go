@@ -21,6 +21,7 @@ package k8score
 
 import (
 	"fmt"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
 	"strings"
 	"time"
 
@@ -36,7 +37,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -77,7 +77,7 @@ var _ = Describe("Event Controller", func() {
 			UID:        podUid,
 		}
 		eventName := strings.Join([]string{podName, seq}, ".")
-		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
+		return builder2.NewEventBuilder(testCtx.DefaultNamespace, eventName).
 			SetInvolvedObject(objectRef).
 			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
 			SetReason(string(probeutil.CheckRoleOperation)).
@@ -88,7 +88,7 @@ var _ = Describe("Event Controller", func() {
 	}
 
 	createInvolvedPod := func(name, clusterName, componentName string) *corev1.Pod {
-		return builder.NewPodBuilder(testCtx.DefaultNamespace, name).
+		return builder2.NewPodBuilder(testCtx.DefaultNamespace, name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddLabels(constant.KBAppComponentLabelKey, componentName).
 			SetContainers([]corev1.Container{

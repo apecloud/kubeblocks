@@ -29,7 +29,7 @@ import (
 )
 
 type MockBackupFactory struct {
-	builder.BaseFactory[dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.Backup, MockBackupFactory]
+	builder.BaseBuilder[dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.Backup, MockBackupFactory]
 }
 
 func NewBackupFactory(namespace, name string) *MockBackupFactory {
@@ -42,7 +42,7 @@ func NewBackupFactory(namespace, name string) *MockBackupFactory {
 }
 
 func (factory *MockBackupFactory) SetBackupPolicyName(backupPolicyName string) *MockBackupFactory {
-	factory.get().Spec.BackupPolicyName = backupPolicyName
+	factory.GetObject().Spec.BackupPolicyName = backupPolicyName
 	return factory
 }
 

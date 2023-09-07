@@ -23,23 +23,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-type ConfigMapBuilder struct {
-	BaseBuilder[corev1.ConfigMap, *corev1.ConfigMap, ConfigMapBuilder]
+type SecretBuilder struct {
+	BaseBuilder[corev1.Secret, *corev1.Secret, SecretBuilder]
 }
 
-func NewConfigMapBuilder(namespace, name string) *ConfigMapBuilder {
-	builder := &ConfigMapBuilder{}
-	builder.init(namespace, name, &corev1.ConfigMap{}, builder)
+func NewSecretBuilder(namespace, name string) *SecretBuilder {
+	builder := &SecretBuilder{}
+	builder.Init(namespace, name, &corev1.Secret{}, builder)
 	return builder
 }
 
-func (builder *ConfigMapBuilder) SetImmutable(immutable bool) *ConfigMapBuilder {
-	builder.get().Immutable = &immutable
+func (builder *SecretBuilder) SetImmutable(immutable bool) *SecretBuilder {
+	builder.GetObject().Immutable = &immutable
 	return builder
 }
 
-func (builder *ConfigMapBuilder) PutData(key, value string) *ConfigMapBuilder {
-	data := builder.get().Data
+func (builder *SecretBuilder) PutStringData(key, value string) *SecretBuilder {
+	data := builder.GetObject().StringData
 	if data == nil {
 		data = make(map[string]string, 1)
 	}
@@ -47,13 +47,13 @@ func (builder *ConfigMapBuilder) PutData(key, value string) *ConfigMapBuilder {
 	return builder
 }
 
-func (builder *ConfigMapBuilder) SetData(data map[string]string) *ConfigMapBuilder {
-	builder.get().Data = data
+func (builder *SecretBuilder) SetStringData(data map[string]string) *SecretBuilder {
+	builder.GetObject().StringData = data
 	return builder
 }
 
-func (builder *ConfigMapBuilder) PutBinaryData(key string, value []byte) *ConfigMapBuilder {
-	data := builder.get().BinaryData
+func (builder *SecretBuilder) PutData(key string, value []byte) *SecretBuilder {
+	data := builder.GetObject().Data
 	if data == nil {
 		data = make(map[string][]byte, 1)
 	}
@@ -61,7 +61,12 @@ func (builder *ConfigMapBuilder) PutBinaryData(key string, value []byte) *Config
 	return builder
 }
 
-func (builder *ConfigMapBuilder) SetBinaryData(binaryData map[string][]byte) *ConfigMapBuilder {
-	builder.get().BinaryData = binaryData
+func (builder *SecretBuilder) SetData(binaryData map[string][]byte) *SecretBuilder {
+	builder.GetObject().Data = binaryData
+	return builder
+}
+
+func (builder *SecretBuilder) SetSecretType(secretType corev1.SecretType) *SecretBuilder {
+	builder.GetObject().Type = secretType
 	return builder
 }

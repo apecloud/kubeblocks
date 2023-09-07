@@ -21,6 +21,8 @@ package rsm
 
 import (
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	mockclient "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
@@ -53,7 +54,7 @@ var _ = Describe("plan builder test", func() {
 			planBuilder := NewRSMPlanBuilder(reqCtx, cli, req)
 			rsmBuilder, _ = planBuilder.(*PlanBuilder)
 
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 				AddFinalizers([]string{getFinalizer(&workloads.ReplicatedStateMachine{})}).
 				GetObject()
 		})
@@ -76,7 +77,7 @@ var _ = Describe("plan builder test", func() {
 		})
 
 		It("should update sts object", func() {
-			stsOrig := builder.NewStatefulSetBuilder(namespace, name).SetReplicas(3).GetObject()
+			stsOrig := builder2.NewStatefulSetBuilder(namespace, name).SetReplicas(3).GetObject()
 			sts := stsOrig.DeepCopy()
 			replicas := int32(5)
 			sts.Spec.Replicas = &replicas
@@ -100,7 +101,7 @@ var _ = Describe("plan builder test", func() {
 		})
 
 		It("should update svc object", func() {
-			svcOrig := builder.NewServiceBuilder(namespace, name).SetType(corev1.ServiceTypeLoadBalancer).GetObject()
+			svcOrig := builder2.NewServiceBuilder(namespace, name).SetType(corev1.ServiceTypeLoadBalancer).GetObject()
 			svc := svcOrig.DeepCopy()
 			svc.Spec.Selector = map[string]string{"foo": "bar"}
 			v := &model.ObjectVertex{
@@ -121,7 +122,7 @@ var _ = Describe("plan builder test", func() {
 		})
 
 		It("should update pvc object", func() {
-			pvcOrig := builder.NewPVCBuilder(namespace, name).GetObject()
+			pvcOrig := builder2.NewPVCBuilder(namespace, name).GetObject()
 			pvc := pvcOrig.DeepCopy()
 			pvc.Spec.Resources = corev1.ResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{

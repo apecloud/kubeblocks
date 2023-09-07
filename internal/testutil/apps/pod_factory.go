@@ -25,7 +25,7 @@ import (
 )
 
 type MockPodFactory struct {
-	builder.BaseFactory[corev1.Pod, *corev1.Pod, MockPodFactory]
+	builder.BaseBuilder[corev1.Pod, *corev1.Pod, MockPodFactory]
 }
 
 func NewPodFactory(namespace, name string) *MockPodFactory {

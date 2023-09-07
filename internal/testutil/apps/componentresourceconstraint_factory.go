@@ -91,7 +91,7 @@ const (
 )
 
 type MockComponentResourceConstraintFactory struct {
-	builder.BaseFactory[appsv1alpha1.ComponentResourceConstraint, *appsv1alpha1.ComponentResourceConstraint, MockComponentResourceConstraintFactory]
+	builder.BaseBuilder[appsv1alpha1.ComponentResourceConstraint, *appsv1alpha1.ComponentResourceConstraint, MockComponentResourceConstraintFactory]
 }
 
 func NewComponentResourceConstraintFactory(name string) *MockComponentResourceConstraintFactory {

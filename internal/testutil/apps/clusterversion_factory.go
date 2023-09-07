@@ -27,7 +27,7 @@ import (
 )
 
 type MockClusterVersionFactory struct {
-	builder.BaseFactory[appsv1alpha1.ClusterVersion, *appsv1alpha1.ClusterVersion, MockClusterVersionFactory]
+	builder.BaseBuilder[appsv1alpha1.ClusterVersion, *appsv1alpha1.ClusterVersion, MockClusterVersionFactory]
 }
 
 func NewClusterVersionFactory(name, cdRef string) *MockClusterVersionFactory {

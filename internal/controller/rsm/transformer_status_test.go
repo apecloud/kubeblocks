@@ -21,6 +21,8 @@ package rsm
 
 import (
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,13 +35,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("object status transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
 			AddMatchLabelsInMap(selectors).
 			SetServiceName(headlessSvcName).
@@ -108,13 +109,13 @@ var _ = Describe("object status transformer test.", func() {
 					*obj = *sts
 					return nil
 				}).Times(1)
-			pod0 := builder.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).
+			pod0 := builder2.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).
 				AddLabels(roleLabelKey, "follower").
 				GetObject()
-			pod1 := builder.NewPodBuilder(namespace, getPodName(name, 1)).
+			pod1 := builder2.NewPodBuilder(namespace, getPodName(name, 1)).
 				AddLabels(roleLabelKey, "leader").
 				GetObject()
-			pod2 := builder.NewPodBuilder(namespace, getPodName(name, 2)).
+			pod2 := builder2.NewPodBuilder(namespace, getPodName(name, 2)).
 				AddLabels(roleLabelKey, "follower").
 				GetObject()
 			makePodUpdateReady("new-revision", pod0, pod1, pod2)

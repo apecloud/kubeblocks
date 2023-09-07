@@ -30,7 +30,7 @@ import (
 )
 
 type MockPersistentVolumeClaimFactory struct {
-	builder.BaseFactory[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, MockPersistentVolumeClaimFactory]
+	builder.BaseBuilder[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, MockPersistentVolumeClaimFactory]
 }
 
 func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName, vctName string) *MockPersistentVolumeClaimFactory {

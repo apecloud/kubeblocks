@@ -20,21 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"github.com/apecloud/kubeblocks/internal/builder"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockStatefulSetFactory struct {
-	builder.BaseFactory[appsv1.StatefulSet, *appsv1.StatefulSet, MockStatefulSetFactory]
+	builder.StatefulSetBuilder
+	ObjectCreator
+	CommonLabelAppender
 }
 
 func NewStatefulSetFactory(namespace, name string, clusterName string, componentName string) *MockStatefulSetFactory {
 	f := &MockStatefulSetFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -65,41 +67,7 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 				},
 			},
 		}, f)
+	f.ObjectCreator.Object = f.StatefulSetBuilder.GetObject()
+	f.CommonLabelAppender.Object = f.StatefulSetBuilder.GetObject()
 	return f
-}
-
-func (factory *MockStatefulSetFactory) SetReplicas(replicas int32) *MockStatefulSetFactory {
-	factory.get().Spec.Replicas = &replicas
-	return factory
-}
-
-func (factory *MockStatefulSetFactory) AddVolume(volume corev1.Volume) *MockStatefulSetFactory {
-	volumes := &factory.get().Spec.Template.Spec.Volumes
-	*volumes = append(*volumes, volume)
-	return factory
-}
-
-func (factory *MockStatefulSetFactory) AddConfigmapVolume(volumeName string, configmapName string) *MockStatefulSetFactory {
-	volume := corev1.Volume{
-		Name: volumeName,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: configmapName},
-			},
-		},
-	}
-	factory.AddVolume(volume)
-	return factory
-}
-
-func (factory *MockStatefulSetFactory) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *MockStatefulSetFactory {
-	volumeClaimTpls := &factory.get().Spec.VolumeClaimTemplates
-	*volumeClaimTpls = append(*volumeClaimTpls, pvc)
-	return factory
-}
-
-func (factory *MockStatefulSetFactory) AddContainer(container corev1.Container) *MockStatefulSetFactory {
-	containers := &factory.get().Spec.Template.Spec.Containers
-	*containers = append(*containers, container)
-	return factory
 }

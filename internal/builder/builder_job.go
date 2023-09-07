@@ -31,28 +31,28 @@ type JobBuilder struct {
 
 func NewJobBuilder(namespace, name string) *JobBuilder {
 	builder := &JobBuilder{}
-	builder.init(namespace, name, &batchv1.Job{}, builder)
+	builder.Init(namespace, name, &batchv1.Job{}, builder)
 	return builder
 }
 
 func (builder *JobBuilder) SetPodTemplateSpec(template corev1.PodTemplateSpec) *JobBuilder {
-	builder.get().Spec.Template = template
+	builder.GetObject().Spec.Template = template
 	return builder
 }
 
 func (builder *JobBuilder) AddSelector(key, value string) *JobBuilder {
-	selector := builder.get().Spec.Selector
+	selector := builder.GetObject().Spec.Selector
 	if selector == nil {
 		selector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{},
 		}
 	}
 	selector.MatchLabels[key] = value
-	builder.get().Spec.Selector = selector
+	builder.GetObject().Spec.Selector = selector
 	return builder
 }
 
 func (builder *JobBuilder) SetSuspend(suspend bool) *JobBuilder {
-	builder.get().Spec.Suspend = &suspend
+	builder.GetObject().Spec.Suspend = &suspend
 	return builder
 }

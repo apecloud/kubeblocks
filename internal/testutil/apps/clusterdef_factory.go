@@ -36,7 +36,7 @@ const (
 )
 
 type MockClusterDefFactory struct {
-	builder.BaseFactory[appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterDefinition, MockClusterDefFactory]
+	builder.BaseBuilder[appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterDefinition, MockClusterDefFactory]
 }
 
 func NewClusterDefFactory(name string) *MockClusterDefFactory {

@@ -21,6 +21,7 @@ package rsm
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,7 +38,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"

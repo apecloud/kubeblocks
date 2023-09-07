@@ -22,6 +22,7 @@ package rsm
 import (
 	"context"
 	"fmt"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,7 +34,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -45,7 +45,7 @@ var _ = Describe("pod role label event handler test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).SetUID(uid).GetObject()
+			pod := builder2.NewPodBuilder(namespace, getPodName(name, 0)).SetUID(uid).GetObject()
 			objectRef := corev1.ObjectReference{
 				APIVersion: "v1",
 				Kind:       "Pod",
@@ -63,7 +63,7 @@ var _ = Describe("pod role label event handler test", func() {
 
 			By("build an expected message")
 			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", role.Name)
-			event := builder.NewEventBuilder(namespace, "foo").
+			event := builder2.NewEventBuilder(namespace, "foo").
 				SetInvolvedObject(objectRef).
 				SetMessage(message).
 				GetObject()
@@ -107,7 +107,7 @@ var _ = Describe("pod role label event handler test", func() {
 
 			By("build an unexpected message")
 			message = "unexpected message"
-			event = builder.NewEventBuilder(namespace, "foo").
+			event = builder2.NewEventBuilder(namespace, "foo").
 				SetInvolvedObject(objectRef).
 				SetMessage(message).
 				GetObject()
@@ -133,7 +133,7 @@ var _ = Describe("pod role label event handler test", func() {
 			By("build an well formatted message")
 			roleName := "leader"
 			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", roleName)
-			event := builder.NewEventBuilder(namespace, "foo").
+			event := builder2.NewEventBuilder(namespace, "foo").
 				SetMessage(message).
 				GetObject()
 			msg := parseProbeEventMessage(reqCtx, event)

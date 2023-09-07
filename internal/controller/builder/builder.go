@@ -25,6 +25,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -304,7 +306,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		constant.AppInstanceLabelKey:    cluster.Name,
 		constant.KBAppComponentLabelKey: component.Name,
 	}
-	podBuilder := NewPodBuilder("", "").
+	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
@@ -315,7 +317,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *component.PodSpec,
 	}
-	stsBuilder := NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
+	stsBuilder := builder.NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddMatchLabelsInMap(commonLabels).
@@ -380,7 +382,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		service.Labels = labels
 	}
 
-	podBuilder := NewPodBuilder("", "").
+	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
@@ -392,7 +394,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		Spec:       *component.PodSpec,
 	}
 	rsmName := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
-	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
+	rsmBuilder := builderx.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddMatchLabelsInMap(commonLabels).

@@ -17,9 +17,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package builder
+package builderx
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -59,7 +60,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 				Command: []string{"bar"},
 			},
 		}
-		pod := NewPodBuilder(ns, "foo").
+		pod := builder.NewPodBuilder(ns, "foo").
 			AddContainer(corev1.Container{
 				Name:  "foo",
 				Image: "bar",

@@ -22,6 +22,8 @@ package handler
 import (
 	"context"
 	"fmt"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,7 +38,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
@@ -58,13 +59,13 @@ var _ = Describe("handler builder test.", func() {
 				constant.AppInstanceLabelKey:    clusterName,
 				constant.KBAppComponentLabelKey: componentName,
 			}
-			rsm := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
+			rsm := builderx.NewReplicatedStateMachineBuilder(namespace, rsmName).
 				AddLabelsInMap(labels).
 				GetObject()
-			sts := builder.NewStatefulSetBuilder(namespace, stsName).
+			sts := builder2.NewStatefulSetBuilder(namespace, stsName).
 				AddLabelsInMap(labels).
 				GetObject()
-			pod := builder.NewPodBuilder(namespace, podName).
+			pod := builder2.NewPodBuilder(namespace, podName).
 				SetOwnerReferences("apps/v1", "StatefulSet", sts).
 				GetObject()
 			objectRef := corev1.ObjectReference{
@@ -74,7 +75,7 @@ var _ = Describe("handler builder test.", func() {
 				Name:       pod.Name,
 				UID:        pod.UID,
 			}
-			evt := builder.NewEventBuilder(namespace, eventName).
+			evt := builder2.NewEventBuilder(namespace, eventName).
 				SetInvolvedObject(objectRef).
 				GetObject()
 

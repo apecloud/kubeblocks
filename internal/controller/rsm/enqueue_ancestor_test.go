@@ -22,6 +22,8 @@ package rsm
 import (
 	"context"
 	"fmt"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
@@ -61,15 +62,15 @@ var _ = Describe("enqueue ancestor", func() {
 		ancestorL1Name := "ancestor-level-1"
 		objectName := ancestorL1Name + "-0"
 
-		ancestorLevel2 := builder.NewReplicatedStateMachineBuilder(namespace, ancestorL2Name).GetObject()
+		ancestorLevel2 := builderx.NewReplicatedStateMachineBuilder(namespace, ancestorL2Name).GetObject()
 		ancestorLevel2.APIVersion = ancestorL2APIVersion
 		ancestorLevel2.Kind = ancestorL2Kind
-		ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, ancestorL1Name).
+		ancestorLevel1 := builder2.NewStatefulSetBuilder(namespace, ancestorL1Name).
 			SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
 			GetObject()
 		ancestorLevel1.APIVersion = ancestorL1APIVersion
 		ancestorLevel1.Kind = ancestorL1Kind
-		object := builder.NewPodBuilder(namespace, objectName).
+		object := builder2.NewPodBuilder(namespace, objectName).
 			SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
 			GetObject()
 
@@ -212,7 +213,7 @@ var _ = Describe("enqueue ancestor", func() {
 			By("build a non-event object")
 			name := "foo"
 			uid := types.UID("bar")
-			object1 := builder.NewPodBuilder(namespace, name).SetUID(uid).GetObject()
+			object1 := builder2.NewPodBuilder(namespace, name).SetUID(uid).GetObject()
 			objectSrc1, err := handler.getSourceObject(object1)
 			Expect(err).Should(BeNil())
 			Expect(objectSrc1).Should(Equal(object1))
@@ -227,7 +228,7 @@ var _ = Describe("enqueue ancestor", func() {
 				Name:       object1.Name,
 				UID:        object1.UID,
 			}
-			object2 := builder.NewEventBuilder(namespace, "foo").
+			object2 := builder2.NewEventBuilder(namespace, "foo").
 				SetInvolvedObject(objectRef).
 				GetObject()
 			k8sMock.EXPECT().

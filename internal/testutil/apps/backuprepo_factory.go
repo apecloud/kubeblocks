@@ -29,7 +29,7 @@ import (
 )
 
 type MockBackupRepoFactory struct {
-	builder.BaseFactory[dataprotectionv1alpha1.BackupRepo, *dataprotectionv1alpha1.BackupRepo, MockBackupRepoFactory]
+	builder.BaseBuilder[dataprotectionv1alpha1.BackupRepo, *dataprotectionv1alpha1.BackupRepo, MockBackupRepoFactory]
 }
 
 func NewBackupRepoFactory(namespace, name string) *MockBackupRepoFactory {

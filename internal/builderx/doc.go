@@ -17,27 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package model
-
-import (
-	"github.com/apecloud/kubeblocks/internal/builder"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-)
-
-var _ = Describe("transform types test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
-	Context("FindX function", func() {
-		It("should work well", func() {
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			vertex := &ObjectVertex{Obj: root}
-			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: nil}"))
-			vertex.Action = ActionPtr(CREATE)
-			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: CREATE}"))
-		})
-	})
-})
+/*
+Package builderx is an extension of `builder` pkg which includes all KubeBlocks dedicated objects.
+ */
+package builderx

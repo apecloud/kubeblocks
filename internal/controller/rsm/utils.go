@@ -22,6 +22,7 @@ package rsm
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"regexp"
 	"sort"
 	"strconv"
@@ -42,7 +43,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"

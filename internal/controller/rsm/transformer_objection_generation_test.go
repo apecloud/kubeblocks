@@ -21,6 +21,8 @@ package rsm
 
 import (
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,12 +34,11 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 var _ = Describe("object generation transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
 			AddLabels(constant.AppComponentLabelKey, name).
 			SetReplicas(3).
@@ -64,10 +65,10 @@ var _ = Describe("object generation transformer test.", func() {
 
 	Context("Transform function", func() {
 		It("should work well", func() {
-			sts := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsm)).GetObject()
-			svc := builder.NewServiceBuilder(name, name).GetObject()
-			env := builder.NewConfigMapBuilder(name, name+"-env").GetObject()
+			sts := builder2.NewStatefulSetBuilder(namespace, name).GetObject()
+			headlessSvc := builder2.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsm)).GetObject()
+			svc := builder2.NewServiceBuilder(name, name).GetObject()
+			env := builder2.NewConfigMapBuilder(name, name+"-env").GetObject()
 			k8sMock.EXPECT().
 				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {

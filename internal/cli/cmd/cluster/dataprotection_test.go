@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"strings"
 	"time"
 
@@ -50,7 +51,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("DataProtection", func() {

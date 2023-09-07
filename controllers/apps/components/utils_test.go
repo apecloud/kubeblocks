@@ -21,6 +21,7 @@ package components
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/builder"
 	"reflect"
 	"testing"
 	"time"
@@ -36,7 +37,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/types"

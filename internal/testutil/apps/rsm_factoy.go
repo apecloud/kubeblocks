@@ -30,7 +30,7 @@ import (
 )
 
 type MockRSMFactory struct {
-	builder.BaseFactory[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, MockRSMFactory]
+	builder.BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, MockRSMFactory]
 }
 
 func NewRSMFactory(namespace, name string, clusterName string, componentName string) *MockRSMFactory {

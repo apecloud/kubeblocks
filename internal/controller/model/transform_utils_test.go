@@ -21,6 +21,7 @@ package model
 
 import (
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -53,10 +53,10 @@ var _ = Describe("transform utils test", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("root vertex not found"))
 
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			obj0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
-			obj1 := builder.NewPodBuilder(namespace, name+"-1").GetObject()
-			obj2 := builder.NewPodBuilder(namespace, name+"-2").GetObject()
+			root := builder2.NewStatefulSetBuilder(namespace, name).GetObject()
+			obj0 := builder2.NewPodBuilder(namespace, name+"-0").GetObject()
+			obj1 := builder2.NewPodBuilder(namespace, name+"-1").GetObject()
+			obj2 := builder2.NewPodBuilder(namespace, name+"-2").GetObject()
 			dag.AddVertex(&ObjectVertex{Obj: root})
 			dag.AddConnectRoot(&ObjectVertex{Obj: obj0})
 			dag.AddConnectRoot(&ObjectVertex{Obj: obj1})
@@ -93,8 +93,8 @@ var _ = Describe("transform utils test", func() {
 			ownerAPIVersion := "apps/v1"
 			ownerKind := "StatefulSet"
 			objectName := name + "-0"
-			owner := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			object := builder.NewPodBuilder(namespace, objectName).
+			owner := builder2.NewStatefulSetBuilder(namespace, name).GetObject()
+			object := builder2.NewPodBuilder(namespace, objectName).
 				SetOwnerReferences(ownerAPIVersion, ownerKind, owner).
 				GetObject()
 			Expect(IsOwnerOf(owner, object)).Should(BeTrue())
@@ -145,10 +145,10 @@ var _ = Describe("transform utils test", func() {
 			controller, k8sMock := testutil.SetupK8sMock()
 			defer controller.Finish()
 
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			obj0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
-			obj1 := builder.NewPodBuilder(namespace, name+"-1").GetObject()
-			obj2 := builder.NewPodBuilder(namespace, name+"-2").GetObject()
+			root := builder2.NewStatefulSetBuilder(namespace, name).GetObject()
+			obj0 := builder2.NewPodBuilder(namespace, name+"-0").GetObject()
+			obj1 := builder2.NewPodBuilder(namespace, name+"-1").GetObject()
+			obj2 := builder2.NewPodBuilder(namespace, name+"-2").GetObject()
 
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).

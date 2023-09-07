@@ -21,6 +21,8 @@ package rsm
 
 import (
 	"context"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
+	"github.com/apecloud/kubeblocks/internal/builderx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,12 +35,11 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 var _ = Describe("update strategy transformer test.", func() {
 	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
+		rsm = builderx.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
@@ -156,15 +157,15 @@ var _ = Describe("update strategy transformer test.", func() {
 					obj.Spec.Replicas = rsm.Spec.Replicas
 					return nil
 				}).Times(4)
-			pod0 := builder.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).
+			pod0 := builder2.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).
 				AddLabels(roleLabelKey, "follower").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
-			pod1 := builder.NewPodBuilder(namespace, getPodName(name, 1)).
+			pod1 := builder2.NewPodBuilder(namespace, getPodName(name, 1)).
 				AddLabels(roleLabelKey, "leader").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
-			pod2 := builder.NewPodBuilder(namespace, getPodName(name, 2)).
+			pod2 := builder2.NewPodBuilder(namespace, getPodName(name, 2)).
 				AddLabels(roleLabelKey, "follower").
 				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
 				GetObject()
@@ -201,7 +202,7 @@ var _ = Describe("update strategy transformer test.", func() {
 			makePodUpdateReady(newRevision, pod2)
 			dagExpected = mockDAG()
 			actionName := getActionName(rsm.Name, int(rsm.Generation), 1, jobTypeSwitchover)
-			action := builder.NewJobBuilder(name, actionName).GetObject()
+			action := builder2.NewJobBuilder(name, actionName).GetObject()
 			graphCli.Create(dagExpected, action)
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
@@ -221,7 +222,7 @@ var _ = Describe("update strategy transformer test.", func() {
 
 			By("update the last(leader) pod")
 			dagExpected = mockDAG()
-			action = builder.NewJobBuilder(name, actionName).
+			action = builder2.NewJobBuilder(name, actionName).
 				AddLabelsInMap(map[string]string{
 					constant.AppInstanceLabelKey: rsm.Name,
 					constant.KBManagedByKey:      kindReplicatedStateMachine,

@@ -17,9 +17,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package builder
+package builderx
 
 import (
+	"github.com/apecloud/kubeblocks/internal/builder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ import (
 )
 
 type ReplicatedStateMachineBuilder struct {
-	BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, ReplicatedStateMachineBuilder]
+	builder.BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, ReplicatedStateMachineBuilder]
 }
 
 func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMachineBuilder {

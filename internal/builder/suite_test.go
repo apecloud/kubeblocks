@@ -17,27 +17,32 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package model
+package builder
 
 import (
-	"github.com/apecloud/kubeblocks/internal/builder"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("transform types test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-	Context("FindX function", func() {
-		It("should work well", func() {
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			vertex := &ObjectVertex{Obj: root}
-			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: nil}"))
-			vertex.Action = ActionPtr(CREATE)
-			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: CREATE}"))
-		})
-	})
+func init() {
+}
+
+func TestAPIs(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Builder Suite")
+}
+
+var _ = BeforeSuite(func() {
+	go func() {
+		defer GinkgoRecover()
+	}()
+})
+
+var _ = AfterSuite(func() {
 })

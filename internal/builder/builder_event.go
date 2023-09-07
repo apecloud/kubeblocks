@@ -30,36 +30,36 @@ type EventBuilder struct {
 
 func NewEventBuilder(namespace, name string) *EventBuilder {
 	builder := &EventBuilder{}
-	builder.init(namespace, name, &corev1.Event{}, builder)
+	builder.Init(namespace, name, &corev1.Event{}, builder)
 	return builder
 }
 
 func (builder *EventBuilder) SetInvolvedObject(objectRef corev1.ObjectReference) *EventBuilder {
-	builder.get().InvolvedObject = objectRef
+	builder.GetObject().InvolvedObject = objectRef
 	return builder
 }
 
 func (builder *EventBuilder) SetMessage(message string) *EventBuilder {
-	builder.get().Message = message
+	builder.GetObject().Message = message
 	return builder
 }
 
 func (builder *EventBuilder) SetReason(reason string) *EventBuilder {
-	builder.get().Reason = reason
+	builder.GetObject().Reason = reason
 	return builder
 }
 
 func (builder *EventBuilder) SetType(tp string) *EventBuilder {
-	builder.get().Type = tp
+	builder.GetObject().Type = tp
 	return builder
 }
 
 func (builder *EventBuilder) SetFirstTimestamp(firstTimestamp metav1.Time) *EventBuilder {
-	builder.get().FirstTimestamp = firstTimestamp
+	builder.GetObject().FirstTimestamp = firstTimestamp
 	return builder
 }
 
 func (builder *EventBuilder) SetLastTimestamp(lastTimestamp metav1.Time) *EventBuilder {
-	builder.get().LastTimestamp = lastTimestamp
+	builder.GetObject().LastTimestamp = lastTimestamp
 	return builder
 }

@@ -22,6 +22,7 @@ package rsm
 import (
 	"encoding/json"
 	"fmt"
+	builder2 "github.com/apecloud/kubeblocks/internal/builder"
 	"reflect"
 	"strconv"
 	"strings"
@@ -35,7 +36,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -210,7 +210,7 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	}
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, false)
-	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
+	return builder2.NewServiceBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(rsm.Spec.Service.Labels).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
@@ -246,7 +246,7 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, true)
-	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
+	hdlBuilder := builder2.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors)
 	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
@@ -278,7 +278,7 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	template := buildStsPodTemplate(rsm, envConfig)
 	labels := getLabels(&rsm)
-	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+	return builder2.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
 		AddAnnotationsInMap(rsm.Annotations).
 		SetSelector(rsm.Spec.Selector).
@@ -297,7 +297,7 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
 	}
-	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-rsm-env").
+	return builder2.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-rsm-env").
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }

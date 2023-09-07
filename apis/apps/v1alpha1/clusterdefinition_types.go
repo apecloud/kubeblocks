@@ -271,21 +271,33 @@ type ProtectedVolume struct {
 }
 
 type ServiceRefDeclaration struct {
-	// The name of the predefined service reference.
+	// The name of the service reference declaration.
 	// The service reference can come from an external service that is not part of KubeBlocks, or services provided by other KubeBlocks Cluster objects.
 	// The specific type of service reference depends on the binding declaration when creates a Cluster.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// serviceRefDeclarationSpecs is a collection of service descriptions for a service reference declaration.
+	// Each ServiceRefDeclarationSpec defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs are defined,
+	// it indicates that the ServiceRefDeclaration can be any one of the specified ServiceRefDeclarationSpecs.
+	// For example, when the ServiceRefDeclaration is declared to require an OLTP database, which can be either MySQL or PostgreSQL,
+	// you can define a ServiceRefDeclarationSpec for MySQL and another ServiceRefDeclarationSpec for PostgreSQL,
+	// when referencing the service within the cluster, as long as the serviceKind and serviceVersion match either MySQL or PostgreSQL, it can be used.
+	// +kubebuilder:validation:Required
+	ServiceRefDeclarationSpecs []ServiceRefDeclarationSpec `json:"serviceRefDeclarationSpecs"`
+}
+
+type ServiceRefDeclarationSpec struct {
 	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	Kind string `json:"kind"`
+	ServiceKind string `json:"serviceKind"`
 
-	// The version of the service reference.
-	// If version is set to "*", it means that no specific version is specified for the service reference and any version is matched.
+	// The service version of the service reference.
+	// It can be a specific version number of a service or a regular expression that matches a version number pattern.
+	// For example, `8.0.8`, `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
 	// +kubebuilder:validation:Required
-	Version string `json:"version"`
+	ServiceVersion string `json:"serviceVersion"`
 }
 
 // ClusterComponentDefinition provides a workload component specification template,

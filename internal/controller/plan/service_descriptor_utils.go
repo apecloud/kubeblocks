@@ -21,6 +21,7 @@ package plan
 
 import (
 	"fmt"
+	"regexp"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -126,16 +127,37 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 			}
 
 			if serviceRef.ServiceDescriptor != "" {
+				// verify service kind and version
+				verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, serviceRefDeclSpecs ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
+					match := false
+					for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
+						if serviceRefDeclSpec.ServiceKind != serviceDescriptor.Spec.ServiceKind {
+							continue
+						}
+						regex := regexp.MustCompile(serviceRefDeclSpec.ServiceVersion)
+						versionMatch := regex.MatchString(serviceDescriptor.Spec.ServiceVersion)
+						if versionMatch {
+							match = true
+							break
+						}
+					}
+					return match
+				}
 				serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
 				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: serviceRef.ServiceDescriptor}, serviceDescriptor); err != nil {
 					return nil, err
 				}
-				if serviceDescriptor.Spec.Kind != serviceRefDecl.Kind || serviceDescriptor.Spec.Version != serviceRefDecl.Version {
+				if serviceDescriptor.Status.Phase != appsv1alpha1.AvailablePhase {
+					return nil, fmt.Errorf("service descriptor %s status is not available", serviceDescriptor.Name)
+				}
+				match := verifyServiceKindAndVersion(*serviceDescriptor, serviceRefDecl.ServiceRefDeclarationSpecs...)
+				if !match {
 					return nil, fmt.Errorf("service descriptor %s kind or version is not match with service reference declaration %s", serviceDescriptor.Name, serviceRefDecl.Name)
 				}
 				serviceReferences[serviceRefDecl.Name] = serviceDescriptor
 			}
 		}
+		// TODO:
 	}
 	return serviceReferences, nil
 }

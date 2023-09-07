@@ -26,13 +26,13 @@ import (
 
 // ServiceDescriptorSpec defines the desired state of ServiceDescriptor
 type ServiceDescriptorSpec struct {
-	// The type of the service reference.
+	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
 	// +kubebuilder:validation:Required
-	Kind string `json:"kind"`
+	ServiceKind string `json:"serviceKind"`
 
 	// The version of the service reference.
 	// +kubebuilder:validation:Required
-	Version string `json:"version"`
+	ServiceVersion string `json:"serviceVersion"`
 
 	// endpoint is the endpoint of the service connection credential.
 	// +optional
@@ -45,10 +45,6 @@ type ServiceDescriptorSpec struct {
 	// port is the port of the service connection credential.
 	// +optional
 	Port *CredentialVar `json:"port,omitempty" protobuf:"bytes,4,opt,name=port"`
-
-	// extra is the extra information of the service connection credential, and it is a key-value pair.
-	// +optional
-	Extra map[string]string `json:"extra,omitempty"`
 }
 
 type ConnectionCredentialAuth struct {
@@ -104,8 +100,8 @@ func (r ServiceDescriptorStatus) GetTerminalPhases() []Phase {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=sd
-// +kubebuilder:printcolumn:name="KIND",type="string",JSONPath=".spec.kind",description="service kind"
-// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.version",description="service version"
+// +kubebuilder:printcolumn:name="SERVICE_KIND",type="string",JSONPath=".spec.serviceKind",description="service kind"
+// +kubebuilder:printcolumn:name="SERVICE_VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

@@ -94,14 +94,22 @@ var _ = Describe("generate service descriptor", func() {
 		mockClient = testutil.NewK8sMockClient()
 		serviceRefDeclarations := []appsv1alpha1.ServiceRefDeclaration{
 			{
-				Name:    redisServiceRefDeclarationName,
-				Kind:    externalServiceDescriptorKind,
-				Version: externalServiceDescriptorVersion,
+				Name: redisServiceRefDeclarationName,
+				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+					{
+						ServiceKind:    externalServiceDescriptorKind,
+						ServiceVersion: externalServiceDescriptorVersion,
+					},
+				},
 			},
 			{
-				Name:    mysqlServiceRefDeclarationName,
-				Kind:    internalClusterServiceRefKind,
-				Version: internalClusterServiceRefVersion,
+				Name: mysqlServiceRefDeclarationName,
+				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+					{
+						ServiceKind:    internalClusterServiceRefKind,
+						ServiceVersion: internalClusterServiceRefVersion,
+					},
+				},
 			},
 		}
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
@@ -177,7 +185,6 @@ var _ = Describe("generate service descriptor", func() {
 				SetEndpoint(endpoint).
 				SetPort(port).
 				SetAuth(auth).
-				SetExtra(map[string]string{"extra": "mock-extra"}).
 				Create(&testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor kind and version not match")
@@ -188,8 +195,8 @@ var _ = Describe("generate service descriptor", func() {
 
 			By("update external service descriptor kind and version")
 			Expect(testapps.ChangeObj(&testCtx, externalServiceDescriptor, func(externalServiceDescriptor *appsv1alpha1.ServiceDescriptor) {
-				externalServiceDescriptor.Spec.Kind = externalServiceDescriptorKind
-				externalServiceDescriptor.Spec.Version = externalServiceDescriptorVersion
+				externalServiceDescriptor.Spec.ServiceKind = externalServiceDescriptorKind
+				externalServiceDescriptor.Spec.ServiceVersion = externalServiceDescriptorVersion
 			})).Should(Succeed())
 
 			By("GenServiceReferences succeed because external service descriptor found and internal cluster reference found")

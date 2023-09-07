@@ -126,12 +126,12 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 		return true
 	}
 
-	if serviceDescriptor.Spec.Kind == "" {
-		return fmt.Errorf("serviceDescriptor %s kind is empty", serviceDescriptor.Name)
+	if serviceDescriptor.Spec.ServiceKind == "" {
+		return fmt.Errorf("serviceDescriptor %s serviceKind is empty", serviceDescriptor.Name)
 	}
 
-	if serviceDescriptor.Spec.Version == "" {
-		return fmt.Errorf("serviceDescriptor %s version is empty", serviceDescriptor.Name)
+	if serviceDescriptor.Spec.ServiceVersion == "" {
+		return fmt.Errorf("serviceDescriptor %s serviceVersion is empty", serviceDescriptor.Name)
 	}
 
 	if serviceDescriptor.Spec.Endpoint != nil && !secretRefExistFn(serviceDescriptor.Spec.Endpoint.ValueFrom) {

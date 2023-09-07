@@ -45,13 +45,13 @@ func NewServiceDescriptorFactory(namespace, name string) *MockServiceDescriptorF
 	return f
 }
 
-func (factory *MockServiceDescriptorFactory) SetKind(kind string) *MockServiceDescriptorFactory {
-	factory.get().Spec.Kind = kind
+func (factory *MockServiceDescriptorFactory) SetServiceKind(serviceKind string) *MockServiceDescriptorFactory {
+	factory.get().Spec.ServiceKind = serviceKind
 	return factory
 }
 
-func (factory *MockServiceDescriptorFactory) SetVersion(version string) *MockServiceDescriptorFactory {
-	factory.get().Spec.Version = version
+func (factory *MockServiceDescriptorFactory) SetServiceVersion(serviceVersion string) *MockServiceDescriptorFactory {
+	factory.get().Spec.ServiceVersion = serviceVersion
 	return factory
 }
 
@@ -62,11 +62,6 @@ func (factory *MockServiceDescriptorFactory) SetEndpoint(endpoint appsv1alpha1.C
 
 func (factory *MockServiceDescriptorFactory) SetPort(port appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
 	factory.get().Spec.Port = &port
-	return factory
-}
-
-func (factory *MockServiceDescriptorFactory) SetExtra(extra map[string]string) *MockServiceDescriptorFactory {
-	factory.get().Spec.Extra = extra
 	return factory
 }
 

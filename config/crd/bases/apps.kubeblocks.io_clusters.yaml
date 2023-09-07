@@ -411,7 +411,7 @@ spec:
                               by other KubeBlocks cluster.
                             type: string
                           name:
-                            description: name of the predefined service reference.
+                            description: name of the service reference declaration.
                               references the serviceRefDeclaration name defined in
                               clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
                             type: string

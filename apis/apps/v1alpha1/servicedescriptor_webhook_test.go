@@ -41,8 +41,8 @@ var _ = Describe("ServiceDescriptor Webhook", func() {
 					Namespace: namespace,
 				},
 				Spec: ServiceDescriptorSpec{
-					Kind:    "mock-kind",
-					Version: "mock-version",
+					ServiceKind:    "mock-kind",
+					ServiceVersion: "mock-version",
 					Endpoint: &CredentialVar{
 						Value: "mock-endpoint",
 					},

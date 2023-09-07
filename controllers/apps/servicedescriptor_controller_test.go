@@ -74,12 +74,11 @@ var _ = Describe("test clusterVersion controller", func() {
 			}
 			validSDName := "service-descriptor-valid-" + randomStr
 			validServiceDescriptor := testapps.NewServiceDescriptorFactory(namespace, validSDName).
-				SetKind("mock-kind").
-				SetVersion("mock-version").
+				SetServiceKind("mock-kind").
+				SetServiceVersion("mock-version").
 				SetEndpoint(endpoint).
 				SetPort(port).
 				SetAuth(auth).
-				SetExtra(map[string]string{"extra": "mock-extra"}).
 				Create(&testCtx).GetObject()
 
 			By("wait for ServiceDescriptor phase is available when serviceDescriptor is valid")
@@ -113,12 +112,11 @@ var _ = Describe("test clusterVersion controller", func() {
 				},
 			}
 			invalidServiceDescriptor := testapps.NewServiceDescriptorFactory(testCtx.DefaultNamespace, invalidSDName).
-				SetKind("mock-kind").
-				SetVersion("mock-version").
+				SetServiceKind("mock-kind").
+				SetServiceVersion("mock-version").
 				SetEndpoint(endpoint).
 				SetPort(port).
 				SetAuth(authValueFrom).
-				SetExtra(map[string]string{"extra": "mock-extra"}).
 				Create(&testCtx).GetObject()
 			By("wait for ServiceDescriptor phase is Unavailable because serviceDescriptor secretRef not found")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(invalidServiceDescriptor),

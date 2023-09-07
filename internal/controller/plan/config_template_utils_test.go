@@ -101,14 +101,22 @@ var _ = Describe("generate service descriptor", func() {
 		mockClient = testutil.NewK8sMockClient()
 		serviceRefDeclarations := []appsv1alpha1.ServiceRefDeclaration{
 			{
-				Name:    redisServiceRefDeclarationName,
-				Kind:    externalServiceDescriptorKind,
-				Version: externalServiceDescriptorVersion,
+				Name: redisServiceRefDeclarationName,
+				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+					{
+						ServiceKind:    externalServiceDescriptorKind,
+						ServiceVersion: externalServiceDescriptorVersion,
+					},
+				},
 			},
 			{
-				Name:    mysqlServiceRefDeclarationName,
-				Kind:    internalClusterServiceRefKind,
-				Version: internalClusterServiceRefVersion,
+				Name: mysqlServiceRefDeclarationName,
+				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+					{
+						ServiceKind:    internalClusterServiceRefKind,
+						ServiceVersion: internalClusterServiceRefVersion,
+					},
+				},
 			},
 		}
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
@@ -167,8 +175,8 @@ var _ = Describe("generate service descriptor", func() {
 						Namespace: namespace,
 					},
 					Spec: appsv1alpha1.ServiceDescriptorSpec{
-						Kind:    externalServiceDescriptorKind,
-						Version: externalServiceDescriptorVersion,
+						ServiceKind:    externalServiceDescriptorKind,
+						ServiceVersion: externalServiceDescriptorVersion,
 						Endpoint: &appsv1alpha1.CredentialVar{
 							ValueFrom: &corev1.EnvVarSource{
 								SecretKeyRef: &corev1.SecretKeySelector{
@@ -219,8 +227,8 @@ var _ = Describe("generate service descriptor", func() {
 						Namespace: namespace,
 					},
 					Spec: appsv1alpha1.ServiceDescriptorSpec{
-						Kind:    externalServiceDescriptorKind,
-						Version: externalServiceDescriptorVersion,
+						ServiceKind:    externalServiceDescriptorKind,
+						ServiceVersion: externalServiceDescriptorVersion,
 						Endpoint: &appsv1alpha1.CredentialVar{
 							ValueFrom: &corev1.EnvVarSource{
 								ConfigMapKeyRef: &corev1.ConfigMapKeySelector{

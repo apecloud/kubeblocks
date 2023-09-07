@@ -609,7 +609,7 @@ type ClusterNetwork struct {
 }
 
 type ServiceRef struct {
-	// name of the predefined service reference. references the serviceRefDeclaration name defined in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
+	// name of the service reference declaration. references the serviceRefDeclaration name defined in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 

@@ -23,12 +23,12 @@ spec:
   versions:
   - additionalPrinterColumns:
     - description: service kind
-      jsonPath: .spec.kind
-      name: KIND
+      jsonPath: .spec.serviceKind
+      name: SERVICE_KIND
       type: string
     - description: service version
-      jsonPath: .spec.version
-      name: VERSION
+      jsonPath: .spec.serviceVersion
+      name: SERVICE_VERSION
       type: string
     - description: status phase
       jsonPath: .status.phase
@@ -355,15 +355,6 @@ spec:
                         type: object
                     type: object
                 type: object
-              extra:
-                additionalProperties:
-                  type: string
-                description: extra is the extra information of the service connection
-                  credential, and it is a key-value pair.
-                type: object
-              kind:
-                description: The type of the service reference.
-                type: string
               port:
                 description: port is the port of the service connection credential.
                 properties:
@@ -460,12 +451,17 @@ spec:
                         type: object
                     type: object
                 type: object
-              version:
+              serviceKind:
+                description: service kind, indicating the type or nature of the service.
+                  It should be well-known application cluster type, e.g. {mysql, redis,
+                  mongodb}.
+                type: string
+              serviceVersion:
                 description: The version of the service reference.
                 type: string
             required:
-            - kind
-            - version
+            - serviceKind
+            - serviceVersion
             type: object
           status:
             description: ServiceDescriptorStatus defines the observed state of ServiceDescriptor

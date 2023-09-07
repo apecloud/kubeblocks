@@ -360,8 +360,8 @@ var _ = Describe("component module", func() {
 					Namespace: ns,
 				},
 				Spec: appsv1alpha1.ServiceDescriptorSpec{
-					Kind:    kind,
-					Version: version,
+					ServiceKind:    kind,
+					ServiceVersion: version,
 				},
 			}
 			serviceReferenceMap := map[string]*appsv1alpha1.ServiceDescriptor{
@@ -381,8 +381,8 @@ var _ = Describe("component module", func() {
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 			Expect(component.ServiceReferences[testapps.NginxImage].Name).Should(Equal(name))
-			Expect(component.ServiceReferences[testapps.NginxImage].Spec.Kind).Should(Equal(kind))
-			Expect(component.ServiceReferences[testapps.NginxImage].Spec.Version).Should(Equal(version))
+			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceKind).Should(Equal(kind))
+			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceVersion).Should(Equal(version))
 		})
 	})
 })

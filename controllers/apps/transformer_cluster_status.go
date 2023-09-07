@@ -115,18 +115,21 @@ func (t *ClusterStatusTransformer) reconcileClusterStatus2(cluster *appsv1alpha1
 	}
 	for _, status := range cluster.Status.Components {
 		phase := status.Phase
-		switch {
-		case !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase,
+		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase,
 			appsv1alpha1.RunningClusterCompPhase,
-			appsv1alpha1.SpecReconcilingClusterCompPhase):
-				isAllComponentWorking = false
-		case !isPhaseIn(phase, appsv1alpha1.RunningClusterCompPhase):
+			appsv1alpha1.SpecReconcilingClusterCompPhase) {
+			isAllComponentWorking = false
+		}
+		if !isPhaseIn(phase, appsv1alpha1.RunningClusterCompPhase) {
 			isAllComponentRunning = false
-		case isPhaseIn(phase, appsv1alpha1.StoppingClusterCompPhase):
+		}
+		if isPhaseIn(phase, appsv1alpha1.StoppingClusterCompPhase) {
 			hasComponentStopping = true
-		case !isPhaseIn(phase, appsv1alpha1.StoppedClusterCompPhase):
+		}
+		if !isPhaseIn(phase, appsv1alpha1.StoppedClusterCompPhase) {
 			isAllComponentStopped = false
-		case !isPhaseIn(phase, appsv1alpha1.FailedClusterCompPhase):
+		}
+		if !isPhaseIn(phase, appsv1alpha1.FailedClusterCompPhase) {
 			isAllComponentFailed = false
 		}
 	}

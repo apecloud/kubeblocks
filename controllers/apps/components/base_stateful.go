@@ -189,7 +189,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 	hasComponentPod := func() bool {
-		return len(pods) == 0
+		return len(pods) > 0
 	}
 	hasFailedPod, _, _ := hasFailedAndTimedOutPod(pods)
 	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, c.runningWorkload)
@@ -203,12 +203,12 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	switch {
 	case isDeleting():
 		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
-	case isRunning:
-		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
 	case isZeroReplica() && hasComponentPod():
 		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
 	case isZeroReplica():
 		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
+	case isRunning:
+		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
 	case hasFailedPod:
 		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, nil, "Component is Failed")
 	case isFirstGeneration():

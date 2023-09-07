@@ -11,7 +11,7 @@ func (t ClusterType) String() string {
 }
 
 type chartConfigInterface interface {
-	// LoadChart loads the chart from the file system or the url
+	// LoadChart loads the chart content
 	loadChart() (io.ReadCloser, error)
 	// GetChartFileName returns the chart file name, include the extension
 	getChartFileName() string

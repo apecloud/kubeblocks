@@ -9,45 +9,111 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
-	"helm.sh/helm/v3/pkg/downloader"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var ClusterList []*ClusterTypes
-
 var chartsCacheDir string
 var cacheFiles []fs.DirEntry
 
-var chartsDownloaders *downloader.ChartDownloader
+type clusterConfig []*TypeInstance
 
-// ClusterTypes gets the helm chart from the url and
-type ClusterTypes struct {
+// GlobalClusterChartConfig is kbcli global cluster chart config
+var GlobalClusterChartConfig clusterConfig
+
+// ReadConfigs read the config from $HOME/.kbcli/clusterTypes
+func (c *clusterConfig) ReadConfigs() error {
+	homeDir, err := util.GetCliHomeDir()
+	if err != nil {
+		return err
+	}
+	contents, err := os.ReadFile(filepath.Join(homeDir, types.CliClusterTypeConfigs))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		contents = []byte{}
+	}
+	err = yaml.Unmarshal(contents, c)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// WriteConfigs write current config into $HOME/.kbcli/clusterTypes
+func (c *clusterConfig) WriteConfigs() error {
+	homeDir, err := util.GetCliHomeDir()
+	if err != nil {
+		return err
+	}
+	newConfig, err := yaml.Marshal(*c)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(homeDir, types.CliClusterTypeConfigs), newConfig, 0666)
+}
+
+// AddConfig add a new cluster type instance into current config
+func (c *clusterConfig) AddConfig(add *TypeInstance) {
+	*c = append(*c, add)
+}
+
+// RemoveConfig remove a ClusterType from current config
+func (c *clusterConfig) RemoveConfig(name ClusterType) {
+	tempList := *c
+	for i, chart := range tempList {
+		if chart.Name == name {
+			*c = append((*c)[:i], (*c)[i+1:]...)
+			break
+		}
+	}
+}
+
+// RegisterCMD will register all cluster type instances in the config and auto clear the register failed instances
+// and rewrite config
+func (c *clusterConfig) RegisterCMD() {
+	var needRemove []ClusterType
+	for _, config := range *c {
+		if err := config.register(config.Name); err != nil {
+			fmt.Println(err.Error())
+			needRemove = append(needRemove, config.Name)
+		}
+	}
+	for _, name := range needRemove {
+		c.RemoveConfig(name)
+	}
+	if err := c.WriteConfigs(); err != nil {
+		fmt.Printf("Warning: auto clear kbcli cluster chart config failed %s", err.Error())
+	}
+}
+
+// TypeInstance reference to a cluster type instance in config
+type TypeInstance struct {
 	Name  ClusterType `yaml:"name"`
 	Url   string      `yaml:"helmChartUrl"`
 	Alias string      `yaml:"alias"`
 }
 
-func (h *ClusterTypes) getCMD() ClusterType {
-	return h.Name
-}
-
-func (h *ClusterTypes) loadChart() (io.ReadCloser, error) {
+func (h *TypeInstance) loadChart() (io.ReadCloser, error) {
 	return os.Open(filepath.Join(chartsCacheDir, h.getChartFileName()))
 }
 
-func (h *ClusterTypes) getChartFileName() string {
+func (h *TypeInstance) getChartFileName() string {
 	return path.Base(h.Url)
 }
 
-func (h *ClusterTypes) getAlias() string {
+func (h *TypeInstance) getAlias() string {
 	return h.Alias
 }
 
-func (h *ClusterTypes) register(subcmd ClusterType) error {
+func (h *TypeInstance) register(subcmd ClusterType) error {
+	if len(subcmd.String()) == 0 {
+		subcmd = h.Name
+	}
 	if _, ok := ClusterTypeCharts[subcmd]; ok {
-		panic(fmt.Sprintf("cluster type %s already registered", subcmd))
+		return fmt.Errorf("cluster type %s already registered", subcmd)
 	}
 	ClusterTypeCharts[subcmd] = h
 
@@ -56,29 +122,19 @@ func (h *ClusterTypes) register(subcmd ClusterType) error {
 			return nil
 		}
 	}
-
-	fmt.Printf("can't find the %s in config, please use 'kbcli cluster pull %s --url %s' first", h.Name.String(), h.Name.String(), h.Url)
-	return nil
+	return fmt.Errorf("Can't find the %s in config, please use 'kbcli cluster pull %s --url %s' first\n", h.Name.String(), h.Name.String(), h.Url)
 }
 
-var _ chartConfigInterface = &ClusterTypes{}
+var _ chartConfigInterface = &TypeInstance{}
 
 func init() {
-
-	homeDir, err := util.GetCliHomeDir()
-	contents, err := os.ReadFile(filepath.Join(homeDir, types.CliClusterTypeConfigs))
+	err := GlobalClusterChartConfig.ReadConfigs()
 	if err != nil {
-		if !os.IsNotExist(err) {
-			fmt.Printf(err.Error())
-			return
-		}
-	}
-	err = yaml.Unmarshal(contents, &ClusterList)
-	if err != nil {
-		fmt.Printf(err.Error())
+		fmt.Println(err.Error())
 		return
 	}
-
+	// check charts cache dir
+	homeDir, _ := util.GetCliHomeDir()
 	chartsCacheDir = filepath.Join(homeDir, types.CliChartsCache)
 	dirFS := os.DirFS(homeDir)
 	cacheFiles, err = fs.ReadDir(dirFS, "charts")
@@ -95,10 +151,5 @@ func init() {
 			return
 		}
 	}
-	for _, chart := range ClusterList {
-		err = chart.register(chart.getCMD())
-		if err != nil {
-			fmt.Printf("Failed to register chart %s: %s", chart.Name, err.Error())
-		}
-	}
+	GlobalClusterChartConfig.RegisterCMD()
 }

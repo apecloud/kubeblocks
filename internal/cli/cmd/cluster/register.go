@@ -2,8 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -17,15 +15,12 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
-var clusterPullExample = templates.Examples(`
-	# Pull a cluster type to local and register it to "kbcli cluster create" sub-cmd from KubeBlocks community
-	kbcli cluster pull mysql 
-	
+var clusterRegisterExample = templates.Examples(`
 	# Pull a cluster type to local and register it to "kbcli cluster create" sub-cmd from specified Url
-	kbcli cluster pull orioledb --url https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
+	kbcli cluster register orioledb --url https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
 `)
 
-type pullOption struct {
+type registerOption struct {
 	Factory cmdutil.Factory
 	genericclioptions.IOStreams
 
@@ -34,20 +29,20 @@ type pullOption struct {
 	alias       string
 }
 
-func newPullOption(f cmdutil.Factory, streams genericclioptions.IOStreams) *pullOption {
-	o := &pullOption{
+func newRegisterOption(f cmdutil.Factory, streams genericclioptions.IOStreams) *registerOption {
+	o := &registerOption{
 		Factory:   f,
 		IOStreams: streams,
 	}
 	return o
 }
 
-func newPullCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newPullOption(f, streams)
+func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newRegisterOption(f, streams)
 	cmd := &cobra.Command{
-		Use:     "pull [NAME] [CHART-URL]",
-		Short:   "Pull the cluster chart to the local cache and add the NAME to 'create' sub-command",
-		Example: clusterCreateExample,
+		Use:     "register [NAME] --url [CHART-URL]",
+		Short:   "Pull the cluster chart to the local cache and register the type to 'create' sub-command",
+		Example: clusterRegisterExample,
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.clusterType = cluster.ClusterType(args[0])
@@ -62,7 +57,7 @@ func newPullCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 }
 
 // validate will check the
-func (o *pullOption) validate() error {
+func (o *registerOption) validate() error {
 	if len(o.clusterType) > 15 {
 		return fmt.Errorf("cluster type %s is too long as a sub command", o.clusterType.String())
 	}
@@ -76,7 +71,7 @@ func (o *pullOption) validate() error {
 	return nil
 }
 
-func (o *pullOption) run() error {
+func (o *registerOption) run() error {
 	chartsDownloader, err := helm.NewDownloader(helm.NewConfig("default", "", "", false))
 	if err != nil {
 		return err
@@ -87,16 +82,14 @@ func (o *pullOption) run() error {
 	}
 	chartsCacheDir := filepath.Join(homeDir, types.CliChartsCache)
 	_, _, err = chartsDownloader.DownloadTo(o.url, "", chartsCacheDir)
-
-	cluster.ClusterList = append(cluster.ClusterList, &cluster.ClusterTypes{
+	if err != nil {
+		return err
+	}
+	cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
 		Name:  o.clusterType,
 		Url:   o.url,
 		Alias: o.alias,
 	})
-	newConfig, err := yaml.Marshal(cluster.ClusterList)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(homeDir, types.CliClusterTypeConfigs), newConfig, 0666)
+	return cluster.GlobalClusterChartConfig.WriteConfigs()
 
 }

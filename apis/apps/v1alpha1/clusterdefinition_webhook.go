@@ -247,7 +247,7 @@ func (r *SystemAccountSpec) validate(allErrs *field.ErrorList) {
 		if provisionPolicy.Type == ReferToExisting && sysAccount.ProvisionPolicy.SecretRef == nil {
 			*allErrs = append(*allErrs,
 				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.secretRef"),
-					sysAccount.Name, "SecretRef should not be empty when provisionPolicy = ReferToExisting. "))
+					sysAccount.Name, "SecretName should not be empty when provisionPolicy = ReferToExisting. "))
 			continue
 		}
 		// account names should be unique

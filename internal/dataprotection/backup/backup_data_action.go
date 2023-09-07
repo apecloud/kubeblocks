@@ -26,8 +26,19 @@ import (
 type BackupDataAction struct {
 }
 
-func (b BackupDataAction) Execute() error {
+func (b BackupDataAction) Execute(ctx action.Context) error {
+	//TODO implement me
+	panic("implement me")
+}
 
+func (b BackupDataAction) GetName() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (b BackupDataAction) Type() action.ActionType {
+	//TODO implement me
+	panic("implement me")
 }
 
 var _ action.Action = &BackupDataAction{}

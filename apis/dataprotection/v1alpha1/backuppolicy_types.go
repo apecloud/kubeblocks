@@ -104,9 +104,9 @@ const (
 // ConnectionCredential specifies the connection credential to connect to the
 // target database cluster.
 type ConnectionCredential struct {
-	// secretRef refers to the Secret object that contains the connection credential.
+	// secretName refers to the Secret object that contains the connection credential.
 	// +kube:validation:Required
-	SecretRef *SecretReference `json:"secretRef,omitempty"`
+	SecretName string `json:"secretName,omitempty"`
 
 	// usernameKey specifies the map key of the user in the connection credential secret.
 	// +kubebuilder:default=username

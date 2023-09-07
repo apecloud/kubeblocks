@@ -19,36 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package action
 
-import (
-	"context"
-
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-type Action interface {
-	// Execute executes the action.
-	Execute(ctx Context) error
-
-	// GetName returns the Name of the action.
-	GetName() string
-
-	// Type returns the type of the action.
-	Type() ActionType
+type Builder interface {
+	Build() Action
 }
-
-type Context struct {
-	Ctx    context.Context
-	Client client.Client
-
-	RestClient       rest.Interface
-	RestClientConfig *rest.Config
-}
-
-type ActionType string
-
-const (
-	ActionTypeExec        ActionType = "Exec"
-	ActionTypeJob         ActionType = "Job"
-	ActionTypeStatefulSet ActionType = "StatefulSet"
-)

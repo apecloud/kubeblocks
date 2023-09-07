@@ -19,6 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
+const (
+	BackupPathBase                 = "/backupdata"
+	DeleteBackupFilesJobNamePrefix = "delete-"
+)
+
+const (
+	// DataProtectionFinalizerName is the finalizer name for dataProtection.
+	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
+)
+
 // annotation keys
 const (
 	// DefaultBackupPolicyAnnotationKey specifies the default backup policy.
@@ -45,15 +55,21 @@ const (
 
 // env names
 const (
-	DPTargetPodName = "DP_TARGET_POD_NAME"
 	// DPDBHost database host for dataProtection
-	DPDBHost = "DB_HOST"
+	DPDBHost = "DP_DB_HOST"
 	// DPDBUser database user for dataProtection
-	DPDBUser = "DB_USER"
+	DPDBUser = "DP_DB_USER"
 	// DPDBPassword database password for dataProtection
-	DPDBPassword = "DB_PASSWORD"
+	DPDBPassword = "DP_DB_PASSWORD"
+	// DPDBEndpoint database endpoint for dataProtection
+	DPDBEndpoint = "DP_DB_ENDPOINT"
+	// DPDBPort database port for dataProtection
+	DPDBPort = "DP_DB_PORT"
+
+	DPTargetPodName = "DP_TARGET_POD_NAME"
+
 	// DPBackupDIR the dest directory for backup data
-	DPBackupDIR = "BACKUP_DIR"
+	DPBackupDIR = "DP_BACKUP_DIR"
 	// DPLogFileDIR log file dir
 	DPLogFileDIR = "BACKUP_LOGFILE_DIR"
 	// DPBackupName backup CR name

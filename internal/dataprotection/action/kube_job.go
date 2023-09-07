@@ -26,13 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/builder"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 type KubeJob struct {
-	// Name is the name of the action.
+	// Name is the Name of the action.
 	Name string
 
 	// Owner is the owner of the job.
@@ -41,8 +42,8 @@ type KubeJob struct {
 	// ObjectMeta is the metadata of the job.
 	ObjectMeta metav1.ObjectMeta
 
-	// PodSpecBuilder is the builder of the pod spec.
-	PodSpecBuilder builder.Builder
+	// PodSpec is the
+	PodSpec *corev1.PodSpec
 
 	// BackOffLimit is the number of retries before considering a Job as failed.
 	BackOffLimit int32
@@ -50,6 +51,10 @@ type KubeJob struct {
 
 func (j *KubeJob) GetName() string {
 	return j.Name
+}
+
+func (j *KubeJob) Type() ActionType {
+	return ActionTypeJob
 }
 
 func (j *KubeJob) Execute(ctx Context) error {
@@ -65,27 +70,24 @@ func (j *KubeJob) Execute(ctx Context) error {
 		return nil
 	}
 
-	podSpec := j.PodSpecBuilder.Build().(*corev1.PodSpec)
-
 	// job not found, create it
 	job := &batchv1.Job{
 		ObjectMeta: j.ObjectMeta,
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: j.ObjectMeta,
-				Spec:       *podSpec,
+				Spec:       *j.PodSpec,
 			},
 			BackoffLimit: &j.BackOffLimit,
 		},
 	}
 
-	// TODO: set finalizer
-	// 		controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
+	controllerutil.AddFinalizer(job, types.DataProtectionFinalizerName)
 
 	// TODO: set controller reference
-	// 		if err := controllerutil.SetControllerReference(backup, job, r.Scheme); err != nil {
-	//			return err
-	//		}
+	if err := controllerutil.SetControllerReference(backup, job, r.Scheme); err != nil {
+		return err
+	}
 
 	return client.IgnoreAlreadyExists(ctx.Client.Create(ctx.Ctx, job))
 }
@@ -94,8 +96,8 @@ func (j *KubeJob) validate() error {
 	if j.ObjectMeta.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	if j.PodSpecBuilder == nil {
-		return fmt.Errorf("podSpecBuilder is required")
+	if j.PodSpec == nil {
+		return fmt.Errorf("PodSpec is required")
 	}
 	return nil
 }

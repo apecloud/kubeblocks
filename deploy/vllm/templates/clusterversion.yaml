@@ -33,10 +33,10 @@ spec:
           - name: vllm
             image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
             env:
-                - name: MODEL_NAME
-                  value: baichuan-inc/Baichuan2-13B-Chat
-                    - name: EXTRA_ARGS
-                      value: "--trust-remote-code"
+              - name: MODEL_NAME
+                value: baichuan-inc/Baichuan2-13B-Chat
+              - name: EXTRA_ARGS
+                value: "--trust-remote-code"
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion

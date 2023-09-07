@@ -109,9 +109,6 @@ func (h *TypeInstance) getAlias() string {
 }
 
 func (h *TypeInstance) register(subcmd ClusterType) error {
-	if len(subcmd.String()) == 0 {
-		subcmd = h.Name
-	}
 	if _, ok := ClusterTypeCharts[subcmd]; ok {
 		return fmt.Errorf("cluster type %s already registered", subcmd)
 	}

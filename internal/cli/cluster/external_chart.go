@@ -43,7 +43,7 @@ type clusterConfig []*TypeInstance
 
 // GlobalClusterChartConfig is kbcli global cluster chart config reference to CliClusterChartConfig
 var GlobalClusterChartConfig clusterConfig
-var cacheFiles []fs.DirEntry
+var CacheFiles []fs.DirEntry
 
 // ReadConfigs read the config from configPath
 func (c *clusterConfig) ReadConfigs(configPath string) error {
@@ -76,14 +76,15 @@ func (c *clusterConfig) AddConfig(add *TypeInstance) {
 }
 
 // RemoveConfig remove a ClusterType from current config
-func (c *clusterConfig) RemoveConfig(name ClusterType) {
+func (c *clusterConfig) RemoveConfig(name ClusterType) bool {
 	tempList := *c
 	for i, chart := range tempList {
 		if chart.Name == name {
 			*c = append((*c)[:i], (*c)[i+1:]...)
-			break
+			return true
 		}
 	}
+	return false
 }
 func (c *clusterConfig) Len() int {
 	return len(*c)
@@ -104,6 +105,39 @@ func RegisterCMD(c clusterConfig, configPath string) {
 	}
 	if err := c.WriteConfigs(configPath); err != nil {
 		fmt.Printf("Warning: auto clear kbcli cluster chart config failed %s\n", err.Error())
+	}
+}
+
+func GetChartCacheFiles() []fs.DirEntry {
+	homeDir, _ := util.GetCliHomeDir()
+	dirFS := os.DirFS(homeDir)
+	result, err := fs.ReadDir(dirFS, "charts")
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(CliChartsCacheDir, 0777)
+			if err != nil {
+				fmt.Printf("Failed to create charts cache dir %s: %s", CliChartsCacheDir, err.Error())
+				return nil
+			}
+			result = []fs.DirEntry{}
+		} else {
+			fmt.Printf("Failed to read charts cache dir %s: %s", CliChartsCacheDir, err.Error())
+			return nil
+		}
+	}
+	return result
+}
+
+func ClearCharts(c ClusterType) {
+	// if the fail clusterType is from external config, remove the config and the elated charts
+	if GlobalClusterChartConfig.RemoveConfig(c) {
+		if err := GlobalClusterChartConfig.WriteConfigs(CliClusterChartConfig); err != nil {
+			fmt.Printf("Warning: auto clear %s config fail due to: %s\n", c, err.Error())
+		}
+		if err := os.Remove(filepath.Join(CliChartsCacheDir, ClusterTypeCharts[c].getChartFileName())); err != nil {
+			fmt.Printf("Warning: auto clear %s config fail due to: %s\n", c, err.Error())
+		}
+		CacheFiles = GetChartCacheFiles()
 	}
 }
 
@@ -132,7 +166,7 @@ func (h *TypeInstance) register(subcmd ClusterType) error {
 	}
 	ClusterTypeCharts[subcmd] = h
 
-	for _, f := range cacheFiles {
+	for _, f := range CacheFiles {
 		if f.Name() == h.getChartFileName() {
 			return nil
 		}
@@ -153,20 +187,6 @@ func init() {
 		return
 	}
 	// check charts cache dir
-	dirFS := os.DirFS(homeDir)
-	cacheFiles, err = fs.ReadDir(dirFS, "charts")
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = os.MkdirAll(CliChartsCacheDir, 0777)
-			if err != nil {
-				fmt.Printf("Failed to create charts cache dir %s: %s", CliChartsCacheDir, err.Error())
-				return
-			}
-			cacheFiles = []fs.DirEntry{}
-		} else {
-			fmt.Printf("Failed to read charts cache dir %s: %s", CliChartsCacheDir, err.Error())
-			return
-		}
-	}
+	CacheFiles = GetChartCacheFiles()
 	RegisterCMD(GlobalClusterChartConfig, CliClusterChartConfig)
 }

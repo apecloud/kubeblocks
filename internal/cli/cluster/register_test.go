@@ -79,7 +79,7 @@ var _ = Describe("cluster register", func() {
 		It("test read configs and remove", func() {
 			Expect(tempCLusterConfig.ReadConfigs(tempConfigPath)).Should(Succeed())
 			Expect(tempCLusterConfig.Len()).Should(Equal(1))
-			tempCLusterConfig.RemoveConfig("orioledb")
+			Expect(tempCLusterConfig.RemoveConfig("orioledb")).Should(BeTrue())
 			Expect(tempCLusterConfig.Len()).Should(Equal(0))
 		})
 

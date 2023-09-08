@@ -75,6 +75,7 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 		o, err := newSubCmdsOptions(createOptions, t)
 		if err != nil {
 			fmt.Printf("Failed add '%s' to 'create' sub command due to %s\n", t.String(), err.Error())
+			cluster.ClearCharts(t)
 			continue
 		}
 

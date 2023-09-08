@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 
 	"github.com/spf13/cobra"
@@ -93,6 +94,12 @@ func (o *registerOption) run() error {
 	chartsDownloader, err := helm.NewDownloader(helm.NewConfig("default", "", "", false))
 	if err != nil {
 		return err
+	}
+	// before download, we should check the chart name whether conflict in local cache
+	for _, file := range cluster.CacheFiles {
+		if file.Name() == filepath.Base(o.url) {
+			return fmt.Errorf("cluster type '%s' register failed due to the cluster chart's name conflict %s", o.clusterType, file.Name())
+		}
 	}
 
 	_, _, err = chartsDownloader.DownloadTo(o.url, "", cluster.CliChartsCacheDir)

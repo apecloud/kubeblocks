@@ -30,9 +30,9 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -89,7 +89,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		serverID: uint(serverID) + 1,
 	}
 
-	component.RegisterManager("mysql", internal.Replication, mgr)
+	component.RegisterManager("mysql", constant.Replication, mgr)
 	return mgr, nil
 }
 

@@ -25,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -33,7 +32,7 @@ import (
 
 func (mgr *Manager) GetRole(ctx context.Context) (string, error) {
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(workloadType, Replication) {
+	if strings.EqualFold(workloadType, constant.Replication) {
 		return mgr.GetRoleForReplication(ctx)
 	}
 	return mgr.GetRoleForConsensus(ctx)

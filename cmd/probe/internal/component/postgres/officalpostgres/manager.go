@@ -36,11 +36,11 @@ import (
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type Manager struct {
@@ -61,7 +61,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 	}
 
 	Mgr.Manager = *baseManager
-	component.RegisterManager("postgresql", internal.Replication, Mgr)
+	component.RegisterManager("postgresql", constant.Replication, Mgr)
 
 	return Mgr, nil
 }

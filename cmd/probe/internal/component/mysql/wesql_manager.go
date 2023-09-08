@@ -28,7 +28,6 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -85,7 +84,7 @@ func NewWesqlManager(logger logger.Logger) (*WesqlManager, error) {
 		},
 	}
 
-	component.RegisterManager("mysql", internal.Consensus, mgr)
+	component.RegisterManager("mysql", constant.Consensus, mgr)
 	return mgr, nil
 }
 

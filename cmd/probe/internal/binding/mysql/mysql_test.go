@@ -36,7 +36,6 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -516,7 +515,7 @@ func TestMySQLAccounts(t *testing.T) {
 func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	viper.Set("KB_POD_NAME", "test-pod-0")
-	viper.Set(constant.KBEnvWorkloadType, internal.Consensus)
+	viper.Set(constant.KBEnvWorkloadType, constant.Consensus)
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)

@@ -35,9 +35,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -94,7 +94,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Database: client.Database(config.databaseName),
 	}
 
-	component.RegisterManager("mongodb", internal.Consensus, Mgr)
+	component.RegisterManager("mongodb", constant.Consensus, Mgr)
 	return Mgr, nil
 
 }

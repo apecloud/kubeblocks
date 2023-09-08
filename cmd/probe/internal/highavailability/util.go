@@ -17,14 +17,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package internal
+package highavailability
 
-import "strings"
+import (
+	"strings"
 
-const (
-	WorkloadTypeKey = "workloadType"
-	Replication     = "Replication"
-	Consensus       = "Consensus"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func IsHAAvailable(characterType, workloadType string) bool {
@@ -32,11 +30,11 @@ func IsHAAvailable(characterType, workloadType string) bool {
 	case "mongodb":
 		return true
 	case "mysql":
-		if strings.EqualFold(workloadType, Replication) || strings.EqualFold(workloadType, Consensus) {
+		if strings.EqualFold(workloadType, constant.Replication) || strings.EqualFold(workloadType, constant.Consensus) {
 			return true
 		}
 	case "postgresql":
-		if strings.EqualFold(workloadType, Consensus) {
+		if strings.EqualFold(workloadType, constant.Consensus) {
 			return true
 		}
 	}

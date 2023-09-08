@@ -26,65 +26,23 @@ import (
 	"os/signal"
 	"syscall"
 
-	// Register all components
-	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
-	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
-	lockLoader "github.com/dapr/dapr/pkg/components/lock"
-	httpMiddlewareLoader "github.com/dapr/dapr/pkg/components/middleware/http"
-	nrLoader "github.com/dapr/dapr/pkg/components/nameresolution"
-	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
-	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
-	stateLoader "github.com/dapr/dapr/pkg/components/state"
-	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
-	"github.com/spf13/pflag"
-
-	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
-
-	dhttp "github.com/dapr/components-contrib/bindings/http"
-	"github.com/dapr/components-contrib/bindings/localstorage"
-	"github.com/dapr/components-contrib/middleware"
-	"github.com/dapr/components-contrib/nameresolution/mdns"
-
+	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/apiserver"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var (
-	log        = logger.NewLogger("dapr.runtime")
-	logContrib = logger.NewLogger("dapr.contrib")
-	logHa      = logger.NewLogger("dapr.ha")
+	log   = logger.NewLogger("lorry.runtime")
+	logHa = logger.NewLogger("lorry.ha")
 )
 
 func init() {
 	viper.AutomaticEnv()
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(postgres.NewPostgres, "postgres")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(custom.NewHTTPCustom, "custom")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
-	bindingsLoader.DefaultRegistry.RegisterOutputBinding(kafka.NewKafka, "kafka")
-	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
-	httpMiddlewareLoader.DefaultRegistry.RegisterComponent(func(log logger.Logger) httpMiddlewareLoader.FactoryMethod {
-		return func(metadata middleware.Metadata) (httpMiddleware.Middleware, error) {
-			return probe.NewProbeMiddleware(log).GetHandler(metadata)
-		}
-	}, "probe")
 
 }
 
@@ -92,10 +50,12 @@ func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
-	rt, err := runtime.FromFlags()
+	// start apiserver for HTTP and GRPC
+	rt, err := apiserver.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Start ApiServer failed: %s", err)
 	}
+
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	err = viper.BindPFlags(pflag.CommandLine)
@@ -108,34 +68,11 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
-	secretstoresLoader.DefaultRegistry.Logger = logContrib
-	stateLoader.DefaultRegistry.Logger = logContrib
-	configurationLoader.DefaultRegistry.Logger = logContrib
-	lockLoader.DefaultRegistry.Logger = logContrib
-	pubsubLoader.DefaultRegistry.Logger = logContrib
-	nrLoader.DefaultRegistry.Logger = logContrib
-	bindingsLoader.DefaultRegistry.Logger = logContrib
-	httpMiddlewareLoader.DefaultRegistry.Logger = logContrib
-
-	err = rt.Run(
-		runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
-		runtime.WithStates(stateLoader.DefaultRegistry),
-		runtime.WithConfigurations(configurationLoader.DefaultRegistry),
-		runtime.WithLocks(lockLoader.DefaultRegistry),
-		runtime.WithPubSubs(pubsubLoader.DefaultRegistry),
-		runtime.WithNameResolutions(nrLoader.DefaultRegistry),
-		runtime.WithBindings(bindingsLoader.DefaultRegistry),
-		runtime.WithHTTPMiddlewares(httpMiddlewareLoader.DefaultRegistry),
-	)
-	if err != nil {
-		log.Fatalf("fatal error from runtime: %s", err)
-	}
-
 	// ha dependent on dbmanager which is initialized by rt.Run
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	ha := highavailability.NewHa(logHa)
-	if IsHAAvailable(characterType, workloadType) {
+	if highavailability.IsHAAvailable(characterType, workloadType) {
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()

@@ -31,7 +31,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
@@ -87,7 +86,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 
 	var manager component.DBManager
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(workloadType, Consensus) {
+	if strings.EqualFold(workloadType, constant.Consensus) {
 		manager, err = mysql.NewWesqlManager(mysqlOps.Logger)
 		if err != nil {
 			mysqlOps.Logger.Errorf("WeSQL DB Manager initialize failed: %v", err)
@@ -128,7 +127,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(workloadType, Replication) {
+	if strings.EqualFold(workloadType, constant.Replication) {
 		dcsStore := dcs.GetStore()
 		if dcsStore == nil {
 			return "", nil

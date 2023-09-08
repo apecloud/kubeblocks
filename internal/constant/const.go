@@ -311,3 +311,10 @@ const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
 )
+
+const (
+	Stateless   = "Stateless"
+	Stateful    = "Stateful"
+	Consensus   = "Consensus"
+	Replication = "Replication"
+)

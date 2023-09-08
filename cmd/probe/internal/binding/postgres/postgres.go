@@ -30,7 +30,6 @@ import (
 	"github.com/dapr/kit/logger"
 	"golang.org/x/exp/slices"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres/apecloudpostgres"
@@ -106,7 +105,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	}
 
 	var manager postgres.PgIFace
-	if strings.EqualFold(pgOps.workloadType, internal.Consensus) {
+	if strings.EqualFold(pgOps.workloadType, constant.Consensus) {
 		manager, err = apecloudpostgres.NewManager(pgOps.Logger)
 		if err != nil {
 			pgOps.Logger.Errorf("ApeCloud PostgreSQL DB Manager initialize failed: %v", err)

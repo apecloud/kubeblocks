@@ -30,11 +30,11 @@ func (t ClusterType) String() string {
 }
 
 type chartLoader interface {
-	// LoadChart loads the chart content
+	// loadChart loads the chart content during building sub-command
 	loadChart() (io.ReadCloser, error)
-	// GetChartFileName returns the chart file name, include the extension
+	// getChartFileName returns the chart file name, include the extension
 	getChartFileName() string
-	// GetAlias returns the chart alias, this alias will be used as the command alias
+	// getAlias returns the chart alias, this alias will be used as the command alias
 	getAlias() string
 	// register registers the cluster type as a sub	cmd into create cluster command
 	register(subcmd ClusterType) error

@@ -449,7 +449,7 @@ func (c *componentBase) updateStatus(phaseTransitionMsg string, updatefn func(st
 
 	if phase != status.Phase {
 		// TODO: logging the event
-		if c.Recorder != nil {
+		if c.Recorder != nil && phaseTransitionMsg != "" {
 			c.Recorder.Eventf(c.Cluster, corev1.EventTypeNormal, ComponentPhaseTransition, phaseTransitionMsg)
 		}
 	}

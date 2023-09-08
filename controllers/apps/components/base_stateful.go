@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -266,15 +267,31 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return running
 	}
 
+	updatePodsReady := func(ready bool) {
+		_ = c.updateStatus("", func(status *appsv1alpha1.ClusterComponentStatus) error {
+			status.PodsReady = &ready
+			if ready {
+				time := metav1.Now()
+				status.PodsReadyTime = &time
+			}
+			return nil
+		})
+	}
+
+	updatePodsReady(false)
 	switch {
 	case isDeleting():
 		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
+		updatePodsReady(true)
 	case isZeroReplica() && hasComponentPod():
 		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
+		updatePodsReady(true)
 	case isZeroReplica():
 		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
+		updatePodsReady(true)
 	case isRunning && isAllConfigSynced && !hasVolumeExpansionRunning():
 		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
+		updatePodsReady(true)
 	case hasFailedPod(), isScaleOutFailed():
 		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "Component is Failed")
 	case isFirstGeneration():

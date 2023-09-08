@@ -136,7 +136,7 @@ func (o *InstallOptions) Upgrade() error {
 			upgradeWarn = fmt.Sprintf("Upgrade KubeBlocks from %s to %s", kbVersion, o.Version)
 		}
 
-		if err = prompt.Confirm([]string{"Yes"}, o.In, upgradeWarn, "Please type 'Yes' to confirm your operation:"); err != nil {
+		if err = prompt.Confirm(nil, o.In, upgradeWarn, "Please type 'Yes' to confirm your operation:"); err != nil {
 			return err
 		}
 	}

@@ -46,13 +46,14 @@ var (
 var fs = afero.NewOsFs()
 
 const (
-	PGDATA = "PGDATA"
+	PGDATA  = "PGDATA"
+	PGMAJOR = "PG_MAJOR"
 )
 
 const (
 	ReplicationMode = "replication_mode"
 	SyncStandBys    = "sync_standbys"
-	PrimaryInfo     = "primary_info"
+	PrimaryConnInfo = "primary_conninfo"
 	TimeLine        = "timeline"
 )
 

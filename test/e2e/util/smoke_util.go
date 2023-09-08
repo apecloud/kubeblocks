@@ -318,7 +318,12 @@ func Check(command string, input string) (string, error) {
 
 func GetName(fileName string) (name, ns string) {
 	name = StringSplit(ReadLineLast(fileName, "  name:"))
-	ns = StringSplit(ReadLineLast(fileName, "  namespace:"))
+	if len(ReadLineLast(fileName, "  namespace:")) > 0 {
+		ns = StringSplit(ReadLineLast(fileName, "  namespace:"))
+	} else {
+		ns = "default"
+	}
+
 	return name, ns
 }
 

@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -284,12 +284,16 @@ source:
 	event.Reason = string(opsResult["operation"].(bindings.OperationKind))
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()
+	event.EventTime = metav1.NowMicro()
+	event.ReportingController = "lorry"
+	event.ReportingInstance = podName
+	event.Action = string(opsResult["operation"].(bindings.OperationKind))
 
 	return event, nil
 }
 
 func sendEvent(ctx context.Context, log logger.Logger, event *corev1.Event) error {
-	config, err := rest.InClusterConfig()
+	config, err := ctlruntime.GetConfig()
 	if err != nil {
 		log.Errorf("get k8s client config failed: %v", err)
 		return err

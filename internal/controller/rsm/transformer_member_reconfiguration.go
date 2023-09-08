@@ -72,7 +72,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	// cluster initialization done, handle dynamic membership reconfiguration
 
 	// rsm is ready
-	if isRSMReady(rsm) {
+	if IsRSMReady(rsm) {
 		return cleanAction(transCtx, dag)
 	}
 
@@ -137,23 +137,6 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	}
 }
 
-// rsm level 'ready' state:
-// 1. all replicas exist
-// 2. all members have role set
-func isRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
-	membersStatus := rsm.Status.MembersStatus
-	if len(membersStatus) != int(*rsm.Spec.Replicas) {
-		return false
-	}
-	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
-		podName := getPodName(rsm.Name, i)
-		if !isMemberReady(podName, membersStatus) {
-			return false
-		}
-	}
-	return true
-}
-
 func isStatefulSetReady(sts *apps.StatefulSet) bool {
 	if sts == nil {
 		return false
@@ -162,15 +145,6 @@ func isStatefulSetReady(sts *apps.StatefulSet) bool {
 		sts.Status.Replicas == *sts.Spec.Replicas &&
 		sts.Status.ReadyReplicas == sts.Status.Replicas {
 		return true
-	}
-	return false
-}
-
-func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool {
-	for _, memberStatus := range membersStatus {
-		if memberStatus.PodName == podName {
-			return true
-		}
 	}
 	return false
 }

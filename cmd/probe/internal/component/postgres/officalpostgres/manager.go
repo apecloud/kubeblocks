@@ -45,7 +45,8 @@ import (
 
 type Manager struct {
 	postgres.Manager
-	syncStandbys *postgres.PGStandby
+	syncStandbys   *postgres.PGStandby
+	recoveryParams map[string]map[string]string
 }
 
 var Mgr *Manager
@@ -88,12 +89,17 @@ func (mgr *Manager) IsClusterInitialized(context.Context, *dcs.Cluster) (bool, e
 	return mgr.IsDBStartupReady(), nil
 }
 
-func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
-	mgr.DBState = nil
+func (mgr *Manager) cleanDBState() {
 	mgr.UnsetIsLeader()
-	dbState := &dcs.DBState{
+	mgr.recoveryParams = nil
+	mgr.syncStandbys = nil
+	mgr.DBState = &dcs.DBState{
 		Extra: map[string]string{},
 	}
+}
+
+func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.DBState {
+	mgr.cleanDBState()
 
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err != nil {
@@ -107,13 +113,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("get replication mode failed, err:%v", err)
 		return nil
 	}
-	dbState.Extra[postgres.ReplicationMode] = replicationMode
+	mgr.DBState.Extra[postgres.ReplicationMode] = replicationMode
 
 	if replicationMode == postgres.Synchronous && cluster.Leader != nil && cluster.Leader.Name == mgr.CurrentMemberName {
 		syncStandbys := mgr.getSyncStandbys(ctx)
 		if syncStandbys != nil {
 			mgr.syncStandbys = syncStandbys
-			dbState.Extra[postgres.SyncStandBys] = strings.Join(syncStandbys.Members.ToSlice(), ",")
+			mgr.DBState.Extra[postgres.SyncStandBys] = strings.Join(syncStandbys.Members.ToSlice(), ",")
 		}
 	}
 
@@ -122,7 +128,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("get wal position failed, err:%v", err)
 		return nil
 	}
-	dbState.OpTimestamp = walPosition
+	mgr.DBState.OpTimestamp = walPosition
 
 	var timeLine int64
 	if isLeader {
@@ -134,18 +140,17 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		mgr.Logger.Errorf("get received timeLine failed, err:%v", err)
 		return nil
 	}
-	dbState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
+	mgr.DBState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
 
 	if !isLeader {
-		primaryInfo := mgr.readRecoveryParams(ctx)
-		if primaryInfo == "" {
-			mgr.Logger.Errorf("get primary info failed")
+		recoveryParams, err := mgr.readRecoveryParams(ctx)
+		if err != nil {
+			mgr.Logger.Errorf("get recoveryParams failed, err:%v", err)
 			return nil
 		}
-		dbState.Extra[postgres.PrimaryInfo] = primaryInfo
+		mgr.recoveryParams = recoveryParams
 	}
 
-	mgr.DBState = dbState
 	return mgr.DBState
 }
 
@@ -164,7 +169,6 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
 	}
 
-	mgr.Logger.Infof("get member:%s role:%s", host, role)
 	return role == binding.PRIMARY, nil
 }
 
@@ -588,43 +592,56 @@ func (mgr *Manager) getPgControlData() *map[string]string {
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {
-	_, err := fs.Stat(mgr.DataDir + "/standby.signal")
-	if errors.Is(err, afero.ErrFileNotFound) {
+	if mgr.MajorVersion >= 12 {
+		_, err := fs.Stat(mgr.DataDir + "/standby.signal")
+		if errors.Is(err, afero.ErrFileNotFound) {
+			return true, true
+		}
+	} else {
+		mgr.Logger.Infof("check recovery conf")
+		// TODO: support check recovery.conf
+	}
+
+	recoveryParams, err := mgr.readRecoveryParams(ctx)
+	if err != nil {
 		return true, true
 	}
 
-	primaryInfo := mgr.readRecoveryParams(ctx)
-	if primaryInfo == "" {
-		return true, true
-	}
-
-	if !strings.HasPrefix(primaryInfo, leaderName) {
-		mgr.Logger.Warnf("host not match, need to reload")
-		return true, false
+	if !strings.HasPrefix(recoveryParams[postgres.PrimaryConnInfo]["host"], leaderName) {
+		if recoveryParams[postgres.PrimaryConnInfo]["context"] == "postmaster" {
+			mgr.Logger.Warnf("host not match, need to restart")
+			return true, true
+		} else {
+			mgr.Logger.Warnf("host not match, need to reload")
+			return true, false
+		}
 	}
 
 	return false, false
 }
 
-func (mgr *Manager) readRecoveryParams(ctx context.Context) string {
-	if mgr.DBState != nil && mgr.DBState.Extra[postgres.PrimaryInfo] != "" {
-		return mgr.DBState.Extra[postgres.PrimaryInfo]
+func (mgr *Manager) readRecoveryParams(ctx context.Context) (map[string]map[string]string, error) {
+	if mgr.recoveryParams != nil {
+		return mgr.recoveryParams, nil
 	}
 
-	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
+	sql := fmt.Sprintf(`SELECT name, setting, context FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = '%s';`, postgres.PrimaryConnInfo)
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("get primary conn info failed, err:%v", err)
-		return ""
+		return nil, err
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
-		return ""
+		return nil, err
 	}
 
-	return postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))["host"]
+	primaryConnInfo := postgres.ParsePrimaryConnInfo(cast.ToString(resMap[0]["setting"]))
+	primaryConnInfo["context"] = cast.ToString(resMap[0]["context"])
+
+	return map[string]map[string]string{
+		postgres.PrimaryConnInfo: primaryConnInfo,
+	}, nil
 }
 
 // TODO: Parse history file
@@ -736,8 +753,8 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 		return nil
 	}
 
-	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=my-application'",
-		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, mgr.Config.Username, mgr.Config.Password)
+	primaryInfo := fmt.Sprintf("\nprimary_conninfo = 'host=%s port=%s user=%s password=%s application_name=%s'",
+		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, mgr.Config.Username, mgr.Config.Password, mgr.CurrentMemberName)
 
 	pgConf, err := fs.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {

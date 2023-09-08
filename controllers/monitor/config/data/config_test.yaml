@@ -1,0 +1,23 @@
+image: "apecloud-node-exporter:v0.1.0"
+resources:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+authType: serviceAccount
+collectionInterval: 15s
+
+datasource:
+  metrics:
+    kubeletState:
+      enabled: true
+      metricGroups:
+        - container
+        - pod
+        - volume
+    k8sNode:
+      enabled: true
+    k8sCluster:
+      enabled: true
+    collectionInterval: 15s
+    exporterRef:
+      - prometheus

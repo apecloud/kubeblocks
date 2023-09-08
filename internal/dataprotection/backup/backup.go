@@ -21,6 +21,7 @@ package backup
 
 import (
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,7 @@ import (
 )
 
 const (
-	backupDataJobNamePrefix = "dp-backup"
+	backupDataJobNamePrefix = "dp-backupdata"
 	prebackupJobNamePrefix  = "dp-prebackup"
 	postbackupJobNamePrefix = "dp-postbackup"
 )
@@ -70,6 +71,15 @@ func (r *Request) GetBackupType() string {
 func (r *Request) BuildActions() ([]action.Action, error) {
 	var actions []action.Action
 
+	appendIgnoreNil := func(elems ...action.Action) {
+		for _, elem := range elems {
+			if elem == nil || reflect.ValueOf(elem).IsNil() {
+				continue
+			}
+			actions = append(actions, elem)
+		}
+	}
+
 	// build pre-backup actions
 	preBackupActions, err := r.buildPreBackupActions()
 	if err != nil {
@@ -100,9 +110,9 @@ func (r *Request) BuildActions() ([]action.Action, error) {
 		return nil, err
 	}
 
-	actions = append(actions, preBackupActions...)
-	actions = append(actions, backupDataAction, createVolumeSnapshotAction, backupKubeResourcesAction)
-	actions = append(actions, postBackupActions...)
+	appendIgnoreNil(preBackupActions...)
+	appendIgnoreNil(backupDataAction, createVolumeSnapshotAction, backupKubeResourcesAction)
+	appendIgnoreNil(postBackupActions...)
 	return actions, nil
 }
 
@@ -181,6 +191,7 @@ func (r *Request) buildBackupDataStsAction(backupDataAct *dpv1alpha1.BackupDataA
 	return &action.StsAction{
 		Name:       actionName,
 		ObjectMeta: objectMeta,
+		Owner:      r.Backup,
 		PodSpec:    r.buildJobActionPodSpec(actionName, &backupDataAct.JobActionSpec),
 		Replicas:   &replicas,
 	}, nil
@@ -249,6 +260,7 @@ func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (ac
 	return &action.JobAction{
 		Name:         name,
 		ObjectMeta:   objectMeta,
+		Owner:        r.Backup,
 		PodSpec:      r.buildJobActionPodSpec(name, job),
 		BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
 	}, nil

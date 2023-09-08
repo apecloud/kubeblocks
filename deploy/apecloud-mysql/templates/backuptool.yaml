@@ -1,22 +1,46 @@
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: BackupTool
+kind: ActionSet
 metadata:
   name: xtrabackup-for-apecloud-mysql
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
-    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  image: {{ .Values.image.registry | default "docker.io" }}/apecloud/apecloud-xtrabackup:latest
-  deployKind: job
+  backupType: Full
   env:
-    - name: DATA_DIR
-      value: {{ .Values.mysqlConfigs.dataDir }}
-    - name: LOG_BIN
-      value: {{ .Values.mysqlConfigs.logBin }}
-    - name: DP_DB_PORT
-      value: "3306"
-  physical:
-    restoreCommands:
+  - name: DATA_DIR
+    value: /data/mysql/data
+  - name: LOG_BIN
+    value: /data/mysql/binlog/mysql-bin
+
+  backup:
+    preBackup: []
+    postBackup: []
+    backupData:
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      scheduleToTargetPodNode: true
+      command:
+      - sh
+      - -c
+      - |
+        set -e;
+        if [ -d ${DP_BACKUP_DIR} ]; then
+          rm -rf ${DP_BACKUP_DIR}
+        fi
+        mkdir -p ${DP_BACKUP_DIR};
+        START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+        xtrabackup --compress=zstd --backup  --safe-slave-backup --slave-info --stream=xbstream \
+        --host=${DP_DB_HOST} --user=${DP_DB_USER} --port=${DP_DB_PORT} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
+        STOP_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+        TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
+        echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
+      syncProgress:
+        enabled: false
+        intervalSeconds: 10
+
+  restore:
+    prepareData:
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      command:
       - sh
       - -c
       - |
@@ -31,23 +55,4 @@ spec:
         touch ${DATA_DIR}/.xtrabackup_restore_new_cluster
         rm -rf ${TMP_DIR}
         chmod -R 0777 ${DATA_DIR}
-    incrementalRestoreCommands: []
-  logical:
-    restoreCommands: []
-    incrementalRestoreCommands: []
-  backupCommands:
-    - sh
-    - -c
-    - |
-      set -e;
-      if [ -d ${BACKUP_DIR} ]; then
-        rm -rf ${BACKUP_DIR}
-      fi
-      mkdir -p ${BACKUP_DIR};
-      START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-      xtrabackup --compress=zstd --backup  --safe-slave-backup --slave-info --stream=xbstream \
-      --host=${DB_HOST} --user=${DB_USER} --port=${DP_DB_PORT} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
-      STOP_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-      TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
-      echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
-  incrementalBackupCommands: []
+    postReady: []

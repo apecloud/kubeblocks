@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -227,46 +226,6 @@ func addTolerations(podSpec *corev1.PodSpec) (err error) {
 		}
 	}
 	return nil
-}
-
-// getIntervalSecondsForLogfile gets the interval seconds for logfile schedule cronExpression.
-// currently, only the fields of minutes and hours are taken and contain expressions such as '*/'.
-// If there is no such field, the default return is 60s.
-func getIntervalSecondsForLogfile(backupType dpv1alpha1.BackupType, cronExpression string) string {
-	if backupType != dpv1alpha1.BackupTypeLogFile {
-		return ""
-	}
-	// move time zone field
-	if strings.HasPrefix(cronExpression, "TZ=") || strings.HasPrefix(cronExpression, "CRON_TZ=") {
-		i := strings.Index(cronExpression, " ")
-		cronExpression = strings.TrimSpace(cronExpression[i:])
-	}
-	var interval = "60"
-	// skip the macro syntax
-	if strings.HasPrefix(cronExpression, "@") {
-		return interval + "s"
-	}
-	fields := strings.Fields(cronExpression)
-loop:
-	for i, v := range fields {
-		switch i {
-		case 0:
-			if strings.HasPrefix(v, "*/") {
-				m, _ := strconv.Atoi(strings.ReplaceAll(v, "*/", ""))
-				interval = strconv.Itoa(m * 60)
-				break loop
-			}
-		case 1:
-			if strings.HasPrefix(v, "*/") {
-				m, _ := strconv.Atoi(strings.ReplaceAll(v, "*/", ""))
-				interval = strconv.Itoa(m * 60 * 60)
-				break loop
-			}
-		default:
-			break loop
-		}
-	}
-	return interval + "s"
 }
 
 // filterCreatedByPolicy filters the workloads which are create by backupPolicy.

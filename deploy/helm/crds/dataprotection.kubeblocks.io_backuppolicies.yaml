@@ -63,11 +63,11 @@ spec:
                 items:
                   description: BackupMethod defines the backup method.
                   properties:
-                    backupScriptRef:
-                      description: backupScriptRef refers to the BackupScript object
-                        that defines the backup actions. For volume snapshot backup,
-                        the backupScript is not required, the controller will use
-                        the CSI volume snapshotter to create the snapshot.
+                    actionSetName:
+                      description: actionSetName refers to the ActionSet object that
+                        defines the backup actions. For volume snapshot backup, the
+                        actionSet is not required, the controller will use the CSI
+                        volume snapshotter to create the snapshot.
                       type: string
                     env:
                       description: env specifies the environment variables for the
@@ -346,19 +346,10 @@ spec:
                         description: portKey specifies the map key of the port in
                           the connection credential secret.
                         type: string
-                      secretRef:
-                        description: secretRef refers to the Secret object that contains
+                      secretName:
+                        description: secretName refers to the Secret object that contains
                           the connection credential.
-                        properties:
-                          name:
-                            description: Name is unique within a namespace to reference
-                              a secret resource.
-                            type: string
-                          namespace:
-                            description: Namespace defines the space within which
-                              the secret name must be unique.
-                            type: string
-                        type: object
+                        type: string
                       usernameKey:
                         default: username
                         description: usernameKey specifies the map key of the user
@@ -432,7 +423,8 @@ spec:
                           type: string
                         type: array
                       included:
-                        default: '*'
+                        default:
+                        - '*'
                         description: included is a slice of namespaced-scoped resource
                           type names to include in the kubernetes resources. The default
                           value is "*", which means all resource types will be included.

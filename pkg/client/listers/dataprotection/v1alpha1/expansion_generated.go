@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
+// ActionSetListerExpansion allows custom methods to be added to
+// ActionSetLister.
+type ActionSetListerExpansion interface{}
+
 // BackupListerExpansion allows custom methods to be added to
 // BackupLister.
 type BackupListerExpansion interface{}
@@ -45,10 +49,6 @@ type BackupScheduleListerExpansion interface{}
 // BackupScheduleNamespaceListerExpansion allows custom methods to be added to
 // BackupScheduleNamespaceLister.
 type BackupScheduleNamespaceListerExpansion interface{}
-
-// BackupToolListerExpansion allows custom methods to be added to
-// BackupToolLister.
-type BackupToolListerExpansion interface{}
 
 // RestoreJobListerExpansion allows custom methods to be added to
 // RestoreJobLister.

@@ -25,44 +25,44 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// BackupToolLister helps list BackupTools.
+// ActionSetLister helps list ActionSets.
 // All objects returned here must be treated as read-only.
-type BackupToolLister interface {
-	// List lists all BackupTools in the indexer.
+type ActionSetLister interface {
+	// List lists all ActionSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.BackupTool, err error)
-	// Get retrieves the BackupTool from the index for a given name.
+	List(selector labels.Selector) (ret []*v1alpha1.ActionSet, err error)
+	// Get retrieves the ActionSet from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.BackupTool, error)
-	BackupToolListerExpansion
+	Get(name string) (*v1alpha1.ActionSet, error)
+	ActionSetListerExpansion
 }
 
-// backupToolLister implements the BackupToolLister interface.
-type backupToolLister struct {
+// actionSetLister implements the ActionSetLister interface.
+type actionSetLister struct {
 	indexer cache.Indexer
 }
 
-// NewBackupToolLister returns a new BackupToolLister.
-func NewBackupToolLister(indexer cache.Indexer) BackupToolLister {
-	return &backupToolLister{indexer: indexer}
+// NewActionSetLister returns a new ActionSetLister.
+func NewActionSetLister(indexer cache.Indexer) ActionSetLister {
+	return &actionSetLister{indexer: indexer}
 }
 
-// List lists all BackupTools in the indexer.
-func (s *backupToolLister) List(selector labels.Selector) (ret []*v1alpha1.BackupTool, err error) {
+// List lists all ActionSets in the indexer.
+func (s *actionSetLister) List(selector labels.Selector) (ret []*v1alpha1.ActionSet, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.BackupTool))
+		ret = append(ret, m.(*v1alpha1.ActionSet))
 	})
 	return ret, err
 }
 
-// Get retrieves the BackupTool from the index for a given name.
-func (s *backupToolLister) Get(name string) (*v1alpha1.BackupTool, error) {
+// Get retrieves the ActionSet from the index for a given name.
+func (s *actionSetLister) Get(name string) (*v1alpha1.ActionSet, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("backuptool"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("actionset"), name)
 	}
-	return obj.(*v1alpha1.BackupTool), nil
+	return obj.(*v1alpha1.ActionSet), nil
 }

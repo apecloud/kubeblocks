@@ -43,8 +43,6 @@ func (c *CreateVolumeSnapshotAction) Type() dpv1alpha1.ActionType {
 }
 
 func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
-	snap := &snapv1.VolumeSnapshot{}
-
 	return nil, nil
 }
 

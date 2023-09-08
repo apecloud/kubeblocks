@@ -32,58 +32,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// BackupToolInformer provides access to a shared informer and lister for
-// BackupTools.
-type BackupToolInformer interface {
+// ActionSetInformer provides access to a shared informer and lister for
+// ActionSets.
+type ActionSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.BackupToolLister
+	Lister() v1alpha1.ActionSetLister
 }
 
-type backupToolInformer struct {
+type actionSetInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewBackupToolInformer constructs a new informer for BackupTool type.
+// NewActionSetInformer constructs a new informer for ActionSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewBackupToolInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredBackupToolInformer(client, resyncPeriod, indexers, nil)
+func NewActionSetInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredActionSetInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredBackupToolInformer constructs a new informer for BackupTool type.
+// NewFilteredActionSetInformer constructs a new informer for ActionSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredBackupToolInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredActionSetInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.DataprotectionV1alpha1().BackupTools().List(context.TODO(), options)
+				return client.DataprotectionV1alpha1().ActionSets().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.DataprotectionV1alpha1().BackupTools().Watch(context.TODO(), options)
+				return client.DataprotectionV1alpha1().ActionSets().Watch(context.TODO(), options)
 			},
 		},
-		&dataprotectionv1alpha1.BackupTool{},
+		&dataprotectionv1alpha1.ActionSet{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *backupToolInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredBackupToolInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *actionSetInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredActionSetInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *backupToolInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&dataprotectionv1alpha1.BackupTool{}, f.defaultInformer)
+func (f *actionSetInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&dataprotectionv1alpha1.ActionSet{}, f.defaultInformer)
 }
 
-func (f *backupToolInformer) Lister() v1alpha1.BackupToolLister {
-	return v1alpha1.NewBackupToolLister(f.Informer().GetIndexer())
+func (f *actionSetInformer) Lister() v1alpha1.ActionSetLister {
+	return v1alpha1.NewActionSetLister(f.Informer().GetIndexer())
 }

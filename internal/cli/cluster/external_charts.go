@@ -34,10 +34,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-// CliClusterChartConfig is $HOME/.kbcli/cluster_types in default
+// CliClusterChartConfig is $HOME/.kbcli/cluster_types by default
 var CliClusterChartConfig string
 
-// CliChartsCacheDir is $HOME/.kbcli/charts in default
+// CliChartsCacheDir is $HOME/.kbcli/charts by default
 var CliChartsCacheDir string
 
 type clusterConfig []*TypeInstance

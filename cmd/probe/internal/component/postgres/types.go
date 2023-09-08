@@ -279,9 +279,17 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 	return -1
 }
 
+type HistoryFile struct {
+	History []History
+}
+
 type History struct {
 	ParentTimeline int64
 	SwitchPoint    int64
+}
+
+func ParseHistory(str string) *HistoryFile {
+	return nil
 }
 
 func ParsePgLsn(str string) int64 {

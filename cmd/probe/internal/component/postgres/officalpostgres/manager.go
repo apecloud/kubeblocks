@@ -412,7 +412,7 @@ func (mgr *Manager) executeRewind() error {
 
 func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluster) bool {
 	var needRewind bool
-	var historys []*postgres.History
+	var history *postgres.HistoryFile
 
 	isRecovery, localTimeLine, localLsn := mgr.getLocalTimeLineAndLsn(ctx)
 	if localTimeLine == 0 || localLsn == 0 {
@@ -437,11 +437,11 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 	case localTimeLine == primaryTimeLine:
 		needRewind = false
 	case primaryTimeLine > 1:
-		historys = mgr.getHistory()
+		history = mgr.getHistory(cluster.GetMemberAddr(*cluster.GetLeaderMember()), primaryTimeLine)
 	}
 
-	if len(historys) != 0 {
-		for _, h := range historys {
+	if len(history.History) != 0 {
+		for _, h := range history.History {
 			if h.ParentTimeline == localTimeLine {
 				switch {
 				case isRecovery:
@@ -645,7 +645,7 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) (map[string]map[stri
 }
 
 // TODO: Parse history file
-func (mgr *Manager) getHistory() []*postgres.History {
+func (mgr *Manager) getHistory(host string, timeline int64) *postgres.HistoryFile {
 	return nil
 }
 

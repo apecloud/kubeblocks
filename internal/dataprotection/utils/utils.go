@@ -17,28 +17,4 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package action
-
-import (
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-)
-
-type ExecActionBuilder struct {
-	Name      string
-	Namespace string
-	PodName   string
-	Exec      *dpv1alpha1.ExecAction
-}
-
-var _ Builder = &ExecActionBuilder{}
-
-func (e *ExecActionBuilder) Build() Action {
-	return &KubeExec{
-		Name:      e.Name,
-		Command:   e.Exec.Command,
-		Container: e.Exec.Container,
-		Namespace: e.Namespace,
-		PodName:   e.PodName,
-		Timeout:   e.Exec.Timeout,
-	}
-}
+package utils

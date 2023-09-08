@@ -26,12 +26,15 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
+
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
-// KubeExec is an action that executes a command on a pod.
-type KubeExec struct {
+// ExecAction is an action that executes a command on a pod.
+type ExecAction struct {
 	// Name is the Name of the action.
 	Name string
 
@@ -51,25 +54,36 @@ type KubeExec struct {
 	Timeout metav1.Duration
 }
 
-func (e *KubeExec) GetName() string {
+func (e *ExecAction) GetName() string {
 	return e.Name
 }
 
-func (e *KubeExec) Type() ActionType {
-	return ActionTypeExec
+func (e *ExecAction) Type() dpv1alpha1.ActionType {
+	return dpv1alpha1.ActionTypeExec
 }
 
-func (e *KubeExec) Execute(ctx Context) error {
-	if err := e.validate(); err != nil {
-		return err
+func (e *ExecAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
+	sb := newStatusBuilder(e)
+	handleErr := func(err error) (*dpv1alpha1.ActionStatus, error) {
+		return sb.withErr(err).build(), err
 	}
 
-	req := ctx.RestClient.Post().
+	if err := e.validate(); err != nil {
+		return handleErr(err)
+	}
+
+	kc, err := kubernetes.NewForConfig(ctx.RestClientConfig)
+	if err != nil {
+		return handleErr(err)
+	}
+
+	req := kc.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(e.Namespace).
 		Name(e.PodName).
-		SubResource("Exec")
+		SubResource("ExecAction")
 
+	// if container not specified, exec will use the first container in the pod
 	if e.Container != "" {
 		req.Param("container", e.Container)
 	}
@@ -84,7 +98,7 @@ func (e *KubeExec) Execute(ctx Context) error {
 
 	executor, err := remotecommand.NewSPDYExecutor(ctx.RestClientConfig, "POST", req.URL())
 	if err != nil {
-		return err
+		return handleErr(err)
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -109,12 +123,16 @@ func (e *KubeExec) Execute(ctx Context) error {
 	select {
 	case err = <-errCh:
 	case <-timeoutCh:
-		return errors.Errorf("timed out after %v", e.Timeout.Duration)
+		return handleErr(errors.Errorf("timed out after %v", e.Timeout.Duration))
 	}
-	return err
+
+	if err != nil {
+		return handleErr(err)
+	}
+	return sb.phase(dpv1alpha1.ActionPhaseCompleted).completionTimestamp(nil).build(), nil
 }
 
-func (e *KubeExec) validate() error {
+func (e *ExecAction) validate() error {
 	if e.PodName == "" {
 		return errors.New("pod Name is required")
 	}
@@ -127,4 +145,4 @@ func (e *KubeExec) validate() error {
 	return nil
 }
 
-var _ Action = &KubeExec{}
+var _ Action = &ExecAction{}

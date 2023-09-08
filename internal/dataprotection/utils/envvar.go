@@ -26,28 +26,28 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
-func BuildEnvVarsByCredential(credential *dpv1alpha1.ConnectionCredential) []corev1.EnvVar {
+func BuildEnvByCredential(credential *dpv1alpha1.ConnectionCredential) []corev1.EnvVar {
 	var envVars []corev1.EnvVar
 	if credential == nil {
 		return nil
 	}
 	envVars = append(envVars,
-		buildEnvVar(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey),
-		buildEnvVar(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey),
-		buildEnvVar(dptypes.DPDBHost, credential.SecretName, credential.HostKey),
-		buildEnvVar(dptypes.DPDBPort, credential.SecretName, credential.PortKey),
-		buildEnvVar(dptypes.DPDBEndpoint, credential.SecretName, credential.EndpointKey),
+		buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey),
+		buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey),
+		buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey),
+		buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey),
+		buildEnvBySecretKey(dptypes.DPDBEndpoint, credential.SecretName, credential.EndpointKey),
 	)
 	return envVars
 }
 
-func buildEnvVar(name, objRefName, key string) corev1.EnvVar {
+func buildEnvBySecretKey(name, secretName, key string) corev1.EnvVar {
 	return corev1.EnvVar{
 		Name: name,
 		ValueFrom: &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: objRefName,
+					Name: secretName,
 				},
 				Key: key,
 			},

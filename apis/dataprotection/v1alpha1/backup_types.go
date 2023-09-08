@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -130,10 +131,6 @@ type BackupStatus struct {
 	// actions records the actions information for this backup.
 	// +optional
 	Actions []ActionStatus `json:"actions,omitempty"`
-
-	// availableReplicas available replicas for statefulSet which created by backup.
-	// +optional
-	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
 }
 
 // BackupTimeRange records the time range of backed up data, for PITR, this is the
@@ -201,6 +198,18 @@ type ActionStatus struct {
 	// failureReason is an error that caused the backup to fail.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// actionType is the type of the action.
+	// +optional
+	ActionType ActionType `json:"actionType,omitempty"`
+
+	// availableReplicas available replicas for statefulSet action.
+	// +optional
+	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
+
+	// objectRef is the object reference for the action.
+	// +optional
+	ObjectRef *corev1.ObjectReference `json:"objectRef,omitempty"`
 }
 
 type ActionPhase string
@@ -218,6 +227,14 @@ const (
 
 	// ActionPhaseFailed means the action ran but encountered an error that
 	ActionPhaseFailed ActionPhase = "Failed"
+)
+
+type ActionType string
+
+const (
+	ActionTypeExec        ActionType = "Exec"
+	ActionTypeJob         ActionType = "Job"
+	ActionTypeStatefulSet ActionType = "StatefulSet"
 )
 
 // +genclient

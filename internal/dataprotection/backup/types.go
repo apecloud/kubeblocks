@@ -17,8 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package action
+package backup
 
-type Builder interface {
-	Build() Action
-}
+// FormatVersion is the backup file format version, including major, minor, and patch version.
+const FormatVersion = "0.1.0"

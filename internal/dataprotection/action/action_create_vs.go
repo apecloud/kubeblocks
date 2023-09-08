@@ -20,32 +20,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package action
 
 import (
-	"context"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	corev1 "k8s.io/api/core/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
-type Action interface {
-	// Execute executes the action.
-	Execute(ctx Context) (*dpv1alpha1.ActionStatus, error)
+// CreateVolumeSnapshotAction is an action that creates the volume snapshot.
+type CreateVolumeSnapshotAction struct {
+	// Name is the Name of the action.
+	Name string
 
-	// GetName returns the Name of the action.
-	GetName() string
-
-	// Type returns the type of the action.
-	Type() dpv1alpha1.ActionType
+	// PersistentVolumeClaims is the list of persistent volume claims to snapshot.
+	PersistentVolumeClaims []corev1.PersistentVolumeClaim
 }
 
-type Context struct {
-	Ctx      context.Context
-	Client   client.Client
-	Recorder record.EventRecorder
-
-	Scheme           *runtime.Scheme
-	RestClientConfig *rest.Config
+func (c *CreateVolumeSnapshotAction) GetName() string {
+	return c.Name
 }
+
+func (c *CreateVolumeSnapshotAction) Type() dpv1alpha1.ActionType {
+	return dpv1alpha1.ActionTypeExec
+}
+
+func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
+	snap := &snapv1.VolumeSnapshot{}
+
+	return nil, nil
+}
+
+var _ Action = &CreateVolumeSnapshotAction{}

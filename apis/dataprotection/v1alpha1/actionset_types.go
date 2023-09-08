@@ -49,30 +49,30 @@ type ActionSetSpec struct {
 
 	// backup specifies the backup action.
 	// +optional
-	Backup *BackupAction `json:"backup,omitempty"`
+	Backup *BackupActionSpec `json:"backup,omitempty"`
 
 	// restore specifies the restore action.
 	// +optional
-	Restore *RestoreAction `json:"restore,omitempty"`
+	Restore *RestoreActionSpec `json:"restore,omitempty"`
 }
 
-type BackupAction struct {
+type BackupActionSpec struct {
 	// backupData specifies the backup data action.
 	// +kubebuilder:validation:Required
-	BackupData *BackupDataAction `json:"backupData,omitempty"`
+	BackupData *BackupDataActionSpec `json:"backupData,omitempty"`
 
 	// preBackup specifies a hook that should be executed before the backup.
 	// +optional
-	PreBackup []Action `json:"preBackup,omitempty"`
+	PreBackup []ActionSpec `json:"preBackup,omitempty"`
 
 	// postBackup specifies a hook that should be executed after the backup.
 	// +optional
-	PostBackup []Action `json:"postBackup,omitempty"`
+	PostBackup []ActionSpec `json:"postBackup,omitempty"`
 }
 
-// BackupDataAction defines how to backup data.
-type BackupDataAction struct {
-	JobAction `json:",inline"`
+// BackupDataActionSpec defines how to backup data.
+type BackupDataActionSpec struct {
+	JobActionSpec `json:",inline"`
 
 	// syncProgress specifies whether to sync the backup progress and its interval seconds.
 	// +optional
@@ -92,31 +92,31 @@ type SyncProgress struct {
 	IntervalSeconds *int32 `json:"intervalSeconds,omitempty"`
 }
 
-// RestoreAction defines how to restore data.
-type RestoreAction struct {
+// RestoreActionSpec defines how to restore data.
+type RestoreActionSpec struct {
 	// prepareData specifies the action to prepare data.
 	// +optional
-	PrepareData *JobAction `json:"prepareData,omitempty"`
+	PrepareData *JobActionSpec `json:"prepareData,omitempty"`
 
 	// postReady specifies the action to execute after the data is ready.
 	// +optional
-	PostReady []Action `json:"postReady,omitempty"`
+	PostReady []ActionSpec `json:"postReady,omitempty"`
 }
 
-// Action defines an action that should be executed. Only one of the fields may be set.
-type Action struct {
+// ActionSpec defines an action that should be executed. Only one of the fields may be set.
+type ActionSpec struct {
 	// exec specifies the action should be executed by the pod exec API in a container.
 	// +optional
-	Exec *ExecAction `json:"exec,omitempty"`
+	Exec *ExecActionSpec `json:"exec,omitempty"`
 
 	// job specifies the action should be executed by a Kubernetes Job.
 	// +optional
-	Job *JobAction `json:"job,omitempty"`
+	Job *JobActionSpec `json:"job,omitempty"`
 }
 
-// ExecAction is an action that uses the pod exec API to execute a command in a container
+// ExecActionSpec is an action that uses the pod exec API to execute a command in a container
 // in a pod.
-type ExecAction struct {
+type ExecActionSpec struct {
 	// container is the container in the pod where the command should be executed.
 	// If not specified, the pod's first container is used.
 	// +optional
@@ -137,8 +137,8 @@ type ExecAction struct {
 	Timeout metav1.Duration `json:"timeout,omitempty"`
 }
 
-// JobAction is an action that creates a Kubernetes Job to execute a command.
-type JobAction struct {
+// JobActionSpec is an action that creates a Kubernetes Job to execute a command.
+type JobActionSpec struct {
 	// image specifies the image of backup container.
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`

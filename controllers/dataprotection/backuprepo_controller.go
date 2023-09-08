@@ -52,6 +52,7 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -177,7 +178,7 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 		}
 		repo.Status.Phase = phase
 	}
-	repo.Status.IsDefault = repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal
+	repo.Status.IsDefault = repo.Annotations[dptypes.DefaultBackupRepoAnnotationKey] == trueVal
 
 	if !reflect.DeepEqual(old.Status, repo.Status) {
 		if err := r.Client.Status().Patch(reqCtx.Ctx, repo, client.MergeFrom(old)); err != nil {

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
@@ -85,6 +86,30 @@ func getVolumesByVolumeInfo(pod *corev1.Pod, volumeInfo *dpv1alpha1.TargetVolume
 	return volumes
 }
 
+func getPVCsByVolumeNames(cli client.Client,
+	pod *corev1.Pod,
+	volumeNames []string) ([]corev1.PersistentVolumeClaim, error) {
+	var all []corev1.PersistentVolumeClaim
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim == nil {
+			continue
+		}
+		for _, name := range volumeNames {
+			if v.Name != name {
+				continue
+			}
+			// get the PVC from pod's volumes
+			tmp := corev1.PersistentVolumeClaim{}
+			pvcKey := client.ObjectKey{Namespace: pod.Namespace, Name: v.PersistentVolumeClaim.ClaimName}
+			if err := cli.Get(context.Background(), pvcKey, &tmp); err != nil {
+				return nil, err
+			}
+			all = append(all, *tmp.DeepCopy())
+		}
+	}
+	return all, nil
+}
+
 func backupRepoVolumeName(pvcName string) string {
 	return fmt.Sprintf("backup-%s", pvcName)
 }
@@ -105,4 +130,31 @@ func buildBackupRepoVolumeMount(pvcName string) corev1.VolumeMount {
 		Name:      backupRepoVolumeName(pvcName),
 		MountPath: types.BackupPathBase,
 	}
+}
+
+func generateBackupWorkloadName(backup *dpv1alpha1.Backup, prefix string) string {
+	name := fmt.Sprintf("%s-%s-%s", prefix, backup.Name, backup.UID[:8])
+	// job name cannot exceed 63 characters for label name limit.
+	if len(name) > 63 {
+		return name[:63]
+	}
+	return name
+}
+
+func excludeLabelsForWorkload() []string {
+	return []string{constant.KBAppComponentLabelKey}
+}
+
+// buildBackupWorkloadLabels builds the labels for workload which owned by backup.
+func buildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
+	labels := backup.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	} else {
+		for _, v := range excludeLabelsForWorkload() {
+			delete(labels, v)
+		}
+	}
+	labels[types.DataProtectionLabelBackupNameKey] = backup.Name
+	return labels
 }

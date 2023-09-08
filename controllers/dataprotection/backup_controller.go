@@ -24,10 +24,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -61,6 +59,7 @@ import (
 	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/action"
 	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
 	dperrors "github.com/apecloud/kubeblocks/internal/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
@@ -132,11 +131,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	case "", dpv1alpha1.BackupPhaseNew:
 		return r.handleNewPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseRunning:
-		if err = r.doInRunningPhaseAction(reqCtx, backup); err != nil {
-			sendWarningEventForError(r.Recorder, backup, err)
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-		}
-		return intctrlutil.Reconciled()
+		return r.handleRunningPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseCompleted:
 		return r.handleCompletedPhase(reqCtx, backup)
 	default:
@@ -327,6 +322,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 	request := &dpbackup.Request{
 		Backup:     backup.DeepCopy(),
 		RequestCtx: reqCtx,
+		Client:     r.Client,
 	}
 
 	if request.Annotations == nil {
@@ -510,34 +506,63 @@ func (r *BackupReconciler) getBackupRepo(ctx context.Context,
 func (r *BackupReconciler) handleRunningPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	var (
+		err         error
+		res         *ctrl.Result
+		actionIndex = -1
+	)
+
+	request, err := r.prepareBackupRequest(reqCtx, backup)
+	if err != nil {
+		return r.updateStatusIfFailed(reqCtx, request.Backup, err)
+	}
+
+	actions, err := request.BuildActions()
+	if err != nil {
+		return r.updateStatusIfFailed(reqCtx, request.Backup, err)
+	}
+
 	// check all actions status, if any action failed, update backup status to failed
-	// if all actions completed, update backup status to completed
-	for _, action := range backup.Status.Actions {
-		switch action.Phase {
+	// if all actions completed, update backup status to completed, otherwise,
+	// continue to handle following actions.
+	for i, act := range backup.Status.Actions {
+		switch act.Phase {
 		case dpv1alpha1.ActionPhaseFailed:
-			return r.updateStatusIfFailed(reqCtx, backup, fmt.Errorf("action %s failed", action.Name))
+			return r.updateStatusIfFailed(reqCtx, backup, fmt.Errorf("action %s failed", act.Name))
 		case dpv1alpha1.ActionPhaseCompleted:
 			continue
 		case dpv1alpha1.ActionPhaseNew, dpv1alpha1.ActionPhaseRunning:
+			actionIndex = i
 		}
 	}
-}
 
-func (r *BackupReconciler) doInProgressPhaseAction(
-	reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-	backupPolicy, err := r.getBackupPolicy(reqCtx, backup)
-	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup, err)
+	// all actions completed, update backup status to completed
+	// TODO: use a function
+	if actionIndex == -1 {
+		request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+		request.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+		if !request.Status.StartTimestamp.IsZero() {
+			// round the duration to a multiple of seconds.
+			duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
+			request.Status.Duration = &metav1.Duration{Duration: duration}
+		}
+		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup.")
+		if err := r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
 	}
-	backupDestinationPath := getBackupPath(backup, backupPolicy.Annotations[dptypes.BackupDataPathPrefixAnnotationKey])
-	patch := client.MergeFrom(backup.DeepCopy())
-	var res *ctrl.Result
-	switch backup.Spec.BackupType {
-	case dpv1alpha1.BackupTypeSnapshot:
-		res, err = r.doSnapshotInProgressPhaseAction(reqCtx, backup, backupPolicy, backupDestinationPath)
-	default:
-		res, err = r.doBaseBackupInProgressPhaseAction(reqCtx, backup, backupPolicy, backupDestinationPath)
+
+	// handle current and following actions
+	for i := actionIndex; i < len(actions); i++ {
+		act := actions[i]
+		actStatus := &backup.Status.Actions[i]
+		if err = r.handleAction(reqCtx, request, act, actStatus); err != nil {
+			return r.updateStatusIfFailed(reqCtx, request.Backup, err)
+		}
+		if act.Phase == dpv1alpha1.ActionPhaseRunning {
+			break
+		}
 	}
 
 	if res != nil {
@@ -545,18 +570,24 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 	} else if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	// finally, update backup status
-	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup.")
-	if backup.Status.CompletionTimestamp != nil {
-		// round the duration to a multiple of seconds.
-		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
-		backup.Status.Duration = &metav1.Duration{Duration: duration}
-	}
-	if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
 
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupReconciler) handleAction(
+	reqCtx intctrlutil.RequestCtx,
+	request *dpbackup.Request,
+	act *action.Action,
+	actStatus *dpv1alpha1.ActionStatus) error {
+	switch actStatus.Phase {
+	case dpv1alpha1.ActionPhaseNew:
+		return r.startAction(reqCtx, request, action)
+	case dpv1alpha1.ActionPhaseRunning:
+		return r.updateAction(reqCtx, request, action)
+	case dpv1alpha1.ActionPhaseCompleted:
+		return r.completeAction(reqCtx, request, action)
+	}
+	return nil
 }
 
 // doSnapshotInProgressPhaseAction handles for snapshot backup during in progress.
@@ -665,50 +696,6 @@ func (r *BackupReconciler) doBaseBackupInProgressPhaseAction(reqCtx intctrlutil.
 		}
 	}
 	return nil, nil
-}
-
-func (r *BackupReconciler) doInRunningPhaseAction(
-	reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup) error {
-	backupPolicy, isCompleted, err := r.checkBackupIsCompletedDuringRunning(reqCtx, backup)
-	if err != nil {
-		return err
-	} else if isCompleted {
-		return nil
-	}
-	commonPolicy := backupPolicy.Spec.GetCommonPolicy(backup.Spec.BackupType)
-	if commonPolicy == nil {
-		return fmt.Errorf(`can not find spec.%s in BackupPolicy "%s"`, strings.ToLower(string(backup.Spec.BackupType)), backupPolicy.Name)
-	}
-	// reconcile StatefulSet
-	sts := &appsv1.StatefulSet{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, types.NamespacedName{
-		Namespace: backup.Namespace,
-		Name:      backup.Name,
-	}, sts)
-	if err != nil {
-		return err
-	}
-	statefulSetSpec, err := r.buildStatefulSpec(reqCtx, backup, backupPolicy, commonPolicy)
-	if err != nil {
-		return err
-	}
-	// if not exists, create the statefulSet
-	if !exists {
-		return r.createBackupStatefulSet(reqCtx, backup, statefulSetSpec)
-	}
-	sts.Spec.Template = statefulSetSpec.Template
-	// update the statefulSet
-	if err = r.Update(reqCtx.Ctx, sts); err != nil {
-		return err
-	}
-	// if available replicas not changed, return
-	if backup.Status.AvailableReplicas != nil && *backup.Status.AvailableReplicas == sts.Status.AvailableReplicas {
-		return nil
-	}
-	patch := client.MergeFrom(backup.DeepCopy())
-	backup.Status.AvailableReplicas = &sts.Status.AvailableReplicas
-	return r.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 
 // checkBackupIsCompletedDuringRunning checks if backup is completed during it is running.
@@ -878,66 +865,6 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
 	}
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-}
-
-func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup,
-	snapshotPolicy *dpv1alpha1.SnapshotPolicy) (bool, error) {
-
-	emptyCmd, err := r.ensureEmptyHooksCommand(snapshotPolicy, true)
-	if err != nil {
-		return false, err
-	}
-	// if undefined commands, skip create job.
-	if emptyCmd {
-		return true, err
-	}
-
-	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	key := types.NamespacedName{Namespace: mgrNS, Name: generateUniqueJobName(backup, "hook-pre")}
-	if err := r.createHooksCommandJob(reqCtx, backup, snapshotPolicy, key, true); err != nil {
-		return false, err
-	}
-	return r.ensureBatchV1JobCompleted(reqCtx, key)
-}
-
-func (r *BackupReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup,
-	snapshotPolicy *dpv1alpha1.SnapshotPolicy) (bool, error) {
-
-	emptyCmd, err := r.ensureEmptyHooksCommand(snapshotPolicy, false)
-	if err != nil {
-		return false, err
-	}
-	// if undefined commands, skip create job.
-	if emptyCmd {
-		return true, err
-	}
-
-	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	key := types.NamespacedName{Namespace: mgrNS, Name: generateUniqueJobName(backup, "hook-post")}
-	if err = r.createHooksCommandJob(reqCtx, backup, snapshotPolicy, key, false); err != nil {
-		return false, err
-	}
-	return r.ensureBatchV1JobCompleted(reqCtx, key)
-}
-
-func (r *BackupReconciler) ensureBatchV1JobCompleted(
-	reqCtx intctrlutil.RequestCtx, key types.NamespacedName) (bool, error) {
-	job := &batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job)
-	if err != nil {
-		return false, err
-	}
-	if exists {
-		if containsJobCondition(job, batchv1.JobComplete) {
-			return true, nil
-		}
-		if containsJobCondition(job, batchv1.JobFailed) {
-			return false, intctrlutil.NewBackupJobFailed(job.Name)
-		}
-	}
-	return false, nil
 }
 
 func (r *BackupReconciler) createVolumeSnapshot(
@@ -1217,119 +1144,6 @@ func (r *BackupReconciler) createDeleteBackupFileJob(
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
 }
 
-func (r *BackupReconciler) createBackupToolJob(
-	reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup,
-	backupPolicy *dpv1alpha1.BackupPolicy,
-	commonPolicy *dpv1alpha1.CommonBackupPolicy,
-	backupDestinationPath string) error {
-
-	key := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
-	job := batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, &job)
-	if err != nil {
-		return err
-	}
-	if exists {
-		// find resource object, skip created.
-		return nil
-	}
-
-	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup, backupPolicy, commonPolicy, backupDestinationPath)
-	if err != nil {
-		return err
-	}
-
-	if err = r.createBatchV1Job(reqCtx, key, backup, toolPodSpec); err != nil {
-		return err
-	}
-	msg := fmt.Sprintf("Waiting for the job %s creation to complete.", key.Name)
-	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob", msg)
-	return nil
-}
-
-// ensureEmptyHooksCommand determines whether it has empty commands in the hooks
-func (r *BackupReconciler) ensureEmptyHooksCommand(
-	snapshotPolicy *dpv1alpha1.SnapshotPolicy,
-	preCommand bool) (bool, error) {
-	// return true directly, means hooks commands is empty, skip subsequent hook jobs.
-	if snapshotPolicy.Hooks == nil {
-		return true, nil
-	}
-
-	commands := snapshotPolicy.Hooks.PostCommands
-	if preCommand {
-		commands = snapshotPolicy.Hooks.PreCommands
-	}
-	if len(commands) == 0 {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (r *BackupReconciler) createHooksCommandJob(
-	reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup,
-	snapshotPolicy *dpv1alpha1.SnapshotPolicy,
-	key types.NamespacedName,
-	preCommand bool) error {
-
-	job := batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, &job)
-	if err != nil {
-		return err
-	}
-	if exists {
-		// find resource object, skip created.
-		return nil
-	}
-
-	jobPodSpec, err := r.buildSnapshotPodSpec(reqCtx, backup, snapshotPolicy, preCommand)
-	if err != nil {
-		return err
-	}
-
-	msg := fmt.Sprintf("Waiting for the job %s creation to complete.", key.Name)
-	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
-
-	return r.createBatchV1Job(reqCtx, key, backup, jobPodSpec)
-}
-
-func (r *BackupReconciler) createBatchV1Job(
-	reqCtx intctrlutil.RequestCtx,
-	key types.NamespacedName,
-	backup *dpv1alpha1.Backup,
-	templatePodSpec corev1.PodSpec) error {
-
-	backOffLimit := int32(3)
-	job := &batchv1.Job{
-		// TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: "batch/v1"},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: key.Namespace,
-			Name:      key.Name,
-			Labels:    buildBackupWorkloadLabels(backup),
-		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: key.Namespace,
-					Name:      key.Name},
-				Spec: templatePodSpec,
-			},
-			BackoffLimit: &backOffLimit,
-		},
-	}
-	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
-	if backup.Namespace == job.Namespace {
-		if err := controllerutil.SetControllerReference(backup, job, r.Scheme); err != nil {
-			return err
-		}
-	}
-
-	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
-	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
-}
-
 // deleteExternalJobs deletes the external jobs.
 func (r *BackupReconciler) deleteExternalJobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	jobs := &batchv1.JobList{}
@@ -1422,10 +1236,7 @@ func (r *BackupReconciler) handleDeleteBackupFiles(reqCtx intctrlutil.RequestCtx
 			return nil, err
 		}
 
-		backupFilePath := ""
-		if backup.Status.Manifests != nil && backup.Status.Manifests.BackupTool != nil {
-			backupFilePath = backup.Status.Manifests.BackupTool.FilePath
-		}
+		backupFilePath := backup.Status.Path
 		if backupFilePath == "" || !strings.Contains(backupFilePath, backup.Name) {
 			// For compatibility: the FilePath field is changing from time to time,
 			// and it may not contain the backup name as a path component if the Backup object
@@ -1560,182 +1371,6 @@ func (r *BackupReconciler) appendBackupVolumeMount(
 	}
 	podSpec.Volumes = append(podSpec.Volumes, remoteVolume)
 	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
-}
-
-func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup,
-	backupPolicy *dpv1alpha1.BackupPolicy,
-	commonPolicy *dpv1alpha1.CommonBackupPolicy,
-	pathPrefix string) (corev1.PodSpec, error) {
-	podSpec := corev1.PodSpec{}
-	// get backup tool
-	backupTool, err := getBackupToolByName(reqCtx, r.Client, commonPolicy.BackupToolName)
-	if err != nil {
-		return podSpec, err
-	}
-	// TODO: check if pvc exists
-	clusterPod, err := r.getTargetPod(reqCtx, backup, commonPolicy.Target.LabelsSelector.MatchLabels)
-	if err != nil {
-		return podSpec, err
-	}
-
-	// build pod dns string
-	container := corev1.Container{}
-	container.Name = backup.Name
-	container.Command = backupTool.Spec.BackupCommands
-	container.Image = backupTool.Spec.Image
-	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	if container.Image == "" {
-		// TODO(dsj): need determine container name to get, temporary use first container
-		container.Image = clusterPod.Spec.Containers[0].Image
-	}
-	if backupTool.Spec.Resources != nil {
-		container.Resources = *backupTool.Spec.Resources
-	}
-	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
-
-	allowPrivilegeEscalation := false
-	runAsUser := int64(0)
-	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-		RunAsUser:                &runAsUser}
-
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
-
-	envBackupName := corev1.EnvVar{
-		Name:  dptypes.DPBackupName,
-		Value: backup.Name,
-	}
-
-	envBackupDir := corev1.EnvVar{
-		Name:  dptypes.DPBackupDIR,
-		Value: backupPathBase + pathPrefix,
-	}
-
-	envDBHost := corev1.EnvVar{
-		Name:  dptypes.DPDBHost,
-		Value: intctrlutil.BuildPodHostDNS(clusterPod),
-	}
-
-	envDPTargetPodName := corev1.EnvVar{
-		Name:  dptypes.DPTargetPodName,
-		Value: clusterPod.Name,
-	}
-
-	container.Env = []corev1.EnvVar{envDPTargetPodName, envDBHost, envBackupName, envBackupDir}
-	if commonPolicy.Target.Secret != nil {
-		envDBUser := corev1.EnvVar{
-			Name: dptypes.DPDBUser,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: commonPolicy.Target.Secret.Name,
-					},
-					Key: commonPolicy.Target.Secret.UsernameKey,
-				},
-			},
-		}
-
-		envDBPassword := corev1.EnvVar{
-			Name: dptypes.DPDBPassword,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: commonPolicy.Target.Secret.Name,
-					},
-					Key: commonPolicy.Target.Secret.PasswordKey,
-				},
-			},
-		}
-
-		container.Env = append(container.Env, envDBUser, envDBPassword)
-	}
-
-	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
-		ttl := backupPolicy.Spec.Retention.TTL
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  dptypes.DPTTL,
-			Value: *ttl,
-		})
-		// one more day than the configured TTL for logfile backup
-		logTTL := dpv1alpha1.AddTTL(ttl, 24)
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  dptypes.DPLogfileTTL,
-			Value: logTTL,
-		})
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  dptypes.DPLogfileTTLSecond,
-			Value: strconv.FormatInt(int64(math.Floor(dpv1alpha1.ToDuration(&logTTL).Seconds())), 10),
-		})
-	}
-
-	// merge env from backup tool.
-	container.Env = append(container.Env, backupTool.Spec.Env...)
-
-	podSpec.Containers = []corev1.Container{container}
-	podSpec.Volumes = clusterPod.Spec.Volumes
-	podSpec.RestartPolicy = corev1.RestartPolicyNever
-
-	// mount the backup volume to the pod of backup tool
-	pvcName := backup.Status.PersistentVolumeClaimName
-	r.appendBackupVolumeMount(pvcName, &podSpec, &podSpec.Containers[0])
-
-	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
-	if clusterPod.Spec.NodeName != "" {
-		podSpec.NodeSelector = map[string]string{
-			hostNameLabelKey: clusterPod.Spec.NodeName,
-		}
-	}
-	// ignore taints
-	podSpec.Tolerations = []corev1.Toleration{
-		{
-			Operator: corev1.TolerationOpExists,
-		},
-	}
-	return podSpec, nil
-}
-
-func (r *BackupReconciler) buildSnapshotPodSpec(
-	reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup,
-	snapshotPolicy *dpv1alpha1.SnapshotPolicy,
-	preCommand bool) (corev1.PodSpec, error) {
-	podSpec := corev1.PodSpec{}
-
-	clusterPod, err := r.getTargetPod(reqCtx, backup, snapshotPolicy.Target.LabelsSelector.MatchLabels)
-	if err != nil {
-		return podSpec, err
-	}
-
-	container := corev1.Container{}
-	container.Name = backup.Name
-	container.Command = []string{"kubectl", "exec", "-n", backup.Namespace,
-		"-i", clusterPod.Name, "-c", snapshotPolicy.Hooks.ContainerName, "--", "sh", "-c"}
-	if preCommand {
-		container.Args = snapshotPolicy.Hooks.PreCommands
-	} else {
-		container.Args = snapshotPolicy.Hooks.PostCommands
-	}
-	container.Image = snapshotPolicy.Hooks.Image
-	if container.Image == "" {
-		container.Image = viper.GetString(constant.KBToolsImage)
-		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	}
-	allowPrivilegeEscalation := false
-	runAsUser := int64(0)
-	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-		RunAsUser:                &runAsUser}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
-	podSpec.Containers = []corev1.Container{container}
-	podSpec.RestartPolicy = corev1.RestartPolicyNever
-	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
-
-	if err = addTolerations(&podSpec); err != nil {
-		return podSpec, err
-	}
-
-	return podSpec, nil
 }
 
 func (r *BackupReconciler) buildMetadataCollectionPodSpec(

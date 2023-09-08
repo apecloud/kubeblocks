@@ -42,3 +42,20 @@ func (builder *PodBuilder) AddContainer(container corev1.Container) *PodBuilder 
 	builder.get().Spec.Containers = containers
 	return builder
 }
+
+func (builder *PodBuilder) AddSerciveAccount(serviceAccount string) *PodBuilder {
+	builder.get().Spec.ServiceAccountName = serviceAccount
+	return builder
+}
+
+func (builder *PodBuilder) SetVolumes(volumes ...corev1.Volume) *PodBuilder {
+	builder.get().Spec.Volumes = volumes
+	return builder
+}
+
+func (builder *PodBuilder) AddVolume(volume corev1.Volume) *PodBuilder {
+	volumes := builder.get().Spec.Volumes
+	volumes = append(volumes, volume)
+	builder.get().Spec.Volumes = volumes
+	return builder
+}

@@ -24,6 +24,6 @@ import "github.com/apecloud/kubeblocks/controllers/monitor/types"
 const OTeldAgentName = "oteld-agent"
 
 func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	// TODO
-	panic("implement me")
+	// TODO: implement me
+	return nil
 }

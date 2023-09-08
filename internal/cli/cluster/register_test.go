@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"io"
 	"os"
 	"path/filepath"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("cluster register", func() {
@@ -62,7 +63,7 @@ var _ = Describe("cluster register", func() {
 		var tempConfigPath string
 
 		var tempCLusterConfig clusterConfig
-		var configContent string = `- name: orioledb
+		var configContent = `- name: orioledb
   helmChartUrl: https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.7.0-alpha.7/orioledb-cluster-0.7.0-alpha.7.tgz
   alias: ""
 `

@@ -66,8 +66,6 @@ var (
 	kafkaChart embed.FS
 	//go:embed charts/redis-cluster.tgz
 	redisChart embed.FS
-	//go:embed charts/neon-cluster.tgz
-	neonChart embed.FS
 	//go:embed charts/mongodb-cluster.tgz
 	mongodbChart embed.FS
 )
@@ -109,15 +107,6 @@ func init() {
 		alias:   "",
 	}
 	if err := redis.register("redis"); err != nil {
-		fmt.Println(err.Error())
-	}
-
-	neon := &embedConfig{
-		chartFS: neonChart,
-		name:    "neon-cluster.tgz",
-		alias:   "",
-	}
-	if err := neon.register("neon"); err != nil {
 		fmt.Println(err.Error())
 	}
 

@@ -24,9 +24,6 @@ spec:
     - jsonPath: .status.phase
       name: STATUS
       type: string
-    - jsonPath: .status.lastScheduleTime
-      name: LAST SCHEDULE
-      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date

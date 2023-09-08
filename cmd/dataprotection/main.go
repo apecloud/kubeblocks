@@ -197,32 +197,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dpcontrollers.BackupToolReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
-		os.Exit(1)
-	}
-
-	if err = (&dpcontrollers.BackupPolicyReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
-		os.Exit(1)
-	}
-
-	if err = (&dpcontrollers.CronJobReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CronJob")
-		os.Exit(1)
-	}
+	//if err = (&dpcontrollers.BackupToolReconciler{
+	//	Client:   mgr.GetClient(),
+	//	Scheme:   mgr.GetScheme(),
+	//	Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
+	//}).SetupWithManager(mgr); err != nil {
+	//	setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
+	//	os.Exit(1)
+	//}
+	//
+	//if err = (&dpcontrollers.BackupPolicyReconciler{
+	//	Client:   mgr.GetClient(),
+	//	Scheme:   mgr.GetScheme(),
+	//	Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
+	//}).SetupWithManager(mgr); err != nil {
+	//	setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
+	//	os.Exit(1)
+	//}
+	//
+	//if err = (&dpcontrollers.CronJobReconciler{
+	//	Client:   mgr.GetClient(),
+	//	Scheme:   mgr.GetScheme(),
+	//	Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
+	//}).SetupWithManager(mgr); err != nil {
+	//	setupLog.Error(err, "unable to create controller", "controller", "CronJob")
+	//	os.Exit(1)
+	//}
 
 	if err = (&dpcontrollers.BackupReconciler{
 		Client:     mgr.GetClient(),
@@ -234,14 +234,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dpcontrollers.RestoreJobReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
-		os.Exit(1)
-	}
+	//if err = (&dpcontrollers.RestoreJobReconciler{
+	//	Client:   mgr.GetClient(),
+	//	Scheme:   mgr.GetScheme(),
+	//	Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
+	//}).SetupWithManager(mgr); err != nil {
+	//	setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
+	//	os.Exit(1)
+	//}
 
 	if err = (&dpcontrollers.BackupRepoReconciler{
 		Client:   mgr.GetClient(),

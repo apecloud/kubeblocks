@@ -58,7 +58,7 @@ func (b *statusBuilder) startTimestamp(timestamp *metav1.Time) *statusBuilder {
 			Time: metav1.Now().UTC(),
 		}
 	}
-	b.status.StartTimestamp = timestamp
+	b.status.StartTimestamp = t
 	return b
 }
 

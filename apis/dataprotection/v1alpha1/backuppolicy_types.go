@@ -152,7 +152,7 @@ type KubeResources struct {
 	// the kubernetes resources.
 	// The default value is "*", which means all resource types will be included.
 	// +optional
-	// +kubebuilder:default="*"
+	// +kubebuilder:default={"*"}
 	Included []string `json:"included,omitempty"`
 
 	// excluded is a slice of namespaced-scoped resource type names to exclude in

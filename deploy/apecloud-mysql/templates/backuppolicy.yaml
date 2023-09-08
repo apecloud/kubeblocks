@@ -1,0 +1,32 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicy
+metadata:
+  name: apecloud-mysql-backup-policy
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+  annotations:
+    dataprotection.kubeblocks.io/is-default-policy-template: "true"
+spec:
+  pathPrefix: /mydata/
+  backoffLimit: 0
+  target:
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/component: mysql
+        app.kubernetes.io/instance: cornel27
+    connectionCredential:
+      secretName: cornel27-conn-credential
+      usernameKey: username
+      passwordKey: password
+      portKey: port
+      hostKey: host
+      endpointKey: endpoint
+  backupMethods:
+  - name: xtrabackup
+    snapshotVolumes: false
+    actionSetName: xtrabackup-for-apecloud-mysql
+    targetVolumes:
+      volumeMounts:
+        - name: data
+          mountPath: /data/mysql
+

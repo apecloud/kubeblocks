@@ -17,9 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"sort"
-
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -291,7 +288,7 @@ func (r *BackupStatus) GetEndTime() *metav1.Time {
 	return r.CompletionTimestamp
 }
 
-// GetRecoverableTimeRange returns the recoverable time range array.
+/*// GetRecoverableTimeRange returns the recoverable time range array.
 func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	sort.Slice(backups, func(i, j int) bool {
 		if backups[i].Status.StartTimestamp == nil && backups[j].Status.StartTimestamp != nil {
@@ -347,4 +344,4 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	// range of recoverable time
 	return []BackupLogStatus{{StopTime: &logfileStopTime,
 		StartTime: firstRecoverableBaseBackup.Status.GetEndTime()}}
-}
+}*/

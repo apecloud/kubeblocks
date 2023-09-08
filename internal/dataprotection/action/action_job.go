@@ -97,6 +97,7 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 				reason("JobCompleted").
 				build(), nil
 		} else if utils.BatchV1JobFailed(&original) {
+			// TODO: get failed reason from job
 			return sb.phase(dpv1alpha1.ActionPhaseFailed).
 				reason("JobFailed").
 				build(), nil

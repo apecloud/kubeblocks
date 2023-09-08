@@ -126,7 +126,7 @@ var _ = BeforeSuite(func() {
 
 	uncachedObjects := []client.Object{
 		&dataprotectionv1alpha1.BackupPolicy{},
-		&dataprotectionv1alpha1.BackupTool{},
+		//&dataprotectionv1alpha1.BackupTool{},
 		&dataprotectionv1alpha1.Backup{},
 		&dataprotectionv1alpha1.RestoreJob{},
 		&snapshotv1.VolumeSnapshot{},
@@ -149,33 +149,33 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&BackupPolicyReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-policy-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&BackupToolReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-tool-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&RestoreJobReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("restore-job-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&CronJobReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cronjob-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
+	//err = (&BackupPolicyReconciler{
+	//	Client:   k8sManager.GetClient(),
+	//	Scheme:   k8sManager.GetScheme(),
+	//	Recorder: k8sManager.GetEventRecorderFor("backup-policy-controller"),
+	//}).SetupWithManager(k8sManager)
+	//Expect(err).ToNot(HaveOccurred())
+	//
+	//err = (&BackupToolReconciler{
+	//	Client:   k8sManager.GetClient(),
+	//	Scheme:   k8sManager.GetScheme(),
+	//	Recorder: k8sManager.GetEventRecorderFor("backup-tool-controller"),
+	//}).SetupWithManager(k8sManager)
+	//Expect(err).ToNot(HaveOccurred())
+	//
+	//err = (&RestoreJobReconciler{
+	//	Client:   k8sManager.GetClient(),
+	//	Scheme:   k8sManager.GetScheme(),
+	//	Recorder: k8sManager.GetEventRecorderFor("restore-job-controller"),
+	//}).SetupWithManager(k8sManager)
+	//Expect(err).ToNot(HaveOccurred())
+	//
+	//err = (&CronJobReconciler{
+	//	Client:   k8sManager.GetClient(),
+	//	Scheme:   k8sManager.GetScheme(),
+	//	Recorder: k8sManager.GetEventRecorderFor("cronjob-controller"),
+	//}).SetupWithManager(k8sManager)
+	//Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupRepoReconciler{
 		Client:   k8sManager.GetClient(),

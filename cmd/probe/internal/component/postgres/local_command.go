@@ -39,3 +39,20 @@ func (mgr *Manager) Psql(args ...string) (string, error) {
 
 	return stdout.String(), nil
 }
+
+func (mgr *Manager) PgCtl(arg string) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	cmd := exec.Command("su", "-c")
+	pgCtlCmd := "pg_ctl " + arg
+	cmd.Args = append(cmd.Args, pgCtlCmd, "postgres")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil || stderr.String() != "" {
+		return "", errors.Errorf("exec pg_ctl %s failed, err:%v, stderr:%s", arg, err, stderr.String())
+	}
+
+	return stdout.String(), nil
+}

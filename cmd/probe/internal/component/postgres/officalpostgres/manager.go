@@ -655,22 +655,18 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return err
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("su", "-c", "pg_ctl promote", "postgres")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err = cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("promote failed, err:%v, stderr:%s", err, stderr.String())
+	resp, err := mgr.PgCtl("promote")
+	if err != nil {
+		mgr.Logger.Errorf("promote failed, err:%v", err)
 		return err
 	}
-	mgr.Logger.Infof("promote success, response:%s", stdout.String())
 
 	err = mgr.postPromote()
 	if err != nil {
 		return err
 	}
+
+	mgr.Logger.Infof("promote success, response:%s", resp)
 	return nil
 }
 
@@ -698,14 +694,9 @@ func (mgr *Manager) Stop() error {
 		return err
 	}
 
-	var stdout, stderr bytes.Buffer
-	stopCmd := exec.Command("su", "-c", "pg_ctl stop -m fast", "postgres")
-	stopCmd.Stdout = &stdout
-	stopCmd.Stderr = &stderr
-
-	err = stopCmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
+	_, err = mgr.PgCtl("stop -m fast")
+	if err != nil {
+		mgr.Logger.Errorf("pg_ctl stop failed, err:%v", err)
 		return err
 	}
 

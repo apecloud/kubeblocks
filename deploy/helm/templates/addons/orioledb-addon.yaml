@@ -15,7 +15,9 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/orioledb-0.6.0-beta.44.tgz
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "orioledb" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: {{ default .Chart.Version .Values.versionOverride }}

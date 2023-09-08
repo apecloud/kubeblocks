@@ -30,6 +30,11 @@ spec:
           volumeName: configs
           namespace: {{ .Release.Namespace }}
           defaultMode: 0755
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9104
+          scrapePath: "/metrics"
       podSpec:
         containers:
           - name: mysql-container
@@ -55,3 +60,22 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+          - name: mysql-exporter
+            imagePullPolicy: IfNotPresent
+            ports:
+              - name: metrics
+                containerPort: 9104
+                protocol: TCP
+            env:
+              - name: "MYSQL_MONITOR_USER"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: "MYSQL_MONITOR_PASSWORD"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: "DATA_SOURCE_NAME"
+                value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"

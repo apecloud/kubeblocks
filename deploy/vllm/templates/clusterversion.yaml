@@ -61,6 +61,26 @@ spec:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
+  name: vllm-baichuan2-7b
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: vllm
+  componentVersions:
+    - componentDefRef: vllm
+      versionsContext:
+        containers:
+          - name: vllm
+            image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+            env:
+              - name: MODEL_NAME
+                value: baichuan-inc/Baichuan2-7B-Chat
+              - name: EXTRA_ARGS
+                value: "--trust-remote-code"
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
   name: vllm-vicuna-13b
   labels:
     {{- include "llm.labels" . | nindent 4 }}

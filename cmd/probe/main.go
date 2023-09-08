@@ -51,7 +51,7 @@ func main() {
 	_, _ = maxprocs.Set()
 
 	// start apiserver for HTTP and GRPC
-	rt, err := apiserver.Start()
+	rt, err := apiserver.StartDapr()
 	if err != nil {
 		log.Fatalf("Start ApiServer failed: %s", err)
 	}

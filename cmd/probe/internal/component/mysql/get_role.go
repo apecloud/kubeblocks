@@ -21,24 +21,11 @@ package mysql
 
 import (
 	"context"
-	"strings"
-
-	"github.com/pkg/errors"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 func (mgr *Manager) GetRole(ctx context.Context) (string, error) {
-	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(workloadType, constant.Replication) {
-		return mgr.GetRoleForReplication(ctx)
-	}
-	return mgr.GetRoleForConsensus(ctx)
-}
-
-func (mgr *Manager) GetRoleForReplication(ctx context.Context) (string, error) {
 	slaveRunning, err := mgr.isSlaveRunning(ctx)
 	if err != nil {
 		return "", err
@@ -66,35 +53,4 @@ func (mgr *Manager) GetRoleForReplication(ctx context.Context) (string, error) {
 	}
 
 	return PRIMARY, nil
-}
-
-func (mgr *Manager) GetRoleForConsensus(ctx context.Context) (string, error) {
-	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-
-	rows, err := mgr.DB.QueryContext(ctx, sql)
-	if err != nil {
-		mgr.Logger.Infof("error executing %s: %v", sql, err)
-		return "", errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var curLeader string
-	var role string
-	var serverID string
-	var isReady bool
-	for rows.Next() {
-		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
-			mgr.Logger.Errorf("Role query error: %v", err)
-			return role, err
-		}
-		isReady = true
-	}
-	if isReady {
-		return role, nil
-	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }

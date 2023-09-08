@@ -74,7 +74,7 @@ func init() {
 
 }
 
-func Start() (*runtime.DaprRuntime, error) {
+func StartDapr() (*runtime.DaprRuntime, error) {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
 

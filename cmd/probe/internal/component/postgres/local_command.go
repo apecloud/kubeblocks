@@ -26,32 +26,27 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (mgr *Manager) Psql(args ...string) (string, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("psql", args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		return "", errors.Errorf("exec psql failed, err:%v, stderr:%s", err, stderr.String())
-	}
-
-	return stdout.String(), nil
+func Psql(args ...string) (string, error) {
+	return ExecCommand("psql", args...)
 }
 
-func (mgr *Manager) PgCtl(arg string) (string, error) {
-	var stdout, stderr bytes.Buffer
+func PgCtl(arg string) (string, error) {
+	args := []string{"-c"}
+	args = append(args, "pg_ctl "+arg)
+	args = append(args, "postgres")
 
-	cmd := exec.Command("su", "-c")
-	pgCtlCmd := "pg_ctl " + arg
-	cmd.Args = append(cmd.Args, pgCtlCmd, "postgres")
+	return ExecCommand("su", args...)
+}
+
+func ExecCommand(name string, args ...string) (string, error) {
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command(name, args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	if err != nil || stderr.String() != "" {
-		return "", errors.Errorf("exec pg_ctl %s failed, err:%v, stderr:%s", arg, err, stderr.String())
+		return "", errors.Errorf("exec command %s failed, err:%v, stderr:%s", name, err, stderr.String())
 	}
 
 	return stdout.String(), nil

@@ -21,11 +21,9 @@ package officalpostgres
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -463,7 +461,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 }
 
 func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
-	resp, err := mgr.Psql("-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
+	resp, err := postgres.Psql("-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
 	if err != nil {
 		mgr.Logger.Errorf("get primary time line failed, err:%v", err)
 		return 0, err
@@ -564,18 +562,13 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
 func (mgr *Manager) getPgControlData() *map[string]string {
 	result := map[string]string{}
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("pg_controldata")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get pg control data failed, err:%v, stderr: %s", err, stderr.String())
+	resp, err := postgres.ExecCommand("pg_controldata")
+	if err != nil {
+		mgr.Logger.Errorf("get pg control data failed, err:%v", err)
 		return &result
 	}
 
-	stdoutList := strings.Split(stdout.String(), "\n")
+	stdoutList := strings.Split(resp, "\n")
 	for _, s := range stdoutList {
 		out := strings.Split(s, ":")
 		if len(out) == 2 {
@@ -655,7 +648,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return err
 	}
 
-	resp, err := mgr.PgCtl("promote")
+	resp, err := postgres.PgCtl("promote")
 	if err != nil {
 		mgr.Logger.Errorf("promote failed, err:%v", err)
 		return err
@@ -694,7 +687,7 @@ func (mgr *Manager) Stop() error {
 		return err
 	}
 
-	_, err = mgr.PgCtl("stop -m fast")
+	_, err = postgres.PgCtl("stop -m fast")
 	if err != nil {
 		mgr.Logger.Errorf("pg_ctl stop failed, err:%v", err)
 		return err

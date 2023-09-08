@@ -289,8 +289,9 @@ type ServiceRefDeclaration struct {
 
 type ServiceRefDeclarationSpec struct {
 	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
+	// The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
+	// For example, both 'zk' and 'zookeeper' will be considered as a ZooKeeper cluster, and 'pg', 'postgres', 'postgresql' will all be considered as a PostgreSQL cluster.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ServiceKind string `json:"serviceKind"`
 
 	// The service version of the service reference. It is a regular expression that matches a version number pattern.

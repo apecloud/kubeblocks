@@ -22,7 +22,9 @@ package plan
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -135,7 +137,7 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				// verify service kind and version
 				verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, serviceRefDeclSpecs ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
 					for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
-						if serviceRefDeclSpec.ServiceKind != serviceDescriptor.Spec.ServiceKind {
+						if getWellKnownServiceKindAliasMapping(serviceRefDeclSpec.ServiceKind) != getWellKnownServiceKindAliasMapping(serviceDescriptor.Spec.ServiceKind) {
 							continue
 						}
 						versionMatch := verifyServiceVersion(serviceDescriptor.Spec.ServiceVersion, serviceRefDeclSpec.ServiceVersion)
@@ -159,10 +161,10 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				serviceReferences[serviceRefDecl.Name] = serviceDescriptor
 			}
 		}
-		_, exist := serviceReferences[serviceRefDecl.Name]
-		if !exist {
-			return nil, fmt.Errorf("componentDef %s's serviceRefDeclaration %s has not been defined, please check if there is corresponding service definition and binding in Cluster.spec.componentSpecs[*].serviceRefs", clusterCompDef.Name, serviceRefDecl.Name)
-		}
+		//_, exist := serviceReferences[serviceRefDecl.Name]
+		//if !exist {
+		//	return nil, fmt.Errorf("componentDef %s's serviceRefDeclaration %s has not been defined, please check if there is corresponding service definition and binding in Cluster.spec.componentSpecs[*].serviceRefs", clusterCompDef.Name, serviceRefDecl.Name)
+		//}
 	}
 	return serviceReferences, nil
 }
@@ -177,4 +179,22 @@ func verifyServiceVersion(serviceDescriptorVersion, serviceRefDeclarationService
 		return serviceDescriptorVersion == serviceRefDeclarationServiceVersion
 	}
 	return regex.MatchString(serviceDescriptorVersion)
+}
+
+func getWellKnownServiceKindAliasMapping(serviceKind string) string {
+	lowerServiceKind := strings.ToLower(serviceKind)
+	switch {
+	case slices.Contains(constant.GetZookeeperAlias(), lowerServiceKind):
+		return constant.ServiceKindZookeeper
+	case slices.Contains(constant.GetElasticSearchAlias(), lowerServiceKind):
+		return constant.ServiceKindElasticSearch
+	case slices.Contains(constant.GetMongoDBAlias(), lowerServiceKind):
+		return constant.ServiceKindMongoDB
+	case slices.Contains(constant.GetPostgreSQLAlias(), lowerServiceKind):
+		return constant.ServiceKindPostgreSQL
+	case slices.Contains(constant.GetClickHouseAlias(), lowerServiceKind):
+		return constant.ServiceKindClickHouse
+	default:
+		return lowerServiceKind
+	}
 }

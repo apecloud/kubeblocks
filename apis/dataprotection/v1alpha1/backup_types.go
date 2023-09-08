@@ -267,7 +267,10 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 				continue
 			}
 			startTime = *b.Status.GetStartTime()
-			stopTime = *b.Status.GetStopTime()
+			// the stop time can be nil, because the logfile backup don't end
+			if b.Status.GetStopTime() != nil {
+				stopTime = *b.Status.GetStopTime()
+			}
 			break
 		}
 		return startTime, stopTime

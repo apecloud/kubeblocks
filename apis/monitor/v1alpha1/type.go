@@ -23,7 +23,7 @@ import "time"
 
 // LogsSinkType defines the type for LogsExporterSink
 // +enum
-// +kubebuilder:validation:Enum={S3SinkType,LokiSinkType}
+// +kubebuilder:validation:Enum={apeclouds3,loki}
 type LogsSinkType string
 
 const (
@@ -33,11 +33,11 @@ const (
 
 // MetricsSinkType defines the type for LogsExporterSink
 // +enum
-// +kubebuilder:validation:Enum={S3SinkType,LokiSinkType}
+// +kubebuilder:validation:Enum={prometheus}
 type MetricsSinkType string
 
 const (
-	prometheusSinkType LogsSinkType = "proemtheus"
+	PrometheusSinkType MetricsSinkType = "prometheus"
 )
 
 type RetryPolicyOnFailure struct {

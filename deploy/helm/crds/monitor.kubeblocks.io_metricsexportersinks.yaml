@@ -36,10 +36,38 @@ spec:
           spec:
             description: MetricsExporterSinkSpec defines the desired state of MetricsExporterSink
             properties:
-              foo:
-                description: Foo is an example field of MetricsExporterSink. Edit
-                  metricsexportersink_types.go to remove/update
+              prometheusConfig:
+                description: lokiConfig defines the config of the loki
+                properties:
+                  clusterName:
+                    description: Specify the cluster of the referenced service.
+                    type: string
+                  endpoint:
+                    description: TODO the field for test Specify the endpoint of the
+                      referenced service.
+                    type: string
+                  namespace:
+                    default: default
+                    description: Specify the namespace of the referenced the serviceConnectionCredential
+                      object. An empty namespace is equivalent to the "default" namespace.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                    type: string
+                  serviceConnectionCredential:
+                    description: Specify the name of the referenced the serviceConnectionCredential
+                      object.
+                    type: string
+                required:
+                - namespace
+                - serviceConnectionCredential
+                type: object
+              type:
+                description: type defines the type of the exporterSink
+                enum:
+                - prometheus
                 type: string
+            required:
+            - type
             type: object
           status:
             description: MetricsExporterSinkStatus defines the observed state of MetricsExporterSink

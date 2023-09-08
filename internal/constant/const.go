@@ -72,7 +72,8 @@ const (
 const (
 	APIGroup = "kubeblocks.io"
 
-	AppName = "kubeblocks"
+	AppName      = "kubeblocks"
+	OTeldAppName = "oteld"
 
 	// K8s recommonded well-known labels and annotation keys
 	AppInstanceLabelKey  = "app.kubernetes.io/instance"
@@ -177,6 +178,12 @@ const (
 
 	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
 	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
+
+	// monitor.io annotations
+	MonitorScrapeKey    = "monitor.kubeblocks.io/scrape"
+	MonitorPathKey      = "monitor.kubeblocks.io/path"
+	MonitorSchemaKey    = "monitor.kubeblocks.io/schema"
+	MonitorManagedByKey = "monitor.kubeblocks.io/managed-by"
 )
 
 const (

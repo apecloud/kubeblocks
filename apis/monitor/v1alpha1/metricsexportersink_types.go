@@ -29,10 +29,6 @@ type PrometheusConfig struct {
 	// namespace defines the namespace of the prometheus
 	// +kube:validation:Required
 	Namespace string `json:"namespace"`
-
-	// externalLabels defines the labels added to metrics
-	// +kube:validation:Required
-	ExternalLabels map[string]string `json:"externalLabels"`
 }
 
 type MetricsSinkSource struct {

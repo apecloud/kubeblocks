@@ -36,10 +36,16 @@ spec:
           spec:
             description: CollectorDataSourceSpec defines the desired state of CollectorDataSource
             properties:
-              foo:
-                description: Foo is an example field of CollectorDataSource. Edit
-                  collectordatasource_types.go to remove/update
+              exporterRef:
+                items:
+                  type: string
+                type: array
+              type:
+                description: Type is the type of the data source
                 type: string
+            required:
+            - exporterRef
+            - type
             type: object
           status:
             description: CollectorDataSourceStatus defines the observed state of CollectorDataSource

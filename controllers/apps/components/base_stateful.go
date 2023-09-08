@@ -28,7 +28,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -187,6 +186,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err != nil {
 		return err
 	}
+	var messages appsv1alpha1.ComponentMessageMap
 	hasFailedPod := func() bool {
 		if len(pods) != int(c.Component.Replicas) {
 			return false
@@ -197,14 +197,15 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 			}
 		}
 
-		hasFailedPod, _, _ := hasFailedAndTimedOutPod(pods)
+		hasFailedPod, msg, _ := hasFailedAndTimedOutPod(pods)
 		if hasFailedPod {
+			messages = msg
 			return true
 		}
 		if c.Component.WorkloadType != appsv1alpha1.Consensus && c.Component.WorkloadType != appsv1alpha1.Replication {
 			return false
 		}
-		var podsReadyTime *metav1.Time
+		hasProbeTimeout := false
 		for _, pod := range pods {
 			if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
 				continue
@@ -213,10 +214,17 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 				if condition.Type != corev1.PodReady || condition.Status != corev1.ConditionTrue {
 					continue
 				}
-				podsReadyTime = &condition.LastTransitionTime
+				podsReadyTime := &condition.LastTransitionTime
+				if isProbeTimeout(c.Component.Probes, podsReadyTime) {
+					hasProbeTimeout = true
+					if messages == nil {
+						messages = appsv1alpha1.ComponentMessageMap{}
+					}
+					messages.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+				}
 			}
 		}
-		return isProbeTimeout(c.Component.Probes, podsReadyTime)
+		return hasProbeTimeout
 	}
 	isScaleOutFailed := func() bool {
 		if c.runningWorkload.Spec.Replicas == nil {
@@ -249,50 +257,13 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}
 		return false
 	}
-	isAllConfigSynced := func() bool {
-		checkFinishedReconfigure := func(cm *corev1.ConfigMap) bool {
-			labels := cm.GetLabels()
-			annotations := cm.GetAnnotations()
-			if len(annotations) == 0 || len(labels) == 0 {
-				return false
-			}
-			hash, _ := util.ComputeHash(cm.Data)
-			return labels[constant.CMInsConfigurationHashLabelKey] == hash
-		}
-
-		var (
-			cmKey           client.ObjectKey
-			cmObj           = &corev1.ConfigMap{}
-			allConfigSynced = true
-		)
-		for _, configSpec := range c.Component.ConfigTemplates {
-			cmKey = client.ObjectKey{
-				Namespace: c.GetNamespace(),
-				Name:      cfgcore.GetComponentCfgName(c.GetClusterName(), c.GetName(), configSpec.Name),
-			}
-			if err := cli.Get(reqCtx.Ctx, cmKey, cmObj); err != nil {
-				return true
-			}
-			if !checkFinishedReconfigure(cmObj) {
-				allConfigSynced = false
-				break
-			}
-		}
-		return allConfigSynced
-	}
+	isAllConfigSynced := c.isAllConfigSynced(reqCtx, cli)
 	hasVolumeExpansionRunning := func() bool {
-		hasRunning := false
-		for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
-			running, _, err := c.hasVolumeExpansionRunning(reqCtx, cli, vct.Name)
-			if err != nil {
-				return false
-			}
-			if running {
-				hasRunning = true
-				break
-			}
+		running, _, err := c.hasVolumeExpansionRunning(reqCtx, cli)
+		if err != nil {
+			return false
 		}
-		return hasRunning
+		return running
 	}
 
 	switch {
@@ -302,10 +273,10 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
 	case isZeroReplica():
 		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
-	case isRunning && isAllConfigSynced() && !hasVolumeExpansionRunning():
+	case isRunning && isAllConfigSynced && !hasVolumeExpansionRunning():
 		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
 	case hasFailedPod(), isScaleOutFailed():
-		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, nil, "Component is Failed")
+		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "Component is Failed")
 	case isFirstGeneration():
 		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
 	case !isFirstGeneration():
@@ -314,6 +285,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "unknown")
 	}
 
+	// works should continue to be done after spec updated.
 	if err := c.horizontalScale(reqCtx, cli); err != nil {
 		return err
 	}
@@ -325,28 +297,6 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 			c.Dag.AddVertex(v)
 		}
 	}
-
-	//statusTxn := &statusReconciliationTxn{}
-	//
-	//if err := c.statusExpandVolume(reqCtx, cli, statusTxn); err != nil {
-	//	return err
-	//}
-	//
-	//var delayedRequeueError error
-	//if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
-	//	if !intctrlutil.IsDelayedRequeueError(err) {
-	//		return err
-	//	}
-	//	delayedRequeueError = err
-	//}
-	//
-	//if err := c.statusConfig(reqCtx, cli, statusTxn); err != nil {
-	//	return err
-	//}
-	//
-	//if err := statusTxn.commit(); err != nil {
-	//	return err
-	//}
 
 	c.updateWorkload(c.runningWorkload)
 
@@ -361,7 +311,6 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 
-	//return delayedRequeueError
 	return nil
 }
 
@@ -563,29 +512,7 @@ func (c *rsmComponentBase) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli clie
 	return nil
 }
 
-func (c *rsmComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
-		running, failed, err := c.hasVolumeExpansionRunning(reqCtx, cli, vct.Name)
-		if err != nil {
-			return err
-		}
-		if failed {
-			txn.propose(appsv1alpha1.UnknownClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "Volume Expansion failed")
-			})
-			return nil
-		}
-		if running {
-			txn.propose(appsv1alpha1.SpecReconcilingClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Volume Expansion failed")
-			})
-			return nil
-		}
-	}
-	return nil
-}
-
-func (c *rsmComponentBase) statusConfig(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *rsmComponentBase) isAllConfigSynced(reqCtx intctrlutil.RequestCtx, cli client.Client) bool {
 	checkFinishedReconfigure := func(cm *corev1.ConfigMap) bool {
 		labels := cm.GetLabels()
 		annotations := cm.GetAnnotations()
@@ -595,14 +522,11 @@ func (c *rsmComponentBase) statusConfig(reqCtx intctrlutil.RequestCtx, cli clien
 		hash, _ := util.ComputeHash(cm.Data)
 		return labels[constant.CMInsConfigurationHashLabelKey] == hash
 	}
-	proposePhase := func(phase appsv1alpha1.ClusterComponentPhase, phaseTransitionMsg string) {
-		txn.propose(phase, func() {
-			c.SetStatusPhase(phase, nil, phaseTransitionMsg)
-		})
-	}
+
 	var (
-		cmKey client.ObjectKey
-		cmObj = &corev1.ConfigMap{}
+		cmKey           client.ObjectKey
+		cmObj           = &corev1.ConfigMap{}
+		allConfigSynced = true
 	)
 	for _, configSpec := range c.Component.ConfigTemplates {
 		cmKey = client.ObjectKey{
@@ -610,33 +534,33 @@ func (c *rsmComponentBase) statusConfig(reqCtx intctrlutil.RequestCtx, cli clien
 			Name:      cfgcore.GetComponentCfgName(c.GetClusterName(), c.GetName(), configSpec.Name),
 		}
 		if err := cli.Get(reqCtx.Ctx, cmKey, cmObj); err != nil {
-			return err
+			return true
 		}
-		if checkFinishedReconfigure(cmObj) {
-			proposePhase(appsv1alpha1.RunningClusterCompPhase, "Config reloading succeed")
-		} else {
-			proposePhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Config is reloading")
+		if !checkFinishedReconfigure(cmObj) {
+			allConfigSynced = false
+			break
 		}
-
 	}
-	return nil
+	return allConfigSynced
 }
 
-func (c *rsmComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string) (bool, bool, error) {
+func (c *rsmComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, bool, error) {
 	var (
 		running bool
 		failed  bool
 	)
-	volumes, err := c.getRunningVolumes(reqCtx, cli, vctName, c.runningWorkload)
-	if err != nil {
-		return false, false, err
-	}
-	for _, v := range volumes {
-		if v.Status.Capacity == nil || v.Status.Capacity.Storage().Cmp(v.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
-			continue
+	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
+		volumes, err := c.getRunningVolumes(reqCtx, cli, vct.Name, c.runningWorkload)
+		if err != nil {
+			return false, false, err
 		}
-		running = true
-		// TODO: how to check the expansion failed?
+		for _, v := range volumes {
+			if v.Status.Capacity == nil || v.Status.Capacity.Storage().Cmp(v.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
+				continue
+			}
+			running = true
+			// TODO: how to check the expansion failed?
+		}
 	}
 	return running, failed, nil
 }

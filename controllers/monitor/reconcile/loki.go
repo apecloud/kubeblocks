@@ -19,13 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package reconcile
 
-import (
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-)
+import "github.com/apecloud/kubeblocks/controllers/monitor/types"
 
 const LokiName = "loki"
 
 func Loki(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	// TODO
-	panic("implement me")
+	// TODO: implement me
+	return nil
 }

@@ -21,6 +21,8 @@ package builder
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type DaemonSetBuilder struct {
@@ -30,5 +32,49 @@ type DaemonSetBuilder struct {
 func NewDaemonSetBuilder(namespace, name string) *DaemonSetBuilder {
 	builder := &DaemonSetBuilder{}
 	builder.init(namespace, name, &appsv1.DaemonSet{}, builder)
+	return builder
+}
+
+func (builder *DaemonSetBuilder) SetSelector(selector *metav1.LabelSelector) *DaemonSetBuilder {
+	builder.get().Spec.Selector = selector
+	return builder
+}
+
+func (builder *DaemonSetBuilder) SetTemplate(template corev1.PodTemplateSpec) *DaemonSetBuilder {
+	builder.get().Spec.Template = template
+	return builder
+}
+
+func (builder *DaemonSetBuilder) SetUpdateStrategy(strategy appsv1.DaemonSetUpdateStrategy) *DaemonSetBuilder {
+	builder.get().Spec.UpdateStrategy = strategy
+	return builder
+}
+
+func (builder *DaemonSetBuilder) AddLabelsInMap(labels map[string]string) *DaemonSetBuilder {
+	l := builder.object.GetLabels()
+	if l == nil {
+		l = make(map[string]string)
+	}
+	for k, v := range labels {
+		l[k] = v
+	}
+	builder.object.SetLabels(l)
+	return builder.concreteBuilder
+}
+
+func (builder *DaemonSetBuilder) AddMatchLabelsInMap(labels map[string]string) *DaemonSetBuilder {
+	selector := builder.get().Spec.Selector
+	if selector == nil {
+		selector = &metav1.LabelSelector{}
+		builder.get().Spec.Selector = selector
+	}
+	matchLabels := builder.get().Spec.Selector.MatchLabels
+	if matchLabels == nil {
+		matchLabels = make(map[string]string, len(labels))
+	}
+	for k, v := range labels {
+		matchLabels[k] = v
+	}
+	builder.get().Spec.Selector.MatchLabels = matchLabels
 	return builder
 }

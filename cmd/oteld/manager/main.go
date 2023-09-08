@@ -24,12 +24,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/viper"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -44,8 +43,6 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
-const appName = "oteld"
-
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -59,8 +56,9 @@ func init() {
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", appName))
-	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName))
+	viper.SetDefault("OTELD_NAMESPACE", "default")
+	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", constant.OTeldAppName))
+	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", constant.OTeldAppName))
 	viper.AddConfigPath(".")
 
 	// set env default value
@@ -85,6 +83,10 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	if err := viper.ReadInConfig(); err != nil {
+		setupLog.Error(err, "error reading config")
+		os.Exit(1)
+	}
 	setupLog.Info(fmt.Sprintf("oteld config file: %s", viper.ConfigFileUsed()))
 	config, err := types.LoadConfig(viper.ConfigFileUsed())
 	if err != nil {

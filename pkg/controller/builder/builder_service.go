@@ -101,3 +101,8 @@ func (builder *ServiceBuilder) SetType(serviceType corev1.ServiceType) *ServiceB
 	}
 	return builder
 }
+
+func (builder *ServiceBuilder) SetAnnotations(annotations map[string]string) *ServiceBuilder {
+	builder.get().SetAnnotations(annotations)
+	return builder
+}

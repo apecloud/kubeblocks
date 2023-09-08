@@ -334,7 +334,7 @@ func newRSM(ctx context.Context,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *RSM {
 	reqCtx := intctrlutil.RequestCtx{Log: log.FromContext(ctx).WithValues("rsm-test", def.Name)}
-	synthesizedComponent, _ := component.BuildComponent(reqCtx, nil, cluster, clusterDef, &def, spec)
+	synthesizedComponent, _ := component.BuildComponent(reqCtx, nil, cluster, clusterDef, &def, spec, nil)
 	return &RSM{
 		componentSetBase: componentSetBase{
 			Cli:                  cli,

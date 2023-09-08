@@ -8473,9 +8473,8 @@ spec:
                                   type: string
                                 serviceVersion:
                                   description: The service version of the service
-                                    reference. It can be a specific version number
-                                    of a service or a regular expression that matches
-                                    a version number pattern. For example, `8.0.8`,
+                                    reference. It is a regular expression that matches
+                                    a version number pattern. For example, `^8.0.8$`,
                                     `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
                                   type: string
                               required:

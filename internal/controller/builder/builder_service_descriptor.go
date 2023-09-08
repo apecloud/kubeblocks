@@ -33,13 +33,13 @@ func NewServiceDescriptorBuilder(namespace, name string) *ServiceDescriptorBuild
 	return builder
 }
 
-func (builder *ServiceDescriptorBuilder) SetKind(kind string) *ServiceDescriptorBuilder {
-	builder.get().Spec.Kind = kind
+func (builder *ServiceDescriptorBuilder) SetServiceKind(serviceKind string) *ServiceDescriptorBuilder {
+	builder.get().Spec.ServiceKind = serviceKind
 	return builder
 }
 
-func (builder *ServiceDescriptorBuilder) SetVersion(version string) *ServiceDescriptorBuilder {
-	builder.get().Spec.Version = version
+func (builder *ServiceDescriptorBuilder) SetServiceVersion(serviceVersion string) *ServiceDescriptorBuilder {
+	builder.get().Spec.ServiceVersion = serviceVersion
 	return builder
 }
 
@@ -55,10 +55,5 @@ func (builder *ServiceDescriptorBuilder) SetAuth(auth appsv1alpha1.ConnectionCre
 
 func (builder *ServiceDescriptorBuilder) SetPort(port appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
 	builder.get().Spec.Port = &port
-	return builder
-}
-
-func (builder *ServiceDescriptorBuilder) SetExtra(extra map[string]string) *ServiceDescriptorBuilder {
-	builder.get().Spec.Extra = extra
 	return builder
 }

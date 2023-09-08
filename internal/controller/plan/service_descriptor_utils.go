@@ -87,8 +87,8 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 
 				sdBuilder := builder.NewServiceDescriptorBuilder(referencedCluster.Namespace, sdName)
 				// use cd.Spec.Type as the default Kind and use cluster.Spec.ClusterVersionRef as the default Version
-				sdBuilder.SetKind(referencedClusterDef.Spec.Type)
-				sdBuilder.SetVersion(referencedCluster.Spec.ClusterVersionRef)
+				sdBuilder.SetServiceKind(referencedClusterDef.Spec.Type)
+				sdBuilder.SetServiceVersion(referencedCluster.Spec.ClusterVersionRef)
 				sdBuilder.SetEndpoint(appsv1alpha1.CredentialVar{
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
@@ -124,24 +124,23 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 					},
 				})
 				serviceReferences[serviceRefDecl.Name] = sdBuilder.GetObject()
+				// serviceRef.Cluster takes precedence, and if serviceRef.Cluster is set, serviceRef.ServiceDescriptor will be ignored
+				break
 			}
 
 			if serviceRef.ServiceDescriptor != "" {
 				// verify service kind and version
 				verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, serviceRefDeclSpecs ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
-					match := false
 					for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
 						if serviceRefDeclSpec.ServiceKind != serviceDescriptor.Spec.ServiceKind {
 							continue
 						}
-						regex := regexp.MustCompile(serviceRefDeclSpec.ServiceVersion)
-						versionMatch := regex.MatchString(serviceDescriptor.Spec.ServiceVersion)
+						versionMatch := verifyServiceVersion(serviceDescriptor.Spec.ServiceVersion, serviceRefDeclSpec.ServiceVersion)
 						if versionMatch {
-							match = true
-							break
+							return true
 						}
 					}
-					return match
+					return false
 				}
 				serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
 				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: serviceRef.ServiceDescriptor}, serviceDescriptor); err != nil {
@@ -157,7 +156,22 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				serviceReferences[serviceRefDecl.Name] = serviceDescriptor
 			}
 		}
-		// TODO:
+		_, exist := serviceReferences[serviceRefDecl.Name]
+		if !exist {
+			return nil, fmt.Errorf("componentDef %s's serviceRefDeclaration %s has not been defined, please check if there is corresponding service definition and binding in Cluster.spec.componentSpecs[*].serviceRefs", clusterCompDef.Name, serviceRefDecl.Name)
+		}
 	}
 	return serviceReferences, nil
+}
+
+func verifyServiceVersion(serviceDescriptorVersion, serviceRefDeclarationServiceVersion string) bool {
+	isRegex := false
+	regex, err := regexp.Compile(serviceRefDeclarationServiceVersion)
+	if err == nil {
+		isRegex = true
+	}
+	if !isRegex {
+		return serviceDescriptorVersion == serviceRefDeclarationServiceVersion
+	}
+	return regex.MatchString(serviceDescriptorVersion)
 }

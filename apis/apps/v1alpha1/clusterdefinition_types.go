@@ -293,9 +293,8 @@ type ServiceRefDeclarationSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ServiceKind string `json:"serviceKind"`
 
-	// The service version of the service reference.
-	// It can be a specific version number of a service or a regular expression that matches a version number pattern.
-	// For example, `8.0.8`, `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
+	// The service version of the service reference. It is a regular expression that matches a version number pattern.
+	// For example, `^8.0.8$`, `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
 	// +kubebuilder:validation:Required
 	ServiceVersion string `json:"serviceVersion"`
 }

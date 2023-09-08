@@ -32,12 +32,12 @@ import (
 var _ = Describe("service descriptor builder", func() {
 	It("should work well", func() {
 		const (
-			name          = "foo"
-			ns            = "default"
-			kind          = "mock-kind"
-			version       = "mock-version"
-			endpointName  = "mock-endpoint"
-			secretRefName = "foo"
+			name           = "foo"
+			ns             = "default"
+			serviceKind    = "mock-kind"
+			serviceVersion = "mock-version"
+			endpointName   = "mock-endpoint"
+			secretRefName  = "foo"
 		)
 		endpoint := appsv1alpha1.CredentialVar{
 			Value: endpointName,
@@ -70,20 +70,18 @@ var _ = Describe("service descriptor builder", func() {
 			Username: username,
 			Password: password,
 		}
-		extra := map[string]string{"foo": "bar"}
 		sd := NewServiceDescriptorBuilder(ns, name).
-			SetKind(kind).
-			SetVersion(version).
+			SetServiceKind(serviceKind).
+			SetServiceVersion(serviceVersion).
 			SetEndpoint(endpoint).
 			SetPort(port).
 			SetAuth(auth).
-			SetExtra(extra).
 			GetObject()
 
 		Expect(sd.Name).Should(Equal(name))
 		Expect(sd.Namespace).Should(Equal(ns))
-		Expect(sd.Spec.Kind).Should(Equal(kind))
-		Expect(sd.Spec.Version).Should(Equal(version))
+		Expect(sd.Spec.ServiceKind).Should(Equal(serviceKind))
+		Expect(sd.Spec.ServiceVersion).Should(Equal(serviceVersion))
 		Expect(sd.Spec.Endpoint.Value).Should(Equal(endpointName))
 		Expect(sd.Spec.Endpoint.ValueFrom).Should(BeNil())
 		Expect(sd.Spec.Auth.Username.Value).Should(BeEmpty())
@@ -95,6 +93,5 @@ var _ = Describe("service descriptor builder", func() {
 		Expect(sd.Spec.Port.Value).Should(BeEmpty())
 		Expect(sd.Spec.Port.ValueFrom.SecretKeyRef.Key).Should(Equal(constant.ServiceDescriptorPortKey))
 		Expect(sd.Spec.Port.ValueFrom.SecretKeyRef.Name).Should(Equal(secretRefName))
-		Expect(sd.Spec.Extra).Should(Equal(extra))
 	})
 })

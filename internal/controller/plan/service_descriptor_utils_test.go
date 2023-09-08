@@ -21,10 +21,8 @@ package plan
 
 import (
 	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,55 +90,6 @@ var _ = Describe("generate service descriptor", func() {
 	BeforeEach(func() {
 		cleanEnv()
 		mockClient = testutil.NewK8sMockClient()
-		serviceRefDeclarations := []appsv1alpha1.ServiceRefDeclaration{
-			{
-				Name: redisServiceRefDeclarationName,
-				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
-					{
-						ServiceKind:    externalServiceDescriptorKind,
-						ServiceVersion: externalServiceDescriptorVersion,
-					},
-				},
-			},
-			{
-				Name: mysqlServiceRefDeclarationName,
-				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
-					{
-						ServiceKind:    internalClusterServiceRefKind,
-						ServiceVersion: internalClusterServiceRefVersion,
-					},
-				},
-			},
-		}
-		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
-			AddServiceRefDeclarations(serviceRefDeclarations).
-			Create(&testCtx).GetObject()
-		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponentVersion(nginxCompDefName).
-			AddInitContainerShort("nginx-init", testapps.NginxImage).
-			AddContainerShort("nginx", testapps.NginxImage).
-			Create(&testCtx).GetObject()
-		beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName,
-			clusterDef.Name, clusterVersion.Name).
-			AddComponent(mysqlCompName, mysqlCompDefName).
-			Create(&testCtx).GetObject()
-
-		serviceRefs := []appsv1alpha1.ServiceRef{
-			{
-				Name:              redisServiceRefDeclarationName,
-				ServiceDescriptor: externalServiceDescriptorName,
-			},
-			{
-				Name:    mysqlServiceRefDeclarationName,
-				Cluster: beReferencedCluster.Name,
-			},
-		}
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDef.Name, clusterVersion.Name).
-			AddComponent(nginxCompName, nginxCompDefName).
-			SetServiceRefs(serviceRefs).
-			Create(&testCtx).GetObject()
 	})
 
 	AfterEach(func() {
@@ -150,7 +99,126 @@ var _ = Describe("generate service descriptor", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("generate service descriptor test", func() {
+		BeforeEach(func() {
+			serviceRefDeclarations := []appsv1alpha1.ServiceRefDeclaration{
+				{
+					Name: redisServiceRefDeclarationName,
+					ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+						{
+							ServiceKind:    externalServiceDescriptorKind,
+							ServiceVersion: externalServiceDescriptorVersion,
+						},
+					},
+				},
+				{
+					Name: mysqlServiceRefDeclarationName,
+					ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+						{
+							ServiceKind:    internalClusterServiceRefKind,
+							ServiceVersion: internalClusterServiceRefVersion,
+						},
+					},
+				},
+			}
+			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
+				AddServiceRefDeclarations(serviceRefDeclarations).
+				Create(&testCtx).GetObject()
+			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+				AddComponentVersion(nginxCompDefName).
+				AddInitContainerShort("nginx-init", testapps.NginxImage).
+				AddContainerShort("nginx", testapps.NginxImage).
+				Create(&testCtx).GetObject()
+		})
+
+		It("serviceRefDeclaration serviceVersion regex validation test", func() {
+			type versionCmp struct {
+				serviceRefDeclRegex      string
+				serviceDescriptorVersion string
+			}
+			tests := []struct {
+				name   string
+				fields versionCmp
+				want   bool
+			}{{
+				name: "version string test true",
+				fields: versionCmp{
+					serviceRefDeclRegex:      "8.0.8",
+					serviceDescriptorVersion: "8.0.8",
+				},
+				want: true,
+			}, {
+				name: "version string test false",
+				fields: versionCmp{
+					serviceRefDeclRegex:      "8.0.8",
+					serviceDescriptorVersion: "8.0.7",
+				},
+				want: false,
+			}, {
+				name: "version string test false",
+				fields: versionCmp{
+					serviceRefDeclRegex:      "^8.0.8$",
+					serviceDescriptorVersion: "v8.0.8",
+				},
+				want: false,
+			}, {
+				name: "version string test true",
+				fields: versionCmp{
+					serviceRefDeclRegex:      "8.0.\\d{1,2}$",
+					serviceDescriptorVersion: "8.0.6",
+				},
+				want: true,
+			}, {
+				name: "version string test false",
+				fields: versionCmp{
+					serviceRefDeclRegex:      "8.0.\\d{1,2}$",
+					serviceDescriptorVersion: "8.0.8.8",
+				},
+				want: false,
+			}, {
+				name: "version string test true",
+				fields: versionCmp{
+					serviceRefDeclRegex:      "^[v\\-]*?(\\d{1,2}\\.){0,3}\\d{1,2}$",
+					serviceDescriptorVersion: "8.0.8.0",
+				},
+				want: true,
+			}, {
+				name: "version string test false",
+				fields: versionCmp{
+					serviceRefDeclRegex:      "^[v\\-]*?(\\d{1,2}\\.){0,3}\\d{1,2}$",
+					serviceDescriptorVersion: "mysql-8.0.8",
+				},
+				want: false,
+			}}
+			for _, tt := range tests {
+				match := verifyServiceVersion(tt.fields.serviceDescriptorVersion, tt.fields.serviceRefDeclRegex)
+				Expect(match).Should(Equal(tt.want))
+			}
+		})
+
 		It("generate service descriptor test", func() {
+			By("Create cluster and beReferencedCluster object")
+			beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName,
+				clusterDef.Name, clusterVersion.Name).
+				AddComponent(mysqlCompName, mysqlCompDefName).
+				Create(&testCtx).GetObject()
+
+			serviceRefs := []appsv1alpha1.ServiceRef{
+				{
+					Name:              redisServiceRefDeclarationName,
+					ServiceDescriptor: externalServiceDescriptorName,
+				},
+				{
+					Name:    mysqlServiceRefDeclarationName,
+					Cluster: beReferencedCluster.Name,
+				},
+			}
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDef.Name, clusterVersion.Name).
+				AddComponent(nginxCompName, nginxCompDefName).
+				SetServiceRefs(serviceRefs).
+				Create(&testCtx).GetObject()
+
 			clusterKey := client.ObjectKeyFromObject(cluster)
 			req := ctrl.Request{
 				NamespacedName: clusterKey,
@@ -186,6 +254,17 @@ var _ = Describe("generate service descriptor", func() {
 				SetPort(port).
 				SetAuth(auth).
 				Create(&testCtx).GetObject()
+
+			By("GenServiceReferences failed because external service descriptor status is not available")
+			serviceReferences, err = GenServiceReferences(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("status is not available"))
+			Expect(serviceReferences).Should(BeNil())
+
+			By("update external service descriptor status to available")
+			Expect(testapps.ChangeObjStatus(&testCtx, externalServiceDescriptor, func() {
+				externalServiceDescriptor.Status.Phase = appsv1alpha1.AvailablePhase
+			})).Should(Succeed())
 
 			By("GenServiceReferences failed because external service descriptor kind and version not match")
 			serviceReferences, err = GenServiceReferences(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])

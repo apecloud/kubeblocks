@@ -54,14 +54,17 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 			if serviceRef.Name != serviceRefDecl.Name {
 				continue
 			}
-
+			targetNamespace := cluster.Namespace
+			if serviceRef.Namespace != "" {
+				targetNamespace = serviceRef.Namespace
+			}
 			// if service reference is another KubeBlocks Cluster, then it is necessary to generate a service connection credential from the cluster connection credential secret
 			if serviceRef.Cluster != "" {
 				if serviceRef.Cluster == cluster.Name {
 					return nil, fmt.Errorf("cluster %s cannot reference itself", cluster.Name)
 				}
 				referencedCluster := &appsv1alpha1.Cluster{}
-				if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
+				if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: targetNamespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
 					return nil, err
 				}
 				referencedClusterDef := &appsv1alpha1.ClusterDefinition{}
@@ -74,18 +77,18 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				secretRef := &corev1.Secret{}
 				if serviceRef.ConnectionCredential != "" {
 					sdName = component.GenerateCustomServiceDescriptorName(serviceRef.ConnectionCredential)
-					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: referencedCluster.Namespace, Name: serviceRef.ConnectionCredential}, secretRef); err != nil {
+					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: targetNamespace, Name: serviceRef.ConnectionCredential}, secretRef); err != nil {
 						return nil, err
 					}
 				} else {
 					sdName = component.GenerateDefaultServiceDescriptorName(cluster.Name)
 					secretRefName := component.GenerateConnCredential(referencedCluster.Name)
-					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: referencedCluster.Namespace, Name: secretRefName}, secretRef); err != nil {
+					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: targetNamespace, Name: secretRefName}, secretRef); err != nil {
 						return nil, err
 					}
 				}
 
-				sdBuilder := builder.NewServiceDescriptorBuilder(referencedCluster.Namespace, sdName)
+				sdBuilder := builder.NewServiceDescriptorBuilder(targetNamespace, sdName)
 				// use cd.Spec.Type as the default Kind and use cluster.Spec.ClusterVersionRef as the default Version
 				sdBuilder.SetServiceKind(referencedClusterDef.Spec.Type)
 				sdBuilder.SetServiceVersion(referencedCluster.Spec.ClusterVersionRef)
@@ -143,7 +146,7 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 					return false
 				}
 				serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
-				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: serviceRef.ServiceDescriptor}, serviceDescriptor); err != nil {
+				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: targetNamespace, Name: serviceRef.ServiceDescriptor}, serviceDescriptor); err != nil {
 					return nil, err
 				}
 				if serviceDescriptor.Status.Phase != appsv1alpha1.AvailablePhase {

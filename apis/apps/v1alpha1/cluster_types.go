@@ -613,18 +613,24 @@ type ServiceRef struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced. and the referenced cluster should be in the same namespace.
+	// namespace defines the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
+	// If not set, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current cluster by default.
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+
+	// When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced.
 	// By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential secret corresponding to the referenced Cluster will be used to bind to the current component.
 	// If you require an additional connection credential secret, please set it using the ConnectionCredential.
-	// If you have specified a Cluster, please do not specify a ServiceDescriptor.
+	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
 	// +optional
 	Cluster string `json:"cluster,omitempty"`
 
 	// serviceDescriptor defines the service descriptor of the service provided by external sources.
-	// When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding. The ServiceDescriptor object should be in the same namespace with the cluster.
-	// And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the ServiceDescriptor.Spec.kind and ServiceDescriptor.Spec.Version
-	// should match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].kind and clusterDefinition.componentDefs[*].serviceRefDeclarations[*].version respectively.
-	// If you have specified a ServiceDescriptor, please do not specify a Cluster.
+	// When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding.
+	// And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the ServiceDescriptor.spec.serviceKind and ServiceDescriptor.spec.serviceVersion
+	// should match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind
+	// and the regular expression defines in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion.
+	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
 	// +optional
 	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`
 

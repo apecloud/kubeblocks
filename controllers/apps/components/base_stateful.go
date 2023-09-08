@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -166,6 +167,153 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 
+	isDeleting := func() bool {
+		return !c.runningWorkload.DeletionTimestamp.IsZero()
+	}
+	isFirstGeneration := func() bool {
+		return c.runningWorkload.Generation == 1
+	}
+	isZeroReplica := func() bool {
+		return (c.runningWorkload.Spec.Replicas == nil || *c.runningWorkload.Spec.Replicas == 0) && c.Component.Replicas == 0
+	}
+	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
+		return err
+	}
+	hasComponentPod := func() bool {
+		return len(pods) > 0
+	}
+	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, c.runningWorkload)
+	if err != nil {
+		return err
+	}
+	hasFailedPod := func() bool {
+		if len(pods) != int(c.Component.Replicas) {
+			return false
+		}
+		for _, pod := range pods {
+			if intctrlutil.GetPodRevision(pod) != c.runningWorkload.Status.UpdateRevision {
+				return false
+			}
+		}
+
+		hasFailedPod, _, _ := hasFailedAndTimedOutPod(pods)
+		if hasFailedPod {
+			return true
+		}
+		if c.Component.WorkloadType != appsv1alpha1.Consensus && c.Component.WorkloadType != appsv1alpha1.Replication {
+			return false
+		}
+		var podsReadyTime *metav1.Time
+		for _, pod := range pods {
+			if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
+				continue
+			}
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type != corev1.PodReady || condition.Status != corev1.ConditionTrue {
+					continue
+				}
+				podsReadyTime = &condition.LastTransitionTime
+			}
+		}
+		return isProbeTimeout(c.Component.Probes, podsReadyTime)
+	}
+	isScaleOutFailed := func() bool {
+		if c.runningWorkload.Spec.Replicas == nil {
+			return false
+		}
+		if c.Component.Replicas <= *c.runningWorkload.Spec.Replicas {
+			return false
+		}
+		if c.WorkloadVertex == nil {
+			return false
+		}
+		stsObj := ConvertRSMToSTS(c.runningWorkload)
+		rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+		stsProto := ConvertRSMToSTS(rsmProto)
+		backupKey := types.NamespacedName{
+			Namespace: stsObj.Namespace,
+			Name:      stsObj.Name + "-scaling",
+		}
+		d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+		if err != nil {
+			return false
+		}
+		if status, _ := d.checkBackupStatus(); status == backupStatusFailed {
+			return true
+		}
+		for _, name := range d.pvcKeysToRestore() {
+			if status, _ := d.checkRestoreStatus(name); status == backupStatusFailed {
+				return true
+			}
+		}
+		return false
+	}
+	isAllConfigSynced := func() bool {
+		checkFinishedReconfigure := func(cm *corev1.ConfigMap) bool {
+			labels := cm.GetLabels()
+			annotations := cm.GetAnnotations()
+			if len(annotations) == 0 || len(labels) == 0 {
+				return false
+			}
+			hash, _ := util.ComputeHash(cm.Data)
+			return labels[constant.CMInsConfigurationHashLabelKey] == hash
+		}
+
+		var (
+			cmKey           client.ObjectKey
+			cmObj           = &corev1.ConfigMap{}
+			allConfigSynced = true
+		)
+		for _, configSpec := range c.Component.ConfigTemplates {
+			cmKey = client.ObjectKey{
+				Namespace: c.GetNamespace(),
+				Name:      cfgcore.GetComponentCfgName(c.GetClusterName(), c.GetName(), configSpec.Name),
+			}
+			if err := cli.Get(reqCtx.Ctx, cmKey, cmObj); err != nil {
+				return true
+			}
+			if !checkFinishedReconfigure(cmObj) {
+				allConfigSynced = false
+				break
+			}
+		}
+		return allConfigSynced
+	}
+	hasVolumeExpansionRunning := func() bool {
+		hasRunning := false
+		for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
+			running, _, err := c.hasVolumeExpansionRunning(reqCtx, cli, vct.Name)
+			if err != nil {
+				return false
+			}
+			if running {
+				hasRunning = true
+				break
+			}
+		}
+		return hasRunning
+	}
+
+	switch {
+	case isDeleting():
+		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
+	case isZeroReplica() && hasComponentPod():
+		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
+	case isZeroReplica():
+		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
+	case isRunning && isAllConfigSynced() && !hasVolumeExpansionRunning():
+		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
+	case hasFailedPod(), isScaleOutFailed():
+		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, nil, "Component is Failed")
+	case isFirstGeneration():
+		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
+	case !isFirstGeneration():
+		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component is Updating")
+	default:
+		c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "unknown")
+	}
+
 	if err := c.horizontalScale(reqCtx, cli); err != nil {
 		return err
 	}
@@ -176,47 +324,6 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		for _, v := range vertexes {
 			c.Dag.AddVertex(v)
 		}
-	}
-
-	isFirstGeneration := func() bool {
-		return c.runningWorkload.Generation == 1
-	}
-	isZeroReplica := func() bool {
-		return c.runningWorkload.Spec.Replicas == nil || *c.runningWorkload.Spec.Replicas == 0
-	}
-	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return err
-	}
-	hasComponentPod := func() bool {
-		return len(pods) > 0
-	}
-	hasFailedPod, _, _ := hasFailedAndTimedOutPod(pods)
-	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, c.runningWorkload)
-	if err != nil {
-		return err
-	}
-	isDeleting := func() bool {
-		return !c.runningWorkload.DeletionTimestamp.IsZero()
-	}
-
-	switch {
-	case isDeleting():
-		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
-	case isZeroReplica() && hasComponentPod():
-		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
-	case isZeroReplica():
-		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
-	case isRunning:
-		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
-	case hasFailedPod:
-		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, nil, "Component is Failed")
-	case isFirstGeneration():
-		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
-	case !isFirstGeneration():
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component is Updating")
-	default:
-		c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "unknown")
 	}
 
 	//statusTxn := &statusReconciliationTxn{}

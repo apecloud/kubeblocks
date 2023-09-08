@@ -61,6 +61,9 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		componentReplicasMap = map[string]int32{}
 		cluster              = opsRes.Cluster
 	)
+	if _, ok := cluster.Annotations[constant.SnapShotForStartAnnotationKey]; ok {
+		return nil
+	}
 	for i, v := range cluster.Spec.ComponentSpecs {
 		componentReplicasMap[v.Name] = v.Replicas
 		cluster.Spec.ComponentSpecs[i].Replicas = expectReplicas

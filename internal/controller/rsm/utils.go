@@ -672,7 +672,13 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 			return false
 		}
 	}
-	return true
+	hasLeader := false
+	for _, status := range membersStatus {
+		if status.IsLeader {
+			hasLeader = true
+		}
+	}
+	return hasLeader
 }
 
 func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool {

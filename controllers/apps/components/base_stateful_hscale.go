@@ -50,6 +50,7 @@ type dataClone interface {
 
 	checkBackupStatus() (backupStatus, error)
 	backup() ([]client.Object, error)
+	pvcKeysToRestore() []types.NamespacedName
 	checkRestoreStatus(types.NamespacedName) (backupStatus, error)
 	restore(name types.NamespacedName) ([]client.Object, error)
 }

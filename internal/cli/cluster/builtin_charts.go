@@ -34,7 +34,7 @@ type embedConfig struct {
 	alias string
 }
 
-var _ chartConfigInterface = &embedConfig{}
+var _ chartLoader = &embedConfig{}
 
 func (e *embedConfig) register(subcmd ClusterType) error {
 	if _, ok := ClusterTypeCharts[subcmd]; ok {

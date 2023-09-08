@@ -29,7 +29,7 @@ func (t ClusterType) String() string {
 	return string(t)
 }
 
-type chartConfigInterface interface {
+type chartLoader interface {
 	// LoadChart loads the chart content
 	loadChart() (io.ReadCloser, error)
 	// GetChartFileName returns the chart file name, include the extension
@@ -42,5 +42,5 @@ type chartConfigInterface interface {
 
 // ClusterTypeCharts is the map of the cluster type and the chart config
 // ClusterType is the type of the cluster, the ClusterType t will be used as sub command name,
-// chartConfigInterface is the interface for the chart config, implement this interface to register cluster type.
-var ClusterTypeCharts = map[ClusterType]chartConfigInterface{}
+// chartLoader is the interface for the chart config, implement this interface to register cluster type.
+var ClusterTypeCharts = map[ClusterType]chartLoader{}

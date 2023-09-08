@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
+	"k8s.io/klog"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -96,7 +97,7 @@ func RegisterCMD(c clusterConfig, configPath string) {
 	var needRemove []ClusterType
 	for _, config := range c {
 		if err := config.register(config.Name); err != nil {
-			fmt.Println(err.Error())
+			klog.V(2).Info(err.Error())
 			needRemove = append(needRemove, config.Name)
 		}
 	}
@@ -104,7 +105,7 @@ func RegisterCMD(c clusterConfig, configPath string) {
 		c.RemoveConfig(name)
 	}
 	if err := c.WriteConfigs(configPath); err != nil {
-		fmt.Printf("Warning: auto clear kbcli cluster chart config failed %s\n", err.Error())
+		klog.V(2).Info(fmt.Sprintf("Warning: auto clear kbcli cluster chart config failed %s\n", err.Error()))
 	}
 }
 
@@ -116,12 +117,12 @@ func GetChartCacheFiles() []fs.DirEntry {
 		if os.IsNotExist(err) {
 			err = os.MkdirAll(CliChartsCacheDir, 0777)
 			if err != nil {
-				fmt.Printf("Failed to create charts cache dir %s: %s", CliChartsCacheDir, err.Error())
+				klog.V(2).Info(fmt.Sprintf("Failed to create charts cache dir %s: %s", CliChartsCacheDir, err.Error()))
 				return nil
 			}
 			result = []fs.DirEntry{}
 		} else {
-			fmt.Printf("Failed to read charts cache dir %s: %s", CliChartsCacheDir, err.Error())
+			klog.V(2).Info(fmt.Sprintf("Failed to create charts cache dir %s: %s", CliChartsCacheDir, err.Error()))
 			return nil
 		}
 	}
@@ -132,10 +133,11 @@ func ClearCharts(c ClusterType) {
 	// if the fail clusterType is from external config, remove the config and the elated charts
 	if GlobalClusterChartConfig.RemoveConfig(c) {
 		if err := GlobalClusterChartConfig.WriteConfigs(CliClusterChartConfig); err != nil {
-			fmt.Printf("Warning: auto clear %s config fail due to: %s\n", c, err.Error())
+			klog.V(2).Info(fmt.Sprintf("Warning: auto clear %s config fail due to: %s\n", c, err.Error()))
+
 		}
 		if err := os.Remove(filepath.Join(CliChartsCacheDir, ClusterTypeCharts[c].getChartFileName())); err != nil {
-			fmt.Printf("Warning: auto clear %s config fail due to: %s\n", c, err.Error())
+			klog.V(2).Info(fmt.Sprintf("Warning: auto clear %s config fail due to: %s\n", c, err.Error()))
 		}
 		CacheFiles = GetChartCacheFiles()
 	}
@@ -174,7 +176,7 @@ func (h *TypeInstance) register(subcmd ClusterType) error {
 	return fmt.Errorf("can't find the %s in cache, please use 'kbcli cluster pull %s --url %s' first", h.Name.String(), h.Name.String(), h.URL)
 }
 
-var _ chartConfigInterface = &TypeInstance{}
+var _ chartLoader = &TypeInstance{}
 
 func init() {
 	homeDir, _ := util.GetCliHomeDir()

@@ -26,13 +26,27 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type ExporterRef struct {
+	ExporterNames []string `json:"exporterRef"`
+}
+
+type DataSourceType string
+
+const (
+	MetricsDatasourceType DataSourceType = "metrics"
+	LogsDataSourceType    DataSourceType = "logs"
+)
+
 // CollectorDataSourceSpec defines the desired state of CollectorDataSource
 type CollectorDataSourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of CollectorDataSource. Edit collectordatasource_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// ExporterRef is the exporters to export data source
+	ExporterRef `json:",inline"`
+
+	// Type is the type of the data source
+	Type DataSourceType `json:"type"`
 }
 
 // CollectorDataSourceStatus defines the observed state of CollectorDataSource

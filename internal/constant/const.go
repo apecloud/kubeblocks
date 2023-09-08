@@ -72,7 +72,8 @@ const (
 const (
 	APIGroup = "kubeblocks.io"
 
-	AppName = "kubeblocks"
+	AppName      = "kubeblocks"
+	OTeldAppName = "oteld"
 
 	// K8s recommonded well-known labels and annotation keys
 	AppInstanceLabelKey  = "app.kubernetes.io/instance"
@@ -171,6 +172,13 @@ const (
 
 	RBACRoleName        = "kubeblocks-cluster-pod-role"
 	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
+
+	// monitor.io annotations
+	MonitorScrapeKey    = "monitor.kubeblocks.io/scrape"
+	MonitorPathKey      = "monitor.kubeblocks.io/path"
+	MonitorSchemaKey    = "monitor.kubeblocks.io/schema"
+	MonitorManagedByKey = "monitor.kubeblocks.io/managed-by"
+
 )
 
 const (

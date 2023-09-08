@@ -23,6 +23,13 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,8 +41,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/monitor/reconcile"
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	monitorreconsile "github.com/apecloud/kubeblocks/controllers/monitor/reconcile"
+	monitortypes "github.com/apecloud/kubeblocks/controllers/monitor/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -44,10 +51,10 @@ type OTeldReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
-	Config   *types.Config
+	Config   *monitortypes.Config
 
 	// sub-controllers
-	tasks []types.ReconcileTask
+	tasks []monitortypes.ReconcileTask
 }
 
 //+kubebuilder:rbac:groups=monitor.kubeblocks.io,resources=collectordatasources,verbs=get;list;watch;create;update;patch;delete
@@ -70,7 +77,7 @@ type OTeldReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqCtx := types.ReconcileCtx{
+	reqCtx := monitortypes.ReconcileCtx{
 		Ctx:    ctx,
 		Req:    req,
 		Log:    log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
@@ -85,7 +92,7 @@ func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return intctrlutil.Reconciled()
 }
 
-func (r *OTeldReconciler) runTasks(reqCtx types.ReconcileCtx) error {
+func (r *OTeldReconciler) runTasks(reqCtx monitortypes.ReconcileCtx) error {
 	for _, task := range r.tasks {
 		if err := task.Do(reqCtx); err != nil {
 			return err
@@ -94,7 +101,7 @@ func (r *OTeldReconciler) runTasks(reqCtx types.ReconcileCtx) error {
 	return nil
 }
 
-func New(params types.OTeldParams, config *types.Config) *OTeldReconciler {
+func New(params monitortypes.OTeldParams, config *monitortypes.Config) *OTeldReconciler {
 	reconcile := OTeldReconciler{
 		Client:   params.Client,
 		Scheme:   params.Scheme,
@@ -102,20 +109,20 @@ func New(params types.OTeldParams, config *types.Config) *OTeldReconciler {
 		Config:   config,
 
 		// sub-controllers
-		tasks: []types.ReconcileTask{
-			types.NewReconcileTask(reconcile.OTeldName, types.WithReconcileOption(reconcile.OTeld, params)),
-			types.NewReconcileTask(reconcile.OTeldAPIServerName, types.WithReconcileOption(reconcile.Deployment, params)),
-			types.NewReconcileTask(reconcile.OTeldAgentName, types.WithReconcileOption(reconcile.OTeldAgent, params)),
-			types.NewReconcileTask(reconcile.PrometheusName, types.WithReconcileOption(reconcile.Prometheus, params)),
-			types.NewReconcileTask(reconcile.LokiName, types.WithReconcileOption(reconcile.Loki, params)),
-			types.NewReconcileTask(reconcile.GrafnaName, types.WithReconcileOption(reconcile.Grafana, params)),
-			types.NewReconcileTask(reconcile.VMAgentName, types.WithReconcileOption(reconcile.VMAgent, params)),
+		tasks: []monitortypes.ReconcileTask{
+			monitortypes.NewReconcileTask(monitorreconsile.OTeldName, monitortypes.WithReconcileOption(monitorreconsile.OTeld, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.OTeldAPIServerName, monitortypes.WithReconcileOption(monitorreconsile.Deployment, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.OTeldAgentName, monitortypes.WithReconcileOption(monitorreconsile.OTeldAgent, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.PrometheusName, monitortypes.WithReconcileOption(monitorreconsile.Prometheus, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.LokiName, monitortypes.WithReconcileOption(monitorreconsile.Loki, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.GrafnaName, monitortypes.WithReconcileOption(monitorreconsile.Grafana, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.VMAgentName, monitortypes.WithReconcileOption(monitorreconsile.VMAgent, params)),
 		},
 	}
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		log.Log.Info(fmt.Sprintf("config file changed: %s", e.Name))
-		newConfig, err := types.LoadConfig(viper.ConfigFileUsed())
+		newConfig, err := monitortypes.LoadConfig(viper.ConfigFileUsed())
 		if err != nil {
 			log.Log.Error(err, fmt.Sprintf("failed to reload config: %s", e.Name))
 			return
@@ -129,13 +136,35 @@ func New(params types.OTeldParams, config *types.Config) *OTeldReconciler {
 // SetupWithManager sets up the controller with the Manager.
 func (r *OTeldReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// For(&monitorv1alpha1.OTeld{}).
-		For(&monitorv1alpha1.LogsExporterSink{}).
-		For(&monitorv1alpha1.MetricsExporterSink{}).
-		For(&monitorv1alpha1.CollectorDataSource{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.Secret{}).
-		Owns(&appsv1.DaemonSet{}).
-		Owns(&appsv1.Deployment{}).
+		Named("OTeld").
+		Watches(&source.Kind{Type: &monitorv1alpha1.LogsExporterSink{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
+		Watches(&source.Kind{Type: &monitorv1alpha1.MetricsExporterSink{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
+		Watches(&source.Kind{Type: &monitorv1alpha1.CollectorDataSource{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
+		Watches(&source.Kind{Type: &corev1.ConfigMap{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
+		Watches(&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
+		Watches(&source.Kind{Type: &appsv1.DaemonSet{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
+		Watches(&source.Kind{Type: &appsv1.Deployment{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
 		Complete(r)
+}
+
+func (r *OTeldReconciler) filterOTelResources(obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if obj.GetNamespace() != viper.GetString("OTELD_NAMESPACE") {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      labels[constant.AppInstanceLabelKey],
+			},
+		},
+	}
 }

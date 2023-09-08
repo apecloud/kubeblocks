@@ -24,6 +24,6 @@ import "github.com/apecloud/kubeblocks/controllers/monitor/types"
 const OTeldAPIServerName = "grafana"
 
 func Deployment(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	// TODO
-	panic("implement me")
+	// TODO: implement me
+	return nil
 }

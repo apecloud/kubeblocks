@@ -62,3 +62,20 @@ func (builder *PodBuilder) AddTolerations(tolerations ...corev1.Toleration) *Pod
 	builder.get().Spec.Tolerations = append(builder.get().Spec.Tolerations, tolerations...)
 	return builder
 }
+
+func (builder *PodBuilder) AddSerciveAccount(serviceAccount string) *PodBuilder {
+	builder.get().Spec.ServiceAccountName = serviceAccount
+	return builder
+}
+
+func (builder *PodBuilder) SetVolumes(volumes ...corev1.Volume) *PodBuilder {
+	builder.get().Spec.Volumes = volumes
+	return builder
+}
+
+func (builder *PodBuilder) AddVolume(volume corev1.Volume) *PodBuilder {
+	volumes := builder.get().Spec.Volumes
+	volumes = append(volumes, volume)
+	builder.get().Spec.Volumes = volumes
+	return builder
+}

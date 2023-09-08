@@ -463,18 +463,13 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 }
 
 func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("psql", "-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get primary time line failed, err:%v, stderr%s", err, stderr.String())
+	resp, err := mgr.Psql("-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
+	if err != nil {
+		mgr.Logger.Errorf("get primary time line failed, err:%v", err)
 		return 0, err
 	}
 
-	stdoutList := strings.Split(stdout.String(), "\n")
+	stdoutList := strings.Split(resp, "\n")
 	value := stdoutList[2]
 	values := strings.Split(value, "|")
 

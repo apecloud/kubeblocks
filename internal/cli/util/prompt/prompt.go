@@ -58,7 +58,7 @@ func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *prom
 // use customMessage to display more information
 // when names are empty, require validation for 'yes'.
 func Confirm(names []string, in io.Reader, customMessage string, prompt string) error {
-	if names == nil || len(names) == 0 {
+	if len(names) == 0 {
 		names = []string{"yes"}
 	}
 	if len(customMessage) != 0 {

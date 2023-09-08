@@ -54,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/polarx"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
@@ -71,6 +72,7 @@ var (
 func init() {
 	viper.AutomaticEnv()
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(polarx.NewPolarx, "polarx")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")

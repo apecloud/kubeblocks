@@ -224,7 +224,7 @@ type ClusterComponentSpec struct {
 
 	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
 	// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster. It is important to note that the hosting cluster should be in the same namespace.
+	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
 	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
 	// +optional

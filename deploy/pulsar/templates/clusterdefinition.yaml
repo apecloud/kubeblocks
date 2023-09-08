@@ -20,8 +20,9 @@ spec:
         updateStrategy: BestEffortParallel
       serviceRefDeclarations:
       - name: pulsarZookeeper
-        kind: zookeeper
-        version: 3.8.1
+        serviceRefDeclarationSpecs:
+          - serviceKind: zookeeper
+            serviceVersion: ^3.8.\d{1,2}$
       monitor:
         builtIn: false
         exporterConfig:
@@ -419,8 +420,9 @@ spec:
         updateStrategy: BestEffortParallel
       serviceRefDeclarations:
       - name: pulsarZookeeper
-        kind: zookeeper
-        version: 3.8.1
+        serviceRefDeclarationSpecs:
+        - serviceKind: zookeeper
+          serviceVersion: ^3.8.\d{1,2}$
       monitor:
         builtIn: false
         exporterConfig:

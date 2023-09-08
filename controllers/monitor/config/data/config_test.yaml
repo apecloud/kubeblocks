@@ -1,4 +1,4 @@
-image: "apecloud-node-exporter:v0.1.0"
+image: "registry.cn-hangzhou.aliyuncs.com/apecloud/agamotto:0.1.2-beta.3"
 resources:
   limits:
     cpu: 100m
@@ -15,8 +15,6 @@ datasource:
         - pod
         - volume
     k8sNode:
-      enabled: true
-    k8sCluster:
       enabled: true
     collectionInterval: 15s
     exporterRef:

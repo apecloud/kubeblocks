@@ -165,7 +165,7 @@ func (cg *OteldConfigGenerater) buildMetricsDatasourceSlice(datasources *types.M
 	}
 
 	receiverConfigs := yaml.MapSlice{}
-	if datasources.K8sNodeConfig != nil || datasources.K8sNodeConfig.Enabled {
+	if datasources.K8sNodeConfig != nil && datasources.K8sNodeConfig.Enabled {
 		k8sNodeItem := yaml.MapItem{
 			Key: "apecloudnode",
 			Value: yaml.MapSlice{
@@ -174,7 +174,7 @@ func (cg *OteldConfigGenerater) buildMetricsDatasourceSlice(datasources *types.M
 		}
 		receiverConfigs = append(receiverConfigs, k8sNodeItem)
 	}
-	if datasources.K8sClusterConfig != nil || datasources.K8sClusterConfig.Enabled {
+	if datasources.K8sClusterConfig != nil && datasources.K8sClusterConfig.Enabled {
 		k8sClusterItem := yaml.MapItem{
 			Key: "k8s_cluster",
 			Value: yaml.MapSlice{
@@ -183,7 +183,7 @@ func (cg *OteldConfigGenerater) buildMetricsDatasourceSlice(datasources *types.M
 		}
 		receiverConfigs = append(receiverConfigs, k8sClusterItem)
 	}
-	if datasources.KubeletStateConfig != nil || datasources.KubeletStateConfig.Enabled {
+	if datasources.KubeletStateConfig != nil && datasources.KubeletStateConfig.Enabled {
 		k8sStateSlice := yaml.MapSlice{}
 		if datasources.KubeletStateConfig.MetricGroups != nil {
 			k8sStateSlice = append(k8sStateSlice, yaml.MapItem{Key: "metric_groups", Value: datasources.KubeletStateConfig.MetricGroups})
@@ -211,19 +211,27 @@ func (cg *OteldConfigGenerater) buildPiplineItem() yaml.MapItem {
 
 	if cg.metricsPipline != nil {
 		metricsSlice := yaml.MapSlice{}
-		receiverSlice, exporterSlice := []string{}, []string{}
+		receiverMap, exporterMap := map[string]bool{}, map[string]bool{}
 		for _, receiver := range cg.metricsPipline.ReceiverList {
-			receiverSlice = append(receiverSlice, receiver.Name)
+			receiverMap[receiver.Name] = true
 			for _, exporterName := range receiver.ExporterRef.ExporterNames {
 				if cg.metricsPipline.ExporterMap[exporterName] {
-					exporterSlice = append(exporterSlice, exporterName)
+					exporterMap[exporterName] = true
 				}
 			}
 		}
-		if len(receiverSlice) > 0 {
+		if len(receiverMap) > 0 {
+			receiverSlice := []string{}
+			for receiverName, _ := range receiverMap {
+				receiverSlice = append(receiverSlice, receiverName)
+			}
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 		}
-		if len(exporterSlice) > 0 {
+		if len(exporterMap) > 0 {
+			exporterSlice := []string{}
+			for exporterName, _ := range exporterMap {
+				exporterSlice = append(exporterSlice, exporterName)
+			}
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
 		}
 		pipline = append(pipline, yaml.MapItem{Key: "metrics", Value: metricsSlice})
@@ -249,13 +257,13 @@ func (cg *OteldConfigGenerater) buildPipline(datasourceList *v1alpha1.CollectorD
 
 	datasource := cg.config.Datasource.MetricsDatasource
 	if datasource != nil {
-		if datasource.KubeletStateConfig != nil {
+		if datasource.KubeletStateConfig != nil && datasource.KubeletStateConfig.Enabled {
 			cg.addMetricsPiplineReceiver("apecloudkubeletstats", datasource.ExporterNames)
 		}
-		if datasource.K8sClusterConfig != nil {
-			cg.addMetricsPiplineReceiver("k8scluster", datasource.ExporterNames)
-		}
-		if datasource.K8sNodeConfig != nil {
+		//if datasource.K8sClusterConfig != nil && datasource.K8sClusterConfig.Enabled {
+		//	cg.addMetricsPiplineReceiver("k8s_cluster", datasource.ExporterNames)
+		//}
+		if datasource.K8sNodeConfig != nil && datasource.K8sNodeConfig.Enabled {
 			cg.addMetricsPiplineReceiver("apecloudk8snode", datasource.ExporterNames)
 		}
 	}

@@ -46,9 +46,11 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			}
 			membersStatus = append(membersStatus, status)
 		}
+		leaderIndex := 0
 		if replicas > 1 {
-			membersStatus[1].ReplicaRole = workloads.ReplicaRole{Name: "leader", IsLeader: true}
+			leaderIndex = 1
 		}
+		membersStatus[leaderIndex].ReplicaRole = workloads.ReplicaRole{Name: "leader", IsLeader: true}
 		return membersStatus
 	}
 	setRSMStatus := func(replicas int) {

@@ -171,8 +171,8 @@ spec:
               type:
                 description: type defines the type of the exporterSink
                 enum:
-                - S3SinkType
-                - LokiSinkType
+                - apeclouds3
+                - loki
                 type: string
             required:
             - inline

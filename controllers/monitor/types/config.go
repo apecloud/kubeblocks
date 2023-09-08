@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
@@ -33,7 +33,7 @@ type APIConfig struct {
 	// (for no auth), `serviceAccount` (to use the standard service account
 	// token provided to the agent pod), or `kubeConfig` to use credentials
 	// from `~/.kube/config`.
-	AuthType AuthType `mapstructure:"auth_type"`
+	AuthType AuthType `json:"authType"`
 }
 
 // AuthType describes the type of authentication to use for the K8s API
@@ -52,17 +52,17 @@ const (
 )
 
 type KubeletStateConfig struct {
-
+	Enabled bool `json:"enabled"`
 	// MetricGroups are the groups of metrics to collect
-	MetricGroups []string `json:"metric_groups"`
+	MetricGroups []string `json:"metricGroups"`
 }
 
-type K8sNodeConfig struct{}
+type K8sNodeConfig struct {
+	Enabled bool `json:"enabled"`
+}
 
-type K8sClusterConfig struct{}
-
-type ExporterRef struct {
-	ExporterNames []string `json:"exporter_ref"`
+type K8sClusterConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 type MetricsDatasource struct {
@@ -77,10 +77,10 @@ type MetricsDatasource struct {
 	K8sClusterConfig *K8sClusterConfig `json:"k8sCluster"`
 
 	// CollectionInterval is the metrics collection interval
-	CollectionInterval string `json:"collectionInterval"`
+	CollectionInterval *string `json:"collectionInterval"`
 
 	// ExporterRef is the exporters to export metrics
-	ExporterRef
+	v1alpha1.ExporterRef `json:",inline"`
 }
 
 type PodsLogsConfig struct{}
@@ -91,7 +91,7 @@ type LogsDatasource struct {
 	PodsLogsConfig *PodsLogsConfig `json:"podsLogs"`
 
 	// ExporterRef is the exporters to export logs
-	ExporterRef
+	v1alpha1.ExporterRef `json:",inline"`
 }
 
 type Datasource struct {
@@ -107,7 +107,7 @@ type Config struct {
 	APIConfig `json:",inline"`
 
 	// CollectionInterval is the metrics collection interval
-	CollectionInterval time.Duration `json:"collectionInterval"`
+	CollectionInterval string `json:"collectionInterval"`
 
 	// Datasource is the metrics and logs to be scraped
 	Datasource Datasource `json:"datasource"`

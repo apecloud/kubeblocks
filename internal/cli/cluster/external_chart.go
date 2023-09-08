@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package cluster
 
 import (
@@ -14,21 +33,21 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var chartsCacheDir string
-var cacheFiles []fs.DirEntry
+// CliClusterChartConfig is $HOME/.kbcli/cluster_types in default
+var CliClusterChartConfig string
+
+// CliChartsCacheDir is $HOME/.kbcli/charts in default
+var CliChartsCacheDir string
 
 type clusterConfig []*TypeInstance
 
-// GlobalClusterChartConfig is kbcli global cluster chart config
+// GlobalClusterChartConfig is kbcli global cluster chart config reference to CliClusterChartConfig
 var GlobalClusterChartConfig clusterConfig
+var cacheFiles []fs.DirEntry
 
-// ReadConfigs read the config from $HOME/.kbcli/clusterTypes
-func (c *clusterConfig) ReadConfigs() error {
-	homeDir, err := util.GetCliHomeDir()
-	if err != nil {
-		return err
-	}
-	contents, err := os.ReadFile(filepath.Join(homeDir, types.CliClusterTypeConfigs))
+// ReadConfigs read the config from configPath
+func (c *clusterConfig) ReadConfigs(configPath string) error {
+	contents, err := os.ReadFile(configPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -42,17 +61,13 @@ func (c *clusterConfig) ReadConfigs() error {
 	return nil
 }
 
-// WriteConfigs write current config into $HOME/.kbcli/clusterTypes
-func (c *clusterConfig) WriteConfigs() error {
-	homeDir, err := util.GetCliHomeDir()
-	if err != nil {
-		return err
-	}
+// WriteConfigs write current config into configPath
+func (c *clusterConfig) WriteConfigs(configPath string) error {
 	newConfig, err := yaml.Marshal(*c)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(homeDir, types.CliClusterTypeConfigs), newConfig, 0666)
+	return os.WriteFile(configPath, newConfig, 0666)
 }
 
 // AddConfig add a new cluster type instance into current config
@@ -70,12 +85,15 @@ func (c *clusterConfig) RemoveConfig(name ClusterType) {
 		}
 	}
 }
+func (c *clusterConfig) Len() int {
+	return len(*c)
+}
 
-// RegisterCMD will register all cluster type instances in the config and auto clear the register failed instances
+// RegisterCMD will register all cluster type instances in the config c and auto clear the register failed instances
 // and rewrite config
-func (c *clusterConfig) RegisterCMD() {
+func RegisterCMD(c clusterConfig, configPath string) {
 	var needRemove []ClusterType
-	for _, config := range *c {
+	for _, config := range c {
 		if err := config.register(config.Name); err != nil {
 			fmt.Println(err.Error())
 			needRemove = append(needRemove, config.Name)
@@ -84,7 +102,7 @@ func (c *clusterConfig) RegisterCMD() {
 	for _, name := range needRemove {
 		c.RemoveConfig(name)
 	}
-	if err := c.WriteConfigs(); err != nil {
+	if err := c.WriteConfigs(configPath); err != nil {
 		fmt.Printf("Warning: auto clear kbcli cluster chart config failed %s\n", err.Error())
 	}
 }
@@ -97,7 +115,7 @@ type TypeInstance struct {
 }
 
 func (h *TypeInstance) loadChart() (io.ReadCloser, error) {
-	return os.Open(filepath.Join(chartsCacheDir, h.getChartFileName()))
+	return os.Open(filepath.Join(CliChartsCacheDir, h.getChartFileName()))
 }
 
 func (h *TypeInstance) getChartFileName() string {
@@ -119,34 +137,36 @@ func (h *TypeInstance) register(subcmd ClusterType) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("can't find the %s in config, please use 'kbcli cluster pull %s --url %s' first", h.Name.String(), h.Name.String(), h.URL)
+	return fmt.Errorf("can't find the %s in cache, please use 'kbcli cluster pull %s --url %s' first", h.Name.String(), h.Name.String(), h.URL)
 }
 
 var _ chartConfigInterface = &TypeInstance{}
 
 func init() {
-	err := GlobalClusterChartConfig.ReadConfigs()
+	homeDir, _ := util.GetCliHomeDir()
+	CliClusterChartConfig = filepath.Join(homeDir, types.CliClusterTypeConfigs)
+	CliChartsCacheDir = filepath.Join(homeDir, types.CliChartsCache)
+
+	err := GlobalClusterChartConfig.ReadConfigs(CliClusterChartConfig)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	// check charts cache dir
-	homeDir, _ := util.GetCliHomeDir()
-	chartsCacheDir = filepath.Join(homeDir, types.CliChartsCache)
 	dirFS := os.DirFS(homeDir)
 	cacheFiles, err = fs.ReadDir(dirFS, "charts")
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(chartsCacheDir, 0777)
+			err = os.MkdirAll(CliChartsCacheDir, 0777)
 			if err != nil {
-				fmt.Printf("Failed to create charts cache dir %s: %s", chartsCacheDir, err.Error())
+				fmt.Printf("Failed to create charts cache dir %s: %s", CliChartsCacheDir, err.Error())
 				return
 			}
 			cacheFiles = []fs.DirEntry{}
 		} else {
-			fmt.Printf("Failed to read charts cache dir %s: %s", chartsCacheDir, err.Error())
+			fmt.Printf("Failed to read charts cache dir %s: %s", CliChartsCacheDir, err.Error())
 			return
 		}
 	}
-	GlobalClusterChartConfig.RegisterCMD()
+	RegisterCMD(GlobalClusterChartConfig, CliClusterChartConfig)
 }

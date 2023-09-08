@@ -1,8 +1,27 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package cluster
 
 import (
 	"fmt"
-	"path/filepath"
+	"regexp"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -10,8 +29,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
@@ -58,8 +75,9 @@ func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 // validate will check the
 func (o *registerOption) validate() error {
-	if len(o.clusterType) > 15 {
-		return fmt.Errorf("cluster type %s is too long as a sub command", o.clusterType.String())
+	re := regexp.MustCompile(`^[a-zA-Z0-9]{1,9}$`)
+	if !re.MatchString(o.clusterType.String()) {
+		return fmt.Errorf("cluster type %s is not appropriate as a subcommand", o.clusterType.String())
 	}
 
 	for key := range cluster.ClusterTypeCharts {
@@ -76,12 +94,8 @@ func (o *registerOption) run() error {
 	if err != nil {
 		return err
 	}
-	homeDir, err := util.GetCliHomeDir()
-	if err != nil {
-		return err
-	}
-	chartsCacheDir := filepath.Join(homeDir, types.CliChartsCache)
-	_, _, err = chartsDownloader.DownloadTo(o.url, "", chartsCacheDir)
+
+	_, _, err = chartsDownloader.DownloadTo(o.url, "", cluster.CliChartsCacheDir)
 	if err != nil {
 		return err
 	}
@@ -90,6 +104,6 @@ func (o *registerOption) run() error {
 		URL:   o.url,
 		Alias: o.alias,
 	})
-	return cluster.GlobalClusterChartConfig.WriteConfigs()
+	return cluster.GlobalClusterChartConfig.WriteConfigs(cluster.CliClusterChartConfig)
 
 }

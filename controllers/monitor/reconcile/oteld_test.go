@@ -54,7 +54,7 @@ var _ = Describe("monitor_controller", func() {
 
 	It("should generate config correctly from config yaml", func() {
 		Eventually(func(g Gomega) {
-			otel := buildDaemonsetForOteld(config, "test")
+			otel := buildDaemonsetForOteld(config, "test", "test")
 			g.Expect(otel).ShouldNot(BeNil())
 			g.Expect(otel.Name).Should(Equal("test"))
 		}).Should(Succeed())

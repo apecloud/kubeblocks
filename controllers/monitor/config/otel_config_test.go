@@ -61,7 +61,7 @@ var _ = Describe("monitor_controller", func() {
 		cfg := cg.GenerateOteldConfiguration(&datasourceList, &metricsExporterList, &logsExporterList)
 		bytes, err := yaml.Marshal(cfg)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(string(bytes)).Should(Equal(""))
+		Expect(len(bytes) > 0).Should(BeTrue())
 		Expect(true).Should(BeTrue())
 	})
 

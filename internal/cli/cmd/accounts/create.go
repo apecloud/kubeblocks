@@ -25,17 +25,17 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type CreateUserOptions struct {
 	*AccountBaseOptions
-	info channelutil.UserInfo
+	info lorryutil.UserInfo
 }
 
 func NewCreateUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateUserOptions {
 	return &CreateUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, channelutil.CreateUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.CreateUserOp),
 	}
 }
 

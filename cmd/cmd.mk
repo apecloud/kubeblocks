@@ -73,27 +73,27 @@ cue-helper: test-go-generate build-checks ## Build cue-helper related binaries
 clean-cue-helper: ## Clean bin/cue-helper.
 	rm -f bin/cue-helper
 
-## probe cmd
+## lorry cmd
 
-PROBE_LD_FLAGS = "-s -w"
+LORRY_LD_FLAGS = "-s -w"
 
-bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o $@  ./cmd/probe/main.go
+bin/lorry.%: ## Cross build bin/lorry.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${LORRY_LD_FLAGS} -o $@  ./cmd/lorry/main.go
 
-.PHONY: probe
-probe: OS=$(shell $(GO) env GOOS)
-probe: ARCH=$(shell $(GO) env GOARCH)
-probe: test-go-generate build-checks ## Build probe related binaries
-	$(MAKE) bin/probe.${OS}.${ARCH}
-	mv bin/probe.${OS}.${ARCH} bin/probe
+.PHONY: lorry
+lorry: OS=$(shell $(GO) env GOOS)
+lorry: ARCH=$(shell $(GO) env GOARCH)
+lorry: test-go-generate build-checks ## Build lorry related binaries
+	$(MAKE) bin/lorry.${OS}.${ARCH}
+	mv bin/lorry.${OS}.${ARCH} bin/lorry
 
-.PHONY: probe-fast
-probe-fast: OS=$(shell $(GO) env GOOS)
-probe-fast: ARCH=$(shell $(GO) env GOARCH)
-probe-fast:
-	$(MAKE) bin/probe.${OS}.${ARCH}
-	mv bin/probe.${OS}.${ARCH} bin/probe
+.PHONY: lorry-fast
+lorry-fast: OS=$(shell $(GO) env GOOS)
+lorry-fast: ARCH=$(shell $(GO) env GOARCH)
+lorry-fast:
+	$(MAKE) bin/lorry.${OS}.${ARCH}
+	mv bin/lorry.${OS}.${ARCH} bin/lorry
 
-.PHONY: clean-probe
-clean-probe: ## Clean bin/probe.
-	rm -f bin/probe
+.PHONY: clean-lorry
+clean-lorry: ## Clean bin/lorry.
+	rm -f bin/lorry

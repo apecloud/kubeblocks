@@ -135,12 +135,12 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"probe", "--app-id", "batch-sdk",
+	container.Command = []string{"lorry", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
 		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
 		"--log-level", logLevel,
-		"--config", "/config/probe/config.yaml",
-		"--components-path", "/config/probe/components"}
+		"--config", "/config/lorry/config.yaml",
+		"--components-path", "/config/lorry/components"}
 
 	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
 		mainContainer := component.PodSpec.Containers[0]

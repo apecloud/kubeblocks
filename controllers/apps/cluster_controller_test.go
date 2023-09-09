@@ -57,11 +57,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
-	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	lorry "github.com/apecloud/kubeblocks/lorry/client"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 const (
@@ -1542,7 +1542,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      pod.Name + "-event",
 					Namespace: testCtx.DefaultNamespace,
 				},
-				Reason:  string(probeutil.CheckRoleOperation),
+				Reason:  string(lorryutil.CheckRoleOperation),
 				Message: `{"event":"Success","originalRole":"Leader","role":"Follower"}`,
 				InvolvedObject: corev1.ObjectReference{
 					Name:      pod.Name,

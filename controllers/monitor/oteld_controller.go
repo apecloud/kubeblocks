@@ -78,10 +78,12 @@ type OTeldReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := monitortypes.ReconcileCtx{
-		Ctx:    ctx,
-		Req:    req,
-		Log:    log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
-		Config: r.Config,
+		Ctx: ctx,
+		Req: req,
+		Log: log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
+
+		Config:      r.Config,
+		OteldCfgRef: &monitortypes.OteldCfgRef{},
 	}
 
 	// TODO prepare required resources
@@ -111,6 +113,9 @@ func New(params monitortypes.OTeldParams, config *monitortypes.Config) *OTeldRec
 		// sub-controllers
 		tasks: []monitortypes.ReconcileTask{
 			monitortypes.NewReconcileTask(monitorreconsile.OTeldName, monitortypes.WithReconcileOption(monitorreconsile.OTeld, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.OteldSecretName, monitortypes.WithReconcileOption(monitorreconsile.Secret, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.OteldConfigMapName, monitortypes.WithReconcileOption(monitorreconsile.ConfigMap, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.OteldServiceName, monitortypes.WithReconcileOption(monitorreconsile.Service, params)),
 			monitortypes.NewReconcileTask(monitorreconsile.OTeldAPIServerName, monitortypes.WithReconcileOption(monitorreconsile.Deployment, params)),
 			monitortypes.NewReconcileTask(monitorreconsile.OTeldAgentName, monitortypes.WithReconcileOption(monitorreconsile.OTeldAgent, params)),
 			monitortypes.NewReconcileTask(monitorreconsile.PrometheusName, monitortypes.WithReconcileOption(monitorreconsile.Prometheus, params)),

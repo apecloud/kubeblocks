@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: jupyter-notebook
+  name: risingwave
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     "kubeblocks.io/provider": community
@@ -10,21 +10,21 @@ metadata:
     helm.sh/resource-policy: keep
   {{- end }}
 spec:
-  description: 'Jupyter Notebook: Interactive coding, documentation, and visualization tool with multi-language support for data analysis and education.'
+  description: 'RisingWave is a distributed SQL streaming database.'
+
   type: Helm
 
   helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "jupyter-notebook" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "risingwave" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: {{ default .Chart.Version .Values.versionOverride }}
-      {{- end }}
+     {{- end }}
 
   installable:
     autoInstall: false
 
   defaultInstallValues:
     - enabled: true
-

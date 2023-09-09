@@ -19,11 +19,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package reconcile
 
-import "github.com/apecloud/kubeblocks/controllers/monitor/types"
+import (
+	"reflect"
+
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/spf13/viper"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 const OTeldAgentName = "oteld-agent"
 
 func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	// TODO: implement me
-	return nil
+	var (
+		k8sClient = params.Client
+		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
+	)
+
+	oteldDaemonset := buildDaemonsetForOteld(reqCtx.Config, namespace)
+
+	existingDaemonset := &appsv1.DaemonSet{}
+	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDaemonset)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			reqCtx.Log.Error(err, "Failed to find secret", "daemonset", existingDaemonset.Name)
+			params.Recorder.Eventf(existingDaemonset, corev1.EventTypeWarning, "Failed to find secret", err.Error())
+			return err
+		}
+		return k8sClient.Create(reqCtx.Ctx, oteldDaemonset)
+	}
+
+	if reflect.DeepEqual(existingDaemonset.Spec, oteldDaemonset.Spec) {
+		return nil
+	}
+
+	updatedDeamonset := existingDaemonset.DeepCopy()
+	updatedDeamonset.Spec = oteldDaemonset.Spec
+	updatedDeamonset.Labels = oteldDaemonset.Labels
+	updatedDeamonset.Annotations = oteldDaemonset.Annotations
+	reqCtx.Log.Info("updating existing daemonset", "daemonset", client.ObjectKeyFromObject(updatedDeamonset))
+	return k8sClient.Update(reqCtx.Ctx, oteldDaemonset)
+}
+
+func buildDaemonsetForOteld(config *types.Config, namespace string) *appsv1.DaemonSet {
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppNameLabelKey:      OTeldName,
+		constant.AppInstanceLabelKey:  OTeldName,
+		constant.MonitorManagedByKey:  "agamotto",
+	}
+
+	labelSelector := &metav1.LabelSelector{
+		MatchLabels: commonLabels,
+	}
+
+	podSpec := buildPodSpecForOteld(config)
+
+	podBuilder := builder.NewPodBuilder("", "").
+		AddLabelsInMap(commonLabels)
+
+	podTemplate := corev1.PodTemplateSpec{
+		ObjectMeta: podBuilder.GetObject().ObjectMeta,
+		Spec:       *podSpec,
+	}
+
+	return builder.NewDaemonSetBuilder(namespace, OTeldName).
+		SetTemplate(podTemplate).
+		AddLabelsInMap(commonLabels).
+		AddMatchLabelsInMap(commonLabels).
+		SetSelector(labelSelector).
+		GetObject()
 }

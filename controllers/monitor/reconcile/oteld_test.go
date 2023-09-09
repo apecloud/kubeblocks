@@ -47,14 +47,14 @@ var _ = Describe("monitor_controller", func() {
 
 	It("should generate config correctly from config yaml", func() {
 		Eventually(func(g Gomega) {
-			otel := buildSvcForOtel("test")
+			otel := buildSvcForOtel("test", OTeldName)
 			g.Expect(otel).ShouldNot(BeNil())
 		}).Should(Succeed())
 	})
 
 	It("should generate config correctly from config yaml", func() {
 		Eventually(func(g Gomega) {
-			otel := buildDaemonsetForOtel(config, "test")
+			otel := buildDaemonsetForOteld(config, "test")
 			g.Expect(otel).ShouldNot(BeNil())
 			g.Expect(otel.Name).Should(Equal("test"))
 		}).Should(Succeed())

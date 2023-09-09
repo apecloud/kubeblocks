@@ -22,6 +22,7 @@ package monitor
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v2"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
@@ -56,9 +57,9 @@ var _ = Describe("monitor_controller", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 
 		By("create cluster & clusterDef")
-		cg, err := NewConfigGenerator(config)
-		Expect(err).NotTo(HaveOccurred())
-		bytes, err := cg.GenerateOteldConfiguration(&datasourceList, &metricsExporterList, &logsExporterList)
+		cg := NewConfigGenerator(config)
+		cfg := cg.GenerateOteldConfiguration(&datasourceList, &metricsExporterList, &logsExporterList)
+		bytes, err := yaml.Marshal(cfg)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(string(bytes)).Should(Equal(""))
 		Expect(true).Should(BeTrue())

@@ -120,7 +120,7 @@ func buildPodSpecForOteld(config *types.Config) *corev1.PodSpec {
 		GetObject().Spec
 }
 
-func buildSvcForOtel(namespace string) *corev1.Service {
+func buildSvcForOtel(namespace string, name string) *corev1.Service {
 	var (
 		svcPort = corev1.ServicePort{
 			Name:       "http",
@@ -146,7 +146,7 @@ func buildSvcForOtel(namespace string) *corev1.Service {
 		}
 	)
 
-	return builder.NewServiceBuilder(namespace, OTeldName).
+	return builder.NewServiceBuilder(namespace, name).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
 		AddPorts(svcPort).

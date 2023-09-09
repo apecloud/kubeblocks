@@ -47,7 +47,7 @@ type OteldConfigGenerater struct {
 	config *types.Config
 }
 
-func NewConfigGenerator(config *types.Config) (*OteldConfigGenerater, error) {
+func NewConfigGenerator(config *types.Config) *OteldConfigGenerater {
 	metricsPipline := &Pipline{
 		ReceiverList: []SimpleReceiver{},
 		ProcessorMap: map[string]bool{},
@@ -58,17 +58,17 @@ func NewConfigGenerator(config *types.Config) (*OteldConfigGenerater, error) {
 		ProcessorMap: map[string]bool{},
 		ExporterMap:  map[string]bool{},
 	}
-	return &OteldConfigGenerater{config: config, metricsPipline: metricsPipline, logsPipline: logsPipline}, nil
+	return &OteldConfigGenerater{config: config, metricsPipline: metricsPipline, logsPipline: logsPipline}
 }
 
-func (cg *OteldConfigGenerater) GenerateOteldConfiguration(datasourceList *v1alpha1.CollectorDataSourceList, metricsExporterList *v1alpha1.MetricsExporterSinkList, logsExporterList *v1alpha1.LogsExporterSinkList) ([]byte, error) {
+func (cg *OteldConfigGenerater) GenerateOteldConfiguration(datasourceList *v1alpha1.CollectorDataSourceList, metricsExporterList *v1alpha1.MetricsExporterSinkList, logsExporterList *v1alpha1.LogsExporterSinkList) yaml.MapSlice {
 	cfg := yaml.MapSlice{}
 	cfg = cg.appendReceiver(cfg, datasourceList)
 	cfg = cg.appendProcessor(cfg)
 	cfg = cg.appendExporter(cfg, metricsExporterList, logsExporterList)
 	cfg = cg.appendServices(cfg, datasourceList, metricsExporterList, logsExporterList)
 
-	return yaml.Marshal(cfg)
+	return cfg
 }
 
 func (cg *OteldConfigGenerater) appendReceiver(cfg yaml.MapSlice, datasourceList *v1alpha1.CollectorDataSourceList) yaml.MapSlice {
@@ -222,14 +222,14 @@ func (cg *OteldConfigGenerater) buildPiplineItem() yaml.MapItem {
 		}
 		if len(receiverMap) > 0 {
 			receiverSlice := []string{}
-			for receiverName, _ := range receiverMap {
+			for receiverName := range receiverMap {
 				receiverSlice = append(receiverSlice, receiverName)
 			}
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 		}
 		if len(exporterMap) > 0 {
 			exporterSlice := []string{}
-			for exporterName, _ := range exporterMap {
+			for exporterName := range exporterMap {
 				exporterSlice = append(exporterSlice, exporterName)
 			}
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
@@ -260,9 +260,9 @@ func (cg *OteldConfigGenerater) buildPipline(datasourceList *v1alpha1.CollectorD
 		if datasource.KubeletStateConfig != nil && datasource.KubeletStateConfig.Enabled {
 			cg.addMetricsPiplineReceiver("apecloudkubeletstats", datasource.ExporterNames)
 		}
-		//if datasource.K8sClusterConfig != nil && datasource.K8sClusterConfig.Enabled {
+		// if datasource.K8sClusterConfig != nil && datasource.K8sClusterConfig.Enabled {
 		//	cg.addMetricsPiplineReceiver("k8s_cluster", datasource.ExporterNames)
-		//}
+		// }
 		if datasource.K8sNodeConfig != nil && datasource.K8sNodeConfig.Enabled {
 			cg.addMetricsPiplineReceiver("apecloudk8snode", datasource.ExporterNames)
 		}

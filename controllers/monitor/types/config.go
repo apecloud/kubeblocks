@@ -117,6 +117,9 @@ type Config struct {
 
 	// Resources is the resource requirements for the oteld
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// UseConfigMap indicates whether to use configmap to store oteld config
+	UseConfigMap bool `json:"useConfigMap"`
 }
 
 func LoadConfig(configFile string) (*Config, error) {

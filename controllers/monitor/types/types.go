@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,12 +38,38 @@ type OTeldParams struct {
 	Recorder record.EventRecorder
 }
 
+type OteldConfig struct {
+	AsMap yaml.MapSlice
+}
+
+type OteldCfgRef struct {
+	Config *OteldConfig
+}
+
 // ReconcileCtx wrapper for reconcile procedure context parameters
 type ReconcileCtx struct {
 	Ctx    context.Context
 	Req    ctrl.Request
 	Log    logr.Logger
 	Config *Config
+
+	OteldCfgRef *OteldCfgRef
+}
+
+func (c *ReconcileCtx) SetOteldConfig(configAsMap yaml.MapSlice) {
+	if c.OteldCfgRef == nil {
+		c.OteldCfgRef = &OteldCfgRef{}
+	}
+	c.OteldCfgRef.Config = &OteldConfig{AsMap: configAsMap}
+}
+
+func (c *ReconcileCtx) GetOteldConfigYaml() ([]byte, error) {
+	if c.OteldCfgRef == nil ||
+		c.OteldCfgRef.Config == nil ||
+		c.OteldCfgRef.Config.AsMap == nil {
+		return nil, cfgcore.MakeError("not found oteld config")
+	}
+	return yaml.Marshal(c.OteldCfgRef.Config.AsMap)
 }
 
 type ReconcileTask interface {
@@ -68,10 +95,11 @@ func NewReconcileTask(name string, task ReconcileFunc) ReconcileTask {
 	}
 	newTask := func(reqCtx ReconcileCtx) error {
 		reqCtx = ReconcileCtx{
-			Ctx:    reqCtx.Ctx,
-			Req:    reqCtx.Req,
-			Log:    reqCtx.Log.WithValues("subTask", name),
-			Config: reqCtx.Config,
+			Ctx:         reqCtx.Ctx,
+			Req:         reqCtx.Req,
+			Log:         reqCtx.Log.WithValues("subTask", name),
+			Config:      reqCtx.Config,
+			OteldCfgRef: reqCtx.OteldCfgRef,
 		}
 		return task(reqCtx)
 	}

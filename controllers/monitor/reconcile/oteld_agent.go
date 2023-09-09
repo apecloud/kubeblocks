@@ -41,7 +41,7 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
 	)
 
-	oteldDaemonset := buildDaemonsetForOteld(reqCtx.Config, namespace)
+	oteldDaemonset := buildDaemonsetForOteld(reqCtx.Config, namespace, OTeldName)
 
 	existingDaemonset := &appsv1.DaemonSet{}
 	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDaemonset)
@@ -66,11 +66,11 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	return k8sClient.Update(reqCtx.Ctx, oteldDaemonset)
 }
 
-func buildDaemonsetForOteld(config *types.Config, namespace string) *appsv1.DaemonSet {
+func buildDaemonsetForOteld(config *types.Config, namespace string, name string) *appsv1.DaemonSet {
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
 		constant.AppNameLabelKey:      OTeldName,
-		constant.AppInstanceLabelKey:  OTeldName,
+		constant.AppInstanceLabelKey:  name,
 		constant.MonitorManagedByKey:  "agamotto",
 	}
 
@@ -88,7 +88,7 @@ func buildDaemonsetForOteld(config *types.Config, namespace string) *appsv1.Daem
 		Spec:       *podSpec,
 	}
 
-	return builder.NewDaemonSetBuilder(namespace, OTeldName).
+	return builder.NewDaemonSetBuilder(namespace, name).
 		SetTemplate(podTemplate).
 		AddLabelsInMap(commonLabels).
 		AddMatchLabelsInMap(commonLabels).

@@ -520,7 +520,7 @@ func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 
 	properties := make(component.Properties)
 	properties["url"] = urlWithPort
-	mysqlOps, _ := NewMysql()
+	mysqlOps := NewMysql()
 	_ = mysqlOps.Init(properties)
 	mysqlOps.Manager.(*mysql.WesqlManager).DB = db
 

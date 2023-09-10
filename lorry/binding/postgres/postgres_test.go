@@ -47,10 +47,7 @@ const (
 )
 
 func TestOperations(t *testing.T) {
-	pgOps, err := NewPostgres()
-	if err != nil {
-		t.Fatal(err)
-	}
+	pgOps := NewPostgres()
 	properties := make(component.Properties)
 	properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
 	_ = pgOps.Init(properties)
@@ -86,10 +83,7 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 
 	// live DB test
-	b, err := NewPostgres()
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := NewPostgres()
 	if err := b.Init(nil); err != nil {
 		t.Fatal(err)
 	}
@@ -206,10 +200,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 	}
 
 	// live DB test
-	b, err := NewPostgres()
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := NewPostgres()
 	properties := make(component.Properties)
 	properties[connectionURLKey] = url
 	if err := b.Init(properties); err != nil {

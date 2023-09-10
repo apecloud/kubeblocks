@@ -39,16 +39,17 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 	return Task{
 		Name: item.Name,
 		Do: func(fetcher *Task, component *component.SynthesizedComponent) error {
-			return plan.NewReconcilePipeline(plan.ReconcileCtx{
+			reconcileTask := plan.NewReconcilePipeline(plan.ReconcileCtx{
 				ResourceCtx: fetcher.ResourceCtx,
 				Cluster:     fetcher.ClusterObj,
 				ClusterVer:  fetcher.ClusterVerObj,
 				Component:   component,
 				PodSpec:     component.PodSpec,
-			}, item, status).ConfigMap().
-				Prepare().
-				ConfigConstraints().
-				// ConfigMap().
+			}, item, status)
+			return reconcileTask.InitConfigSpec().
+				ConfigMap(item.Name).
+				ConfigConstraints(reconcileTask.ConfigSpec().ConfigConstraintRef).
+				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().
 				UpdateConfigVersion().

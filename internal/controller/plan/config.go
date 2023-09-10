@@ -78,7 +78,7 @@ func (c *configOperator) Reconcile() error {
 		CreateConfigTemplate().
 		UpdatePodVolumes().
 		BuildConfigManagerSidecar().
-		UpdateConfigMeta().
+		UpdateConfigRelatedObject().
 		UpdateConfigurationStatus().
 		Complete()
 }
@@ -86,6 +86,6 @@ func (c *configOperator) Reconcile() error {
 func (c *configOperator) UpdateConfiguration() error {
 	return NewCreatePipeline(c.ReconcileCtx).
 		UpdateConfiguration().
-		UpdateConfigMeta().
+		UpdateConfigRelatedObject().
 		Complete()
 }

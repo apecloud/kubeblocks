@@ -38,20 +38,18 @@ type ResourceCtx struct {
 	Namespace     string
 	ClusterName   string
 	ComponentName string
-
-	ConfigConstraint string
 }
 
 type ResourceFetcher[T any] struct {
 	obj *T
 	*ResourceCtx
 
-	ClusterObj       *appsv1alpha1.Cluster
-	ClusterDefObj    *appsv1alpha1.ClusterDefinition
-	ClusterVerObj    *appsv1alpha1.ClusterVersion
-	ConfigurationObj *appsv1alpha1.Configuration
+	ClusterObj    *appsv1alpha1.Cluster
+	ClusterDefObj *appsv1alpha1.ClusterDefinition
+	ClusterVerObj *appsv1alpha1.ClusterVersion
 
 	ConfigMapObj        *corev1.ConfigMap
+	ConfigurationObj    *appsv1alpha1.Configuration
 	ConfigConstraintObj *appsv1alpha1.ConfigConstraint
 
 	ClusterComObj    *appsv1alpha1.ClusterComponentSpec
@@ -132,14 +130,14 @@ func (r *ResourceFetcher[T]) Configuration() *T {
 		Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
 		Namespace: r.Namespace,
 	}
-
-	return r.Wrap(func() error {
+	return r.Wrap(func() (err error) {
 		configuration := appsv1alpha1.Configuration{}
-		err := r.Client.Get(r.Context, configKey, &configuration)
-		if err == nil {
-			r.ConfigurationObj = &configuration
+		err = r.Client.Get(r.Context, configKey, &configuration)
+		if err != nil {
+			return client.IgnoreNotFound(err)
 		}
-		return client.IgnoreNotFound(err)
+		r.ConfigurationObj = &configuration
+		return
 	})
 }
 
@@ -155,15 +153,11 @@ func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) ConfigConstraints() *T {
-	ccKey := client.ObjectKey{
-		Name: r.ConfigConstraint,
-	}
-
+func (r *ResourceFetcher[T]) ConfigConstraints(ccName string) *T {
 	return r.Wrap(func() error {
-		if r.ConfigConstraint != "" {
+		if ccName != "" {
 			r.ConfigConstraintObj = &appsv1alpha1.ConfigConstraint{}
-			return r.Client.Get(r.Context, ccKey, r.ConfigConstraintObj)
+			return r.Client.Get(r.Context, client.ObjectKey{Name: ccName}, r.ConfigConstraintObj)
 		}
 		return nil
 	})

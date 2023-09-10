@@ -163,6 +163,9 @@ func checkAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1al
 	}
 
 	status := foundStatus(item.Name)
+	if status != nil && status.Phase == "" {
+		status.Phase = appsv1alpha1.CInitPhase
+	}
 	if status == nil {
 		updated.Status.ConfigurationItemStatus = append(updated.Status.ConfigurationItemStatus,
 			appsv1alpha1.ConfigurationItemDetailStatus{
@@ -184,7 +187,7 @@ func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
 	})
 }
 
-func (p *pipeline) UpdateConfigMeta() *pipeline {
+func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	updateMeta := func() error {
 		updateResourceAnnotationsWithTemplate(p.ctx.Object, p.renderWrapper.templateAnnotations)
 		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.Component, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
@@ -248,7 +251,7 @@ func (p *updatePipeline) isDone() bool {
 	return !p.reconcile
 }
 
-func (p *updatePipeline) Prepare() *updatePipeline {
+func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 	buildTemplate := func() (err error) {
 		p.reconcile = !isFinish(p.originalCM, p.item)
 		if p.isDone() {
@@ -282,20 +285,14 @@ func isFinish(cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) b
 	return reflect.DeepEqual(target, item)
 }
 
-func (p *updatePipeline) ConfigMap() *updatePipeline {
-	cmKey := client.ObjectKey{
-		Namespace: p.Namespace,
-		Name:      core.GetComponentCfgName(p.ClusterName, p.ComponentName, p.item.Name),
-	}
-	return p.Wrap(func() error {
-		configSpec, err := p.foundConfigSpec(p.item.Name)
-		if err != nil {
-			return err
-		}
-		p.configSpec = configSpec
-		p.originalCM = &corev1.ConfigMap{}
-		p.ConfigConstraint = configSpec.ConfigConstraintRef
-		return p.Client.Get(p.Context, cmKey, p.originalCM)
+func (p *updatePipeline) ConfigSpec() *appsv1alpha1.ComponentConfigSpec {
+	return p.configSpec
+}
+
+func (p *updatePipeline) InitConfigSpec() *updatePipeline {
+	return p.Wrap(func() (err error) {
+		p.configSpec, err = p.foundConfigSpec(p.item.Name)
+		return
 	})
 }
 

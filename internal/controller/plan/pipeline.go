@@ -60,10 +60,11 @@ type updatePipeline struct {
 	reconcile     bool
 	renderWrapper renderWrapper
 
-	item        appsv1alpha1.ConfigurationItemDetail
-	itemStatus  *appsv1alpha1.ConfigurationItemDetailStatus
-	configSpec  *appsv1alpha1.ComponentConfigSpec
-	originalCM  *corev1.ConfigMap
+	item       appsv1alpha1.ConfigurationItemDetail
+	itemStatus *appsv1alpha1.ConfigurationItemDetailStatus
+	configSpec *appsv1alpha1.ComponentConfigSpec
+	// replace of ConfigMapObj
+	// originalCM  *corev1.ConfigMap
 	newCM       *corev1.ConfigMap
 	configPatch *core.ConfigPatchInfo
 
@@ -253,7 +254,7 @@ func (p *updatePipeline) isDone() bool {
 
 func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 	buildTemplate := func() (err error) {
-		p.reconcile = !isFinish(p.originalCM, p.item)
+		p.reconcile = !isFinish(p.ConfigMapObj, p.item)
 		if p.isDone() {
 			return
 		}
@@ -315,10 +316,10 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 		if p.isDone() {
 			return
 		}
-		if needRerender(p.originalCM, p.item) {
+		if needRerender(p.ConfigMapObj, p.item) {
 			p.newCM, err = p.renderWrapper.rerenderConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, &p.item)
 		} else {
-			p.newCM = p.originalCM
+			p.newCM = p.ConfigMapObj
 		}
 		return
 	})
@@ -379,10 +380,10 @@ func (p *updatePipeline) Sync() *updatePipeline {
 		switch {
 		case p.isDone():
 			return nil
-		case p.originalCM == nil && p.newCM != nil:
+		case p.ConfigMapObj == nil && p.newCM != nil:
 			return p.Client.Create(p.Context, p.newCM)
-		case p.originalCM != nil:
-			patch := client.MergeFrom(p.originalCM)
+		case p.ConfigMapObj != nil:
+			patch := client.MergeFrom(p.ConfigMapObj)
 			return p.Client.Patch(p.Context, p.newCM, patch)
 		}
 		return core.MakeError("unexpected condition")

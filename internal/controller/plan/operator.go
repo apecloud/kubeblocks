@@ -22,12 +22,12 @@ package plan
 import (
 	"context"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type configOperator struct {

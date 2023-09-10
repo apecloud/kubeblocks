@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apecloud/kubeblocks/lorry/component/kafka/thirdparty"
+
 	"github.com/go-logr/logr"
 
 	"github.com/Shopify/sarama"
@@ -40,7 +42,7 @@ type Kafka struct {
 	subscribeTopics TopicHandlerConfig
 	subscribeLock   sync.Mutex
 
-	backOffConfig Config
+	backOffConfig thirdparty.Config
 
 	// The default value should be true for kafka pubsub component and false for kafka binding component
 	// This default value can be overridden by metadata consumeRetryEnabled
@@ -119,7 +121,7 @@ func (k *Kafka) Init(_ context.Context, metadata map[string]string) error {
 
 	// Default retry configuration is used if no
 	// backOff properties are set.
-	if err := DecodeConfigWithPrefix(
+	if err := thirdparty.DecodeConfigWithPrefix(
 		&k.backOffConfig,
 		metadata,
 		"backOff"); err != nil {

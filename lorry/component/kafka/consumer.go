@@ -21,6 +21,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/apecloud/kubeblocks/lorry/component/kafka/thirdparty"
+
 	"github.com/Shopify/sarama"
 	"github.com/cenkalti/backoff/v4"
 )
@@ -44,7 +46,7 @@ func (consumer *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 			}
 
 			if consumer.k.consumeRetryEnabled {
-				if err := NotifyRecover(func() error {
+				if err := thirdparty.NotifyRecover(func() error {
 					return consumer.doCallback(session, message)
 				}, b, func(err error, d time.Duration) {
 					consumer.k.logger.Error(err, fmt.Sprintf("Error processing Kafka message: %s/%d/%d [key=%s]. Retrying...", message.Topic, message.Partition, message.Offset, asBase64String(message.Key)))
@@ -177,7 +179,7 @@ func (k *Kafka) Subscribe(ctx context.Context) error {
 
 			// Consume the requested topics
 			bo := backoff.WithContext(backoff.NewConstantBackOff(k.consumeRetryInterval), ctx)
-			innerErr := NotifyRecover(func() error {
+			innerErr := thirdparty.NotifyRecover(func() error {
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return backoff.Permanent(ctxErr)
 				}

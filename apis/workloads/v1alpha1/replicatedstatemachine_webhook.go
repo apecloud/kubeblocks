@@ -97,7 +97,7 @@ func (r *ReplicatedStateMachine) validate() error {
 	}
 
 	// servicePort must provide if spec.service is not nil
-	if r.Spec.Service != nil && len(r.Spec.Service.Ports) == 0 {
+	if r.Spec.Service != nil && len(r.Spec.Service.Spec.Ports) == 0 {
 		allErrs = append(allErrs,
 			field.Required(field.NewPath("spec.service.ports"),
 				"servicePort must provide"))

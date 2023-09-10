@@ -26,7 +26,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/utils"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type AddonsInstaller struct {

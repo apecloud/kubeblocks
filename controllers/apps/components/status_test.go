@@ -167,7 +167,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				})).Should(Succeed())
 				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+						testk8s.MockRSMReady(rsm, pod)
 					})).Should(Succeed())
 				}
 
@@ -261,7 +261,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				})).Should(Succeed())
 				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+						testk8s.MockRSMReady(rsm, pods...)
 					})).Should(Succeed())
 				}
 
@@ -352,7 +352,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				})).Should(Succeed())
 				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+						testk8s.MockRSMReady(rsm, pods...)
 					})).Should(Succeed())
 				}
 
@@ -457,7 +457,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				})).Should(Succeed())
 				if intctrlutil.IsRSMEnabled() {
 					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-						testk8s.MockRSMReady(rsm)
+						testk8s.MockRSMReady(rsm, pods...)
 					})).Should(Succeed())
 				}
 

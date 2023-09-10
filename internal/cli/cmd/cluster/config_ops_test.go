@@ -26,6 +26,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -34,7 +36,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -107,6 +108,7 @@ var _ = Describe("reconfigure test", func() {
 			},
 		}
 		o.KeyValues = make(map[string]*string)
+		o.HasPatch = true
 		defer ttf.Cleanup()
 
 		By("validate reconfiguring parameters")

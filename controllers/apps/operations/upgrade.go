@@ -66,11 +66,6 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleComponentStatusProgress)
 }
 
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (u upgradeOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return realAffectedComponentMap(opsRequest.GetUpgradeComponentNameSet())
-}
-
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compsStatus, err := u.getUpgradeComponentsStatus(reqCtx, cli, opsRes)

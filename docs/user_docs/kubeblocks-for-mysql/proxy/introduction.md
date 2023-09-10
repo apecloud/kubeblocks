@@ -16,8 +16,6 @@ ApeCloud MySQL Proxy is a database proxy designed to be highly compatible with M
 
 ApeCloud MySQL Proxy is a fork of the Vitess project and the support for sharding is removed in exchange for better SQL compatibility, for example, better support for subqueries, Common Table Expressions (CTE) and expression evaluation. The below graph displays the architecture of a proxy cluster.
 
-![Proxy architecture](../../../img/proxy-architecture.png)
-
 **VTGate**: Client application usually connects to VTGate via standard MySQL wire protocol. VTGate is stateless, which means it can be easily and effectively scaled in terms of size and performance. It acts like a MySQL and is responsible for parsing SQL queries, as well as planning and routing queries to VTTables.
 
 **VTTablet**: Typically, VTTablet is implemented as a sidecar for MySQL. If ApeCloud MySQL Proxy is deployed in Kubernetes, VTTablet should be in the same pod as MySQL. VTTablet accepts gRPC requests from VTGate and then sends those queries to be executed on MySQL. The VTTablet takes care of a few tasks such as permission checking and logging, but its most critical role is to ensure proper connection pooling.

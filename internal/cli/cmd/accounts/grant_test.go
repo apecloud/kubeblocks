@@ -34,7 +34,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 var _ = Describe("Grant Account Options", func() {
@@ -81,18 +81,18 @@ var _ = Describe("Grant Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			for _, op := range []channelutil.OperationKind{channelutil.GrantUserRoleOp, channelutil.RevokeUserRoleOp} {
+			for _, op := range []lorryutil.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 			}
-			for _, op := range []channelutil.OperationKind{channelutil.CreateUserOp, channelutil.DeleteUserOp, channelutil.DescribeUserOp, channelutil.ListUsersOp} {
+			for _, op := range []lorryutil.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp, lorryutil.DescribeUserOp, lorryutil.ListUsersOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).Should(BeNil())
 			}
 		})
 
 		It("validate options", func() {
-			for _, op := range []channelutil.OperationKind{channelutil.GrantUserRoleOp, channelutil.RevokeUserRoleOp} {
+			for _, op := range []lorryutil.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 				args := []string{}
@@ -116,7 +116,7 @@ var _ = Describe("Grant Account Options", func() {
 		})
 
 		It("complete option", func() {
-			o := NewGrantOptions(tf, streams, channelutil.GrantUserRoleOp)
+			o := NewGrantOptions(tf, streams, lorryutil.GrantUserRoleOp)
 			Expect(o).ShouldNot(BeNil())
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName

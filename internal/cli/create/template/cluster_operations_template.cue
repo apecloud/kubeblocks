@@ -35,7 +35,8 @@ options: {
 	storage:  string
 	vctNames: [...string]
 	keyValues: [string]: {string | null}
-  fileContent: string
+	hasPatch:        bool
+	fileContent:     string
 	cfgTemplateName: string
 	cfgFile:         string
 	forceRestart:    bool
@@ -131,10 +132,12 @@ content: {
 						if options.fileContent != "" {
 							fileContent: options.fileContent
 						}
-						parameters: [ for k, v in options.keyValues {
-							key:   k
-							value: v
-						}]
+						if options.hasPatch {
+							parameters: [ for k, v in options.keyValues {
+								key:   k
+								value: v
+							}]
+						}
 					}]
 				}]
 			}

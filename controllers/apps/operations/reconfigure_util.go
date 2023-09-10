@@ -24,31 +24,38 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/spf13/cast"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type reconfiguringResult struct {
 	failed               bool
 	noFormatFilesUpdated bool
-	configPatch          *cfgcore.ConfigPatchInfo
+	configPatch          *core.ConfigPatchInfo
 	lastAppliedConfigs   map[string]string
 	err                  error
 }
 
+type updateReconfigureStatus func(params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) error
+
+// Deprecated: use NewPipeline instead
 // updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
 func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
 	ctx context.Context,
 	cli client.Client,
-	opsCrName string) reconfiguringResult {
+	opsCrName string,
+	updater updateReconfigureStatus) reconfiguringResult {
 	var (
 		cm = &corev1.ConfigMap{}
 		cc = &appsv1alpha1.ConfigConstraint{}
@@ -68,29 +75,35 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 	}
 
 	updatedFiles := make(map[string]string, len(config.Keys))
-	updatedParams := make([]cfgcore.ParamPairs, 0, len(config.Keys))
+	updatedParams := make([]core.ParamPairs, 0, len(config.Keys))
 	for _, key := range config.Keys {
 		if key.FileContent != "" {
 			updatedFiles[key.Key] = key.FileContent
-			continue
 		}
 		if len(key.Parameters) > 0 {
-			updatedParams = append(updatedParams, cfgcore.ParamPairs{
+			updatedParams = append(updatedParams, core.ParamPairs{
 				Key:           key.Key,
-				UpdatedParams: fromKeyValuePair(key.Parameters)})
+				UpdatedParams: fromKeyValuePair(key.Parameters),
+			})
 		}
 	}
 
-	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc.Spec, configSpec); err != nil {
+	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc, configSpec); err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
-	configPatch, restart, err := cfgcore.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, configSpec.Keys, len(updatedFiles) != 0)
+	configPatch, restart, err := core.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, configSpec.Keys, len(updatedFiles) != 0)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}
 	if !restart && !configPatch.IsModify {
 		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
 	}
+	if updater != nil {
+		if err := updater(updatedParams, cm.Data, cc.Spec.FormatterConfig); err != nil {
+			return makeReconfiguringResult(err)
+		}
+	}
+
 	return makeReconfiguringResult(
 		syncConfigmap(cm, newCfg, cli, ctx, opsCrName, configSpec, &cc.Spec, config.Policy),
 		withReturned(newCfg, configPatch),
@@ -99,22 +112,31 @@ func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
 
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
-	updatedParams []cfgcore.ParamPairs,
-	cc appsv1alpha1.ConfigConstraintSpec,
+	updatedParams []core.ParamPairs,
+	cc *appsv1alpha1.ConfigConstraint,
 	tpl appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
 	updatedConfig := base
 
 	// merge updated files into configmap
 	if len(updatedFiles) != 0 {
-		updatedConfig = cfgcore.MergeUpdatedConfig(base, updatedFiles)
+		return core.MergeUpdatedConfig(base, updatedFiles), nil
 	}
-	if len(updatedParams) == 0 {
+	if cc == nil {
 		return updatedConfig, nil
 	}
-	return cfgcore.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
+	return intctrlutil.MergeAndValidateConfigs(cc.Spec, updatedConfig, tpl.Keys, updatedParams)
 }
 
-func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec, policy *appsv1alpha1.UpgradePolicy) error {
+func syncConfigmap(
+	cmObj *corev1.ConfigMap,
+	newCfg map[string]string,
+	cli client.Client,
+	ctx context.Context,
+	opsCrName string,
+	configSpec appsv1alpha1.ComponentConfigSpec,
+	cc *appsv1alpha1.ConfigConstraintSpec,
+	policy *appsv1alpha1.UpgradePolicy) error {
+
 	patch := client.MergeFrom(cmObj.DeepCopy())
 	cmObj.Data = newCfg
 	if cmObj.Annotations == nil {
@@ -124,11 +146,66 @@ func syncConfigmap(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client
 		cmObj.Annotations[constant.UpgradePolicyAnnotationKey] = string(*policy)
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
-	cfgcore.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
+	core.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
 	if err := plan.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
 		return err
 	}
 	return cli.Patch(ctx, cmObj, patch)
+}
+
+func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.ParamPairs, orinalData map[string]string, formatter *appsv1alpha1.FormatterConfig) {
+	var maxLabelCount = 16
+	updateLabel := func(param map[string]interface{}) {
+		if obj.Labels == nil {
+			obj.Labels = make(map[string]string)
+		}
+		for key, val := range param {
+			if maxLabelCount <= 0 {
+				return
+			}
+			maxLabelCount--
+			obj.Labels[key] = core.FromValueToString(val)
+		}
+	}
+	updateAnnotation := func(keyFile string, param map[string]interface{}) {
+		data, ok := orinalData[keyFile]
+		if !ok {
+			return
+		}
+		if obj.Annotations == nil {
+			obj.Annotations = make(map[string]string)
+		}
+		oldValue, err := fetchOriginalValue(keyFile, data, param, formatter)
+		if err != nil {
+			log.Log.Error(err, "failed to fetch original value")
+			return
+		}
+		obj.Annotations[keyFile] = oldValue
+	}
+
+	for _, param := range params {
+		updateLabel(param.UpdatedParams)
+		if maxLabelCount <= 0 {
+			return
+		}
+		updateAnnotation(param.Key, param.UpdatedParams)
+	}
+}
+
+func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1alpha1.FormatterConfig) (string, error) {
+	baseConfigObj, err := core.FromConfigObject(keyFile, data, formatter)
+	if err != nil {
+		return "", err
+	}
+	r := make(map[string]string, len(params))
+	for key := range params {
+		oldVal := baseConfigObj.Get(key)
+		if oldVal != nil {
+			r[key] = cast.ToString(oldVal)
+		}
+	}
+	b, err := json.Marshal(r)
+	return string(b), err
 }
 
 func fromKeyValuePair(parameters []appsv1alpha1.ParameterPair) map[string]interface{} {
@@ -149,7 +226,7 @@ func withFailed(failed bool) func(result *reconfiguringResult) {
 	}
 }
 
-func withReturned(configs map[string]string, patch *cfgcore.ConfigPatchInfo) func(result *reconfiguringResult) {
+func withReturned(configs map[string]string, patch *core.ConfigPatchInfo) func(result *reconfiguringResult) {
 	return func(result *reconfiguringResult) {
 		result.lastAppliedConfigs = configs
 		result.configPatch = patch
@@ -182,7 +259,7 @@ func getConfigSpecName(configSpec []appsv1alpha1.ComponentConfigSpec) []string {
 }
 
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
-	if result.configPatch.IsModify || result.noFormatFilesUpdated {
+	if result.noFormatFilesUpdated || result.configPatch.IsModify {
 		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureMerged,
@@ -221,7 +298,7 @@ func b2sMap(config map[string][]byte) map[string]string {
 
 func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error {
 	if !isInvalid {
-		return cfgcore.WrapError(err, "failed to update param!")
+		return core.WrapError(err, "failed to update param!")
 	}
 
 	// if failed to validate configure, set opsRequest to failed and return
@@ -230,28 +307,17 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	return nil
 }
 
-func formatConfigPatchToMessage(configPatch *cfgcore.ConfigPatchInfo, execStatus *cfgcore.PolicyExecStatus) string {
+func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *core.PolicyExecStatus) string {
 	policyName := ""
 	if execStatus != nil {
 		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
+	}
+	if configPatch == nil {
+		return fmt.Sprintf("%supdated full config files.", policyName)
 	}
 	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
 		policyName,
 		configPatch.UpdateConfig,
 		configPatch.AddConfig,
 		configPatch.DeleteConfig)
-}
-
-func getClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, cli client.Client, ctx context.Context) error {
-	if cvName == "" {
-		return nil
-	}
-	clusterVersionKey := client.ObjectKey{
-		Namespace: "",
-		Name:      cvName,
-	}
-	if err := cli.Get(ctx, clusterVersionKey, cv); err != nil {
-		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cvName)
-	}
-	return nil
 }

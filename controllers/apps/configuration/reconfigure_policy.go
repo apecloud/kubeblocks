@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -78,7 +78,7 @@ type reconfigureParams struct {
 	ConfigSpecName string
 
 	// Configuration files patch.
-	ConfigPatch *cfgcore.ConfigPatchInfo
+	ConfigPatch *core.ConfigPatchInfo
 
 	// Configmap object of the configuration template instance in the component.
 	ConfigMap *corev1.ConfigMap
@@ -197,14 +197,14 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(appsv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
-	if !cfgPatch.IsModify {
+func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.ConfigPatchInfo, policy appsv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+	if cfgPatch != nil && !cfgPatch.IsModify {
 		// not walk here
-		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)
+		return nil, core.MakeError("cfg not modify. [%v]", cfgPatch)
 	}
 
 	if enableAutoDecision(restart, policy) {
-		if dynamicUpdate, err := cfgcore.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
+		if dynamicUpdate, err := core.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
 			policy = appsv1alpha1.AutoReload
@@ -219,7 +219,7 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgco
 	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil
 	}
-	return nil, cfgcore.MakeError("not supported upgrade policy:[%s]", policy)
+	return nil, core.MakeError("not supported upgrade policy:[%s]", policy)
 }
 
 func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
@@ -236,11 +236,11 @@ func enableSyncTrigger(options *appsv1alpha1.ReloadOptions) bool {
 	}
 
 	if options.TPLScriptTrigger != nil {
-		return !cfgcore.IsWatchModuleForTplTrigger(options.TPLScriptTrigger)
+		return !core.IsWatchModuleForTplTrigger(options.TPLScriptTrigger)
 	}
 
 	if options.ShellTrigger != nil {
-		return !cfgcore.IsWatchModuleForShellTrigger(options.ShellTrigger)
+		return !core.IsWatchModuleForShellTrigger(options.ShellTrigger)
 	}
 	return false
 }
@@ -260,8 +260,8 @@ func withExpected(expectedCount int32) func(status *ReturnedStatus) {
 func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) ReturnedStatus {
 	ret := ReturnedStatus{
 		Status:        status,
-		SucceedCount:  cfgcore.Unconfirmed,
-		ExpectedCount: cfgcore.Unconfirmed,
+		SucceedCount:  core.Unconfirmed,
+		ExpectedCount: core.Unconfirmed,
 	}
 	for _, o := range ops {
 		o(&ret)

@@ -14,9 +14,9 @@ spec:
       hooks:
         containerName: mysql
         preCommands:
-        - "touch /data/mysql/data/.restore; sync"
+        - "touch {{ .Values.mysqlConfigs.dataDir }}/.restore; sync"
         postCommands:
-        - "rm -f /data/mysql/data/.restore; sync"
+        - "rm -f {{ .Values.mysqlConfigs.dataDir }}/.restore; sync"
       target:
         role: leader
     datafile:

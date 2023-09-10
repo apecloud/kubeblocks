@@ -24,9 +24,9 @@ import (
 
 	"go.uber.org/zap"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )

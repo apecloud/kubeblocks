@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -79,11 +79,11 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 
 	// Generate Pod Volumes for ConfigMap objects
 	if err := intctrlutil.CreateOrUpdatePodVolumes(podSpec, renderWrapper.volumes); err != nil {
-		return cfgcore.WrapError(err, "failed to generate pod volume")
+		return core.WrapError(err, "failed to generate pod volume")
 	}
 
 	if err := buildConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
-		return cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
+		return core.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
 	if err := injectTemplateEnvFrom(cluster, component, podSpec, cli, ctx, renderWrapper.renderedObjs); err != nil {
@@ -99,7 +99,7 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 				return err
 			}
 			// for update script cm
-			if cfgcore.IsSchedulableConfigResource(obj) {
+			if core.IsSchedulableConfigResource(obj) {
 				continue
 			}
 			if err := cli.Update(ctx, obj); err != nil {
@@ -256,7 +256,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 	volumeDirs := make([]corev1.VolumeMount, 0, len(configSpecs)+1)
 	for _, configSpec := range usingConfigSpecs {
 		// Ignore config template, e.g scripts configmap
-		if !cfgcore.NeedReloadVolume(configSpec) {
+		if !core.NeedReloadVolume(configSpec) {
 			continue
 		}
 		sets := cfgutil.NewSet()

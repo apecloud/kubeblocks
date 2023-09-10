@@ -341,6 +341,7 @@ func injectHttp2Shell(pod *corev1.PodSpec) {
 func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
 	port []int32, path, usage string,
 	credentialEnv []corev1.EnvVar) {
+	// todo: uncomment to enable new lorry way
 	// actions := probeSetting.Actions
 	// volumeMount := corev1.VolumeMount{
 	//	Name:      constant.ProbeAgentMountName,

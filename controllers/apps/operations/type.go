@@ -46,26 +46,13 @@ type OpsHandler interface {
 	// SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration,
 	// and this method will be executed together when opsRequest in running.
 	SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
-
-	// GetRealAffectedComponentMap returns a component map that is actually affected by the opsRequest.
-	// when MaintainClusterPhaseBySelf of the opsBehaviour is true,
-	// will change the phase of the component to Updating after Action is done which exists in this map.
-	// Deprecated: will be removed soon.
-	GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap
 }
-
-type realAffectedComponentMap map[string]struct{}
 
 type OpsBehaviour struct {
 	FromClusterPhases []appsv1alpha1.ClusterPhase
 
 	// ToClusterPhase indicates that the cluster will enter this phase during the operation.
 	ToClusterPhase appsv1alpha1.ClusterPhase
-
-	// MaintainClusterPhaseBySelf indicates whether the operation will maintain cluster/component phase by itself.
-	// Generally, the cluster/component phase will be maintained by cluster controller, but if the operation will not update
-	// StatefulSet/Deployment by Cluster controller and make pod rebuilt, maintain the cluster/component phase by self.
-	MaintainClusterPhaseBySelf bool
 
 	// ProcessingReasonInClusterCondition indicates the reason of the condition that type is "OpsRequestProcessed" in Cluster.Status.Conditions and
 	// is only valid when ToClusterPhase is not empty. it will indicate what operation the cluster is doing and
@@ -116,4 +103,6 @@ const (
 	ProcessingReasonVersionUpgrading = "VersionUpgrading"
 	// ProcessingReasonSwitchovering is the reason of the "OpsRequestProcessed" condition for the switchover opsRequest processing in cluster.
 	ProcessingReasonSwitchovering = "Switchovering"
+	// ProcessingReasonBackup is the reason of the "OpsRequestProcessed" condition for the backup opsRequest processing in cluster.
+	ProcessingReasonBackup = "Backup"
 )

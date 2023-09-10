@@ -1,0 +1,59 @@
+# Build the dataprotection binary
+ARG DIST_IMG=gcr.io/distroless/static:nonroot
+
+ARG GO_VERSION=1.20
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
+
+## docker buildx build injected build-args:
+#BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
+#BUILDOS — os component of BUILDPLATFORM, e.g. linux
+#BUILDARCH — e.g. amd64, arm64, riscv64
+#BUILDVARIANT — used to set ARM variant, e.g. v7
+#TARGETPLATFORM — The value set with --platform flag on build
+#TARGETOS - OS component from --platform, e.g. linux
+#TARGETARCH - Architecture from --platform, e.g. arm64
+#TARGETVARIANT
+
+ARG TARGETOS
+ARG TARGETARCH
+
+ARG GOPROXY
+#ARG GOPROXY=https://goproxy.cn
+ARG LD_FLAGS="-s -w"
+
+ENV GOPROXY=${GOPROXY}
+
+WORKDIR /src
+# Copy the Go Modules manifests
+#COPY go.mod go.mod
+#COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Copy the go source
+#COPY cmd/manager/main.go cmd/manager/main.go
+#COPY cmd/manager/ cmd/manager/
+#COPY apis/ apis/
+#COPY internal/ internal/
+#COPY controllers/ controllers/
+#COPY test/testdata/testdata.go test/testdata/testdata.go
+
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go env && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -o /out/dataprotection ./cmd/dataprotection/main.go
+
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM ${DIST_IMG} as dist
+
+WORKDIR /
+COPY --from=builder /out/dataprotection .
+USER 65532:65532
+
+ENTRYPOINT ["/dataprotection"]

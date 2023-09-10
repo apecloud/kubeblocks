@@ -39,7 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
@@ -224,6 +224,9 @@ func generateParameterSchema(paramName string, property apiext.JSONSchemaProps) 
 			return nil, err
 		}
 		pt.miniNum = b
+	}
+	if property.Format != "" {
+		pt.valueType = property.Format
 	}
 	if property.Maximum != nil {
 		b, err := toString(property.Maximum)

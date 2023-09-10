@@ -164,13 +164,12 @@ const (
 
 const (
 	// define the cluster condition type
-	ConditionTypeLatestOpsRequestProcessed = "LatestOpsRequestProcessed" // ConditionTypeLatestOpsRequestProcessed describes whether the latest OpsRequest that affect the cluster lifecycle has been processed.
-	ConditionTypeHaltRecovery              = "HaltRecovery"              // ConditionTypeHaltRecovery describe Halt recovery processing stage
-	ConditionTypeProvisioningStarted       = "ProvisioningStarted"       // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
-	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
-	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready
-	ConditionTypeReady                     = "Ready"                     // ConditionTypeReady all components are running
-	ConditionTypeSwitchoverPrefix          = "Switchover-"               // ConditionTypeSwitchoverPrefix component status condition of switchover
+	ConditionTypeHaltRecovery        = "HaltRecovery"        // ConditionTypeHaltRecovery describe Halt recovery processing stage
+	ConditionTypeProvisioningStarted = "ProvisioningStarted" // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
+	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
+	ConditionTypeReplicasReady       = "ReplicasReady"       // ConditionTypeReplicasReady all pods of components are ready
+	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components are running
+	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
 // Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase
@@ -211,7 +210,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup}
 type OpsType string
 
 const (
@@ -226,6 +225,7 @@ const (
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
 	ExposeType            OpsType = "Expose"
 	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
+	BackupType            OpsType = "Backup"
 )
 
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.

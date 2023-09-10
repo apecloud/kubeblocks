@@ -34,7 +34,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 var _ = Describe("Base Account Options", func() {
@@ -81,16 +81,16 @@ var _ = Describe("Base Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			for _, op := range []channelutil.OperationKind{channelutil.CreateUserOp, channelutil.DeleteUserOp,
-				channelutil.ListUsersOp, channelutil.DescribeUserOp,
-				channelutil.GrantUserRoleOp, channelutil.RevokeUserRoleOp} {
+			for _, op := range []lorryutil.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp,
+				lorryutil.ListUsersOp, lorryutil.DescribeUserOp,
+				lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
 				o := NewAccountBaseOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 			}
 		})
 
 		It("validate options", func() {
-			o := NewAccountBaseOptions(tf, streams, channelutil.CreateUserOp)
+			o := NewAccountBaseOptions(tf, streams, lorryutil.CreateUserOp)
 			Expect(o).ShouldNot(BeNil())
 			args := []string{}
 			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
@@ -117,7 +117,7 @@ var _ = Describe("Base Account Options", func() {
 		})
 
 		It("complete option", func() {
-			o := NewAccountBaseOptions(tf, streams, channelutil.CreateUserOp)
+			o := NewAccountBaseOptions(tf, streams, lorryutil.CreateUserOp)
 			Expect(o).ShouldNot(BeNil())
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName

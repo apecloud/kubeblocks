@@ -65,7 +65,6 @@ const (
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBProbeImage             = "KUBEBLOCKS_PROBE_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
-	KBChartsImage            = "KUBEBLOCKS_CHARTS_IMAGE"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
 
@@ -291,7 +290,7 @@ const (
 
 const (
 	// dataProtection env names
-
+	DPTargetPodName            = "DP_TARGET_POD_NAME"
 	DPDBHost                   = "DB_HOST"                     // db host for dataProtection
 	DPDBUser                   = "DB_USER"                     // db user for dataProtection
 	DPDBPassword               = "DB_PASSWORD"                 // db password for dataProtection

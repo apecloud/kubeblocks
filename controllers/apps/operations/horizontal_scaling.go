@@ -85,22 +85,6 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
-// GetRealAffectedComponentMap gets the real affected component map for the operation
-func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	realChangedMap := realAffectedComponentMap{}
-	hsMap := opsRequest.Spec.ToHorizontalScalingListToMap()
-	for k, v := range opsRequest.Status.LastConfiguration.Components {
-		currHs, ok := hsMap[k]
-		if !ok {
-			continue
-		}
-		if v.Replicas == nil || *v.Replicas != currHs.Replicas {
-			realChangedMap[k] = struct{}{}
-		}
-	}
-	return realChangedMap
-}
-
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest

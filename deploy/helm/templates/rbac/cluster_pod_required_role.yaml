@@ -14,7 +14,7 @@ aggregationRule:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeblocks-sqlchannel-pod-role
+  name: kubeblocks-lorry-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/required-by: pod

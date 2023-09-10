@@ -31,7 +31,7 @@ import (
 	"text/template/parse"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
@@ -114,7 +114,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 			if err != nil {
 				return err
 			}
-			newConfig, err := cfgcore.ApplyConfigPatch(b, cfgcore.FromStringPointerMap(updatedParams), formatConfig)
+			newConfig, err := core.ApplyConfigPatch(b, core.FromStringPointerMap(updatedParams), formatConfig)
 			if err != nil {
 				return err
 			}
@@ -124,8 +124,8 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 }
 
 func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *appsv1alpha1.FormatterConfig) (map[string]string, error) {
-	patchOption := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
+	patchOption := core.CfgOption{
+		Type:    core.CfgTplType,
 		CfgType: formatCfg.Format,
 		Log:     logger,
 	}
@@ -139,15 +139,15 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	if err != nil {
 		return nil, err
 	}
-	patch, err := cfgcore.CreateMergePatch(&cfgcore.ConfigResource{ConfigData: oldData}, &cfgcore.ConfigResource{ConfigData: newData}, patchOption)
+	patch, err := core.CreateMergePatch(&core.ConfigResource{ConfigData: oldData}, &core.ConfigResource{ConfigData: newData}, patchOption)
 	if err != nil {
 		return nil, err
 	}
 
-	params := cfgcore.GenerateVisualizedParamsList(patch, formatCfg, nil)
+	params := core.GenerateVisualizedParamsList(patch, formatCfg, nil)
 	r := make(map[string]string)
 	for _, key := range params {
-		if key.UpdateType != cfgcore.DeletedType {
+		if key.UpdateType != core.DeletedType {
 			for _, p := range key.Parameters {
 				if p.Value != nil {
 					r[p.Key] = *p.Value
@@ -208,7 +208,7 @@ func createFileRegex(fileRegex string) (regexFilter, error) {
 
 	regxPattern, err := regexp.Compile(fileRegex)
 	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to create regexp [%s]", fileRegex)
+		return nil, core.WrapError(err, "failed to create regexp [%s]", fileRegex)
 	}
 	return func(s string) bool {
 		return regxPattern.MatchString(s)

@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 // CfgManagerBuildParams is the params for building config manager sidecar
@@ -84,7 +84,7 @@ func ValidateReloadOptions(reloadOptions *appsv1alpha1.ReloadOptions, cli client
 	case reloadOptions.TPLScriptTrigger != nil:
 		return checkTPLScriptTrigger(reloadOptions.TPLScriptTrigger, cli, ctx)
 	}
-	return cfgutil.MakeError("require special reload type!")
+	return core.MakeError("require special reload type!")
 }
 
 func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Client, ctx context.Context) error {
@@ -97,7 +97,7 @@ func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Cl
 
 func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
 	if len(options.Command) == 0 {
-		return cfgutil.MakeError("required shell trigger")
+		return core.MakeError("required shell trigger")
 	}
 	return nil
 }
@@ -105,7 +105,7 @@ func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
 func checkSignalTrigger(options *appsv1alpha1.UnixSignalTrigger) error {
 	signal := options.Signal
 	if !IsValidUnixSignal(signal) {
-		return cfgutil.MakeError("this special signal [%s] is not supported now.", signal)
+		return core.MakeError("this special signal [%s] is not supported now.", signal)
 	}
 	return nil
 }
@@ -113,7 +113,7 @@ func checkSignalTrigger(options *appsv1alpha1.UnixSignalTrigger) error {
 func CreateCfgRegexFilter(regexString string) (NotifyEventFilter, error) {
 	regxPattern, err := regexp.Compile(regexString)
 	if err != nil {
-		return nil, cfgutil.WrapError(err, "failed to create regexp [%s]", regexString)
+		return nil, core.WrapError(err, "failed to create regexp [%s]", regexString)
 	}
 
 	return func(event fsnotify.Event) (bool, error) {
@@ -138,7 +138,7 @@ func CreateValidConfigMapFilter() NotifyEventFilter {
 func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) ([]ConfigSpecMeta, error) {
 	var reloadConfigSpecMeta []ConfigSpecMeta
 	for _, configSpec := range configSpecs {
-		if !cfgutil.NeedReloadVolume(configSpec) {
+		if !core.NeedReloadVolume(configSpec) {
 			continue
 		}
 		ccKey := client.ObjectKey{
@@ -147,7 +147,7 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 		}
 		cc := &appsv1alpha1.ConfigConstraint{}
 		if err := cli.Get(ctx, ccKey, cc); err != nil {
-			return nil, cfgutil.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+			return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
 		reloadOptions := cc.Spec.ReloadOptions
 		if !IsSupportReload(reloadOptions) {

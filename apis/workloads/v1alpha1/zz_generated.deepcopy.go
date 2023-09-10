@@ -232,7 +232,7 @@ func (in *ReplicatedStateMachineSpec) DeepCopyInto(out *ReplicatedStateMachineSp
 	}
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
-		*out = new(corev1.ServiceSpec)
+		*out = new(corev1.Service)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.AlternativeServices != nil {

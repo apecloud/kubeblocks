@@ -103,9 +103,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		return nil, err
 	}
 
-	// patch cluster.status after updating cluster.spec.
-	// because cluster controller probably reconciles status.phase to Running if cluster is not updated.
-	return nil, patchClusterStatusAndRecordEvent(reqCtx, cli, opsRes, opsBehaviour)
+	return nil, nil
 }
 
 // Reconcile entry function when OpsRequest.status.phase is Running.

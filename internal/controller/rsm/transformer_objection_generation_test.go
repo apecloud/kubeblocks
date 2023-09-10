@@ -30,6 +30,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
@@ -37,6 +39,8 @@ var _ = Describe("object generation transformer test.", func() {
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID(uid).
+			AddLabels(constant.AppComponentLabelKey, name).
+			SetReplicas(3).
 			AddMatchLabelsInMap(selectors).
 			SetServiceName(headlessSvcName).
 			SetRoles(roles).
@@ -93,6 +97,64 @@ var _ = Describe("object generation transformer test.", func() {
 
 			// compare DAGs
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+		})
+	})
+
+	Context("buildEnvConfigData function", func() {
+		It("should work well", func() {
+			By("build env config data")
+			rsm.Status.MembersStatus = []workloads.MemberStatus{
+				{
+					PodName:     getPodName(rsm.Name, 1),
+					ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+				},
+				{
+					PodName:     getPodName(rsm.Name, 0),
+					ReplicaRole: workloads.ReplicaRole{Name: "follower", CanVote: true},
+				},
+				{
+					PodName:     getPodName(rsm.Name, 2),
+					ReplicaRole: workloads.ReplicaRole{Name: "follower", CanVote: true},
+				},
+			}
+			requiredKeys := []string{
+				"KB_REPLICA_COUNT",
+				"KB_0_HOSTNAME",
+				"KB_CLUSTER_UID",
+			}
+			cfg := buildEnvConfigData(*rsm)
+
+			By("builds Env Config correctly")
+			Expect(cfg).ShouldNot(BeNil())
+			for _, k := range requiredKeys {
+				_, ok := cfg[k]
+				Expect(ok).Should(BeTrue())
+			}
+
+			By("builds env config with resources recreate")
+			Expect(cfg["KB_CLUSTER_UID"]).Should(BeEquivalentTo(uid))
+
+			By("builds Env Config with ConsensusSet status correctly")
+			toCheckKeys := append(requiredKeys, []string{
+				"KB_LEADER",
+				"KB_FOLLOWERS",
+			}...)
+			for _, k := range toCheckKeys {
+				_, ok := cfg[k]
+				Expect(ok).Should(BeTrue())
+			}
+		})
+	})
+
+	Context("well-known service labels", func() {
+		It("should work well", func() {
+			svc := buildSvc(*rsm)
+			Expect(svc).ShouldNot(BeNil())
+			for k, ev := range service.Labels {
+				v, ok := svc.Labels[k]
+				Expect(ok).Should(BeTrue())
+				Expect(v).Should(Equal(ev))
+			}
 		})
 	})
 })

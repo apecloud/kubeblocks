@@ -1787,11 +1787,6 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// build pod dns string
-	envDBHost := corev1.EnvVar{
-		Name:  constant.DPDBHost,
-		Value: intctrlutil.BuildPodHostDNS(clusterPod),
-	}
-
 	container := corev1.Container{}
 	container.Name = backup.Name
 	container.Command = backupTool.Spec.BackupCommands
@@ -1824,7 +1819,17 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		Value: backupPathBase + pathPrefix,
 	}
 
-	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDir}
+	envDBHost := corev1.EnvVar{
+		Name:  constant.DPDBHost,
+		Value: intctrlutil.BuildPodHostDNS(clusterPod),
+	}
+
+	envDPTargetPodName := corev1.EnvVar{
+		Name:  constant.DPTargetPodName,
+		Value: clusterPod.Name,
+	}
+
+	container.Env = []corev1.EnvVar{envDPTargetPodName, envDBHost, envBackupName, envBackupDir}
 	if commonPolicy.Target.Secret != nil {
 		envDBUser := corev1.EnvVar{
 			Name: constant.DPDBUser,

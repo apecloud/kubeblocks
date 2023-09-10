@@ -27,7 +27,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -42,12 +43,12 @@ func retrieveRelatedComponentsByConfigmap[T generics.Object, L generics.ObjList[
 
 	objs := make([]T, 0)
 	containers := cfgutil.NewSet()
-	configSpecKey := cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
+	configSpecKey := core.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
 	items := toObjects[T, L, PL](&objList)
 	for i := range items {
 		obj := toResourceObject(&items[i])
 		if objs == nil {
-			return nil, nil, cfgcore.MakeError("failed to convert to resource object")
+			return nil, nil, core.MakeError("failed to convert to resource object")
 		}
 		if !foundComponentConfigSpec(obj.GetAnnotations(), configSpecKey, cfg.Name) {
 			continue
@@ -80,6 +81,8 @@ func transformPodTemplate(obj client.Object) *corev1.PodTemplateSpec {
 	case *appv1.StatefulSet:
 		return &v.Spec.Template
 	case *appv1.Deployment:
+		return &v.Spec.Template
+	case *workloads.ReplicatedStateMachine:
 		return &v.Spec.Template
 	}
 }

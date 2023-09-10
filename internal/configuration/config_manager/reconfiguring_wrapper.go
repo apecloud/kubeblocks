@@ -32,7 +32,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 

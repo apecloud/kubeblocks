@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
@@ -247,9 +246,13 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}
+	isMemberOf := func(stsName string, pod *corev1.Pod) bool {
+		parent, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+		return parent == stsName
+	}
 	var pods []corev1.Pod
 	for _, pod := range podList.Items {
-		if components.IsMemberOf(stsObj, &pod) {
+		if isMemberOf(stsObj.Name, &pod) {
 			pods = append(pods, pod)
 		}
 	}
@@ -264,7 +267,7 @@ func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
 	if rsm.Spec.Service == nil {
 		return 0
 	}
-	port := rsm.Spec.Service.Ports[0]
+	port := rsm.Spec.Service.Spec.Ports[0]
 	for _, c := range rsm.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {
 			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
@@ -535,12 +538,11 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 				labels[key] = value
 			}
 		}
-		labels[workloadsManagedByLabelKey] = kindReplicatedStateMachine
 		return labels
 	}
 	return map[string]string{
-		constant.AppInstanceLabelKey: rsm.Name,
-		workloadsManagedByLabelKey:   kindReplicatedStateMachine,
+		workloadsManagedByLabelKey: kindReplicatedStateMachine,
+		workloadsInstanceLabelKey:  rsm.Name,
 	}
 }
 
@@ -648,4 +650,36 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 		}
 	}
 	return nil
+}
+
+// IsRSMReady gives rsm level 'ready' state:
+// 1. all replicas exist
+// 2. all members have role set
+func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
+	if rsm == nil || rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
+		return true
+	}
+	if rsm.Spec.Replicas != nil && rsm.Status.UpdatedReplicas != *rsm.Spec.Replicas {
+		return false
+	}
+	membersStatus := rsm.Status.MembersStatus
+	if len(membersStatus) != int(*rsm.Spec.Replicas) {
+		return false
+	}
+	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
+		podName := getPodName(rsm.Name, i)
+		if !isMemberReady(podName, membersStatus) {
+			return false
+		}
+	}
+	return true
+}
+
+func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool {
+	for _, memberStatus := range membersStatus {
+		if memberStatus.PodName == podName {
+			return true
+		}
+	}
+	return false
 }

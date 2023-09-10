@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/leaanthony/debme"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -66,11 +68,6 @@ var _ = Describe("builder", func() {
 	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
 	const proxyCompDefName = "proxy"
-	var requiredKeys = []string{
-		"KB_REPLICA_COUNT",
-		"KB_0_HOSTNAME",
-		"KB_CLUSTER_UID",
-	}
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -307,6 +304,103 @@ var _ = Describe("builder", func() {
 			}
 		})
 
+		It("builds RSM correctly", func() {
+			reqCtx := newReqCtx()
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			envConfigName := "test-env-config-name"
+
+			rsm, err := BuildRSM(reqCtx, cluster, synthesizedComponent, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(rsm).ShouldNot(BeNil())
+
+			By("set replicas = 0")
+			newComponent := *synthesizedComponent
+			newComponent.Replicas = 0
+			rsm, err = BuildRSM(reqCtx, cluster, &newComponent, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(rsm).ShouldNot(BeNil())
+			Expect(*rsm.Spec.Replicas).Should(Equal(int32(0)))
+			Expect(rsm.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
+				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
+
+			By("set workload type to Replication")
+			replComponent := *synthesizedComponent
+			replComponent.Replicas = 2
+			replComponent.WorkloadType = appsv1alpha1.Replication
+			rsm, err = BuildRSM(reqCtx, cluster, &replComponent, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(rsm).ShouldNot(BeNil())
+			Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(2))
+			// test extra envs
+			Expect(rsm.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
+			for _, container := range rsm.Spec.Template.Spec.Containers {
+				isContainEnv := false
+				for _, env := range container.Env {
+					if env.Name == "mock-key" && env.Value == "mock-value" {
+						isContainEnv = true
+						break
+					}
+				}
+				Expect(isContainEnv).Should(BeTrue())
+			}
+
+			// test service labels
+			expectLabelsExist := func(labels map[string]string) {
+				expectedLabels := map[string]string{
+					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.AppNameLabelKey:        replComponent.ClusterDefName,
+					constant.AppInstanceLabelKey:    cluster.Name,
+					constant.KBAppComponentLabelKey: replComponent.Name,
+					constant.AppComponentLabelKey:   replComponent.CompDefName,
+				}
+				Expect(labels).ShouldNot(BeNil())
+				for k, ev := range expectedLabels {
+					v, ok := labels[k]
+					Expect(ok).Should(BeTrue())
+					Expect(v).Should(Equal(ev))
+				}
+			}
+			Expect(rsm.Spec.Service).ShouldNot(BeNil())
+			expectLabelsExist(rsm.Spec.Service.Labels)
+
+			// test roles
+			Expect(rsm.Spec.Roles).Should(HaveLen(2))
+			for _, roleName := range []string{constant.Primary, constant.Secondary} {
+				Expect(slices.IndexFunc(rsm.Spec.Roles, func(role workloads.ReplicaRole) bool {
+					return role.Name == roleName
+				})).Should(BeNumerically(">", -1))
+			}
+
+			// test role probe
+			Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())
+
+			// test member update strategy
+			Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
+			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
+
+			By("set workload type to Consensus")
+			csComponent := *synthesizedComponent
+			csComponent.Replicas = 3
+			csComponent.WorkloadType = appsv1alpha1.Consensus
+			csComponent.CharacterType = "mysql"
+			csComponent.ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
+			csComponent.ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
+			rsm, err = BuildRSM(reqCtx, cluster, &csComponent, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(rsm).ShouldNot(BeNil())
+
+			// test roles
+			Expect(rsm.Spec.Roles).Should(HaveLen(1))
+			Expect(rsm.Spec.Roles[0].Name).Should(Equal(appsv1alpha1.DefaultLeader.Name))
+
+			// test role probe
+			Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())
+
+			// test member update strategy
+			Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
+			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
+		})
+
 		It("builds Deploy correctly", func() {
 			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
@@ -320,58 +414,6 @@ var _ = Describe("builder", func() {
 			pdb, err := BuildPDB(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(pdb).ShouldNot(BeNil())
-		})
-
-		It("builds Env Config correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			for _, k := range requiredKeys {
-				_, ok := cfg.Data[k]
-				Expect(ok).Should(BeTrue())
-			}
-		})
-
-		It("builds env config with resources recreate", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-
-			uuid := "12345"
-			By("mock a cluster uuid")
-			cluster.UID = types.UID(uuid)
-
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_CLUSTER_UID"]).Should(Equal(uuid))
-		})
-
-		It("builds Env Config with ConsensusSet status correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				synthesizedComponent.Name: {
-					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
-						Leader: appsv1alpha1.ConsensusMemberStatus{
-							Pod: "pod1",
-						},
-						Followers: []appsv1alpha1.ConsensusMemberStatus{{
-							Pod: "pod2",
-						}, {
-							Pod: "pod3",
-						}},
-					},
-				}}
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			toCheckKeys := append(requiredKeys, []string{
-				"KB_LEADER",
-				"KB_FOLLOWERS",
-			}...)
-			for _, k := range toCheckKeys {
-				_, ok := cfg.Data[k]
-				Expect(ok).Should(BeTrue())
-			}
 		})
 
 		It("builds BackupJob correctly", func() {

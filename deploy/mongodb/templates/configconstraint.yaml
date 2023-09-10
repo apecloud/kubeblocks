@@ -5,8 +5,15 @@ metadata:
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
+
+  ## top level mysql configuration type
+  cfgSchemaTopLevelName: MongodbParameters
+
+  ## defines the configuration schema
   configurationSchema:
     cue: ""
+{{/*    cue: |-*/}}
+{{/*      {{- .Files.Get "config/mongodb-config-constraint.cue" | nindent 6 }}*/}}
 
   # mysql configuration file format
   formatterConfig:

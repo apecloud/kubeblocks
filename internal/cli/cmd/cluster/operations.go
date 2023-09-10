@@ -84,6 +84,7 @@ type OperationsOptions struct {
 	CfgFile         string             `json:"cfgFile"`
 	ForceRestart    bool               `json:"forceRestart"`
 	FileContent     string             `json:"fileContent"`
+	HasPatch        bool               `json:"hasPatch"`
 
 	// VolumeExpansion options.
 	// VCTNames VolumeClaimTemplate names
@@ -112,6 +113,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 	o := &OperationsOptions{
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
 		KeyValues:             map[string]*string{},
+		HasPatch:              true,
 		OpsType:               opsType,
 		HasComponentNamesFlag: hasComponentNamesFlag,
 		autoApprove:           false,
@@ -340,7 +342,7 @@ func (o *OperationsOptions) Validate() error {
 		}
 	}
 	if !o.autoApprove && o.DryRun == "none" {
-		return prompt.Confirm([]string{o.Name}, o.In, "")
+		return prompt.Confirm([]string{o.Name}, o.In, "", "")
 	}
 	return nil
 }
@@ -778,7 +780,7 @@ func cancelOps(o *OperationsOptions) error {
 		return fmt.Errorf("opsRequest type: %s not support cancel action", opsRequest.Spec.Type)
 	}
 	if !o.autoApprove {
-		if err := prompt.Confirm([]string{o.Name}, o.In, ""); err != nil {
+		if err := prompt.Confirm([]string{o.Name}, o.In, "", ""); err != nil {
 			return err
 		}
 	}

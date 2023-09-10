@@ -21,7 +21,7 @@ package cluster
 
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 var (
@@ -44,6 +44,7 @@ var (
 	notConfigSchemaPrompt         = "The config template[%s] is not defined in schema and parameter explanation info cannot be generated."
 	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explanation info cannot be generated."
 	restartConfirmPrompt          = "The parameter change incurs a cluster restart, which brings the cluster down for a while. Enter to continue...\n, "
+	fullRestartConfirmPrompt      = "The config file[%s] change incurs a cluster restart, which brings the cluster down for a while. Enter to continue...\n, "
 	confirmApplyReconfigurePrompt = "Are you sure you want to apply these changes?\n"
 )
 
@@ -60,7 +61,7 @@ func makeConfigSpecNotExistErr(clusterName, component, configSpec string) error 
 }
 
 func makeNotFoundTemplateErr(clusterName, component string) error {
-	return cfgcore.MakeError(notFoundValidConfigTemplateErrorMessage, clusterName, component)
+	return cfgcore.MakeError(notFoundValidConfigTemplateErrorMessage, component, clusterName)
 }
 
 func makeNotFoundConfigFileErr(configFile, configSpec string, all []string) error {

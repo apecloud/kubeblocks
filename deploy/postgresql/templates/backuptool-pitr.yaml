@@ -29,7 +29,7 @@ spec:
     - name: DP_INTERVAL_SECONDS
       value: "10"
     - name: SWITCH_WAL_INTERVAL_SECONDS
-      value: "300"
+      value: "600"
   image: ""
   logical:
     restoreCommands:

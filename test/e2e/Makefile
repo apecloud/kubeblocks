@@ -4,7 +4,7 @@ GOPATH ?= $(shell $(GO) env GOPATH)
 GINKGO_VERSION = 2.9.1
 GINKGO = $(GOPATH)/bin/ginkgo
 HELM_VERSION ?= v3.9.0
-
+INIT_ENV ?= false
 # The help target prints out all targets with their descriptions organized
 # beneath their categories. The categories are represented by '##@' and the
 # target descriptions by '##'. The awk commands is responsible for reading the

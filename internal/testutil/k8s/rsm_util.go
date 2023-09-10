@@ -22,6 +22,7 @@ package testutil
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -87,7 +88,7 @@ func NewFakeRSMPod(rsm *workloads.ReplicatedStateMachine, ordinal int) *corev1.P
 }
 
 // MockRSMReady mocks the RSM workload to ready state.
-func MockRSMReady(rsm *workloads.ReplicatedStateMachine) {
+func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 	rsm.Status.InitReplicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyInitReplicas = *rsm.Spec.Replicas
 	rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
@@ -95,6 +96,30 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine) {
 	rsm.Status.Replicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyReplicas = *rsm.Spec.Replicas
 	rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
+	rsm.Status.UpdatedReplicas = rsm.Status.Replicas
+
+	composeRoleMap := func(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
+		roleMap := make(map[string]workloads.ReplicaRole, 0)
+		for _, role := range rsm.Spec.Roles {
+			roleMap[strings.ToLower(role.Name)] = role
+		}
+		return roleMap
+	}
+	var membersStatus []workloads.MemberStatus
+	roleMap := composeRoleMap(*rsm)
+	for _, pod := range pods {
+		roleName := strings.ToLower(pod.Labels[constant.RoleLabelKey])
+		role, ok := roleMap[roleName]
+		if !ok {
+			continue
+		}
+		memberStatus := workloads.MemberStatus{
+			PodName:     pod.Name,
+			ReplicaRole: role,
+		}
+		membersStatus = append(membersStatus, memberStatus)
+	}
+	rsm.Status.MembersStatus = membersStatus
 }
 
 func ListAndCheckRSM(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.ReplicatedStateMachineList {

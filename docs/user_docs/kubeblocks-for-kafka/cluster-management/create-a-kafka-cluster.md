@@ -1,14 +1,14 @@
 ---
-title: Create cluster for kafka
+title: Create a cluster for Kafka
 description: Guide for cluster creation for kafka
 keywords: [kafka, cluster, management]
 sidebar_position: 1
-sidebar_label: Snapshot backup and restore
+sidebar_label: Create
 ---
 
-# Create and connect to a kafka cluster
+# Create a Kafka cluster
 
-This document shows how to create and connect to a kafka cluster.
+This document shows how to create and connect to a Kafka cluster.
 
 ## Before you start
 
@@ -27,12 +27,12 @@ This document shows how to create and connect to a kafka cluster.
 
 :::note
 
-* KubeBlocks integrates kafka 3.3.2, running it in KRaft mode.
+* KubeBlocks integrates Kafka v3.3.2, running it in KRaft mode.
 * You are not recommended to use kraft cluster in combined mode in production environment.
 * The controller number suggested ranges from 3 to 5, out of complexity and availability.
 
 :::
-## Create a kafka cluster
+## Create a Kafka cluster
 
 <Tabs>
 <TabItem value="using kbcli" label="Using kbcli" default>
@@ -72,7 +72,7 @@ See the table below for detailed descriptions of customizable parameters, settin
 
 <TabItem value="using kubectl" label="Using kubectl" default>
 
-* Create kafka cluster in combined mode.
+* Create a Kafka cluster in combined mode.
 
     ```bash
     # create kafka in combined mode 
@@ -108,7 +108,7 @@ See the table below for detailed descriptions of customizable parameters, settin
     EOF
     ```
 
-* Create kafka cluster in separated mode.
+* Create a Kafka cluster in separated mode.
 
     ```bash
     # Create kafka cluster in separated mode
@@ -162,11 +162,3 @@ See the table below for detailed descriptions of customizable parameters, settin
 </TabItem>
 
 </Tabs>
-
-## Connect to a kafka Cluster
-
-```bash
-kbcli cluster connect mongodb-cluster
-```
-
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).

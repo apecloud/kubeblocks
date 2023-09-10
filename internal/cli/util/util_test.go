@@ -42,7 +42,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -234,6 +234,7 @@ var _ = Describe("util", func() {
 			name     string
 			args     args
 			expected bool
+			err      error
 		}{{
 			name: "normal test",
 			args: args{
@@ -261,11 +262,17 @@ var _ = Describe("util", func() {
 				},
 				updatedParams: testapps.WithMap("automatic_sp_privileges", "1"),
 			},
-			expected: true,
+			expected: false,
+			err:      cfgcore.MakeError("field not found:"),
 		}}
 
 		for _, tt := range tests {
-			Expect(IsSupportReconfigureParams(tt.args.configSpec, cfgcore.FromStringPointerMap(tt.args.updatedParams), mockClient)).Should(BeEquivalentTo(tt.expected))
+			ret, err := IsSupportReconfigureParams(tt.args.configSpec, cfgcore.FromStringPointerMap(tt.args.updatedParams), mockClient)
+			Expect(ret).Should(BeEquivalentTo(tt.expected))
+			Expect(err != nil).Should(BeEquivalentTo(tt.err != nil))
+			if err != nil {
+				Expect(err.Error()).Should(ContainSubstring(tt.err.Error()))
+			}
 		}
 	})
 

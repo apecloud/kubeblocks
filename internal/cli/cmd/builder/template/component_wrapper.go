@@ -36,7 +36,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -76,7 +76,7 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 	if w.renderedOpts.ConfigSpec != "" {
 		comp := w.getComponentWithConfigSpec(w.renderedOpts.ConfigSpec)
 		if comp == nil {
-			return cfgcore.MakeError("config spec[%s] is not found", w.renderedOpts.ConfigSpec)
+			return core.MakeError("config spec[%s] is not found", w.renderedOpts.ConfigSpec)
 		}
 		components = []appsv1alpha1.ClusterComponentDefinition{*comp}
 	}
@@ -99,7 +99,7 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 func (w *templateRenderWorkflow) getComponentName(componentType string, cluster *appsv1alpha1.Cluster) (string, error) {
 	clusterCompSpec := cluster.Spec.GetDefNameMappingComponents()[componentType]
 	if len(clusterCompSpec) == 0 {
-		return "", cfgcore.MakeError("component[%s] is not defined in cluster definition", componentType)
+		return "", core.MakeError("component[%s] is not defined in cluster definition", componentType)
 	}
 	return clusterCompSpec[0].Name, nil
 }
@@ -171,7 +171,7 @@ func (w *templateRenderWorkflow) dumpRenderedTemplates(outputDir string, objects
 			continue
 		}
 		comName, _ := w.getComponentName(componentDef.Name, cluster)
-		cfgName := cfgcore.GetComponentCfgName(cluster.Name, comName, template.Name)
+		cfgName := core.GetComponentCfgName(cluster.Name, comName, template.Name)
 		if err := dumpTemplate(template, outputDir, objects, componentDef.Name, cfgName, foundConfigSpec(synthesizedComponent, template.Name)); err != nil {
 			return err
 		}
@@ -230,7 +230,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions, clu
 
 	clusterDefObj := GetTypedResourceObjectBySignature(allObjects, generics.ClusterDefinitionSignature, WithResourceName(clusterDef))
 	if clusterDefObj == nil {
-		return nil, cfgcore.MakeError("cluster definition object is not found in helm template directory[%s]", helmTemplateDir)
+		return nil, core.MakeError("cluster definition object is not found in helm template directory[%s]", helmTemplateDir)
 	}
 
 	// hack apiserver auto filefield
@@ -238,7 +238,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions, clu
 
 	var cdComponents []appsv1alpha1.ClusterComponentDefinition
 	if cdComponents = getClusterDefComponents(clusterDefObj, opts.ComponentName); cdComponents == nil {
-		return nil, cfgcore.MakeError("component[%s] is not defined in cluster definition", opts.ComponentName)
+		return nil, core.MakeError("component[%s] is not defined in cluster definition", opts.ComponentName)
 	}
 	clusterVersionObj := foundCVResource(allObjects)
 	return &templateRenderWorkflow{

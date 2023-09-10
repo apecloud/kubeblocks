@@ -72,7 +72,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/internal/configuration/openapi"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -456,11 +457,11 @@ func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterCompone
 	componentName string,
 	reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
 
-	configSpecs, err := cfgcore.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, componentName)
+	configSpecs, err := core.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, componentName)
 	if err != nil {
 		return nil, err
 	}
-	if !reloadTpl {
+	if !reloadTpl || len(configSpecs) == 1 {
 		return configSpecs, nil
 	}
 
@@ -480,7 +481,7 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 		Namespace(key.Namespace).
 		Get(context.TODO(), key.Name, metav1.GetOptions{})
 	if err != nil {
-		return cfgcore.WrapError(err, "failed to get resource[%v]", key)
+		return core.WrapError(err, "failed to get resource[%v]", key)
 	}
 	return apiruntime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, k8sObj)
 }
@@ -505,10 +506,16 @@ func GetComponentsFromClusterName(key client.ObjectKey, cli dynamic.Interface) (
 
 // GetComponentsFromResource returns name of component.
 func GetComponentsFromResource(componentSpecs []appsv1alpha1.ClusterComponentSpec, clusterDefObj *appsv1alpha1.ClusterDefinition) ([]string, error) {
+	filter := func(component *appsv1alpha1.ClusterComponentDefinition) bool {
+		if component != nil && len(componentSpecs) == 1 {
+			return true
+		}
+		return enableReconfiguring(component)
+	}
 	componentNames := make([]string, 0, len(componentSpecs))
 	for _, component := range componentSpecs {
 		cdComponent := clusterDefObj.GetComponentDefByName(component.ComponentDefRef)
-		if enableReconfiguring(cdComponent) {
+		if filter(cdComponent) {
 			componentNames = append(componentNames, component.Name)
 		}
 	}
@@ -547,7 +554,7 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 
 	schema := configConstraint.Spec.ConfigurationSchema.DeepCopy()
 	if schema.Schema == nil {
-		schema.Schema, err = cfgcore.GenerateOpenAPISchema(schema.CUE, configConstraint.Spec.CfgSchemaTopLevelName)
+		schema.Schema, err = openapi.GenerateOpenAPISchema(schema.CUE, configConstraint.Spec.CfgSchemaTopLevelName)
 		if err != nil {
 			return false, err
 		}
@@ -587,7 +594,7 @@ func ValidateParametersModified2(parameters sets.Set[string], cc appsv1alpha1.Co
 	if uniqueParameters.Len() == 0 {
 		return nil
 	}
-	return cfgcore.MakeError("parameter[%v] is immutable, cannot be modified!", cfgutil.ToSet(uniqueParameters).AsSlice())
+	return core.MakeError("parameter[%v] is immutable, cannot be modified!", cfgutil.ToSet(uniqueParameters).AsSlice())
 }
 
 func GetIPLocation() (string, error) {

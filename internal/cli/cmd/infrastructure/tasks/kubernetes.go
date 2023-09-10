@@ -38,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 

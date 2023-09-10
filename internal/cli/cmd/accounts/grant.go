@@ -28,16 +28,16 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type GrantOptions struct {
 	*AccountBaseOptions
-	info channelutil.UserInfo
+	info lorryutil.UserInfo
 }
 
-func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op channelutil.OperationKind) *GrantOptions {
-	if (op != channelutil.GrantUserRoleOp) && (op != channelutil.RevokeUserRoleOp) {
+func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op lorryutil.OperationKind) *GrantOptions {
+	if (op != lorryutil.GrantUserRoleOp) && (op != lorryutil.RevokeUserRoleOp) {
 		klog.V(1).Infof("invalid operation kind: %s", op)
 		return nil
 	}
@@ -71,7 +71,7 @@ func (o *GrantOptions) Validate(args []string) error {
 }
 
 func (o *GrantOptions) validRoleName() error {
-	candidates := []string{string(channelutil.SuperUserRole), string(channelutil.ReadWriteRole), string(channelutil.ReadOnlyRole)}
+	candidates := []string{string(lorryutil.SuperUserRole), string(lorryutil.ReadWriteRole), string(lorryutil.ReadOnlyRole)}
 	if slices.Contains(candidates, strings.ToLower(o.info.RoleName)) {
 		return nil
 	}

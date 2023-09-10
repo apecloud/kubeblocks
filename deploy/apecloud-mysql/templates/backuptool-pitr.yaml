@@ -7,31 +7,49 @@ metadata:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
   name: apecloud-mysql-pitr-tool
 spec:
-  deployKind: job
+  deployKind: statefulSet
   env:
     - name: VOLUME_DATA_DIR
-      value: /data/mysql
-    - name: PITR_DIR
-      value: "$(VOLUME_DATA_DIR)/docker-entrypoint-initdb.d"
+      value: {{ .Values.mysqlConfigs.dataMountPath }}
     - name: DATA_DIR
-      value: "$(VOLUME_DATA_DIR)/data"
+      value: {{ .Values.mysqlConfigs.dataDir }}
+    - name: PITR_RELATIVE_PATH
+      value: pitr-logs
+    - name: PITR_DIR
+      value: "$(DATA_DIR)/$(PITR_RELATIVE_PATH)"
     - name: CONF_DIR
       value: "$(VOLUME_DATA_DIR)/conf"
     - name: TIME_FORMAT
       value: 2006-01-02T15:04:05Z
-    - name: LOG_DIR
-      value: $(VOLUME_DATA_DIR)/data
-  image: {{ .Values.image.registry | default "docker.io" }}/apecloud/wal-g:mysql-latest
+    - name: DP_TARGET_POD_ROLE
+      # TODO input by backup policy
+      value: follower
+    - name: DP_DB_PORT
+      value: "3306"
+    - name: DP_INTERVAL_SECONDS
+      value: "10"
+    - name: FLUSH_BINLOG_INTERVAL_SECONDS
+      value: "3600"
+  image: apecloud/wal-g:mysql-latest
   logical:
     restoreCommands:
-      - sh
+      - bash
       - -c
       - |
+        #!/bin/bash
         set -e;
-        rm -rf ${PITR_DIR}/replay.sql;
+        echo "INFO: waiting for analysis of archive logs to complete."
+        while true; do
+          if [ ! -f ${DATA_DIR}/.xtrabackup_restore_new_cluster ] && [ ! -f ${DATA_DIR}/.restore_new_cluster ];then
+            break
+          fi
+          sleep 1
+        done
+        rm -rf ${DATA_DIR}/${PITR_RELATIVE_PATH};
+        echo "INFO: remove ${DATA_DIR}/${PITR_RELATIVE_PATH}."
   physical:
     restoreCommands:
-      - sh
+      - bash
       - -c
       - |
         set -e;

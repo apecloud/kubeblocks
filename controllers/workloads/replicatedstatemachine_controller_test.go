@@ -37,12 +37,14 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 		It("should reconcile well", func() {
 			name := "test-stateful-replica-set"
 			port := int32(12345)
-			service := corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Name:     "foo",
-						Protocol: corev1.ProtocolTCP,
-						Port:     port,
+			service := &corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "foo",
+							Protocol: corev1.ProtocolTCP,
+							Port:     port,
+						},
 					},
 				},
 			}

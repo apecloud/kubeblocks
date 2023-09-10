@@ -95,7 +95,7 @@ spec:
         containers:
           - name: mysql
             volumeMounts:
-              - mountPath: /data/mysql
+              - mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
                 name: data
               - mountPath: /opt/mysql
                 name: mysql-config
@@ -204,10 +204,12 @@ spec:
               - name: agamotto-configuration
                 mountPath: /opt/agamotto
               - name: data
-                mountPath: /data/mysql
+                mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
+              {{- if .Values.logCollector.enabled }}
               - name: log-data
                 mountPath: /var/log/kubeblocks
                 readOnly: false
+              {{- end }}
               - name: scripts
                 mountPath: /scripts
           - name: vttablet
@@ -254,10 +256,12 @@ spec:
               - name: data
                 mountPath: /vtdataroot
         volumes:
+          {{- if .Values.logCollector.enabled }}
           - name: log-data
             hostPath:
               path: /var/log/kubeblocks
               type: DirectoryOrCreate
+          {{- end }}
           - name: annotations
             downwardAPI:
               items:

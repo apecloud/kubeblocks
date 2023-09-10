@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -51,7 +51,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
-		pod.Annotations[cfgcore.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)] = configVersion
+		pod.Annotations[core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)] = configVersion
 	}
 
 	Context("simple reconfigure policy test", func() {
@@ -71,8 +71,8 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 					}}}))
 
 			// mock client update caller
-			updateErr := cfgcore.MakeError("update failed!")
-			k8sMockClient.MockUpdateMethod(
+			updateErr := core.MakeError("update failed!")
+			k8sMockClient.MockPatchMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -134,7 +134,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 					}}}),
 			)
 
-			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
 					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 2)),
@@ -171,8 +171,8 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 						VolumeName: "test_volume",
 					}}}))
 
-			updateErr := cfgcore.MakeError("update failed!")
-			k8sMockClient.MockUpdateMethod(
+			updateErr := core.MakeError("update failed!")
+			k8sMockClient.MockPatchMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(

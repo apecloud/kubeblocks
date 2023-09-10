@@ -36,8 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -105,19 +105,22 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	if cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfigure.")
-		return intctrlutil.Reconciled()
+	// process configuration without ConfigConstraints
+	cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]
+	if !ok || cfgConstraintsName == "" {
+		reqCtx.Log.Info("configuration without ConfigConstraints.")
+		return r.sync(reqCtx, config, &appsv1alpha1.ConfigConstraint{})
 	}
 
-	tpl := &appsv1alpha1.ConfigConstraint{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+	// process configuration with ConfigConstraints
+	key := types.NamespacedName{
 		Namespace: config.Namespace,
 		Name:      config.Labels[constant.CMConfigurationConstraintsNameLabelKey],
-	}, tpl); err != nil {
+	}
+	tpl := &appsv1alpha1.ConfigConstraint{}
+	if err := r.Client.Get(reqCtx.Ctx, key, tpl); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
-
 	return r.sync(reqCtx, config, tpl)
 }
 
@@ -151,22 +154,25 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		keySelector = strings.Split(keysLabel, ",")
 	}
 
-	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
+	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig, keySelector)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// No parameters updated
-	if !configPatch.IsModify {
+	if configPatch != nil && !configPatch.IsModify {
 		reqCtx.Recorder.Eventf(config, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
 			"nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, config, cfgcore.ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, config, core.ReconfigureNoChangeType)
 	}
 
-	reqCtx.Log.V(1).Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
-		configPatch.AddConfig,
-		configPatch.DeleteConfig,
-		configPatch.UpdateConfig))
+	if configPatch != nil {
+		reqCtx.Log.V(1).Info(fmt.Sprintf(
+			"reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
+			configPatch.AddConfig,
+			configPatch.DeleteConfig,
+			configPatch.UpdateConfig))
+	}
 
 	reconcileContext := newConfigReconcileContext(reqCtx.Ctx, r.Client, config, tpl, componentName, configSpecName, componentLabels)
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
@@ -229,7 +235,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	}
 
 	returnedStatus, err := policy.Upgrade(params)
-	if err := r.handleConfigEvent(params, cfgcore.PolicyExecStatus{
+	if err := r.handleConfigEvent(params, core.PolicyExecStatus{
 		PolicyName:    policy.GetPolicyName(),
 		ExecStatus:    string(returnedStatus.Status),
 		SucceedCount:  returnedStatus.SucceedCount,
@@ -267,7 +273,7 @@ func getOpsRequestID(cm *corev1.ConfigMap) string {
 	return ""
 }
 
-func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status core.PolicyExecStatus, err error) error {
 	var (
 		cm             = params.ConfigMap
 		lastOpsRequest = ""
@@ -277,7 +283,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
 	}
 
-	eventContext := cfgcore.ConfigEventContext{
+	eventContext := intctrlutil.ConfigEventContext{
 		ConfigSpecName:   params.ConfigSpecName,
 		Client:           params.Client,
 		ReqCtx:           params.Ctx,
@@ -291,7 +297,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		PolicyStatus:     status,
 	}
 
-	for _, handler := range cfgcore.ConfigEventHandlerMap {
+	for _, handler := range intctrlutil.ConfigEventHandlerMap {
 		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(ExecStatus(status.ExecStatus)), err); err != nil {
 			return err
 		}

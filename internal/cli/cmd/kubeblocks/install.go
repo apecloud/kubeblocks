@@ -79,7 +79,9 @@ type InstallOptions struct {
 	Quiet           bool
 	CreateNamespace bool
 	Check           bool
-	ValueOpts       values.Options
+	// autoApprove for KubeBlocks upgrade
+	autoApprove bool
+	ValueOpts   values.Options
 
 	// ConfiguredOptions is the options that kubeblocks
 	PodAntiAffinity string

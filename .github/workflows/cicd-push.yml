@@ -226,6 +226,16 @@ jobs:
       DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
     secrets: inherit
 
+  check-dataprotection-image:
+    needs: trigger-mode
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
+    with:
+      IMG: "apecloud/kubeblocks-dataprotection"
+      BUILDX_PLATFORMS: "linux/amd64"
+      DOCKERFILE_PATH: "./docker/Dockerfile-dataprotection"
+    secrets: inherit
+
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') }}

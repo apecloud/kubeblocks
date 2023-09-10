@@ -181,14 +181,14 @@ KubeBlocks also supports email alert.
 
    KubeBlocks email alert now supports receiving emails from a specified cluster and of a certain severity. You can set this function by using `--cluster` and `--severity` flags.
 
-  * `--cluster`: means only receiving emails from a specified cluster.
+   * `--cluster`: means only receiving emails from a specified cluster.
 
-    ```bash
-    kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
-    ```
+       ```bash
+       kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
+       ```
 
-  * `--severity`: means only receiving emails from a specified cluster and the alert severity is `warning`.
+   * `--severity`: means only receiving emails from a specified cluster and the alert severity is `warning`.
 
-    ```bash
-    kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
-    ```
+       ```bash
+       kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
+       ```

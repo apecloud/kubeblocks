@@ -1,0 +1,162 @@
+{{- if .Values.dataProtection.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-dataprotection
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "dataprotection"
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+  {{- if .Values.updateStrategy }}
+  strategy:
+    {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
+    spec:
+      priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
+      {{- with .Values.dataProtection.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kubeblocks.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers: # only download tools image to local
+        - name: tools
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/true
+      containers:
+        - name: dataprotection
+          args:
+            - "--health-probe-bind-address=:8081"
+            - "--metrics-bind-address=:8080"
+            - "--leader-elect"
+            - "--leader-elect-id=abd03fda"
+            - "--zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
+            - "--zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
+            {{- with .Values.loggerSettings.level }}
+            - "--zap-log-level={{ . }}"
+            {{- end }}
+            {{- with .Values.loggerSettings.encoder }}
+            - "--zap-encoder={{ . }}"
+            {{- end }}
+          env:
+            - name: CM_NAMESPACE
+              value: {{ .Release.Namespace }}
+            {{- with .Values.affinity }}
+            - name: CM_AFFINITY
+              value: {{ toJson . | quote }}
+            {{- end }}
+            {{- with .Values.nodeSelector }}
+            - name: CM_NODE_SELECTOR
+              value: {{ toJson . | quote }}
+            {{- end }}
+            {{- with .Values.tolerations }}
+            - name: CM_TOLERATIONS
+              value: {{ toJson . | quote }}
+            {{- end }}
+            - name: KUBEBLOCKS_IMAGE_PULL_POLICY
+              value: {{ .Values.dataProtection.image.pullPolicy }}
+            - name: KUBEBLOCKS_TOOLS_IMAGE
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
+              value: {{ include "kubeblocks.serviceAccountName" . }}
+            {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
+            - name: VOLUMESNAPSHOT
+              value: "true"
+            {{- end }}
+            {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1beta1" }}
+            - name: VOLUMESNAPSHOT_API_BETA
+              value: "true"
+            {{- end }}
+            {{- if .Values.admissionWebhooks.enabled }}
+            - name: ENABLE_WEBHOOKS
+              value: "true"
+            {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.dataProtection.image.registry | default "docker.io" }}/{{ .Values.dataProtection.image.repository }}:{{ .Values.dataProtection.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.dataProtection.image.pullPolicy }}
+          ports:
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /etc/kubeblocks
+              name: manager-config
+          {{- if .Values.admissionWebhooks.enabled }}
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
+          {{- end }}
+      {{- if .Values.hostNetwork }}
+      hostNetwork: {{ .Values.hostNetwork }}
+      {{- end }}
+      {{- if .Values.dnsPolicy }}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: manager-config
+          configMap:
+            name: {{ include "kubeblocks.fullname" . }}-manager-config
+        {{- if .Values.admissionWebhooks.enabled }}
+        - name: cert
+        secret:
+          defaultMode: 420
+          secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+        {{- end }}
+{{- end }}

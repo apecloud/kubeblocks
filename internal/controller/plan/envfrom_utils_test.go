@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -76,7 +76,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			GetObject()
 
 		origCMObject = cm.DeepCopy()
-		origCMObject.Name = cfgcore.GetComponentCfgName(clusterName, mysqlCompName, cm.Name)
+		origCMObject.Name = core.GetComponentCfgName(clusterName, mysqlCompName, cm.Name)
 	})
 
 	AfterEach(func() {
@@ -127,7 +127,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				cmObj,
 				configConstraint,
 			}), testutil.WithAnyTimes()))
-			k8sMockClient.MockPatchMethod(testutil.WithFailed(cfgcore.MakeError("failed to patch"), testutil.WithTimes(1)),
+			k8sMockClient.MockPatchMethod(testutil.WithFailed(core.MakeError("failed to patch"), testutil.WithTimes(1)),
 				testutil.WithSucceed(), testutil.WithAnyTimes())
 
 			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).ShouldNot(Succeed())

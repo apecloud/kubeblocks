@@ -32,7 +32,6 @@ import (
 )
 
 const label = "app.kubernetes.io/instance"
-const namespace = "default"
 
 func GetFiles(path string) ([]string, error) {
 	var result []string
@@ -74,23 +73,23 @@ func GetFolders(path string) ([]string, error) {
 	return result, nil
 }
 
-func CheckClusterStatus(name string) bool {
-	cmd := "kubectl get cluster " + name + " -n " + namespace + " | grep " + name + " | awk '{print $5}'"
+func CheckClusterStatus(name, ns string) bool {
+	cmd := "kubectl get cluster " + name + " -n " + ns + " | grep " + name + " | awk '{print $5}'"
 	log.Println(cmd)
 	clusterStatus := ExecCommand(cmd)
 	log.Println("clusterStatus is " + clusterStatus)
 	return strings.TrimSpace(clusterStatus) == "Running"
 }
 
-func CheckPodStatus(name string) map[string]bool {
+func CheckPodStatus(name, ns string) map[string]bool {
 	var podStatusResult = make(map[string]bool)
-	cmd := "kubectl get pod -n " + namespace + " -l '" + label + "=" + name + "'| grep " + name + " | awk '{print $1}'"
+	cmd := "kubectl get pod -n " + ns + " -l '" + label + "=" + name + "'| grep " + name + " | awk '{print $1}'"
 	log.Println(cmd)
 	arr := ExecCommandReadline(cmd)
 	log.Println(arr)
 	if len(arr) > 0 {
 		for _, podName := range arr {
-			command := "kubectl get pod " + podName + " -n " + namespace + " | grep " + podName + " | awk '{print $3}'"
+			command := "kubectl get pod " + podName + " -n " + ns + " | grep " + podName + " | awk '{print $3}'"
 			log.Println(command)
 			podStatus := ExecCommand(command)
 			log.Println("podStatus is " + podStatus)
@@ -317,10 +316,15 @@ func Check(command string, input string) (string, error) {
 	return output.String(), nil
 }
 
-func GetName(fileName string) (name string) {
-	name = ReadLineLast(fileName, "  name:")
-	s := StringSplit(name)
-	return s
+func GetName(fileName string) (name, ns string) {
+	name = StringSplit(ReadLineLast(fileName, "  name:"))
+	if len(ReadLineLast(fileName, "  namespace:")) > 0 {
+		ns = StringSplit(ReadLineLast(fileName, "  namespace:"))
+	} else {
+		ns = "default"
+	}
+
+	return name, ns
 }
 
 func ReadLineLast(fileName string, name string) string {

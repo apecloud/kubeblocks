@@ -21,6 +21,7 @@ package components
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -73,11 +74,22 @@ var _ = Describe("RSM Component", func() {
 	AfterEach(cleanAll)
 
 	Context("RSM Component test", func() {
-		It("RSM Component test", func() {
+		FIt("RSM Component test", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, rsmCompDefRef, rsmCompName)
-			_ = testapps.MockRSMComponent(&testCtx, clusterName, rsmCompName)
+			rsm := testapps.MockRSMComponent(&testCtx, clusterName, rsmCompName)
+			Expect(testapps.ChangeObj(&testCtx, rsm, func(machine *workloads.ReplicatedStateMachine) {
+				annotations := machine.Annotations
+				if annotations == nil {
+					annotations = make(map[string]string, 0)
+				}
+				annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
+				machine.Annotations = annotations
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.ObservedGeneration = cluster.Generation
+			})).Should(Succeed())
 			rsmList := &workloads.ReplicatedStateMachineList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, rsmList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
@@ -95,9 +107,18 @@ var _ = Describe("RSM Component", func() {
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}).Should(BeTrue())
+			Expect(testapps.ChangeObjStatus(&testCtx, &stsList.Items[0], func() {
+				stsList.Items[0].Status.ObservedGeneration = stsList.Items[0].Generation
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+				rsm.Status.ObservedGeneration = rsm.Generation
+				rsm.Status.CurrentGeneration = rsm.Generation
+				rsm.Status.InitReplicas = *rsm.Spec.Replicas
+				rsm.Status.Replicas = *rsm.Spec.Replicas
+			})).Should(Succeed())
 
 			By("test pods number of sts is 0")
-			rsm := &rsmList.Items[0]
+			rsm = &rsmList.Items[0]
 			clusterComponent := cluster.Spec.GetComponentByName(rsmCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			rsmComponent := newRSM(testCtx.Ctx, k8sClient, cluster, clusterDef, clusterComponent, *componentDef)
@@ -183,10 +204,16 @@ var _ = Describe("RSM Component", func() {
 			oldReplicas := rsmComponent.SynthesizedComponent.Replicas
 			replicas := int32(4)
 			rsmComponent.SynthesizedComponent.Replicas = replicas
+			Expect(testapps.ChangeObj(&testCtx, rsm, func(machine *workloads.ReplicatedStateMachine) {
+				rsm.Annotations[constant.KubeBlocksGenerationKey] = "new-generation"
+			})).Should(Succeed())
 			isRunning, _ := rsmComponent.IsRunning(ctx, rsm)
 			Expect(isRunning).Should(BeFalse())
 			// reset replicas
 			rsmComponent.SynthesizedComponent.Replicas = oldReplicas
+			Expect(testapps.ChangeObj(&testCtx, rsm, func(machine *workloads.ReplicatedStateMachine) {
+				rsm.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
+			})).Should(Succeed())
 
 			By("test component is running")
 			isRunning, _ = rsmComponent.IsRunning(ctx, rsm)

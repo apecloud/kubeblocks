@@ -124,6 +124,7 @@ func (r *ConfigurationReconciler) runTasks(
 	patch := client.MergeFrom(configuration.DeepCopy())
 	for _, task := range tasks {
 		if err := task.Do(fetcher, synthesizedComp); err != nil {
+			task.Status.Phase = appsv1alpha1.CMergeFailedPhase
 			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)
 		}
@@ -169,6 +170,8 @@ func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 	return phase == appsv1alpha1.CRunningPhase ||
 		phase == appsv1alpha1.CInitPhase ||
 		phase == appsv1alpha1.CPendingPhase ||
-		phase == appsv1alpha1.CFailedPhase ||
+		phase == appsv1alpha1.CMergedPhase ||
+		phase == appsv1alpha1.CMergeFailedPhase ||
+		phase == appsv1alpha1.CUpgradingPhase ||
 		phase == appsv1alpha1.CFinishedPhase
 }

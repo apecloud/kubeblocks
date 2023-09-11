@@ -19,19 +19,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package v1alpha1
 
+// +--------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+// |                                                                                                                                                                    |
+// |     ++---------------------------------------------------------------------------------------------------+                                                         |
+// |     |+--------------------------------------------------------------------------------------------------+|                                                         |
+// |     ||                                CInitPhase                                                        ||                                                         |
+// |     ||                                                                                                  ||                                                         |
+// |     ||   +-------------+          +---------------+            +-----------------+          +-----+     ||                                                         |
+// |     ||   |             |          |               |            |                 |          |     |     ||      Creating                                           |
+// |     ||   | PreparePhase|----------| RenderingPhase+----------->|GeneratingSideCar|--------->| END |     ||---------------- fireEvent                               |
+// |     ||   |             |          |               |            |                 |          |     |     ||                    |                                    |
+// |     ||   +-------------+          +---------------+            +-----------------+          +-----+     ||                    |                                    |
+// |     ||                                                                                                  ||                    |                                    |
+// |     ||                                                                                                  ||                    |                                    |
+// |     ++--------------------------------------------------------------------------------------------------+|                    |    Reconfiguring                   |
+// |     +----------------------------------------------------------------------------------------------------+                    |                                    |
+// |           ^                    /                                           \                                                  |                                    |
+// |           |                   /                                             \  Succeed                                        V                                    |
+// |           | Creating         /                 +-----------------------------\----------------------------------------------------------------------------+        |
+// |           |                 /                  |+-----------------------------V--------------------------------------------------------------------------+|        |
+// |           |                /                   ||                                                                                                        ||        |
+// |           |            Failed                  ||                                     RunningPhase                                                       ||        |
+// |           |              /                     ||                                                              Reconfiguring                             ||        |
+// |           |             /                      ||                                                   +---------------------------------+                  ||        |
+// |           |            /                       ||                                                   v                                 |                  ||        |
+// |           |           v                        ||      +---------------+                  +--------------------+             +--------+---------+        ||        |
+// |      +----+----------------+                   ||      |               |  Reconfiguring   |                    |   Failed    |                  |        ||        |
+// |      |                     |                   ||      |  CFinishPhase |----------------->|   MergingPhase     |------------>| MergeFailedPhase |        ||        |
+// |      | CCreateFailedPhase  |                   ||      |               |               -> |                    |             |                  |        ||        |
+// |      |                     |                   ||      +-------+-------+              /   +---------+----------+             +------------------+        ||        |
+// |      +---------------------+                   ||              ^                     /              |                                                    ||        |
+// |                                                ||              |                Reconfiguring       |                                                    ||        |
+// |                                                ||              |                   /                |                                                    ||        |
+// |                                                ||       Finish |                  /                 | Succeed                                            ||        |
+// |                                                ||              |                 /                  |                                                    ||        |
+// |                                                ||              |     +-----------------+            |                                                    ||        |
+// |                                                ||              |     |                 |            |                                                    ||        |
+// |                                                ||              +-----+ UpgradingPhase  |<-----------+                                                    ||        |
+// |                                                ||                    |                 |                                                                 ||        |
+// |                                                ||                    +------------+----+                                                                 ||        |
+// |                                                ||                         ^       |                                                                      ||        |
+// |                                                ||                         |       |                                                                      ||        |
+// |                                                ||                         +-------+                                                                      ||        |
+// |                                                ||                                                                                                        ||        |
+// |                                                ||                                                                                                        ||        |
+// |                                                |+--------------------------------------------------------------------------------------------------------+|        |
+// |                                                +----------------------------------------------------------------------------------------------------------+        |
+// |                                                                                                                                                                    |
+// |                                                                                                                                                                    |
+// +--------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+//
+
 // ConfigurationPhase defines the Configuration FSM phase
 // +enum
-// +kubebuilder:validation:Enum={Init,Running,Pending,Merged,Failed,Deleting,Finished}
+// +kubebuilder:validation:Enum={Init,Running,Pending,Merged,MergeFailed,Upgrading,Deleting,Finished}
 type ConfigurationPhase string
 
 const (
-	CInitPhase     ConfigurationPhase = "Init"
-	CRunningPhase  ConfigurationPhase = "Running"
-	CPendingPhase  ConfigurationPhase = "Pending"
-	CMergedPhase   ConfigurationPhase = "Merged"
-	CFailedPhase   ConfigurationPhase = "Failed"
-	CDeletingPhase ConfigurationPhase = "Deleting"
-	CFinishedPhase ConfigurationPhase = "Finished"
+	CInitPhase        ConfigurationPhase = "Init"
+	CRunningPhase     ConfigurationPhase = "Running"
+	CPendingPhase     ConfigurationPhase = "Pending"
+	CMergedPhase      ConfigurationPhase = "Merged"
+	CMergeFailedPhase ConfigurationPhase = "MergeFailed"
+	CDeletingPhase    ConfigurationPhase = "Deleting"
+	CUpgradingPhase   ConfigurationPhase = "Upgrading"
+	CFinishedPhase    ConfigurationPhase = "Finished"
 )
 
 type ConfigParams struct {

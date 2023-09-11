@@ -396,7 +396,6 @@ func (p *updatePipeline) SyncStatus() *updatePipeline {
 		if p.configSpec == nil || p.itemStatus == nil {
 			return nil
 		}
-
 		p.itemStatus.Phase = appsv1alpha1.CMergedPhase
 		return nil
 	})

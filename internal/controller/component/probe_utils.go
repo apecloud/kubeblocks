@@ -156,8 +156,14 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 			})
 		}
 
+		dataVolumeName := dataVolume
+		for _, v := range component.VolumeTypes {
+			if v.Type == appsv1alpha1.VolumeTypeData {
+				dataVolumeName = v.Name
+			}
+		}
 		for _, volumeMount := range mainContainer.VolumeMounts {
-			if volumeMount.Name != dataVolume {
+			if volumeMount.Name != dataVolumeName {
 				continue
 			}
 			vm := volumeMount.DeepCopy()

@@ -140,6 +140,7 @@ func FromConfigData(data map[string]string, cmKeys *set.LinkedHashSetString) *Co
 	}
 }
 
+// GenerateComponentConfigurationName generates configuration name for component
 func GenerateComponentConfigurationName(clusterName, componentName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, componentName)
 }

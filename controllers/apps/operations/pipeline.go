@@ -239,7 +239,6 @@ func (p *pipeline) UpdateOpsLabel() *pipeline {
 func (p *pipeline) Sync() *pipeline {
 	return p.Wrap(func() error {
 		return p.Client.Patch(p.reqCtx.Ctx, p.updatedObject, client.MergeFrom(p.ConfigurationObj))
-
 		// var cc *appsv1alpha1.ConfigConstraintSpec
 		// var configSpec = *p.configSpec
 		//

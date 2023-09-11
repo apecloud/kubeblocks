@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -90,15 +91,13 @@ func (o *registerOption) validate() error {
 		}
 	}
 
-	//validateSource(o.source)
+	if validateSource(o.source) != nil {
+		fmt.Printf("your entered `--source` %s, which is neither a URL nor a file that can be found locally", o.source)
+	}
 	return nil
 }
 
 func (o *registerOption) run() error {
-	chartsDownloader, err := helm.NewDownloader(helm.NewConfig("default", "", "", false))
-	if err != nil {
-		return err
-	}
 	// before download, we should check the chart name whether conflict in local cache
 	for _, file := range cluster.CacheFiles {
 		if file.Name() == filepath.Base(o.source) {
@@ -106,17 +105,29 @@ func (o *registerOption) run() error {
 		}
 	}
 
-	_, _, err = chartsDownloader.DownloadTo(o.source, "", cluster.CliChartsCacheDir)
-	if err != nil {
-		return err
+	if _, err := url.ParseRequestURI(o.source); err == nil {
+		// source is URL
+		chartsDownloader, err := helm.NewDownloader(helm.NewConfig("default", "", "", false))
+		if err != nil {
+			return err
+		}
+		_, _, err = chartsDownloader.DownloadTo(o.source, "", cluster.CliChartsCacheDir)
+		if err != nil {
+			return err
+		}
+	} else {
+		// source is local_path
+		if err := copyFile(o.source, filepath.Join(cluster.CliChartsCacheDir, filepath.Base(o.source))); err != nil {
+			return err
+		}
 	}
+	// update config
 	cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
 		Name:  o.clusterType,
 		URL:   o.source,
 		Alias: o.alias,
 	})
 	return cluster.GlobalClusterChartConfig.WriteConfigs(cluster.CliClusterChartConfig)
-
 }
 
 func validateSource(source string) error {
@@ -128,5 +139,22 @@ func validateSource(source string) error {
 	if _, err = os.Stat(source); err == nil {
 		return nil
 	}
+	return err
+}
+
+func copyFile(src, dest string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
 	return err
 }

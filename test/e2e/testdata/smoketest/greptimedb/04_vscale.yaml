@@ -1,9 +1,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: mongodb-cluster-vscale-
+  generateName: greptimedb-cluster-vscale-
 spec:
-  clusterRef: mongodb-cluster
+  clusterRef: greptimedb-cluster
   type: VerticalScaling
   verticalScaling:
     - componentName: frontend

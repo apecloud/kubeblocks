@@ -116,7 +116,7 @@ func (p *pipeline) UpdateConfiguration() *pipeline {
 		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectConfiguration), &configuration)
 		switch {
 		case err == nil:
-			return p.updateConfiguration(&configuration, expectConfiguration)
+			return p.updateConfiguration(expectConfiguration, &configuration)
 		case apierrors.IsNotFound(err):
 			if len(expectConfiguration.Spec.ConfigItemDetails) == 0 {
 				return nil

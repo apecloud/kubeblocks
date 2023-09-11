@@ -20,9 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package action
 
 import (
+	"context"
+	"fmt"
+	"strings"
+
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 // CreateVolumeSnapshotAction is an action that creates the volume snapshot.
@@ -30,8 +43,23 @@ type CreateVolumeSnapshotAction struct {
 	// Name is the Name of the action.
 	Name string
 
+	// Owner is the owner of the volume snapshot.
+	Owner client.Object
+
+	// ObjectMeta is the metadata of the volume snapshot.
+	ObjectMeta metav1.ObjectMeta
+
+	// VolumeSnapshotNamePrefix is the prefix of the volume snapshot name.
+	VolumeSnapshotNamePrefix string
+
 	// PersistentVolumeClaims is the list of persistent volume claims to snapshot.
 	PersistentVolumeClaims []corev1.PersistentVolumeClaim
+}
+
+var configVolumeSnapshotError = []string{
+	"Failed to set default snapshot class with error",
+	"Failed to get snapshot class with error",
+	"Failed to create snapshot content with error cannot find CSI PersistentVolumeSource for volume",
 }
 
 func (c *CreateVolumeSnapshotAction) GetName() string {
@@ -39,11 +67,191 @@ func (c *CreateVolumeSnapshotAction) GetName() string {
 }
 
 func (c *CreateVolumeSnapshotAction) Type() dpv1alpha1.ActionType {
-	return dpv1alpha1.ActionTypeExec
+	return dpv1alpha1.ActionTypeOther
 }
 
 func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
-	return nil, nil
+	sb := newStatusBuilder(c)
+	handleErr := func(err error) (*dpv1alpha1.ActionStatus, error) {
+		return sb.withErr(err).build(), err
+	}
+
+	if err := c.validate(); err != nil {
+		return handleErr(err)
+	}
+
+	vsCli := intctrlutil.VolumeSnapshotCompatClient{
+		Client: ctx.Client,
+		Ctx:    ctx.Ctx,
+	}
+
+	var (
+		ok   bool
+		err  error
+		snap *vsv1.VolumeSnapshot
+	)
+	for _, pvc := range c.PersistentVolumeClaims {
+		key := client.ObjectKey{Namespace: pvc.Namespace, Name: c.VolumeSnapshotNamePrefix + pvc.Name}
+		// create volume snapshot
+		if err = c.createVolumeSnapshot(ctx, vsCli, &pvc, key); err != nil {
+			return handleErr(err)
+		}
+
+		ok, snap, err = ensureVolumeSnapshotReady(vsCli, key)
+		if err != nil {
+			return handleErr(err)
+		}
+
+		if !ok {
+			return sb.startTimestamp(&snap.CreationTimestamp).build(), nil
+		}
+	}
+
+	// volume snapshot is ready and status is not error
+	// TODO: now only support one volume to take snapshot, set its time to status
+	return sb.phase(dpv1alpha1.ActionPhaseCompleted).
+		phase(dpv1alpha1.ActionPhaseCompleted).
+		totalSize(snap.Status.RestoreSize.String()).
+		timeRange(snap.Status.CreationTime, snap.Status.CreationTime).
+		build(), nil
+}
+
+func (c *CreateVolumeSnapshotAction) validate() error {
+	if c.VolumeSnapshotNamePrefix == "" {
+		return errors.New("volume snapshot name prefix is required")
+	}
+	if len(c.PersistentVolumeClaims) == 0 {
+		return errors.New("persistent volume claims are required")
+	}
+	if len(c.PersistentVolumeClaims) > 1 {
+		return errors.New("only one persistent volume claim is supported")
+	}
+	return nil
+}
+
+func (c *CreateVolumeSnapshotAction) createVolumeSnapshot(ctx Context,
+	vsCli intctrlutil.VolumeSnapshotCompatClient,
+	pvc *corev1.PersistentVolumeClaim,
+	key client.ObjectKey) error {
+	// get volumeSnapshotClass, if not exists, create one
+	var (
+		err error
+		vsc *vsv1.VolumeSnapshotClass
+	)
+
+	snap := &vsv1.VolumeSnapshot{}
+	exists, err := vsCli.CheckResourceExists(key, snap)
+	if err != nil {
+		return err
+	}
+
+	// If the volume snapshot already exists, skip creating it.
+	if exists {
+		return nil
+	}
+
+	// create volume snapshot
+	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
+		vsc, err = getOrCreateVolumeSnapshotClass(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName)
+		if err != nil {
+			return err
+		}
+	}
+
+	c.ObjectMeta.Name = key.Name
+	c.ObjectMeta.Namespace = key.Namespace
+
+	// create volume snapshot
+	snap = &vsv1.VolumeSnapshot{
+		ObjectMeta: c.ObjectMeta,
+		Spec: vsv1.VolumeSnapshotSpec{
+			Source: vsv1.VolumeSnapshotSource{
+				PersistentVolumeClaimName: &pvc.Name,
+			},
+		},
+	}
+
+	if vsc != nil {
+		snap.Spec.VolumeSnapshotClassName = &vsc.Name
+	}
+
+	controllerutil.AddFinalizer(snap, types.DataProtectionFinalizerName)
+	if err = controllerutil.SetControllerReference(c.Owner, snap, ctx.Scheme); err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("creating volume snapshot %s/%s", snap.Namespace, snap.Name)
+	ctx.Recorder.Event(c.Owner, corev1.EventTypeNormal, "CreatingVolumeSnapshot", msg)
+	if err = ctx.Client.Create(ctx.Ctx, snap); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getOrCreateVolumeSnapshotClass(
+	ctx context.Context,
+	cli client.Client,
+	vsCli intctrlutil.VolumeSnapshotCompatClient,
+	scName string) (*vsv1.VolumeSnapshotClass, error) {
+	scObj := storagev1.StorageClass{}
+	// ignore if not found storage class, use the default volume snapshot class
+	if err := cli.Get(ctx, client.ObjectKey{Name: scName}, &scObj); client.IgnoreNotFound(err) != nil {
+		return nil, err
+	}
+
+	vscList := vsv1.VolumeSnapshotClassList{}
+	if err := vsCli.List(&vscList); err != nil {
+		return nil, err
+	}
+	for _, item := range vscList.Items {
+		if item.Driver == scObj.Provisioner {
+			return item.DeepCopy(), nil
+		}
+	}
+
+	// not found matched volume snapshot class, create one
+	vscName := fmt.Sprintf("vsc-%s-%s", scName, scObj.UID[:8])
+	newVsc, err := builder.BuildVolumeSnapshotClass(vscName, scObj.Provisioner)
+	if err != nil {
+		return nil, err
+	}
+	if err = vsCli.Create(newVsc); err != nil {
+		return nil, err
+	}
+	return newVsc, nil
+}
+
+func ensureVolumeSnapshotReady(
+	vsCli intctrlutil.VolumeSnapshotCompatClient,
+	key client.ObjectKey) (bool, *vsv1.VolumeSnapshot, error) {
+	snap := &vsv1.VolumeSnapshot{}
+	// not found, continue the creation process
+	exists, err := vsCli.CheckResourceExists(key, snap)
+	if err != nil {
+		return false, nil, err
+	}
+	if exists && snap.Status != nil {
+		// check if snapshot status throws an error, e.g. csi does not support volume snapshot
+		if isVolumeSnapshotConfigError(snap) {
+			return false, nil, errors.New(*snap.Status.Error.Message)
+		}
+		if snap.Status.ReadyToUse != nil && *snap.Status.ReadyToUse {
+			return true, snap, nil
+		}
+	}
+	return false, snap, nil
+}
+
+func isVolumeSnapshotConfigError(snap *vsv1.VolumeSnapshot) bool {
+	if snap.Status == nil || snap.Status.Error == nil || snap.Status.Error.Message == nil {
+		return false
+	}
+	for _, errMsg := range configVolumeSnapshotError {
+		if strings.Contains(*snap.Status.Error.Message, errMsg) {
+			return true
+		}
+	}
+	return false
 }
 
 var _ Action = &CreateVolumeSnapshotAction{}

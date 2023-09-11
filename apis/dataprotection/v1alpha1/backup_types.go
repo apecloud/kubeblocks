@@ -207,6 +207,16 @@ type ActionStatus struct {
 	// objectRef is the object reference for the action.
 	// +optional
 	ObjectRef *corev1.ObjectReference `json:"objectRef,omitempty"`
+
+	// totalSize is the total size of backed up data size.
+	// A string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+	// +optional
+	TotalSize string `json:"totalSize,omitempty"`
+
+	// timeRange records the time range of backed up data, for PITR, this is the
+	// time range of recoverable data.
+	// +optional
+	TimeRange *BackupTimeRange `json:"timeRange,omitempty"`
 }
 
 type ActionPhase string
@@ -229,9 +239,9 @@ const (
 type ActionType string
 
 const (
-	ActionTypeExec        ActionType = "Exec"
 	ActionTypeJob         ActionType = "Job"
 	ActionTypeStatefulSet ActionType = "StatefulSet"
+	ActionTypeOther       ActionType = "Other"
 )
 
 // +genclient

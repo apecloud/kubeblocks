@@ -192,7 +192,7 @@ func (r *Request) buildBackupDataStsAction(backupDataAct *dpv1alpha1.BackupDataA
 		Name:       actionName,
 		ObjectMeta: objectMeta,
 		Owner:      r.Backup,
-		PodSpec:    r.buildJobActionPodSpec(actionName, &backupDataAct.JobActionSpec),
+		PodSpec:    podSpec,
 		Replicas:   &replicas,
 	}, nil
 }
@@ -214,8 +214,15 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 	}
 
 	return &action.CreateVolumeSnapshotAction{
-		Name:                   "createVolumesnapshot",
-		PersistentVolumeClaims: pvcs,
+		Name: "createVolumeSnapshot",
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: r.Backup.Namespace,
+			Name:      r.Backup.Name,
+			Labels:    buildBackupWorkloadLabels(r.Backup),
+		},
+		Owner:                    r.Backup,
+		VolumeSnapshotNamePrefix: r.Backup.Name,
+		PersistentVolumeClaims:   pvcs,
 	}, nil
 }
 
@@ -242,24 +249,24 @@ func (r *Request) buildAction(name string, act *dpv1alpha1.ActionSpec) (action.A
 func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) action.Action {
 	targetPod := r.TargetPods[0]
 	return &action.ExecAction{
-		Name:      name,
-		Command:   exec.Command,
-		Container: exec.Container,
-		Namespace: targetPod.Namespace,
-		PodName:   targetPod.Name,
-		Timeout:   exec.Timeout,
+		JobAction: action.JobAction{
+			Name:       name,
+			ObjectMeta: *buildBackupWorkloadObjMeta(r.Backup, name),
+			Owner:      r.Backup,
+		},
+		Command:            exec.Command,
+		Container:          exec.Container,
+		Namespace:          targetPod.Namespace,
+		PodName:            targetPod.Name,
+		Timeout:            exec.Timeout,
+		ServiceAccountName: r.targetServiceAccountName(),
 	}
 }
 
 func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (action.Action, error) {
-	objectMeta := metav1.ObjectMeta{
-		Namespace: r.Backup.Namespace,
-		Name:      generateBackupWorkloadName(r.Backup, name),
-		Labels:    buildBackupWorkloadLabels(r.Backup),
-	}
 	return &action.JobAction{
 		Name:         name,
-		ObjectMeta:   objectMeta,
+		ObjectMeta:   *buildBackupWorkloadObjMeta(r.Backup, name),
 		Owner:        r.Backup,
 		PodSpec:      r.buildJobActionPodSpec(name, job),
 		BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
@@ -361,11 +368,8 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	return podSpec
 }
 
-// buildBackupDataActionPodSpec builds the pod spec for the backup data action.
-// The pod spec is similar to the JobAction, but with some differences:
-// 1. init container to sync the backup progress
-// 2. extra environment variables to set the sync interval seconds
-func (r *Request) buildBackupDataActionPodSpec() {
+// buildSyncProgressContainer builds the init container to sync the backup progress.
+func (r *Request) buildSyncProgressContainer(original *corev1.Container) {
 
 }
 

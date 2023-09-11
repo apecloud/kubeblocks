@@ -29,4 +29,5 @@ spec:
       volumeMounts:
         - name: data
           mountPath: /data/mysql
-
+  - name: volumeSnapshot
+    snapshotVolumes: true

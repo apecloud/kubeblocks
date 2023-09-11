@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -111,7 +112,7 @@ func getPVCsByVolumeNames(cli client.Client,
 }
 
 func backupRepoVolumeName(pvcName string) string {
-	return fmt.Sprintf("backup-%s", pvcName)
+	return fmt.Sprintf("dp-backup-%s", pvcName)
 }
 
 func buildBackupRepoVolume(pvcName string) corev1.Volume {
@@ -157,4 +158,12 @@ func buildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 	}
 	labels[types.DataProtectionLabelBackupNameKey] = backup.Name
 	return labels
+}
+
+func buildBackupWorkloadObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.ObjectMeta {
+	return &metav1.ObjectMeta{
+		Name:      generateBackupWorkloadName(backup, prefix),
+		Namespace: backup.Namespace,
+		Labels:    buildBackupWorkloadLabels(backup),
+	}
 }

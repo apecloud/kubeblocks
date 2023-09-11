@@ -294,13 +294,13 @@ func (r *BackupReconciler) handleNewPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup, err)
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	}
 
 	// set and patch backup object meta, including labels, annotations and finalizers
 	// if the backup object meta is changed, the backup object will be patched.
 	if patched, err := r.patchBackupObjectMeta(backup, request); err != nil {
-		return r.updateStatusIfFailed(reqCtx, request.Backup, err)
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	} else if patched {
 		return intctrlutil.Reconciled()
 	}
@@ -519,28 +519,9 @@ func (r *BackupReconciler) getBackupRepo(ctx context.Context,
 func (r *BackupReconciler) handleRunningPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-	var (
-		err         error
-		actionIndex = -1
-	)
-
-	// check all actions status, if any action failed, update backup status to failed
-	// if all actions completed, update backup status to completed, otherwise,
-	// continue to handle following actions.
-	for i, act := range backup.Status.Actions {
-		switch act.Phase {
-		case dpv1alpha1.ActionPhaseFailed:
-			return r.updateStatusIfFailed(reqCtx, backup, fmt.Errorf("action %s failed", act.Name))
-		case dpv1alpha1.ActionPhaseCompleted:
-			continue
-		case dpv1alpha1.ActionPhaseNew, dpv1alpha1.ActionPhaseRunning:
-			actionIndex = i
-		}
-	}
-
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, request.Backup, err)
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	}
 
 	completed := func() (reconcile.Result, error) {
@@ -558,15 +539,10 @@ func (r *BackupReconciler) handleRunningPhase(
 		return intctrlutil.Reconciled()
 	}
 
-	// all actions completed, update backup status to completed
-	if actionIndex == -1 {
-		return completed()
-	}
-
 	// there are actions not completed, continue to handle following actions
 	actions, err := request.BuildActions()
 	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, request.Backup, err)
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	}
 
 	actionCtx := action.Context{
@@ -577,8 +553,10 @@ func (r *BackupReconciler) handleRunningPhase(
 		RestClientConfig: r.RestConfig,
 	}
 
-	for i := actionIndex; i < len(actions); i++ {
-		act := actions[i]
+	// check all actions status, if any action failed, update backup status to failed
+	// if all actions completed, update backup status to completed, otherwise,
+	// continue to handle following actions.
+	for i, act := range actions {
 		status, err := act.Execute(actionCtx)
 		if err != nil {
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "backup action", act.GetName())
@@ -589,13 +567,13 @@ func (r *BackupReconciler) handleRunningPhase(
 		case dpv1alpha1.ActionPhaseCompleted:
 			continue
 		case dpv1alpha1.ActionPhaseFailed:
-			return r.updateStatusIfFailed(reqCtx, request.Backup, fmt.Errorf("action %s failed", act.GetName()))
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("action %s failed", act.GetName()))
 		case dpv1alpha1.ActionPhaseRunning:
 			// update status
 			if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 	}
 
@@ -823,141 +801,20 @@ func (r *BackupReconciler) handleCompletedPhase(
 	return intctrlutil.Reconciled()
 }
 
-func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup, err error) (ctrl.Result, error) {
-	patch := client.MergeFrom(backup.DeepCopy())
+func (r *BackupReconciler) updateStatusIfFailed(
+	reqCtx intctrlutil.RequestCtx,
+	original *dpv1alpha1.Backup,
+	backup *dpv1alpha1.Backup,
+	err error) (ctrl.Result, error) {
 	sendWarningEventForError(r.Recorder, backup, err)
 	backup.Status.Phase = dpv1alpha1.BackupPhaseFailed
 	backup.Status.FailureReason = err.Error()
-	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); errUpdate != nil {
+	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(original)); errUpdate != nil {
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
 	}
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
-/*
-func (r *BackupReconciler) createVolumeSnapshot(
-	reqCtx intctrlutil.RequestCtx,
-	backup *dpv1alpha1.Backup,
-	snapshotPolicy *dpv1alpha1.SnapshotPolicy) error {
-
-	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := r.vsCli.CheckResourceExists(reqCtx.Req.NamespacedName, snap)
-	if err != nil {
-		return err
-	}
-	if exists {
-		// find resource object, skip created.
-		return nil
-	}
-
-	// get backup policy
-	backupPolicy := &dpv1alpha1.BackupPolicy{}
-	backupPolicyNameSpaceName := types.NamespacedName{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      backup.Spec.BackupPolicyName,
-	}
-
-	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
-		reqCtx.Log.Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
-		return err
-	}
-
-	targetPVCs, err := r.getTargetPVCs(reqCtx, backup, snapshotPolicy.Target.LabelsSelector.MatchLabels)
-	if err != nil {
-		return err
-	}
-	for _, target := range targetPVCs {
-		snapshotName := backup.Name
-		vsc := snapshotv1.VolumeSnapshotClass{}
-		if target.Spec.StorageClassName != nil {
-			if err = r.getVolumeSnapshotClassOrCreate(reqCtx.Ctx, *target.Spec.StorageClassName, &vsc); err != nil {
-				return err
-			}
-		}
-		labels := buildBackupWorkloadLabels(backup)
-		labels[constant.VolumeTypeLabelKey] = target.Labels[constant.VolumeTypeLabelKey]
-		if target.Labels[constant.VolumeTypeLabelKey] == string(appsv1alpha1.VolumeTypeLog) {
-			snapshotName += "-log"
-		}
-		snap = &snapshotv1.VolumeSnapshot{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: reqCtx.Req.Namespace,
-				Name:      snapshotName,
-				Labels:    labels,
-			},
-			Spec: snapshotv1.VolumeSnapshotSpec{
-				Source: snapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: &target.Name,
-				},
-				VolumeSnapshotClassName: &vsc.Name,
-			},
-		}
-
-		controllerutil.AddFinalizer(snap, dataProtectionFinalizerName)
-		if err = controllerutil.SetControllerReference(backup, snap, r.Scheme); err != nil {
-			return err
-		}
-
-		reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap.Name)
-		if err = r.vsCli.Create(snap); err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	msg := fmt.Sprintf("Waiting for the volume snapshot %s creation to complete in backup.", snap.Name)
-	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingVolumeSnapshot", msg)
-	return nil
-}
-
-func (r *BackupReconciler) getVolumeSnapshotClassOrCreate(ctx context.Context, storageClassName string, vsc *snapshotv1.VolumeSnapshotClass) error {
-	storageClassObj := storagev1.StorageClass{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: storageClassName}, &storageClassObj); err != nil {
-		// ignore if not found storage class, use the default volume snapshot class
-		return client.IgnoreNotFound(err)
-	}
-	vscList := snapshotv1.VolumeSnapshotClassList{}
-	if err := r.vsCli.List(&vscList); err != nil {
-		return err
-	}
-	for _, item := range vscList.Items {
-		if item.Driver == storageClassObj.Provisioner {
-			*vsc = item
-			return nil
-		}
-	}
-	// not found matched volume snapshot class, create one
-	vscName := fmt.Sprintf("vsc-%s-%s", storageClassName, storageClassObj.UID[:8])
-	newVSC, err := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
-	if err != nil {
-		return err
-	}
-	if err = r.vsCli.Create(newVSC); err != nil {
-		return err
-	}
-	*vsc = *newVSC
-	return nil
-}
-
-func (r *BackupReconciler) ensureVolumeSnapshotReady(
-	key types.NamespacedName) (bool, *metav1.Time, error) {
-	snap := &snapshotv1.VolumeSnapshot{}
-	// not found, continue the creation process
-	exists, err := r.vsCli.CheckResourceExists(key, snap)
-	if err != nil {
-		return false, nil, err
-	}
-	if exists && snap.Status != nil {
-		// check if snapshot status throws an error, e.g. csi does not support volume snapshot
-		if isVolumeSnapshotConfigError(snap) {
-			return false, nil, errors.New(*snap.Status.Error.Message)
-		}
-		if snap.Status.ReadyToUse != nil && *snap.Status.ReadyToUse {
-			return true, snap.Status.CreationTime, nil
-		}
-	}
-	return false, nil, nil
-}
-*/
 /*
 func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup,

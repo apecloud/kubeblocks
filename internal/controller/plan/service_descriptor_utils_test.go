@@ -172,14 +172,14 @@ var _ = Describe("generate service descriptor", func() {
 				name: "version string test false",
 				fields: versionCmp{
 					serviceRefDeclRegex:      "8.0.\\d{1,2}$",
-					serviceDescriptorVersion: "8.0.8.8",
+					serviceDescriptorVersion: "8.0.8.8.8",
 				},
 				want: false,
 			}, {
 				name: "version string test true",
 				fields: versionCmp{
 					serviceRefDeclRegex:      "^[v\\-]*?(\\d{1,2}\\.){0,3}\\d{1,2}$",
-					serviceDescriptorVersion: "8.0.8.0",
+					serviceDescriptorVersion: "v-8.0.8.0",
 				},
 				want: true,
 			}, {

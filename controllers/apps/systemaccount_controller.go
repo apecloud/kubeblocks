@@ -44,8 +44,8 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	lorry "github.com/apecloud/kubeblocks/lorry/client"
 )
 
 // SystemAccountReconciler reconciles a SystemAccount object.
@@ -436,11 +436,11 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pod is running for cluster: %s, component %s", key.clusterName, key.componentName)
 	}
 
-	sqlChanClient, err := sqlchannel.NewClientWithPod(target, key.characterType)
+	lorryClient, err := lorry.NewClientWithPod(target, key.characterType)
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err
 	}
-	accounts, err := sqlChanClient.GetSystemAccounts()
+	accounts, err := lorryClient.GetSystemAccounts()
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err
 	}

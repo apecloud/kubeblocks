@@ -372,22 +372,29 @@ func getComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
 	workload metav1.Object,
 	componentReplicas,
 	availableReplicas int32,
+	checkLeaderIsReady func(pod *corev1.Pod, workload metav1.Object) bool,
 	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.ClusterComponentPhase {
 	podCount := len(podList.Items)
 	if podCount == 0 || availableReplicas == 0 {
 		return getPhaseWithNoAvailableReplicas(componentReplicas)
 	}
-	var existLatestRevisionFailedPod bool
+	var (
+		existLatestRevisionFailedPod bool
+		leaderIsReady                bool
+	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
 			return ""
 		}
+		if checkLeaderIsReady == nil || checkLeaderIsReady(&v, workload) {
+			leaderIsReady = true
+		}
 		if checkFailedPodRevision != nil && checkFailedPodRevision(&v, workload) {
 			existLatestRevisionFailedPod = true
 		}
 	}
-	return getCompPhaseByConditions(existLatestRevisionFailedPod, true,
+	return getCompPhaseByConditions(existLatestRevisionFailedPod, leaderIsReady,
 		componentReplicas, int32(podCount), availableReplicas)
 }
 

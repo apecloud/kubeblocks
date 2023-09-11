@@ -50,10 +50,10 @@ auth:
 
 
 configTemplate:
-  ## @param config template name
-  ## name: mysql-3node-tpl-8.0
+## @param config template name
+## name: mysql-3node-tpl-8.0
 
-imagePullSecrets: []
+imagePullSecrets: [ ]
 nameOverride: ""
 fullnameOverride: ""
 clusterVersionOverride: ""
@@ -84,6 +84,9 @@ roleProbe:
   failureThreshold: 2
   periodSeconds: 1
   timeoutSeconds: 1
+
+logCollector:
+  enabled: false
 
 metrics:
   image:

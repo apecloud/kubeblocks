@@ -1,0 +1,67 @@
+apiVersion: storage.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: obs
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  csiDriverName: ru.yandex.s3.csi
+  csiDriverSecretTemplate: |
+    accessKeyID: {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secretAccessKey: {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    {{ `{{- $region := index .Parameters "region" }}` }}
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "https://obs.%s.myhuaweicloud.com" $region) }}` }}
+    {{ `{{- end }}` }}
+    endpoint: {{ `{{ $endpoint }}` }}
+    locationConstraint: {{ `{{ $region }}` }}
+
+  storageClassTemplate: |
+    provisioner: ru.yandex.s3.csi
+    parameters:
+      mounter: geesefs
+      # you can set mount options here, for example limit memory cache size (recommended)
+      options: {{ `{{ printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 %s --subdomain" (index .Parameters "mountOptions") }}` }}
+      bucket: {{ `{{ index .Parameters "bucket" }}` }}
+      csi.storage.k8s.io/provisioner-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/provisioner-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/controller-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/controller-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-stage-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-stage-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        region:
+          type: string
+          description: "OBS region, e.g. cn-north-4"
+        bucket:
+          type: string
+          description: "OBS bucket"
+        endpoint:
+          type: string
+          description: "OBS endpoint (optional)"
+        mountOptions:
+          type: string
+          description: "mount options for geesefs"
+        accessKeyId:
+          type: string
+          description: "OBS access key"
+        secretAccessKey:
+          type: string
+          description: "OBS secret key"
+
+      required:
+        - bucket
+        - region
+        - accessKeyId
+        - secretAccessKey
+
+    credentialFields:
+      - accessKeyId
+      - secretAccessKey

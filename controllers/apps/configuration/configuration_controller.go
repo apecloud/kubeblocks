@@ -127,6 +127,12 @@ func (r *ConfigurationReconciler) runTasks(
 			task.Status.Phase = appsv1alpha1.CMergeFailedPhase
 			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)
+			continue
+		}
+		if err := task.SyncStatus(fetcher); err != nil {
+			task.Status.Phase = appsv1alpha1.CFailedPhase
+			task.Status.Message = cfgutil.ToPointer(err.Error())
+			errs = append(errs, err)
 		}
 	}
 

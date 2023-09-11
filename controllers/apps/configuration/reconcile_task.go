@@ -32,7 +32,8 @@ type Task struct {
 	Status *appsv1alpha1.ConfigurationItemDetailStatus
 	Name   string
 
-	Do func(task *Task, component *component.SynthesizedComponent) error
+	Do         func(task *Task, component *component.SynthesizedComponent) error
+	SyncStatus func(task *Task) error
 }
 
 func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {

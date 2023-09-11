@@ -223,8 +223,11 @@ spec:
                       - Init
                       - Running
                       - Pending
-                      - Failed
+                      - Merged
+                      - MergeFailed
+                      - Upgrading
                       - Deleting
+                      - FailedAndRetry
                       - Finished
                       type: string
                   required:

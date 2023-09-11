@@ -148,24 +148,26 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	// mergeAnnotations keeps the original annotations.
-	mergeAnnotations := func(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
-		if targetAnnotations == nil || originalAnnotations == nil {
+	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
+		if targetMap == nil || originalMap == nil {
 			return
 		}
-		if *targetAnnotations == nil {
-			*targetAnnotations = map[string]string{}
+		if *targetMap == nil {
+			*targetMap = map[string]string{}
 		}
-		for k, v := range originalAnnotations {
+		for k, v := range originalMap {
 			// if the annotation not exist in targetAnnotations, copy it from original.
-			if _, ok := (*targetAnnotations)[k]; !ok {
-				(*targetAnnotations)[k] = v
+			if _, ok := (*targetMap)[k]; !ok {
+				(*targetMap)[k] = v
 			}
 		}
 	}
 
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
+		mergeMetadataMap(oldSts.Labels, &newSts.Labels)
+		oldSts.Labels = newSts.Labels
 		// if annotations exist and are replaced, the StatefulSet will be updated.
-		mergeAnnotations(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
+		mergeMetadataMap(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
 		oldSts.Spec.Replicas = newSts.Spec.Replicas
 		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
@@ -179,7 +181,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 				return strings.HasPrefix(k, "monitor.kubeblocks.io")
 			})
 		}
-		mergeAnnotations(oldSvc.Annotations, &newSvc.Annotations)
+		mergeMetadataMap(oldSvc.Annotations, &newSvc.Annotations)
 		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec
 		return oldSvc

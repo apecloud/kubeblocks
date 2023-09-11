@@ -166,15 +166,14 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 	return roleMap
 }
 
-func SetMembersStatusForTest(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
-	setMembersStatus(rsm, pods)
-}
-
 func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*rsm)
 	for _, pod := range pods {
+		if intctrlutil.GetPodRevision(&pod) != rsm.Status.UpdateRevision {
+			continue
+		}
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
@@ -656,15 +655,32 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 // 1. all replicas exist
 // 2. all members have role set
 func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
+	if rsm == nil {
+		return false
+	}
+	// check whether the rsm cluster has been initialized
+	if rsm.Status.ReadyInitReplicas != rsm.Status.InitReplicas {
+		return false
+	}
+	// check whether latest spec has been sent to the underlying workload(sts)
 	if rsm.Status.ObservedGeneration != rsm.Generation ||
 		rsm.Status.CurrentGeneration != rsm.Generation {
 		return false
 	}
-	if rsm == nil || rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
-		return true
-	}
-	if rsm.Spec.Replicas != nil && rsm.Status.UpdatedReplicas != *rsm.Spec.Replicas {
+	// check whether the underlying workload(sts) is ready
+	if rsm.Spec.Replicas == nil {
 		return false
+	}
+	replicas := *rsm.Spec.Replicas
+	if rsm.Status.Replicas != replicas ||
+		rsm.Status.ReadyReplicas != replicas ||
+		rsm.Status.AvailableReplicas != replicas ||
+		rsm.Status.UpdatedReplicas != replicas {
+		return false
+	}
+	// check whether role probe has done
+	if rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
+		return true
 	}
 	membersStatus := rsm.Status.MembersStatus
 	if len(membersStatus) != int(*rsm.Spec.Replicas) {

@@ -187,76 +187,13 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err != nil {
 		return err
 	}
-	var messages appsv1alpha1.ComponentMessageMap
-	hasFailedPod := func() bool {
-		if len(pods) != int(c.Component.Replicas) {
-			return false
-		}
-		for _, pod := range pods {
-			if intctrlutil.GetPodRevision(pod) != c.runningWorkload.Status.UpdateRevision {
-				return false
-			}
-		}
-
-		hasFailedPod, msg, _ := hasFailedAndTimedOutPod(pods)
-		if hasFailedPod {
-			messages = msg
-			return true
-		}
-		if c.Component.WorkloadType != appsv1alpha1.Consensus && c.Component.WorkloadType != appsv1alpha1.Replication {
-			return false
-		}
-		hasProbeTimeout := false
-		for _, pod := range pods {
-			if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
-				continue
-			}
-			for _, condition := range pod.Status.Conditions {
-				if condition.Type != corev1.PodReady || condition.Status != corev1.ConditionTrue {
-					continue
-				}
-				podsReadyTime := &condition.LastTransitionTime
-				if isProbeTimeout(c.Component.Probes, podsReadyTime) {
-					hasProbeTimeout = true
-					if messages == nil {
-						messages = appsv1alpha1.ComponentMessageMap{}
-					}
-					messages.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
-				}
-			}
-		}
-		return hasProbeTimeout
+	hasFailedPod, messages, err := c.hasFailedPod(reqCtx, cli, pods)
+	if err != nil {
+		return err
 	}
-	isScaleOutFailed := func() bool {
-		if c.runningWorkload.Spec.Replicas == nil {
-			return false
-		}
-		if c.Component.Replicas <= *c.runningWorkload.Spec.Replicas {
-			return false
-		}
-		if c.WorkloadVertex == nil {
-			return false
-		}
-		stsObj := ConvertRSMToSTS(c.runningWorkload)
-		rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
-		stsProto := ConvertRSMToSTS(rsmProto)
-		backupKey := types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      stsObj.Name + "-scaling",
-		}
-		d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
-		if err != nil {
-			return false
-		}
-		if status, _ := d.checkBackupStatus(); status == backupStatusFailed {
-			return true
-		}
-		for _, name := range d.pvcKeysToRestore() {
-			if status, _ := d.checkRestoreStatus(name); status == backupStatusFailed {
-				return true
-			}
-		}
-		return false
+	isScaleOutFailed, err := c.isScaleOutFailed(reqCtx, cli)
+	if err != nil {
+		return err
 	}
 	isAllConfigSynced := c.isAllConfigSynced(reqCtx, cli)
 	hasVolumeExpansionRunning := func() bool {
@@ -292,7 +229,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	case isRunning && isAllConfigSynced && !hasVolumeExpansionRunning():
 		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
 		updatePodsReady(true)
-	case hasFailedPod(), isScaleOutFailed():
+	case hasFailedPod, isScaleOutFailed:
 		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "Component is Failed")
 	case isFirstGeneration():
 		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
@@ -329,6 +266,82 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 
 	return nil
+}
+
+func (c *rsmComponentBase) hasFailedPod(reqCtx intctrlutil.RequestCtx, cli client.Client, pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
+	if isLatestRevision, err := isPodWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
+		return false, nil, err
+	} else if !isLatestRevision {
+		return false, nil, nil
+	}
+
+	var messages appsv1alpha1.ComponentMessageMap
+	// check pod readiness
+	hasFailedPod, msg, _ := hasFailedAndTimedOutPod(pods)
+	if hasFailedPod {
+		messages = msg
+		return true, messages, nil
+	}
+	// check role probe
+	if c.Component.WorkloadType != appsv1alpha1.Consensus && c.Component.WorkloadType != appsv1alpha1.Replication {
+		return false, messages, nil
+	}
+	hasProbeTimeout := false
+	for _, pod := range pods {
+		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
+			continue
+		}
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type != corev1.PodReady || condition.Status != corev1.ConditionTrue {
+				continue
+			}
+			podsReadyTime := &condition.LastTransitionTime
+			if isProbeTimeout(c.Component.Probes, podsReadyTime) {
+				hasProbeTimeout = true
+				if messages == nil {
+					messages = appsv1alpha1.ComponentMessageMap{}
+				}
+				messages.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+			}
+		}
+	}
+	return hasProbeTimeout, messages, nil
+}
+
+func (c *rsmComponentBase) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
+	if c.runningWorkload.Spec.Replicas == nil {
+		return false, nil
+	}
+	if c.Component.Replicas <= *c.runningWorkload.Spec.Replicas {
+		return false, nil
+	}
+	if c.WorkloadVertex == nil {
+		return false, nil
+	}
+	stsObj := ConvertRSMToSTS(c.runningWorkload)
+	rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	stsProto := ConvertRSMToSTS(rsmProto)
+	backupKey := types.NamespacedName{
+		Namespace: stsObj.Namespace,
+		Name:      stsObj.Name + "-scaling",
+	}
+	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	if err != nil {
+		return false, err
+	}
+	if status, err := d.checkBackupStatus(); err != nil {
+		return false, err
+	} else if status == backupStatusFailed {
+		return true, nil
+	}
+	for _, name := range d.pvcKeysToRestore() {
+		if status, err := d.checkRestoreStatus(name); err != nil {
+			return false, err
+		} else if status == backupStatusFailed {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *rsmComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

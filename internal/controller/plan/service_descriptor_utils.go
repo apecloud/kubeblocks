@@ -161,10 +161,10 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 				serviceReferences[serviceRefDecl.Name] = serviceDescriptor
 			}
 		}
-		//_, exist := serviceReferences[serviceRefDecl.Name]
-		//if !exist {
-		//	return nil, fmt.Errorf("componentDef %s's serviceRefDeclaration %s has not been defined, please check if there is corresponding service definition and binding in Cluster.spec.componentSpecs[*].serviceRefs", clusterCompDef.Name, serviceRefDecl.Name)
-		//}
+		// _, exist := serviceReferences[serviceRefDecl.Name]
+		// if !exist {
+		//	 return nil, fmt.Errorf("componentDef %s's serviceRefDeclaration %s has not been defined, please check if there is corresponding service definition and binding in Cluster.spec.componentSpecs[*].serviceRefs", clusterCompDef.Name, serviceRefDecl.Name)
+		// }
 	}
 	return serviceReferences, nil
 }

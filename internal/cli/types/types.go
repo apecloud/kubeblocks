@@ -34,6 +34,13 @@ import (
 const (
 	// CliDefaultHome defines kbcli default home name
 	CliDefaultHome = ".kbcli"
+
+	// CliClusterTypeConfigs defines kbcli cluster-type config file name
+	CliClusterTypeConfigs = "cluster_types"
+
+	//	CliChartsCache defines kbcli charts cache dir name
+	CliChartsCache = "charts"
+
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
 

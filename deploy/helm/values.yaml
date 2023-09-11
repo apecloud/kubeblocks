@@ -1792,7 +1792,7 @@ storageClass:
     tencentCloud:
       volumeType: CLOUD_SSD
     huaweiCloud: # Huawei Cloud
-      volumeType: SAS
+      volumeType: SSD
       fsType: ext4
 
 external-dns:

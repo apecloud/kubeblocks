@@ -21,6 +21,8 @@ package cluster
 
 import (
 	"fmt"
+	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -35,7 +37,7 @@ import (
 
 var clusterRegisterExample = templates.Examples(`
 	# Pull a cluster type to local and register it to "kbcli cluster create" sub-cmd from specified URL
-	kbcli cluster register orioledb --url https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
+	kbcli cluster register orioledb --source https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
 `)
 
 type registerOption struct {
@@ -43,7 +45,7 @@ type registerOption struct {
 	genericclioptions.IOStreams
 
 	clusterType cluster.ClusterType
-	url         string
+	source      string
 	alias       string
 }
 
@@ -58,7 +60,7 @@ func newRegisterOption(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newRegisterOption(f, streams)
 	cmd := &cobra.Command{
-		Use:     "register [NAME] --url [CHART-URL]",
+		Use:     "register [NAME] --source [CHART-URL]",
 		Short:   "Pull the cluster chart to the local cache and register the type to 'create' sub-command",
 		Example: clusterRegisterExample,
 		Args:    cobra.ExactArgs(1),
@@ -68,9 +70,10 @@ func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			cmdutil.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().StringVar(&o.url, "url", "", "Specify the cluster type chart download url")
+	cmd.Flags().StringVarP(&o.source, "source", "S", "", "Specify the cluster type chart source, support a URL or a local file path")
 	cmd.Flags().StringVar(&o.alias, "alias", "", "Set the cluster type alias")
-	_ = cmd.MarkFlagRequired("url")
+	_ = cmd.MarkFlagRequired("source")
+
 	return cmd
 }
 
@@ -87,6 +90,7 @@ func (o *registerOption) validate() error {
 		}
 	}
 
+	//validateSource(o.source)
 	return nil
 }
 
@@ -97,20 +101,32 @@ func (o *registerOption) run() error {
 	}
 	// before download, we should check the chart name whether conflict in local cache
 	for _, file := range cluster.CacheFiles {
-		if file.Name() == filepath.Base(o.url) {
+		if file.Name() == filepath.Base(o.source) {
 			return fmt.Errorf("cluster type '%s' register failed due to the cluster chart's name conflict %s", o.clusterType, file.Name())
 		}
 	}
 
-	_, _, err = chartsDownloader.DownloadTo(o.url, "", cluster.CliChartsCacheDir)
+	_, _, err = chartsDownloader.DownloadTo(o.source, "", cluster.CliChartsCacheDir)
 	if err != nil {
 		return err
 	}
 	cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
 		Name:  o.clusterType,
-		URL:   o.url,
+		URL:   o.source,
 		Alias: o.alias,
 	})
 	return cluster.GlobalClusterChartConfig.WriteConfigs(cluster.CliClusterChartConfig)
 
+}
+
+func validateSource(source string) error {
+	var err error
+	if _, err = url.ParseRequestURI(source); err == nil {
+		return nil
+	}
+
+	if _, err = os.Stat(source); err == nil {
+		return nil
+	}
+	return err
 }

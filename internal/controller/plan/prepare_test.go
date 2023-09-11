@@ -123,7 +123,15 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		return RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
+		return RenderConfigNScriptFiles(
+			&intctrlutil.ResourceCtx{
+				Context:       reqCtx.Ctx,
+				Client:        cli,
+				Namespace:     cluster.GetNamespace(),
+				ClusterName:   cluster.GetNamespace(),
+				ComponentName: component.Name,
+			},
+			clusterVer, cluster, component, workload, podSpec, nil)
 	}
 
 	// TODO: may add a PDB transform to Create/Update/Delete.

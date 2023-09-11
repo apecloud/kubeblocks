@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plan
 
 import (
-	"context"
-
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,22 +31,19 @@ import (
 
 // RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
 // and generates configManager sidecar for the reconfigure operation.
-// TODO rename this function, this function name is not very reasonable, but there is no suitable name.
-func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
+func RenderConfigNScriptFiles(resourceCtx *intctrlutil.ResourceCtx,
+	clusterVersion *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	obj client.Object,
+	compObject client.Object,
 	podSpec *corev1.PodSpec,
-	localObjs []client.Object,
-	ctx context.Context,
-	cli client.Client) error {
+	localObjs []client.Object) error {
 	return configuration.NewConfigReconcileTask(
-		cli,
-		ctx,
+		resourceCtx,
 		cluster,
 		clusterVersion,
 		component,
-		obj,
+		compObject,
 		podSpec,
 		localObjs).Reconcile()
 }

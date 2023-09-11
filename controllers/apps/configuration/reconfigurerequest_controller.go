@@ -136,34 +136,34 @@ func checkConfigurationObject(object client.Object) bool {
 	return checkConfigLabels(object, ConfigurationRequiredLabels)
 }
 
-func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, configConstraint *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
 
 	var (
-		componentName  = config.Labels[constant.KBAppComponentLabelKey]
-		configSpecName = config.Labels[constant.CMConfigurationSpecProviderLabelKey]
+		componentName  = configMap.Labels[constant.KBAppComponentLabelKey]
+		configSpecName = configMap.Labels[constant.CMConfigurationSpecProviderLabelKey]
 	)
 
 	componentLabels := map[string]string{
-		constant.AppNameLabelKey:        config.Labels[constant.AppNameLabelKey],
-		constant.AppInstanceLabelKey:    config.Labels[constant.AppInstanceLabelKey],
-		constant.KBAppComponentLabelKey: config.Labels[constant.KBAppComponentLabelKey],
+		constant.AppNameLabelKey:        configMap.Labels[constant.AppNameLabelKey],
+		constant.AppInstanceLabelKey:    configMap.Labels[constant.AppInstanceLabelKey],
+		constant.KBAppComponentLabelKey: configMap.Labels[constant.KBAppComponentLabelKey],
 	}
 
 	var keySelector []string
-	if keysLabel, ok := config.Labels[constant.CMConfigurationCMKeysLabelKey]; ok && keysLabel != "" {
+	if keysLabel, ok := configMap.Labels[constant.CMConfigurationCMKeysLabelKey]; ok && keysLabel != "" {
 		keySelector = strings.Split(keysLabel, ",")
 	}
 
-	configPatch, forceRestart, err := createConfigPatch(config, tpl.Spec.FormatterConfig, keySelector)
+	configPatch, forceRestart, err := createConfigPatch(configMap, configConstraint.Spec.FormatterConfig, keySelector)
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
 	// No parameters updated
 	if configPatch != nil && !configPatch.IsModify {
-		reqCtx.Recorder.Eventf(config, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
+		reqCtx.Recorder.Eventf(configMap, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
 			"nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, config, core.ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType)
 	}
 
 	if configPatch != nil {
@@ -174,17 +174,20 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			configPatch.UpdateConfig))
 	}
 
-	reconcileContext := newConfigReconcileContext(reqCtx.Ctx,
-		r.Client,
-		config,
-		tpl,
-		componentName,
+	reconcileContext := newConfigReconcileContext(
+		&intctrlutil.ResourceCtx{
+			Context:       reqCtx.Ctx,
+			Client:        r.Client,
+			Namespace:     configMap.Namespace,
+			ClusterName:   configMap.Labels[constant.AppInstanceLabelKey],
+			ComponentName: componentName,
+		},
+		configMap,
+		configConstraint,
 		configSpecName,
-		componentLabels,
-		config.Labels[constant.AppInstanceLabelKey],
-		config.Namespace)
+		componentLabels)
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
 	// Assumption: It is required that the cluster must have a component.
@@ -194,12 +197,12 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 	if reconcileContext.ConfigSpec == nil {
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].", configSpecName, componentName))
-		reqCtx.Recorder.Eventf(config, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
+		reqCtx.Recorder.Eventf(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"related component does not have any configSpecs, skip reconfigure")
 		return intctrlutil.Reconciled()
 	}
 	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 {
-		reqCtx.Recorder.Eventf(config,
+		reqCtx.Recorder.Eventf(configMap,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
 		return intctrlutil.Reconciled()
@@ -208,8 +211,8 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	return r.performUpgrade(reconfigureParams{
 		ConfigSpecName:           configSpecName,
 		ConfigPatch:              configPatch,
-		ConfigMap:                config,
-		ConfigConstraint:         &tpl.Spec,
+		ConfigMap:                configMap,
+		ConfigConstraint:         &configConstraint.Spec,
 		Client:                   r.Client,
 		Ctx:                      reqCtx,
 		Cluster:                  reconcileContext.ClusterObj,
@@ -218,7 +221,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		DeploymentUnits:          reconcileContext.Deployments,
 		Component:                reconcileContext.ClusterDefComObj,
 		ClusterComponent:         reconcileContext.ClusterComObj,
-		Restart:                  forceRestart || !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
+		Restart:                  forceRestart || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions),
 		ReconfigureClientFactory: GetClientFactory(),
 	})
 }

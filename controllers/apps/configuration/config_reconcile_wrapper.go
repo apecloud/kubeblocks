@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
-
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,20 +50,18 @@ type configReconcileContext struct {
 	ConfigConstraint *appsv1alpha1.ConfigConstraint
 }
 
-func newConfigReconcileContext(ctx context.Context, cli client.Client, cm *corev1.ConfigMap, cc *appsv1alpha1.ConfigConstraint, componentName string, configSpecName string, matchingLabels client.MatchingLabels, clusterName, ns string) *configReconcileContext {
+func newConfigReconcileContext(resourceCtx *intctrlutil.ResourceCtx,
+	cm *corev1.ConfigMap,
+	cc *appsv1alpha1.ConfigConstraint,
+	configSpecName string,
+	matchingLabels client.MatchingLabels) *configReconcileContext {
 	configContext := configReconcileContext{
 		ConfigMap:        cm,
 		ConfigConstraint: cc,
 		Name:             configSpecName,
 		MatchingLabels:   matchingLabels,
 	}
-	return configContext.Init(&intctrlutil.ResourceCtx{
-		Context:       ctx,
-		Client:        cli,
-		Namespace:     ns,
-		ClusterName:   clusterName,
-		ComponentName: componentName,
-	}, &configContext)
+	return configContext.Init(resourceCtx, &configContext)
 }
 
 func (l configSpecList) findByName(name string) *appsv1alpha1.ComponentConfigSpec {

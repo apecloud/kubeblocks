@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,29 +32,23 @@ type configOperator struct {
 	ReconcileCtx
 }
 
-func NewConfigReconcileTask(cli client.Client,
-	ctx context.Context,
+func NewConfigReconcileTask(resourceCtx *intctrlutil.ResourceCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
 	component *component.SynthesizedComponent,
-	obj client.Object,
+	compObject client.Object,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object,
 ) *configOperator {
 	return &configOperator{
-		ReconcileCtx{ResourceCtx: &intctrlutil.ResourceCtx{
-			Context:       ctx,
-			Client:        cli,
-			Namespace:     cluster.Namespace,
-			ClusterName:   cluster.Name,
-			ComponentName: component.Name,
-		},
-			Cluster:    cluster,
-			ClusterVer: clusterVersion,
-			Component:  component,
-			Object:     obj,
-			PodSpec:    podSpec,
-			Cache:      localObjs,
+		ReconcileCtx{
+			ResourceCtx: resourceCtx,
+			Cluster:     cluster,
+			ClusterVer:  clusterVersion,
+			Component:   component,
+			Object:      compObject,
+			PodSpec:     podSpec,
+			Cache:       localObjs,
 		},
 	}
 }
@@ -74,7 +66,7 @@ func (c *configOperator) Reconcile() error {
 		Prepare().
 		RenderScriptTemplate().
 		UpdateConfiguration(). // reconcile Configuration
-		Configuration().
+		Configuration().       // sync Configuration
 		CreateConfigTemplate().
 		UpdatePodVolumes().
 		BuildConfigManagerSidecar().

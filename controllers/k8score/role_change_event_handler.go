@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // RoleChangeEventHandler is the event handler for the role change event
@@ -42,7 +42,7 @@ var _ EventHandler = &RoleChangeEventHandler{}
 
 // Handle handles role changed event.
 func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.Reason != string(probeutil.CheckRoleOperation) {
+	if event.Reason != string(lorryutil.CheckRoleOperation) {
 		return nil
 	}
 	var (

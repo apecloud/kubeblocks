@@ -205,9 +205,11 @@ spec:
                 mountPath: /opt/agamotto
               - name: data
                 mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
+              {{- if .Values.logCollector.enabled }}
               - name: log-data
                 mountPath: /var/log/kubeblocks
                 readOnly: false
+              {{- end }}
               - name: scripts
                 mountPath: /scripts
           - name: vttablet
@@ -254,10 +256,12 @@ spec:
               - name: data
                 mountPath: /vtdataroot
         volumes:
+          {{- if .Values.logCollector.enabled }}
           - name: log-data
             hostPath:
               path: /var/log/kubeblocks
               type: DirectoryOrCreate
+          {{- end }}
           - name: annotations
             downwardAPI:
               items:

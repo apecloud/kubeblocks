@@ -334,7 +334,9 @@ func WithCreatedFailedResult() HandleCreateReturnedObject {
 	}
 }
 
-func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObject {
+type Getter = func(key client.ObjectKey, obj client.Object) (bool, error)
+
+func WithConstructSimpleGetResult(mockObjs []client.Object, get ...Getter) HandleGetReturnedObject {
 	mockMap := make(map[client.ObjectKey]client.Object, len(mockObjs))
 	for _, obj := range mockObjs {
 		mockMap[client.ObjectKeyFromObject(obj)] = obj
@@ -343,6 +345,12 @@ func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObj
 		if mockObj, ok := mockMap[key]; ok {
 			SetGetReturnedObject(obj, mockObj)
 			return nil
+		}
+		if len(get) > 0 {
+			processed, err := get[0](key, obj)
+			if processed {
+				return err
+			}
 		}
 		return apierrors.NewNotFound(schema.GroupResource{Group: "unknown", Resource: "unknown"}, key.Name)
 	}

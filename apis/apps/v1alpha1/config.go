@@ -21,13 +21,14 @@ package v1alpha1
 
 // ConfigurationPhase defines the Configuration FSM phase
 // +enum
-// +kubebuilder:validation:Enum={Init,Running,Pending,Failed,Deleting,Finished}
+// +kubebuilder:validation:Enum={Init,Running,Pending,Merged,Failed,Deleting,Finished}
 type ConfigurationPhase string
 
 const (
 	CInitPhase     ConfigurationPhase = "Init"
 	CRunningPhase  ConfigurationPhase = "Running"
 	CPendingPhase  ConfigurationPhase = "Pending"
+	CMergedPhase   ConfigurationPhase = "Merged"
 	CFailedPhase   ConfigurationPhase = "Failed"
 	CDeletingPhase ConfigurationPhase = "Deleting"
 	CFinishedPhase ConfigurationPhase = "Finished"

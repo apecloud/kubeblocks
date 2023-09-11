@@ -319,7 +319,7 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 		if needRerender(p.ConfigMapObj, p.item) {
 			p.newCM, err = p.renderWrapper.rerenderConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, &p.item)
 		} else {
-			p.newCM = p.ConfigMapObj
+			p.newCM = p.ConfigMapObj.DeepCopy()
 		}
 		return
 	})
@@ -347,6 +347,7 @@ func (p *updatePipeline) ApplyParameters() *updatePipeline {
 		if err != nil {
 			return err
 		}
+		cm.Data = newData
 		return nil
 	}
 
@@ -392,10 +393,11 @@ func (p *updatePipeline) Sync() *updatePipeline {
 
 func (p *updatePipeline) SyncStatus() *updatePipeline {
 	return p.Wrap(func() error {
-		if p.configSpec == nil {
+		if p.configSpec == nil || p.itemStatus == nil {
 			return nil
 		}
-		// TODO merge and sync
+
+		p.itemStatus.Phase = appsv1alpha1.CMergedPhase
 		return nil
 	})
 }

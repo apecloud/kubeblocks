@@ -590,20 +590,3 @@ type StatefulSetWorkload interface {
 	FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy)
 	GetUpdateStrategy() UpdateStrategy
 }
-
-type ConnectionCredential struct {
-	// +optional
-	Endpoint BuiltInString `json:"endpoint,omitempty"`
-
-	// +optional
-	Host BuiltInString `json:"host,omitempty"`
-
-	// +optional
-	Port BuiltInString `json:"port,omitempty"`
-
-	// +optional
-	User BuiltInString `json:"user,omitempty"`
-
-	// +optional
-	Password BuiltInString `json:"password,omitempty"`
-}

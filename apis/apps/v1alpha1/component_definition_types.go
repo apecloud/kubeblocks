@@ -30,7 +30,7 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cpd
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpd
 // +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.version",description="component version"
 // +kubebuilder:printcolumn:name="SERVICE",type="string",JSONPath=".spec.serviceKind",description="service"
 // +kubebuilder:printcolumn:name="SERVICE-VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"
@@ -103,7 +103,7 @@ type ComponentDefinitionSpec struct {
 	//       - Mounts
 	//       - Ports
 	//       - Security context
-	//       - Probes: startup, liveness, readiness
+	//       - Probes: readiness
 	//       - Lifecycle
 	//   - Volumes
 	// CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority),
@@ -120,7 +120,7 @@ type ComponentDefinitionSpec struct {
 	// Services defines endpoints that can be used to access the service provided by the component.
 	// If specified, a headless service will be created with some attributes of Services[0] by default.
 	// +optional
-	Services []*corev1.ServiceSpec `json:"services,omitempty"`
+	Services []ComponentService `json:"services,omitempty"`
 
 	// The configs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -153,10 +153,10 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Scripts []ComponentTemplateSpec `json:"scripts,omitempty"`
 
-	// ConnectionCredential defines the template used to create a default connection credential secret for a component instance.
+	// ConnectionCredentials defines the default connection credentials that can be used to access the component service.
 	// Cannot be updated.
 	// +optional
-	ConnectionCredential ConnectionCredential `json:"connectionCredential,omitempty"`
+	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
 	// Rules defines the namespaced policy rules required by a component.
 	// If any rule application fails (e.g., due to lack of permissions), the provisioning of the component instance will also fail.
@@ -170,30 +170,34 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Labels map[string]BuiltInString `json:"labels,omitempty"`
 
-	// Lifecycle defines the lifecycle actions of the component instance.
+	// TODO: support other resources provisioning.
+	// Statement to create system account.
 	// Cannot be updated.
 	// +optional
-	Lifecycle *corev1.Lifecycle `json:"lifecycle,omitempty"`
-
-	// TODO: support the provisioning of meta resources (e.g., account/database/table, namespace, topic).
+	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
 
 	// UpdateStrategy defines the strategy for updating the component instance.
+	// Cannot be updated.
 	// +kubebuilder:default=Serial
 	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Roles defines all the roles that the component can assume.
+	// Cannot be updated.
 	// +optional
 	Roles []ComponentReplicaRole `json:"roles,omitempty"`
 
 	// RoleArbitrator defines the strategy for electing the component's active role.
+	// Cannot be updated.
 	// +kubebuilder:default=External
 	// +optional
 	RoleArbitrator ComponentRoleArbitrator `json:"roleArbitrator,omitempty"`
 
-	// Actions defines the operational actions that needed to interoperate with the component service and processes.
+	// LifecycleActions defines the operational actions that needed to interoperate with the component
+	// service and processes for lifecycle management.
+	// Cannot be updated.
 	// +optional
-	Actions ComponentActionSet `json:"actions,omitempty"`
+	LifecycleActions ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// TODO: introduce the event-based interoperability mechanism.
 
@@ -243,6 +247,39 @@ type ComponentPersistentVolume struct {
 	HighWatermark int `json:"highWatermark,omitempty"`
 }
 
+type ComponentService struct {
+	// The name of the component service.
+	// +required
+	Name string `json:"name"`
+
+	// ServiceName defines the name of the service object.
+	// If not specified, the default service name with pattern <CLUSTER_NAME>-<COMPONENT_NAME> will be used.
+	// +optional
+	ServiceName string `json:"serviceName,omitempty"`
+
+	corev1.ServiceSpec `json:",inline"`
+}
+
+type ConnectionCredential struct {
+	// The name of the ConnectionCredential.
+	// +required
+	Name string `json:"name"`
+
+	// ServiceName specifies the service spec to use for accessing the component service.
+	// +optional
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// PortName specifies the name of the port to access the component service.
+	// If the service has multiple ports, you can specify a specific port to use here.
+	// Otherwise, the unique port of the service will be used.
+	// +optional
+	PortName string `json:"portName,omitempty"`
+
+	// CredentialSecret specifies the secret required to access the component service.
+	// +optional
+	CredentialSecret string `json:"credentialSecret,omitempty"`
+}
+
 // ComponentRoleArbitrator defines how to arbitrate the role of replicas.
 // +enum
 // +kubebuilder:validation:Enum={External,Lorry}
@@ -262,8 +299,13 @@ type ComponentReplicaRole struct {
 	// +kubebuilder:validation:Pattern=`^.*[^\s]+.*$`
 	Name string `json:"name"`
 
-	// Writable indicates whether a replica with this role is allowed to write data.
+	// Serviceable indicates whether a replica with this role can provide services.
 	// +kubebuilder:default=true
+	// +optional
+	Serviceable bool `json:"serviceable,omitempty"`
+
+	// Writable indicates whether a replica with this role is allowed to write data.
+	// +kubebuilder:default=false
 	// +optional
 	Writable bool `json:"writable,omitempty"`
 
@@ -296,22 +338,27 @@ type HTTPAction struct {
 	// Path to access on the HTTP server.
 	// +optional
 	Path string `json:"path,omitempty"`
+
 	// Name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
 	Port intstr.IntOrString `json:"port"`
+
 	// Host name to connect to, defaults to the pod IP. You probably want to set
 	// "Host" in httpHeaders instead.
 	// +optional
 	Host string `json:"host,omitempty"`
+
 	// Scheme to use for connecting to the host.
 	// Defaults to HTTP.
 	// +optional
 	Scheme corev1.URIScheme `json:"scheme,omitempty"`
+
 	// Method represents the HTTP request method, which can be one of the standard HTTP methods like "GET," "POST," "PUT," etc.
 	// Defaults to Get.
 	// +optional
 	Method string `json:"method,omitempty"`
+
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
 	HTTPHeaders []corev1.HTTPHeader `json:"httpHeaders,omitempty"`
@@ -344,51 +391,83 @@ type RetryPolicy struct {
 // If an action encounters any errors, error messages should be written to stderr (or included in the HTTP response payload with a non-200 HTTP status code).
 type Action struct {
 	// Image defines the container image to run the action.
+	// Cannot be updated.
 	// +optional
 	Image string `json:"image,omitempty"`
 
 	// Exec specifies the action to take.
+	// Cannot be updated.
 	// +optional
 	Exec *corev1.ExecAction `json:"exec,omitempty"`
 
 	// HTTP specifies the http request to perform.
+	// Cannot be updated.
 	// +optional
 	HTTP *HTTPAction `json:"http,omitempty"`
 
+	// List of environment variables to set in the container.
+	// Cannot be updated.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
 	// TargetPodSelector defines the way that how to select the target Pod where the action will be performed,
 	// if there may not have a target replica by default.
+	// Cannot be updated.
 	// +optional
 	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
 
 	// MatchingKey uses to select the target pod(s) actually.
 	// If the selector is AnyReplica or AllReplicas, the matchingKey will be ignored.
 	// If the selector is RoleSelector, any replica which has the same role with matchingKey will be chosen.
+	// Cannot be updated.
 	// +optional
 	MatchingKey string `json:"matchingKey,omitempty"`
 
 	// Container defines the name of the container within the target Pod where the action will be executed.
 	// If specified, it must be one of container declared in @Runtime.
+	// Cannot be updated.
 	// +optional
 	Container string `json:"container,omitempty"`
 
 	// Preconditions represent conditions that must be met before executing the action.
 	// If any precondition is not met, the action will not be executed.
+	// Cannot be updated.
 	// +optional
 	Preconditions *Preconditions `json:"preconditions:omitempty"`
 
 	// TimeoutSeconds defines the timeout duration for the action in seconds.
+	// Cannot be updated.
 	// +kubebuilder:default=0
 	// +optional
 	TimeoutSeconds int32 `json:"timeoutSeconds:omitempty"`
 
 	// RetryPolicy defines the strategy for retrying the action in case of failure.
+	// Cannot be updated.
 	// +optional
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 }
 
-// ComponentActionSet defines a set of operational actions for interacting with component services and processes.
-type ComponentActionSet struct {
-	// RoleProbe defines how to probe the role of a replica. The probe should return the role
+// ComponentLifecycleActions defines a set of operational actions for interacting with component services and processes.
+type ComponentLifecycleActions struct {
+	// PostStart is called immediately after a component is created.
+	// Cannot be updated.
+	// +optional
+	PostStart *Action `json:"postStart,omitempty"`
+
+	// PreStop is called immediately before a component is terminated due to an API request.
+	// Cannot be updated.
+	// +optional
+	PreStop *Action `json:"preStop,omitempty"`
+
+	// LivenessProbe defines how to probe the liveness of replicas periodically.
+	// Cannot be updated.
+	// +optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// RoleProbe defines how to probe the role of replicas.
+	// Cannot be updated.
 	// +optional
 	RoleProbe *corev1.Probe `json:"roleProbe,omitempty"`
 
@@ -398,15 +477,18 @@ type ComponentActionSet struct {
 	// - stop
 	// - restart
 	// - scale-in
-	// Dedicated environment variables for this action:
+	// - liveness probe
+	// Dedicated env vars for the action:
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the new candidate replica's Pod. It may be empty.
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate replica. It may be empty.
+	// Cannot be updated.
 	// +optional
 	Switchover *Action `json:"switchover,omitempty"`
 
 	// MemberJoin defines how to add a new replica to the replication group.
 	// This action is typically invoked when a new replica needs to be added, such as during scale-out.
 	// It may involve updating configuration, notifying other members, and ensuring data consistency.
+	// Cannot be updated.
 	// +optional
 	MemberJoin *Action `json:"memberJoin,omitempty"`
 
@@ -414,38 +496,44 @@ type ComponentActionSet struct {
 	// This action is typically invoked when a replica needs to be removed, such as during scale-in.
 	// It may involve configuration updates and notifying other members about the departure,
 	// but it is advisable to avoid performing data migration within this action.
+	// Cannot be updated.
 	// +optional
 	MemberLeave *Action `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set a replica service as read-only.
 	// This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
+	// Cannot be updated.
 	// +optional
 	Readonly *Action `json:"readonly,omitempty"`
 
 	// Readwrite defines how to set a replica service as read-write.
+	// Cannot be updated.
 	// +optional
 	Readwrite *Action `json:"readwrite,omitempty"`
 
-	// Backup defines how to populate the data to create a new complete replica.
+	// DataPopulate defines how to populate the data to create new replicas.
 	// This action is typically used when a new replica needs to be constructed, such as:
 	// - scale-out
 	// - rebuild
 	// - clone
 	// It should write the valid data to stdout without including any extraneous information.
+	// Cannot be updated.
 	// +optional
-	Backup *Action `json:"backup,omitempty"`
+	DataPopulate *Action `json:"dataPopulate,omitempty"`
 
-	// Restore defines how to prepare data synchronized from another replica before starting the service for a new replica.
+	// DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
 	// This action is typically used when creating a new replica, such as:
 	//  - scale-out
 	//  - rebuild
 	//  - clone
-	// The data will be streamed in via stdin. If any error occurs during the restore process,
+	// The data will be streamed in via stdin. If any error occurs during the assembly process,
 	// the action must be able to guarantee idempotence to allow for retries from the beginning.
+	// Cannot be updated.
 	// +optional
-	Restore *Action `json:"restore,omitempty"`
+	DataAssemble *Action `json:"dataAssemble,omitempty"`
 
 	// Reload defines how to notify the replica service that there is a configuration update.
+	// Cannot be updated.
 	// +optional
 	Reload *Action `json:"reload,omitempty"`
 }

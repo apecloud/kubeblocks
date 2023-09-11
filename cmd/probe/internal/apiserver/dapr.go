@@ -36,7 +36,6 @@ import (
 	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
 	"github.com/dapr/dapr/pkg/runtime"
 	"github.com/dapr/kit/logger"
-	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
@@ -50,9 +49,7 @@ import (
 )
 
 var (
-	log        = logger.NewLogger("dapr.runtime")
 	logContrib = logger.NewLogger("dapr.contrib")
-	logHa      = logger.NewLogger("dapr.ha")
 )
 
 func init() {
@@ -92,7 +89,6 @@ func StartDapr() (*runtime.DaprRuntime, error) {
 	bindingsLoader.DefaultRegistry.Logger = logContrib
 	httpMiddlewareLoader.DefaultRegistry.Logger = logContrib
 
-	log.Infof("args: %v", pflag.Args())
 	err = rt.Run(
 		runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
 		runtime.WithStates(stateLoader.DefaultRegistry),

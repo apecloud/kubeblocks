@@ -43,7 +43,6 @@ var (
 
 func init() {
 	viper.AutomaticEnv()
-
 }
 
 func main() {

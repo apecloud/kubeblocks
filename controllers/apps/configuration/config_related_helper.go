@@ -63,7 +63,8 @@ func retrieveRelatedComponentsByConfigmap[T generics.Object, L generics.ObjList[
 		}
 		// filter config manager sidecar container
 		contains := intctrlutil.GetContainersByConfigmap(podTemplate.Spec.Containers,
-			volumeMounted.Name, func(containerName string) bool {
+			volumeMounted.Name, core.GenerateEnvFromName(cfg.Name),
+			func(containerName string) bool {
 				return constant.ConfigSidecarName == containerName
 			})
 		if len(contains) > 0 {

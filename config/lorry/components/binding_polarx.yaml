@@ -1,9 +1,9 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: polarx
+  name: polardbx
 spec:
-  type: bindings.polarx
+  type: bindings.polardbx
   version: v1
   metadata:
     - name: url # Required, define DB connection in DSN format

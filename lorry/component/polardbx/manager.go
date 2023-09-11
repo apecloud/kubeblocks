@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package polarx
+package polardbx
 
 import (
 	"context"
@@ -45,7 +45,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Manager: *mysqlMgr,
 	}
 
-	component.RegisterManager("polarx", util.Consensus, mgr)
+	component.RegisterManager("polardbx", util.Consensus, mgr)
 	return mgr, nil
 }
 

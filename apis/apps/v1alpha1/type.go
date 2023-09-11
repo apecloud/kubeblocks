@@ -210,7 +210,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup}
 type OpsType string
 
 const (
@@ -225,6 +225,7 @@ const (
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
 	ExposeType            OpsType = "Expose"
 	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
+	BackupType            OpsType = "Backup"
 )
 
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.

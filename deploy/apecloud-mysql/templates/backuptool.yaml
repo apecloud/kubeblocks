@@ -15,6 +15,8 @@ spec:
       value: {{ .Values.mysqlConfigs.logBin }}
     - name: DP_DB_PORT
       value: "3306"
+    - name: DATA_MOUNT_DIR
+      value: {{ .Values.mysqlConfigs.dataMountPath }}
   physical:
     restoreCommands:
       - sh
@@ -22,7 +24,7 @@ spec:
       - |
         set -e;
         mkdir -p ${DATA_DIR}
-        TMP_DIR=/data/mysql/temp
+        TMP_DIR=${DATA_MOUNT_DIR}/temp
         mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
         xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
         xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}

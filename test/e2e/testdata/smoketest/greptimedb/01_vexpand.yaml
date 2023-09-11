@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: greptimedb-cluster-vexpand-
+spec:
+  clusterRef: greptimedb-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: nebula-metad
+      volumeClaimTemplates:
+        - name: datanode
+          storage: "15Gi"
+    - componentName: etcd
+      volumeClaimTemplates:
+        - name: etcd-storage
+          storage: "15Gi"

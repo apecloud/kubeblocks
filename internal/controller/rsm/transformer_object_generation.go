@@ -280,6 +280,7 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 	labels := getLabels(&rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
+		AddLabels(rsmGenerationLabelKey, strconv.FormatInt(rsm.Generation, 10)).
 		AddAnnotationsInMap(rsm.Annotations).
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).

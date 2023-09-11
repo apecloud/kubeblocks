@@ -304,6 +304,15 @@ func getActionOrdinal(actionName string) (int, error) {
 	return strconv.Atoi(subMatches[3])
 }
 
+func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
+	vertices := model.FindAll[*apps.StatefulSet](dag)
+	if len(vertices) != 1 {
+		return nil, fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))
+	}
+	stsVertex, _ := vertices[0].(*model.ObjectVertex)
+	return stsVertex, nil
+}
+
 // all members with ordinal less than action target pod should be in a good replication state:
 // 1. they should be in membersStatus
 // 2. they should have a leader

@@ -22,6 +22,7 @@ package rsm
 import (
 	apps "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
@@ -48,20 +49,6 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 	case model.IsObjectUpdating(rsmOrig):
 		// use rsm's generation instead of sts's
 		rsm.Status.ObservedGeneration = rsm.Generation
-		stsVertex, err := getUnderlyingStsVertex(dag)
-		if err != nil {
-			return err
-		}
-		newSts, _ := stsVertex.Obj.(*apps.StatefulSet)
-		revisionGetter := NewStatefulSetRevisionGetter(transCtx.Context, transCtx.Client)
-		_, updateRevision, _, err := revisionGetter.GetStatefulSetRevisions(newSts)
-		if err != nil {
-			return err
-		}
-		rsm.Status.UpdateRevision = updateRevision.Name
-		// hack for mismatch between new version of rsm spec and old version of the underlying sts spec
-		// TODO(free6om): review this when cluster phase refactoring. should reset all sts status fields?
-		rsm.Status.UpdatedReplicas = 0
 	case model.IsObjectStatusUpdating(rsmOrig):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}
@@ -70,10 +57,13 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		}
 		// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
 		generation := rsm.Status.ObservedGeneration
-		updateRevision := rsm.Status.UpdateRevision
 		rsm.Status.StatefulSetStatus = sts.Status
-		rsm.Status.UpdateRevision = updateRevision
 		rsm.Status.ObservedGeneration = generation
+		currentGeneration, err := strconv.ParseInt(sts.Labels[rsmGenerationLabelKey], 10, 64)
+		if err != nil {
+			return err
+		}
+		rsm.Status.CurrentGeneration = currentGeneration
 		// read all pods belong to the sts, hence belong to the rsm
 		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 		if err != nil {

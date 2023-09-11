@@ -656,6 +656,10 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 // 1. all replicas exist
 // 2. all members have role set
 func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
+	if rsm.Status.ObservedGeneration != rsm.Generation ||
+		rsm.Status.CurrentGeneration != rsm.Generation {
+		return false
+	}
 	if rsm == nil || rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
 		return true
 	}
@@ -688,13 +692,4 @@ func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool 
 		}
 	}
 	return false
-}
-
-func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
-	vertices := model.FindAll[*appsv1.StatefulSet](dag)
-	if len(vertices) != 1 {
-		return nil, fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))
-	}
-	stsVertex, _ := vertices[0].(*model.ObjectVertex)
-	return stsVertex, nil
 }

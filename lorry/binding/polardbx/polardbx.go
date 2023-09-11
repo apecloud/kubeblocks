@@ -38,7 +38,7 @@ type PolardbxOperations struct {
 
 type QueryRes []map[string]interface{}
 
-// Newpolardbx returns a new polardbx output binding.
+// NewPolardbx returns a new polardbx output binding.
 func NewPolardbx(logger logger.Logger) bindings.OutputBinding {
 	return &PolardbxOperations{BaseOperations: BaseOperations{Logger: logger}}
 }

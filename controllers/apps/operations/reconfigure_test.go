@@ -31,6 +31,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -91,6 +92,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			return nil
 		}
 		var cmObj *corev1.ConfigMap
+		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, componentName)).
+			ClusterRef(clusterName).
+			Component(componentName).
+			ClusterDefRef(clusterDefinitionName).
+			ClusterVerRef(clusterVersionName)
 		for _, configSpec := range cdComponent.ConfigSpecs {
 			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
 			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
@@ -106,9 +112,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)
+			configuration.AddConfigurationItem(configSpec.Name)
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 			cmObj = cfgCM
 		}
+		Expect(testCtx.CheckedCreateObj(ctx, configuration.GetObject())).Should(Succeed())
 		return cmObj
 	}
 

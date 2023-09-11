@@ -39,6 +39,10 @@ type Task struct {
 func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
+		SyncStatus: func(task *Task) error {
+			// TODO sync reconfiguring reconcile status
+			return nil
+		},
 		Do: func(fetcher *Task, component *component.SynthesizedComponent) error {
 			reconcileTask := configuration.NewReconcilePipeline(configuration.ReconcileCtx{
 				ResourceCtx: fetcher.ResourceCtx,

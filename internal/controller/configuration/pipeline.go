@@ -378,6 +378,11 @@ func (p *updatePipeline) UpdateConfigVersion() *updatePipeline {
 
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
+		if p.ConfigConstraintObj != nil {
+			if err := SyncEnvConfigmap(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context); err != nil {
+				return err
+			}
+		}
 		switch {
 		case p.isDone():
 			return nil
@@ -392,11 +397,14 @@ func (p *updatePipeline) Sync() *updatePipeline {
 }
 
 func (p *updatePipeline) SyncStatus() *updatePipeline {
-	return p.Wrap(func() error {
+	return p.Wrap(func() (err error) {
+		if p.isDone() {
+			return
+		}
 		if p.configSpec == nil || p.itemStatus == nil {
-			return nil
+			return
 		}
 		p.itemStatus.Phase = appsv1alpha1.CMergedPhase
-		return nil
+		return
 	})
 }

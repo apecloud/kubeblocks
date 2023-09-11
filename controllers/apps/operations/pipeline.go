@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -49,6 +50,7 @@ type pipeline struct {
 	configPatch       *cfgcore.ConfigPatchInfo
 	isFileUpdated     bool
 
+	updatedObject    *appsv1alpha1.Configuration
 	configConstraint *appsv1alpha1.ConfigConstraint
 	configSpec       *appsv1alpha1.ComponentConfigSpec
 
@@ -142,7 +144,7 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 	})
 }
 
-func (p *pipeline) doMergeV2(parameters appsv1alpha1.ConfigurationItem) error {
+func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error {
 	newConfigObj := p.ConfigurationObj.DeepCopy()
 
 	item := newConfigObj.Spec.GetConfigurationItem(p.config.Name)
@@ -168,7 +170,24 @@ func (p *pipeline) doMergeV2(parameters appsv1alpha1.ConfigurationItem) error {
 		}
 		updateFileContent(item, key.Key, key.FileContent)
 	}
-	return nil
+	p.updatedObject = newConfigObj
+	return p.createUpdatePatch(item, configSpec)
+}
+
+func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail, configSpec *appsv1alpha1.ComponentConfigSpec) error {
+	if p.configConstraint == nil {
+		return nil
+	}
+	updatedData, err := configuration.DoMerge(p.ConfigMapObj.Data, item.ConfigFileParams, p.configConstraint, *configSpec)
+	if err != nil {
+		return err
+	}
+	p.configPatch, _, err = cfgcore.CreateConfigPatch(p.ConfigMapObj.Data,
+		updatedData,
+		p.configConstraint.Spec.FormatterConfig.Format,
+		p.configSpec.Keys,
+		false)
+	return err
 }
 
 func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, content string) {
@@ -188,57 +207,11 @@ func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, pa
 }
 
 func (p *pipeline) doMerge() error {
-	if p.ConfigurationObj != nil {
-		return p.doMergeV2(p.config)
+	if p.ConfigurationObj == nil {
+		return cfgcore.MakeError("not found config: %s",
+			cfgcore.GenerateComponentConfigurationName(p.clusterName, p.componentName))
 	}
-
-	var err error
-	var newCfg map[string]string
-
-	cm := p.ConfigMapObj
-	cc := p.configConstraint
-	config := p.config
-
-	updatedFiles := make(map[string]string, len(config.Keys))
-	updatedParams := make([]cfgcore.ParamPairs, 0, len(config.Keys))
-	for _, key := range config.Keys {
-		if key.FileContent != "" {
-			updatedFiles[key.Key] = key.FileContent
-		}
-		if len(key.Parameters) > 0 {
-			updatedParams = append(updatedParams, cfgcore.ParamPairs{
-				Key:           key.Key,
-				UpdatedParams: fromKeyValuePair(key.Parameters),
-			})
-		}
-	}
-
-	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc, *p.configSpec); err != nil {
-		p.isFailed = true
-		return err
-	}
-
-	p.mergedConfig = newCfg
-
-	// for full update
-	if cc == nil {
-		p.isFileUpdated = true
-		return nil
-	}
-
-	// for patch update
-	configPatch, restart, err := cfgcore.CreateConfigPatch(cm.Data,
-		newCfg,
-		cc.Spec.FormatterConfig.Format,
-		p.configSpec.Keys,
-		len(updatedFiles) != 0)
-	if err != nil {
-		return err
-	}
-	p.isFileUpdated = restart
-	p.configPatch = configPatch
-	p.updatedParameters = updatedParams
-	return nil
+	return p.doMergeImpl(p.config)
 }
 
 func (p *pipeline) Merge() *pipeline {
@@ -265,20 +238,22 @@ func (p *pipeline) UpdateOpsLabel() *pipeline {
 
 func (p *pipeline) Sync() *pipeline {
 	return p.Wrap(func() error {
-		var cc *appsv1alpha1.ConfigConstraintSpec
-		var configSpec = *p.configSpec
+		return p.Client.Patch(p.reqCtx.Ctx, p.updatedObject, client.MergeFrom(p.ConfigurationObj))
 
-		if p.configConstraint != nil {
-			cc = &p.configConstraint.Spec
-		}
-		return syncConfigmap(p.ConfigMapObj,
-			p.mergedConfig,
-			p.cli,
-			p.reqCtx.Ctx,
-			p.resource.OpsRequest.Name,
-			configSpec,
-			cc,
-			p.config.Policy)
+		// var cc *appsv1alpha1.ConfigConstraintSpec
+		// var configSpec = *p.configSpec
+		//
+		// if p.configConstraint != nil {
+		//	cc = &p.configConstraint.Spec
+		// }
+		// return syncConfigmap(p.ConfigMapObj,
+		//	p.mergedConfig,
+		//	p.cli,
+		//	p.reqCtx.Ctx,
+		//	p.resource.OpsRequest.Name,
+		//	configSpec,
+		//	cc,
+		//	p.config.Policy)
 	})
 }
 

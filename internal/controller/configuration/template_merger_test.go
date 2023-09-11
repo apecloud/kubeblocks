@@ -61,6 +61,7 @@ max_connections=666
 
 		testConfigSpecName = "test-config"
 		testClusterName    = "test-cluster"
+		testConfigName     = "my.cnf"
 	)
 
 	var (
@@ -80,12 +81,12 @@ max_connections=666
 			&appsv1alpha1.ConfigConstraint{})
 		baseCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
-				"my.cnf": baseConfig,
+				testConfigName: baseConfig,
 			},
 		}
 		updatedCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
-				"my.cnf": extendConfig,
+				testConfigName: extendConfig,
 			},
 		}
 		baseCMObject.SetName(baseCMName)
@@ -126,7 +127,7 @@ max_connections=666
 	})
 
 	Context("with patch Merge", func() {
-		It("test mergerConfigTemplate function", func() {
+		It("mergerConfigTemplate patch policy", func() {
 			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
 					Namespace: "default",
@@ -143,7 +144,7 @@ max_connections=666
 			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
-			configObject := configReaders["my.cnf"]
+			configObject := configReaders[testConfigName]
 			Expect(configObject.Get("gtid_mode")).Should(BeEquivalentTo("OFF"))
 			Expect(configObject.Get("consensus_auto_leader_transfer")).Should(BeEquivalentTo("ON"))
 			Expect(configObject.Get("default_storage_engine")).Should(BeEquivalentTo("xengine"))
@@ -155,7 +156,7 @@ max_connections=666
 	})
 
 	Context("with replace Merge", func() {
-		It("test mergerConfigTemplate function", func() {
+		It("test mergerConfigTemplate replace policy", func() {
 			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
 					Namespace:   "default",
@@ -172,7 +173,7 @@ max_connections=666
 			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
-			configObject := configReaders["my.cnf"]
+			configObject := configReaders[testConfigName]
 			Expect(configObject.Get("gtid_mode")).Should(BeNil())
 			Expect(configObject.Get("consensus_auto_leader_transfer")).Should(BeNil())
 			Expect(configObject.Get("default_storage_engine")).Should(BeEquivalentTo("xengine"))
@@ -181,7 +182,7 @@ max_connections=666
 	})
 
 	Context("with only add Merge", func() {
-		It("test mergerConfigTemplate function", func() {
+		It("test mergerConfigTemplate add policy", func() {
 			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
 					Namespace:   "default",
@@ -197,7 +198,7 @@ max_connections=666
 	})
 
 	Context("with none Merge", func() {
-		It("test mergerConfigTemplate function", func() {
+		It("test mergerConfigTemplate none policy", func() {
 			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
 					Namespace:   "default",

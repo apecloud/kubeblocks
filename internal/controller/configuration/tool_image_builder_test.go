@@ -38,6 +38,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 	const kbToolsImage = "apecloud/kubeblocks-tools:latest"
 
+	var noneCommand = []string{"/bin/true"}
 	var clusterObj *appsv1alpha1.Cluster
 	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var ClusterDefObj *appsv1alpha1.ClusterDefinition
@@ -51,6 +52,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	})
 
 	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
 	})
 
 	Context("ToolsImageBuilderTest", func() {
@@ -82,17 +84,17 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 							{
 								Name:    "test",
 								Image:   "test_images",
-								Command: []string{"/bin/true"},
+								Command: noneCommand,
 							},
 							{
 								Name:    "test2",
 								Image:   "",
-								Command: []string{"/bin/true"},
+								Command: noneCommand,
 							},
 							{
 								Name:    "test3",
 								Image:   "$(KUBEBLOCKS_TOOLS_IMAGE)",
-								Command: []string{"/bin/true"},
+								Command: noneCommand,
 							},
 						},
 					},

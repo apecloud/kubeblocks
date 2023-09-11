@@ -69,7 +69,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 						Namespace: testCtx.DefaultNamespace,
 					},
 					Data: map[string]string{
-						"test-config-spec": "test-config-spec",
+						configSpecName: testConfigContent,
 					},
 				},
 			}), testutil.WithAnyTimes()))
@@ -86,7 +86,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 						Namespace: testCtx.DefaultNamespace,
 					},
 					Data: map[string]string{
-						"test-config-spec": "test-config-spec",
+						configSpecName: testConfigContent,
 					},
 				},
 			}), testutil.WithAnyTimes()))
@@ -108,7 +108,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 						},
 					},
 					Data: map[string]string{
-						"test-config-spec": "test-config-spec-update",
+						configSpecName: testConfigContent,
 					},
 				},
 				&corev1.ConfigMap{
@@ -153,7 +153,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 						Namespace: testCtx.DefaultNamespace,
 					},
 					Data: map[string]string{
-						"test-config-spec": "test-config-spec",
+						configSpecName: testConfigContent,
 					},
 				},
 			}), testutil.WithAnyTimes()))
@@ -169,7 +169,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 					Namespace: testCtx.DefaultNamespace,
 				},
 				Data: map[string]string{
-					"test-config-spec": "test-config-spec",
+					configSpecName: testConfigContent,
 				},
 			}
 			tplWrapper := mockTemplateWrapper()

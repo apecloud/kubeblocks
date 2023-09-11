@@ -41,6 +41,7 @@ const mysqlCompName = "mysql"
 const mysqlConfigName = "mysql-component-config"
 const mysqlConfigConstraintName = "mysql8.0-config-constraints"
 const mysqlScriptsConfigName = "apecloud-mysql-scripts"
+const testConfigContent = "test-config-content"
 
 func allFieldsClusterDefObj(needCreate bool) *appsv1alpha1.ClusterDefinition {
 	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).

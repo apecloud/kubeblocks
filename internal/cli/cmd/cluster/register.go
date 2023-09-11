@@ -39,6 +39,9 @@ import (
 var clusterRegisterExample = templates.Examples(`
 	# Pull a cluster type to local and register it to "kbcli cluster create" sub-cmd from specified URL
 	kbcli cluster register orioledb --source https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
+
+	# Register a cluster type from a local path file
+	kbcli cluster register neon -S internal/cli/cluster/charts/neon-cluster.tgz
 `)
 
 type registerOption struct {

@@ -80,7 +80,7 @@ func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 // validate will check the
 func (o *registerOption) validate() error {
-	re := regexp.MustCompile(`^[a-zA-Z0-9]{1,9}$`)
+	re := regexp.MustCompile(`^[a-zA-Z0-9]{1,16}$`)
 	if !re.MatchString(o.clusterType.String()) {
 		return fmt.Errorf("cluster type %s is not appropriate as a subcommand", o.clusterType.String())
 	}
@@ -92,7 +92,7 @@ func (o *registerOption) validate() error {
 	}
 
 	if validateSource(o.source) != nil {
-		fmt.Printf("your entered `--source` %s, which is neither a URL nor a file that can be found locally", o.source)
+		return fmt.Errorf("your entered `--source` %s, which is neither a URL nor a file that can be found locally", o.source)
 	}
 	return nil
 }
@@ -143,6 +143,9 @@ func validateSource(source string) error {
 }
 
 func copyFile(src, dest string) error {
+	if src == dest {
+		return nil
+	}
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err

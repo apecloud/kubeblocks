@@ -90,7 +90,6 @@ var _ = Describe("object status transformer test.", func() {
 			Expect(ok).Should(BeTrue())
 			Expect(rsmNew.Generation).Should(Equal(generation))
 			Expect(rsmNew.Status.ObservedGeneration).Should(Equal(generation))
-			Expect(rsmNew.Status.Replicas).Should(Equal(*rsmNew.Spec.Replicas))
 		})
 	})
 
@@ -99,6 +98,7 @@ var _ = Describe("object status transformer test.", func() {
 			generation := int64(2)
 			rsm.Generation = generation
 			rsm.Status.ObservedGeneration = generation
+			rsm.Status.UpdateRevision = newRevision
 			transCtx.rsmOrig = rsm.DeepCopy()
 			sts := mockUnderlyingSts(*rsm, 1)
 			k8sMock.EXPECT().
@@ -117,7 +117,7 @@ var _ = Describe("object status transformer test.", func() {
 			pod2 := builder.NewPodBuilder(namespace, getPodName(name, 2)).
 				AddLabels(roleLabelKey, "follower").
 				GetObject()
-			makePodUpdateReady("new-revision", pod0, pod1, pod2)
+			makePodUpdateReady(newRevision, pod0, pod1, pod2)
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {

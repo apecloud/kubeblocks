@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -189,28 +188,7 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
 
-	// members(pods) being scheduled should be kept
-	oldMemberMap := make(map[string]*workloads.MemberStatus, len(rsm.Status.MembersStatus))
-	for i, status := range rsm.Status.MembersStatus {
-		oldMemberMap[status.PodName] = &rsm.Status.MembersStatus[i]
-	}
-	newMemberMap := make(map[string]*workloads.MemberStatus, len(newMembersStatus))
-	for i, status := range newMembersStatus {
-		newMemberMap[status.PodName] = &newMembersStatus[i]
-	}
-	oldMemberSet := sets.KeySet(oldMemberMap)
-	newMemberSet := sets.KeySet(newMemberMap)
-	memberToKeepSet := oldMemberSet.Difference(newMemberSet)
-	// TODO(free6om): handle stale role in memberToKeepSet
-	for podName := range memberToKeepSet {
-		ordinal, _ := getPodOrdinal(podName)
-		// members have left because of scale-in
-		if ordinal >= int(*rsm.Spec.Replicas) {
-			continue
-		}
-		newMembersStatus = append(newMembersStatus, *oldMemberMap[podName])
-	}
-
+	// sort and set
 	rolePriorityMap := composeRolePriorityMap(*rsm)
 	sortMembersStatus(newMembersStatus, rolePriorityMap)
 	rsm.Status.MembersStatus = newMembersStatus

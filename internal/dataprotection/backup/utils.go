@@ -160,10 +160,14 @@ func buildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 	return labels
 }
 
-func buildBackupWorkloadObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.ObjectMeta {
+func buildBackupJobObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.ObjectMeta {
 	return &metav1.ObjectMeta{
 		Name:      generateBackupWorkloadName(backup, prefix),
 		Namespace: backup.Namespace,
 		Labels:    buildBackupWorkloadLabels(backup),
 	}
+}
+
+func buildBackupInfoENV(backupDestinationPath string) string {
+	return types.BackupPathBase + backupDestinationPath + "/backup.info"
 }

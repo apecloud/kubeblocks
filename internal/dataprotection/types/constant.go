@@ -80,10 +80,10 @@ const (
 	DPLogfileTTL = "LOGFILE_TTL"
 	// DPLogfileTTLSecond ttl seconds with LOGFILE_TTL, integer format
 	DPLogfileTTLSecond = "LOGFILE_TTL_SECOND"
-	// DPArchiveInterval archive interval for statefulSet deploy kind, trans from the schedule cronExpression for logfile
-	DPArchiveInterval = "ARCHIVE_INTERVAL"
+	// DPCheckInterval check interval for continue backup
+	DPCheckInterval = "DP_CHECK_INTERVAL"
 	// DPBackupInfoFile the file name which retains the backup.status info
-	DPBackupInfoFile = "BACKUP_INFO_FILE"
+	DPBackupInfoFile = "DP_BACKUP_INFO_FILE"
 	// DPTimeFormat golang time format string
 	DPTimeFormat = "TIME_FORMAT"
 	// DPVolumeDataDIR the volume data dir

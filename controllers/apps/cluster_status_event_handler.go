@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // EventTimeOut timeout of the event
@@ -49,7 +49,7 @@ func init() {
 
 // Handle handles the cluster status events.
 func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.Reason != string(probeutil.CheckRoleOperation) {
+	if event.Reason != string(lorryutil.CheckRoleOperation) {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
@@ -61,7 +61,7 @@ func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil
 	}
 
 	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
-	if message.Event == probeutil.OperationFailed {
+	if message.Event == lorryutil.OperationFailed {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 	return nil

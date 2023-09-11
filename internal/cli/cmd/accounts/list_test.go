@@ -34,7 +34,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 var _ = Describe("List Account Options", func() {
@@ -84,7 +84,7 @@ var _ = Describe("List Account Options", func() {
 			o := NewListUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			Expect(o.AccountBaseOptions).ShouldNot(BeNil())
-			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(channelutil.ListUsersOp))
+			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(lorryutil.ListUsersOp))
 		})
 
 		It("validate options", func() {

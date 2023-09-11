@@ -11,11 +11,11 @@ spec:
         outcomes:
           - fail:
               when: "< 1.22.0"
-              message: This application requires at least Kubernetes 1.20.0 or later, and recommends 1.22.0.
+              message: This application requires at least Kubernetes 1.22.0 or later
               uri: https://www.kubernetes.io
           - pass:
               when: ">= 1.22.0"
-              message: Your cluster meets the recommended and required versions（>= 1.22.0） of Kubernetes.
+              message: Your cluster meets the recommended and required versions（>= 1.22.0） of Kubernetes
               uri: https://www.kubernetes.io
     - nodeResources:
         checkName: At-Least-3-Nodes

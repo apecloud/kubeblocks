@@ -117,7 +117,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager dataprotection kbcli probe reloader ## Make all cmd binaries.
+all: manager dataprotection kbcli lorry reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -302,7 +302,7 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.postgresql-cluster \
 	build-single-kbcli-embed-chart.kafka-cluster \
 	build-single-kbcli-embed-chart.mongodb-cluster \
-	build-single-kbcli-embed-chart.neon-cluster
+#	build-single-kbcli-embed-chart.neon-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
 #	build-single-kbcli-embed-chart.milvus-cluster \
@@ -320,9 +320,9 @@ clean-kbcli: ## Clean bin/kbcli*.
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
-.PHONY: sqlctl-doc
-sqlctl-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/sqlctl/main.go ./docs/user_docs/sqlctl
+.PHONY: lorryctl-doc
+lorryctl-doc: generate test-go-generate ## generate CLI command reference manual.
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/lorryctl/main.go ./docs/user_docs/lorryctl
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.

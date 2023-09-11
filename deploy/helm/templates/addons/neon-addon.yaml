@@ -10,7 +10,7 @@ metadata:
     helm.sh/resource-policy: keep
   {{- end }}
 spec:
-  description: 'Neon is a fully managed serverless PostgreSQL with a generous free tier. Neon separates storage and compute and offers modern developer features such as serverless, branching, bottomless storage, and more. '
+  description: 'Neon is a fully managed serverless PostgreSQL with a generous free tier. Neon separates storage and compute and offers modern developer features such as serverless, branching, bottomless storage, and more. Before deploying neon, you must execute `kbcli addon enable cert-manager` command to deploy cert-manager.'
 
   type: Helm
 

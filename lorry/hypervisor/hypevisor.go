@@ -17,4 +17,39 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package hypevisor
+package hypervisor
+
+import (
+	"github.com/dapr/kit/logger"
+	"github.com/spf13/pflag"
+)
+
+type Hypervisor struct {
+	Logger  logger.Logger
+	Daemon  *Daemon
+	Watcher *Watcher
+}
+
+func NewHypervisor(logger logger.Logger) (*Hypervisor, error) {
+	args := pflag.Args()
+	daemon, err := NewDeamon(args, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	hypervisor := &Hypervisor{
+		Logger: logger,
+		Daemon: daemon,
+	}
+
+	return hypervisor, nil
+}
+
+func (hypervisor *Hypervisor) Start() {
+	if hypervisor.Daemon == nil {
+		hypervisor.Logger.Info("No DB Service")
+		return
+	}
+	hypervisor.Daemon.Start()
+
+}

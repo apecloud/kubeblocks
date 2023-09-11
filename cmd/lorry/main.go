@@ -34,6 +34,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/apiserver"
 	"github.com/apecloud/kubeblocks/lorry/highavailability"
+	"github.com/apecloud/kubeblocks/lorry/hypervisor"
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -80,6 +81,11 @@ func main() {
 		}
 	}
 
+	hypervisor, err := hypervisor.NewHypervisor(log)
+	if err != nil {
+		log.Errorf("Hypervisor initialize failed: %s", err)
+	}
+	hypervisor.Start()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop

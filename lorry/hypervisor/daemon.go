@@ -17,12 +17,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package hypevisor
+package hypervisor
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
+	"syscall"
+
+	"github.com/dapr/kit/logger"
 )
 
 // Daemon represents the managed subprocesses.
@@ -35,10 +40,11 @@ type Daemon struct {
 	Stdout  *os.File
 	Stderr  *os.File
 	Status  *os.ProcessState
-	process *os.Process
+	Process *os.Process
+	Logger  logger.Logger
 }
 
-func NewDeamon(args []string) (*Daemon, error) {
+func NewDeamon(args []string, logger logger.Logger) (*Daemon, error) {
 	argCount := len(args)
 
 	if argCount == 0 {
@@ -58,7 +64,7 @@ func NewDeamon(args []string) (*Daemon, error) {
 
 	go func() {
 		for outScanner.Scan() {
-			fmt.Printf("== DB Service == %s\n", outScanner.Text())
+			fmt.Printf("== DB == %s\n", outScanner.Text())
 		}
 	}()
 
@@ -70,7 +76,7 @@ func NewDeamon(args []string) (*Daemon, error) {
 
 	go func() {
 		for errScanner.Scan() {
-			fmt.Printf("== DB Service ERR == %s\n", errScanner.Text())
+			fmt.Printf("== DB ERR == %s\n", errScanner.Text())
 		}
 	}()
 
@@ -79,6 +85,7 @@ func NewDeamon(args []string) (*Daemon, error) {
 		Args:   args,
 		Stdout: stdout,
 		Stderr: stderr,
+		Logger: logger,
 	}
 
 	return daemon, nil
@@ -96,10 +103,44 @@ func (daemon *Daemon) Start() error {
 		},
 	}
 	args := append([]string{daemon.Cmd}, daemon.Args...)
+	daemon.Logger.Infof("Start DB Service: %s", strings.Join(args, " "))
 	process, err := os.StartProcess(daemon.Cmd, args, procAtr)
 	if err != nil {
+		daemon.Logger.Errorf("Start DB Service failed: %s", err)
 		return err
 	}
-	daemon.process = process
+	daemon.Process = process
 	return nil
+}
+
+func (daemon *Daemon) IsAlive() bool {
+	if daemon.Process == nil {
+		return false
+	}
+
+	p, err := os.FindProcess(daemon.Process.Pid)
+	if err != nil {
+		return false
+	}
+	return p.Signal(syscall.Signal(0)) == nil
+}
+
+func (daemon *Daemon) ForceStop() error {
+	if daemon.Process != nil {
+		err := daemon.Process.Signal(syscall.SIGKILL)
+		return err
+	}
+	return errors.New("process not exist")
+}
+
+func (daemon *Daemon) GracefullyStop() error {
+	if daemon.Process != nil {
+		err := daemon.Process.Signal(syscall.SIGTERM)
+		return err
+	}
+	return errors.New("process not exist")
+}
+
+func (daemon *Daemon) Wait() (*os.ProcessState, error) {
+	return daemon.Process.Wait()
 }

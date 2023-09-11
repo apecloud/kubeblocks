@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -40,6 +40,9 @@ var _ = Describe("ConfigEnvFrom test", func() {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterName        = "test-cluster"
+
+		mysqlCompDefName = "replicasets"
+		mysqlCompName    = "mysql"
 	)
 	var (
 		clusterDef     *appsv1alpha1.ClusterDefinition

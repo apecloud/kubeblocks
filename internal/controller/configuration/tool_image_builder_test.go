@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
@@ -45,6 +45,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	const mysqlCompDefName = "replicasets"
 	const configSpecName = "test-config-spec"
 	const kbToolsImage = "apecloud/kubeblocks-tools:latest"
+	const mysqlCompName = "mysql"
 
 	var clusterObj *appsv1alpha1.Cluster
 	var clusterVersionObj *appsv1alpha1.ClusterVersion

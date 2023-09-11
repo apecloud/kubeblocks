@@ -36,7 +36,7 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -123,7 +123,7 @@ func main() {
 		failed(err, "failed to parse config spec")
 	}
 
-	mergePolicy, err := plan.NewTemplateMerger(configRenderMeta.LegacyRenderedConfigSpec.ConfigTemplateExtension,
+	mergePolicy, err := configuration.NewTemplateMerger(configRenderMeta.LegacyRenderedConfigSpec.ConfigTemplateExtension,
 		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1alpha1.ConfigConstraintSpec{
 			FormatterConfig: &configRenderMeta.FormatterConfig,
 		})

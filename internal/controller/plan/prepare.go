@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 )
 
 // RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
@@ -40,7 +41,7 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	localObjs []client.Object,
 	ctx context.Context,
 	cli client.Client) error {
-	return NewConfigReconcileTask(
+	return configuration.NewConfigReconcileTask(
 		cli,
 		ctx,
 		cluster,

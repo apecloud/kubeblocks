@@ -33,7 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -147,7 +147,7 @@ func syncConfigmap(
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
 	core.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
-	if err := plan.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
+	if err := configuration.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
 		return err
 	}
 	return cli.Patch(ctx, cmObj, patch)

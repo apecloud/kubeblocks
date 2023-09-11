@@ -22,7 +22,7 @@ package configuration
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -39,7 +39,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 	return Task{
 		Name: item.Name,
 		Do: func(fetcher *Task, component *component.SynthesizedComponent) error {
-			reconcileTask := plan.NewReconcilePipeline(plan.ReconcileCtx{
+			reconcileTask := configuration.NewReconcilePipeline(configuration.ReconcileCtx{
 				ResourceCtx: fetcher.ResourceCtx,
 				Cluster:     fetcher.ClusterObj,
 				ClusterVer:  fetcher.ClusterVerObj,

@@ -689,3 +689,12 @@ func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool 
 	}
 	return false
 }
+
+func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
+	vertices := model.FindAll[*appsv1.StatefulSet](dag)
+	if len(vertices) != 1 {
+		return nil, fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))
+	}
+	stsVertex, _ := vertices[0].(*model.ObjectVertex)
+	return stsVertex, nil
+}

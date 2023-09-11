@@ -24,11 +24,15 @@ import (
 	"encoding/json"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 )
+
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 
@@ -38,9 +42,8 @@ type StatefulSetRevisionGetter interface {
 	// GetStatefulSetRevisions returns the current and update ControllerRevisions for set. It also
 	// returns a collision count that records the number of name collisions set saw when creating
 	// new ControllerRevisions. This count is incremented on every name collision and is used in
-	// building the ControllerRevision names for name collision avoidance. This method may create
-	// a new revision, or modify the Revision of an existing revision if an update to set is detected.
-	// This method expects that revisions is sorted when supplied.
+	// building the ControllerRevision names for name collision avoidance. This method expects that
+	// revisions is sorted when supplied.
 	GetStatefulSetRevisions(set *appsv1.StatefulSet) (*appsv1.ControllerRevision, *appsv1.ControllerRevision, int32, error)
 }
 
@@ -50,7 +53,30 @@ type realStatefulSetRevisionGetter struct {
 
 var _ StatefulSetRevisionGetter = &realStatefulSetRevisionGetter{}
 
-func NewStatefulSetRevisionGetter(ctx context.Context, cli client.Client) StatefulSetRevisionGetter {
+type getterClient struct {
+	roclient.ReadonlyClient
+	client.Writer
+	client.StatusClient
+	client.SubResourceClientConstructor
+}
+
+func (g *getterClient) Scheme() *runtime.Scheme {
+	panic("should not be called")
+}
+
+func (g *getterClient) RESTMapper() meta.RESTMapper {
+	panic("should not be called")
+}
+
+var _ client.Client = &getterClient{}
+
+func NewStatefulSetRevisionGetter(ctx context.Context, readonlyClient roclient.ReadonlyClient) StatefulSetRevisionGetter {
+	cli := &getterClient{
+		ReadonlyClient: readonlyClient,
+		Writer: nil,
+		StatusClient: nil,
+		SubResourceClientConstructor: nil,
+	}
 	return &realStatefulSetRevisionGetter{
 		ControllerHistoryInterface: NewHistory(ctx, cli),
 	}
@@ -130,13 +156,11 @@ func (g *realStatefulSetRevisionGetter) ListRevisions(set *appsv1.StatefulSet) (
 // GetStatefulSetRevisions returns the current and update ControllerRevisions for set. It also
 // returns a collision count that records the number of name collisions set saw when creating
 // new ControllerRevisions. This count is incremented on every name collision and is used in
-// building the ControllerRevision names for name collision avoidance. This method may create
-// a new revision, or modify the Revision of an existing revision if an update to set is detected.
-// This method expects that revisions is sorted when supplied.
+// building the ControllerRevision names for name collision avoidance. This method expects that
+// revisions is sorted when supplied.
 func (g *realStatefulSetRevisionGetter) GetStatefulSetRevisions(set *appsv1.StatefulSet) (*appsv1.ControllerRevision, *appsv1.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *appsv1.ControllerRevision
 	revisions, err := g.ListRevisions(set)
-	revisionCount := len(revisions)
 	SortControllerRevisions(revisions)
 
 	// Use a local copy of set.Status.CollisionCount to avoid modifying set.Status directly.
@@ -150,30 +174,6 @@ func (g *realStatefulSetRevisionGetter) GetStatefulSetRevisions(set *appsv1.Stat
 	updateRevision, err = newRevision(set, nextRevision(revisions), &collisionCount)
 	if err != nil {
 		return nil, nil, collisionCount, err
-	}
-
-	// find any equivalent revisions
-	equalRevisions := FindEqualRevisions(revisions, updateRevision)
-	equalCount := len(equalRevisions)
-
-	if equalCount > 0 && EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
-		// if the equivalent revision is immediately prior the update revision has not changed
-		updateRevision = revisions[revisionCount-1]
-	} else if equalCount > 0 {
-		// if the equivalent revision is not immediately prior we will roll back by incrementing the
-		// Revision of the equivalent revision
-		updateRevision, err = g.UpdateControllerRevision(
-			equalRevisions[equalCount-1],
-			updateRevision.Revision)
-		if err != nil {
-			return nil, nil, collisionCount, err
-		}
-	} else {
-		//if there is no equivalent revision we create a new one
-		updateRevision, err = g.CreateControllerRevision(set, updateRevision, &collisionCount)
-		if err != nil {
-			return nil, nil, collisionCount, err
-		}
 	}
 
 	// attempt to find the revision that corresponds to the current revision

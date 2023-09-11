@@ -48,10 +48,17 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 	case model.IsObjectUpdating(rsmOrig):
 		// use rsm's generation instead of sts's
 		rsm.Status.ObservedGeneration = rsm.Generation
-		// hack for sts initialization error: is invalid: status.replicas: Required value
-		if rsm.Status.Replicas == 0 {
-			rsm.Status.Replicas = *rsm.Spec.Replicas
+		stsVertex, err := getUnderlyingStsVertex(dag)
+		if err != nil {
+			return err
 		}
+		newSts, _ := stsVertex.Obj.(*apps.StatefulSet)
+		revisionGetter := NewStatefulSetRevisionGetter(transCtx.Context, transCtx.Client)
+		_, updateRevision, _, err := revisionGetter.GetStatefulSetRevisions(newSts)
+		if err != nil {
+			return err
+		}
+		rsm.Status.UpdateRevision = updateRevision.Name
 		// hack for mismatch between new version of rsm spec and old version of the underlying sts spec
 		// TODO(free6om): review this when cluster phase refactoring. should reset all sts status fields?
 		rsm.Status.UpdatedReplicas = 0
@@ -63,7 +70,9 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		}
 		// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
 		generation := rsm.Status.ObservedGeneration
+		updateRevision := rsm.Status.UpdateRevision
 		rsm.Status.StatefulSetStatus = sts.Status
+		rsm.Status.UpdateRevision = updateRevision
 		rsm.Status.ObservedGeneration = generation
 		// read all pods belong to the sts, hence belong to the rsm
 		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)

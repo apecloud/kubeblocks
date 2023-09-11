@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	ref "k8s.io/client-go/tools/reference"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -92,15 +93,11 @@ func (s *StsAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 		return handleErr(client.IgnoreAlreadyExists(ctx.Client.Create(ctx.Ctx, sts)))
 	}
 
+	objRef, _ := ref.GetReference(ctx.Scheme, &original)
 	// statefulSet exists, check statefulSet status and set action status accordingly
 	sb = sb.startTimestamp(&original.CreationTimestamp).
-		ObjectRef(&corev1.ObjectReference{
-			Kind:       original.Kind,
-			Namespace:  original.Namespace,
-			Name:       original.Name,
-			APIVersion: original.APIVersion,
-			UID:        original.UID,
-		}).availableReplicas(original.Status.AvailableReplicas)
+		objectRef(objRef).
+		availableReplicas(original.Status.AvailableReplicas)
 
 	// statefulSet exist, update its status
 	original.Spec.Template = sts.Spec.Template

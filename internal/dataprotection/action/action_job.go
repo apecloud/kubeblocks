@@ -25,6 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ref "k8s.io/client-go/tools/reference"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -33,8 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 )
-
-var ()
 
 // JobAction is an action that creates a batch job.
 type JobAction struct {
@@ -81,24 +80,20 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 	if err != nil {
 		return handleErr(err)
 	} else if exists {
+		objRef, _ := ref.GetReference(ctx.Scheme, &original)
 		// job exists, check job status and set action status accordingly
-		sb = sb.startTimestamp(&original.CreationTimestamp).
-			ObjectRef(&corev1.ObjectReference{
-				Kind:       original.Kind,
-				Namespace:  original.Namespace,
-				Name:       original.Name,
-				APIVersion: original.APIVersion,
-				UID:        original.UID,
-			})
-
-		if utils.BatchV1JobCompleted(&original) {
+		sb = sb.startTimestamp(&original.CreationTimestamp).objectRef(objRef)
+		_, finishedType := utils.IsJobFinished(&original)
+		switch finishedType {
+		case batchv1.JobComplete:
 			return sb.phase(dpv1alpha1.ActionPhaseCompleted).
 				completionTimestamp(nil).
 				reason("JobCompleted").
 				build(), nil
-		} else if utils.BatchV1JobFailed(&original) {
+		case batchv1.JobFailed:
 			// TODO: get failed reason from job
 			return sb.phase(dpv1alpha1.ActionPhaseFailed).
+				completionTimestamp(nil).
 				reason("JobFailed").
 				build(), nil
 		}
@@ -123,7 +118,7 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 		return handleErr(err)
 	}
 	msg := fmt.Sprintf("creating job %s/%s", job.Namespace, job.Name)
-	ctx.Recorder.Event(j.Owner, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
+	ctx.Recorder.Event(j.Owner, corev1.EventTypeNormal, "CreatingJob", msg)
 	return handleErr(client.IgnoreAlreadyExists(ctx.Client.Create(ctx.Ctx, job)))
 }
 

@@ -20,45 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
-	"context"
-
 	batchv1 "k8s.io/api/batch/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/errors"
+	corev1 "k8s.io/api/core/v1"
 )
 
-func EnsureBatchV1JobCompleted(ctx context.Context, cli client.Client, key client.ObjectKey) (bool, error) {
-	job := &batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(ctx, cli, key, job)
-	if err != nil {
-		return false, err
-	}
-	if exists {
-		if ContainsJobCondition(job, batchv1.JobComplete) {
-			return true, nil
-		}
-		if ContainsJobCondition(job, batchv1.JobFailed) {
-			return false, errors.NewBackupJobFailed(job.Name)
+func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType) {
+	for _, c := range job.Status.Conditions {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == corev1.ConditionTrue {
+			return true, c.Type
 		}
 	}
-	return false, nil
-}
 
-func ContainsJobCondition(job *batchv1.Job, jobCondType batchv1.JobConditionType) bool {
-	for _, jobCond := range job.Status.Conditions {
-		if jobCond.Type == jobCondType {
-			return true
-		}
-	}
-	return false
-}
-
-func BatchV1JobCompleted(job *batchv1.Job) bool {
-	return ContainsJobCondition(job, batchv1.JobComplete)
-}
-
-func BatchV1JobFailed(job *batchv1.Job) bool {
-	return ContainsJobCondition(job, batchv1.JobFailed)
+	return false, ""
 }

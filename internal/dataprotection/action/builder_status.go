@@ -83,7 +83,7 @@ func (b *statusBuilder) availableReplicas(replicas int32) *statusBuilder {
 	return b
 }
 
-func (b *statusBuilder) ObjectRef(objectRef *corev1.ObjectReference) *statusBuilder {
+func (b *statusBuilder) objectRef(objectRef *corev1.ObjectReference) *statusBuilder {
 	b.status.ObjectRef = objectRef
 	return b
 }
@@ -94,6 +94,19 @@ func (b *statusBuilder) withErr(err error) *statusBuilder {
 	}
 	b.status.FailureReason = err.Error()
 	b.status.Phase = dpv1alpha1.ActionPhaseFailed
+	return b
+}
+
+func (b *statusBuilder) totalSize(size string) *statusBuilder {
+	b.status.TotalSize = size
+	return b
+}
+
+func (b *statusBuilder) timeRange(start, end *metav1.Time) *statusBuilder {
+	b.status.TimeRange = &dpv1alpha1.BackupTimeRange{
+		Start: start,
+		End:   end,
+	}
 	return b
 }
 

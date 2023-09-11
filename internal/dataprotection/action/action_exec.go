@@ -20,23 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package action
 
 import (
-	"bytes"
-	"time"
-
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/remotecommand"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // ExecAction is an action that executes a command on a pod.
+// This action will create a job to execute the command.
 type ExecAction struct {
-	// Name is the Name of the action.
-	Name string
+	JobAction
 
 	// PodName is the Name of the pod to execute the command on.
 	PodName string
@@ -50,86 +46,19 @@ type ExecAction struct {
 	// Container is the container to execute the command on.
 	Container string
 
+	// ServiceAccountName is the service account to use to build the job object.
+	ServiceAccountName string
+
 	// Timeout is the timeout for the command.
 	Timeout metav1.Duration
 }
 
-func (e *ExecAction) GetName() string {
-	return e.Name
-}
-
-func (e *ExecAction) Type() dpv1alpha1.ActionType {
-	return dpv1alpha1.ActionTypeExec
-}
-
 func (e *ExecAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
-	sb := newStatusBuilder(e)
-	handleErr := func(err error) (*dpv1alpha1.ActionStatus, error) {
-		return sb.withErr(err).build(), err
-	}
-
 	if err := e.validate(); err != nil {
-		return handleErr(err)
+		return nil, err
 	}
-
-	kc, err := kubernetes.NewForConfig(ctx.RestClientConfig)
-	if err != nil {
-		return handleErr(err)
-	}
-
-	req := kc.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(e.Namespace).
-		Name(e.PodName).
-		SubResource("ExecAction")
-
-	// if container not specified, exec will use the first container in the pod
-	if e.Container != "" {
-		req.Param("container", e.Container)
-	}
-
-	req.VersionedParams(&corev1.PodExecOptions{
-		Container: e.Container,
-		Command:   e.Command,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, scheme.ParameterCodec)
-
-	executor, err := remotecommand.NewSPDYExecutor(ctx.RestClientConfig, "POST", req.URL())
-	if err != nil {
-		return handleErr(err)
-	}
-
-	var stdout, stderr bytes.Buffer
-	streamOptions := remotecommand.StreamOptions{
-		Stdout: &stdout,
-		Stderr: &stderr,
-	}
-
-	errCh := make(chan error)
-	go func() {
-		err = executor.StreamWithContext(ctx.Ctx, streamOptions)
-		errCh <- err
-	}()
-
-	var timeoutCh <-chan time.Time
-	if e.Timeout.Duration > 0 {
-		timer := time.NewTimer(e.Timeout.Duration)
-		defer timer.Stop()
-		timeoutCh = timer.C
-	}
-
-	select {
-	case err = <-errCh:
-	case <-timeoutCh:
-		return handleErr(errors.Errorf("timed out after %v", e.Timeout.Duration))
-	}
-
-	if err != nil {
-		return handleErr(err)
-	}
-	return sb.phase(dpv1alpha1.ActionPhaseCompleted).completionTimestamp(nil).build(), nil
+	e.JobAction.PodSpec = e.buildPodSpec()
+	return e.JobAction.Execute(ctx)
 }
 
 func (e *ExecAction) validate() error {
@@ -143,6 +72,39 @@ func (e *ExecAction) validate() error {
 		return errors.New("command is required")
 	}
 	return nil
+}
+
+func (e *ExecAction) buildPodSpec() *corev1.PodSpec {
+	return &corev1.PodSpec{
+		RestartPolicy:      corev1.RestartPolicyNever,
+		ServiceAccountName: e.ServiceAccountName,
+		Containers: []corev1.Container{
+			{
+				Name:            e.Name,
+				Image:           viper.GetString(constant.KBToolsImage),
+				ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
+				Command:         []string{"kubectl"},
+				Args: append([]string{
+					"-n",
+					e.Namespace,
+					"exec",
+					e.PodName,
+					"-c",
+					e.Container,
+					"--",
+				}, e.Command...),
+			},
+		},
+		Volumes: []corev1.Volume{},
+		// tolerate all taints
+		Tolerations: []corev1.Toleration{
+			{
+				Operator: corev1.TolerationOpExists,
+			},
+		},
+		Affinity:     &corev1.Affinity{},
+		NodeSelector: map[string]string{},
+	}
 }
 
 var _ Action = &ExecAction{}

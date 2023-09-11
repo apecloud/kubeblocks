@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +50,34 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var configConstraint *appsv1alpha1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
+
+	mockStatefulSet := func() *appsv1.StatefulSet {
+		envConfig, err := builder.BuildEnvConfig(clusterObj, clusterComponent)
+		Expect(err).Should(Succeed())
+		stsObj, err := builder.BuildSts(intctrlutil.RequestCtx{
+			Ctx: ctx,
+			Log: logger,
+		}, clusterObj, clusterComponent, envConfig.Name)
+		Expect(err).Should(Succeed())
+		return stsObj
+	}
+
+	createConfigReconcileTask := func() *configOperator {
+		task := NewConfigReconcileTask(&intctrlutil.ResourceCtx{
+			Client:        k8sMockClient.Client(),
+			Context:       ctx,
+			Namespace:     testCtx.DefaultNamespace,
+			ClusterName:   clusterName,
+			ComponentName: mysqlCompName,
+		},
+			clusterObj,
+			clusterVersionObj,
+			clusterComponent,
+			mockStatefulSet(),
+			clusterComponent.PodSpec,
+			nil)
+		return task
+	}
 
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
@@ -126,26 +155,10 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			//	return nil
 			// })
 
-			envConfig, err := builder.BuildEnvConfig(clusterObj, clusterComponent)
-			Expect(err).Should(Succeed())
-			stsObj, err := builder.BuildSts(intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}, clusterObj, clusterComponent, envConfig.Name)
-			Expect(err).Should(Succeed())
-
-			Expect(NewConfigReconcileTask(&intctrlutil.ResourceCtx{
-				Client:        k8sMockClient.Client(),
-				Context:       ctx,
-				Namespace:     testCtx.DefaultNamespace,
-				ClusterName:   clusterName,
-				ComponentName: mysqlCompName,
-			}, clusterObj, clusterVersionObj, clusterComponent, stsObj, clusterComponent.PodSpec, nil).Reconcile()).Should(Succeed())
+			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
 		})
 
 		It("EmptyConfigSpecTest", func() {
-			clusterComponent.ConfigTemplates = nil
-			clusterComponent.ScriptTemplates = nil
 
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
@@ -156,20 +169,9 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 				},
 			), testutil.WithAnyTimes()))
 
-			envConfig, err := builder.BuildEnvConfig(clusterObj, clusterComponent)
-			Expect(err).Should(Succeed())
-			stsObj, err := builder.BuildSts(intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}, clusterObj, clusterComponent, envConfig.Name)
-			Expect(err).Should(Succeed())
-			Expect(NewConfigReconcileTask(&intctrlutil.ResourceCtx{
-				Client:        k8sMockClient.Client(),
-				Context:       ctx,
-				Namespace:     testCtx.DefaultNamespace,
-				ClusterName:   clusterName,
-				ComponentName: mysqlCompName,
-			}, clusterObj, clusterVersionObj, clusterComponent, stsObj, clusterComponent.PodSpec, nil).Reconcile()).Should(Succeed())
+			clusterComponent.ConfigTemplates = nil
+			clusterComponent.ScriptTemplates = nil
+			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
 		})
 
 	})

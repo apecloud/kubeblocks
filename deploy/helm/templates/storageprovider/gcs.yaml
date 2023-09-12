@@ -1,8 +1,8 @@
-# obs is a storage provider for [Huawei OBS](https://www.huaweicloud.com/product/obs.html) object storage.
+# gcs is a storage provider for [Google Cloud Storage](https://cloud.google.com/storage/).
 apiVersion: storage.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
-  name: obs
+  name: gcs
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
@@ -13,7 +13,7 @@ spec:
     {{ `{{- $region := index .Parameters "region" }}` }}
     {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
     {{ `{{- if not $endpoint }}` }}
-      {{ `{{- $endpoint = (printf "https://obs.%s.myhuaweicloud.com" $region) }}` }}
+      {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
     {{ `{{- end }}` }}
     endpoint: {{ `{{ $endpoint }}` }}
 
@@ -39,22 +39,22 @@ spec:
       properties:
         region:
           type: string
-          description: "OBS region, e.g. cn-north-4"
+          description: "GCS region, e.g. auto"
         bucket:
           type: string
-          description: "OBS bucket"
+          description: "GCS bucket"
         endpoint:
           type: string
-          description: "OBS endpoint (optional)"
+          description: "GCS endpoint (optional)"
         mountOptions:
           type: string
           description: "mount options for geesefs"
         accessKeyId:
           type: string
-          description: "OBS access key"
+          description: "GCS access key"
         secretAccessKey:
           type: string
-          description: "OBS secret key"
+          description: "GCS secret key"
 
       required:
         - bucket

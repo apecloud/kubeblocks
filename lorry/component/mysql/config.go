@@ -85,8 +85,6 @@ func NewConfig(properties map[string]string) (*Config, error) {
 
 	if viper.IsSet("KB_SERVICE_USER") {
 		config.username = viper.GetString("KB_SERVICE_USER")
-	} else {
-		config.username = "root"
 	}
 
 	if viper.IsSet("KB_SERVICE_PASSWORD") {

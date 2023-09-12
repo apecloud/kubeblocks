@@ -21,7 +21,6 @@ package plan
 
 import (
 	"context"
-	"strings"
 
 	"github.com/spf13/cast"
 	corev1 "k8s.io/api/core/v1"
@@ -129,7 +128,7 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 
 func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1alpha1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
-		Name:      generateEnvFromName(originKey.Name),
+		Name:      core.GenerateEnvFromName(originKey.Name),
 		Namespace: originKey.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
@@ -219,7 +218,7 @@ func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1
 
 func updateEnvFromConfigmap(origObj client.ObjectKey, envMap map[string]string, cli client.Client, ctx context.Context) error {
 	cmKey := client.ObjectKey{
-		Name:      generateEnvFromName(origObj.Name),
+		Name:      core.GenerateEnvFromName(origObj.Name),
 		Namespace: origObj.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
@@ -232,8 +231,4 @@ func updateEnvFromConfigmap(origObj client.ObjectKey, envMap map[string]string, 
 		return err
 	}
 	return nil
-}
-
-func generateEnvFromName(originName string) string {
-	return strings.Join([]string{originName, "envfrom"}, "-")
 }

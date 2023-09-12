@@ -1,12 +1,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: risingwave-cluster-hscale-
+  generateName: greptimedb-cluster-hscale-up-
 spec:
-  clusterRef: risingwave-cluster
+  clusterRef: greptimedb-cluster
   type: HorizontalScaling
   horizontalScaling:
     - componentName: frontend
       replicas: 3
     - componentName: meta
-        replicas: 3
+      replicas: 3

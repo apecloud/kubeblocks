@@ -1,14 +1,18 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: risingwave-cluster-start-
+  generateName: risingwave-cluster-hscale-up-
 spec:
   clusterRef: risingwave-cluster
-  ttlSecondsAfterSucceed: 27017
-  type: Start
-  restart:
+  type: HorizontalScaling
+  horizontalScaling:
     - componentName: frontend
+      replicas: 3
     - componentName: meta
+      replicas: 3
     - componentName: compute
+      replicas: 3
     - componentName: compactor
+      replicas: 3
     - componentName: connector
+      replicas: 3

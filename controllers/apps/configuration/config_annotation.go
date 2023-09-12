@@ -88,7 +88,9 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 	if config.ObjectMeta.Annotations == nil {
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
-
+	if revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]; ok && revision != "" {
+		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(appsv1alpha1.CFinishedPhase)
+	}
 	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)
 	hash, err := util.ComputeHash(config.Data)
 	if err != nil {

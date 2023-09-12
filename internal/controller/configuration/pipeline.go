@@ -22,6 +22,7 @@ package configuration
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -372,6 +373,9 @@ func (p *updatePipeline) UpdateConfigVersion() *updatePipeline {
 			return err
 		}
 		p.newCM.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+		hash, _ := cfgutil.ComputeHash(p.newCM.Data)
+		p.newCM.Annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
+		p.newCM.Annotations[constant.ConfigurationRevision] = strconv.FormatInt(p.ConfigurationObj.GetGeneration(), 10)
 		return nil
 	})
 }

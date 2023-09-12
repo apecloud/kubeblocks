@@ -183,3 +183,7 @@ func GetComponentCfgName(clusterName, componentName, tplName string) string {
 func GenerateEnvFromName(originName string) string {
 	return strings.Join([]string{originName, "envfrom"}, "-")
 }
+
+func GenerateRevisionPhaseKey(revision string) string {
+	return strings.Join([]string{constant.LastConfigurationRevisionPhase, revision}, "/")
+}

@@ -106,6 +106,7 @@ const (
 	CMTemplateNameLabelKey                   = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey              = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey           = "config.kubeblocks.io/config-hash"
+	CMInsCurrentConfigurationHashLabelKey    = "config.kubeblocks.io/current-config-hash"
 	CMConfigurationConstraintsNameLabelKey   = "config.kubeblocks.io/config-constraints-name"
 	CMConfigurationTemplateVersion           = "config.kubeblocks.io/config-template-version"
 	ConsensusSetAccessModeLabelKey           = "cs.apps.kubeblocks.io/access-mode"
@@ -163,6 +164,12 @@ const (
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
+	// ConfigurationRevision defines the current revision
+	// TODO support multi version
+	ConfigurationRevision          = "config.kubeblocks.io/configuration-revision"
+	LastConfigurationRevisionPhase = "config.kubeblocks.io/revision-reconcile-phase"
+
+	// Deprecated: only compatible with version 0.6, will be removed in 0.8
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 

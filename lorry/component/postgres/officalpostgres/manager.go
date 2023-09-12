@@ -470,10 +470,6 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 	return needRewind
 }
 
-func getCheckPointEnd(timeline, lsn int64) {
-
-}
-
 func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
 	resp, err := postgres.Psql("-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
 	if err != nil {

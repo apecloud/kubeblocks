@@ -326,7 +326,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&configuration.ReconfigureRequestReconciler{
+		if err = (&configuration.ReconfigureReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),

@@ -20,15 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package hypervisor
 
 import (
+	"errors"
+
 	"github.com/dapr/kit/logger"
 	"github.com/spf13/pflag"
 )
 
 type Hypervisor struct {
-	Logger  logger.Logger
-	Daemon  *Daemon
-	Watcher *Watcher
+	Logger    logger.Logger
+	DBService *Daemon
+	Watcher   *Watcher
 }
+
+var hypervisor *Hypervisor
 
 func NewHypervisor(logger logger.Logger) (*Hypervisor, error) {
 	args := pflag.Args()
@@ -39,37 +43,75 @@ func NewHypervisor(logger logger.Logger) (*Hypervisor, error) {
 
 	watcher := NewWatcher(logger)
 	go watcher.Start()
-	hypervisor := &Hypervisor{
-		Logger:  logger,
-		Daemon:  daemon,
-		Watcher: watcher,
+	hypervisor = &Hypervisor{
+		Logger:    logger,
+		DBService: daemon,
+		Watcher:   watcher,
 	}
 
 	return hypervisor, nil
 }
 
 func (hypervisor *Hypervisor) Start() {
-	if hypervisor.Daemon == nil {
+	if hypervisor.DBService == nil {
 		hypervisor.Logger.Info("No DB Service")
 		return
 	}
 
-	err := hypervisor.Daemon.Start()
+	err := hypervisor.DBService.Start()
 	if err != nil {
 		hypervisor.Logger.Warnf("Start DB Service failed: %s", err)
 		return
 	}
 
-	hypervisor.Watcher.Watch(hypervisor.Daemon)
+	hypervisor.Watcher.Watch(hypervisor.DBService)
 }
 
 func (hypervisor *Hypervisor) StopAndWait() {
-	if hypervisor.Daemon == nil {
+	if hypervisor.DBService == nil {
 		hypervisor.Logger.Info("No DB Service")
 		return
 	}
 
-	hypervisor.Daemon.Stop()
+	hypervisor.DBService.Stop()
 
 	hypervisor.Watcher.StopAndWait()
+}
+
+func StopDBService() {
+	if hypervisor.DBService == nil {
+		hypervisor.Logger.Info("No DB Service")
+	}
+
+	hypervisor.DBService.Stop()
+}
+
+func StartDBService() error {
+	if hypervisor.DBService == nil {
+		hypervisor.Logger.Info("No DB Service")
+		return errors.New("no db service")
+	}
+
+	if IsDBServiceAlive() {
+		hypervisor.Logger.Info("DB Service is already running")
+		return nil
+	}
+
+	err := hypervisor.DBService.Start()
+	if err != nil {
+		hypervisor.Logger.Warnf("Start DB Service failed: %s", err)
+		return err
+	}
+
+	hypervisor.Watcher.Watch(hypervisor.DBService)
+	return nil
+}
+
+func IsDBServiceAlive() bool {
+	if hypervisor.DBService == nil || hypervisor.DBService.Process == nil {
+		return false
+	}
+
+	_, ok := hypervisor.Watcher.Processes[hypervisor.DBService.Process.Pid]
+	return ok
 }

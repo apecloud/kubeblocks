@@ -35,6 +35,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/lorry/hypervisor"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -116,6 +117,8 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		UnlockOperation:       ops.UnlockOps,
 		JoinMemberOperation:   ops.JoinMemberOps,
 		LeaveMemberOperation:  ops.LeaveMemberOps,
+		StartOperation:        ops.StartOps,
+		StopOperation:         ops.StopOps,
 	}
 
 	ops.DBAddress = ops.getAddress()
@@ -493,5 +496,35 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *bindings.Inv
 
 	opsRes["event"] = OperationSuccess
 	opsRes["message"] = "left of the current member is complete"
+	return opsRes, nil
+}
+
+func (ops *BaseOperations) StartOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	err := hypervisor.StartDBService()
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("start db service failed: %v", err)
+		return opsRes, err
+	}
+
+	opsRes["event"] = OperationSuccess
+	opsRes["message"] = "start db service success"
+	return opsRes, nil
+}
+
+func (ops *BaseOperations) StopOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	hypervisor.StopDBService()
+
+	if hypervisor.IsDBServiceAlive() {
+		msg := "waiting for db service to stop"
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = msg
+		return opsRes, errors.New(msg)
+	}
+
+	opsRes["event"] = OperationSuccess
+	opsRes["message"] = "stop db service success"
 	return opsRes, nil
 }

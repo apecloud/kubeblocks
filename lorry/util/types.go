@@ -59,6 +59,9 @@ const (
 	JoinMemberOperation  bindings.OperationKind = "joinMember"
 	LeaveMemberOperation bindings.OperationKind = "leaveMember"
 
+	StartOperation bindings.OperationKind = "start"
+	StopOperation  bindings.OperationKind = "stop"
+
 	OperationNotImplemented = "NotImplemented"
 	OperationInvalid        = "Invalid"
 	OperationSuccess        = "Success"

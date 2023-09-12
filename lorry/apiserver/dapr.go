@@ -38,6 +38,7 @@ import (
 	"github.com/dapr/kit/logger"
 	"go.uber.org/automaxprocs/maxprocs"
 
+	"github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
 	"github.com/apecloud/kubeblocks/lorry/binding/kafka"
@@ -53,6 +54,7 @@ var (
 )
 
 func init() {
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(binding.NewBase, "base")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")

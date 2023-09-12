@@ -38,4 +38,5 @@ const (
 	KBEnvServiceRoles    = "KB_SERVICE_ROLES"
 	KBEnvServicePort     = "KB_SERVICE_PORT"
 	KBEnvTTL             = "KB_TTL"
+	KBEnvScriptsPath     = "KB_SCRIPTS_PATH"
 )

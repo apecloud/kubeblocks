@@ -18,3 +18,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package hypervisor
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/viperx"
+)
+
+var scriptsPath = "/scripts"
+
+type Command struct {
+	Cmd    string
+	Args   []string
+	Stdout []byte
+	Err    error
+}
+
+func init() {
+	if viperx.IsSet(constant.KBEnvScriptsPath) {
+		scriptsPath = viperx.GetString(constant.KBEnvScriptsPath)
+	}
+}
+
+func GetRole() (string, error) {
+	program := "get_role.sh"
+	program = filepath.Join(scriptsPath, program)
+
+	cmd := exec.Command(program)
+	cmd.Env = os.Environ()
+	bytes, err := cmd.Output()
+	return string(bytes), err
+}

@@ -85,7 +85,11 @@ func init() {
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
-func (ops *BaseOperations) Init(metadata bindings.Metadata) {
+func NewBase(logger logger.Logger) bindings.OutputBinding {
+	return &BaseOperations{Logger: logger}
+}
+
+func (ops *BaseOperations) Init(metadata bindings.Metadata) error {
 	ops.FailedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
 	if ops.FailedEventReportFrequency < 300 {
 		ops.FailedEventReportFrequency = 300
@@ -121,7 +125,9 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		StopOperation:         ops.StopOps,
 	}
 
+	ops.GetRole = ops.getRole
 	ops.DBAddress = ops.getAddress()
+	return nil
 }
 
 func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
@@ -286,6 +292,10 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
 	return opsRes, nil
+}
+
+func (ops *BaseOperations) getRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+	return hypervisor.GetRole()
 }
 
 // Component may have some internal roles that needn't be exposed to end user,

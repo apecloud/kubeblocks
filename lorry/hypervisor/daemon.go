@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"syscall"
 
@@ -51,6 +52,10 @@ func NewDeamon(args []string, logger logger.Logger) (*Daemon, error) {
 		return nil, nil
 	}
 	command := args[0]
+	command, err := exec.LookPath(command)
+	if err != nil {
+		return nil, err
+	}
 
 	if argCount > 1 {
 		args = args[1:]

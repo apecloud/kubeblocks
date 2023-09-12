@@ -127,13 +127,13 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
      ```bash
      kbcli backuprepo create my-repo \
-     --provider oss \
-     --region cn-zhangjiakou \
-     --bucket  test-kb-backup \
-     # --endpoint oss-cn-zhangjiakou-internal.aliyuncs.com \ To display the specified oss endpoint
-     --access-key-id <ACCESS KEY> \
-     --secret-access-key <SECRET KEY> \
-     --default
+       --provider oss \
+       --region cn-zhangjiakou \
+       --bucket  test-kb-backup \
+       # --endpoint oss-cn-zhangjiakou-internal.aliyuncs.com \ To display the specified oss endpoint
+       --access-key-id <ACCESS KEY> \
+       --secret-access-key <SECRET KEY> \
+       --default
      ```
 
      </TabItem>
@@ -142,12 +142,12 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
      ```bash
      kbcli backuprepo create my-repo \
-        --provider minio \
-        --endpoint <ip:port> \
-        --bucket test-minio \
-        --access-key-id <ACCESS KEY> \
-        --secret-access-key <SECRET KEY> \
-        --default
+       --provider minio \
+       --endpoint <ip:port> \
+       --bucket test-minio \
+       --access-key-id <ACCESS KEY> \
+       --secret-access-key <SECRET KEY> \
+       --default
      ```
 
      </TabItem>

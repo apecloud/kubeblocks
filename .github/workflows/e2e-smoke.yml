@@ -8,7 +8,7 @@ on:
         required: true
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g. mysql|postgres|redis|mongo|pulsar)'
+        description: 'test type (e.g. mysql|postgres|redis|mongo|pulsar|greptimedb|nebula|risingwave|starrocks)'
         required: false
         default: ''
       CLOUD_PROVIDER:
@@ -75,7 +75,7 @@ jobs:
   e2e:
     name: ${{ inputs.CLOUD_PROVIDER }}
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@v0.1.19
+    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@v0.1.21
     with:
       CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"
@@ -83,5 +83,5 @@ jobs:
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       REGION: "${{ needs.check.outputs.cluster-region }}"
       TEST_TYPE: "${{ inputs.TEST_TYPE }}"
-      APECD_REF: "v0.1.19"
+      APECD_REF: "v0.1.21"
     secrets: inherit

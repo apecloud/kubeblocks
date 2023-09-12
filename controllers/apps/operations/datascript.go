@@ -37,8 +37,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel/engine"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/lorry/engine"
 )
 
 var _ OpsHandler = DataScriptOpsHandler{}

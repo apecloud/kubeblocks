@@ -43,10 +43,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	lorry "github.com/apecloud/kubeblocks/lorry/client"
 )
 
 var _ = Describe("OpsRequest Controller", func() {

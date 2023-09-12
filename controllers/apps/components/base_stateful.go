@@ -43,8 +43,8 @@ import (
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
-	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	lorry "github.com/apecloud/kubeblocks/lorry/client"
 )
 
 // rsmComponentBase as a base class for single rsm based component (stateful & replication & consensus).

@@ -39,7 +39,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -185,10 +184,14 @@ var _ = Describe("OpsRequest Controller", func() {
 		if controllerutil.IsRSMEnabled() {
 			rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, mysqlCompName)
 			mysqlRSM = &rsmList.Items[0]
+			mysqlSts = testapps.NewStatefulSetFactory(mysqlRSM.Namespace, mysqlRSM.Name, clusterKey.Name, mysqlCompName).
+				SetReplicas(*mysqlRSM.Spec.Replicas).Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, mysqlSts, func() {
+				testk8s.MockStatefulSetReady(mysqlSts)
+			})).ShouldNot(HaveOccurred())
 			Expect(testapps.ChangeObjStatus(&testCtx, mysqlRSM, func() {
 				testk8s.MockRSMReady(mysqlRSM, pod)
 			})).ShouldNot(HaveOccurred())
-			mysqlSts = components.ConvertRSMToSTS(mysqlRSM)
 		} else {
 			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
 			mysqlSts = &stsList.Items[0]
@@ -368,7 +371,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			wl := componentWorkload()
 			if controllerutil.IsRSMEnabled() {
 				rsm, _ := wl.(*workloads.ReplicatedStateMachine)
-				sts = components.ConvertRSMToSTS(rsm)
+				sts = testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, mysqlCompName).
+					SetReplicas(*rsm.Spec.Replicas).GetObject()
+				testapps.CheckedCreateK8sResource(&testCtx, sts)
 			} else {
 				sts, _ = wl.(*appsv1.StatefulSet)
 			}
@@ -378,11 +383,10 @@ var _ = Describe("OpsRequest Controller", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 					testk8s.MockRSMReady(rsm, mockPods...)
 				})).ShouldNot(HaveOccurred())
-			} else {
-				Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-					testk8s.MockStatefulSetReady(sts)
-				})).ShouldNot(HaveOccurred())
 			}
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		}
@@ -514,7 +518,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				// component phase should be running during snapshot backup
 				// g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 				// TODO(REVIEW): component phase is Updating after refactor, does it meet expectations?
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 				// the expected cluster phase is Updating during Hscale.
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			})).Should(Succeed())
@@ -527,7 +531,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			Expect(k8sClient.Status().Update(testCtx.Ctx, backup)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			})).Should(Succeed())
 

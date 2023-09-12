@@ -856,9 +856,11 @@ func (c *rsmComponentBase) updateWorkload(rsmObj *workloads.ReplicatedStateMachi
 	resolvePodSpecDefaultFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
 	delayUpdatePodSpecSystemFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
-
-	if !reflect.DeepEqual(&rsmObj.Spec, &rsmObjCopy.Spec) || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
+	isTemplateUpdated := !reflect.DeepEqual(&rsmObj.Spec, &rsmObjCopy.Spec)
+	if isTemplateUpdated {
 		updatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
+	}
+	if isTemplateUpdated || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
 		c.WorkloadVertex.Obj = rsmObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		return true

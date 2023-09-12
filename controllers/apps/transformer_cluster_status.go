@@ -75,7 +75,7 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 func (t *ClusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.Cluster) {
 	isFirstGeneration := func() bool {
 		return cluster.Generation == 1
-	}
+	}()
 	var (
 		isAllComponentWorking = true
 		isAllComponentRunning = true
@@ -117,7 +117,7 @@ func (t *ClusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 		if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 			t.syncClusterPhaseToRunning(cluster)
 		}
-	case isAllComponentWorking && isFirstGeneration():
+	case isAllComponentWorking && isFirstGeneration:
 		cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
 	case isAllComponentWorking:
 		cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase

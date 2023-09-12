@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"strconv"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/configuration"
@@ -32,17 +34,14 @@ type Task struct {
 	Status *appsv1alpha1.ConfigurationItemDetailStatus
 	Name   string
 
-	Do         func(task *Task, component *component.SynthesizedComponent, revision string) error
-	SyncStatus func(task *Task) error
+	Do         func(fetcher *Task, component *component.SynthesizedComponent, revision string) error
+	SyncStatus func(fetcher *Task, status *appsv1alpha1.ConfigurationItemDetailStatus) error
 }
 
 func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
 	return Task{
-		Name: item.Name,
-		SyncStatus: func(task *Task) error {
-			// TODO sync reconfiguring reconcile status
-			return nil
-		},
+		Name:   item.Name,
+		Status: status,
 		Do: func(fetcher *Task, component *component.SynthesizedComponent, revision string) error {
 			reconcileTask := configuration.NewReconcilePipeline(configuration.ReconcileCtx{
 				ResourceCtx: fetcher.ResourceCtx,
@@ -62,6 +61,39 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 				SyncStatus().
 				Complete()
 		},
-		Status: status,
+		SyncStatus: syncStatus,
+	}
+}
+
+func syncStatus(fetcher *Task, status *appsv1alpha1.ConfigurationItemDetailStatus) (err error) {
+	err = fetcher.ConfigMap(status.Name).Complete()
+	if err != nil {
+		return
+	}
+
+	annotations := fetcher.ConfigMapObj.GetAnnotations()
+	// status.CurrentRevision = GetCurrentRevision(annotations)
+	revisions := RetrieveRevision(annotations)
+	if len(revisions) == 0 {
+		return
+	}
+
+	for i := 0; i < len(revisions); i++ {
+		updateRevision(revisions[i], status)
+		updateLastDoneRevision(revisions[i], status)
+	}
+
+	return
+}
+
+func updateLastDoneRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigurationItemDetailStatus) {
+	if revision.Phase == appsv1alpha1.CFinishedPhase {
+		status.LastDoneRevision = strconv.FormatInt(revision.Revision, 10)
+	}
+}
+
+func updateRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigurationItemDetailStatus) {
+	if revision.StrRevision == status.UpdateRevision {
+		status.Phase = revision.Phase
 	}
 }

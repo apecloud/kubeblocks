@@ -102,7 +102,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedConfigs {
-		return intctrlutil.Reconciled()
+		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase)
 	}
 
 	// process configuration without ConfigConstraints
@@ -199,13 +199,13 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].", configSpecName, componentName))
 		reqCtx.Recorder.Eventf(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"related component does not have any configSpecs, skip reconfigure")
-		return intctrlutil.Reconciled()
+		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase)
 	}
 	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 {
 		reqCtx.Recorder.Eventf(configMap,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
-		return intctrlutil.Reconciled()
+		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase)
 	}
 
 	return r.performUpgrade(reconfigureParams{
@@ -260,6 +260,7 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 
 	switch returnedStatus.Status {
 	case ESRetry, ESAndRetryFailed:
+		_, _ = updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedPhase)
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
 		params.Ctx.Recorder.Eventf(params.ConfigMap,
@@ -271,7 +272,7 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}
-		return intctrlutil.Reconciled()
+		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedAndPausePhase)
 	default:
 		return intctrlutil.Reconciled()
 	}

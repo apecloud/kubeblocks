@@ -118,7 +118,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		if err := applyUpdatedParameters(item, newCMObj, configSpec, wrapper.cli, wrapper.ctx); err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme, configuration); err != nil {
 			return err
 		}
 	}
@@ -219,17 +219,22 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 		if err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(templateSpec, cm, scheme); err != nil {
+		if err := wrapper.addRenderedObject(templateSpec, cm, scheme, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme, configuration *appsv1alpha1.Configuration) (err error) {
 	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
-	if err := controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme); err != nil {
+	if configuration != nil {
+		err = controllerutil.SetControllerReference(configuration, cm, scheme)
+	} else {
+		err = controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme)
+	}
+	if err != nil {
 		return err
 	}
 

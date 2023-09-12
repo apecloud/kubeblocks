@@ -97,7 +97,7 @@ type ConfigurationItemDetailStatus struct {
 
 	// currentRevision is the current revision of configurationItem.
 	// +optional
-	CurrentRevision string `json:"currentRevision,omitempty"`
+	// CurrentRevision string `json:"currentRevision,omitempty"`
 
 	// updateRevision is the update revision of configurationItem.
 	// +optional

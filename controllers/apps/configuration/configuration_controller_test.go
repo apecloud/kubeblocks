@@ -27,7 +27,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Configuration Controller", func() {
@@ -36,12 +38,9 @@ var _ = Describe("Configuration Controller", func() {
 
 	AfterEach(cleanEnv)
 
-	Context("When updating configmap", func() {
-		It("Should rolling upgrade pod", func() {
-			configmap, constraint, clusterObj, clusterVersionObj, synthesizedComp := mockReconcileResource()
-			_ = configmap
-			_ = constraint
-			_ = clusterObj
+	Context("When updating configuration", func() {
+		It("Should reconcile success", func() {
+			_, _, clusterObj, clusterVersionObj, synthesizedComp := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{
 				Name:      core.GenerateComponentConfigurationName(clusterName, statefulCompName),
@@ -66,7 +65,29 @@ var _ = Describe("Configuration Controller", func() {
 				ComponentName: statefulCompName,
 			}, synthesizedComp, clusterObj, clusterVersionObj)).Should(Succeed())
 
-			Eventually(checkCfgStatus(appsv1alpha1.CMergedPhase)).Should(BeTrue())
+			Eventually(checkCfgStatus(appsv1alpha1.CFinishedPhase)).Should(BeTrue())
+
+			By("reconfiguring parameters.")
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *appsv1alpha1.Configuration) {
+				cfg.Spec.GetConfigurationItem(configSpecName).ConfigFileParams = map[string]appsv1alpha1.ConfigParams{
+					"my.cnf": {
+						Parameters: map[string]*string{
+							"max_connections": cfgutil.ToPointer("1000"),
+							"gtid_mode":       cfgutil.ToPointer("ON"),
+						},
+					},
+				}
+				cfg.SetGeneration(2)
+			})).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				cfg := &appsv1alpha1.Configuration{}
+				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
+				itemStatus := cfg.Status.GetItemStatus(configSpecName)
+				g.Expect(itemStatus).ShouldNot(BeNil())
+				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
+				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))
+			}).Should(Succeed())
 		})
 	})
 

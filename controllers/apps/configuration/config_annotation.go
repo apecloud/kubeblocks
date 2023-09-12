@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -64,6 +65,25 @@ func setCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 	return nil
 }
 
+func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase appsv1alpha1.ConfigurationPhase) (ctrl.Result, error) {
+	revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]
+	if !ok || revision == "" {
+		return intctrlutil.Reconciled()
+	}
+
+	patch := client.MergeFrom(config.DeepCopy())
+	if config.ObjectMeta.Annotations == nil {
+		config.ObjectMeta.Annotations = map[string]string{}
+	}
+
+	GcConfigRevision(config)
+	config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(phase)
+	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
+		return intctrlutil.RequeueWithError(err, ctx.Log, "")
+	}
+	return intctrlutil.Reconciled()
+}
+
 // checkAndApplyConfigsChanged check if configs changed
 func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCtx, cm *corev1.ConfigMap) (bool, error) {
 	annotations := cm.GetAnnotations()
@@ -88,6 +108,8 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 	if config.ObjectMeta.Annotations == nil {
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
+
+	GcConfigRevision(config)
 	if revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]; ok && revision != "" {
 		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(appsv1alpha1.CFinishedPhase)
 	}

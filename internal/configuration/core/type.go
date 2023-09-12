@@ -185,5 +185,5 @@ func GenerateEnvFromName(originName string) string {
 }
 
 func GenerateRevisionPhaseKey(revision string) string {
-	return strings.Join([]string{constant.LastConfigurationRevisionPhase, revision}, "/")
+	return strings.Join([]string{constant.LastConfigurationRevisionPhase, revision}, "-")
 }

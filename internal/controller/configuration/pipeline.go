@@ -377,6 +377,7 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 		hash, _ := cfgutil.ComputeHash(p.newCM.Data)
 		p.newCM.Annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
 		p.newCM.Annotations[constant.ConfigurationRevision] = revision
+		p.itemStatus.UpdateRevision = revision
 		return nil
 	})
 }

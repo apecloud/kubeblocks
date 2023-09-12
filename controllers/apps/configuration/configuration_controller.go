@@ -22,6 +22,7 @@ package configuration
 import (
 	"context"
 	"strconv"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +45,8 @@ type ConfigurationReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+const reconcileInterval = time.Millisecond * 10
 
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations/status,verbs=get;update;patch
@@ -102,7 +105,20 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := r.runTasks(reqCtx, configuration, fetcherTask, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
+	if !isAllReady(configuration) {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	}
 	return intctrlutil.Reconciled()
+}
+
+func isAllReady(configuration *appsv1alpha1.Configuration) bool {
+	for _, item := range configuration.Spec.ConfigItemDetails {
+		itemStatus := configuration.Status.GetItemStatus(item.Name)
+		if itemStatus == nil || itemStatus.Phase != appsv1alpha1.CFinishedPhase {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *ConfigurationReconciler) runTasks(
@@ -132,7 +148,7 @@ func (r *ConfigurationReconciler) runTasks(
 			errs = append(errs, err)
 			continue
 		}
-		if err := task.SyncStatus(fetcher); err != nil {
+		if err := task.SyncStatus(fetcher, task.Status); err != nil {
 			task.Status.Phase = appsv1alpha1.CFailedPhase
 			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)

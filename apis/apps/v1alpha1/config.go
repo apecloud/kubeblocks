@@ -72,19 +72,20 @@ package v1alpha1
 
 // ConfigurationPhase defines the Configuration FSM phase
 // +enum
-// +kubebuilder:validation:Enum={Init,Running,Pending,Merged,MergeFailed,Upgrading,Deleting,FailedAndRetry,Finished}
+// +kubebuilder:validation:Enum={Init,Running,Pending,Merged,MergeFailed,FailedAndPause,Upgrading,Deleting,FailedAndRetry,Finished}
 type ConfigurationPhase string
 
 const (
-	CInitPhase        ConfigurationPhase = "Init"
-	CRunningPhase     ConfigurationPhase = "Running"
-	CPendingPhase     ConfigurationPhase = "Pending"
-	CFailedPhase      ConfigurationPhase = "FailedAndRetry"
-	CMergedPhase      ConfigurationPhase = "Merged"
-	CMergeFailedPhase ConfigurationPhase = "MergeFailed"
-	CDeletingPhase    ConfigurationPhase = "Deleting"
-	CUpgradingPhase   ConfigurationPhase = "Upgrading"
-	CFinishedPhase    ConfigurationPhase = "Finished"
+	CInitPhase           ConfigurationPhase = "Init"
+	CRunningPhase        ConfigurationPhase = "Running"
+	CPendingPhase        ConfigurationPhase = "Pending"
+	CFailedPhase         ConfigurationPhase = "FailedAndRetry"
+	CFailedAndPausePhase ConfigurationPhase = "FailedAndPause"
+	CMergedPhase         ConfigurationPhase = "Merged"
+	CMergeFailedPhase    ConfigurationPhase = "MergeFailed"
+	CDeletingPhase       ConfigurationPhase = "Deleting"
+	CUpgradingPhase      ConfigurationPhase = "Upgrading"
+	CFinishedPhase       ConfigurationPhase = "Finished"
 )
 
 type ConfigParams struct {

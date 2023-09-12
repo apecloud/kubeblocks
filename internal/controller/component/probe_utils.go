@@ -104,6 +104,10 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		probeContainers = append(probeContainers, *c)
 	}
 
+	initContainer := container.DeepCopy()
+	buildProbeInitContainer(component, initContainer)
+	modifyMainContainerForProbe(component, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
+	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, *initContainer)
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
 		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
@@ -112,6 +116,71 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
 	return nil
+}
+
+func buildProbeInitContainer(component *SynthesizedComponent, container *corev1.Container) {
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Name = constant.ProbeInitContainerName
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Command = []string{"cp", "-r", "/bin/lorryctl", "/bin/lorry", "/config", "/kubeblocks/"}
+	container.StartupProbe = nil
+	container.ReadinessProbe = nil
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
+}
+
+func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+	container := component.PodSpec.Containers[0]
+	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
+	command := []string{"/kubeblocks/lorry", "--app-id", "lorry",
+		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
+		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
+		"--log-level", logLevel,
+		"--config", "/kubeblocks/config/lorry/config.yaml",
+		"--components-path", "/kubeblocks/config/lorry/components", "--"}
+	container.Command = append(command, container.Command...)
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+	roles := getComponentRoles(component)
+	rolesJSON, _ := json.Marshal(roles)
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      constant.KBPrefix + "_SERVICE_ROLES",
+		Value:     string(rolesJSON),
+		ValueFrom: nil,
+	},
+		corev1.EnvVar{
+			Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
+			Value:     component.CharacterType,
+			ValueFrom: nil,
+		},
+		corev1.EnvVar{
+			Name: constant.KBPrefix + "_SERVICE_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{Key: "username", LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"}},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBPrefix + "_SERVICE_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{Key: "password", LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"}},
+			},
+		})
+
+	if volumeProtectionEnabled(component) {
+		container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
+	}
+
+	container.Ports = append(container.Ports, corev1.ContainerPort{
+		ContainerPort: int32(probeSvcHTTPPort),
+		Name:          constant.ProbeHTTPPortName,
+		Protocol:      "TCP",
+	},
+		corev1.ContainerPort{
+			ContainerPort: int32(probeSvcGRPCPort),
+			Name:          constant.ProbeGRPCPortName,
+			Protocol:      "TCP",
+		})
+	component.PodSpec.Containers[0] = container
 }
 
 func buildProbeContainer() (*corev1.Container, error) {
@@ -136,13 +205,15 @@ func buildProbeContainer() (*corev1.Container, error) {
 func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"lorry", "--app-id", "batch-sdk",
-		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
-		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
-		"--log-level", logLevel,
-		"--config", "/config/lorry/config.yaml",
-		"--components-path", "/config/lorry/components"}
+
+	container.Command = []string{"/bin/sh", "-c", "cp -r /bin/lorryctl /bin/lorry /config /kubeblocks/; while true; do sleep 10; done"}
+	// logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
+	// container.Command = []string{"lorry", "--app-id", "batch-sdk",
+	// 	"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
+	// 	"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
+	// 	"--log-level", logLevel,
+	// 	"--config", "/config/lorry/config.yaml",
+	// 	"--components-path", "/config/lorry/components"}
 
 	if len(component.PodSpec.Containers) > 0 {
 		mainContainer := component.PodSpec.Containers[0]
@@ -176,42 +247,42 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		}
 	}
 
-	roles := getComponentRoles(component)
-	rolesJSON, _ := json.Marshal(roles)
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvServiceRoles,
-		Value:     string(rolesJSON),
-		ValueFrom: nil,
-	})
+	// roles := getComponentRoles(component)
+	// rolesJSON, _ := json.Marshal(roles)
+	// container.Env = append(container.Env, corev1.EnvVar{
+	// 	Name:      constant.KBEnvServiceRoles,
+	// 	Value:     string(rolesJSON),
+	// 	ValueFrom: nil,
+	// })
 
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvCharacterType,
-		Value:     component.CharacterType,
-		ValueFrom: nil,
-	})
+	// container.Env = append(container.Env, corev1.EnvVar{
+	// 	Name:      constant.KBEnvCharacterType,
+	// 	Value:     component.CharacterType,
+	// 	ValueFrom: nil,
+	// })
 
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvWorkloadType,
-		Value:     string(component.WorkloadType),
-		ValueFrom: nil,
-	})
+	// container.Env = append(container.Env, corev1.EnvVar{
+	// 	Name:      constant.KBEnvWorkloadType,
+	// 	Value:     string(component.WorkloadType),
+	// 	ValueFrom: nil,
+	// })
 
-	container.Ports = []corev1.ContainerPort{
-		{
-			ContainerPort: int32(probeSvcHTTPPort),
-			Name:          constant.ProbeHTTPPortName,
-			Protocol:      "TCP",
-		},
-		{
-			ContainerPort: int32(probeSvcGRPCPort),
-			Name:          constant.ProbeGRPCPortName,
-			Protocol:      "TCP",
-		}}
+	// container.Ports = []corev1.ContainerPort{
+	// 	{
+	// 		ContainerPort: int32(probeSvcHTTPPort),
+	// 		Name:          constant.ProbeHTTPPortName,
+	// 		Protocol:      "TCP",
+	// 	},
+	// 	{
+	// 		ContainerPort: int32(probeSvcGRPCPort),
+	// 		Name:          constant.ProbeGRPCPortName,
+	// 		Protocol:      "TCP",
+	// 	}}
 
-	// pass the volume protection spec to probe container through env.
-	if volumeProtectionEnabled(component) {
-		container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
-	}
+	// // pass the volume protection spec to probe container through env.
+	// if volumeProtectionEnabled(component) {
+	// 	container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
+	// }
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {

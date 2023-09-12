@@ -33,7 +33,9 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -133,6 +135,9 @@ var clusterCreateExample = templates.Examples(`
 
     # Create a cluster with time to restore from point in time
     kbcli cluster create --restore-to-time "Jun 16,2023 18:58:53 UTC+0800" --source-cluster mycluster
+
+	# Create a cluster with auto backup
+	kbcli cluster create --cluster-definition apecloud-mysql --backup-enabled
 `)
 
 const (
@@ -178,6 +183,15 @@ type UpdatableFlags struct {
 	NodeLabels     map[string]string `json:"nodeLabels,omitempty"`
 	Tenancy        string            `json:"tenancy"`
 	TolerationsRaw []string          `json:"-"`
+
+	// backup config
+	BackupEnabled                 bool   `json:"-"`
+	BackupRetentionPeriod         string `json:"-"`
+	BackupMethod                  string `json:"-"`
+	BackupCronExpression          string `json:"-"`
+	BackupStartingDeadlineMinutes int64  `json:"-"`
+	BackupRepoName                string `json:"-"`
+	BackupPITREnabled             bool   `json:"-"`
 }
 
 type CreateOptions struct {
@@ -195,6 +209,11 @@ type CreateOptions struct {
 	Backup        string `json:"backup,omitempty"`
 	RestoreTime   string `json:"restoreTime,omitempty"`
 	SourceCluster string `json:"sourceCluster,omitempty"`
+
+	// backup config
+	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`
+
+	Cmd *cobra.Command `json:"-"`
 
 	UpdatableFlags
 	create.CreateOptions `json:"-"`
@@ -238,6 +257,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	// add all subcommands for supported cluster type
 	cmd.AddCommand(buildCreateSubCmds(&o.CreateOptions)...)
+
+	o.Cmd = cmd
 
 	return cmd
 }
@@ -489,6 +510,11 @@ func (o *CreateOptions) Complete() error {
 
 	// build cluster version
 	o.buildClusterVersion(cls)
+
+	// build backup config
+	if err := o.buildBackupConfig(cls); err != nil {
+		return err
+	}
 
 	// build components
 	components, err := o.buildComponents(clusterCompSpecs)
@@ -1175,6 +1201,13 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
 	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'`)
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
+	cmd.Flags().BoolVar(&f.BackupEnabled, "backup-enabled", false, "Specify whether enabled automated backup")
+	cmd.Flags().StringVar(&f.BackupRetentionPeriod, "backup-retention-period", "1d", "a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained")
+	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "snapshot", "the backup method, support: snapshot, backupTool")
+	cmd.Flags().StringVar(&f.BackupCronExpression, "backup-cron-expression", "", "the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.")
+	cmd.Flags().Int64Var(&f.BackupStartingDeadlineMinutes, "backup-starting-deadline-minutes", 0, "the deadline in minutes for starting the backup job if it misses its scheduled time for any reason")
+	cmd.Flags().StringVar(&f.BackupRepoName, "backup-repo-name", "", "the backup repository name")
+	cmd.Flags().BoolVar(&f.BackupPITREnabled, "pitr-enabled", false, "Specify whether enabled point in time recovery")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",
@@ -1333,6 +1366,51 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 	if o.Annotations == nil {
 		o.Annotations = cls.Annotations
 	}
+}
+
+func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
+	// set default backup config
+	o.BackupConfig = &appsv1alpha1.ClusterBackup{
+		Method: dataprotectionv1alpha1.BackupMethodSnapshot,
+	}
+
+	// if the cls.Backup isn't nil, use the backup config in cluster
+	if cls != nil && cls.Spec.Backup != nil {
+		o.BackupConfig = cls.Spec.Backup
+	}
+
+	// check the flag is ser by user or not
+	var flags []*pflag.Flag
+	if o.Cmd != nil {
+		o.Cmd.Flags().Visit(func(flag *pflag.Flag) {
+			flags = append(flags, flag)
+		})
+	}
+
+	// if the flag is set by user, use the flag value
+	for _, flag := range flags {
+		switch flag.Name {
+		case "backup-enabled":
+			o.BackupConfig.Enabled = &o.BackupEnabled
+		case "backup-retention-period":
+			o.BackupConfig.RetentionPeriod = &o.BackupRetentionPeriod
+		case "backup-method":
+			o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(o.BackupMethod)
+		case "backup-cron-expression":
+			if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
+				return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+			}
+			o.BackupConfig.CronExpression = o.BackupCronExpression
+		case "backup-starting-deadline-minutes":
+			o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
+		case "backup-repo-name":
+			o.BackupConfig.RepoName = o.BackupRepoName
+		case "pitr-enabled":
+			o.BackupConfig.PITREnabled = &o.BackupPITREnabled
+		}
+	}
+
+	return nil
 }
 
 // parse the cluster component spec

@@ -18,6 +18,7 @@ APP_NAME = kubeblocks
 VERSION ?= 0.7.0-alpha.0
 GITHUB_PROXY ?=
 INIT_ENV ?= false
+TEST_TYPE ?= wesql
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
 GENERATED_CLIENT_PKG = "pkg/client"
@@ -116,7 +117,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager dataprotection kbcli probe reloader ## Make all cmd binaries.
+all: manager dataprotection kbcli lorry reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -300,7 +301,8 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.redis-cluster \
 	build-single-kbcli-embed-chart.postgresql-cluster \
 	build-single-kbcli-embed-chart.kafka-cluster \
-	build-single-kbcli-embed-chart.mongodb-cluster
+	build-single-kbcli-embed-chart.mongodb-cluster \
+#	build-single-kbcli-embed-chart.neon-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
 #	build-single-kbcli-embed-chart.milvus-cluster \
@@ -318,9 +320,9 @@ clean-kbcli: ## Clean bin/kbcli*.
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
-.PHONY: sqlctl-doc
-sqlctl-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/sqlctl/main.go ./docs/user_docs/sqlctl
+.PHONY: lorryctl-doc
+lorryctl-doc: generate test-go-generate ## generate CLI command reference manual.
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/lorryctl/main.go ./docs/user_docs/lorryctl
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
@@ -598,17 +600,42 @@ KUBECTL=$(shell which kubectl)
 ##@ End-to-end (E2E) tests
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
+ifeq ($(TEST_TYPE), wesql)
 	$(HELM) dependency build deploy/apecloud-mysql-cluster --skip-refresh
-	$(HELM) dependency build deploy/redis-cluster --skip-refresh
-	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
-	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
-	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
-	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
 	$(HELM) template mysql-cluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+else ifeq ($(TEST_TYPE), postgresql)
+	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
 	$(HELM) template pg-cluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+else ifeq ($(TEST_TYPE), redis)
+	$(HELM) dependency build deploy/redis-cluster --skip-refresh
 	$(HELM) template redis-cluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+else ifeq ($(TEST_TYPE), mongodb)
+	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
 	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+else ifeq ($(TEST_TYPE), pulsar)
+	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
 	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
+else ifeq ($(TEST_TYPE), nebula)
+	$(HELM) dependency build deploy/nebula-cluster --skip-refresh
+	$(HELM) upgrade --install nebula deploy/nebula
+	$(HELM) template nebula-cluster deploy/nebula-cluster > test/e2e/testdata/smoketest/nebula/00_nebulacluster.yaml
+else ifeq ($(TEST_TYPE), greptimedb)
+	$(HELM) dependency build deploy/greptimedb-cluster --skip-refresh
+	$(HELM) upgrade --install greptimedb deploy/greptimedb
+	$(HELM) template greptimedb-cluster deploy/greptimedb-cluster > test/e2e/testdata/smoketest/greptimedb/00_greptimedbcluster.yaml
+else ifeq ($(TEST_TYPE), starrocks)
+	$(HELM) dependency build deploy/starrocks-cluster --skip-refresh
+	$(HELM) upgrade --install starrocks deploy/starrocks
+	$(HELM) template starrocks-cluster deploy/starrocks-cluster > test/e2e/testdata/smoketest/starrocks/00_starrocksbcluster.yaml
+else ifeq ($(TEST_TYPE), risingwave)
+	$(HELM) dependency build deploy/risingwave-cluster --skip-refresh
+	$(HELM) upgrade --install risingwave deploy/risingwave
+	$(HELM) template risingwave-cluster deploy/risingwave-cluster > test/e2e/testdata/smoketest/risingwave/00_risingwavecluster.yaml
+else ifeq ($(TEST_TYPE), kafka)
+	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+else
+	$(error "test type does not exist")
+endif
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
@@ -616,15 +643,35 @@ test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV
+ifeq ($(TEST_TYPE), wesql)
 	$(HELM) upgrade --install wesql deploy/apecloud-mysql
+else ifeq ($(TEST_TYPE), postgresql)
 	$(HELM) upgrade --install postgresql deploy/postgresql
+else ifeq ($(TEST_TYPE), mongodb)
 	$(HELM) upgrade --install  mongodb deploy/mongodb
+else ifeq ($(TEST_TYPE), redis)
 	$(HELM) upgrade --install redis deploy/redis
+else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) upgrade --install pulsar deploy/pulsar
+else ifeq ($(TEST_TYPE), nebula)
+	$(HELM) upgrade --install nebula deploy/nebula
+else ifeq ($(TEST_TYPE), greptimedb)
+	$(HELM) upgrade --install greptimedb deploy/greptimedb
+else ifeq ($(TEST_TYPE), starrocks)
+	$(HELM) upgrade --install starrocks deploy/starrocks
+else ifeq ($(TEST_TYPE), risingwave)
+	$(HELM) upgrade --install risingwave deploy/risingwave
+else
+	$(error "test type does not exist")
+endif
 
 .PHONY: test-e2e-local
-test-e2e-local: render-smoke-testdata-manifests-local helm-package render-smoke-testdata-manifests ## Run E2E tests on local.
+test-e2e-local: generate-cluster-role render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
 	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
+
+.PHONY: generate-cluster-role
+generate-cluster-role:
+	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml deploy/helm | kubectl apply -f -
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

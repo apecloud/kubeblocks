@@ -1,0 +1,2 @@
+1. By default, the helm chart will create an Official PostgreSQL cluster with the same version as the Chart appVersion.
+2. If you need to create a different version, you need to specify the version through clusterVersionOverride value.

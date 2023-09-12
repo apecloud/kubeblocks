@@ -68,6 +68,9 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 	// Update PodTemplate Volumes
 	for _, cmName := range volumeKeys {
 		templateSpec := volumes[cmName]
+		if templateSpec.VolumeName == "" {
+			continue
+		}
 		if podVolumes, err = CreateOrUpdateVolume(podVolumes, templateSpec.VolumeName, func(volumeName string) corev1.Volume {
 			return corev1.Volume{
 				Name: volumeName,

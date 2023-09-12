@@ -114,7 +114,7 @@ func (stateless *stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	}
 	deploy := &deployList.Items[0]
 	return getComponentPhaseWhenPodsNotReady(podList, deploy, stateless.getReplicas(),
-		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), statusMessages, nil
+		deploy.Status.AvailableReplicas, nil, checkExistFailedPodOfNewRS), statusMessages, nil
 }
 
 func (stateless *stateless) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {

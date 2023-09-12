@@ -41,6 +41,7 @@ const (
 	ConditionTypeVersionUpgrading  = "VersionUpgrading"
 	ConditionTypeExpose            = "Exposing"
 	ConditionTypeDataScript        = "ExecuteDataScript"
+	ConditionTypeBackup            = "Backup"
 
 	// condition and event reasons
 
@@ -327,5 +328,16 @@ func NewReconfigureFailedCondition(ops *OpsRequest, err error) *metav1.Condition
 		Reason:             "ReconfigureFailed",
 		LastTransitionTime: metav1.Now(),
 		Message:            msg,
+	}
+}
+
+// NewBackupCondition creates a condition that the OpsRequest backup the cluster.
+func NewBackupCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeBackup,
+		Status:             metav1.ConditionTrue,
+		Reason:             "BackupStarted",
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("Start to backup the Cluster: %s", ops.Spec.ClusterRef),
 	}
 }

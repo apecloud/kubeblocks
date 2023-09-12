@@ -99,6 +99,10 @@ var (
 		},
 	}
 
+	roleProbe = &workloads.RoleProbe{
+		ProbeActions: []workloads.Action{{Command: []string{"cmd"}}},
+	}
+
 	reconfiguration = workloads.MembershipReconfiguration{
 		SwitchoverAction:  &workloads.Action{Command: []string{"cmd"}},
 		MemberJoinAction:  &workloads.Action{Command: []string{"cmd"}},

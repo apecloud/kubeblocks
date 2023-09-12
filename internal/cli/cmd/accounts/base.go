@@ -36,8 +36,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/lorry/client"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type AccountBaseOptions struct {
@@ -152,7 +152,7 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 	var err error
 	response, err := o.Do()
 	if err != nil {
-		if channelutil.IsUnSupportedError(err) {
+		if lorryutil.IsUnSupportedError(err) {
 			return fmt.Errorf("command `%s` on characterType `%s` (defined in cluster: %s, component: %s) is not supported yet", cmd.Use, o.CharType, o.ClusterName, o.ComponentName)
 		}
 		return err
@@ -160,20 +160,20 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 
 	switch o.AccountOp {
 	case
-		channelutil.DeleteUserOp,
-		channelutil.RevokeUserRoleOp,
-		channelutil.GrantUserRoleOp:
+		lorryutil.DeleteUserOp,
+		lorryutil.RevokeUserRoleOp,
+		lorryutil.GrantUserRoleOp:
 		o.printGeneralInfo(response)
 		err = nil
-	case channelutil.CreateUserOp:
+	case lorryutil.CreateUserOp:
 		o.printGeneralInfo(response)
-		if response.Event == channelutil.RespEveSucc {
+		if response.Event == lorryutil.RespEveSucc {
 			printer.Alert(o.Out, "Please do REMEMBER the password for the new user! Once forgotten, it cannot be retrieved!\n")
 		}
 		err = nil
-	case channelutil.DescribeUserOp:
+	case lorryutil.DescribeUserOp:
 		err = o.printRoleInfo(response)
-	case channelutil.ListUsersOp:
+	case lorryutil.ListUsersOp:
 		err = o.printUserInfo(response)
 	default:
 		err = errInvalidOp
@@ -189,15 +189,15 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 	return err
 }
 
-func (o *AccountBaseOptions) Do() (channelutil.SQLChannelResponse, error) {
+func (o *AccountBaseOptions) Do() (lorryutil.SQLChannelResponse, error) {
 	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
-	response := channelutil.SQLChannelResponse{}
-	sqlClient, err := sqlchannel.NewHTTPClientWithChannelPod(o.Pod, o.CharType)
+	response := lorryutil.SQLChannelResponse{}
+	sqlClient, err := client.NewHTTPClientWithChannelPod(o.Pod, o.CharType)
 	if err != nil {
 		return response, err
 	}
 
-	request := channelutil.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
+	request := lorryutil.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
 	response, err = sqlClient.SendRequest(o.ExecOptions, request)
 	return response, err
 }
@@ -210,13 +210,13 @@ func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []inter
 	return tblPrinter
 }
 
-func (o *AccountBaseOptions) printGeneralInfo(response channelutil.SQLChannelResponse) {
+func (o *AccountBaseOptions) printGeneralInfo(response lorryutil.SQLChannelResponse) {
 	tblPrinter := o.newTblPrinterWithStyle("QUERY RESULT", []interface{}{"RESULT", "MESSAGE"})
 	tblPrinter.AddRow(response.Event, response.Message)
 	tblPrinter.Print()
 }
 
-func (o *AccountBaseOptions) printMeta(response channelutil.SQLChannelResponse) {
+func (o *AccountBaseOptions) printMeta(response lorryutil.SQLChannelResponse) {
 	meta := response.Metadata
 	tblPrinter := o.newTblPrinterWithStyle("QUERY META", []interface{}{"START TIME", "END TIME", "OPERATION", "DATA"})
 	tblPrinter.SetStyle(printer.KubeCtlStyle)
@@ -224,13 +224,13 @@ func (o *AccountBaseOptions) printMeta(response channelutil.SQLChannelResponse) 
 	tblPrinter.Print()
 }
 
-func (o *AccountBaseOptions) printUserInfo(response channelutil.SQLChannelResponse) error {
-	if response.Event == channelutil.RespEveFail {
+func (o *AccountBaseOptions) printUserInfo(response lorryutil.SQLChannelResponse) error {
+	if response.Event == lorryutil.RespEveFail {
 		o.printGeneralInfo(response)
 		return nil
 	}
 	// decode user info from metadata
-	users := []channelutil.UserInfo{}
+	users := []lorryutil.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err
@@ -246,14 +246,14 @@ func (o *AccountBaseOptions) printUserInfo(response channelutil.SQLChannelRespon
 	return nil
 }
 
-func (o *AccountBaseOptions) printRoleInfo(response channelutil.SQLChannelResponse) error {
-	if response.Event == channelutil.RespEveFail {
+func (o *AccountBaseOptions) printRoleInfo(response lorryutil.SQLChannelResponse) error {
+	if response.Event == lorryutil.RespEveFail {
 		o.printGeneralInfo(response)
 		return nil
 	}
 
 	// decode role info from metadata
-	users := []channelutil.UserInfo{}
+	users := []lorryutil.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err

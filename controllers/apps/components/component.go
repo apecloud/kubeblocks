@@ -84,7 +84,12 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, nil
 	}
 
-	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, definition, compDef, compSpec, compVer)
+	clsMgr, err := getClassManager(reqCtx.Ctx, cli, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, definition, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
 	}
@@ -108,24 +113,6 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	panic(fmt.Sprintf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
 		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef))
-}
-
-func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
-	compVer *appsv1alpha1.ClusterComponentVersion) (*component.SynthesizedComponent, error) {
-	clsMgr, err := getClassManager(reqCtx.Ctx, cli, cluster)
-	if err != nil {
-		return nil, err
-	}
-	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, clusterDef, compDef, compSpec, compVer)
-	if err != nil {
-		return nil, err
-	}
-	return synthesizedComp, nil
 }
 
 func getClassManager(ctx context.Context, cli types2.ReadonlyClient, cluster *appsv1alpha1.Cluster) (*class.Manager, error) {

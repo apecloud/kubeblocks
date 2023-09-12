@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -191,19 +190,11 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 			"related component does not have any configSpecs, skip reconfigure")
 		return intctrlutil.Reconciled()
 	}
-	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 && len(reconcileContext.RSMList) == 0 {
+	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 {
 		reqCtx.Recorder.Eventf(config,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
 		return intctrlutil.Reconciled()
-	}
-	// TODO(free6om): configuration controller needs workload type to do the config reloading job.
-	// it's a rather hacky way converting rsm to sts to make configuration controller works as usual.
-	// should make configuration controller recognizing rsm.
-	if len(reconcileContext.RSMList) > 0 {
-		for _, rsm := range reconcileContext.RSMList {
-			reconcileContext.StatefulSets = append(reconcileContext.StatefulSets, *components.ConvertRSMToSTS(&rsm))
-		}
 	}
 
 	return r.performUpgrade(reconfigureParams{

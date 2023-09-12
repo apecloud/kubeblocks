@@ -22,11 +22,12 @@ package apps
 import (
 	"fmt"
 
+	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	"golang.org/x/exp/slices"
-	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 // phaseSyncLevel defines a phase synchronization level to notify the status synchronizer how to handle cluster phase.

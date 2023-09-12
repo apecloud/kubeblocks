@@ -127,7 +127,7 @@ func (o *FaultBaseOptions) BaseValidate() error {
 			return err
 		}
 		if !enable {
-			return fmt.Errorf("chaos-mesh is not enabled, use `kbcli addon enable chaos-mesh` to  enable chaos-mesh first")
+			return fmt.Errorf("chaos-mesh is not enabled, use `kbcli addon enable fault-chaos-mesh` to  enable chaos-mesh first")
 		}
 	}
 

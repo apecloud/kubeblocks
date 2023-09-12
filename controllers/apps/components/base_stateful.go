@@ -42,8 +42,8 @@ import (
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
-	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	lorry "github.com/apecloud/kubeblocks/lorry/client"
 )
 
 // rsmComponentBase as a base class for single rsm based component (stateful & replication & consensus).
@@ -604,9 +604,11 @@ func (c *rsmComponentBase) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cl
 	if err != nil {
 		return err
 	}
-	basePodName := fmt.Sprintf("%s-%d", stsObj.Name, c.Component.Replicas)
 	for _, pod := range pods {
-		if strings.TrimSpace(pod.Name) < basePodName {
+		subs := strings.Split(pod.Name, "-")
+		if ordinal, err := strconv.Atoi(subs[len(subs)-1]); err != nil {
+			return err
+		} else if int32(ordinal) < c.Component.Replicas {
 			continue
 		}
 		lorryCli, err1 := lorry.NewClient(c.Component.CharacterType, *pod)

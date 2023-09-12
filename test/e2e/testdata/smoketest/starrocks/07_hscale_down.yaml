@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: starrocks-cluster-hscale-down-
+spec:
+  clusterRef: starrocks-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: be
+      replicas: 2
+    - componentName: fe
+      replicas: 2

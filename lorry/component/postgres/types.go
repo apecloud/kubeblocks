@@ -289,7 +289,26 @@ type History struct {
 }
 
 func ParseHistory(str string) *HistoryFile {
-	return nil
+	result := &HistoryFile{
+		History: []History{},
+	}
+
+	lines := strings.Split(str, "\n")
+	for _, line := range lines {
+		values := strings.Split(line, "|")
+		if len(values) > 1 {
+			content := strings.TrimSpace(values[1])
+			history := strings.Split(content, " ")
+			if len(history) > 2 {
+				result.History = append(result.History, History{
+					ParentTimeline: cast.ToInt64(history[0]),
+					SwitchPoint:    ParsePgLsn(history[1]),
+				})
+			}
+		}
+	}
+
+	return result
 }
 
 func ParsePgLsn(str string) int64 {

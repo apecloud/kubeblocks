@@ -439,7 +439,12 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 	}
 
 	if len(history.History) != 0 {
+		// use a boolean value to check if the loop should exit early
+		flag := false
 		for _, h := range history.History {
+			// Don't need to rewind just when:
+			// for replica: replayed location is not ahead of switchpoint
+			// for the former primary: end of checkpoint record is the same as switchpoint
 			if h.ParentTimeline == localTimeLine {
 				switch {
 				case isRecovery:
@@ -449,15 +454,24 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 				default:
 					// TODO:get checkpoint end
 				}
+				flag = true
 				break
 			} else if h.ParentTimeline > localTimeLine {
 				needRewind = true
+				flag = true
 				break
 			}
+		}
+		if !flag {
+			needRewind = true
 		}
 	}
 
 	return needRewind
+}
+
+func getCheckPointEnd(timeline, lsn int64) {
+
 }
 
 func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
@@ -634,7 +648,13 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) (map[string]map[stri
 
 // TODO: Parse history file
 func (mgr *Manager) getHistory(host string, timeline int64) *postgres.HistoryFile {
-	return nil
+	resp, err := postgres.Psql("-h", host, "replication=database", "-c", fmt.Sprintf("TIMELINE_HISTORY %d", timeline))
+	if err != nil {
+		mgr.Logger.Errorf("get history failed, err:%v", err)
+		return nil
+	}
+
+	return postgres.ParseHistory(resp)
 }
 
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {

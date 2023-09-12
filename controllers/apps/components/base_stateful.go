@@ -169,20 +169,20 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	isDeleting := func() bool {
 		return !c.runningWorkload.DeletionTimestamp.IsZero()
-	}
+	}()
 	isFirstGeneration := func() bool {
 		return c.runningWorkload.Generation == 1
-	}
+	}()
 	isZeroReplica := func() bool {
 		return (c.runningWorkload.Spec.Replicas == nil || *c.runningWorkload.Spec.Replicas == 0) && c.Component.Replicas == 0
-	}
+	}()
 	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return err
 	}
 	hasComponentPod := func() bool {
 		return len(pods) > 0
-	}
+	}()
 	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, c.runningWorkload)
 	if err != nil {
 		return err
@@ -196,12 +196,9 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 	isAllConfigSynced := c.isAllConfigSynced(reqCtx, cli)
-	hasVolumeExpansionRunning := func() bool {
-		running, _, err := c.hasVolumeExpansionRunning(reqCtx, cli)
-		if err != nil {
-			return false
-		}
-		return running
+	hasRunningVolumeExpansion, hasFailedVolumeExpansion, err := c.hasVolumeExpansionRunning(reqCtx, cli)
+	if err != nil {
+		return err
 	}
 
 	updatePodsReady := func(ready bool) {
@@ -217,23 +214,23 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	updatePodsReady(false)
 	switch {
-	case isDeleting():
+	case isDeleting:
 		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
 		updatePodsReady(true)
-	case isZeroReplica() && hasComponentPod():
+	case isZeroReplica && hasComponentPod:
 		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
 		updatePodsReady(true)
-	case isZeroReplica():
+	case isZeroReplica:
 		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
 		updatePodsReady(true)
-	case isRunning && isAllConfigSynced && !hasVolumeExpansionRunning():
+	case isRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
 		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
 		updatePodsReady(true)
-	case hasFailedPod, isScaleOutFailed:
+	case hasFailedPod, isScaleOutFailed, hasFailedVolumeExpansion:
 		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "Component is Failed")
-	case isFirstGeneration():
+	case isFirstGeneration && !hasRunningVolumeExpansion:
 		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
-	case !isFirstGeneration():
+	case !isFirstGeneration, hasRunningVolumeExpansion:
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component is Updating")
 	default:
 		c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "unknown")
@@ -817,11 +814,8 @@ func (c *rsmComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli clien
 func (c *rsmComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, rsmObj *workloads.ReplicatedStateMachine) error {
 	if rsmObj == nil {
 		c.createWorkload()
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
 	} else {
-		if c.updateWorkload(rsmObj) {
-			c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")
-		}
+		c.updateWorkload(rsmObj)
 		// to work around that the scaled PVC will be deleted at object action.
 		if err := c.updateVolumes(reqCtx, cli, rsmObj); err != nil {
 			return err
@@ -835,6 +829,7 @@ func (c *rsmComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestC
 
 func (c *rsmComponentBase) createWorkload() {
 	rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	buildWorkLoadAnnotations(rsmProto, c.Cluster)
 	c.WorkloadVertex.Obj = rsmProto
 	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
 }
@@ -862,7 +857,7 @@ func (c *rsmComponentBase) updateWorkload(rsmObj *workloads.ReplicatedStateMachi
 
 	delayUpdatePodSpecSystemFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
-	if !reflect.DeepEqual(&rsmObj.Spec, &rsmObjCopy.Spec) {
+	if !reflect.DeepEqual(&rsmObj.Spec, &rsmObjCopy.Spec) || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
 		updatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
 		c.WorkloadVertex.Obj = rsmObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)

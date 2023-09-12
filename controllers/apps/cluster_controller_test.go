@@ -351,6 +351,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
+			SetReplicas(1).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -484,7 +485,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("Checking cluster status and the number of replicas changed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(expectedOG))
-				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			})).Should(Succeed())
 
 			checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
@@ -1006,7 +1007,9 @@ var _ = Describe("Cluster Controller", func() {
 		if intctrlutil.IsRSMEnabled() {
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 			rsm = &rsmList.Items[0]
-			sts = components.ConvertRSMToSTS(rsm)
+			sts = testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterObj.Name, compName).
+				SetReplicas(*rsm.Spec.Replicas).
+				Create(&testCtx).GetObject()
 		} else {
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			sts = &stsList.Items[0]
@@ -1051,11 +1054,10 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 				testk8s.MockRSMReady(rsm, mockPods...)
 			})).ShouldNot(HaveOccurred())
-		} else {
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
-			})).ShouldNot(HaveOccurred())
 		}
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
 
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
@@ -1442,7 +1444,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
-			AddComponent(compName, compDefName).SetComponentAffinity(compAffinity).
+			AddComponent(compName, compDefName).SetReplicas(1).SetComponentAffinity(compAffinity).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1512,7 +1514,7 @@ var _ = Describe("Cluster Controller", func() {
 				Operator: corev1.TolerationOpExists,
 				Effect:   corev1.TaintEffectNoExecute,
 			}).
-			AddComponent(compName, compDefName).AddComponentToleration(compToleration).
+			AddComponent(compName, compDefName).SetReplicas(1).AddComponentToleration(compToleration).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 

@@ -644,15 +644,15 @@ func updateKubeBlocksToolsImage(pc *corev1.Container) {
 
 func getImageName(image string) string {
 	subs := strings.Split(image, ":")
-	if len(subs) != 2 {
-		if len(subs) == 3 {
-			lastIndex := strings.LastIndex(image, ":")
-			return image[:lastIndex]
-		} else {
-			return ""
-		}
+	switch len(subs) {
+	case 2:
+		return subs[0]
+	case 3:
+		lastIndex := strings.LastIndex(image, ":")
+		return image[:lastIndex]
+	default:
+		return ""
 	}
-	return subs[0]
 }
 
 // getCustomLabelSupportKind returns the kinds that support custom label.

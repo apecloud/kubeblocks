@@ -55,7 +55,7 @@ func NewEtcd(logger logger.Logger) bindings.OutputBinding {
 
 func (e *Etcd) Init(metadata bindings.Metadata) error {
 	e.endpoint = metadata.Properties[endpoint]
-	e.BaseOperations.Init(metadata)
+	_ = e.BaseOperations.Init(metadata)
 	e.DBType = "etcd"
 	e.InitIfNeed = e.initIfNeed
 	e.DBPort = e.GetRunningPort()

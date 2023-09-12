@@ -46,7 +46,7 @@ func NewPolardbx(logger logger.Logger) bindings.OutputBinding {
 // Init initializes the polardbx binding.
 func (polardbxOps *PolardbxOperations) Init(metadata bindings.Metadata) error {
 	polardbxOps.Logger.Debug("Initializing polardbx binding")
-	polardbxOps.BaseOperations.Init(metadata)
+	_ = polardbxOps.BaseOperations.Init(metadata)
 	config, err := polardbx.NewConfig(metadata.Properties)
 	if err != nil {
 		polardbxOps.Logger.Errorf("polardbx config initialize failed: %v", err)

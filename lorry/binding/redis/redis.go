@@ -82,7 +82,7 @@ func NewRedis(logger logger.Logger) bindings.OutputBinding {
 
 // Init performs metadata parsing and connection creation.
 func (r *Redis) Init(meta bindings.Metadata) (err error) {
-	r.BaseOperations.Init(meta)
+	_ = r.BaseOperations.Init(meta)
 
 	if viper.IsSet("KB_SERVICE_USER") {
 		redisUser = viper.GetString("KB_SERVICE_USER")

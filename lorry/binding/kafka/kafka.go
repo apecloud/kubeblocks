@@ -59,7 +59,7 @@ func NewKafka(logger logger.Logger) bindings.OutputBinding {
 }
 
 func (kafkaOps *KafkaOperations) Init(metadata bindings.Metadata) error {
-	kafkaOps.BaseOperations.Init(metadata)
+	_ = kafkaOps.BaseOperations.Init(metadata)
 	kafkaOps.Logger.Debug("Initializing kafka binding")
 	kafkaOps.DBType = "kafka"
 	kafkaOps.InitIfNeed = kafkaOps.initIfNeed

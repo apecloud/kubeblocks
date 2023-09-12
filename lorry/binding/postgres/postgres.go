@@ -97,7 +97,7 @@ func NewPostgres(logger logger.Logger) bindings.OutputBinding {
 // Init initializes the PostgreSql binding.
 func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.Logger.Debug("Initializing Postgres binding")
-	pgOps.BaseOperations.Init(metadata)
+	_ = pgOps.BaseOperations.Init(metadata)
 	pgOps.workloadType = viper.GetString(constant.KBEnvWorkloadType)
 	config, err := postgres.NewConfig(metadata.Properties)
 	if err != nil {

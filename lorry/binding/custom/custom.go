@@ -76,7 +76,7 @@ func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
 		Transport: netTransport,
 	}
 
-	h.BaseOperations.Init(metadata)
+	_ = h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
 	h.OperationsMap[CheckRoleOperation] = h.CheckRoleOps
 

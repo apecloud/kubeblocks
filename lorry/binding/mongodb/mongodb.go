@@ -83,7 +83,7 @@ func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
 // Init initializes the MongoDB Binding.
 func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 	mongoOps.Logger.Debug("Initializing MongoDB binding")
-	mongoOps.BaseOperations.Init(metadata)
+	_ = mongoOps.BaseOperations.Init(metadata)
 	config, _ := mongodb.NewConfig(metadata.Properties)
 	manager, _ := mongodb.NewManager(mongoOps.Logger)
 

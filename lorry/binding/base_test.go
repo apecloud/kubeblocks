@@ -267,7 +267,7 @@ func mockFakeOperations() *fakeOperations {
 
 // Init initializes the fake binding.
 func (fakeOps *fakeOperations) Init(metadata bindings.Metadata) {
-	fakeOps.BaseOperations.Init(metadata)
+	_ = fakeOps.BaseOperations.Init(metadata)
 	fakeOps.Logger.Debug("Initializing MySQL binding")
 	fakeOps.DBType = "mysql"
 	fakeOps.InitIfNeed = fakeOps.initIfNeed

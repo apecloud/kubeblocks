@@ -557,12 +557,15 @@ var _ = Describe("OpsRequest Controller", func() {
 					func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
 						g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
 					})).Should(Succeed())
-			} else {
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-					func(g Gomega, sts *appsv1.StatefulSet) {
-						g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
-					})).Should(Succeed())
+				rsm := componentWorkload()
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(sts *appsv1.StatefulSet) {
+					sts.Spec.Replicas = &replicas
+				})).Should(Succeed())
 			}
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
+				func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				})).Should(Succeed())
 
 			By("Checking pvc created")
 			Eventually(testapps.List(&testCtx, intctrlutil.PersistentVolumeClaimSignature,
@@ -635,12 +638,15 @@ var _ = Describe("OpsRequest Controller", func() {
 					func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
 						g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
 					})).Should(Succeed())
-			} else {
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-					func(g Gomega, sts *appsv1.StatefulSet) {
-						g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
-					})).Should(Succeed())
+				rsm := componentWorkload()
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(sts *appsv1.StatefulSet) {
+					sts.Spec.Replicas = &replicas
+				})).Should(Succeed())
 			}
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
+				func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				})).Should(Succeed())
 
 			By("mock scale down successfully by deleting one pod ")
 			podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, 2)

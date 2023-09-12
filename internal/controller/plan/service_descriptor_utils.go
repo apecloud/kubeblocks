@@ -90,10 +90,10 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 					}
 				}
 
+				// TODO: Second-stage optimization: Cluster-type references no longer perform conversion on the connection credential field. Instead, the configMap or secret is directly passed through to the serviceDescriptor.
 				sdBuilder := builder.NewServiceDescriptorBuilder(targetNamespace, sdName)
-				// use cd.Spec.Type as the default Kind and use cluster.Spec.ClusterVersionRef as the default Version
-				sdBuilder.SetServiceKind(referencedClusterDef.Spec.Type)
-				sdBuilder.SetServiceVersion(referencedCluster.Spec.ClusterVersionRef)
+				sdBuilder.SetServiceKind("")
+				sdBuilder.SetServiceVersion("")
 				sdBuilder.SetEndpoint(appsv1alpha1.CredentialVar{
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{

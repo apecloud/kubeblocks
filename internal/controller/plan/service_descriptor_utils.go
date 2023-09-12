@@ -62,103 +62,17 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 			}
 			// if service reference is another KubeBlocks Cluster, then it is necessary to generate a service connection credential from the cluster connection credential secret
 			if serviceRef.Cluster != "" {
-				if serviceRef.Cluster == cluster.Name {
-					return nil, fmt.Errorf("cluster %s cannot reference itself", cluster.Name)
-				}
-				referencedCluster := &appsv1alpha1.Cluster{}
-				if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: targetNamespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
+				if err := handleClusterTypeServiceRef(reqCtx, cli, targetNamespace, cluster, serviceRef, serviceRefDecl, serviceReferences); err != nil {
 					return nil, err
 				}
-				referencedClusterDef := &appsv1alpha1.ClusterDefinition{}
-				if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: referencedCluster.Spec.ClusterDefRef}, referencedClusterDef); err != nil {
-					return nil, err
-				}
-
-				// get the connection credential secret of the referenced cluster
-				var sdName string
-				secretRef := &corev1.Secret{}
-				if serviceRef.ConnectionCredential != "" {
-					sdName = component.GenerateCustomServiceDescriptorName(serviceRef.ConnectionCredential)
-					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: targetNamespace, Name: serviceRef.ConnectionCredential}, secretRef); err != nil {
-						return nil, err
-					}
-				} else {
-					sdName = component.GenerateDefaultServiceDescriptorName(cluster.Name)
-					secretRefName := component.GenerateConnCredential(referencedCluster.Name)
-					if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: targetNamespace, Name: secretRefName}, secretRef); err != nil {
-						return nil, err
-					}
-				}
-
-				// TODO: Second-stage optimization: Cluster-type references no longer perform conversion on the connection credential field. Instead, the configMap or secret is directly passed through to the serviceDescriptor.
-				sdBuilder := builder.NewServiceDescriptorBuilder(targetNamespace, sdName)
-				sdBuilder.SetServiceKind("")
-				sdBuilder.SetServiceVersion("")
-				sdBuilder.SetEndpoint(appsv1alpha1.CredentialVar{
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
-							Key:                  constant.ServiceDescriptorEndpointKey,
-						},
-					},
-				})
-				sdBuilder.SetAuth(appsv1alpha1.ConnectionCredentialAuth{
-					Username: &appsv1alpha1.CredentialVar{
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
-								Key:                  constant.ServiceDescriptorUsernameKey,
-							},
-						},
-					},
-					Password: &appsv1alpha1.CredentialVar{
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
-								Key:                  constant.ServiceDescriptorPasswordKey,
-							},
-						},
-					},
-				})
-				sdBuilder.SetPort(appsv1alpha1.CredentialVar{
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
-							Key:                  constant.ServiceDescriptorPortKey,
-						},
-					},
-				})
-				serviceReferences[serviceRefDecl.Name] = sdBuilder.GetObject()
 				// serviceRef.Cluster takes precedence, and if serviceRef.Cluster is set, serviceRef.ServiceDescriptor will be ignored
 				break
 			}
 
 			if serviceRef.ServiceDescriptor != "" {
-				// verify service kind and version
-				verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, serviceRefDeclSpecs ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
-					for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
-						if getWellKnownServiceKindAliasMapping(serviceRefDeclSpec.ServiceKind) != getWellKnownServiceKindAliasMapping(serviceDescriptor.Spec.ServiceKind) {
-							continue
-						}
-						versionMatch := verifyServiceVersion(serviceDescriptor.Spec.ServiceVersion, serviceRefDeclSpec.ServiceVersion)
-						if versionMatch {
-							return true
-						}
-					}
-					return false
-				}
-				serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
-				if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: targetNamespace, Name: serviceRef.ServiceDescriptor}, serviceDescriptor); err != nil {
+				if err := handleServiceDescriptorTypeServiceRef(reqCtx, cli, targetNamespace, serviceRef, serviceRefDecl, serviceReferences); err != nil {
 					return nil, err
 				}
-				if serviceDescriptor.Status.Phase != appsv1alpha1.AvailablePhase {
-					return nil, fmt.Errorf("service descriptor %s status is not available", serviceDescriptor.Name)
-				}
-				match := verifyServiceKindAndVersion(*serviceDescriptor, serviceRefDecl.ServiceRefDeclarationSpecs...)
-				if !match {
-					return nil, fmt.Errorf("service descriptor %s kind or version is not match with service reference declaration %s", serviceDescriptor.Name, serviceRefDecl.Name)
-				}
-				serviceReferences[serviceRefDecl.Name] = serviceDescriptor
 			}
 		}
 		// _, exist := serviceReferences[serviceRefDecl.Name]
@@ -167,6 +81,106 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 		// }
 	}
 	return serviceReferences, nil
+}
+
+// handleClusterTypeServiceRef handles the service reference is another KubeBlocks Cluster.
+func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	namespace string,
+	cluster *appsv1alpha1.Cluster,
+	serviceRef appsv1alpha1.ServiceRef,
+	serviceRefDecl appsv1alpha1.ServiceRefDeclaration,
+	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor) error {
+	if serviceRef.Cluster == cluster.Name {
+		return fmt.Errorf("cluster %s cannot reference itself", cluster.Name)
+	}
+	referencedCluster := &appsv1alpha1.Cluster{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
+		return err
+	}
+
+	// get the connection credential secret of the referenced cluster
+	secretRef := &corev1.Secret{}
+	secretRefName := component.GenerateConnCredential(referencedCluster.Name)
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: secretRefName}, secretRef); err != nil {
+		return err
+	}
+
+	// TODO: Second-stage optimization: Cluster-type references no longer perform conversion on the connection credential field. Instead, the configMap or secret is directly passed through to the serviceDescriptor.
+	sdBuilder := builder.NewServiceDescriptorBuilder(namespace, component.GenerateDefaultServiceDescriptorName(cluster.Name))
+	sdBuilder.SetServiceKind("")
+	sdBuilder.SetServiceVersion("")
+	sdBuilder.SetEndpoint(appsv1alpha1.CredentialVar{
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+				Key:                  constant.ServiceDescriptorEndpointKey,
+			},
+		},
+	})
+	sdBuilder.SetAuth(appsv1alpha1.ConnectionCredentialAuth{
+		Username: &appsv1alpha1.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+					Key:                  constant.ServiceDescriptorUsernameKey,
+				},
+			},
+		},
+		Password: &appsv1alpha1.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+					Key:                  constant.ServiceDescriptorPasswordKey,
+				},
+			},
+		},
+	})
+	sdBuilder.SetPort(appsv1alpha1.CredentialVar{
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
+				Key:                  constant.ServiceDescriptorPortKey,
+			},
+		},
+	})
+	serviceReferences[serviceRefDecl.Name] = sdBuilder.GetObject()
+	return nil
+}
+
+// handleServiceDescriptorTypeServiceRef handles the service reference is provided by external ServiceDescriptor object.
+func handleServiceDescriptorTypeServiceRef(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	namespace string,
+	serviceRef appsv1alpha1.ServiceRef,
+	serviceRefDecl appsv1alpha1.ServiceRefDeclaration,
+	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor) error {
+	// verify service kind and version
+	verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, serviceRefDeclSpecs ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
+		for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
+			if getWellKnownServiceKindAliasMapping(serviceRefDeclSpec.ServiceKind) != getWellKnownServiceKindAliasMapping(serviceDescriptor.Spec.ServiceKind) {
+				continue
+			}
+			versionMatch := verifyServiceVersion(serviceDescriptor.Spec.ServiceVersion, serviceRefDeclSpec.ServiceVersion)
+			if versionMatch {
+				return true
+			}
+		}
+		return false
+	}
+	serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: namespace, Name: serviceRef.ServiceDescriptor}, serviceDescriptor); err != nil {
+		return err
+	}
+	if serviceDescriptor.Status.Phase != appsv1alpha1.AvailablePhase {
+		return fmt.Errorf("service descriptor %s status is not available", serviceDescriptor.Name)
+	}
+	match := verifyServiceKindAndVersion(*serviceDescriptor, serviceRefDecl.ServiceRefDeclarationSpecs...)
+	if !match {
+		return fmt.Errorf("service descriptor %s kind or version is not match with service reference declaration %s", serviceDescriptor.Name, serviceRefDecl.Name)
+	}
+	serviceReferences[serviceRefDecl.Name] = serviceDescriptor
+	return nil
 }
 
 func verifyServiceVersion(serviceDescriptorVersion, serviceRefDeclarationServiceVersion string) bool {

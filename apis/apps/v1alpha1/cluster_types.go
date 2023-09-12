@@ -620,8 +620,8 @@ type ServiceRef struct {
 
 	// When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced.
 	// By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential secret corresponding to the referenced Cluster will be used to bind to the current component.
-	// If you require an additional connection credential secret, please set it using the ConnectionCredential.
 	// currently, the connection credential secret needs to adhere to the following specification: The data field must contain the information for endpoint, port, username, and password.
+	// Under this referencing approach, the ServiceKind and ServiceVersion of service reference declaration defined in the ClusterDefinition will not be validated.
 	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
 	// +optional
 	Cluster string `json:"cluster,omitempty"`
@@ -634,10 +634,6 @@ type ServiceRef struct {
 	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
 	// +optional
 	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`
-
-	// connectionCredential defines the connection credential secret when referencing a service provided by other KubeBlocks cluster.
-	// +optional
-	ConnectionCredential string `json:"connectionCredential,omitempty"`
 }
 
 // +genclient

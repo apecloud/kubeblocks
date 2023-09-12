@@ -500,7 +500,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 		})
 
-		// TODO(refactor): review the case before merge.
 		It("HorizontalScaling via volume snapshot backup", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", true)
@@ -515,9 +514,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Generation == 2).Should(BeTrue())
 				g.Expect(cluster.Status.ObservedGeneration == 2).Should(BeTrue())
-				// component phase should be running during snapshot backup
-				// g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-				// TODO(REVIEW): component phase is Updating after refactor, does it meet expectations?
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 				// the expected cluster phase is Updating during Hscale.
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))

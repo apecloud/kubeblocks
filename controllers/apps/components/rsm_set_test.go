@@ -74,7 +74,7 @@ var _ = Describe("RSM Component", func() {
 	AfterEach(cleanAll)
 
 	Context("RSM Component test", func() {
-		FIt("RSM Component test", func() {
+		It("RSM Component test", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, rsmCompDefRef, rsmCompName)
@@ -107,15 +107,6 @@ var _ = Describe("RSM Component", func() {
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}).Should(BeTrue())
-			Expect(testapps.ChangeObjStatus(&testCtx, &stsList.Items[0], func() {
-				stsList.Items[0].Status.ObservedGeneration = stsList.Items[0].Generation
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-				rsm.Status.ObservedGeneration = rsm.Generation
-				rsm.Status.CurrentGeneration = rsm.Generation
-				rsm.Status.InitReplicas = *rsm.Spec.Replicas
-				rsm.Status.Replicas = *rsm.Spec.Replicas
-			})).Should(Succeed())
 
 			By("test pods number of sts is 0")
 			rsm = &rsmList.Items[0]
@@ -143,6 +134,7 @@ var _ = Describe("RSM Component", func() {
 				rsm.Status.ReadyReplicas = availableReplicas
 				rsm.Status.Replicas = availableReplicas
 				rsm.Status.ObservedGeneration = 1
+				rsm.Status.CurrentGeneration = 1
 				rsm.Status.UpdateRevision = updateRevision
 			})).Should(Succeed())
 			podsReady, _ := rsmComponent.PodsReady(ctx, rsm)
@@ -204,16 +196,12 @@ var _ = Describe("RSM Component", func() {
 			oldReplicas := rsmComponent.SynthesizedComponent.Replicas
 			replicas := int32(4)
 			rsmComponent.SynthesizedComponent.Replicas = replicas
-			Expect(testapps.ChangeObj(&testCtx, rsm, func(machine *workloads.ReplicatedStateMachine) {
-				rsm.Annotations[constant.KubeBlocksGenerationKey] = "new-generation"
-			})).Should(Succeed())
+			rsm.Annotations[constant.KubeBlocksGenerationKey] = "new-generation"
 			isRunning, _ := rsmComponent.IsRunning(ctx, rsm)
 			Expect(isRunning).Should(BeFalse())
 			// reset replicas
 			rsmComponent.SynthesizedComponent.Replicas = oldReplicas
-			Expect(testapps.ChangeObj(&testCtx, rsm, func(machine *workloads.ReplicatedStateMachine) {
-				rsm.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
-			})).Should(Succeed())
+			rsm.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
 
 			By("test component is running")
 			isRunning, _ = rsmComponent.IsRunning(ctx, rsm)

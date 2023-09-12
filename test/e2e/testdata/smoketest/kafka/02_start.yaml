@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: kafka-cluster-start-
+spec:
+  clusterRef: kafka-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Start
+  restart:
+    - componentName: broker

@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: etcd-cluster-stop-
+spec:
+  clusterRef: etcd-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Stop
+  restart:
+    - componentName: etcd

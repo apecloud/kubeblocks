@@ -32,7 +32,7 @@ type Task struct {
 	Status *appsv1alpha1.ConfigurationItemDetailStatus
 	Name   string
 
-	Do         func(task *Task, component *component.SynthesizedComponent) error
+	Do         func(task *Task, component *component.SynthesizedComponent, revision string) error
 	SyncStatus func(task *Task) error
 }
 
@@ -43,7 +43,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 			// TODO sync reconfiguring reconcile status
 			return nil
 		},
-		Do: func(fetcher *Task, component *component.SynthesizedComponent) error {
+		Do: func(fetcher *Task, component *component.SynthesizedComponent, revision string) error {
 			reconcileTask := configuration.NewReconcilePipeline(configuration.ReconcileCtx{
 				ResourceCtx: fetcher.ResourceCtx,
 				Cluster:     fetcher.ClusterObj,
@@ -57,7 +57,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().
-				UpdateConfigVersion().
+				UpdateConfigVersion(revision).
 				Sync().
 				SyncStatus().
 				Complete()

@@ -106,7 +106,7 @@ const (
 	CMTemplateNameLabelKey                   = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey              = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey           = "config.kubeblocks.io/config-hash"
-	CMInsCurrentConfigurationHashLabelKey    = "config.kubeblocks.io/current-config-hash"
+	CMInsCurrentConfigurationHashLabelKey    = "config.kubeblocks.io/update-config-hash"
 	CMConfigurationConstraintsNameLabelKey   = "config.kubeblocks.io/config-constraints-name"
 	CMConfigurationTemplateVersion           = "config.kubeblocks.io/config-template-version"
 	ConsensusSetAccessModeLabelKey           = "cs.apps.kubeblocks.io/access-mode"

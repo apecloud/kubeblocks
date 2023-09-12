@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -215,7 +216,7 @@ max_connections = '1000'
 				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().
-				UpdateConfigVersion().
+				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ConfigurationObj.GetGeneration(), 10)).
 				Sync().
 				SyncStatus().
 				Complete()
@@ -230,7 +231,7 @@ max_connections = '1000'
 				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().
-				UpdateConfigVersion().
+				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ConfigurationObj.GetGeneration(), 10)).
 				Sync().
 				SyncStatus().
 				Complete()

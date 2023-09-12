@@ -22,7 +22,6 @@ package configuration
 import (
 	"encoding/json"
 	"reflect"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -191,7 +190,9 @@ func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
 
 func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	updateMeta := func() error {
-		updateResourceAnnotationsWithTemplate(p.ctx.Object, p.renderWrapper.templateAnnotations)
+		if p.ctx.Object != nil {
+			updateResourceAnnotationsWithTemplate(p.ctx.Object, p.renderWrapper.templateAnnotations)
+		}
 		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.Component, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
 			return err
 		}
@@ -360,7 +361,7 @@ func (p *updatePipeline) ApplyParameters() *updatePipeline {
 	})
 }
 
-func (p *updatePipeline) UpdateConfigVersion() *updatePipeline {
+func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 	return p.Wrap(func() error {
 		if p.isDone() {
 			return nil
@@ -375,7 +376,7 @@ func (p *updatePipeline) UpdateConfigVersion() *updatePipeline {
 		p.newCM.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
 		hash, _ := cfgutil.ComputeHash(p.newCM.Data)
 		p.newCM.Annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
-		p.newCM.Annotations[constant.ConfigurationRevision] = strconv.FormatInt(p.ConfigurationObj.GetGeneration(), 10)
+		p.newCM.Annotations[constant.ConfigurationRevision] = revision
 		return nil
 	})
 }

@@ -110,6 +110,8 @@ var ComponentClassDefinitionSignature = func(_ appsv1alpha1.ComponentClassDefini
 
 var StorageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList) {}
 
+var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ appsv1alpha1.ConfigurationList) {}
+
 func ToGVK(object client.Object) schema.GroupVersionKind {
 	t := reflect.TypeOf(object)
 	if t.Kind() != reflect.Pointer {

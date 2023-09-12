@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,6 +93,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ClusterVer().
 		ClusterComponent().
 		ClusterDefComponent().
+		ClusterVerComponent().
 		Complete()
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
@@ -121,9 +123,10 @@ func (r *ConfigurationReconciler) runTasks(
 		return
 	}
 
+	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	patch := client.MergeFrom(configuration.DeepCopy())
 	for _, task := range tasks {
-		if err := task.Do(fetcher, synthesizedComp); err != nil {
+		if err := task.Do(fetcher, synthesizedComp, revision); err != nil {
 			task.Status.Phase = appsv1alpha1.CMergeFailedPhase
 			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)

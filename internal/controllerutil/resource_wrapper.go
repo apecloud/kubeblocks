@@ -118,6 +118,18 @@ func (r *ResourceFetcher[T]) ClusterDefComponent() *T {
 	return r.Wrap(foundFn)
 }
 
+func (r *ResourceFetcher[T]) ClusterVerComponent() *T {
+	foundFn := func() (err error) {
+		if r.ClusterComObj == nil || r.ClusterVerObj == nil {
+			return
+		}
+		components := r.ClusterVerObj.Spec.GetDefNameMappingComponents()
+		r.ClusterVerComObj = components[r.ClusterComObj.ComponentDefRef]
+		return
+	}
+	return r.Wrap(foundFn)
+}
+
 func (r *ResourceFetcher[T]) ClusterComponent() *T {
 	return r.Wrap(func() (err error) {
 		r.ClusterComObj = r.ClusterObj.Spec.GetComponentByName(r.ComponentName)

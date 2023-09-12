@@ -30,7 +30,7 @@ import (
 	"github.com/dapr/kit/logger"
 )
 
-// Daemon represents the managed subprocesses.
+// Daemon represents the managed DB process.
 type Daemon struct {
 	Cmd  string
 	Args []string
@@ -103,7 +103,7 @@ func (daemon *Daemon) Start() error {
 		},
 	}
 	args := append([]string{daemon.Cmd}, daemon.Args...)
-	daemon.Logger.Infof("Start DB Service: %s", strings.Join(args, " "))
+	daemon.Logger.Infof("Start DB Service: %s", daemon)
 	process, err := os.StartProcess(daemon.Cmd, args, procAtr)
 	if err != nil {
 		daemon.Logger.Errorf("Start DB Service failed: %s", err)
@@ -133,7 +133,7 @@ func (daemon *Daemon) ForceStop() error {
 	return errors.New("process not exist")
 }
 
-func (daemon *Daemon) GracefullyStop() error {
+func (daemon *Daemon) Stop() error {
 	if daemon.Process != nil {
 		err := daemon.Process.Signal(syscall.SIGTERM)
 		return err
@@ -143,4 +143,8 @@ func (daemon *Daemon) GracefullyStop() error {
 
 func (daemon *Daemon) Wait() (*os.ProcessState, error) {
 	return daemon.Process.Wait()
+}
+
+func (daemon *Daemon) String() string {
+	return daemon.Cmd + " " + strings.Join(daemon.Args, " ")
 }

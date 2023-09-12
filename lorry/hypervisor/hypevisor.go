@@ -37,9 +37,12 @@ func NewHypervisor(logger logger.Logger) (*Hypervisor, error) {
 		return nil, err
 	}
 
+	watcher := NewWatcher(logger)
+	go watcher.Start()
 	hypervisor := &Hypervisor{
-		Logger: logger,
-		Daemon: daemon,
+		Logger:  logger,
+		Daemon:  daemon,
+		Watcher: watcher,
 	}
 
 	return hypervisor, nil
@@ -50,6 +53,12 @@ func (hypervisor *Hypervisor) Start() {
 		hypervisor.Logger.Info("No DB Service")
 		return
 	}
-	hypervisor.Daemon.Start()
 
+	err := hypervisor.Daemon.Start()
+	if err != nil {
+		hypervisor.Logger.Warnf("Start DB Service failed: %s", err)
+		return
+	}
+
+	hypervisor.Watcher.Watch(hypervisor.Daemon)
 }

@@ -181,7 +181,7 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: r.Backup.Namespace,
 				Name:      r.Backup.Name,
-				Labels:    buildBackupWorkloadLabels(r.Backup),
+				Labels:    BuildBackupWorkloadLabels(r.Backup),
 			},
 			Owner:    r.Backup,
 			PodSpec:  podSpec,
@@ -212,7 +212,7 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: r.Backup.Namespace,
 			Name:      r.Backup.Name,
-			Labels:    buildBackupWorkloadLabels(r.Backup),
+			Labels:    BuildBackupWorkloadLabels(r.Backup),
 		},
 		Owner:                    r.Backup,
 		VolumeSnapshotNamePrefix: r.Backup.Name,
@@ -363,24 +363,26 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	return podSpec
 }
 
-// injectSyncProgressContainer injects an init container to sync the backup progress.
+// injectSyncProgressContainer injects a container to sync the backup progress.
 func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 	sync *dpv1alpha1.SyncProgress) {
 	if !boolptr.IsSetToTrue(sync.Enabled) {
 		return
 	}
 
-	// build init container to sync backup progress that will update the backup status
+	// build container to sync backup progress that will update the backup status
 	container := podSpec.Containers[0].DeepCopy()
 	container.Name = syncProgressContainerName
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Resources = corev1.ResourceRequirements{Limits: nil, Requests: nil}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	container.Command = []string{"sh", "-c"}
 
 	// append some envs
-	checkInterval := int32(5)
+	checkIntervalSeconds := int32(5)
 	if sync.IntervalSeconds != nil && *sync.IntervalSeconds > 0 {
-		checkInterval = *sync.IntervalSeconds
+		checkIntervalSeconds = *sync.IntervalSeconds
 	}
 	container.Env = append(container.Env,
 		corev1.EnvVar{
@@ -389,7 +391,7 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 		},
 		corev1.EnvVar{
 			Name:  dptypes.DPCheckInterval,
-			Value: fmt.Sprintf("%d", checkInterval)},
+			Value: fmt.Sprintf("%d", checkIntervalSeconds)},
 	)
 
 	args := "set -o errexit; set -o nounset;" +
@@ -397,8 +399,7 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 		"eval kubectl -n %s patch backup %s --subresource=status --type=merge --patch '{\\\"status\\\":${backupInfo}}';"
 	container.Args = []string{fmt.Sprintf(args, r.Backup.Namespace, r.Backup.Name)}
 
-	// set the init container
-	podSpec.InitContainers = []corev1.Container{*container}
+	podSpec.Containers = append(podSpec.Containers, *container)
 }
 
 func (r *Request) backupActionSetExists() bool {

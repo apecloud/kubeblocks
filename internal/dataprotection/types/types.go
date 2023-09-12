@@ -18,3 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package types
+
+var (
+	// DefaultBackOffLimit is the default backoff limit for jobs.
+	DefaultBackOffLimit = int32(3)
+)

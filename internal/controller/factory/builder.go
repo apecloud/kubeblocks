@@ -1012,22 +1012,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	return &container, nil
 }
 
-func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
-	const tplFile = "backup_manifests_template.cue"
-	job := &batchv1.Job{}
-	if err := buildFromCUE(tplFile,
-		map[string]any{
-			"job.metadata.name":      key.Name,
-			"job.metadata.namespace": key.Namespace,
-			"backup":                 backup,
-			"podSpec":                podSpec,
-		},
-		"job", job); err != nil {
-		return nil, err
-	}
-	return job, nil
-}
-
 func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
 	const tplFile = "restore_job_template.cue"

@@ -80,8 +80,8 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 	if err != nil {
 		return handleErr(err)
 	} else if exists {
-		objRef, _ := ref.GetReference(ctx.Scheme, &original)
 		// job exists, check job status and set action status accordingly
+		objRef, _ := ref.GetReference(ctx.Scheme, &original)
 		sb = sb.startTimestamp(&original.CreationTimestamp).objectRef(objRef)
 		_, finishedType := utils.IsJobFinished(&original)
 		switch finishedType {
@@ -123,7 +123,6 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 }
 
 func (j *JobAction) validate() error {
-	defaultBackOffLimit := int32(3)
 	if j.ObjectMeta.Name == "" {
 		return fmt.Errorf("name is required")
 	}
@@ -131,7 +130,7 @@ func (j *JobAction) validate() error {
 		return fmt.Errorf("PodSpec is required")
 	}
 	if j.BackOffLimit == nil {
-		j.BackOffLimit = &defaultBackOffLimit
+		j.BackOffLimit = &types.DefaultBackOffLimit
 	}
 	return nil
 }

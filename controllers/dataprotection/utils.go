@@ -26,12 +26,10 @@ import (
 	"strings"
 	"sync"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var (
@@ -195,39 +192,6 @@ func getBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
 }
 
-// buildBackupWorkloadLabels builds the labels for workload which owned by backup.
-func buildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
-	labels := backup.Labels
-	if labels == nil {
-		labels = map[string]string{}
-	} else {
-		for _, v := range excludeLabelsForWorkload() {
-			delete(labels, v)
-		}
-	}
-	labels[dptypes.DataProtectionLabelBackupNameKey] = backup.Name
-	return labels
-}
-
-func addTolerations(podSpec *corev1.PodSpec) (err error) {
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
-		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
-			return err
-		}
-	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
-		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
-			return err
-		}
-	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
-		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // filterCreatedByPolicy filters the workloads which are create by backupPolicy.
 func filterCreatedByPolicy(object client.Object) bool {
 	labels := object.GetLabels()
@@ -244,33 +208,6 @@ func sendWarningEventForError(recorder record.EventRecorder, backup *dpv1alpha1.
 		recorder.Eventf(backup, corev1.EventTypeWarning, "FailedCreatedBackup",
 			"Creating backup failed, error: %s", err.Error())
 	}
-}
-
-var configVolumeSnapshotError = []string{
-	"Failed to set default snapshot class with error",
-	"Failed to get snapshot class with error",
-	"Failed to create snapshot content with error cannot find CSI PersistentVolumeSource for volume",
-}
-
-func isVolumeSnapshotConfigError(snap *snapshotv1.VolumeSnapshot) bool {
-	if snap.Status == nil || snap.Status.Error == nil || snap.Status.Error.Message == nil {
-		return false
-	}
-	for _, errMsg := range configVolumeSnapshotError {
-		if strings.Contains(*snap.Status.Error.Message, errMsg) {
-			return true
-		}
-	}
-	return false
-}
-
-func generateJSON(path string, value string) string {
-	segments := strings.Split(path, ".")
-	jsonString := value
-	for i := len(segments) - 1; i >= 0; i-- {
-		jsonString = fmt.Sprintf(`{\"%s\":%s}`, segments[i], jsonString)
-	}
-	return jsonString
 }
 
 // cropJobName job name cannot exceed 63 characters for label name limit.

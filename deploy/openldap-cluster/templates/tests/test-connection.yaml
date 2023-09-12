@@ -1,22 +1,21 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "openldap.fullname" . }}-test-connection"
+  name: "{{ include "openldap-cluster.fullname" . }}-test-connection"
   labels:
-{{ include "openldap.labels" . | indent 4 }}
+    {{- include "openldap-cluster.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": test-success
-    "url": "ldap://{{ include "openldap.fullname" . }}-0"
+    "helm.sh/hook": test
 spec:
   containers:
-    - name: test-openldap
+    - name: test-openldap-cluster
       image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
       command:
         - "ldapsearch"
       args:
         - "-x"
         - "-H"
-        - "ldap://myopenldap-openldap-compdef-0.myopenldap-openldap-compdef-headless.default.svc.cluster.local"
+        - "ldap://openldap-cluster-openldap-0.openldap-cluster-openldap-headless.default.svc.cluster.local"
         - "-b"
         - "dc=kubesphere,dc=io"
         - "-D"

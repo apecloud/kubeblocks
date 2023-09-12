@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: {{ include "openldap.fullname" . }}
+  name: openldap
   labels:
     {{- include "openldap.labels" . | nindent 4 }}
 spec:
@@ -53,11 +53,11 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.name
-             {{- if .Values.ldap.replication }}
-              - name: LDAP_REPLICATION_CONFIG_SYNCPROV
-                value: "binddn=\"cn=admin,cn=config\" bindmethod=simple credentials=$LDAP_CONFIG_PASSWORD searchbase=\"cn=config\" type=refreshAndPersist retry=\"60 +\" timeout=1"
-              - name: LDAP_REPLICATION_DB_SYNCPROV
-                value: "binddn=\"cn=admin,$LDAP_BASE_DN\" bindmethod=simple credentials=$LDAP_ADMIN_PASSWORD searchbase=\"$LDAP_BASE_DN\" type=refreshAndPersist interval=01:00:00:10 retry=\"60 +\" timeout=1"
-              - name: LDAP_REPLICATION_HOSTS
-                value: "#PYTHON2BASH:['ldap://$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-0.$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless', 'ldap://$(KB_CLUSTER_NAME)-.$(KB_COMP_NAME)-1.$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless']"
-             {{- end }}
+{{/*             {{- if .Values.ldap.replication }}*/}}
+{{/*              - name: LDAP_REPLICATION_CONFIG_SYNCPROV*/}}
+{{/*                value: "binddn=\"cn=admin,cn=config\" bindmethod=simple credentials=$LDAP_CONFIG_PASSWORD searchbase=\"cn=config\" type=refreshAndPersist retry=\"60 +\" timeout=1"*/}}
+{{/*              - name: LDAP_REPLICATION_DB_SYNCPROV*/}}
+{{/*                value: "binddn=\"cn=admin,$LDAP_BASE_DN\" bindmethod=simple credentials=$LDAP_ADMIN_PASSWORD searchbase=\"$LDAP_BASE_DN\" type=refreshAndPersist interval=01:00:00:10 retry=\"60 +\" timeout=1"*/}}
+{{/*              - name: LDAP_REPLICATION_HOSTS*/}}
+{{/*                value: "#PYTHON2BASH:['ldap://$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-0.$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless', 'ldap://$(KB_CLUSTER_NAME)-.$(KB_COMP_NAME)-1.$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-headless']"*/}}
+{{/*             {{- end }}*/}}

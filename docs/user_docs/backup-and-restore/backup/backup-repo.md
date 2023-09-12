@@ -145,7 +145,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
         --provider minio \
         --endpoint <ip:port> \
         --bucket test-minio \
-        --acces-key-id <ACCESS KEY> \
+        --access-key-id <ACCESS KEY> \
         --secret-access-key <SECRET KEY> \
         --default
      ```

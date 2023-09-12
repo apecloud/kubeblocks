@@ -62,3 +62,14 @@ func (hypervisor *Hypervisor) Start() {
 
 	hypervisor.Watcher.Watch(hypervisor.Daemon)
 }
+
+func (hypervisor *Hypervisor) StopAndWait() {
+	if hypervisor.Daemon == nil {
+		hypervisor.Logger.Info("No DB Service")
+		return
+	}
+
+	hypervisor.Daemon.Stop()
+
+	hypervisor.Watcher.StopAndWait()
+}

@@ -57,7 +57,7 @@ func NewWatcher(logger logger.Logger) *Watcher {
 func (watcher *Watcher) Start() {
 	for daemon := range watcher.DaemonChan {
 		if daemon.Stopped {
-			watcher.Logger.Infof("Daemon %s is stopped by manul. Will not be restarted.", daemon)
+			watcher.Logger.Infof("Daemon %s is stopped by manual. Will not be restarted.", daemon)
 			continue
 		}
 		watcher.Logger.Infof("Restarting daemon")
@@ -100,12 +100,14 @@ func (watcher *Watcher) Watch(daemon *Daemon) {
 
 	go func() {
 		defer delete(watcher.Processes, pid)
-		defer close(statusChan)
 		select {
 		case procStatus := <-statusChan:
-			watcher.Logger.Infof("Daemon %s exists", daemon)
-			watcher.Logger.Infof("State is %s", procStatus.state.String())
-			watcher.DaemonChan <- daemon
+			if procStatus != nil {
+				watcher.Logger.Infof("Daemon %s exists", daemon)
+				watcher.Logger.Infof("State is %s", procStatus.state.String())
+				watcher.DaemonChan <- daemon
+				close(statusChan)
+			}
 			break
 		case <-watcher.ctx.Done():
 			break
@@ -113,6 +115,13 @@ func (watcher *Watcher) Watch(daemon *Daemon) {
 	}()
 }
 
-func (watcher *Watcher) Stop() {
+func (watcher *Watcher) StopAndWait() {
+	for _, statusChan := range watcher.Processes {
+		procStatus := <-statusChan
+		if procStatus != nil {
+			watcher.Logger.Infof("Daemon exists, State is %s", procStatus.state.String())
+			close(statusChan)
+		}
+	}
 	watcher.cancel()
 }

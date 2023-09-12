@@ -126,6 +126,7 @@ func (daemon *Daemon) IsAlive() bool {
 }
 
 func (daemon *Daemon) ForceStop() error {
+	daemon.Stopped = true
 	if daemon.Process != nil {
 		err := daemon.Process.Signal(syscall.SIGKILL)
 		return err
@@ -134,6 +135,7 @@ func (daemon *Daemon) ForceStop() error {
 }
 
 func (daemon *Daemon) Stop() error {
+	daemon.Stopped = true
 	if daemon.Process != nil {
 		err := daemon.Process.Signal(syscall.SIGTERM)
 		return err

@@ -133,7 +133,7 @@ func buildBackupRepoVolumeMount(pvcName string) corev1.VolumeMount {
 	}
 }
 
-func generateBackupWorkloadName(backup *dpv1alpha1.Backup, prefix string) string {
+func generateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
 	name := fmt.Sprintf("%s-%s-%s", prefix, backup.Name, backup.UID[:8])
 	// job name cannot exceed 63 characters for label name limit.
 	if len(name) > 63 {
@@ -146,8 +146,8 @@ func excludeLabelsForWorkload() []string {
 	return []string{constant.KBAppComponentLabelKey}
 }
 
-// buildBackupWorkloadLabels builds the labels for workload which owned by backup.
-func buildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
+// BuildBackupWorkloadLabels builds the labels for workload which owned by backup.
+func BuildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 	labels := backup.Labels
 	if labels == nil {
 		labels = map[string]string{}
@@ -162,9 +162,9 @@ func buildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 
 func buildBackupJobObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.ObjectMeta {
 	return &metav1.ObjectMeta{
-		Name:      generateBackupWorkloadName(backup, prefix),
+		Name:      generateBackupJobName(backup, prefix),
 		Namespace: backup.Namespace,
-		Labels:    buildBackupWorkloadLabels(backup),
+		Labels:    BuildBackupWorkloadLabels(backup),
 	}
 }
 

@@ -645,7 +645,12 @@ func updateKubeBlocksToolsImage(pc *corev1.Container) {
 func getImageName(image string) string {
 	subs := strings.Split(image, ":")
 	if len(subs) != 2 {
-		return ""
+		if len(subs) == 3 {
+			lastIndex := strings.LastIndex(image, ":")
+			return image[:lastIndex]
+		} else {
+			return ""
+		}
 	}
 	return subs[0]
 }

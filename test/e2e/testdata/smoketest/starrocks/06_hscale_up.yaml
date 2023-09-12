@@ -1,12 +1,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: nebula-cluster-hscale-
+  generateName: starrocks-cluster-hscale-up-
 spec:
-  clusterRef: nebula-cluster
+  clusterRef: starrocks-cluster
   type: HorizontalScaling
   horizontalScaling:
-    - componentName: frontend
+    - componentName: be
       replicas: 3
-    - componentName: meta
+    - componentName: fe
       replicas: 3

@@ -176,7 +176,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
        dataprotection.kubeblocks.io/is-default-repo=true
      ```
 
-   - Use Hlem
+   - Use kubectl
 
      `kubectl` is another option to create a BackupRepo, but the commands do not include parameter and default repository verification compared with kbcli, which is not convenient.
 

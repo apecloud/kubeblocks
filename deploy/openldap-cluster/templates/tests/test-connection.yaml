@@ -17,9 +17,9 @@ spec:
         - "-H"
         - "ldap://openldap-cluster-openldap-0.openldap-cluster-openldap-headless.default.svc.cluster.local"
         - "-b"
-        - "dc=kubesphere,dc=io"
+        - "dc=kubeblocks,dc=io"
         - "-D"
-        - "cn=admin,dc=kubesphere,dc=io"
+        - "cn=admin,dc=kubeblocks,dc=io"
         - "-w"
         - "admin"
   restartPolicy: Never

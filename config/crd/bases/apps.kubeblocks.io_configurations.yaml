@@ -208,6 +208,12 @@ spec:
                   reconfiguring.
                 items:
                   properties:
+                    currentRevision:
+                      description: currentRevision is the current revision of configurationItem.
+                      type: string
+                    lastDoneRevision:
+                      description: lastDoneRevision is the last done revision of configurationItem.
+                      type: string
                     message:
                       description: message field describes the reasons of abnormal
                         status.
@@ -229,6 +235,9 @@ spec:
                       - Deleting
                       - FailedAndRetry
                       - Finished
+                      type: string
+                    updateRevision:
+                      description: updateRevision is the update revision of configurationItem.
                       type: string
                   required:
                   - name

@@ -91,6 +91,18 @@ type ConfigurationItemDetailStatus struct {
 	// +optional
 	Phase ConfigurationPhase `json:"phase,omitempty"`
 
+	// lastDoneRevision is the last done revision of configurationItem.
+	// +optional
+	LastDoneRevision string `json:"lastDoneRevision,omitempty"`
+
+	// currentRevision is the current revision of configurationItem.
+	// +optional
+	CurrentRevision string `json:"currentRevision,omitempty"`
+
+	// updateRevision is the update revision of configurationItem.
+	// +optional
+	UpdateRevision string `json:"updateRevision,omitempty"`
+
 	// message field describes the reasons of abnormal status.
 	// +optional
 	Message *string `json:"message,omitempty"`
@@ -157,6 +169,16 @@ func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *Confi
 		configItem := &configuration.ConfigItemDetails[i]
 		if configItem.Name == name {
 			return configItem
+		}
+	}
+	return nil
+}
+
+func (status *ConfigurationStatus) GetItemStatus(name string) *ConfigurationItemDetailStatus {
+	for i := range status.ConfigurationItemStatus {
+		itemStatus := &status.ConfigurationItemStatus[i]
+		if itemStatus.Name == name {
+			return itemStatus
 		}
 	}
 	return nil

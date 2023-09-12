@@ -135,7 +135,7 @@ var _ = Describe("Volume Protection Operation", func() {
 	component.RegisterManager(DBWithLockCharacterType, workloadTypeForTest, dbManagerWithLock)
 	component.RegisterManager(DBWithoutLockCharacterType, workloadTypeForTest, dbManagerWithoutLock)
 
-	p.Init(bindings.Metadata{})
+	_ = p.Init(bindings.Metadata{})
 
 	setup := func() {
 		os.Setenv(constant.KBEnvPodName, podName)

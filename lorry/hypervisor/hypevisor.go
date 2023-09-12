@@ -73,7 +73,7 @@ func (hypervisor *Hypervisor) StopAndWait() {
 		return
 	}
 
-	hypervisor.DBService.Stop()
+	_ = hypervisor.DBService.Stop()
 
 	hypervisor.Watcher.StopAndWait()
 }
@@ -83,7 +83,7 @@ func StopDBService() {
 		hypervisor.Logger.Info("No DB Service")
 	}
 
-	hypervisor.DBService.Stop()
+	_ = hypervisor.DBService.Stop()
 }
 
 func StartDBService() error {

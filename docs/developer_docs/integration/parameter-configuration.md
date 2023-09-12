@@ -240,7 +240,7 @@ For example, the example above defines some constraints for the parameter `perfo
 
 ## 3. How to reconfigure parameters
 
-为了提供更好的使用体验, KubeBlocks通过命令行kbcli 提供了更便捷的参数管理方式.
+Better user experience, KubeBlocks offers kbcli for your convient parameter management.
 
 ### 3.1 Create a cluster
 

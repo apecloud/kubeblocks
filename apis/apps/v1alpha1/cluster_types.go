@@ -620,7 +620,7 @@ type ServiceRef struct {
 
 	// When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced.
 	// By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential secret corresponding to the referenced Cluster will be used to bind to the current component.
-	// currently, the connection credential secret needs to adhere to the following specification: The data field must contain the information for endpoint, port, username, and password.
+	// Currently, if a KubeBlocks cluster is to be referenced, the connection credential secret should include and correspond to the following fields: endpoint, port, username, and password.
 	// Under this referencing approach, the ServiceKind and ServiceVersion of service reference declaration defined in the ClusterDefinition will not be validated.
 	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
 	// +optional

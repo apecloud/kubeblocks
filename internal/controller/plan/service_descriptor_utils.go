@@ -80,6 +80,9 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 		//	 return nil, fmt.Errorf("componentDef %s's serviceRefDeclaration %s has not been defined, please check if there is corresponding service definition and binding in Cluster.spec.componentSpecs[*].serviceRefs", clusterCompDef.Name, serviceRefDecl.Name)
 		// }
 	}
+	if len(serviceReferences) == 0 {
+		return nil, nil
+	}
 	return serviceReferences, nil
 }
 

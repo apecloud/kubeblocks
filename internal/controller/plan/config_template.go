@@ -150,7 +150,7 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 	// preHandle the component
 	var v Visitor = &ComponentVisitor{component: c.component}
 	// v = NewDecoratedVisitor(v, resolveServiceReferences(c.cli, c.ctx, c.namespace))
-	if err := v.Visit(resolveServiceReferences(c.cli, c.ctx, c.namespace)); err != nil {
+	if err := v.Visit(resolveServiceReferences(c.cli, c.ctx)); err != nil {
 		return nil, err
 	}
 

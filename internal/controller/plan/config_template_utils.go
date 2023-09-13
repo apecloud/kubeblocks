@@ -80,7 +80,7 @@ func (r *ComponentVisitor) Visit(fn VisitorFunc) error {
 }
 
 // resolveServiceReferences is the visitor function to resolve the service reference
-func resolveServiceReferences(cli ictrlclient.ReadonlyClient, ctx context.Context, namespace string) VisitorFunc {
+func resolveServiceReferences(cli ictrlclient.ReadonlyClient, ctx context.Context) VisitorFunc {
 	return func(component *component.SynthesizedComponent, err error) error {
 		if err != nil {
 			return err
@@ -90,7 +90,7 @@ func resolveServiceReferences(cli ictrlclient.ReadonlyClient, ctx context.Contex
 		}
 		for _, serviceDescriptor := range component.ServiceReferences {
 			// TODO: currently, only support endpoint and port, serviceDescriptor.Spec.Auth is not supported
-			if err := resolveCredentialVar(cli, ctx, namespace, serviceDescriptor.Spec.Endpoint, serviceDescriptor.Spec.Port); err != nil {
+			if err := resolveCredentialVar(cli, ctx, serviceDescriptor.Namespace, serviceDescriptor.Spec.Endpoint, serviceDescriptor.Spec.Port); err != nil {
 				return err
 			}
 		}

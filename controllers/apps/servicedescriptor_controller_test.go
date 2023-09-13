@@ -38,8 +38,6 @@ var _ = Describe("test clusterVersion controller", func() {
 		namespace = "default"
 	)
 
-	const statefulCompDefName = "stateful"
-
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,

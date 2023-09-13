@@ -47,7 +47,7 @@ import (
 )
 
 func TestIsFailedOrAbnormal(t *testing.T) {
-	if !IsFailedOrAbnormal(appsv1alpha1.UnknownClusterCompPhase) {
+	if !IsFailedOrAbnormal(appsv1alpha1.AbnormalClusterCompPhase) {
 		t.Error("isAbnormal should be true")
 	}
 }
@@ -75,7 +75,7 @@ func TestGetComponentPhase(t *testing.T) {
 		if isFailed {
 			componentPhase = appsv1alpha1.FailedClusterCompPhase
 		} else if isAbnormal {
-			componentPhase = appsv1alpha1.UnknownClusterCompPhase
+			componentPhase = appsv1alpha1.AbnormalClusterCompPhase
 		}
 		return componentPhase
 	}
@@ -85,7 +85,7 @@ func TestGetComponentPhase(t *testing.T) {
 	}
 	isFailed = false
 	status = getComponentPhase(isFailed, isAbnormal)
-	if status != appsv1alpha1.UnknownClusterCompPhase {
+	if status != appsv1alpha1.AbnormalClusterCompPhase {
 		t.Error("function getComponentPhase should return Abnormal")
 	}
 	isAbnormal = false
@@ -125,7 +125,7 @@ func TestGetCompPhaseByConditions(t *testing.T) {
 		t.Error(`function getComponentPhase should return ""`)
 	}
 	phase = getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
-	if phase != appsv1alpha1.UnknownClusterCompPhase {
+	if phase != appsv1alpha1.AbnormalClusterCompPhase {
 		t.Error(`function getComponentPhase should return "Abnormal"`)
 	}
 	primaryReplicaIsReady = false
@@ -276,7 +276,7 @@ var _ = Describe("Consensus Component", func() {
 			})).Should(Succeed())
 			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
 				sts.Status.AvailableReplicas, nil, checkExistFailedPodOfLatestRevision)
-			Expect(phase).Should(Equal(appsv1alpha1.UnknownClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 		})
 

@@ -187,6 +187,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err != nil {
 		return err
 	}
+	isAllConfigSynced := c.isAllConfigSynced(reqCtx, cli)
 	hasFailedPod, messages, err := c.hasFailedPod(reqCtx, cli, pods)
 	if err != nil {
 		return err
@@ -195,11 +196,21 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err != nil {
 		return err
 	}
-	isAllConfigSynced := c.isAllConfigSynced(reqCtx, cli)
 	hasRunningVolumeExpansion, hasFailedVolumeExpansion, err := c.hasVolumeExpansionRunning(reqCtx, cli)
 	if err != nil {
 		return err
 	}
+	hasFailure := func() bool {
+		return hasFailedPod || isScaleOutFailed || hasFailedVolumeExpansion
+	}()
+	isComponentAvailable, err := c.isAvailable(reqCtx, cli, pods)
+	if err != nil {
+		return err
+	}
+	isInCreatingPhase := func() bool {
+		phase := c.getComponentStatus().Phase
+		return phase == "" || phase == appsv1alpha1.CreatingClusterCompPhase
+	}()
 
 	updatePodsReady := func(ready bool) {
 		_ = c.updateStatus("", func(status *appsv1alpha1.ClusterComponentStatus) error {
@@ -226,14 +237,14 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	case isRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
 		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
 		updatePodsReady(true)
-	case hasFailedPod, isScaleOutFailed, hasFailedVolumeExpansion:
-		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "Component is Failed")
-	case isFirstGeneration && !hasRunningVolumeExpansion:
+	case !hasFailure && isInCreatingPhase:
 		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
-	case !isFirstGeneration, hasRunningVolumeExpansion:
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component is Updating")
+	case !hasFailure:
+		c.SetStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "Component is Updating")
+	case !isComponentAvailable:
+		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "Component is Failed")
 	default:
-		c.SetStatusPhase(appsv1alpha1.UnknownClusterCompPhase, nil, "unknown")
+		c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "unknown")
 	}
 
 	// works should continue to be done after spec updated.
@@ -265,8 +276,62 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	return nil
 }
 
+// isAvailable tells whether the component is basically available, ether working well or in a fragile state:
+// 1. at least one pod is available
+// 2. with latest revision
+// 3. and with leader role label set
+func (c *rsmComponentBase) isAvailable(reqCtx intctrlutil.RequestCtx, cli client.Client, pods []*corev1.Pod) (bool, error) {
+	if isLatestRevision, err := isComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
+		return false, err
+	} else if !isLatestRevision {
+		return false, nil
+	}
+
+	isPodReady := func(pod *corev1.Pod) bool {
+		if pod == nil {
+			return false
+		}
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+				return true
+			}
+		}
+		return false
+	}
+	shouldCheckLeader := func() bool {
+		return c.Component.WorkloadType == appsv1alpha1.Consensus || c.Component.WorkloadType == appsv1alpha1.Replication
+	}()
+	hasLeaderRoleLabel := func(pod *corev1.Pod) bool {
+		roleName, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok {
+			return false
+		}
+		for _, replicaRole := range c.runningWorkload.Spec.Roles {
+			if roleName == replicaRole.Name && replicaRole.IsLeader {
+				return true
+			}
+		}
+		return false
+	}
+	for _, pod := range pods {
+		if !isPodReady(pod) {
+			continue
+		}
+		if !shouldCheckLeader {
+			continue
+		}
+		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
+			continue
+		}
+		if hasLeaderRoleLabel(pod) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (c *rsmComponentBase) hasFailedPod(reqCtx intctrlutil.RequestCtx, cli client.Client, pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
-	if isLatestRevision, err := isPodWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
+	if isLatestRevision, err := isComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
 		return false, nil, err
 	} else if !isLatestRevision {
 		return false, nil, nil

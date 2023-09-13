@@ -133,34 +133,34 @@ const (
 
 // ClusterPhase defines the Cluster CR .status.phase
 // +enum
-// +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Unknown}
+// +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Abnormal}
 type ClusterPhase string
 
 const (
-	CreatingClusterPhase        ClusterPhase = "Creating"
-	RunningClusterPhase         ClusterPhase = "Running"
-	SpecReconcilingClusterPhase ClusterPhase = "Updating"
-	StoppingClusterPhase        ClusterPhase = "Stopping"
-	StoppedClusterPhase         ClusterPhase = "Stopped"
-	DeletingClusterPhase        ClusterPhase = "Deleting"
-	FailedClusterPhase          ClusterPhase = "Failed"
-	UnknownClusterPhase         ClusterPhase = "Unknown"
+	CreatingClusterPhase ClusterPhase = "Creating"
+	RunningClusterPhase  ClusterPhase = "Running"
+	UpdatingClusterPhase ClusterPhase = "Updating"
+	StoppingClusterPhase ClusterPhase = "Stopping"
+	StoppedClusterPhase  ClusterPhase = "Stopped"
+	DeletingClusterPhase ClusterPhase = "Deleting"
+	FailedClusterPhase   ClusterPhase = "Failed"
+	AbnormalClusterPhase ClusterPhase = "Abnormal"
 )
 
 // ClusterComponentPhase defines the Cluster CR .status.components.phase
 // +enum
-// +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Unknown}
+// +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Abnormal}
 type ClusterComponentPhase string
 
 const (
-	CreatingClusterCompPhase        ClusterComponentPhase = "Creating"
-	RunningClusterCompPhase         ClusterComponentPhase = "Running"
-	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
-	StoppingClusterCompPhase        ClusterComponentPhase = "Stopping"
-	StoppedClusterCompPhase         ClusterComponentPhase = "Stopped"
-	DeletingClusterCompPhase        ClusterComponentPhase = "Deleting"
-	FailedClusterCompPhase          ClusterComponentPhase = "Failed"
-	UnknownClusterCompPhase         ClusterComponentPhase = "Unknown"
+	CreatingClusterCompPhase ClusterComponentPhase = "Creating"
+	RunningClusterCompPhase  ClusterComponentPhase = "Running"
+	UpdatingClusterCompPhase ClusterComponentPhase = "Updating"
+	StoppingClusterCompPhase ClusterComponentPhase = "Stopping"
+	StoppedClusterCompPhase  ClusterComponentPhase = "Stopped"
+	DeletingClusterCompPhase ClusterComponentPhase = "Deleting"
+	FailedClusterCompPhase   ClusterComponentPhase = "Failed"
+	AbnormalClusterCompPhase ClusterComponentPhase = "Abnormal"
 )
 
 const (

@@ -187,7 +187,7 @@ var _ = Describe("Replication Component", func() {
 
 			By("expect component phase is Abnormal when pod of component is not ready and component is up running")
 			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName, true)
-			Expect(phase).Should(Equal(appsv1alpha1.UnknownClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			// mock pod label is empty
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(pod *corev1.Pod) {

@@ -124,12 +124,12 @@ var _ = Describe("Stateful Component", func() {
 
 			By("expect component phase is Failed when pod of component is not ready and component is up running")
 			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, true)
-			Expect(phase).Should(Equal(appsv1alpha1.UnknownClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("expect component phase is Abnormal when pod of component is failed")
 			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, false)
-			Expect(phase).Should(Equal(appsv1alpha1.UnknownClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("test pods of deployment are ready")
 			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason, rsName)

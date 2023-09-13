@@ -432,14 +432,7 @@ func (c *componentBase) updateStatus(phaseTransitionMsg string, updatefn func(st
 		return nil
 	}
 
-	if c.Cluster.Status.Components == nil {
-		c.Cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
-	}
-	if _, ok := c.Cluster.Status.Components[c.GetName()]; !ok {
-		c.Cluster.Status.Components[c.GetName()] = appsv1alpha1.ClusterComponentStatus{}
-	}
-
-	status := c.Cluster.Status.Components[c.GetName()]
+	status := c.getComponentStatus()
 	phase := status.Phase
 	err := updatefn(&status)
 	if err != nil {
@@ -457,8 +450,17 @@ func (c *componentBase) updateStatus(phaseTransitionMsg string, updatefn func(st
 	return nil
 }
 
+func (c *componentBase) getComponentStatus() appsv1alpha1.ClusterComponentStatus {
+	if c.Cluster.Status.Components == nil {
+		c.Cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
+	}
+	if _, ok := c.Cluster.Status.Components[c.GetName()]; !ok {
+		c.Cluster.Status.Components[c.GetName()] = appsv1alpha1.ClusterComponentStatus{}
+	}
+	return c.Cluster.Status.Components[c.GetName()]
+}
+
 // hasFailedAndTimedOutPod returns whether the pods of components are still failed after a PodFailedTimeout period.
-// if return true, component phase will be set to Failed/Abnormal.
 func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, time.Duration) {
 	var (
 		hasTimedOutPod bool

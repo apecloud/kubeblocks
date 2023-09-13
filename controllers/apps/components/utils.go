@@ -149,7 +149,7 @@ func GetClusterByObject(ctx context.Context,
 func IsFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
 	return slices.Index([]appsv1alpha1.ClusterComponentPhase{
 		appsv1alpha1.FailedClusterCompPhase,
-		appsv1alpha1.UnknownClusterCompPhase}, phase) != -1
+		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
 }
 
 // getComponentMatchLabels gets the labels for matching the cluster component
@@ -417,7 +417,7 @@ func getCompPhaseByConditions(existLatestRevisionFailedPod bool,
 	}
 	// checks if expected replicas number of component is consistent with the number of available workload replicas.
 	if !availableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
-		return appsv1alpha1.UnknownClusterCompPhase
+		return appsv1alpha1.AbnormalClusterCompPhase
 	}
 	return ""
 }
@@ -814,8 +814,8 @@ func updateCustomLabelToObjs(clusterName, uid, componentName string,
 	return nil
 }
 
-// isPodWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
-func isPodWithLatestRevision(ctx context.Context, cli client.Client,
+// isComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
+func isComponentPodsWithLatestRevision(ctx context.Context, cli client.Client,
 	cluster *appsv1alpha1.Cluster, rsm *workloads.ReplicatedStateMachine) (bool, error) {
 	if cluster == nil || rsm == nil {
 		return false, nil

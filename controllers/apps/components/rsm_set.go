@@ -69,7 +69,7 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	if isLatestRevision, err := isPodWithLatestRevision(ctx, r.Cli, r.Cluster, rsm); err != nil {
+	if isLatestRevision, err := isComponentPodsWithLatestRevision(ctx, r.Cli, r.Cluster, rsm); err != nil {
 		return false, err
 	} else if !isLatestRevision {
 		return false, nil
@@ -149,7 +149,7 @@ func (r *RSM) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1al
 	case isFailed:
 		return appsv1alpha1.FailedClusterCompPhase, statusMessages
 	case isAbnormal:
-		return appsv1alpha1.UnknownClusterCompPhase, statusMessages
+		return appsv1alpha1.AbnormalClusterCompPhase, statusMessages
 	default:
 		return "", statusMessages
 	}

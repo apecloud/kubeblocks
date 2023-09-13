@@ -111,12 +111,12 @@ var _ = Describe("DataScriptOps", func() {
 			compPhase = appsv1alpha1.StoppedClusterCompPhase
 		case appsv1alpha1.FailedClusterPhase:
 			compPhase = appsv1alpha1.FailedClusterCompPhase
-		case appsv1alpha1.UnknownClusterPhase:
-			compPhase = appsv1alpha1.UnknownClusterCompPhase
+		case appsv1alpha1.AbnormalClusterPhase:
+			compPhase = appsv1alpha1.AbnormalClusterCompPhase
 		case appsv1alpha1.CreatingClusterPhase:
 			compPhase = appsv1alpha1.CreatingClusterCompPhase
-		case appsv1alpha1.SpecReconcilingClusterPhase:
-			compPhase = appsv1alpha1.SpecReconcilingClusterCompPhase
+		case appsv1alpha1.UpdatingClusterPhase:
+			compPhase = appsv1alpha1.UpdatingClusterCompPhase
 		}
 
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {

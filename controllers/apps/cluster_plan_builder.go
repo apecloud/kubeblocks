@@ -369,7 +369,7 @@ func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1
 		message = fmt.Sprintf("Cluster: %s is ready, current phase is %s", cluster.Name, newPhase)
 	case appsv1alpha1.StoppedClusterPhase:
 		message = fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
-	case appsv1alpha1.FailedClusterPhase, appsv1alpha1.UnknownClusterPhase:
+	case appsv1alpha1.FailedClusterPhase, appsv1alpha1.AbnormalClusterPhase:
 		message = fmt.Sprintf("Cluster: %s is %s, check according to the components message", cluster.Name, newPhase)
 		eType = corev1.EventTypeWarning
 	}

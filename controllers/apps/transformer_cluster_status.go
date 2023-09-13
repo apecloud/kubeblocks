@@ -73,12 +73,10 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 }
 
 func (t *ClusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.Cluster) {
-	isFirstGeneration := func() bool {
-		return cluster.Generation == 1
-	}()
 	var (
-		isAllComponentWorking = true
+		isAllComponentCreating = true
 		isAllComponentRunning = true
+		isAllComponentWorking = true
 		hasComponentStopping  = false
 		isAllComponentStopped = true
 		isAllComponentFailed  = true
@@ -93,13 +91,16 @@ func (t *ClusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 	}
 	for _, status := range cluster.Status.Components {
 		phase := status.Phase
-		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase,
-			appsv1alpha1.RunningClusterCompPhase,
-			appsv1alpha1.SpecReconcilingClusterCompPhase) {
-			isAllComponentWorking = false
+		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase) {
+			isAllComponentCreating = false
 		}
 		if !isPhaseIn(phase, appsv1alpha1.RunningClusterCompPhase) {
 			isAllComponentRunning = false
+		}
+		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase,
+			appsv1alpha1.RunningClusterCompPhase,
+			appsv1alpha1.UpdatingClusterCompPhase) {
+			isAllComponentWorking = false
 		}
 		if isPhaseIn(phase, appsv1alpha1.StoppingClusterCompPhase) {
 			hasComponentStopping = true
@@ -117,10 +118,10 @@ func (t *ClusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 		if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 			t.syncClusterPhaseToRunning(cluster)
 		}
-	case isAllComponentWorking && isFirstGeneration:
+	case isAllComponentCreating:
 		cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
 	case isAllComponentWorking:
-		cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+		cluster.Status.Phase = appsv1alpha1.UpdatingClusterPhase
 	case isAllComponentStopped:
 		if cluster.Status.Phase != appsv1alpha1.StoppedClusterPhase {
 			t.syncClusterPhaseToStopped(cluster)
@@ -130,7 +131,7 @@ func (t *ClusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 	case isAllComponentFailed:
 		cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
 	default:
-		cluster.Status.Phase = appsv1alpha1.UnknownClusterPhase
+		cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
 	}
 }
 
@@ -182,7 +183,7 @@ func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *apps
 			t.notReadyCompNames[k] = struct{}{}
 		}
 		switch v.Phase {
-		case appsv1alpha1.UnknownClusterCompPhase, appsv1alpha1.FailedClusterCompPhase:
+		case appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.FailedClusterCompPhase:
 			t.notReadyCompNames[k] = struct{}{}
 		}
 	}

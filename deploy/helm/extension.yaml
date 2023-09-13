@@ -1,0 +1,55 @@
+apiVersion: kubesphere.io/v1alpha1
+name: kubeblocks
+version: 0.6.2
+displayName:
+  zh: KubeBlocks
+  en: KubeBlocks
+description:
+  zh: KubeBlocks 是一个数据库工作负载管理平台，协助开发人员和平台工程师在他们自己的K8S中有效管理各种数据库。
+  en: KubeBlocks is a platform that assists developers and platform engineers in managing various database workloads, such as MySQL, PostgreSQL, Redis, MongoDB, Kafka, and vector databases.
+category: devops
+keywords:
+  - kubernetes
+  - database
+  - streaming
+  - messsage queue
+  - paas
+  - platform
+home: https://kubeblocks.io
+sources:
+  - https://github.com/apecloud/kubeblocks
+kubeVersion: ">=1.19.0"
+ksVersion: ">=4.0.0-alpha"
+maintainers:
+  - name: "ApeCloud"
+    email: "kubeblocks@apecloud.com"
+    url: "https://kubeblocks.io"
+provider:
+  en:
+    name: "ApeCloud"
+    email: "kubeblocks@apecloud.com"
+    url: "https://kubeblocks.io/"
+icon: ./static/logo.svg
+screenshots:
+  -
+    # dependencies:
+    #   - name: frontend
+    #     tags:
+    #     - extension
+    #   - name: backend
+    #     tags:
+    #     - agent
+    # installationMode describes how to install subcharts, it can be HostOnly or Multicluster.
+    # In Multicluster mode, the subchart with tag `extension` will only be deployed to the host cluster,
+  # and the subchart with tag `agent` will be deployed to all selected clusters.
+installationMode: HostOnly
+# external dependencies example
+#externalDependencies:
+#  - name: a
+#    type: extension
+#    version: ">= 2.6.0"
+#    required: true
+#  - name: b
+#    type: extension
+#    version: ">= 2.2.0"
+#    required: true

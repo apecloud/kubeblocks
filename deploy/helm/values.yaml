@@ -1,7 +1,7 @@
 ## @section Common parameters
 ##
 
-versionOverride:
+versionOverride: 0.6.2
 
 ## KubeBlocks container image settings
 ##
@@ -16,7 +16,7 @@ image:
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "0.6.2"
   imagePullSecrets: []
   tools:
     repository: apecloud/kubeblocks-tools
@@ -370,7 +370,7 @@ addonChartsImage:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/kubeblocks-charts
   pullPolicy: IfNotPresent
-  tag: ""
+  tag: "0.6.2"
   chartsPath: /charts
 
 ## @param addonHelmInstallOptions - addon helm install options.

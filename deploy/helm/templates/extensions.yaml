@@ -1,0 +1,10 @@
+apiVersion: extensions.kubesphere.io/v1alpha1
+kind: APIService
+metadata:
+  name: v1alpha1.kubeblocks.kubesphere.io
+spec:
+  group: KubeBlocks.kubesphere.io
+  version: v1alpha1
+  url: http://{{ include "kubeblocks.name" . }}.{{ include "kubeblocks.namespace" . }}.svc
+status:
+  state: Available

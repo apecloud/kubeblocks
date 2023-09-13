@@ -1,0 +1,1 @@
+KubeBlocks是一个开源的Kubernetes operator，用于管理在公共云或本地部署的各类数据库。KubeBlocks为生产环境而设计，提供可靠、高性能、可观察性和成本效益的数据基础设施，适用于大多数情景。KubeBlocks帮您实现像搭积木一样在Kubernetes上高效又愉快地构建数据基础设施。

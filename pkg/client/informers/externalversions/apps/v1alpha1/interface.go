@@ -40,6 +40,8 @@ type Interface interface {
 	ConfigConstraints() ConfigConstraintInformer
 	// OpsRequests returns a OpsRequestInformer.
 	OpsRequests() OpsRequestInformer
+	// ServiceDescriptors returns a ServiceDescriptorInformer.
+	ServiceDescriptors() ServiceDescriptorInformer
 }
 
 type version struct {
@@ -91,4 +93,9 @@ func (v *version) ConfigConstraints() ConfigConstraintInformer {
 // OpsRequests returns a OpsRequestInformer.
 func (v *version) OpsRequests() OpsRequestInformer {
 	return &opsRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ServiceDescriptors returns a ServiceDescriptorInformer.
+func (v *version) ServiceDescriptors() ServiceDescriptorInformer {
+	return &serviceDescriptorInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

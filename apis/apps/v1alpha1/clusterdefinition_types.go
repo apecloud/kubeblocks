@@ -270,6 +270,36 @@ type ProtectedVolume struct {
 	HighWatermark *int `json:"highWatermark,omitempty"`
 }
 
+type ServiceRefDeclaration struct {
+	// The name of the service reference declaration.
+	// The service reference can come from an external service that is not part of KubeBlocks, or services provided by other KubeBlocks Cluster objects.
+	// The specific type of service reference depends on the binding declaration when creates a Cluster.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// serviceRefDeclarationSpecs is a collection of service descriptions for a service reference declaration.
+	// Each ServiceRefDeclarationSpec defines a service Kind and Version. When multiple ServiceRefDeclarationSpecs are defined,
+	// it indicates that the ServiceRefDeclaration can be any one of the specified ServiceRefDeclarationSpecs.
+	// For example, when the ServiceRefDeclaration is declared to require an OLTP database, which can be either MySQL or PostgreSQL,
+	// you can define a ServiceRefDeclarationSpec for MySQL and another ServiceRefDeclarationSpec for PostgreSQL,
+	// when referencing the service within the cluster, as long as the serviceKind and serviceVersion match either MySQL or PostgreSQL, it can be used.
+	// +kubebuilder:validation:Required
+	ServiceRefDeclarationSpecs []ServiceRefDeclarationSpec `json:"serviceRefDeclarationSpecs"`
+}
+
+type ServiceRefDeclarationSpec struct {
+	// service kind, indicating the type or nature of the service. It should be well-known application cluster type, e.g. {mysql, redis, mongodb}.
+	// The serviceKind is case-insensitive and supports abbreviations for some well-known databases.
+	// For example, both 'zk' and 'zookeeper' will be considered as a ZooKeeper cluster, and 'pg', 'postgres', 'postgresql' will all be considered as a PostgreSQL cluster.
+	// +kubebuilder:validation:Required
+	ServiceKind string `json:"serviceKind"`
+
+	// The service version of the service reference. It is a regular expression that matches a version number pattern.
+	// For example, `^8.0.8$`, `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`
+	// +kubebuilder:validation:Required
+	ServiceVersion string `json:"serviceVersion"`
+}
+
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
@@ -410,6 +440,10 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=componentDefName
 	// +optional
 	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
+
+	// serviceRefDeclarations is used to declare the service reference of the current component.
+	// +optional
+	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -1085,7 +1119,7 @@ type ComponentValueFrom struct {
 	// +optional
 	FieldPath string `json:"fieldPath,omitempty"`
 	// format is the format of each headless service address.
-	// there are three builtin variables can be used as placerholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
+	// there are three builtin variables can be used as placeholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
 	// $POD_ORDINAL is the ordinal of the pod.
 	// $POD_FQDN is the fully qualified domain name of the pod.
 	// $POD_NAME is the name of the pod

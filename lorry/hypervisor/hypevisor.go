@@ -36,7 +36,7 @@ var hypervisor *Hypervisor
 
 func NewHypervisor(logger logger.Logger) (*Hypervisor, error) {
 	args := pflag.Args()
-	daemon, err := NewDeamon(args, logger)
+	daemon, err := NewDaemon(args, logger)
 	if err != nil {
 		return nil, err
 	}

@@ -45,7 +45,7 @@ type Daemon struct {
 	Logger  logger.Logger
 }
 
-func NewDeamon(args []string, logger logger.Logger) (*Daemon, error) {
+func NewDaemon(args []string, logger logger.Logger) (*Daemon, error) {
 	argCount := len(args)
 
 	if argCount == 0 {

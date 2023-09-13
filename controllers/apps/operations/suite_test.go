@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"path/filepath"
 	"testing"
 	"time"
@@ -99,6 +100,8 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = workloads.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

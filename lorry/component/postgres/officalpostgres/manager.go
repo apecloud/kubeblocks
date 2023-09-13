@@ -440,7 +440,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 
 	if len(history.History) != 0 {
 		// use a boolean value to check if the loop should exit early
-		flag := false
+		exitFlag := false
 		for _, h := range history.History {
 			// Don't need to rewind just when:
 			// for replica: replayed location is not ahead of switchpoint
@@ -454,15 +454,15 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 				default:
 					// TODO:get checkpoint end
 				}
-				flag = true
+				exitFlag = true
 				break
 			} else if h.ParentTimeline > localTimeLine {
 				needRewind = true
-				flag = true
+				exitFlag = true
 				break
 			}
 		}
-		if !flag {
+		if !exitFlag {
 			needRewind = true
 		}
 	}

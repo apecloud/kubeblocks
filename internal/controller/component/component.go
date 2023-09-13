@@ -288,7 +288,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 
 	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
 	if err = buildProbeContainers(reqCtx, component); err != nil {
-		reqCtx.Log.Error(err, "build probe container failed.")
+		reqCtx.Log.Error(err, "build lorry container failed.")
 		return nil, err
 	}
 

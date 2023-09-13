@@ -321,8 +321,9 @@ var _ = Describe("Cluster Controller", func() {
 			for i, v := range expects {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
 				if isStatefulSet(v) {
-					container := clusterDef.Spec.ComponentDefs[0].PodSpec.Containers[0]
 					sts := resources[i].(*appsv1.StatefulSet)
+					container := component.PodSpec.Containers[0]
+
 					Expect(len(sts.Spec.Template.Spec.Volumes)).Should(Equal(len(container.VolumeMounts)))
 				}
 			}

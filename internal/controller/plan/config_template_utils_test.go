@@ -321,7 +321,7 @@ var _ = Describe("generate service descriptor", func() {
 				Namespace: configMap.Namespace}, configMap)).Should(Succeed())
 
 			var v Visitor = &ComponentVisitor{component: component}
-			err = v.Visit(resolveServiceReferences(k8sClient, ctx, namespace))
+			err = v.Visit(resolveServiceReferences(k8sClient, ctx))
 			Expect(err).Should(Succeed())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))

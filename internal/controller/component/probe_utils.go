@@ -132,6 +132,10 @@ func buildProbeInitContainer(component *SynthesizedComponent, container *corev1.
 }
 
 func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+	if len(component.PodSpec.Containers) == 0 {
+		return
+	}
+
 	container := component.PodSpec.Containers[0]
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 	command := []string{"/kubeblocks/lorry", "--app-id", "lorry",

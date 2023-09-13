@@ -86,7 +86,7 @@ var _ = Describe("probe_utils", func() {
 				RoleProbe:    &appsv1alpha1.ClusterDefinitionProbe{},
 			}
 			component.PodSpec = &corev1.PodSpec{
-				Containers: []corev1.Container{},
+				Containers: []corev1.Container{{}},
 			}
 		})
 
@@ -96,7 +96,7 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
 			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})
 
@@ -139,7 +139,7 @@ var _ = Describe("probe_utils", func() {
 				},
 			}
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(5))
 		})
 
 		It("build volume protection probe container with RBAC", func() {
@@ -162,7 +162,7 @@ var _ = Describe("probe_utils", func() {
 			}
 			viper.SetDefault(constant.EnableRBACManager, true)
 			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
+			Expect(len(component.PodSpec.Containers)).Should(Equal(5))
 			spec := &appsv1alpha1.VolumeProtectionSpec{}
 			for _, e := range component.PodSpec.Containers[0].Env {
 				if e.Name == constant.KBEnvVolumeProtectionSpec {

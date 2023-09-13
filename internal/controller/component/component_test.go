@@ -132,7 +132,7 @@ var _ = Describe("component module", func() {
 				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
-			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
+			Expect(len(component.PodSpec.InitContainers)).Should(Equal(2))
 		})
 
 		It("should auto fill first component if it's empty", func() {

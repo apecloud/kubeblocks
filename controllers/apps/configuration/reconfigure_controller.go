@@ -246,6 +246,8 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 	}
 
 	returnedStatus, err := policy.Upgrade(params)
+	// TODO delete callback
+	// Replace sync status with configuration.status
 	if err := r.handleConfigEvent(params, core.PolicyExecStatus{
 		PolicyName:    policy.GetPolicyName(),
 		ExecStatus:    string(returnedStatus.Status),
@@ -255,7 +257,7 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
 	}
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
+		params.Ctx.Log.Error(err, "failed to update engine parameters")
 	}
 
 	switch returnedStatus.Status {
@@ -264,9 +266,11 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
 		params.Ctx.Recorder.Eventf(params.ConfigMap,
-			corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureSucceed,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureSucceed,
 			"the reconfigure[%s] request[%s] has been processed successfully",
-			policy.GetPolicyName(), getOpsRequestID(params.ConfigMap))
+			policy.GetPolicyName(),
+			getOpsRequestID(params.ConfigMap))
 		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
 	case ESFailed:
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {

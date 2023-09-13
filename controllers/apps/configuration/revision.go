@@ -53,7 +53,7 @@ func GcRevision(annotations map[string]string) []ConfigurationRevision {
 		return nil
 	}
 
-	return revisions[:len(revisions)-revisionHistoryLimit]
+	return revisions[0 : len(revisions)-revisionHistoryLimit]
 }
 
 func RetrieveRevision(annotations map[string]string) []ConfigurationRevision {

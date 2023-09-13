@@ -29,6 +29,7 @@ Manage alert receiver, include add, list and delete receiver.
 
 Backup command.
 
+* [kbcli backup create](kbcli_backup_create.md)	 - Create a backup for the cluster.
 * [kbcli backup list](kbcli_backup_list.md)	 - List backups.
 
 

@@ -69,6 +69,7 @@ func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 	o.AddFlags(cmd, true)
 	cmd.Flags().StringVar(&o.cluster, "cluster", "", "List backups in the specified cluster")
+	util.RegisterClusterCompletionFunc(cmd, f)
 
 	return cmd
 }

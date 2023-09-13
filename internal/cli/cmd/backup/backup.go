@@ -32,8 +32,8 @@ func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 	cmd.AddCommand(
 		newListCommand(f, streams),
-		//newCreateCommand(nil, f, streams),
-		//newDeleteCommand(nil, f, streams),
+		newCreateCommand(f, streams),
+		//newDeleteCommand(f, streams),
 		//newDescribeCmd(f, streams),
 	)
 	return cmd

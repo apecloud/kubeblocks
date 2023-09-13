@@ -2644,12 +2644,6 @@ var _ = Describe("Cluster Controller", func() {
 					testk8s.MockRSMReady(&rsm, mockPods...)
 				})).ShouldNot(HaveOccurred())
 				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-
-				By("the restore container has been removed from init containers")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
-					g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-				})).Should(Succeed())
-
 			} else {
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 				sts := stsList.Items[0]
@@ -2659,11 +2653,6 @@ var _ = Describe("Cluster Controller", func() {
 					testk8s.MockStatefulSetReady(&sts)
 				})).ShouldNot(HaveOccurred())
 				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-
-				By("the restore container has been removed from init containers")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-					g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-				})).Should(Succeed())
 			}
 
 			By("clean up annotations after cluster running")

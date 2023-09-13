@@ -613,6 +613,10 @@ func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
+
+	for i := range pobj.InitContainers {
+		delayUpdateKubeBlocksToolsImage(obj.InitContainers, &pobj.InitContainers[i])
+	}
 }
 
 // updatePodSpecSystemFields to update system fields in pod spec.

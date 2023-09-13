@@ -106,8 +106,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	initContainer := container.DeepCopy()
 	buildProbeInitContainer(component, initContainer)
+
 	modifyMainContainerForProbe(component, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
-	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, *initContainer)
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
 		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
@@ -127,6 +127,8 @@ func buildProbeInitContainer(component *SynthesizedComponent, container *corev1.
 	container.ReadinessProbe = nil
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
 	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
+
+	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, *container)
 }
 
 func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPort int, probeSvcGRPCPort int) {
@@ -143,11 +145,12 @@ func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPo
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_SERVICE_ROLES",
-		Value:     string(rolesJSON),
-		ValueFrom: nil,
-	},
+	container.Env = append(container.Env,
+		corev1.EnvVar{
+			Name:      constant.KBPrefix + "_SERVICE_ROLES",
+			Value:     string(rolesJSON),
+			ValueFrom: nil,
+		},
 		corev1.EnvVar{
 			Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
 			Value:     component.CharacterType,
@@ -164,7 +167,18 @@ func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPo
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{Key: "password", LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"}},
 			},
-		})
+		},
+		corev1.EnvVar{
+			Name:      constant.KBEnvCharacterType,
+			Value:     component.CharacterType,
+			ValueFrom: nil,
+		},
+		corev1.EnvVar{
+			Name:      constant.KBEnvWorkloadType,
+			Value:     string(component.WorkloadType),
+			ValueFrom: nil,
+		},
+	)
 
 	if volumeProtectionEnabled(component) {
 		container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
@@ -214,6 +228,9 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	// 	"--log-level", logLevel,
 	// 	"--config", "/config/lorry/config.yaml",
 	// 	"--components-path", "/config/lorry/components"}
+
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 	if len(component.PodSpec.Containers) > 0 {
 		mainContainer := component.PodSpec.Containers[0]

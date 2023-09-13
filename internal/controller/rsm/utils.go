@@ -674,6 +674,7 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	for _, status := range membersStatus {
 		if status.IsLeader {
 			hasLeader = true
+			break
 		}
 	}
 	return hasLeader

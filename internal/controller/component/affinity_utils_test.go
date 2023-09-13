@@ -94,6 +94,7 @@ var _ = Describe("affinity utils", func() {
 				clusterDefObj,
 				&clusterDefObj.Spec.ComponentDefs[0],
 				&clusterObj.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersionObj.Spec.ComponentVersions[0],
 			)
 		}

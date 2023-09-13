@@ -33,3 +33,5 @@ type ComponentResourceConstraintExpansion interface{}
 type ConfigConstraintExpansion interface{}
 
 type OpsRequestExpansion interface{}
+
+type ServiceDescriptorExpansion interface{}

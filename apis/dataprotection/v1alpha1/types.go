@@ -22,6 +22,11 @@ import (
 	"time"
 )
 
+const (
+	// DataProtectionFinalizerName is the name of our custom finalizer
+	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
+)
+
 // BackupType the backup type.
 // +enum
 // +kubebuilder:validation:Enum={Full,Continuous}

@@ -72,7 +72,7 @@ package dataprotection
 //	}
 //
 //	// handle finalizer
-//	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupTool, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+//	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupTool, DataProtectionFinalizerName, func() (*ctrl.Result, error) {
 //		return nil, r.deleteExternalResources(reqCtx, backupTool)
 //	})
 //	if res != nil {

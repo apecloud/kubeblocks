@@ -173,22 +173,8 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 			PodSpec:      podSpec,
 			BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
 		}, nil
-	case dpv1alpha1.BackupTypeContinuous:
-		replicas := int32(1)
-		podSpec.RestartPolicy = corev1.RestartPolicyAlways
-		return &action.StsAction{
-			Name: "backupdata",
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: r.Backup.Namespace,
-				Name:      r.Backup.Name,
-				Labels:    BuildBackupWorkloadLabels(r.Backup),
-			},
-			Owner:    r.Backup,
-			PodSpec:  podSpec,
-			Replicas: &replicas,
-		}, nil
 	}
-	return nil, fmt.Errorf("unknown backup type %s", r.ActionSet.Spec.BackupType)
+	return nil, fmt.Errorf("unsupported backup type %s", r.ActionSet.Spec.BackupType)
 }
 
 func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {

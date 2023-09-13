@@ -30,6 +30,5 @@ func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType) {
 			return true, c.Type
 		}
 	}
-
 	return false, ""
 }

@@ -171,3 +171,25 @@ func buildBackupJobObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.Obj
 func buildBackupInfoENV(backupDestinationPath string) string {
 	return types.BackupPathBase + backupDestinationPath + "/backup.info"
 }
+
+func injectBackupVolumeMount(
+	pvcName string,
+	podSpec *corev1.PodSpec,
+	container *corev1.Container) {
+	// TODO(ldm): mount multi remote backup volumes
+	remoteVolumeName := fmt.Sprintf("backup-%s", pvcName)
+	remoteVolume := corev1.Volume{
+		Name: remoteVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvcName,
+			},
+		},
+	}
+	remoteVolumeMount := corev1.VolumeMount{
+		Name:      remoteVolumeName,
+		MountPath: types.BackupPathBase,
+	}
+	podSpec.Volumes = append(podSpec.Volumes, remoteVolume)
+	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
+}

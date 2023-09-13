@@ -210,36 +210,12 @@ func sendWarningEventForError(recorder record.EventRecorder, backup *dpv1alpha1.
 	}
 }
 
-// cropJobName job name cannot exceed 63 characters for label name limit.
-func cropJobName(jobName string) string {
-	if len(jobName) > 63 {
-		return jobName[:63]
-	}
-	return jobName
-}
-
-func buildBackupInfoENV(backupDestinationPath string) string {
-	return backupPathBase + backupDestinationPath + "/backup.info"
-}
-
 func generateUniqueNameWithBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) string {
 	uniqueName := backupPolicy.Name
 	if len(backupPolicy.OwnerReferences) > 0 {
 		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
 	}
 	return uniqueName
-}
-
-func generateUniqueJobName(backup *dpv1alpha1.Backup, prefix string) string {
-	return cropJobName(fmt.Sprintf("%s-%s-%s", prefix, backup.UID[:8], backup.Name))
-}
-
-func buildDeleteBackupFilesJobNamespacedName(backup *dpv1alpha1.Backup) types.NamespacedName {
-	jobName := fmt.Sprintf("%s-%s%s", backup.UID[:8], deleteBackupFilesJobNamePrefix, backup.Name)
-	if len(jobName) > 63 {
-		jobName = jobName[:63]
-	}
-	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
 }
 
 func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.BackupRepo, error) {

@@ -72,6 +72,7 @@ var _ = Describe("generate service descriptor", func() {
 
 	var (
 		namespace                        = "default"
+		notDefaultNamespace              = "notDefault"
 		clusterName                      = "mycluster"
 		beReferencedClusterName          = "mycluster-be-referenced"
 		clusterDefName                   = "test-clusterdef"
@@ -224,7 +225,7 @@ var _ = Describe("generate service descriptor", func() {
 				mysqlServiceRefDeclarationName: {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      externalServiceDescriptorName,
-						Namespace: namespace,
+						Namespace: notDefaultNamespace,
 					},
 					Spec: appsv1alpha1.ServiceDescriptorSpec{
 						ServiceKind:    externalServiceDescriptorKind,
@@ -307,7 +308,7 @@ var _ = Describe("generate service descriptor", func() {
 			configMap := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      configMapRefName,
-					Namespace: namespace,
+					Namespace: notDefaultNamespace,
 				},
 				Data: map[string]string{
 					constant.ServiceDescriptorPasswordKey: serviceRefPasswordValue,
@@ -321,9 +322,10 @@ var _ = Describe("generate service descriptor", func() {
 				Namespace: configMap.Namespace}, configMap)).Should(Succeed())
 
 			var v Visitor = &ComponentVisitor{component: component}
-			err = v.Visit(resolveServiceReferences(k8sClient, ctx, namespace))
+			err = v.Visit(resolveServiceReferences(k8sClient, ctx))
 			Expect(err).Should(Succeed())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Namespace).Should(Equal(namespace))
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
@@ -333,6 +335,7 @@ var _ = Describe("generate service descriptor", func() {
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
 
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Namespace).Should(Equal(notDefaultNamespace))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))

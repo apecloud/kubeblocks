@@ -75,11 +75,11 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 func (t *ClusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.Cluster) {
 	var (
 		isAllComponentCreating = true
-		isAllComponentRunning = true
-		isAllComponentWorking = true
-		hasComponentStopping  = false
-		isAllComponentStopped = true
-		isAllComponentFailed  = true
+		isAllComponentRunning  = true
+		isAllComponentWorking  = true
+		hasComponentStopping   = false
+		isAllComponentStopped  = true
+		isAllComponentFailed   = true
 	)
 	isPhaseIn := func(phase appsv1alpha1.ClusterComponentPhase, phases ...appsv1alpha1.ClusterComponentPhase) bool {
 		for _, p := range phases {

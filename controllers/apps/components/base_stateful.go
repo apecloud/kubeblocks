@@ -170,9 +170,6 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	isDeleting := func() bool {
 		return !c.runningWorkload.DeletionTimestamp.IsZero()
 	}()
-	isFirstGeneration := func() bool {
-		return c.runningWorkload.Generation == 1
-	}()
 	isZeroReplica := func() bool {
 		return (c.runningWorkload.Spec.Replicas == nil || *c.runningWorkload.Spec.Replicas == 0) && c.Component.Replicas == 0
 	}()

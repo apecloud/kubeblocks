@@ -261,7 +261,7 @@ func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.Cluste
 				Ctx: transCtx.Context,
 				Log: log.Log.WithName("rbac"),
 			}
-			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil)
+			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil, nil)
 			if err != nil {
 				return nil, err
 			}

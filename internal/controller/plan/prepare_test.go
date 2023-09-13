@@ -254,6 +254,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -303,6 +304,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0],
 			)
 			Expect(err).Should(Succeed())
@@ -367,6 +369,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -428,6 +431,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -494,6 +498,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
@@ -550,6 +555,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 

@@ -40,9 +40,10 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, clsMgr, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, clsMgr, cluster, clusterDef, clusterCompDef, clusterCompSpec, serviceReferences, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
@@ -53,6 +54,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 	hasSimplifiedAPI := func() bool {
@@ -298,6 +300,11 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.Error(err, "failed to merge componentRef")
 		return nil, err
 	}
+
+	if serviceReferences != nil {
+		component.ServiceReferences = serviceReferences
+	}
+
 	return component, nil
 }
 
@@ -438,6 +445,10 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 
 func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
+}
+
+func GenerateDefaultServiceDescriptorName(clusterName string) string {
+	return fmt.Sprintf("kbsd-%s", GenerateConnCredential(clusterName))
 }
 
 // overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.

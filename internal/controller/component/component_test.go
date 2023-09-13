@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -92,6 +91,7 @@ var _ = Describe("component module", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -106,6 +106,7 @@ var _ = Describe("component module", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -118,6 +119,7 @@ var _ = Describe("component module", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
@@ -130,6 +132,7 @@ var _ = Describe("component module", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(2))
@@ -159,6 +162,7 @@ var _ = Describe("component module", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -172,6 +176,7 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[1],
+				nil,
 				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
@@ -195,6 +200,7 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
+				nil,
 				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
@@ -225,6 +231,7 @@ var _ = Describe("component module", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -239,6 +246,7 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
+				nil,
 				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
@@ -267,6 +275,7 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
+				nil,
 				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
@@ -308,7 +317,7 @@ var _ = Describe("component module", func() {
 			for _, env := range mockEnvs {
 				Expect(env.ValueFrom).ShouldNot(BeNil())
 				Expect(env.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(fmt.Sprintf("%s-conn-credential", cluster.Name)))
+				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(GenerateConnCredential(cluster.Name)))
 			}
 		})
 
@@ -327,9 +336,53 @@ var _ = Describe("component module", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).Should(BeNil())
+		})
+
+		It("build serviceReference correctly", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			const (
+				name    = "nginx"
+				ns      = "default"
+				kind    = "mock-kind"
+				version = "mock-version"
+			)
+			By("generate serviceReference")
+			serviceDescriptor := &appsv1alpha1.ServiceDescriptor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: ns,
+				},
+				Spec: appsv1alpha1.ServiceDescriptorSpec{
+					ServiceKind:    kind,
+					ServiceVersion: version,
+				},
+			}
+			serviceReferenceMap := map[string]*appsv1alpha1.ServiceDescriptor{
+				testapps.NginxImage: serviceDescriptor,
+			}
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				nil,
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
+				serviceReferenceMap,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.ServiceReferences).ShouldNot(BeNil())
+			Expect(component.ServiceReferences[testapps.NginxImage].Name).Should(Equal(name))
+			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceKind).Should(Equal(kind))
+			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceVersion).Should(Equal(version))
 		})
 	})
 })

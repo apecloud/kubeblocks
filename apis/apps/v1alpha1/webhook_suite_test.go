@@ -153,6 +153,9 @@ var _ = BeforeSuite(func() {
 	err = (&OpsRequest{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = (&ServiceDescriptor{}).SetupWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	RegisterWebhookManager(mgr)
 
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)

@@ -48,6 +48,10 @@ func (c *FakeAppsV1alpha1) ComponentClassDefinitions() v1alpha1.ComponentClassDe
 	return &FakeComponentClassDefinitions{c}
 }
 
+func (c *FakeAppsV1alpha1) ComponentDefinitions() v1alpha1.ComponentDefinitionInterface {
+	return &FakeComponentDefinitions{c}
+}
+
 func (c *FakeAppsV1alpha1) ComponentResourceConstraints() v1alpha1.ComponentResourceConstraintInterface {
 	return &FakeComponentResourceConstraints{c}
 }

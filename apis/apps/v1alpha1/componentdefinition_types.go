@@ -37,7 +37,7 @@ import (
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ComponentDefinition is the schema for the component definitions API.
+// ComponentDefinition is the Schema for the componentdefinitions API
 type ComponentDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -46,7 +46,7 @@ type ComponentDefinition struct {
 	Status ComponentDefinitionStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+//+kubebuilder:object:root=true
 
 // ComponentDefinitionList contains a list of ComponentDefinition
 type ComponentDefinitionList struct {
@@ -62,12 +62,6 @@ func init() {
 // ComponentDefinitionSpec provides a workload component specification, with attributes that strongly work with
 // stateful workloads and day-2 operations behaviors.
 type ComponentDefinitionSpec struct {
-	// Name of the component. It will apply to "apps.kubeblocks.io/component-name" object label value.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
 	// Version of the component.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
@@ -213,12 +207,12 @@ type ComponentDefinitionSpec struct {
 
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition
 type ComponentDefinitionStatus struct {
-	// observedGeneration is the most recent generation observed for this ComponentDefinition.
+	// ObservedGeneration is the most recent generation observed for this ComponentDefinition.
 	// It corresponds to the ComponentDefinition's generation, which is updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase valid values are ``, `Available`, 'Unavailable`.
+	// Phase valid values are ``, `Available`, 'Unavailable`.
 	// Available is ComponentDefinition become available, and can be referenced for co-related objects.
 	Phase Phase `json:"phase,omitempty"`
 }

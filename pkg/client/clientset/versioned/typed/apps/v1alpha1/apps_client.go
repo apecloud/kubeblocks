@@ -33,6 +33,7 @@ type AppsV1alpha1Interface interface {
 	ClusterDefinitionsGetter
 	ClusterVersionsGetter
 	ComponentClassDefinitionsGetter
+	ComponentDefinitionsGetter
 	ComponentResourceConstraintsGetter
 	ConfigConstraintsGetter
 	OpsRequestsGetter
@@ -62,6 +63,10 @@ func (c *AppsV1alpha1Client) ClusterVersions() ClusterVersionInterface {
 
 func (c *AppsV1alpha1Client) ComponentClassDefinitions() ComponentClassDefinitionInterface {
 	return newComponentClassDefinitions(c)
+}
+
+func (c *AppsV1alpha1Client) ComponentDefinitions() ComponentDefinitionInterface {
+	return newComponentDefinitions(c)
 }
 
 func (c *AppsV1alpha1Client) ComponentResourceConstraints() ComponentResourceConstraintInterface {

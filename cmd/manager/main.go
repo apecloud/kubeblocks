@@ -308,6 +308,14 @@ func main() {
 			os.Exit(1)
 		}
 
+		if err = (&appscontrollers.ComponentDefinitionReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ComponentDefinition")
+			os.Exit(1)
+		}
+
 		if err = (&appscontrollers.OpsRequestReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -431,6 +439,11 @@ func main() {
 
 		if err = (&appsv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterVersion")
+			os.Exit(1)
+		}
+
+		if err = (&appsv1alpha1.ComponentDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentDefinition")
 			os.Exit(1)
 		}
 

@@ -34,6 +34,8 @@ type Interface interface {
 	ClusterVersions() ClusterVersionInformer
 	// ComponentClassDefinitions returns a ComponentClassDefinitionInformer.
 	ComponentClassDefinitions() ComponentClassDefinitionInformer
+	// ComponentDefinitions returns a ComponentDefinitionInformer.
+	ComponentDefinitions() ComponentDefinitionInformer
 	// ComponentResourceConstraints returns a ComponentResourceConstraintInformer.
 	ComponentResourceConstraints() ComponentResourceConstraintInformer
 	// ConfigConstraints returns a ConfigConstraintInformer.
@@ -78,6 +80,11 @@ func (v *version) ClusterVersions() ClusterVersionInformer {
 // ComponentClassDefinitions returns a ComponentClassDefinitionInformer.
 func (v *version) ComponentClassDefinitions() ComponentClassDefinitionInformer {
 	return &componentClassDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ComponentDefinitions returns a ComponentDefinitionInformer.
+func (v *version) ComponentDefinitions() ComponentDefinitionInformer {
+	return &componentDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ComponentResourceConstraints returns a ComponentResourceConstraintInformer.

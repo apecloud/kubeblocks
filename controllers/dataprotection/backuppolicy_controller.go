@@ -100,7 +100,7 @@ package dataprotection
 //	originBackupPolicy := backupPolicy.DeepCopy()
 //
 //	// handle finalizer
-//	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupPolicy, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+//	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backupPolicy, DataProtectionFinalizerName, func() (*ctrl.Result, error) {
 //		return nil, r.deleteExternalResources(reqCtx, backupPolicy)
 //	})
 //	if res != nil {
@@ -426,7 +426,7 @@ package dataprotection
 //		return nil, err
 //	}
 //
-//	controllerutil.AddFinalizer(cronjob, dataProtectionFinalizerName)
+//	controllerutil.AddFinalizer(cronjob, DataProtectionFinalizerName)
 //
 //	// set labels
 //	for k, v := range backupPolicy.Labels {
@@ -442,7 +442,7 @@ package dataprotection
 //
 //func (r *BackupPolicyReconciler) removeCronJobFinalizer(reqCtx intctrlutil.RequestCtx, cronjob *batchv1.CronJob) error {
 //	patch := client.MergeFrom(cronjob.DeepCopy())
-//	controllerutil.RemoveFinalizer(cronjob, dataProtectionFinalizerName)
+//	controllerutil.RemoveFinalizer(cronjob, DataProtectionFinalizerName)
 //	return r.Patch(reqCtx.Ctx, cronjob, patch)
 //}
 //

@@ -36,7 +36,8 @@ const (
 
 const (
 	// name of our custom finalizer
-	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
+	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
+
 	// settings keys
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 

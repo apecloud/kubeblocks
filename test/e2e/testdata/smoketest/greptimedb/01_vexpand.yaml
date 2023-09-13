@@ -6,7 +6,7 @@ spec:
   clusterRef: greptimedb-cluster
   type: VolumeExpansion
   volumeExpansion:
-    - componentName: nebula-metad
+    - componentName: datanode
       volumeClaimTemplates:
         - name: datanode
           storage: "15Gi"

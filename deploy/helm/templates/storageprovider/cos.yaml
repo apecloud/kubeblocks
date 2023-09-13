@@ -1,8 +1,8 @@
-# obs is a storage provider for [Huawei OBS](https://www.huaweicloud.com/product/obs.html) object storage.
+# cos is a storage provider for [Tencent Cloud Object Storage](https://cloud.tencent.com/product/cos)
 apiVersion: storage.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
-  name: obs
+  name: cos
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
@@ -13,7 +13,7 @@ spec:
     {{ `{{- $region := index .Parameters "region" }}` }}
     {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
     {{ `{{- if not $endpoint }}` }}
-      {{ `{{- $endpoint = (printf "https://obs.%s.myhuaweicloud.com" $region) }}` }}
+      {{ `{{- $endpoint = (printf "https://cos.%s.myqcloud.com" $region) }}` }}
     {{ `{{- end }}` }}
     endpoint: {{ `{{ $endpoint }}` }}
 
@@ -39,22 +39,22 @@ spec:
       properties:
         region:
           type: string
-          description: "OBS region, e.g. cn-north-4"
+          description: "COS region, e.g. cn-guangzhou"
         bucket:
           type: string
-          description: "OBS bucket"
+          description: "COS bucket"
         endpoint:
           type: string
-          description: "OBS endpoint (optional)"
+          description: "COS endpoint (optional)"
         mountOptions:
           type: string
           description: "mount options for geesefs"
         accessKeyId:
           type: string
-          description: "OBS access key"
+          description: "COS access key"
         secretAccessKey:
           type: string
-          description: "OBS secret key"
+          description: "COS secret key"
 
       required:
         - bucket

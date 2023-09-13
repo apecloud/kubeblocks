@@ -186,21 +186,6 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Clust
 	return newCMObj, nil
 }
 
-func needRerender(obj *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
-	if obj == nil {
-		return true
-	}
-	if item.Version == "" {
-		return false
-	}
-
-	version, ok := obj.Annotations[constant.CMConfigurationTemplateVersion]
-	if !ok || version != item.Version {
-		return true
-	}
-	return false
-}
-
 func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
 	localObjs []client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()

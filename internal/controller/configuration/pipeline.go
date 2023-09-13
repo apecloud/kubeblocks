@@ -379,6 +379,7 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 		hash, _ := cfgutil.ComputeHash(p.newCM.Data)
 		annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
 		annotations[constant.ConfigurationRevision] = revision
+		annotations[constant.CMConfigurationTemplateVersion] = p.item.Version
 		// delete disable reconcile annotation
 		if _, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]; ok {
 			annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(false)
@@ -420,4 +421,19 @@ func (p *updatePipeline) SyncStatus() *updatePipeline {
 		p.itemStatus.Phase = appsv1alpha1.CMergedPhase
 		return
 	})
+}
+
+func needRerender(obj *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
+	if obj == nil {
+		return true
+	}
+	if item.Version == "" {
+		return false
+	}
+
+	version, ok := obj.Annotations[constant.CMConfigurationTemplateVersion]
+	if !ok || version != item.Version {
+		return true
+	}
+	return false
 }

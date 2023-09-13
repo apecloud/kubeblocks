@@ -8,6 +8,19 @@ Create a backup for the cluster.
 kbcli backup create NAME [flags]
 ```
 
+### Examples
+
+```
+  # Create a backup for the cluster
+  kbcli backup create mybackup --cluster mycluster
+  
+  # create a snapshot backup
+  kbcli backup create mybackup --cluster mycluster --type snapshot
+  
+  # create a backup with specified policy
+  kbcli backup create mybackup --cluster mycluster --policy mypolicy
+```
+
 ### Options
 
 ```

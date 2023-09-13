@@ -134,14 +134,14 @@ type ListBackupOptions struct {
 	BackupName string
 }
 
-type describeBackupOptions struct {
-	factory   cmdutil.Factory
+type DescribeBackupOptions struct {
+	Factory   cmdutil.Factory
 	client    clientset.Interface
 	dynamic   dynamic.Interface
 	namespace string
 
 	// resource type and names
-	gvr   schema.GroupVersionResource
+	Gvr   schema.GroupVersionResource
 	names []string
 
 	genericclioptions.IOStreams
@@ -352,10 +352,10 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 }
 
 func NewDescribeBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &describeBackupOptions{
-		factory:   f,
+	o := &DescribeBackupOptions{
+		Factory:   f,
 		IOStreams: streams,
-		gvr:       types.BackupGVR(),
+		Gvr:       types.BackupGVR(),
 	}
 	cmd := &cobra.Command{
 		Use:               "describe-backup BACKUP-NAME",
@@ -365,8 +365,8 @@ func NewDescribeBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
-			util.CheckErr(o.complete(args))
-			util.CheckErr(o.run())
+			util.CheckErr(o.Complete(args))
+			util.CheckErr(o.Run())
 		},
 	}
 	return cmd
@@ -1057,7 +1057,7 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 	return nil
 }
 
-func (o *describeBackupOptions) complete(args []string) error {
+func (o *DescribeBackupOptions) Complete(args []string) error {
 	var err error
 
 	if len(args) == 0 {
@@ -1066,24 +1066,24 @@ func (o *describeBackupOptions) complete(args []string) error {
 
 	o.names = args
 
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
 		return err
 	}
 
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
 		return err
 	}
 
-	if o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+	if o.namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *describeBackupOptions) run() error {
+func (o *DescribeBackupOptions) Run() error {
 	for _, name := range o.names {
 		backupObj := &dpv1alpha1.Backup{}
-		if err := cluster.GetK8SClientObject(o.dynamic, backupObj, o.gvr, o.namespace, name); err != nil {
+		if err := cluster.GetK8SClientObject(o.dynamic, backupObj, o.Gvr, o.namespace, name); err != nil {
 			return err
 		}
 		if err := o.printBackupObj(backupObj); err != nil {
@@ -1093,7 +1093,7 @@ func (o *describeBackupOptions) run() error {
 	return nil
 }
 
-func (o *describeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
+func (o *DescribeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
 	printer.PrintLineWithTabSeparator(
 		printer.NewPair("Name", obj.Name),
 		printer.NewPair("Cluster", obj.Status.SourceCluster),
@@ -1163,7 +1163,7 @@ func realPrintPairStringToLine(name, value string, spaceCount ...int) {
 
 // print the pod error logs if failure reason has occurred
 // TODO: the failure reason should be improved in the backup controller
-func (o *describeBackupOptions) enhancePrintFailureReason(backupName, failureReason string, spaceCount ...int) error {
+func (o *DescribeBackupOptions) enhancePrintFailureReason(backupName, failureReason string, spaceCount ...int) error {
 	if failureReason == "" {
 		return nil
 	}

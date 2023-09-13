@@ -28,10 +28,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -392,13 +392,13 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		By("test describe-backup cmd with no backup")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
-		o := describeBackupOptions{
-			factory:   tf,
+		o := DescribeBackupOptions{
+			Factory:   tf,
 			IOStreams: streams,
-			gvr:       types.BackupGVR(),
+			Gvr:       types.BackupGVR(),
 		}
 		args := []string{}
-		Expect(o.complete(args)).Should(HaveOccurred())
+		Expect(o.Complete(args)).Should(HaveOccurred())
 
 		By("test describe-backup")
 		backupName := "test1"
@@ -420,9 +420,9 @@ var _ = Describe("DataProtection", func() {
 		}
 		backup1.Status.SourceCluster = "mycluster"
 		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
-		Expect(o.complete(args)).Should(Succeed())
+		Expect(o.Complete(args)).Should(Succeed())
 		o.client = testing.FakeClientSet()
-		Expect(o.run()).Should(Succeed())
+		Expect(o.Run()).Should(Succeed())
 	})
 })
 

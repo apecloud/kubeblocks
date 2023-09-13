@@ -1,13 +1,24 @@
 ---
-title: kbcli backup
+title: kbcli backup describe
 ---
 
-Backup command.
+Describe a backup
+
+```
+kbcli backup describe [flags]
+```
+
+### Examples
+
+```
+  # describe a backup
+  kbcli backup describe mybackup
+```
 
 ### Options
 
 ```
-  -h, --help   help for backup
+  -h, --help   help for describe
 ```
 
 ### Options inherited from parent commands
@@ -36,11 +47,7 @@ Backup command.
 
 ### SEE ALSO
 
-
-* [kbcli backup create](kbcli_backup_create.md)	 - Create a backup for the cluster.
-* [kbcli backup delete](kbcli_backup_delete.md)	 - Delete a backup.
-* [kbcli backup describe](kbcli_backup_describe.md)	 - Describe a backup
-* [kbcli backup list](kbcli_backup_list.md)	 - List backups.
+* [kbcli backup](kbcli_backup.md)	 - Backup command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

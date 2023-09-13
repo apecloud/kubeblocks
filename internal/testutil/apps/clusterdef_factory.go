@@ -213,6 +213,15 @@ func (factory *MockClusterDefFactory) AddSwitchoverSpec(switchoverSpec *appsv1al
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddServiceRefDeclarations(serviceRefDeclarations []appsv1alpha1.ServiceRefDeclaration) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.ServiceRefDeclarations = serviceRefDeclarations
+	return factory
+}
+
 func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
@@ -238,32 +247,6 @@ func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1
 	}
 	comp.ReplicationSpec = replicationSpec
 	return factory
-}
-
-// There are default volumeMounts for containers in clusterdefinition in pusrpose of a simple & fast creation,
-// but when mounts specified volumes in certain mountPaths, they may conflict with the default volumeMounts,
-// so here provides a way to overwrite the default volumeMounts.
-func appendContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
-	for index := range containers {
-		c := &containers[index]
-		// remove the duplicated volumeMounts and overwrite the default mount path
-		if c.Name == targetContainerName {
-			mergedVolumeMounts := make([]corev1.VolumeMount, 0)
-			volumeMountsMap := make(map[string]corev1.VolumeMount)
-			for _, v := range c.VolumeMounts {
-				volumeMountsMap[v.Name] = v
-			}
-			for _, v := range volumeMounts {
-				volumeMountsMap[v.Name] = v
-			}
-			for _, v := range volumeMountsMap {
-				mergedVolumeMounts = append(mergedVolumeMounts, v)
-			}
-			c.VolumeMounts = mergedVolumeMounts
-			break
-		}
-	}
-	return containers
 }
 
 func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.ComponentDefRef) *MockClusterDefFactory {
@@ -299,5 +282,30 @@ func (factory *MockClusterDefFactory) AddNamedServicePort(name string, port int3
 		}},
 	}
 	return factory
+}
 
+// There are default volumeMounts for containers in clusterdefinition in pusrpose of a simple & fast creation,
+// but when mounts specified volumes in certain mountPaths, they may conflict with the default volumeMounts,
+// so here provides a way to overwrite the default volumeMounts.
+func appendContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
+	for index := range containers {
+		c := &containers[index]
+		// remove the duplicated volumeMounts and overwrite the default mount path
+		if c.Name == targetContainerName {
+			mergedVolumeMounts := make([]corev1.VolumeMount, 0)
+			volumeMountsMap := make(map[string]corev1.VolumeMount)
+			for _, v := range c.VolumeMounts {
+				volumeMountsMap[v.Name] = v
+			}
+			for _, v := range volumeMounts {
+				volumeMountsMap[v.Name] = v
+			}
+			for _, v := range volumeMountsMap {
+				mergedVolumeMounts = append(mergedVolumeMounts, v)
+			}
+			c.VolumeMounts = mergedVolumeMounts
+			break
+		}
+	}
+	return containers
 }

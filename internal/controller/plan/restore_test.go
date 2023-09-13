@@ -232,7 +232,7 @@ var _ = Describe("PITR Functions", func() {
 			backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
 				SetBackupPolicyName("test-fake").
-				SetBackupType(dpv1alpha1.BackupTypeDataFile).
+				SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
 				Create(&testCtx).GetObject()
 			baseStartTime := &startTime
 			baseStopTime := &now
@@ -269,7 +269,7 @@ var _ = Describe("PITR Functions", func() {
 			logfileBackup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(logfileBackupLabels).
 				SetBackupPolicyName("test-fake").
-				SetBackupType(dpv1alpha1.BackupTypeLogFile).
+				SetBackupMethod(dpv1alpha1.BackupTypeLogFile).
 				Create(&testCtx).GetObject()
 			backupStatus = dpv1alpha1.BackupStatus{
 				Phase:                     dpv1alpha1.BackupPhaseCompleted,
@@ -293,7 +293,7 @@ var _ = Describe("PITR Functions", func() {
 			backupSnapshot := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().
 				SetBackupPolicyName("test-fake").
-				SetBackupType(dpv1alpha1.BackupTypeSnapshot).
+				SetBackupMethod(dpv1alpha1.BackupTypeSnapshot).
 				Create(&testCtx).GetObject()
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupSnapshot.Name)
 			cluster.Annotations[constant.RestoreFromBackUpAnnotationKey] = restoreFromBackup

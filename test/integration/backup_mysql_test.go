@@ -63,7 +63,7 @@ var _ = Describe("MySQL data protection function", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ActionSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
 
 	}
@@ -149,7 +149,7 @@ var _ = Describe("MySQL data protection function", func() {
 		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
 			SetBackupPolicyName(backupPolicyKey.Name).
-			SetBackupType(dpv1alpha1.BackupTypeDataFile).
+			SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
 			Create(&testCtx).GetObject()
 		backupKey = client.ObjectKeyFromObject(backup)
 	}

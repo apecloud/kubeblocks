@@ -336,20 +336,20 @@ var _ = Describe("DataProtection", func() {
 		}
 		now := metav1.Now()
 		baseBackup := testapps.NewBackupFactory(testing.Namespace, "backup-base").
-			SetBackupType(dpv1alpha1.BackupTypeSnapshot).
-			SetBackLog(now.Add(-time.Minute), now.Add(-time.Second)).
+			SetBackupMethod(dpv1alpha1.BackupTypeSnapshot).
+			SetBackupTimeRange(now.Add(-time.Minute), now.Add(-time.Second)).
 			SetLabels(backupLabels).GetObject()
 		baseBackup.TypeMeta = backupTypeMeta
 		baseBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 		logfileBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
-			SetBackupType(dpv1alpha1.BackupTypeLogFile).
-			SetBackLog(now.Add(-time.Minute), now.Add(time.Minute)).
+			SetBackupMethod(dpv1alpha1.BackupTypeLogFile).
+			SetBackupTimeRange(now.Add(-time.Minute), now.Add(time.Minute)).
 			SetLabels(backupLabels).GetObject()
 		logfileBackup.TypeMeta = backupTypeMeta
 
 		logfileBackup1 := testapps.NewBackupFactory(testing.Namespace, backupName1).
-			SetBackupType(dpv1alpha1.BackupTypeLogFile).
-			SetBackLog(now.Add(-time.Minute), now.Add(2*time.Minute)).GetObject()
+			SetBackupMethod(dpv1alpha1.BackupTypeLogFile).
+			SetBackupTimeRange(now.Add(-time.Minute), now.Add(2*time.Minute)).GetObject()
 		uid := string(cluster.UID)
 		logfileBackup1.Labels = map[string]string{
 			constant.AppInstanceLabelKey:              clusterName,

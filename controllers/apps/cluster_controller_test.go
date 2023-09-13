@@ -179,7 +179,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		resetTestContext()
 	}
@@ -380,7 +380,7 @@ var _ = Describe("Cluster Controller", func() {
 		backupName := "test-backup"
 		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			SetBackupPolicyName(backupPolicyName).
-			SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
+			SetBackupMethod(dataprotectionv1alpha1.BackupTypeDataFile).
 			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
@@ -2602,7 +2602,7 @@ var _ = Describe("Cluster Controller", func() {
 			By("creating backup")
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
-				SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
+				SetBackupMethod(dataprotectionv1alpha1.BackupTypeDataFile).
 				Create(&testCtx).GetObject()
 
 			By("mocking backup status completed, we don't need backup reconcile here")

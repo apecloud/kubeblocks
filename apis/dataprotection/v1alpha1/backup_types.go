@@ -241,7 +241,7 @@ type ActionType string
 const (
 	ActionTypeJob         ActionType = "Job"
 	ActionTypeStatefulSet ActionType = "StatefulSet"
-	ActionTypeOther       ActionType = "Other"
+	ActionTypeNone        ActionType = ""
 )
 
 // +genclient
@@ -255,8 +255,6 @@ const (
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 // +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=`.status.completionTimestamp`
-// +kubebuilder:printcolumn:name="TIME-RANGE-START",type=string,JSONPath=`.status.timeRange.start`
-// +kubebuilder:printcolumn:name="TIME-RANGE-END",type=string,JSONPath=`.status.timeRange.end`
 
 // Backup is the Schema for the backups API.
 type Backup struct {
@@ -278,22 +276,4 @@ type BackupList struct {
 
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
-}
-
-// GetStartTime gets the backup start time. Default return status.startTime,
-// unless status.timeRange.startTime is not nil.
-func (r *BackupStatus) GetStartTime() *metav1.Time {
-	if r.TimeRange != nil && r.TimeRange.Start != nil {
-		return r.TimeRange.Start
-	}
-	return r.StartTimestamp
-}
-
-// GetEndTime gets the backup end time. Default return status.completionTimestamp,
-// unless status.timeRange.endTime is not nil.
-func (r *BackupStatus) GetEndTime() *metav1.Time {
-	if r.TimeRange != nil && r.TimeRange.End != nil {
-		return r.TimeRange.End
-	}
-	return r.CompletionTimestamp
 }

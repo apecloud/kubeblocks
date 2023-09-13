@@ -97,7 +97,7 @@ var BackupPolicySignature = func(_ dataprotectionv1alpha1.BackupPolicy, _ datapr
 }
 var BackupSignature = func(_ dataprotectionv1alpha1.Backup, _ dataprotectionv1alpha1.BackupList) {
 }
-var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ dataprotectionv1alpha1.BackupToolList) {
+var ActionSetSignature = func(_ dataprotectionv1alpha1.ActionSet, _ dataprotectionv1alpha1.ActionSetList) {
 }
 var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList) {
 }

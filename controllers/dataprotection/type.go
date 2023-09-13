@@ -35,14 +35,13 @@ const (
 )
 
 const (
-	// name of our custom finalizer
-	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
-
 	// settings keys
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 
 	// label keys
+	dataProtectionLabelBackupScheduleKey = "dataprotection.kubeblocks.io/backup-schedule"
 	dataProtectionLabelBackupPolicyKey   = "dataprotection.kubeblocks.io/backup-policy"
+	dataProtectionLabelBackupMethodKey   = "dataprotection.kubeblocks.io/backup-method"
 	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
 	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
 	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
@@ -83,8 +82,6 @@ const (
 	ReasonUnknownError            = "UnknownError"
 )
 
-const manifestsUpdaterContainerName = "manifests-updater"
-
 var reconcileInterval = time.Second
 
 func init() {
@@ -96,14 +93,14 @@ var (
 	cueTemplates embed.FS
 )
 
-type backupPolicyOptions struct {
+type backupScheduleOptions struct {
 	Name             string          `json:"name"`
 	BackupPolicyName string          `json:"backupPolicyName"`
 	Namespace        string          `json:"namespace"`
 	MgrNamespace     string          `json:"mgrNamespace"`
 	Cluster          string          `json:"cluster"`
 	Schedule         string          `json:"schedule"`
-	BackupType       string          `json:"backupType"`
+	BackupMethod     string          `json:"backupMethod"`
 	TTL              metav1.Duration `json:"ttl,omitempty"`
 	ServiceAccount   string          `json:"serviceAccount"`
 	Image            string          `json:"image"`

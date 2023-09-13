@@ -149,13 +149,14 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	deleteBackup := func() error {
 		// remove backup finalizers to delete it
 		patch := client.MergeFrom(backup.DeepCopy())
-		controllerutil.RemoveFinalizer(backup, DataProtectionFinalizerName)
+		controllerutil.RemoveFinalizer(backup, dptypes.DataProtectionFinalizerName)
 		return r.Patch(reqCtx.Ctx, backup, patch)
 	}
 
 	deleter := &dpbackup.Deleter{
 		RequestCtx: reqCtx,
 		Client:     r.Client,
+		Scheme:     r.Scheme,
 	}
 
 	status, err := deleter.DeleteBackupFiles(backup)
@@ -253,7 +254,7 @@ func (r *BackupReconciler) handleNewPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 
 	// set and patch backup object meta, including labels, annotations and finalizers
@@ -441,7 +442,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	request.Annotations[dataProtectionBackupTargetPodKey] = targetPod.Name
 
 	// set finalizer
-	controllerutil.AddFinalizer(request.Backup, DataProtectionFinalizerName)
+	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)
 
 	if reflect.DeepEqual(original.ObjectMeta, request.ObjectMeta) {
 		return wait, nil
@@ -481,7 +482,7 @@ func (r *BackupReconciler) handleRunningPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 
 	// there are actions not completed, continue to handle following actions
@@ -502,10 +503,7 @@ func (r *BackupReconciler) handleRunningPhase(
 	// if all actions completed, update backup status to completed, otherwise,
 	// continue to handle following actions.
 	for i, act := range actions {
-		status, err := act.Execute(actionCtx)
-		if err != nil {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "backup action", act.GetName())
-		}
+		status, _ := act.Execute(actionCtx)
 		request.Status.Actions[i] = mergeActionStatus(&request.Status.Actions[i], status)
 
 		switch status.Phase {
@@ -514,7 +512,7 @@ func (r *BackupReconciler) handleRunningPhase(
 			continue
 		case dpv1alpha1.ActionPhaseFailed:
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
-				fmt.Errorf("action %s failed, reason %s", act.GetName(), status.FailureReason))
+				fmt.Errorf("action %s failed, %s", act.GetName(), status.FailureReason))
 		case dpv1alpha1.ActionPhaseRunning:
 			// update status
 			if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
@@ -593,9 +591,9 @@ func (r *BackupReconciler) deleteExternalJobs(reqCtx intctrlutil.RequestCtx, bac
 	}
 
 	deleteJob := func(job *batchv1.Job) error {
-		if controllerutil.ContainsFinalizer(job, DataProtectionFinalizerName) {
+		if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
 			patch := client.MergeFrom(job.DeepCopy())
-			controllerutil.RemoveFinalizer(job, DataProtectionFinalizerName)
+			controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
 			if err := r.Patch(reqCtx.Ctx, job, patch); err != nil {
 				return err
 			}
@@ -641,7 +639,7 @@ func (r *BackupReconciler) deleteExternalStatefulSet(reqCtx intctrlutil.RequestC
 	}
 
 	patch := client.MergeFrom(sts.DeepCopy())
-	controllerutil.RemoveFinalizer(sts, DataProtectionFinalizerName)
+	controllerutil.RemoveFinalizer(sts, dptypes.DataProtectionFinalizerName)
 	if err := r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
 		return err
 	}

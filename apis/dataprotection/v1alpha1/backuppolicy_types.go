@@ -17,10 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -273,18 +269,4 @@ type BackupPolicyList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupPolicy{}, &BackupPolicyList{})
-}
-
-// AddTTL adds tll with hours
-func AddTTL(ttl *string, hours int) string {
-	if ttl == nil {
-		return ""
-	}
-	ttlLower := strings.ToLower(*ttl)
-	if strings.HasSuffix(ttlLower, "d") {
-		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
-		return fmt.Sprintf("%dh", days*24+hours)
-	}
-	ttlHours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
-	return fmt.Sprintf("%dh", ttlHours+hours)
 }

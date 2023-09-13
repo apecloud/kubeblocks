@@ -195,19 +195,19 @@ package dataprotection
 //				backupExpired := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 //					WithRandomName().AddLabelsInMap(autoBackupLabel).
 //					SetBackupPolicyName(backupPolicyName).
-//					SetBackupType(dpv1alpha1.BackupTypeDataFile).
+//					AddBackupMethod(dpv1alpha1.BackupTypeDataFile).
 //					Create(&testCtx).GetObject()
 //				By("create 1st limit backup")
 //				backupOutLimit1 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 //					WithRandomName().AddLabelsInMap(autoBackupLabel).
 //					SetBackupPolicyName(backupPolicyName).
-//					SetBackupType(dpv1alpha1.BackupTypeDataFile).
+//					AddBackupMethod(dpv1alpha1.BackupTypeDataFile).
 //					Create(&testCtx).GetObject()
 //				By("create 2nd limit backup")
 //				backupOutLimit2 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 //					WithRandomName().AddLabelsInMap(autoBackupLabel).
 //					SetBackupPolicyName(backupPolicyName).
-//					SetBackupType(dpv1alpha1.BackupTypeDataFile).
+//					AddBackupMethod(dpv1alpha1.BackupTypeDataFile).
 //					Create(&testCtx).GetObject()
 //
 //				By("waiting expired backup completed")
@@ -419,7 +419,7 @@ package dataprotection
 //					})).Should(Succeed())
 //					backup := &dpv1alpha1.Backup{}
 //					sts := &appsv1.StatefulSet{}
-//					backupName := getCreatedCRNameByBackupPolicy(backupPolicy, dpv1alpha1.BackupTypeLogFile)
+//					backupName := generateCRNameByBackupSchedule(backupPolicy, dpv1alpha1.BackupTypeLogFile)
 //					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
 //						Name:      backupName,
 //						Namespace: testCtx.DefaultNamespace,

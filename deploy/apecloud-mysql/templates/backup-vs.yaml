@@ -1,0 +1,7 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: Backup
+metadata:
+  name: my-backup-vs
+spec:
+  backupPolicyName: apecloud-mysql-backup-policy
+  backupMethod: volume-snapshot

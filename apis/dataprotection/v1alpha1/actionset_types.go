@@ -56,6 +56,16 @@ type ActionSetSpec struct {
 	Restore *RestoreActionSpec `json:"restore,omitempty"`
 }
 
+// BackupType the backup type.
+// +enum
+// +kubebuilder:validation:Enum={Full,Continuous}
+type BackupType string
+
+const (
+	BackupTypeFull       BackupType = "Full"
+	BackupTypeContinuous BackupType = "Continuous"
+)
+
 type BackupActionSpec struct {
 	// backupData specifies the backup data action.
 	// +kubebuilder:validation:Required

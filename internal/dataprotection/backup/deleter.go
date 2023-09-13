@@ -62,7 +62,7 @@ type Deleter struct {
 }
 
 func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, error) {
-	jobKey := buildDeleteBackupFilesJobNamespacedName(backup)
+	jobKey := BuildDeleteBackupFilesJobKey(backup)
 	job := &batchv1.Job{}
 	exists, err := intctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
 	if err != nil {
@@ -149,7 +149,7 @@ func (d *Deleter) createDeleteBackupFileJob(
 			fi;
 			curr="${parent}";
 		done
-	`, dptypes.BackupPathBase, backupFilePath)
+	`, backupVolumeMountPath, backupFilePath)
 
 	runAsUser := int64(0)
 	container := corev1.Container{
@@ -219,9 +219,9 @@ func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 	}
 
 	deleteVolumeSnapshot := func(vs *snapshotv1.VolumeSnapshot) error {
-		if controllerutil.ContainsFinalizer(vs, dpv1alpha1.DataProtectionFinalizerName) {
+		if controllerutil.ContainsFinalizer(vs, dptypes.DataProtectionFinalizerName) {
 			patch := vs.DeepCopy()
-			controllerutil.RemoveFinalizer(vs, dpv1alpha1.DataProtectionFinalizerName)
+			controllerutil.RemoveFinalizer(vs, dptypes.DataProtectionFinalizerName)
 			if err := vsCli.Patch(vs, patch); err != nil {
 				return err
 			}
@@ -244,10 +244,10 @@ func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 	return nil
 }
 
-func buildDeleteBackupFilesJobNamespacedName(backup *dpv1alpha1.Backup) types.NamespacedName {
+func BuildDeleteBackupFilesJobKey(backup *dpv1alpha1.Backup) client.ObjectKey {
 	jobName := fmt.Sprintf("%s-%s%s", backup.UID[:8], deleteBackupFilesJobNamePrefix, backup.Name)
 	if len(jobName) > 63 {
 		jobName = jobName[:63]
 	}
-	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
+	return client.ObjectKey{Namespace: backup.Namespace, Name: jobName}
 }

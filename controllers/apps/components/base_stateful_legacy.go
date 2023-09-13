@@ -432,8 +432,8 @@ func (c *statefulComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx
 			return nil
 		}
 		if running {
-			txn.propose(appsv1alpha1.SpecReconcilingClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Volume Expansion failed")
+			txn.propose(appsv1alpha1.UpdatingClusterCompPhase, func() {
+				c.SetStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "Volume Expansion failed")
 			})
 			return nil
 		}
@@ -642,10 +642,10 @@ func (c *statefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 func (c *statefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	if stsObj == nil {
 		c.createWorkload()
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
+		c.SetStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "Component workload created")
 	} else {
 		if c.updateWorkload(stsObj) {
-			c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")
+			c.SetStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "Component workload updated")
 		}
 		// to work around that the scaled PVC will be deleted at object action.
 		if err := c.updateVolumes(reqCtx, cli, stsObj); err != nil {

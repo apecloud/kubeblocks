@@ -302,12 +302,12 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				clusterObject.Status.Components[consensusComp] = compStatus
 				Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 			}
-			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase)
+			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase)
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 
 			By("check cluster.status.components[*].phase == Reconfiguring")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
+			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
 			// TODO: add status condition expect
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Running

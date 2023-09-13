@@ -185,6 +185,8 @@ func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *
 	sts.Status.Replicas = *sts.Spec.Replicas
 	sts.Status.ReadyReplicas = sts.Status.Replicas
 	sts.Status.AvailableReplicas = sts.Status.ReadyReplicas
+	sts.Status.UpdatedReplicas = sts.Status.ReadyReplicas
+	sts.Status.UpdateRevision = rsm.Status.UpdateRevision
 	return sts
 }
 

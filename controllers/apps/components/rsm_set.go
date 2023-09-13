@@ -69,7 +69,7 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	if isLatestRevision, err := isComponentPodsWithLatestRevision(ctx, r.Cli, r.Cluster, rsm); err != nil {
+	if isLatestRevision, err := IsComponentPodsWithLatestRevision(ctx, r.Cli, r.Cluster, rsm); err != nil {
 		return false, err
 	} else if !isLatestRevision {
 		return false, nil

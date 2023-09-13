@@ -814,8 +814,8 @@ func updateCustomLabelToObjs(clusterName, uid, componentName string,
 	return nil
 }
 
-// isComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
-func isComponentPodsWithLatestRevision(ctx context.Context, cli client.Client,
+// IsComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
+func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Client,
 	cluster *appsv1alpha1.Cluster, rsm *workloads.ReplicatedStateMachine) (bool, error) {
 	if cluster == nil || rsm == nil {
 		return false, nil

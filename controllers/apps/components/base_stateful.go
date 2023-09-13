@@ -284,7 +284,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // 2. with latest revision
 // 3. and with leader role label set
 func (c *rsmComponentBase) isAvailable(reqCtx intctrlutil.RequestCtx, cli client.Client, pods []*corev1.Pod) (bool, error) {
-	if isLatestRevision, err := isComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
+	if isLatestRevision, err := IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
 		return false, err
 	} else if !isLatestRevision {
 		return false, nil
@@ -323,7 +323,7 @@ func (c *rsmComponentBase) isAvailable(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *rsmComponentBase) hasFailedPod(reqCtx intctrlutil.RequestCtx, cli client.Client, pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
-	if isLatestRevision, err := isComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
+	if isLatestRevision, err := IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
 		return false, nil, err
 	} else if !isLatestRevision {
 		return false, nil, nil

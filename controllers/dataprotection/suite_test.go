@@ -149,7 +149,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(err).ToNot(HaveOccurred())
 
-	//err = (&BackupPolicyReconciler{
+	//err = (&BackupScheduleReconciler{
 	//	Client:   k8sManager.GetClient(),
 	//	Scheme:   k8sManager.GetScheme(),
 	//	Recorder: k8sManager.GetEventRecorderFor("backup-policy-controller"),

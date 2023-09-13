@@ -21,3 +21,6 @@ package backup
 
 // FormatVersion is the backup file format version, including major, minor, and patch version.
 const FormatVersion = "0.1.0"
+
+// backupVolumeMountPath is the backup repo volume mount path.
+const backupVolumeMountPath = "/backupdata"

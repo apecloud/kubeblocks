@@ -184,6 +184,10 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 		return nil, nil
 	}
 
+	if r.BackupMethod.TargetVolumes == nil {
+		return nil, fmt.Errorf("targetVolumes is required for snapshotVolumes")
+	}
+
 	pvcs, err := getPVCsByVolumeNames(r.Client, targetPod, r.BackupMethod.TargetVolumes.Volumes)
 	if err != nil {
 		return nil, err
@@ -267,7 +271,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			},
 			{
 				Name:  dptypes.DPBackupDIR,
-				Value: dptypes.BackupPathBase + r.BackupPolicy.Spec.PathPrefix,
+				Value: backupVolumeMountPath + r.BackupPolicy.Spec.PathPrefix,
 			},
 			{
 				Name:  dptypes.DPTargetPodName,

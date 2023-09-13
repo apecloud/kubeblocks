@@ -206,7 +206,7 @@ func main() {
 	//	os.Exit(1)
 	//}
 	//
-	//if err = (&dpcontrollers.BackupPolicyReconciler{
+	//if err = (&dpcontrollers.BackupScheduleReconciler{
 	//	Client:   mgr.GetClient(),
 	//	Scheme:   mgr.GetScheme(),
 	//	Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),

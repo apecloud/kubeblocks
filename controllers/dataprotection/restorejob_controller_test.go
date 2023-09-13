@@ -83,7 +83,7 @@ package dataprotection
 //		By("By assure an backup obj")
 //		return testapps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
 //			WithRandomName().SetBackupPolicyName(backupPolicy).
-//			SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
+//			AddBackupMethod(dataprotectionv1alpha1.BackupTypeDataFile).
 //			Create(&testCtx).GetObject()
 //	}
 //

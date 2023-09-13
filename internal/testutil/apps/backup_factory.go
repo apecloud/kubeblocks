@@ -24,18 +24,18 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 type MockBackupFactory struct {
-	BaseFactory[dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.Backup, MockBackupFactory]
+	BaseFactory[dpv1alpha1.Backup, *dpv1alpha1.Backup, MockBackupFactory]
 }
 
 func NewBackupFactory(namespace, name string) *MockBackupFactory {
 	f := &MockBackupFactory{}
 	f.init(namespace, name,
-		&dataprotectionv1alpha1.Backup{
-			Spec: dataprotectionv1alpha1.BackupSpec{},
+		&dpv1alpha1.Backup{
+			Spec: dpv1alpha1.BackupSpec{},
 		}, f)
 	return f
 }
@@ -45,8 +45,8 @@ func (factory *MockBackupFactory) SetBackupPolicyName(backupPolicyName string) *
 	return factory
 }
 
-func (factory *MockBackupFactory) SetBackupType(backupType dataprotectionv1alpha1.BackupType) *MockBackupFactory {
-	factory.get().Spec.BackupType = backupType
+func (factory *MockBackupFactory) SetBackupMethod(backupMethod string) *MockBackupFactory {
+	factory.get().Spec.BackupMethod = backupMethod
 	return factory
 }
 
@@ -55,16 +55,13 @@ func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBacku
 	return factory
 }
 
-func (factory *MockBackupFactory) SetBackLog(startTime, stopTime time.Time) *MockBackupFactory {
-	manifests := factory.get().Status.Manifests
-	if manifests == nil {
-		manifests = &dataprotectionv1alpha1.ManifestsStatus{}
+func (factory *MockBackupFactory) SetBackupTimeRange(startTime, stopTime time.Time) *MockBackupFactory {
+	tr := factory.get().Status.TimeRange
+	if tr == nil {
+		tr = &dpv1alpha1.BackupTimeRange{}
 	}
-	if manifests.BackupLog == nil {
-		manifests.BackupLog = &dataprotectionv1alpha1.BackupLogStatus{}
-	}
-	manifests.BackupLog.StartTime = &metav1.Time{Time: startTime}
-	manifests.BackupLog.StopTime = &metav1.Time{Time: stopTime}
-	factory.get().Status.Manifests = manifests
+	tr.Start = &metav1.Time{Time: startTime}
+	tr.End = &metav1.Time{Time: stopTime}
+	factory.get().Status.TimeRange = tr
 	return factory
 }

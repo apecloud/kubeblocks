@@ -22,26 +22,6 @@ import (
 	"time"
 )
 
-const (
-	// DataProtectionFinalizerName is the name of our custom finalizer
-	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
-)
-
-// BackupType the backup type.
-// +enum
-// +kubebuilder:validation:Enum={Full,Continuous}
-type BackupType string
-
-const (
-	BackupTypeFull       BackupType = "Full"
-	BackupTypeContinuous BackupType = "Continuous"
-)
-
-// BaseBackupType the base backup type.
-// +enum
-// +kubebuilder:validation:Enum={full,snapshot}
-type BaseBackupType string
-
 // CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
 // +enum
 // +kubebuilder:validation:Enum={IfNotPresent,Never}

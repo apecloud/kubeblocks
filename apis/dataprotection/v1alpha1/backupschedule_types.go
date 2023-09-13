@@ -36,10 +36,10 @@ type BackupScheduleSpec struct {
 
 	// schedules defines the list of backup schedules.
 	// +kubebuilder:validation:Required
-	Schedules []Schedule `json:"schedules"`
+	Schedules []SchedulePolicy `json:"schedules"`
 }
 
-type Schedule struct {
+type SchedulePolicy struct {
 	// enabled specifies whether the backup schedule is enabled or not.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
@@ -86,9 +86,9 @@ type BackupScheduleStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// message describes BackupSchedule details message in current phase.
+	// failureReason is an error that caused the backup to fail.
 	// +optional
-	Message string `json:"message,omitempty"`
+	FailureReason string `json:"failureReason,omitempty"`
 
 	// schedules describes the status of each schedule.
 	// +optional
@@ -112,9 +112,9 @@ type ScheduleStatus struct {
 	// +optional
 	Phase SchedulePhase `json:"phase,omitempty"`
 
-	// message records the schedule details message in current phase.
+	// failureReason is an error that caused the backup to fail.
 	// +optional
-	Message string `json:"message,omitempty"`
+	FailureReason string `json:"failureReason,omitempty"`
 
 	// lastScheduleTime records the last time the backup was scheduled.
 	// +optional

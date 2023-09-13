@@ -35,7 +35,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 // CreateVolumeSnapshotAction is an action that creates the volume snapshot.
@@ -67,7 +67,7 @@ func (c *CreateVolumeSnapshotAction) GetName() string {
 }
 
 func (c *CreateVolumeSnapshotAction) Type() dpv1alpha1.ActionType {
-	return dpv1alpha1.ActionTypeOther
+	return dpv1alpha1.ActionTypeNone
 }
 
 func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
@@ -175,7 +175,7 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshot(ctx Context,
 		snap.Spec.VolumeSnapshotClassName = &vsc.Name
 	}
 
-	controllerutil.AddFinalizer(snap, types.DataProtectionFinalizerName)
+	controllerutil.AddFinalizer(snap, dptypes.DataProtectionFinalizerName)
 	if err = controllerutil.SetControllerReference(c.Owner, snap, ctx.Scheme); err != nil {
 		return err
 	}

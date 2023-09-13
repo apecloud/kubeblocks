@@ -159,13 +159,13 @@ func getCluster(ctx context.Context,
 	return cluster
 }
 
-// getCreatedCRNameByBackupPolicy gets the CR name which is created by BackupPolicy, such as CronJob/logfile Backup.
-func getCreatedCRNameByBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy, backupType dpv1alpha1.BackupType) string {
-	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace)
+// generateCRNameByBackupSchedule gets the CR name which is created by BackupSchedule, such as CronJob Backup.
+func generateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
+	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupSchedule(backupSchedule), backupSchedule.Namespace)
 	if len(name) > 30 {
 		name = strings.TrimRight(name[:30], "-")
 	}
-	return fmt.Sprintf("%s-%s", name, string(backupType))
+	return fmt.Sprintf("%s-%s", name, method)
 }
 
 func getClusterLabelKeys() []string {
@@ -192,11 +192,11 @@ func getBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
 }
 
-// filterCreatedByPolicy filters the workloads which are create by backupPolicy.
-func filterCreatedByPolicy(object client.Object) bool {
+// filterCreatedBySchedule filters the workloads which are create by backupSchedule.
+func filterCreatedBySchedule(object client.Object) bool {
 	labels := object.GetLabels()
-	_, containsPolicyNameLabel := labels[dataProtectionLabelBackupPolicyKey]
-	return labels[dataProtectionLabelAutoBackupKey] == "true" && containsPolicyNameLabel
+	_, ok := labels[dataProtectionLabelBackupScheduleKey]
+	return labels[dataProtectionLabelAutoBackupKey] == "true" && ok
 }
 
 // sendWarningEventForError sends warning event for backup controller error
@@ -210,10 +210,10 @@ func sendWarningEventForError(recorder record.EventRecorder, backup *dpv1alpha1.
 	}
 }
 
-func generateUniqueNameWithBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) string {
-	uniqueName := backupPolicy.Name
-	if len(backupPolicy.OwnerReferences) > 0 {
-		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
+func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) string {
+	uniqueName := backupSchedule.Name
+	if len(backupSchedule.OwnerReferences) > 0 {
+		uniqueName = fmt.Sprintf("%s-%s", backupSchedule.OwnerReferences[0].UID[:8], backupSchedule.OwnerReferences[0].Name)
 	}
 	return uniqueName
 }

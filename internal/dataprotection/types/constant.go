@@ -20,12 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 const (
-	BackupPathBase                 = "/backupdata"
-	DeleteBackupFilesJobNamePrefix = "delete-"
-)
-
-const (
-	// DataProtectionFinalizerName is the finalizer name for dataProtection.
+	// DataProtectionFinalizerName is the name of our custom finalizer
 	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
 )
 

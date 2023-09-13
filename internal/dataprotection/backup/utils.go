@@ -90,6 +90,9 @@ func getVolumesByVolumeInfo(pod *corev1.Pod, volumeInfo *dpv1alpha1.TargetVolume
 func getPVCsByVolumeNames(cli client.Client,
 	pod *corev1.Pod,
 	volumeNames []string) ([]corev1.PersistentVolumeClaim, error) {
+	if len(volumeNames) == 0 {
+		return nil, nil
+	}
 	var all []corev1.PersistentVolumeClaim
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim == nil {
@@ -129,7 +132,7 @@ func buildBackupRepoVolume(pvcName string) corev1.Volume {
 func buildBackupRepoVolumeMount(pvcName string) corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      backupRepoVolumeName(pvcName),
-		MountPath: types.BackupPathBase,
+		MountPath: backupVolumeMountPath,
 	}
 }
 
@@ -169,27 +172,5 @@ func buildBackupJobObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.Obj
 }
 
 func buildBackupInfoENV(backupDestinationPath string) string {
-	return types.BackupPathBase + backupDestinationPath + "/backup.info"
-}
-
-func injectBackupVolumeMount(
-	pvcName string,
-	podSpec *corev1.PodSpec,
-	container *corev1.Container) {
-	// TODO(ldm): mount multi remote backup volumes
-	remoteVolumeName := fmt.Sprintf("backup-%s", pvcName)
-	remoteVolume := corev1.Volume{
-		Name: remoteVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: pvcName,
-			},
-		},
-	}
-	remoteVolumeMount := corev1.VolumeMount{
-		Name:      remoteVolumeName,
-		MountPath: types.BackupPathBase,
-	}
-	podSpec.Volumes = append(podSpec.Volumes, remoteVolume)
-	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
+	return backupVolumeMountPath + backupDestinationPath + "/backup.info"
 }

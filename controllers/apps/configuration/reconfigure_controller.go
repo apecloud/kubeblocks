@@ -102,7 +102,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedConfigs {
-		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase)
+		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, false, false)
 	}
 
 	// process configuration without ConfigConstraints
@@ -199,13 +199,13 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].", configSpecName, componentName))
 		reqCtx.Recorder.Eventf(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"related component does not have any configSpecs, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase)
+		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, false, false)
 	}
 	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 {
 		reqCtx.Recorder.Eventf(configMap,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase)
+		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, false, false)
 	}
 
 	return r.performUpgrade(reconfigureParams{
@@ -261,9 +261,14 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 	}
 
 	switch returnedStatus.Status {
-	case ESRetry, ESAndRetryFailed:
-		_, _ = updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedPhase)
-		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
+	default:
+		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedAndPausePhase, false, false)
+	case ESFailedAndRetry:
+		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedPhase, false, true)
+	case ESRetry:
+		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CUpgradingPhase, false, true)
+	case ESFailed:
+		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedAndPausePhase, true, false)
 	case ESNone:
 		params.Ctx.Recorder.Eventf(params.ConfigMap,
 			corev1.EventTypeNormal,
@@ -272,13 +277,6 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 			policy.GetPolicyName(),
 			getOpsRequestID(params.ConfigMap))
 		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
-	case ESFailed:
-		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
-		}
-		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedAndPausePhase)
-	default:
-		return intctrlutil.Reconciled()
 	}
 }
 

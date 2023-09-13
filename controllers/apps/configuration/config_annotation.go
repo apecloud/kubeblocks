@@ -51,21 +51,7 @@ func checkEnableCfgUpgrade(object client.Object) bool {
 	return true
 }
 
-func setCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, flag bool) error {
-	patch := client.MergeFrom(config.DeepCopy())
-	if config.ObjectMeta.Annotations == nil {
-		config.ObjectMeta.Annotations = map[string]string{}
-	}
-
-	config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
-	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase appsv1alpha1.ConfigurationPhase) (ctrl.Result, error) {
+func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase appsv1alpha1.ConfigurationPhase, failed bool, retry bool) (ctrl.Result, error) {
 	revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]
 	if !ok || revision == "" {
 		return intctrlutil.Reconciled()
@@ -76,10 +62,17 @@ func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
+	if failed {
+		config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(true)
+	}
+
 	GcConfigRevision(config)
 	config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(phase)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return intctrlutil.RequeueWithError(err, ctx.Log, "")
+	}
+	if retry {
+		return intctrlutil.RequeueAfter(ConfigReconcileInterval, ctx.Log, "")
 	}
 	return intctrlutil.Reconciled()
 }

@@ -22,6 +22,7 @@ package configuration
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -366,17 +367,23 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 		if p.isDone() {
 			return nil
 		}
-		if p.newCM.Annotations == nil {
-			p.newCM.Annotations = make(map[string]string)
+		annotations := p.newCM.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
 		}
 		b, err := json.Marshal(p.item)
 		if err != nil {
 			return err
 		}
-		p.newCM.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+		annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
 		hash, _ := cfgutil.ComputeHash(p.newCM.Data)
-		p.newCM.Annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
-		p.newCM.Annotations[constant.ConfigurationRevision] = revision
+		annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
+		annotations[constant.ConfigurationRevision] = revision
+		// delete disable reconcile annotation
+		if _, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]; ok {
+			annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(false)
+		}
+		p.newCM.Annotations = annotations
 		p.itemStatus.UpdateRevision = revision
 		return nil
 	})

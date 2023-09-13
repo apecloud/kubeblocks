@@ -22,11 +22,11 @@ package controllerutil
 import (
 	"context"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 type ResourceCtx struct {

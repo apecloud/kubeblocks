@@ -665,7 +665,7 @@ spec:
                       - Stopped
                       - Deleting
                       - Failed
-                      - Unknown
+                      - Abnormal
                       type: string
                     progressDetails:
                       description: progressDetails describes the progress details

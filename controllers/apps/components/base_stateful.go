@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -211,6 +213,10 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	updatePodsReady := func(ready bool) {
 		_ = c.updateStatus("", func(status *appsv1alpha1.ClusterComponentStatus) error {
+			// if ready flag not changed, don't update the ready time
+			if status.PodsReady != nil && *status.PodsReady == ready {
+				return nil
+			}
 			status.PodsReady = &ready
 			if ready {
 				time := metav1.Now()
@@ -220,20 +226,19 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		})
 	}
 
-	updatePodsReady(false)
+	podsReady := false
 	switch {
 	case isDeleting:
 		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
-		updatePodsReady(true)
 	case isZeroReplica && hasComponentPod:
 		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
-		updatePodsReady(true)
+		podsReady = true
 	case isZeroReplica:
 		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
-		updatePodsReady(true)
+		podsReady = true
 	case isRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
 		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
-		updatePodsReady(true)
+		podsReady = true
 	case !hasFailure && isInCreatingPhase:
 		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
 	case !hasFailure:
@@ -243,6 +248,7 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	default:
 		c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "unknown")
 	}
+	updatePodsReady(podsReady)
 
 	// works should continue to be done after spec updated.
 	if err := c.horizontalScale(reqCtx, cli); err != nil {
@@ -284,17 +290,6 @@ func (c *rsmComponentBase) isAvailable(reqCtx intctrlutil.RequestCtx, cli client
 		return false, nil
 	}
 
-	isPodReady := func(pod *corev1.Pod) bool {
-		if pod == nil {
-			return false
-		}
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-				return true
-			}
-		}
-		return false
-	}
 	shouldCheckLeader := func() bool {
 		return c.Component.WorkloadType == appsv1alpha1.Consensus || c.Component.WorkloadType == appsv1alpha1.Replication
 	}()
@@ -311,7 +306,7 @@ func (c *rsmComponentBase) isAvailable(reqCtx intctrlutil.RequestCtx, cli client
 		return false
 	}
 	for _, pod := range pods {
-		if !isPodReady(pod) {
+		if !podutils.IsPodAvailable(pod, 0, metav1.Time{Time: time.Now()}) {
 			continue
 		}
 		if !shouldCheckLeader {

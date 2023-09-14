@@ -34,21 +34,6 @@ type oceanbase struct {
 	examples map[ClientType]buildConnectExample
 }
 
-func newOceanbase() *oceanbase {
-	return &oceanbase{
-		info: EngineInfo{
-			Client: "mysql",
-		},
-		examples: map[ClientType]buildConnectExample{
-			CLI: func(info *ConnectionInfo) string {
-				return fmt.Sprintf(`# oceanbase client connection example
-mysql -h %s -P %s -u %s
-`, info.Host, info.Port, info.User)
-			},
-		},
-	}
-}
-
 func (r *oceanbase) ConnectCommand(connectInfo *AuthInfo) []string {
 	userName := "root"
 	userPass := ""

@@ -162,15 +162,6 @@ func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 }
 
-// getBackupPath gets the path to storage backup datas.
-func getBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
-	pathPrefix = strings.TrimRight(pathPrefix, "/")
-	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
-		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
-	}
-	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
-}
-
 // filterCreatedBySchedule filters the workloads which are create by backupSchedule.
 func filterCreatedBySchedule(object client.Object) bool {
 	labels := object.GetLabels()

@@ -369,7 +369,7 @@ func (r *BackupReconciler) patchBackupStatus(
 	original *dpv1alpha1.Backup,
 	request *dpbackup.Request) error {
 	request.Status.FormatVersion = dpbackup.FormatVersion
-	request.Status.Path = getBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
+	request.Status.Path = dpbackup.BuildBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
 	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
 	request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name

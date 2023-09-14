@@ -137,15 +137,6 @@ func buildBackupRepoVolumeMount(pvcName string) corev1.VolumeMount {
 	}
 }
 
-func generateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
-	name := fmt.Sprintf("%s-%s-%s", prefix, backup.Name, backup.UID[:8])
-	// job name cannot exceed 63 characters for label name limit.
-	if len(name) > 63 {
-		return name[:63]
-	}
-	return name
-}
-
 func excludeLabelsForWorkload() []string {
 	return []string{constant.KBAppComponentLabelKey}
 }
@@ -172,8 +163,13 @@ func buildBackupJobObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.Obj
 	}
 }
 
-func buildBackupInfoENV(backupDestinationPath string) string {
-	return backupVolumeMountPath + backupDestinationPath + "/backup.info"
+func generateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
+	name := fmt.Sprintf("%s-%s-%s", prefix, backup.Name, backup.UID[:8])
+	// job name cannot exceed 63 characters for label name limit.
+	if len(name) > 63 {
+		return name[:63]
+	}
+	return name
 }
 
 // GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as CronJob Backup.
@@ -191,4 +187,21 @@ func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSched
 		uniqueName = fmt.Sprintf("%s-%s", backupSchedule.OwnerReferences[0].UID[:8], backupSchedule.OwnerReferences[0].Name)
 	}
 	return uniqueName
+}
+
+func buildBackupInfoFilePath(backup *dpv1alpha1.Backup, pathPrefix string) string {
+	return buildBackupPathInContainer(backup, pathPrefix) + "/" + backupInfoFileName
+}
+
+func buildBackupPathInContainer(backup *dpv1alpha1.Backup, pathPrefix string) string {
+	return backupVolumeMountPath + BuildBackupPath(backup, pathPrefix)
+}
+
+// BuildBackupPath builds the path to storage backup datas in backup repository.
+func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
+	pathPrefix = strings.TrimRight(pathPrefix, "/")
+	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
+		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
+	}
+	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
 }

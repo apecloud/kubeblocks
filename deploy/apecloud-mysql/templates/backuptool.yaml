@@ -9,6 +9,9 @@ spec:
   env:
   - name: DATA_DIR
     value: /data/mysql/data
+  - name: LOG_BIN
+    value: /data/mysql/binlog/mysql-bin
+
   backup:
     preBackup: []
     postBackup: []
@@ -28,11 +31,11 @@ spec:
         xtrabackup --compress=zstd --backup  --safe-slave-backup --slave-info --stream=xbstream \
         --host=${DP_DB_HOST} --user=${DP_DB_USER} --port=${DP_DB_PORT} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
         STOP_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-        TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
-        echo "{\"totalSize\":\"$TOTAL_SIZE\",\"timeRange\":{\"start\":\"${START_TIME}\",\"end\":\"${STOP_TIME}\"}}" > ${BACKUP_DIR}/backup.info
+        TOTAL_SIZE=$(du -shx ${DP_BACKUP_DIR}|awk '{print $1}')
+        echo "{\"totalSize\":\"$TOTAL_SIZE\",\"timeRange\":{\"start\":\"${START_TIME}\",\"end\":\"${STOP_TIME}\"}}" > ${DP_BACKUP_DIR}/backup.info
       syncProgress:
-        enabled: false
-        intervalSeconds: 10
+        enabled: true
+        intervalSeconds: 5
 
   restore:
     prepareData:
@@ -45,7 +48,7 @@ spec:
         mkdir -p ${DATA_DIR}
         TMP_DIR=/data/mysql/temp
         mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
-        xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+        xbstream -x < ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
         xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
         xtrabackup --prepare --target-dir=${TMP_DIR}
         xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}

@@ -271,7 +271,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			},
 			{
 				Name:  dptypes.DPBackupDIR,
-				Value: backupVolumeMountPath + r.BackupPolicy.Spec.PathPrefix,
+				Value: buildBackupPathInContainer(r.Backup, r.BackupPolicy.Spec.PathPrefix),
 			},
 			{
 				Name:  dptypes.DPTargetPodName,
@@ -379,18 +379,25 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 	container.Env = append(container.Env,
 		corev1.EnvVar{
 			Name:  dptypes.DPBackupInfoFile,
-			Value: buildBackupInfoENV(r.BackupPolicy.Spec.PathPrefix),
+			Value: buildBackupInfoFilePath(r.Backup, r.BackupPolicy.Spec.PathPrefix),
 		},
 		corev1.EnvVar{
 			Name:  dptypes.DPCheckInterval,
 			Value: fmt.Sprintf("%d", checkIntervalSeconds)},
 	)
 
-	args := "set -o errexit; set -o nounset;" +
-		"backupInfo=$(cat ${BACKUP_INFO_FILE});echo \"backupInfo:${backupInfo}\";" +
-		"eval kubectl -n %s patch backup %s --subresource=status --type=merge --patch '{\\\"status\\\":${backupInfo}}';"
-	container.Args = []string{fmt.Sprintf(args, r.Backup.Namespace, r.Backup.Name)}
+	args := fmt.Sprintf(`
+set -o errexit;
+set -o nounset;
+while [ ! -f ${%[1]s} ]; do
+  sleep ${%[2]s}
+done
+backupInfo=$(cat ${%[1]s});
+echo backupInfo:${backupInfo};
+eval kubectl -n %[3]s patch backup %[4]s --subresource=status --type=merge --patch '{\"status\":${backupInfo}}';
+`, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
 
+	container.Args = []string{args}
 	podSpec.Containers = append(podSpec.Containers, *container)
 }
 

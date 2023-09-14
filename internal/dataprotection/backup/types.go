@@ -20,7 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package backup
 
 // FormatVersion is the backup file format version, including major, minor, and patch version.
-const FormatVersion = "0.1.0"
+const (
+	FormatVersion = "0.1.0"
 
-// backupVolumeMountPath is the backup repo volume mount path.
-const backupVolumeMountPath = "/backupdata"
+	// backupVolumeMountPath is the backup repo volume mount path.
+	backupVolumeMountPath = "/backupdata"
+
+	// backupInfoFileName is the backup info file name in the backup path.
+	backupInfoFileName = "backup.info"
+)

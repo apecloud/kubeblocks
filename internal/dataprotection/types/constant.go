@@ -70,21 +70,14 @@ const (
 	DPDBEndpoint = "DP_DB_ENDPOINT"
 	// DPDBPort database port for dataProtection
 	DPDBPort = "DP_DB_PORT"
-
+	// DPTargetPodName the target pod name
 	DPTargetPodName = "DP_TARGET_POD_NAME"
-
 	// DPBackupDIR the dest directory for backup data
 	DPBackupDIR = "DP_BACKUP_DIR"
-	// DPLogFileDIR log file dir
-	DPLogFileDIR = "BACKUP_LOGFILE_DIR"
 	// DPBackupName backup CR name
-	DPBackupName = "BACKUP_NAME"
+	DPBackupName = "DP_BACKUP_NAME"
 	// DPTTL backup time to live, reference the backupPolicy.spec.retention.ttl
-	DPTTL = "TTL"
-	// DPLogfileTTL ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
-	DPLogfileTTL = "LOGFILE_TTL"
-	// DPLogfileTTLSecond ttl seconds with LOGFILE_TTL, integer format
-	DPLogfileTTLSecond = "LOGFILE_TTL_SECOND"
+	DPTTL = "DP_TTL"
 	// DPCheckInterval check interval for continue backup
 	DPCheckInterval = "DP_CHECK_INTERVAL"
 	// DPBackupInfoFile the file name which retains the backup.status info

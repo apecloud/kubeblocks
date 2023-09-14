@@ -117,3 +117,50 @@ func (c *rsmTransformContext) GetLogger() logr.Logger {
 }
 
 var _ graph.TransformContext = &rsmTransformContext{}
+
+// AnnotationScope defines scope that annotations belong to.
+//
+// it is a common pattern to add annotations to extend the functionalities of K8s builtin resources.
+//
+// e.g.: Prometheus will start to scrape metrics if a service has annotation 'prometheus.io/scrape'.
+//
+// RSM has encapsulated K8s builtin resources like Service, Headless Service, StatefulSet, ConfigMap etc.
+// AnnotationScope specified a way to tell RSM controller which resource an annotation belongs to.
+//
+// e.g.:
+// let's say we want to add an annotation 'prometheus.io/scrape' with value 'true' to the underlying headless service.
+// here is what we should do:
+// add annotation 'prometheus.io/scrape' with an HeadlessServiceScope suffix to the RSM object's annotations field.
+//
+//	kind: ReplicatedStateMachine
+//	metadata:
+//	  annotations:
+//	    prometheus.io/scrape.headless.rsm: true
+//
+// the RSM controller will figure out which objects this annotation belongs to, cut the suffix and set it to the right place:
+//
+//	kind: Service
+//	metadata:
+//	  annotations:
+//	    prometheus.io/scrape: true
+type AnnotationScope string
+
+const (
+	// RootScope specifies the annotation belongs to the RSM object itself.
+	// they will also be set on the encapsulated StatefulSet.
+	RootScope AnnotationScope = ""
+
+	// HeadlessServiceScope specifies the annotation belongs to the encapsulated headless Service.
+	HeadlessServiceScope AnnotationScope = ".headless.rsm"
+
+	// ServiceScope specifies the annotation belongs to the encapsulated Service.
+	ServiceScope AnnotationScope = ".svc.rsm"
+
+	// AlternativeServiceScope specifies the annotation belongs to the encapsulated alternative Services.
+	AlternativeServiceScope AnnotationScope = ".alternative.rsm"
+
+	// ConfigMapScope specifies the annotation belongs to the encapsulated ConfigMap.
+	ConfigMapScope AnnotationScope = ".cm.rsm"
+)
+
+const scopeSuffix = ".rsm"

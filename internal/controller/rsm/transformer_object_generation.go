@@ -175,12 +175,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		// remove original monitor annotations
-		if len(oldSvc.Annotations) > 0 {
-			maps.DeleteFunc(oldSvc.Annotations, func(k, v string) bool {
-				return strings.HasPrefix(k, "monitor.kubeblocks.io")
-			})
-		}
 		mergeMetadataMap(oldSvc.Annotations, &newSvc.Annotations)
 		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec
@@ -210,9 +204,11 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
+	annotations := ParseAnnotationsOfScope(ServiceScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, false)
 	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
+		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(rsm.Spec.Service.Labels).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
@@ -225,6 +221,7 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 	if rsm.Spec.Service == nil {
 		return nil
 	}
+	annotations := ParseAnnotationsOfScope(AlternativeServiceScope, rsm.Annotations)
 	svcLabels := getLabels(&rsm)
 	var services []*corev1.Service
 	for i := range rsm.Spec.AlternativeServices {
@@ -240,23 +237,26 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 			labels[k] = v
 		}
 		service.Labels = labels
+		newAnnotations := make(map[string]string, 0)
+		maps.Copy(newAnnotations, service.Annotations)
+		maps.Copy(newAnnotations, annotations)
+		if len(newAnnotations) > 0 {
+			service.Annotations = newAnnotations
+		}
 		services = append(services, &service)
 	}
 	return services
 }
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, true)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
-		AddSelectorsInMap(selectors)
-	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
-	// if component.Monitor.Enable {
-	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
-	//		AddAnnotations("prometheus.io/port", strconv.Itoa(int(component.Monitor.ScrapePort))).
-	//		AddAnnotations("prometheus.io/scheme", "http")
-	// }
+		AddSelectorsInMap(selectors).
+		AddAnnotationsInMap(annotations)
+
 	for _, container := range rsm.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
@@ -279,11 +279,12 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	template := buildStsPodTemplate(rsm, envConfig)
+	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
 		AddLabels(rsmGenerationLabelKey, strconv.FormatInt(rsm.Generation, 10)).
-		AddAnnotationsInMap(rsm.Annotations).
+		AddAnnotationsInMap(annotations).
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
 		SetReplicas(*rsm.Spec.Replicas).
@@ -296,11 +297,13 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
+	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
 	}
 	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-rsm-env").
+		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }

@@ -100,6 +100,7 @@ const (
 	ClassProviderLabelKey                    = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
+	ComponentDefinitionLabelKey              = "componentdefinition.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey      = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey            = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey      = "config.kubeblocks.io/config-template-name"

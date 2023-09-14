@@ -309,8 +309,9 @@ func main() {
 		}
 
 		if err = (&appscontrollers.ComponentDefinitionReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-definition-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentDefinition")
 			os.Exit(1)

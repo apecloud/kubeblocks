@@ -54,6 +54,10 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	}
 	rsm := transCtx.rsm
 
+	if len(rsm.Spec.Roles) == 0 || rsm.Spec.RoleProbe == nil {
+		return nil
+	}
+
 	// handle cluster initialization
 	// set initReplicas at creation
 	if rsm.Status.InitReplicas == 0 {

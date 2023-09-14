@@ -17,7 +17,7 @@ View the current configuration file of a cluster.
 kbcli cluster describe-config mykafka  
 ```
 
-From the meta information, the cluster `mykafka` has a configuration file named `my.cnf`.
+From the meta information, the cluster `mykafka` has a configuration file named `server.properties`.
 
 You can also view the details of this configuration file and parameters.
 

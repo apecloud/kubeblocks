@@ -21,6 +21,7 @@ package components
 
 import (
 	"fmt"
+	"golang.org/x/exp/maps"
 	"reflect"
 	"strconv"
 	"strings"
@@ -895,10 +896,19 @@ func (c *rsmComponentBase) updateWorkload(rsmObj *workloads.ReplicatedStateMachi
 	rsmObjCopy := rsmObj.DeepCopy()
 	rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
 
+	// remove original monitor annotations
+	if len(rsmObjCopy.Annotations) > 0 {
+		maps.DeleteFunc(rsmObjCopy.Annotations, func(k, v string) bool {
+			return strings.HasPrefix(k, "monitor.kubeblocks.io")
+		})
+	}
+	mergeAnnotations(rsmObjCopy.Annotations, &rsmProto.Annotations)
+	rsmObjCopy.Annotations = rsmProto.Annotations
+	buildWorkLoadAnnotations(rsmObjCopy, c.Cluster)
+
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the rsm will be updated.
 	mergeAnnotations(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
-	buildWorkLoadAnnotations(rsmObjCopy, c.Cluster)
 	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
 	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
 	c.updateUpdateStrategy(rsmObjCopy, rsmProto)

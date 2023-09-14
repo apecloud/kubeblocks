@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,7 +34,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -110,11 +110,11 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount, err := builder.BuildServiceAccount(cluster)
+			serviceAccount, err := factory.BuildServiceAccount(cluster)
 			Expect(err).Should(BeNil())
 			serviceAccount.Name = serviceAccountName
 
-			roleBinding, err := builder.BuildRoleBinding(cluster)
+			roleBinding, err := factory.BuildRoleBinding(cluster)
 			Expect(err).Should(BeNil())
 			roleBinding.Subjects[0].Name = serviceAccountName
 
@@ -130,15 +130,15 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount, err := builder.BuildServiceAccount(cluster)
+			serviceAccount, err := factory.BuildServiceAccount(cluster)
 			Expect(err).Should(BeNil())
 			serviceAccount.Name = serviceAccountName
 
-			roleBinding, err := builder.BuildRoleBinding(cluster)
+			roleBinding, err := factory.BuildRoleBinding(cluster)
 			Expect(err).Should(BeNil())
 			roleBinding.Subjects[0].Name = serviceAccountName
 
-			clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
+			clusterRoleBinding, err := factory.BuildClusterRoleBinding(cluster)
 			Expect(err).Should(BeNil())
 			clusterRoleBinding.Subjects[0].Name = serviceAccountName
 

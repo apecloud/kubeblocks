@@ -22,6 +22,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -165,7 +165,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 
 	// This sidecar container will be able to view and signal processes from other containers
 	checkAndUpdateShareProcessNamespace(podSpec, buildParams, configSpecMetas)
-	container, err := builder.BuildCfgManagerContainer(buildParams, component)
+	container, err := factory.BuildCfgManagerContainer(buildParams, component)
 	if err != nil {
 		return err
 	}

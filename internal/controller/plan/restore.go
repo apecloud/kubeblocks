@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,7 +42,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -518,7 +518,7 @@ func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.Synthesi
 	for i := int32(0); i < synthesizedComponent.Replicas; i++ {
 		pvcName := fmt.Sprintf("%s-%s-%s-%d", vct.Name, p.Cluster.Name, synthesizedComponent.Name, i)
 		pvcKey := types.NamespacedName{Namespace: p.Cluster.Namespace, Name: pvcName}
-		pvc, err := builder.BuildPVC(p.Cluster, synthesizedComponent, &vct, pvcKey, snapshotName)
+		pvc, err := factory.BuildPVC(p.Cluster, synthesizedComponent, &vct, pvcKey, snapshotName)
 		if err != nil {
 			return err
 		}
@@ -637,7 +637,7 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 			}
 		}
 		jobName := p.GetDatafileRestoreJobName(pvcName)
-		job, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
+		job, err := factory.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
 			backupTool.Spec.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, env, backupTool.Spec.Resources)
 		if err != nil {
 			return nil, err
@@ -693,7 +693,7 @@ func (p *RestoreManager) buildPITRPhysicalRestoreJob(synthesizedComponent *compo
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: logfilePVC.GetName()}}},
 		}
 		pitrJobName := p.buildRestoreJobName(fmt.Sprintf("pitr-phy-%s", dataPVC.GetName()))
-		pitrJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, pitrJobName, image,
+		pitrJob, err := factory.BuildRestoreJob(p.Cluster, synthesizedComponent, pitrJobName, image,
 			recoveryInfo.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
 		if err != nil {
 			return objs, err
@@ -745,7 +745,7 @@ func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.Sy
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: backup.Status.PersistentVolumeClaimName}}},
 		}
 		logicJobName := p.buildRestoreJobName(fmt.Sprintf("restore-%s-logic-%s", backup.Spec.BackupType, pod.Name))
-		logicJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, logicJobName, image,
+		logicJob, err := factory.BuildRestoreJob(p.Cluster, synthesizedComponent, logicJobName, image,
 			backupToolSpec.Logical.GetLogicalRestoreCommand(), volumes, volumeMounts, podENV, backupToolSpec.Resources)
 		if err != nil {
 			return objs, err

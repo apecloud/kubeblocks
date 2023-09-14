@@ -22,6 +22,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +35,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -53,9 +53,9 @@ var _ = Describe("TLSUtilsTest", func() {
 			Expect(secret.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
 			Expect(secret.Labels[constant.KBManagedByKey]).Should(Equal(constant.AppName))
 			Expect(secret.StringData).ShouldNot(BeNil())
-			Expect(secret.StringData[builder.CAName]).ShouldNot(BeZero())
-			Expect(secret.StringData[builder.CertName]).ShouldNot(BeZero())
-			Expect(secret.StringData[builder.KeyName]).ShouldNot(BeZero())
+			Expect(secret.StringData[factory.CAName]).ShouldNot(BeZero())
+			Expect(secret.StringData[factory.CertName]).ShouldNot(BeZero())
+			Expect(secret.StringData[factory.KeyName]).ShouldNot(BeZero())
 		})
 	})
 

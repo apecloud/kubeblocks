@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package builder
+package factory
 
 import (
 	"embed"
@@ -25,6 +25,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -304,7 +306,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		constant.AppInstanceLabelKey:    cluster.Name,
 		constant.KBAppComponentLabelKey: component.Name,
 	}
-	podBuilder := NewPodBuilder("", "").
+	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
@@ -315,7 +317,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *component.PodSpec,
 	}
-	stsBuilder := NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
+	stsBuilder := builder.NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddMatchLabelsInMap(commonLabels).
@@ -380,7 +382,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		service.Labels = labels
 	}
 
-	podBuilder := NewPodBuilder("", "").
+	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
@@ -391,9 +393,29 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *component.PodSpec,
 	}
+
+	monitorAnnotations := func() map[string]string {
+		annotations := make(map[string]string, 0)
+		switch {
+		case !component.Monitor.Enable:
+			annotations["monitor.kubeblocks.io/scrape"] = "false"
+			annotations["monitor.kubeblocks.io/agamotto"] = "false"
+		case component.Monitor.BuiltIn:
+			annotations["monitor.kubeblocks.io/scrape"] = "false"
+			annotations["monitor.kubeblocks.io/agamotto"] = "true"
+		default:
+			annotations["monitor.kubeblocks.io/scrape"] = "true"
+			annotations["monitor.kubeblocks.io/path"] = component.Monitor.ScrapePath
+			annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(component.Monitor.ScrapePort))
+			annotations["monitor.kubeblocks.io/scheme"] = "http"
+			annotations["monitor.kubeblocks.io/agamotto"] = "false"
+		}
+		return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
+	}()
 	rsmName := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
-	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
+	rsmBuilder := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+		AddAnnotationsInMap(monitorAnnotations).
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddMatchLabelsInMap(commonLabels).

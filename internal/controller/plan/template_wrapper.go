@@ -22,6 +22,7 @@ package plan
 import (
 	"context"
 	"encoding/json"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"reflect"
 	"strings"
 
@@ -36,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -245,7 +245,7 @@ func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return builder.BuildConfigMapWithTemplate(cluster, component, configs, cmName, configConstraintName, templateSpec)
+	return factory.BuildConfigMapWithTemplate(cluster, component, configs, cmName, configConstraintName, templateSpec)
 }
 
 // renderConfigMapTemplate renders config file using template engine

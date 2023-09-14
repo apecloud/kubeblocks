@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,7 +34,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -321,7 +321,7 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 		if _, ok := serviceAccounts[serviceAccountName]; ok {
 			continue
 		}
-		serviceAccount, err := builder.BuildServiceAccount(cluster)
+		serviceAccount, err := factory.BuildServiceAccount(cluster)
 		serviceAccount.Name = serviceAccountName
 		if err != nil {
 			return nil, nil, err
@@ -336,7 +336,7 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 }
 
 func buildReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.RoleBinding, error) {
-	roleBinding, err := builder.BuildRoleBinding(cluster)
+	roleBinding, err := factory.BuildRoleBinding(cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func buildReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]
 }
 
 func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.ClusterRoleBinding, error) {
-	clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
+	clusterRoleBinding, err := factory.BuildClusterRoleBinding(cluster)
 	if err != nil {
 		return nil, err
 	}

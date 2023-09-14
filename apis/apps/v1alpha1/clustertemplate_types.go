@@ -39,7 +39,7 @@ type ClusterTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ComponentTemplateSpec `json:"spec,omitempty"`
+	Spec   ClusterTemplateSpec   `json:"spec,omitempty"`
 	Status ClusterTemplateStatus `json:"status,omitempty"`
 }
 
@@ -60,9 +60,9 @@ func init() {
 type ClusterTemplateSpec struct {
 	// UpdatePolicy defines the update behavior for existing clusters using this template when the cluster template is updated.
 	// +kubebuilder:validation:Required
-	UpdatePolicy ClusterTemplateUpdatePolicy `json:"updatePolicy"`
+	UpdatePolicy TemplateUpdatePolicy `json:"updatePolicy"`
 
-	Components []ClusterComponentTemplateSpec `json:"components,omitempty"`
+	Components []ClusterComponentTemplate `json:"components,omitempty"`
 
 	// Services expose endpoints that can be accessed by clients.
 	// +optional
@@ -119,77 +119,18 @@ type ClusterTemplateStatus struct {
 	Phase Phase `json:"phase,omitempty"`
 }
 
-type ClusterTemplateUpdatePolicy struct {
-}
-
-type ClusterComponentTemplateSpec struct {
-	// The name of the component.
+type ClusterComponentTemplate struct {
+	// The name of the component template.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// +kubebuilder:validation:Required
-	ComponentDef string `json:"componentDef"`
+	Spec ComponentSpec `json:"Spec"`
 
-	//// +optional
-	// ClassRef string `json:"classRef,omitempty"`
-
-	// Resources requests and limits of workload.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// volumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
-	// +optional
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
-	// Component replicas. The default value is used in ClusterDefinition spec if not specified.
+	// UpdatePolicy defines the update behavior for existing component using this template when the component template is updated.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=1
-	Replicas int32 `json:"replicas"`
+	UpdatePolicy TemplateUpdatePolicy `json:"updatePolicy"`
+}
 
-	// +optional
-	Configs []ComponentConfigSpec `json:"configs,omitempty"`
-
-	//// Services expose endpoints that can be accessed by clients.
-	//// +optional
-	// Services []ClusterComponentService `json:"services,omitempty"`
-
-	// +optional
-	Monitor *intstr.IntOrString `json:"monitor,omitempty"`
-
-	// +optional
-	EnabledLogs []string `json:"enabledLogs,omitempty"`
-
-	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
-
-	// serviceAccountName is the name of the ServiceAccount that running component depends on.
-	// +optional
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
-
-	// +optional
-	Affinity *Affinity `json:"affinity,omitempty"`
-
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	//// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
-	//// +optional
-	// SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
-
-	// +kubebuilder:default=false
-	// +optional
-	TLS bool `json:"tls,omitempty"`
-
-	// +optional
-	Issuer *Issuer `json:"issuer,omitempty"`
-
-	//// noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget
-	//// for this component is not needed. It defaults to false.
-	//// +kubebuilder:default=false
-	//// +optional
-	// NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+type TemplateUpdatePolicy struct {
 }

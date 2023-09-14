@@ -361,7 +361,7 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 //	pod.InitContainers = append(pod.InitContainers, initContainer)
 //}
 //
-//func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
+// func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
 //	port []int32, path, usage string,
 //	credentialEnv []corev1.EnvVar) {
 //	// todo: uncomment to enable new lorry way

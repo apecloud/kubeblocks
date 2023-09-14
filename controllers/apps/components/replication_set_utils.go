@@ -96,7 +96,7 @@ func updateObjRoleChangedInfo[T generics.Object, PT generics.PObject[T]](
 	if pObj.GetAnnotations() == nil {
 		pObj.SetAnnotations(map[string]string{})
 	}
-	pObj.GetAnnotations()[constant.LastRoleChangedEventTimestampAnnotationKey] = event.LastTimestamp.Time.Format(time.RFC3339)
+	pObj.GetAnnotations()[constant.LastRoleChangedEventTimestampAnnotationKey] = event.EventTime.Time.Format(time.RFC3339Nano)
 	if err := cli.Patch(ctx, pObj, patch); err != nil {
 		return err
 	}

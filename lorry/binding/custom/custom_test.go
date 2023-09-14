@@ -88,7 +88,6 @@ func TestGlobalInfo(t *testing.T) {
 		lines = append(lines, fmt.Sprintf("%d,%s,%s", 1, podName, role))
 	}
 	join := strings.Join(lines, "\n")
-
 	hs, s := setUpHost(join, t)
 	defer s.Close()
 

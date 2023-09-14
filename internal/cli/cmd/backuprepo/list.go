@@ -1,0 +1,131 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package backuprepo
+
+import (
+	"fmt"
+	"sort"
+
+	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/list"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+)
+
+var (
+	listExample = templates.Examples(`
+	# List all backuprepos
+	kbcli backuprepo list
+	`)
+)
+
+func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := list.NewListOptions(f, streams, types.BackupRepoGVR())
+	cmd := &cobra.Command{
+		Use:               "list",
+		Short:             "List BackupRepo.",
+		Aliases:           []string{"ls"},
+		Example:           listExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupRepoGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Names = args
+			cmdutil.CheckErr(printBackupRepoList(o))
+		},
+	}
+	o.AddFlags(cmd)
+	return cmd
+}
+
+func printBackupRepoList(o *list.ListOptions) error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		_, err := o.Run()
+		return err
+	}
+
+	// get and output the result
+	o.Print = false
+	r, err := o.Run()
+	if err != nil {
+		return err
+	}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+
+	if len(infos) == 0 {
+		fmt.Fprintln(o.IOStreams.Out, "No backup found")
+		return nil
+	}
+
+	printRows := func(tbl *printer.TablePrinter) error {
+		// sort BackupRepos with .status.Phase then .metadata.name
+		sort.SliceStable(infos, func(i, j int) bool {
+			toBackupRepo := func(idx int) *dataprotectionv1alpha1.BackupRepo {
+				backupRepo := &dataprotectionv1alpha1.BackupRepo{}
+				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(infos[idx].Object.(*unstructured.Unstructured).Object, backupRepo); err != nil {
+					return nil
+				}
+				return backupRepo
+			}
+			iBackupRepo := toBackupRepo(i)
+			jBackupRepo := toBackupRepo(j)
+			if iBackupRepo == nil {
+				return true
+			}
+			if jBackupRepo == nil {
+				return false
+			}
+			if iBackupRepo.Status.Phase == jBackupRepo.Status.Phase {
+				return iBackupRepo.GetName() < jBackupRepo.GetName()
+			}
+			return iBackupRepo.Status.Phase < jBackupRepo.Status.Phase
+		})
+		for _, info := range infos {
+			BackupRepo := &dataprotectionv1alpha1.BackupRepo{}
+			obj := info.Object.(*unstructured.Unstructured)
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, BackupRepo); err != nil {
+				return err
+			}
+			tbl.AddRow(BackupRepo.Name,
+				BackupRepo.Status.Phase,
+				BackupRepo.Spec.StorageProviderRef,
+				BackupRepo.Status.IsDefault,
+			)
+		}
+		return nil
+	}
+
+	if err = printer.PrintTable(o.Out, nil, printRows,
+		"NAME", "STATUS", "STORAGEPROVIDER", "DEFAULT"); err != nil {
+		return err
+	}
+	return nil
+}

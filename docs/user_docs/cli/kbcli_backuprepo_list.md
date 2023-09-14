@@ -1,13 +1,28 @@
 ---
-title: kbcli backuprepo
+title: kbcli backuprepo list
 ---
 
-BackupRepo command.
+List BackupRepo.
+
+```
+kbcli backuprepo list [flags]
+```
+
+### Examples
+
+```
+  # List all backuprepos
+  kbcli backuprepo list
+```
 
 ### Options
 
 ```
-  -h, --help   help for backuprepo
+  -A, --all-namespaces    If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -h, --help              help for list
+  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
+      --show-labels       When printing, show all labels as the last column (default hide labels column)
 ```
 
 ### Options inherited from parent commands
@@ -36,10 +51,7 @@ BackupRepo command.
 
 ### SEE ALSO
 
-
-* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
-* [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backuprepo.
-* [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List BackupRepo.
+* [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

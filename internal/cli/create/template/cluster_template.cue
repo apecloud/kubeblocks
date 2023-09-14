@@ -50,7 +50,7 @@ content: {
 			nodeLabels:      options.nodeLabels
 			tenancy:         options.tenancy
 		}
-		backup: options.backupConfig
+		backup:            options.backupConfig
 		tolerations:       options.tolerations
 		componentSpecs:    options.componentSpecs
 		terminationPolicy: options.terminationPolicy

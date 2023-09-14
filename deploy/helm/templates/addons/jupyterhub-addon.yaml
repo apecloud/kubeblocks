@@ -14,10 +14,14 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/jupyterhub-0.1.0.tgz
-    installValues:
-      setValues:
-        - proxy.service.type=ClusterIP
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "jupyterhub" "version" "0.1.0" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 0.1.0
+      {{- end }}
+
   installable:
     autoInstall: false
 

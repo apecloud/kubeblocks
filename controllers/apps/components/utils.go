@@ -818,3 +818,40 @@ func updateCustomLabelToObjs(clusterName, uid, componentName string,
 	}
 	return nil
 }
+
+// IsComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
+func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Client,
+	cluster *appsv1alpha1.Cluster, rsm *workloads.ReplicatedStateMachine) (bool, error) {
+	if cluster == nil || rsm == nil {
+		return false, nil
+	}
+	// check whether component spec has been sent to rsm
+	rsmComponentGeneration := rsm.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	if cluster.Status.ObservedGeneration != cluster.Generation ||
+		rsmComponentGeneration != strconv.FormatInt(cluster.Generation, 10) {
+		return false, nil
+	}
+	// check whether rsm spec has been sent to the underlying workload(sts)
+	if rsm.Status.ObservedGeneration != rsm.Generation ||
+		rsm.Status.CurrentGeneration != rsm.Generation {
+		return false, nil
+	}
+	// check whether the underlying workload(sts) has sent the latest template to pods
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		return false, err
+	}
+	if sts.Status.ObservedGeneration != sts.Generation {
+		return false, nil
+	}
+	pods, err := listPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
+	if err != nil {
+		return false, err
+	}
+	for _, pod := range pods {
+		if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
+			return false, nil
+		}
+	}
+	return true, nil
+}

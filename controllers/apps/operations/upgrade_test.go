@@ -78,7 +78,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				clusterObject.Name, appsv1alpha1.UpgradeType)
 			ops.Spec.Upgrade = &appsv1alpha1.Upgrade{ClusterVersionRef: newClusterVersionName}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase,
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase,
 				consensusComp, statelessComp, statefulComp) // appsv1alpha1.VerticalScalingPhase
 			// TODO: add status condition for VerticalScalingPhase
 

@@ -21,11 +21,9 @@ package officalpostgres
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -412,7 +410,7 @@ func (mgr *Manager) executeRewind() error {
 
 func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluster) bool {
 	var needRewind bool
-	var historys []*postgres.History
+	var history *postgres.HistoryFile
 
 	isRecovery, localTimeLine, localLsn := mgr.getLocalTimeLineAndLsn(ctx)
 	if localTimeLine == 0 || localLsn == 0 {
@@ -437,11 +435,16 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 	case localTimeLine == primaryTimeLine:
 		needRewind = false
 	case primaryTimeLine > 1:
-		historys = mgr.getHistory()
+		history = mgr.getHistory(cluster.GetMemberAddr(*cluster.GetLeaderMember()), primaryTimeLine)
 	}
 
-	if len(historys) != 0 {
-		for _, h := range historys {
+	if len(history.History) != 0 {
+		// use a boolean value to check if the loop should exit early
+		exitFlag := false
+		for _, h := range history.History {
+			// Don't need to rewind just when:
+			// for replica: replayed location is not ahead of switchpoint
+			// for the former primary: end of checkpoint record is the same as switchpoint
 			if h.ParentTimeline == localTimeLine {
 				switch {
 				case isRecovery:
@@ -451,11 +454,16 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 				default:
 					// TODO:get checkpoint end
 				}
+				exitFlag = true
 				break
 			} else if h.ParentTimeline > localTimeLine {
 				needRewind = true
+				exitFlag = true
 				break
 			}
+		}
+		if !exitFlag {
+			needRewind = true
 		}
 	}
 
@@ -463,18 +471,13 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 }
 
 func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("psql", "-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get primary time line failed, err:%v, stderr%s", err, stderr.String())
+	resp, err := postgres.Psql("-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
+	if err != nil {
+		mgr.Logger.Errorf("get primary time line failed, err:%v", err)
 		return 0, err
 	}
 
-	stdoutList := strings.Split(stdout.String(), "\n")
+	stdoutList := strings.Split(resp, "\n")
 	value := stdoutList[2]
 	values := strings.Split(value, "|")
 
@@ -569,18 +572,13 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
 func (mgr *Manager) getPgControlData() *map[string]string {
 	result := map[string]string{}
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("pg_controldata")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get pg control data failed, err:%v, stderr: %s", err, stderr.String())
+	resp, err := postgres.ExecCommand("pg_controldata")
+	if err != nil {
+		mgr.Logger.Errorf("get pg control data failed, err:%v", err)
 		return &result
 	}
 
-	stdoutList := strings.Split(stdout.String(), "\n")
+	stdoutList := strings.Split(resp, "\n")
 	for _, s := range stdoutList {
 		out := strings.Split(s, ":")
 		if len(out) == 2 {
@@ -645,8 +643,14 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) (map[string]map[stri
 }
 
 // TODO: Parse history file
-func (mgr *Manager) getHistory() []*postgres.History {
-	return nil
+func (mgr *Manager) getHistory(host string, timeline int64) *postgres.HistoryFile {
+	resp, err := postgres.Psql("-h", host, "replication=database", "-c", fmt.Sprintf("TIMELINE_HISTORY %d", timeline))
+	if err != nil {
+		mgr.Logger.Errorf("get history failed, err:%v", err)
+		return nil
+	}
+
+	return postgres.ParseHistory(resp)
 }
 
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
@@ -660,22 +664,18 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return err
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("su", "-c", "pg_ctl promote", "postgres")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err = cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("promote failed, err:%v, stderr:%s", err, stderr.String())
+	resp, err := postgres.PgCtl("promote")
+	if err != nil {
+		mgr.Logger.Errorf("promote failed, err:%v", err)
 		return err
 	}
-	mgr.Logger.Infof("promote success, response:%s", stdout.String())
 
 	err = mgr.postPromote()
 	if err != nil {
 		return err
 	}
+
+	mgr.Logger.Infof("promote success, response:%s", resp)
 	return nil
 }
 
@@ -703,14 +703,9 @@ func (mgr *Manager) Stop() error {
 		return err
 	}
 
-	var stdout, stderr bytes.Buffer
-	stopCmd := exec.Command("su", "-c", "pg_ctl stop -m fast", "postgres")
-	stopCmd.Stdout = &stdout
-	stopCmd.Stderr = &stderr
-
-	err = stopCmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
+	_, err = postgres.PgCtl("stop -m fast")
+	if err != nil {
+		mgr.Logger.Errorf("pg_ctl stop failed, err:%v", err)
 		return err
 	}
 

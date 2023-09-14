@@ -148,13 +148,11 @@ var _ = Describe("utils test", func() {
 			rsm.Status.MembersStatus = oldMembersStatus
 			setMembersStatus(rsm, pods)
 
-			Expect(rsm.Status.MembersStatus).Should(HaveLen(len(oldMembersStatus)))
+			Expect(rsm.Status.MembersStatus).Should(HaveLen(2))
 			Expect(rsm.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
 			Expect(rsm.Status.MembersStatus[0].Name).Should(Equal("leader"))
-			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-2"))
+			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-0"))
 			Expect(rsm.Status.MembersStatus[1].Name).Should(Equal("follower"))
-			Expect(rsm.Status.MembersStatus[2].PodName).Should(Equal("pod-0"))
-			Expect(rsm.Status.MembersStatus[2].Name).Should(Equal("follower"))
 		})
 	})
 

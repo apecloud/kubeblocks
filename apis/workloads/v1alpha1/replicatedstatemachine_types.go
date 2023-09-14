@@ -131,6 +131,10 @@ type ReplicatedStateMachineStatus struct {
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
 
+	// CurrentGeneration, if not empty, indicates the version of the RSM used to generate the underlying workload
+	// +optional
+	CurrentGeneration int64 `json:"currentGeneration,omitempty"`
+
 	// members' status.
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`

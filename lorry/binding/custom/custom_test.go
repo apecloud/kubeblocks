@@ -28,8 +28,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/lorry/util"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -114,10 +112,10 @@ func TestGlobalInfo(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			response := binding.ProbeResponse{}
 			info, err := hs.GetGlobalInfo(context.TODO(), &binding.ProbeRequest{
-				Operation: util.OperationKind(tc.operation),
+				Operation: OperationKind(tc.operation),
 			}, &response)
 			require.NoError(t, err)
-			assert.Equal(t, util.OperationSuccess, info.Event)
+			assert.Equal(t, OperationSuccess, info.Event)
 			assert.Equal(t, 3, len(info.PodName2Role))
 			assert.Equal(t, 1, info.Term)
 		})

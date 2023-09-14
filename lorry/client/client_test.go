@@ -183,7 +183,7 @@ func TestJoinMember(t *testing.T) {
 			Event: RespEveSucc,
 		}
 		respData, _ := json.Marshal(sqlResponse)
-		port := initHttpServer(respData)
+		port := initHTTPServer(respData)
 
 		cli, closer, err := initSQLChannelClient(port, t)
 		if err != nil {
@@ -214,7 +214,7 @@ func TestLeaveMember(t *testing.T) {
 			Event: RespEveSucc,
 		}
 		respData, _ := json.Marshal(sqlResponse)
-		port := initHttpServer(respData)
+		port := initHTTPServer(respData)
 
 		cli, closer, err := initSQLChannelClient(port, t)
 		if err != nil {
@@ -332,7 +332,7 @@ func initSQLChannelClient(httpPort int, t *testing.T) (*OperationClient, func(),
 	return cli, closer, err
 }
 
-func initHttpServer(resp []byte) int {
+func initHTTPServer(resp []byte) int {
 	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(200)
 		_, _ = writer.Write(resp)

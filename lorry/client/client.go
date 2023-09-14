@@ -75,7 +75,7 @@ type OperationClient struct {
 	Client           *http.Client
 	Port             int32
 	CharacterType    string
-	Url              string
+	URL              string
 	cache            map[string]*OperationResult
 	CacheTTL         time.Duration
 	ReconcileTimeout time.Duration
@@ -122,7 +122,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		Client:           client,
 		Port:             port,
 		CharacterType:    characterType,
-		Url:              fmt.Sprintf(urlTemplate, port, characterType),
+		URL:              fmt.Sprintf(urlTemplate, port, characterType),
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
@@ -136,7 +136,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 	defer cancel()
 
 	// Http request
-	url := fmt.Sprintf("%s?operation=%s", cli.Url, GetRoleOperation)
+	url := fmt.Sprintf("%s?operation=%s", cli.URL, GetRoleOperation)
 
 	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodGet, nil)
 	if err != nil {
@@ -158,7 +158,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
 	defer cancel()
-	url := fmt.Sprintf("%s?operation=%s", cli.Url, ListSystemAccountsOp)
+	url := fmt.Sprintf("%s?operation=%s", cli.URL, ListSystemAccountsOp)
 	var resp *http.Response
 	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodGet, nil)
 	if err != nil {
@@ -200,7 +200,7 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	defer cancel()
 
 	// Request sql channel via http request
-	url := fmt.Sprintf("%s?operation=%s", cli.Url, operation)
+	url := fmt.Sprintf("%s?operation=%s", cli.URL, operation)
 
 	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodPost, nil)
 	if err != nil {

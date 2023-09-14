@@ -331,71 +331,71 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 	}
 }
 
-func injectHttp2Shell(pod *corev1.PodSpec) {
-	// inject shared volume
-	agentVolume := corev1.Volume{
-		Name: constant.ProbeAgentMountName,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	}
-	pod.Volumes = append(pod.Volumes, agentVolume)
-
-	// inject shell2http
-	volumeMount := corev1.VolumeMount{
-		Name:      constant.ProbeAgentMountName,
-		MountPath: constant.ProbeAgentMountPath,
-	}
-	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
-	initContainer := corev1.Container{
-		Name:            constant.ProbeAgent,
-		Image:           constant.ProbeAgentImage,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		VolumeMounts:    []corev1.VolumeMount{volumeMount},
-		Command: []string{
-			"cp",
-			constant.OriginBinaryPath,
-			binPath,
-		},
-	}
-	pod.InitContainers = append(pod.InitContainers, initContainer)
-}
-
-func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
-	port []int32, path, usage string,
-	credentialEnv []corev1.EnvVar) {
-	// todo: uncomment to enable new lorry way
-	// actions := probeSetting.Actions
-	// volumeMount := corev1.VolumeMount{
-	//	Name:      constant.ProbeAgentMountName,
-	//	MountPath: constant.ProbeAgentMountPath,
-	// }
-	// binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
-	//
-	// for i, action := range actions {
-	//	image := action.Image
-	//	if len(action.Image) == 0 {
-	//		image = constant.DefaultActionImage
-	//	}
-	//
-	//	command := []string{
-	//		binPath,
-	//		"-port", fmt.Sprintf("%d", port[i]),
-	//		"-export-all-vars",
-	//		"-form",
-	//		path,
-	//		strings.Join(action.Command, " "),
-	//	}
-	//
-	//	container := corev1.Container{
-	//		Name:            fmt.Sprintf("%s-action-%d", usage, i),
-	//		Image:           image,
-	//		ImagePullPolicy: corev1.PullIfNotPresent,
-	//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
-	//		Env:             credentialEnv,
-	//		Command:         command,
-	//	}
-	//
-	//	pod.Containers = append(pod.Containers, container)
-	// }
-}
+// func injectHttp2Shell(pod *corev1.PodSpec) {
+//	// inject shared volume
+//	agentVolume := corev1.Volume{
+//		Name: constant.ProbeAgentMountName,
+//		VolumeSource: corev1.VolumeSource{
+//			EmptyDir: &corev1.EmptyDirVolumeSource{},
+//		},
+//	}
+//	pod.Volumes = append(pod.Volumes, agentVolume)
+//
+//	// inject shell2http
+//	volumeMount := corev1.VolumeMount{
+//		Name:      constant.ProbeAgentMountName,
+//		MountPath: constant.ProbeAgentMountPath,
+//	}
+//	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
+//	initContainer := corev1.Container{
+//		Name:            constant.ProbeAgent,
+//		Image:           constant.ProbeAgentImage,
+//		ImagePullPolicy: corev1.PullIfNotPresent,
+//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
+//		Command: []string{
+//			"cp",
+//			constant.OriginBinaryPath,
+//			binPath,
+//		},
+//	}
+//	pod.InitContainers = append(pod.InitContainers, initContainer)
+//}
+//
+//func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
+//	port []int32, path, usage string,
+//	credentialEnv []corev1.EnvVar) {
+//	// todo: uncomment to enable new lorry way
+//	// actions := probeSetting.Actions
+//	// volumeMount := corev1.VolumeMount{
+//	//	Name:      constant.ProbeAgentMountName,
+//	//	MountPath: constant.ProbeAgentMountPath,
+//	// }
+//	// binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
+//	//
+//	// for i, action := range actions {
+//	//	image := action.Image
+//	//	if len(action.Image) == 0 {
+//	//		image = constant.DefaultActionImage
+//	//	}
+//	//
+//	//	command := []string{
+//	//		binPath,
+//	//		"-port", fmt.Sprintf("%d", port[i]),
+//	//		"-export-all-vars",
+//	//		"-form",
+//	//		path,
+//	//		strings.Join(action.Command, " "),
+//	//	}
+//	//
+//	//	container := corev1.Container{
+//	//		Name:            fmt.Sprintf("%s-action-%d", usage, i),
+//	//		Image:           image,
+//	//		ImagePullPolicy: corev1.PullIfNotPresent,
+//	//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
+//	//		Env:             credentialEnv,
+//	//		Command:         command,
+//	//	}
+//	//
+//	//	pod.Containers = append(pod.Containers, container)
+//	// }
+// }

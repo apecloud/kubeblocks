@@ -22,6 +22,7 @@ package postgres
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -323,8 +324,8 @@ func ParsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
-func formatPgLsn(lsn int64) string {
-	return ""
+func FormatPgLsn(lsn int64) string {
+	return fmt.Sprintf("%X/%X", lsn>>32, lsn&0xFFFFFFFF)
 }
 
 func ParsePrimaryConnInfo(str string) map[string]string {

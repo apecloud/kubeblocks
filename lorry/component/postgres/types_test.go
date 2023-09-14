@@ -170,6 +170,15 @@ func TestParsePGLsn(t *testing.T) {
 	})
 }
 
+func TestFormatPgLsn(t *testing.T) {
+	t.Run("format lsn", func(t *testing.T) {
+		lsn := int64(97500059720)
+
+		lsnStr := FormatPgLsn(lsn)
+		assert.Equal(t, "16/B374D848", lsnStr)
+	})
+}
+
 func TestParsePrimaryConnInfo(t *testing.T) {
 	t.Run("legal primary conn info str", func(t *testing.T) {
 		primaryConnInfoStr := "host=pg-pg-replication-0.pg-pg-replication-headless port=5432 user=postgres application_name=my-application"

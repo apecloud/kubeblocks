@@ -35,6 +35,7 @@ import (
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -88,8 +89,12 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
+	serviceReferences, err := plan.GenServiceReferences(reqCtx, cli, cluster, compDef, compSpec)
+	if err != nil {
+		return nil, err
+	}
 
-	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, definition, compDef, compSpec, compVer)
+	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, definition, compDef, compSpec, serviceReferences, compVer)
 	if err != nil {
 		return nil, err
 	}

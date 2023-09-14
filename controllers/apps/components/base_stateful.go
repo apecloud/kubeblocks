@@ -24,13 +24,16 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -122,8 +125,6 @@ func (c *rsmComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
-
 	return nil
 }
 
@@ -168,13 +169,89 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 
-	statusTxn := &statusReconciliationTxn{}
-
-	if err := c.statusExpandVolume(reqCtx, cli, statusTxn); err != nil {
+	isDeleting := func() bool {
+		return !c.runningWorkload.DeletionTimestamp.IsZero()
+	}()
+	isZeroReplica := func() bool {
+		return (c.runningWorkload.Spec.Replicas == nil || *c.runningWorkload.Spec.Replicas == 0) && c.Component.Replicas == 0
+	}()
+	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil {
 		return err
 	}
+	hasComponentPod := func() bool {
+		return len(pods) > 0
+	}()
+	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, c.runningWorkload)
+	if err != nil {
+		return err
+	}
+	isAllConfigSynced := c.isAllConfigSynced(reqCtx, cli)
+	hasFailedPod, messages, err := c.hasFailedPod(reqCtx, cli, pods)
+	if err != nil {
+		return err
+	}
+	isScaleOutFailed, err := c.isScaleOutFailed(reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	hasRunningVolumeExpansion, hasFailedVolumeExpansion, err := c.hasVolumeExpansionRunning(reqCtx, cli)
+	if err != nil {
+		return err
+	}
+	hasFailure := func() bool {
+		return hasFailedPod || isScaleOutFailed || hasFailedVolumeExpansion
+	}()
+	isComponentAvailable, err := c.isAvailable(reqCtx, cli, pods)
+	if err != nil {
+		return err
+	}
+	isInCreatingPhase := func() bool {
+		phase := c.getComponentStatus().Phase
+		return phase == "" || phase == appsv1alpha1.CreatingClusterCompPhase
+	}()
 
-	if err := c.horizontalScale(reqCtx, cli, statusTxn); err != nil {
+	updatePodsReady := func(ready bool) {
+		_ = c.updateStatus("", func(status *appsv1alpha1.ClusterComponentStatus) error {
+			// if ready flag not changed, don't update the ready time
+			if status.PodsReady != nil && *status.PodsReady == ready {
+				return nil
+			}
+			status.PodsReady = &ready
+			if ready {
+				time := metav1.Now()
+				status.PodsReadyTime = &time
+			}
+			return nil
+		})
+	}
+
+	podsReady := false
+	switch {
+	case isDeleting:
+		c.SetStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "Component is Deleting")
+	case isZeroReplica && hasComponentPod:
+		c.SetStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "Component is Stopping")
+		podsReady = true
+	case isZeroReplica:
+		c.SetStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "Component is Stopped")
+		podsReady = true
+	case isRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
+		c.SetStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "Component is Running")
+		podsReady = true
+	case !hasFailure && isInCreatingPhase:
+		c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
+	case !hasFailure:
+		c.SetStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "Component is Updating")
+	case !isComponentAvailable:
+		c.SetStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "Component is Failed")
+	default:
+		c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "unknown")
+	}
+	updatePodsReady(podsReady)
+
+	// works should continue to be done after spec updated.
+	if err := c.horizontalScale(reqCtx, cli); err != nil {
 		return err
 	}
 
@@ -184,31 +261,6 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		for _, v := range vertexes {
 			c.Dag.AddVertex(v)
 		}
-	}
-
-	// TODO(impl): restart pod if needed, move it to @Update and restart pod directly.
-	if vertexes, err := c.ComponentSet.HandleRestart(reqCtx.Ctx, c.runningWorkload); err != nil {
-		return err
-	} else {
-		for _, v := range vertexes {
-			c.Dag.AddVertex(v)
-		}
-	}
-
-	var delayedRequeueError error
-	if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
-		if !intctrlutil.IsDelayedRequeueError(err) {
-			return err
-		}
-		delayedRequeueError = err
-	}
-
-	if err := c.statusConfig(reqCtx, cli, statusTxn); err != nil {
-		return err
-	}
-
-	if err := statusTxn.commit(); err != nil {
-		return err
 	}
 
 	c.updateWorkload(c.runningWorkload)
@@ -224,7 +276,126 @@ func (c *rsmComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 
-	return delayedRequeueError
+	return nil
+}
+
+// isAvailable tells whether the component is basically available, ether working well or in a fragile state:
+// 1. at least one pod is available
+// 2. with latest revision
+// 3. and with leader role label set
+func (c *rsmComponentBase) isAvailable(reqCtx intctrlutil.RequestCtx, cli client.Client, pods []*corev1.Pod) (bool, error) {
+	if isLatestRevision, err := IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
+		return false, err
+	} else if !isLatestRevision {
+		return false, nil
+	}
+
+	shouldCheckLeader := func() bool {
+		return c.Component.WorkloadType == appsv1alpha1.Consensus || c.Component.WorkloadType == appsv1alpha1.Replication
+	}()
+	hasLeaderRoleLabel := func(pod *corev1.Pod) bool {
+		roleName, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok {
+			return false
+		}
+		for _, replicaRole := range c.runningWorkload.Spec.Roles {
+			if roleName == replicaRole.Name && replicaRole.IsLeader {
+				return true
+			}
+		}
+		return false
+	}
+	for _, pod := range pods {
+		if !podutils.IsPodAvailable(pod, 0, metav1.Time{Time: time.Now()}) {
+			continue
+		}
+		if !shouldCheckLeader {
+			continue
+		}
+		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
+			continue
+		}
+		if hasLeaderRoleLabel(pod) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c *rsmComponentBase) hasFailedPod(reqCtx intctrlutil.RequestCtx, cli client.Client, pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
+	if isLatestRevision, err := IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, c.Cluster, c.runningWorkload); err != nil {
+		return false, nil, err
+	} else if !isLatestRevision {
+		return false, nil, nil
+	}
+
+	var messages appsv1alpha1.ComponentMessageMap
+	// check pod readiness
+	hasFailedPod, msg, _ := hasFailedAndTimedOutPod(pods)
+	if hasFailedPod {
+		messages = msg
+		return true, messages, nil
+	}
+	// check role probe
+	if c.Component.WorkloadType != appsv1alpha1.Consensus && c.Component.WorkloadType != appsv1alpha1.Replication {
+		return false, messages, nil
+	}
+	hasProbeTimeout := false
+	for _, pod := range pods {
+		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
+			continue
+		}
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type != corev1.PodReady || condition.Status != corev1.ConditionTrue {
+				continue
+			}
+			podsReadyTime := &condition.LastTransitionTime
+			if isProbeTimeout(c.Component.Probes, podsReadyTime) {
+				hasProbeTimeout = true
+				if messages == nil {
+					messages = appsv1alpha1.ComponentMessageMap{}
+				}
+				messages.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+			}
+		}
+	}
+	return hasProbeTimeout, messages, nil
+}
+
+func (c *rsmComponentBase) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
+	if c.runningWorkload.Spec.Replicas == nil {
+		return false, nil
+	}
+	if c.Component.Replicas <= *c.runningWorkload.Spec.Replicas {
+		return false, nil
+	}
+	if c.WorkloadVertex == nil {
+		return false, nil
+	}
+	stsObj := ConvertRSMToSTS(c.runningWorkload)
+	rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	stsProto := ConvertRSMToSTS(rsmProto)
+	backupKey := types.NamespacedName{
+		Namespace: stsObj.Namespace,
+		Name:      stsObj.Name + "-scaling",
+	}
+	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	if err != nil {
+		return false, err
+	}
+	if status, err := d.checkBackupStatus(); err != nil {
+		return false, err
+	} else if status == backupStatusFailed {
+		return true, nil
+	}
+	for _, name := range d.pvcKeysToRestore() {
+		if status, err := d.checkRestoreStatus(name); err != nil {
+			return false, err
+		} else if status == backupStatusFailed {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *rsmComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -425,29 +596,7 @@ func (c *rsmComponentBase) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli clie
 	return nil
 }
 
-func (c *rsmComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
-		running, failed, err := c.hasVolumeExpansionRunning(reqCtx, cli, vct.Name)
-		if err != nil {
-			return err
-		}
-		if failed {
-			txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "Volume Expansion failed")
-			})
-			return nil
-		}
-		if running {
-			txn.propose(appsv1alpha1.SpecReconcilingClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Volume Expansion failed")
-			})
-			return nil
-		}
-	}
-	return nil
-}
-
-func (c *rsmComponentBase) statusConfig(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *rsmComponentBase) isAllConfigSynced(reqCtx intctrlutil.RequestCtx, cli client.Client) bool {
 	checkFinishedReconfigure := func(cm *corev1.ConfigMap) bool {
 		labels := cm.GetLabels()
 		annotations := cm.GetAnnotations()
@@ -457,14 +606,11 @@ func (c *rsmComponentBase) statusConfig(reqCtx intctrlutil.RequestCtx, cli clien
 		hash, _ := util.ComputeHash(cm.Data)
 		return labels[constant.CMInsConfigurationHashLabelKey] == hash
 	}
-	proposePhase := func(phase appsv1alpha1.ClusterComponentPhase, phaseTransitionMsg string) {
-		txn.propose(phase, func() {
-			c.SetStatusPhase(phase, nil, phaseTransitionMsg)
-		})
-	}
+
 	var (
-		cmKey client.ObjectKey
-		cmObj = &corev1.ConfigMap{}
+		cmKey           client.ObjectKey
+		cmObj           = &corev1.ConfigMap{}
+		allConfigSynced = true
 	)
 	for _, configSpec := range c.Component.ConfigTemplates {
 		cmKey = client.ObjectKey{
@@ -472,49 +618,49 @@ func (c *rsmComponentBase) statusConfig(reqCtx intctrlutil.RequestCtx, cli clien
 			Name:      cfgcore.GetComponentCfgName(c.GetClusterName(), c.GetName(), configSpec.Name),
 		}
 		if err := cli.Get(reqCtx.Ctx, cmKey, cmObj); err != nil {
-			return err
+			return true
 		}
-		if checkFinishedReconfigure(cmObj) {
-			proposePhase(appsv1alpha1.RunningClusterCompPhase, "Config reloading succeed")
-		} else {
-			proposePhase(appsv1alpha1.SpecReconcilingClusterCompPhase, "Config is reloading")
+		if !checkFinishedReconfigure(cmObj) {
+			allConfigSynced = false
+			break
 		}
-
 	}
-	return nil
+	return allConfigSynced
 }
 
-func (c *rsmComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string) (bool, bool, error) {
+func (c *rsmComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, bool, error) {
 	var (
 		running bool
 		failed  bool
 	)
-	volumes, err := c.getRunningVolumes(reqCtx, cli, vctName, c.runningWorkload)
-	if err != nil {
-		return false, false, err
-	}
-	for _, v := range volumes {
-		if v.Status.Capacity == nil || v.Status.Capacity.Storage().Cmp(v.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
-			continue
+	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
+		volumes, err := c.getRunningVolumes(reqCtx, cli, vct.Name, c.runningWorkload)
+		if err != nil {
+			return false, false, err
 		}
-		running = true
-		// TODO: how to check the expansion failed?
+		for _, v := range volumes {
+			if v.Status.Capacity == nil || v.Status.Capacity.Storage().Cmp(v.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
+				continue
+			}
+			running = true
+			// TODO: how to check the expansion failed?
+		}
 	}
 	return running, failed, nil
 }
 
 func (c *rsmComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.horizontalScale(reqCtx, cli, nil)
+	return c.horizontalScale(reqCtx, cli)
 }
 
-func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	sts := ConvertRSMToSTS(c.runningWorkload)
 	if sts.Status.ReadyReplicas == c.Component.Replicas {
 		return nil
 	}
 	ret := c.horizontalScaling(sts)
 	if ret == 0 {
-		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
+		if err := c.postScaleIn(reqCtx, cli); err != nil {
 			return err
 		}
 		if err := c.postScaleOut(reqCtx, cli, sts); err != nil {
@@ -595,7 +741,7 @@ func (c *rsmComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	return c.deletePVCs4ScaleIn(reqCtx, cli, stsObj)
 }
 
-func (c *rsmComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *rsmComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return nil
 }
 
@@ -725,11 +871,8 @@ func (c *rsmComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli clien
 func (c *rsmComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, rsmObj *workloads.ReplicatedStateMachine) error {
 	if rsmObj == nil {
 		c.createWorkload()
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
 	} else {
-		if c.updateWorkload(rsmObj) {
-			c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")
-		}
+		c.updateWorkload(rsmObj)
 		// to work around that the scaled PVC will be deleted at object action.
 		if err := c.updateVolumes(reqCtx, cli, rsmObj); err != nil {
 			return err
@@ -743,6 +886,7 @@ func (c *rsmComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestC
 
 func (c *rsmComponentBase) createWorkload() {
 	rsmProto := c.WorkloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	buildWorkLoadAnnotations(rsmProto, c.Cluster)
 	c.WorkloadVertex.Obj = rsmProto
 	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
 }
@@ -769,9 +913,11 @@ func (c *rsmComponentBase) updateWorkload(rsmObj *workloads.ReplicatedStateMachi
 	resolvePodSpecDefaultFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
 	delayUpdatePodSpecSystemFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
-
-	if !reflect.DeepEqual(&rsmObj.Spec, &rsmObjCopy.Spec) {
+	isTemplateUpdated := !reflect.DeepEqual(&rsmObj.Spec, &rsmObjCopy.Spec)
+	if isTemplateUpdated {
 		updatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
+	}
+	if isTemplateUpdated || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
 		c.WorkloadVertex.Obj = rsmObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		return true

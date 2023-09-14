@@ -53,6 +53,9 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if !cluster.IsDeleting() {
 		return nil
 	}
+
+	transCtx.Cluster.Status.Phase = appsv1alpha1.DeletingClusterPhase
+
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
@@ -175,7 +178,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if len(delObjs) == 0 {
 		root.Action = ictrltypes.ActionDeletePtr()
 	} else {
-		root.Action = ictrltypes.ActionNoopPtr()
+		root.Action = ictrltypes.ActionStatusPtr()
 		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")
 	}

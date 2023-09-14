@@ -65,22 +65,14 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-
 	rsm, ok := obj.(*workloads.ReplicatedStateMachine)
 	if !ok {
 		return false, nil
 	}
-	sts := ConvertRSMToSTS(rsm)
-
-	// whether sts is ready
-	isRevisionConsistent, err := isStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
-	if err != nil {
+	if isLatestRevision, err := IsComponentPodsWithLatestRevision(ctx, r.Cli, r.Cluster, rsm); err != nil {
 		return false, err
-	}
-	targetReplicas := r.getReplicas()
-	stsReady := statefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas)
-	if !stsReady {
-		return stsReady, nil
+	} else if !isLatestRevision {
+		return false, nil
 	}
 
 	// whether rsm is ready
@@ -334,7 +326,7 @@ func newRSM(ctx context.Context,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *RSM {
 	reqCtx := intctrlutil.RequestCtx{Log: log.FromContext(ctx).WithValues("rsm-test", def.Name)}
-	synthesizedComponent, _ := component.BuildComponent(reqCtx, nil, cluster, clusterDef, &def, spec)
+	synthesizedComponent, _ := component.BuildComponent(reqCtx, nil, cluster, clusterDef, &def, spec, nil)
 	return &RSM{
 		componentSetBase: componentSetBase{
 			Cli:                  cli,

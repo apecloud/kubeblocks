@@ -50,6 +50,7 @@ type dataClone interface {
 
 	checkBackupStatus() (backupStatus, error)
 	backup() ([]client.Object, error)
+	pvcKeysToRestore() []types.NamespacedName
 	checkRestoreStatus(types.NamespacedName) (backupStatus, error)
 	restore(name types.NamespacedName) ([]client.Object, error)
 }
@@ -311,7 +312,7 @@ func (d *dummyDataClone) clearTmpResources() ([]client.Object, error) {
 }
 
 func (d *dummyDataClone) checkBackupStatus() (backupStatus, error) {
-	panic("runtime error: dummyDataClone.checkBackupStatus called")
+	return backupStatusReadyToUse, nil
 }
 
 func (d *dummyDataClone) backup() ([]client.Object, error) {
@@ -319,7 +320,7 @@ func (d *dummyDataClone) backup() ([]client.Object, error) {
 }
 
 func (d *dummyDataClone) checkRestoreStatus(types.NamespacedName) (backupStatus, error) {
-	panic("runtime error: dummyDataClone.checkRestoreStatus called")
+	return backupStatusReadyToUse, nil
 }
 
 func (d *dummyDataClone) restore(name types.NamespacedName) ([]client.Object, error) {

@@ -21,6 +21,9 @@ package cluster
 
 import (
 	"fmt"
+	"io"
+	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -35,7 +38,10 @@ import (
 
 var clusterRegisterExample = templates.Examples(`
 	# Pull a cluster type to local and register it to "kbcli cluster create" sub-cmd from specified URL
-	kbcli cluster register orioledb --url https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
+	kbcli cluster register orioledb --source https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
+
+	# Register a cluster type from a local path file
+	kbcli cluster register neon -S internal/cli/cluster/charts/neon-cluster.tgz
 `)
 
 type registerOption struct {
@@ -43,7 +49,7 @@ type registerOption struct {
 	genericclioptions.IOStreams
 
 	clusterType cluster.ClusterType
-	url         string
+	source      string
 	alias       string
 }
 
@@ -58,7 +64,7 @@ func newRegisterOption(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newRegisterOption(f, streams)
 	cmd := &cobra.Command{
-		Use:     "register [NAME] --url [CHART-URL]",
+		Use:     "register [NAME] --source [CHART-URL]",
 		Short:   "Pull the cluster chart to the local cache and register the type to 'create' sub-command",
 		Example: clusterRegisterExample,
 		Args:    cobra.ExactArgs(1),
@@ -68,15 +74,16 @@ func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			cmdutil.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().StringVar(&o.url, "url", "", "Specify the cluster type chart download url")
+	cmd.Flags().StringVarP(&o.source, "source", "S", "", "Specify the cluster type chart source, support a URL or a local file path")
 	cmd.Flags().StringVar(&o.alias, "alias", "", "Set the cluster type alias")
-	_ = cmd.MarkFlagRequired("url")
+	_ = cmd.MarkFlagRequired("source")
+
 	return cmd
 }
 
 // validate will check the
 func (o *registerOption) validate() error {
-	re := regexp.MustCompile(`^[a-zA-Z0-9]{1,9}$`)
+	re := regexp.MustCompile(`^[a-zA-Z0-9]{1,16}$`)
 	if !re.MatchString(o.clusterType.String()) {
 		return fmt.Errorf("cluster type %s is not appropriate as a subcommand", o.clusterType.String())
 	}
@@ -87,30 +94,73 @@ func (o *registerOption) validate() error {
 		}
 	}
 
+	if validateSource(o.source) != nil {
+		return fmt.Errorf("your entered `--source` %s, which is neither a URL nor a file that can be found locally", o.source)
+	}
 	return nil
 }
 
 func (o *registerOption) run() error {
-	chartsDownloader, err := helm.NewDownloader(helm.NewConfig("default", "", "", false))
-	if err != nil {
-		return err
-	}
 	// before download, we should check the chart name whether conflict in local cache
 	for _, file := range cluster.CacheFiles {
-		if file.Name() == filepath.Base(o.url) {
+		if file.Name() == filepath.Base(o.source) {
 			return fmt.Errorf("cluster type '%s' register failed due to the cluster chart's name conflict %s", o.clusterType, file.Name())
 		}
 	}
 
-	_, _, err = chartsDownloader.DownloadTo(o.url, "", cluster.CliChartsCacheDir)
-	if err != nil {
-		return err
+	if _, err := url.ParseRequestURI(o.source); err == nil {
+		// source is URL
+		chartsDownloader, err := helm.NewDownloader(helm.NewConfig("default", "", "", false))
+		if err != nil {
+			return err
+		}
+		_, _, err = chartsDownloader.DownloadTo(o.source, "", cluster.CliChartsCacheDir)
+		if err != nil {
+			return err
+		}
+	} else {
+		// source is local_path
+		if err := copyFile(o.source, filepath.Join(cluster.CliChartsCacheDir, filepath.Base(o.source))); err != nil {
+			return err
+		}
 	}
+	// update config
 	cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
 		Name:  o.clusterType,
-		URL:   o.url,
+		URL:   o.source,
 		Alias: o.alias,
 	})
 	return cluster.GlobalClusterChartConfig.WriteConfigs(cluster.CliClusterChartConfig)
+}
 
+func validateSource(source string) error {
+	var err error
+	if _, err = url.ParseRequestURI(source); err == nil {
+		return nil
+	}
+
+	if _, err = os.Stat(source); err == nil {
+		return nil
+	}
+	return err
+}
+
+func copyFile(src, dest string) error {
+	if src == dest {
+		return nil
+	}
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	return err
 }

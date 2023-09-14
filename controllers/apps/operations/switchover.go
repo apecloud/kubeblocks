@@ -49,7 +49,7 @@ type SwitchoverMessage struct {
 func init() {
 	switchoverBehaviour := OpsBehaviour{
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		ToClusterPhase:                     appsv1alpha1.UpdatingClusterPhase,
 		OpsHandler:                         switchoverOpsHandler{},
 		ProcessingReasonInClusterCondition: ProcessingReasonSwitchovering,
 	}
@@ -138,7 +138,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 			continue
 		} else {
 			opsRequest.Status.Components[switchover.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
+				Phase:           appsv1alpha1.UpdatingClusterCompPhase,
 				ProgressDetails: []appsv1alpha1.ProgressStatusDetail{},
 			}
 		}
@@ -193,12 +193,12 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		}
 		if err = checkJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is not succeed", jobName)
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
 			continue
 		} else {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is succeed", jobName)
 			checkJobProcessDetail.Status = appsv1alpha1.SucceedProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
 		}
 
 		// check the current component pod role label whether correct
@@ -211,24 +211,24 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		if err != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress get component %s definition failed", switchover.ComponentName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		}
 		consistency, err = checkPodRoleLabelConsistency(reqCtx.Ctx, cli, opsRes.Cluster, opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName), compDef, &switchover, switchoverCondition)
 		if err != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("waiting for component %s pod role label consistency after switchover", switchover.ComponentName)
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		}
 
 		if !consistency {
 			err = intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for pod role label consistency.")
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		} else {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("check component %s pod role label consistency after switchover is succeed", switchover.ComponentName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.SucceedProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 		}
 
 		// component switchover is successful

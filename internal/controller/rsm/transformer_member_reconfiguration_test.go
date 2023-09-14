@@ -125,7 +125,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		transformer = &MemberReconfigurationTransformer{}
 	})
 
-	Context("cluster initialization", func() {
+	Context("roleful cluster initialization", func() {
 		It("should initialize well", func() {
 			By("initialReplicas=0")
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
@@ -146,6 +146,16 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 				}).Times(1)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(rsm.Status.ReadyInitReplicas).Should(Equal(rsm.Status.InitReplicas))
+		})
+	})
+
+	Context("stateful cluster initialization", func() {
+		It("should work well", func() {
+			By("set spec.roles to nil")
+			rsm.Spec.Roles = nil
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			Expect(rsm.Status.InitReplicas).Should(BeEquivalentTo(0))
+			Expect(rsm.Status.ReadyInitReplicas).Should(BeEquivalentTo(0))
 		})
 	})
 

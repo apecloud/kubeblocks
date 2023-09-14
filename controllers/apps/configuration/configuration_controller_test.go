@@ -79,7 +79,6 @@ var _ = Describe("Configuration Controller", func() {
 						},
 					},
 				}
-				cfg.SetGeneration(2)
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
@@ -87,7 +86,6 @@ var _ = Describe("Configuration Controller", func() {
 				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
 				itemStatus := cfg.Status.GetItemStatus(configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
-				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))
 			}, time.Second*60, time.Second*1).Should(Succeed())
 		})

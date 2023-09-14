@@ -323,6 +323,10 @@ func ParsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
+func formatPgLsn(lsn int64) string {
+
+}
+
 func ParsePrimaryConnInfo(str string) map[string]string {
 	infos := strings.Split(str, " ")
 	result := make(map[string]string)

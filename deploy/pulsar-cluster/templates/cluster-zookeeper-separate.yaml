@@ -1,4 +1,5 @@
 {{- if .Values.serviceReference.enable }}
+{{- if and (not .Values.serviceReference.zookeeper.serviceDescriptor) (not .Values.serviceReference.zookeeper.cluster) }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -50,4 +51,5 @@ spec:
               requests:
                 storage: {{ .Values.zookeeper.persistence.data.size }}
       {{- end }}
+{{- end }}
 {{- end }}

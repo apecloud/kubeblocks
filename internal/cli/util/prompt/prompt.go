@@ -56,9 +56,10 @@ func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *prom
 
 // Confirm let user double-check for the cluster ops
 // use customMessage to display more information
+// when names are empty, require validation for 'yes'.
 func Confirm(names []string, in io.Reader, customMessage string, prompt string) error {
 	if len(names) == 0 {
-		return nil
+		names = []string{"yes"}
 	}
 	if len(customMessage) != 0 {
 		fmt.Println(customMessage)
@@ -68,6 +69,9 @@ func Confirm(names []string, in io.Reader, customMessage string, prompt string) 
 	}
 	_, err := NewPrompt(prompt,
 		func(entered string) error {
+			if len(names) == 1 && names[0] == "yes" {
+				entered = strings.ToLower(entered)
+			}
 			enteredNames := strings.Split(entered, " ")
 			sort.Strings(names)
 			sort.Strings(enteredNames)

@@ -324,7 +324,7 @@ func ParsePgLsn(str string) int64 {
 }
 
 func formatPgLsn(lsn int64) string {
-
+	return ""
 }
 
 func ParsePrimaryConnInfo(str string) map[string]string {

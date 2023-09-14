@@ -20,10 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -44,4 +49,10 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 		}
 	}
 	return nil
+}
+
+func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj client.Object) error {
+	patch := client.MergeFrom(obj.DeepCopyObject().(client.Object))
+	controllerutil.RemoveFinalizer(obj, dptypes.DataProtectionFinalizerName)
+	return cli.Patch(ctx, obj, patch)
 }

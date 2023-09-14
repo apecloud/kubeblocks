@@ -13,14 +13,16 @@ spec:
     podSelector:
       matchLabels:
         app.kubernetes.io/component: mysql
-        app.kubernetes.io/instance: cornel27
+        app.kubernetes.io/instance: azolla35
+        app.kubernetes.io/managed-by: kubeblocks
     connectionCredential:
-      secretName: cornel27-conn-credential
+      secretName: azolla35-conn-credential
       usernameKey: username
       passwordKey: password
       portKey: port
       hostKey: host
       endpointKey: endpoint
+    serviceAccountName: kb-azolla35
   backupMethods:
   - name: xtrabackup
     snapshotVolumes: false

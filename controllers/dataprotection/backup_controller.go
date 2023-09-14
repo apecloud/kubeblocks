@@ -61,11 +61,6 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
-const (
-	backupPathBase                 = "/backupdata"
-	deleteBackupFilesJobNamePrefix = "delete-"
-)
-
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -398,9 +393,13 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
 	request.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 
+	duration, err := original.Spec.RetentionPeriod.ToDuration()
+	if err != nil {
+		return fmt.Errorf("failed to parse retention period %s, %v", original.Spec.RetentionPeriod, err)
+	}
 	if original.Spec.RetentionPeriod != "" {
-		original.Status.Expiration = &metav1.Time{
-			Time: request.Status.StartTimestamp.Add(original.Spec.RetentionPeriod.ToDuration()),
+		request.Status.Expiration = &metav1.Time{
+			Time: request.Status.StartTimestamp.Add(duration),
 		}
 	}
 	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
@@ -429,7 +428,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	request.Labels[dataProtectionLabelBackupTypeKey] = request.GetBackupType()
 
-	// the backupRepo PVC is not present, add a special label and wait for the
+	// if the backupRepo PVC is not present, add a special label and wait for the
 	// backup repo controller to create the PVC.
 	wait := false
 	if request.BackupRepoPVC == nil {

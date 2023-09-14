@@ -21,11 +21,11 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.backupRepoName
+      name: BACKUP-REPO
+      type: string
     - jsonPath: .status.phase
       name: STATUS
-      type: string
-    - jsonPath: .status.lastScheduleTime
-      name: LAST SCHEDULE
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
@@ -502,10 +502,10 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: 'BackupPolicy phase, valid values are: Available, Failed.'
+                description: phase - in list of [Available,Unavailable]
                 enum:
                 - Available
-                - Failed
+                - Unavailable
                 type: string
             type: object
         type: object

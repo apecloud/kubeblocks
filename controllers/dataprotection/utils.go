@@ -26,7 +26,6 @@ import (
 	"strings"
 	"sync"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -159,28 +158,8 @@ func getCluster(ctx context.Context,
 	return cluster
 }
 
-// generateCRNameByBackupSchedule gets the CR name which is created by BackupSchedule, such as CronJob Backup.
-func generateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
-	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupSchedule(backupSchedule), backupSchedule.Namespace)
-	if len(name) > 30 {
-		name = strings.TrimRight(name[:30], "-")
-	}
-	return fmt.Sprintf("%s-%s", name, method)
-}
-
 func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-}
-
-func excludeLabelsForWorkload() []string {
-	return []string{constant.KBAppComponentLabelKey}
-}
-
-func buildAutoCreationAnnotations(backupPolicyName string) map[string]string {
-	return map[string]string{
-		dataProtectionAnnotationCreateByPolicyKey: "true",
-		dataProtectionLabelBackupPolicyKey:        backupPolicyName,
-	}
 }
 
 // getBackupPath gets the path to storage backup datas.
@@ -208,14 +187,6 @@ func sendWarningEventForError(recorder record.EventRecorder, backup *dpv1alpha1.
 		recorder.Eventf(backup, corev1.EventTypeWarning, "FailedCreatedBackup",
 			"Creating backup failed, error: %s", err.Error())
 	}
-}
-
-func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) string {
-	uniqueName := backupSchedule.Name
-	if len(backupSchedule.OwnerReferences) > 0 {
-		uniqueName = fmt.Sprintf("%s-%s", backupSchedule.OwnerReferences[0].UID[:8], backupSchedule.OwnerReferences[0].Name)
-	}
-	return uniqueName
 }
 
 func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.BackupRepo, error) {
@@ -343,13 +314,4 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 		name = flatten
 	}
 	return
-}
-
-func containsJobCondition(job *batchv1.Job, jobCondType batchv1.JobConditionType) bool {
-	for _, jobCond := range job.Status.Conditions {
-		if jobCond.Type == jobCondType {
-			return true
-		}
-	}
-	return false
 }

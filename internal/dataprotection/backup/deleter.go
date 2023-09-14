@@ -201,7 +201,7 @@ func (d *Deleter) createDeleteBackupFileJob(
 	if err := controllerutil.SetControllerReference(backup, job, d.Scheme); err != nil {
 		return err
 	}
-	d.Log.V(1).Info("create a job from delete backup files", "job", job)
+	d.Log.V(1).Info("create a job to delete backup files", "job", job)
 	return client.IgnoreAlreadyExists(d.Client.Create(d.Ctx, job))
 }
 

@@ -24,6 +24,12 @@ spec:
     - jsonPath: .spec.backupType
       name: BACKUP-TYPE
       type: string
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -508,6 +514,24 @@ spec:
                     - image
                     type: object
                 type: object
+            type: object
+          status:
+            description: ActionSetStatus defines the observed state of ActionSet
+            properties:
+              message:
+                description: A human-readable message indicating details about why
+                  the ActionSet is in this phase.
+                type: string
+              observedGeneration:
+                description: generation number
+                format: int64
+                type: integer
+              phase:
+                description: phase - in list of [Available,Unavailable]
+                enum:
+                - Available
+                - Unavailable
+                type: string
             type: object
         type: object
     served: true

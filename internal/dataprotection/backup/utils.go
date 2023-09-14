@@ -22,6 +22,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -173,4 +174,21 @@ func buildBackupJobObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.Obj
 
 func buildBackupInfoENV(backupDestinationPath string) string {
 	return backupVolumeMountPath + backupDestinationPath + "/backup.info"
+}
+
+// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
+	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupSchedule(backupSchedule), backupSchedule.Namespace)
+	if len(name) > 30 {
+		name = strings.TrimRight(name[:30], "-")
+	}
+	return fmt.Sprintf("%s-%s", name, method)
+}
+
+func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) string {
+	uniqueName := backupSchedule.Name
+	if len(backupSchedule.OwnerReferences) > 0 {
+		uniqueName = fmt.Sprintf("%s-%s", backupSchedule.OwnerReferences[0].UID[:8], backupSchedule.OwnerReferences[0].Name)
+	}
+	return uniqueName
 }

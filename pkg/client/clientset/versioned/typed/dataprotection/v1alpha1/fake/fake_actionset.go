@@ -96,6 +96,17 @@ func (c *FakeActionSets) Update(ctx context.Context, actionSet *v1alpha1.ActionS
 	return obj.(*v1alpha1.ActionSet), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeActionSets) UpdateStatus(ctx context.Context, actionSet *v1alpha1.ActionSet, opts v1.UpdateOptions) (*v1alpha1.ActionSet, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(actionsetsResource, "status", actionSet), &v1alpha1.ActionSet{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ActionSet), err
+}
+
 // Delete takes name of the actionSet and deletes it. Returns an error if one occurs.
 func (c *FakeActionSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

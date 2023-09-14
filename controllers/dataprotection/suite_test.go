@@ -149,14 +149,14 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(err).ToNot(HaveOccurred())
 
-	//err = (&BackupScheduleReconciler{
-	//	Client:   k8sManager.GetClient(),
-	//	Scheme:   k8sManager.GetScheme(),
-	//	Recorder: k8sManager.GetEventRecorderFor("backup-policy-controller"),
-	//}).SetupWithManager(k8sManager)
-	//Expect(err).ToNot(HaveOccurred())
-	//
-	//err = (&BackupToolReconciler{
+	err = (&BackupScheduleReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("backup-schedule-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	//err = (&BackupPolicyReconciler{
 	//	Client:   k8sManager.GetClient(),
 	//	Scheme:   k8sManager.GetScheme(),
 	//	Recorder: k8sManager.GetEventRecorderFor("backup-tool-controller"),

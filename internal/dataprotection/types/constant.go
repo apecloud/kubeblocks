@@ -46,6 +46,16 @@ const (
 	BackupTypeLabelKeyKey = "dataprotection.kubeblocks.io/backup-type"
 	// DataProtectionLabelBackupNameKey specifies the backup name label key.
 	DataProtectionLabelBackupNameKey = "dataprotection.kubeblocks.io/backup-name"
+	// DataProtectionLabelBackupScheduleKey specifies the backup schedule label key.
+	DataProtectionLabelBackupScheduleKey = "dataprotection.kubeblocks.io/backup-schedule"
+	// DataProtectionLabelBackupPolicyKey specifies the backup policy label key.
+	DataProtectionLabelBackupPolicyKey = "dataprotection.kubeblocks.io/backup-policy"
+	// DataProtectionLabelBackupMethodKey specifies the backup method label key.
+	DataProtectionLabelBackupMethodKey = "dataprotection.kubeblocks.io/backup-method"
+	// DataProtectionLabelBackupTypeKey specifies the backup type label key.
+	DataProtectionLabelBackupTypeKey = "dataprotection.kubeblocks.io/backup-type"
+	// DataProtectionLabelAutoBackupKey specifies the auto backup label key.
+	DataProtectionLabelAutoBackupKey = "dataprotection.kubeblocks.io/autobackup"
 )
 
 // env names

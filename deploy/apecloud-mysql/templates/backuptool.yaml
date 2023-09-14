@@ -9,9 +9,6 @@ spec:
   env:
   - name: DATA_DIR
     value: /data/mysql/data
-  - name: LOG_BIN
-    value: /data/mysql/binlog/mysql-bin
-
   backup:
     preBackup: []
     postBackup: []
@@ -32,7 +29,7 @@ spec:
         --host=${DP_DB_HOST} --user=${DP_DB_USER} --port=${DP_DB_PORT} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
         STOP_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
         TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
-        echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
+        echo "{\"totalSize\":\"$TOTAL_SIZE\",\"timeRange\":{\"start\":\"${START_TIME}\",\"end\":\"${STOP_TIME}\"}}" > ${BACKUP_DIR}/backup.info
       syncProgress:
         enabled: false
         intervalSeconds: 10

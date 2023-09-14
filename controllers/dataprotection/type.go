@@ -20,12 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
-	"embed"
 	"runtime"
 	"time"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -55,11 +51,6 @@ const (
 	// annotation keys
 	dataProtectionSecretTemplateMD5AnnotationKey = "dataprotection.kubeblocks.io/secret-template-md5"
 	dataProtectionTemplateValuesMD5AnnotationKey = "dataprotection.kubeblocks.io/template-values-md5"
-
-	// the key of persistentVolumeTemplate in the configmap.
-	persistentVolumeTemplateKey = "persistentVolume"
-
-	hostNameLabelKey = "kubernetes.io/hostname"
 )
 
 // condition constants
@@ -86,23 +77,4 @@ var reconcileInterval = time.Second
 
 func init() {
 	viper.SetDefault(maxConcurDataProtectionReconKey, runtime.NumCPU()*2)
-}
-
-var (
-	//go:embed cue/*
-	cueTemplates embed.FS
-)
-
-type backupScheduleOptions struct {
-	Name             string          `json:"name"`
-	BackupPolicyName string          `json:"backupPolicyName"`
-	Namespace        string          `json:"namespace"`
-	MgrNamespace     string          `json:"mgrNamespace"`
-	Cluster          string          `json:"cluster"`
-	Schedule         string          `json:"schedule"`
-	BackupMethod     string          `json:"backupMethod"`
-	TTL              metav1.Duration `json:"ttl,omitempty"`
-	ServiceAccount   string          `json:"serviceAccount"`
-	Image            string          `json:"image"`
-	Tolerations      *corev1.PodSpec `json:"tolerations"`
 }

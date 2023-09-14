@@ -249,12 +249,15 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
-// +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.backupType`
+// +kubebuilder:printcolumn:name="POLICY",type=string,JSONPath=`.spec.backupPolicyName`
+// +kubebuilder:printcolumn:name="METHOD",type=string,JSONPath=`.spec.backupMethod`
+// +kubebuilder:printcolumn:name="REPO",type=string,JSONPath=`.status.backupRepoName`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
-// +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="CREATION-TIME",type=string,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=`.status.completionTimestamp`
+// +kubebuilder:printcolumn:name="EXPIRATION-TIME",type=string,JSONPath=`.status.expiration`
 
 // Backup is the Schema for the backups API.
 type Backup struct {

@@ -214,9 +214,9 @@ type RuntimeSettings struct {
 
 // BackupPolicyStatus defines the observed state of BackupPolicy
 type BackupPolicyStatus struct {
-	// BackupPolicy phase, valid values are: Available, Failed.
+	// phase - in list of [Available,Unavailable]
 	// +optional
-	Phase BackupPolicyPhase `json:"phase,omitempty"`
+	Phase Phase `json:"phase,omitempty"`
 
 	// A human-readable message indicating details about why the BackupPolicy is
 	// in this phase.
@@ -228,6 +228,10 @@ type BackupPolicyStatus struct {
 	// updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+func (r *BackupPolicyStatus) GetTerminalPhases() []Phase {
+	return []Phase{AvailablePhase}
 }
 
 // BackupPolicyPhase defines phases for BackupPolicy.
@@ -245,8 +249,8 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp
+// +kubebuilder:printcolumn:name="BACKUP-REPO", type=string, JSONPath=`.spec.backupRepoName`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BackupPolicy is the Schema for the backuppolicies API.

@@ -56,6 +56,25 @@ type ActionSetSpec struct {
 	Restore *RestoreActionSpec `json:"restore,omitempty"`
 }
 
+// ActionSetStatus defines the observed state of ActionSet
+type ActionSetStatus struct {
+	// phase - in list of [Available,Unavailable]
+	// +optional
+	Phase Phase `json:"phase,omitempty"`
+
+	// A human-readable message indicating details about why the ActionSet is in this phase.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// generation number
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+func (r *ActionSetStatus) GetTerminalPhases() []Phase {
+	return []Phase{AvailablePhase}
+}
+
 // BackupType the backup type.
 // +enum
 // +kubebuilder:validation:Enum={Full,Continuous}
@@ -80,7 +99,7 @@ type BackupActionSpec struct {
 	PostBackup []ActionSpec `json:"postBackup,omitempty"`
 }
 
-// BackupDataActionSpec defines how to backup data.
+// BackupDataActionSpec defines how to back up data.
 type BackupDataActionSpec struct {
 	JobActionSpec `json:",inline"`
 
@@ -189,13 +208,16 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=as
 // +kubebuilder:printcolumn:name="BACKUP-TYPE",type="string",JSONPath=".spec.backupType"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ActionSet is the Schema for the backuptools API (defined by provider)
 type ActionSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ActionSetSpec `json:"spec,omitempty"`
+	Spec   ActionSetSpec   `json:"spec,omitempty"`
+	Status ActionSetStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

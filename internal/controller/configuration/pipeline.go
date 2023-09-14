@@ -257,7 +257,7 @@ func (p *updatePipeline) isDone() bool {
 
 func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 	buildTemplate := func() (err error) {
-		p.reconcile = !isFinish(p.ConfigMapObj, p.item)
+		p.reconcile = !IsApplyConfigChanged(p.ConfigMapObj, p.item)
 		if p.isDone() {
 			return
 		}
@@ -272,7 +272,7 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 	return p.Wrap(buildTemplate)
 }
 
-func isFinish(cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
+func IsApplyConfigChanged(cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
 	if cm == nil {
 		return false
 	}

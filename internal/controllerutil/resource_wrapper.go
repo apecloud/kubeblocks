@@ -178,3 +178,12 @@ func (r *ResourceFetcher[T]) ConfigConstraints(ccName string) *T {
 func (r *ResourceFetcher[T]) Complete() error {
 	return r.Err
 }
+
+type fetcher struct {
+	ResourceFetcher[fetcher]
+}
+
+func NewResourceFetcher(resourceCtx *ResourceCtx) *fetcher {
+	f := &fetcher{}
+	return f.Init(resourceCtx, f)
+}

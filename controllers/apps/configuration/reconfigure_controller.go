@@ -248,14 +248,14 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 	returnedStatus, err := policy.Upgrade(params)
 	// TODO delete callback
 	// Replace sync status with configuration.status
-	if err := r.handleConfigEvent(params, core.PolicyExecStatus{
-		PolicyName:    policy.GetPolicyName(),
-		ExecStatus:    string(returnedStatus.Status),
-		SucceedCount:  returnedStatus.SucceedCount,
-		ExpectedCount: returnedStatus.ExpectedCount,
-	}, err); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
-	}
+	// if err := r.HandleConfigEvent(params, core.PolicyExecStatus{
+	//	PolicyName:    policy.GetPolicyName(),
+	//	ExecStatus:    string(returnedStatus.Status),
+	//	SucceedCount:  returnedStatus.SucceedCount,
+	//	ExpectedCount: returnedStatus.ExpectedCount,
+	// }, err); err != nil {
+	//	return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
+	// }
 	if err != nil {
 		params.Ctx.Log.Error(err, "failed to update engine parameters")
 	}
@@ -287,7 +287,7 @@ func getOpsRequestID(cm *corev1.ConfigMap) string {
 	return ""
 }
 
-func (r *ReconfigureReconciler) handleConfigEvent(params reconfigureParams, status core.PolicyExecStatus, err error) error {
+func (r *ReconfigureReconciler) HandleConfigEvent(params reconfigureParams, status core.PolicyExecStatus, err error) error {
 	var (
 		cm             = params.ConfigMap
 		lastOpsRequest = ""

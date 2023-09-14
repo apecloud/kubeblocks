@@ -182,6 +182,11 @@ func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail,
 	if err != nil {
 		return err
 	}
+	if err = validate.NewConfigValidator(&p.configConstraint.Spec, validate.WithKeySelector(configSpec.Keys)).Validate(updatedData); err != nil {
+		p.isFailed = true
+		return err
+	}
+
 	p.configPatch, _, err = cfgcore.CreateConfigPatch(p.ConfigMapObj.Data,
 		updatedData,
 		p.configConstraint.Spec.FormatterConfig.Format,

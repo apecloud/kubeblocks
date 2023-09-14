@@ -29,7 +29,7 @@ const (
 )
 
 const (
-	// SQL Channel env names
+	// Lorry env names
 	KBEnvClusterName     = "KB_CLUSTER_NAME"
 	KBEnvComponentName   = "KB_COMP_NAME"
 	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
@@ -37,5 +37,6 @@ const (
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceRoles    = "KB_SERVICE_ROLES"
 	KBEnvServicePort     = "KB_SERVICE_PORT"
+	KBEnvDataPath        = "KB_DATA_PATH"
 	KBEnvTTL             = "KB_TTL"
 )

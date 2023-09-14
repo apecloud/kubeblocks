@@ -139,6 +139,22 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						SetReplicas(int32(1)).
 						AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
 						Create(&testCtx).GetObject()
+					sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
+						AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+						SetReplicas(int32(1)).
+						AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
+						Create(&testCtx).GetObject()
+					Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+						sts.Status.ObservedGeneration = sts.Generation
+						sts.Status.UpdateRevision = controllerRevision
+					})).Should(Succeed())
+					Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+						rsm.Status.InitReplicas = *rsm.Spec.Replicas
+						rsm.Status.Replicas = *rsm.Spec.Replicas
+						rsm.Status.UpdateRevision = controllerRevision
+						rsm.Status.ObservedGeneration = rsm.Generation
+						rsm.Status.CurrentGeneration = rsm.Generation
+					})).Should(Succeed())
 				}
 
 				podName := fmt.Sprintf("%s-%s-%s", clusterName, compName, testCtx.GetRandomStr())
@@ -150,6 +166,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					AddAppInstanceLabel(clusterName).
 					AddAppComponentLabel(compName).
 					AddAppManangedByLabel().
+					AddControllerRevisionHashLabel(controllerRevision).
 					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
 					Create(&testCtx).GetObject()
 			})
@@ -337,6 +354,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						Create(&testCtx).GetObject()
 					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
 				}
+				Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+					cluster.Status.ObservedGeneration = cluster.Generation
+				})).Should(Succeed())
 			})
 
 			It("should set component status to failed if container is not ready and have error message", func() {
@@ -442,6 +462,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						Create(&testCtx).GetObject()
 					testk8s.InitRSMStatus(testCtx, rsm, controllerRevision)
 				}
+				Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+					cluster.Status.ObservedGeneration = cluster.Generation
+				})).Should(Succeed())
 			})
 
 			It("should set component status to failed if container is not ready and have error message", func() {

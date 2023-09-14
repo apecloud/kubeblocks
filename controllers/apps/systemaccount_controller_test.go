@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("SystemAccount Controller", func() {
@@ -156,7 +158,6 @@ var _ = Describe("SystemAccount Controller", func() {
 	 */
 	getAccounts := func(g Gomega, cluster *appsv1alpha1.Cluster, ml client.MatchingLabels) appsv1alpha1.KBAccountType {
 		secrets := &corev1.SecretList{}
-		g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace))).To(Succeed())
 		g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 		jobs := &batchv1.JobList{}
 		g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
@@ -175,10 +176,23 @@ var _ = Describe("SystemAccount Controller", func() {
 		_ = assureEndpoint(objectKey.Namespace, serviceName, ips[0:1])
 		_ = assureEndpoint(objectKey.Namespace, headlessServiceName, ips[0:clusterEndPointsSize])
 
-		By("Patching Cluster to running phase")
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, objectKey, func(cluster *appsv1alpha1.Cluster) {
-			cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-		})).Should(Succeed())
+		By("Mock the underlying workloads to ready")
+		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, objectKey, compName)
+		rsm := &rsmList.Items[0]
+		podName := fmt.Sprintf("%s-%s-0", objectKey.Name, compName)
+		pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, objectKey.Name, compName,
+			podName, "leader", "ReadWrite")
+		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, objectKey.Name, compName).
+			SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
+		Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+			testk8s.MockRSMReady(rsm, pod)
+		})).ShouldNot(HaveOccurred())
+
+		By("Wait cluster phase to be Running")
+		Eventually(testapps.GetClusterPhase(&testCtx, objectKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
 
 	initSysAccountTestsAndCluster := func(testCases map[string]*sysAcctTestCase) (clustersMap map[string]types.NamespacedName) {

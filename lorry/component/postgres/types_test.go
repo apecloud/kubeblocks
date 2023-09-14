@@ -190,3 +190,23 @@ func TestParsePrimaryConnInfo(t *testing.T) {
 		assert.Equal(t, map[string]string{}, result)
 	})
 }
+
+func TestParseHistory(t *testing.T) {
+	t.Run("parse history success", func(t *testing.T) {
+		historyStr :=
+			`     filename     |                       content
+------------------+------------------------------------------------------
+ 00000003.history | 1       0/50000A0       no recovery target specified+
+                  |                                                     +
+                  | 2       0/60000A0       no recovery target specified+
+                  |`
+
+		history := ParseHistory(historyStr)
+		assert.NotNil(t, history)
+		assert.Len(t, history.History, 2)
+		assert.Equal(t, int64(1), history.History[0].ParentTimeline)
+		assert.Equal(t, int64(2), history.History[1].ParentTimeline)
+		assert.Equal(t, ParsePgLsn("0/50000A0 "), history.History[0].SwitchPoint)
+		assert.Equal(t, ParsePgLsn("0/60000A0 "), history.History[1].SwitchPoint)
+	})
+}

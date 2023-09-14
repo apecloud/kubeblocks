@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	timeout  time.Duration = time.Second * 600
+	timeout  time.Duration = time.Second * 1000
 	interval time.Duration = time.Second * 10
 )
 
@@ -151,19 +151,16 @@ func runTestCases(files []string) {
 				}
 			}, timeout, interval).Should(Succeed())
 			Eventually(func(g Gomega) {
-				clusterStatusResult := e2eutil.CheckClusterStatus(clusterName, nameSpace)
+				clusterStatusResult := e2eutil.CheckClusterStatus(clusterName, nameSpace, "Running")
 				g.Expect(clusterStatusResult).Should(BeTrue())
 			}, timeout, interval).Should(Succeed())
 			testResult = true
 		} else {
 			testResult = false
-			cmd := " kubectl get cluster " + clusterName + "-n " + nameSpace + " | grep mycluster | awk '{print $5}'"
-			clusterStatus := e2eutil.ExecCommand(cmd)
 			Eventually(func(g Gomega) {
-				e2eutil.WaitTime(10000000)
-				g.Expect(strings.TrimSpace(clusterStatus)).Should(Equal("Stopped"))
-			}, timeout, interval)
-			time.Sleep(time.Second * 50)
+				clusterStatusResult := e2eutil.CheckClusterStatus(clusterName, nameSpace, "Stopped")
+				g.Expect(clusterStatusResult).Should(BeTrue())
+			}, timeout, interval).Should(Succeed())
 			testResult = true
 		}
 		fileName := e2eutil.GetPrefix(file, "/")

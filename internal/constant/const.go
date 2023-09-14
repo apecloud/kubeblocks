@@ -114,6 +114,7 @@ const (
 	AddonNameLabelKey                        = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                   = "ops.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
+	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -152,6 +153,7 @@ const (
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -318,4 +320,11 @@ const (
 const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
+)
+
+const (
+	ServiceDescriptorUsernameKey = "username"
+	ServiceDescriptorPasswordKey = "password"
+	ServiceDescriptorEndpointKey = "endpoint"
+	ServiceDescriptorPortKey     = "port"
 )

@@ -18,6 +18,7 @@ resources:
 - bases/workloads.kubeblocks.io_replicatedstatemachines.yaml
 - bases/storage.kubeblocks.io_storageproviders.yaml
 - bases/dataprotection.kubeblocks.io_backuprepos.yaml
+- bases/apps.kubeblocks.io_servicedescriptors.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -42,6 +43,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_replicatedstatemachines.yaml
 #- patches/webhook_in_storageproviders.yaml
 #- patches/webhook_in_backuprepos.yaml
+#- patches/webhook_in_servicedescriptors.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -65,6 +67,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_replicatedstatemachines.yaml
 #- patches/cainjection_in_storageproviders.yaml
 #- patches/cainjection_in_backuprepos.yaml
+#- patches/cainjection_in_servicedescriptors.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

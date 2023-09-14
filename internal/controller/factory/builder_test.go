@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package builder
+package factory
 
 import (
 	"encoding/json"
@@ -170,6 +170,7 @@ var _ = Describe("builder", func() {
 			clusterDef,
 			&clusterDef.Spec.ComponentDefs[0],
 			&cluster.Spec.ComponentSpecs[0],
+			nil,
 			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(err).Should(Succeed())
 		Expect(component).ShouldNot(BeNil())

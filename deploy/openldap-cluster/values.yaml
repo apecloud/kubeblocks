@@ -1,0 +1,63 @@
+# Default values for openldap-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replication: false
+terminationPolicy: Halt
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: osixia/openldap
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.5.0"
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+topologyKeys:
+  - kubernetes.io/hostname
+
+tolerations: []
+
+## Enable persistence using Persistent Volume Claims
+## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
+##
+persistence:
+  ## @param shard[*].persistence.enabled Enable persistence using Persistent Volume Claims
+  ##
+  enabled: false
+  ## `data` volume settings
+  ##
+  data:
+    ## @param shard[*].persistence.data.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName:
+    ## @param shard[*].persistence.size Size of data volume
+    ##
+    size: 10Gi

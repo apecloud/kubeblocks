@@ -279,9 +279,37 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 	return -1
 }
 
+type HistoryFile struct {
+	History []History
+}
+
 type History struct {
 	ParentTimeline int64
 	SwitchPoint    int64
+}
+
+func ParseHistory(str string) *HistoryFile {
+	result := &HistoryFile{
+		History: []History{},
+	}
+
+	lines := strings.Split(str, "\n")
+	for _, line := range lines {
+		values := strings.Split(line, "|")
+		if len(values) <= 1 {
+			continue
+		}
+		content := strings.TrimSpace(values[1])
+		history := strings.Split(content, " ")
+		if len(history) > 2 {
+			result.History = append(result.History, History{
+				ParentTimeline: cast.ToInt64(history[0]),
+				SwitchPoint:    ParsePgLsn(history[1]),
+			})
+		}
+	}
+
+	return result
 }
 
 func ParsePgLsn(str string) int64 {

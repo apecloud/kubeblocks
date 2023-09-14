@@ -1,0 +1,25 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "oceanbase.fullname" . }}
+  labels: 
+    {{- include "oceanbase.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: oceanbase
+  clusterVersionRef: oceanbase-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  componentSpecs:
+    - name: ob-bundle
+      componentDefRef: ob-bundle
+      serviceAccountName: {{ .Values.clusterName }}-observer-sa
+      replicas: {{ .Values.replicas | default 1 }}
+      volumeClaimTemplates:
+        {{- range $key, $val := .Values.resources.storages }}
+        - name: {{ $key }}
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ $val | quote }}
+        {{- end }}

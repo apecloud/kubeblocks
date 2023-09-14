@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plan
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,7 +31,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -115,6 +115,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			clusterDef,
 			&clusterDef.Spec.ComponentDefs[0],
 			&cluster.Spec.ComponentSpecs[0],
+			nil,
 			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(err).Should(Succeed())
 		Expect(component).ShouldNot(BeNil())
@@ -133,7 +134,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 	Context("ToolsImageBuilderTest", func() {
 		It("TestScriptSpec", func() {
-			sts, err := builder.BuildSts(intctrlutil.RequestCtx{
+			sts, err := factory.BuildSts(intctrlutil.RequestCtx{
 				Ctx: testCtx.Ctx,
 				Log: logger,
 			}, clusterObj, clusterComponent, "for_test_env")

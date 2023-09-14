@@ -173,7 +173,7 @@ tests:
 # For more information about service references, please refer to the Cluster API definition.
 # You can also use the `kubectl explain cluster.spec.componentSpecs.serviceRefs` command for detailed explanations.
 serviceReference:
-  enable: true
+  enable: false
   zookeeper:
     ## namespace of cluster or serviceDescriptor object
     namespace: ""

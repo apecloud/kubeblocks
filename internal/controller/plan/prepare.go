@@ -22,7 +22,6 @@ package plan
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +35,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )

@@ -25,8 +25,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -48,7 +46,9 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -396,19 +396,21 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 
 	monitorAnnotations := func() map[string]string {
 		annotations := make(map[string]string, 0)
+		falseStr := "false"
+		trueStr := "true"
 		switch {
 		case !component.Monitor.Enable:
-			annotations["monitor.kubeblocks.io/scrape"] = "false"
-			annotations["monitor.kubeblocks.io/agamotto"] = "false"
+			annotations["monitor.kubeblocks.io/scrape"] = falseStr
+			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
 		case component.Monitor.BuiltIn:
-			annotations["monitor.kubeblocks.io/scrape"] = "false"
-			annotations["monitor.kubeblocks.io/agamotto"] = "true"
+			annotations["monitor.kubeblocks.io/scrape"] = falseStr
+			annotations["monitor.kubeblocks.io/agamotto"] = trueStr
 		default:
-			annotations["monitor.kubeblocks.io/scrape"] = "true"
+			annotations["monitor.kubeblocks.io/scrape"] = trueStr
 			annotations["monitor.kubeblocks.io/path"] = component.Monitor.ScrapePath
 			annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(component.Monitor.ScrapePort))
 			annotations["monitor.kubeblocks.io/scheme"] = "http"
-			annotations["monitor.kubeblocks.io/agamotto"] = "false"
+			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
 		}
 		return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
 	}()

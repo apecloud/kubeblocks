@@ -21,7 +21,6 @@ package plan
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,6 +35,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"

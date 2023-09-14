@@ -22,7 +22,6 @@ package template
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -40,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"

@@ -22,7 +22,6 @@ package plan
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 

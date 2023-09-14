@@ -22,7 +22,6 @@ package plan
 import (
 	"context"
 	"encoding/json"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"reflect"
 	"strings"
 
@@ -38,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 

@@ -22,7 +22,6 @@ package plan
 import (
 	"bytes"
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"strings"
 	"text/template"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 )
 
 // ComposeTLSSecret composes a TSL secret object.

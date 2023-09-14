@@ -130,7 +130,7 @@ Vertical scaling does not synchronize parameters related to CPU and memory and i
 
 :::
 
-1. Check whether the corresponding resources change.
+3. Check whether the corresponding resources change.
 
     ```bash
     kbcli cluster describe ivy85

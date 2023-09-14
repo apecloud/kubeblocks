@@ -63,3 +63,8 @@ func (builder *EventBuilder) SetLastTimestamp(lastTimestamp metav1.Time) *EventB
 	builder.get().LastTimestamp = lastTimestamp
 	return builder
 }
+
+func (builder *EventBuilder) SetEventTime(eventTime metav1.MicroTime) *EventBuilder {
+	builder.get().EventTime = eventTime
+	return builder
+}

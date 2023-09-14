@@ -25,18 +25,18 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
-	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type DeleteUserOptions struct {
 	*AccountBaseOptions
 	AutoApprove bool
-	info        channelutil.UserInfo
+	info        lorryutil.UserInfo
 }
 
 func NewDeleteUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *DeleteUserOptions {
 	return &DeleteUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, channelutil.DeleteUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.DeleteUserOp),
 	}
 }
 
@@ -56,7 +56,7 @@ func (o *DeleteUserOptions) Validate(args []string) error {
 	if o.AutoApprove {
 		return nil
 	}
-	if err := prompt.Confirm([]string{o.info.UserName}, o.In, ""); err != nil {
+	if err := prompt.Confirm([]string{o.info.UserName}, o.In, "", ""); err != nil {
 		return err
 	}
 	return nil

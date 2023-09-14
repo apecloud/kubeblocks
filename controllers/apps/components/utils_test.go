@@ -255,7 +255,7 @@ var _ = Describe("Consensus Component", func() {
 			}
 			// component phase should be Failed when available replicas is 0
 			phase := getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
-				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+				sts.Status.AvailableReplicas, nil, checkExistFailedPodOfLatestRevision)
 			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			// mock available replicas to component replicas
@@ -263,7 +263,7 @@ var _ = Describe("Consensus Component", func() {
 				testk8s.MockStatefulSetReady(sts)
 			})).Should(Succeed())
 			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
-				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+				sts.Status.AvailableReplicas, nil, checkExistFailedPodOfLatestRevision)
 			Expect(len(phase) == 0).Should(BeTrue())
 
 			// mock component is abnormal
@@ -275,7 +275,7 @@ var _ = Describe("Consensus Component", func() {
 				sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
 			})).Should(Succeed())
 			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
-				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+				sts.Status.AvailableReplicas, nil, checkExistFailedPodOfLatestRevision)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 		})

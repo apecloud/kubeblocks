@@ -1,0 +1,83 @@
+---
+# Source: kafka-cluster/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-kafka-cluster
+  namespace: default
+  labels:
+    helm.sh/chart: kafka-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.3.2"
+    app.kubernetes.io/instance: kafka-cluster
+---
+# Source: kafka-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kb-kafka-cluster
+  labels:
+    helm.sh/chart: kafka-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.3.2"
+    app.kubernetes.io/instance: kafka-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-kafka-cluster
+    namespace: default
+---
+# Source: kafka-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-kafka-cluster
+  labels:
+    helm.sh/chart: kafka-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.3.2"
+    app.kubernetes.io/instance: kafka-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-kafka-cluster
+    namespace: default
+---
+# Source: kafka-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: kafka-cluster
+  labels: 
+    helm.sh/chart: kafka-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.3.2"
+    app.kubernetes.io/instance: kafka-cluster
+  annotations:
+    "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false"}'
+spec:
+  clusterDefinitionRef: kafka # ref clusterdefinition.name
+  clusterVersionRef: kafka-3.3.2
+  terminationPolicy: Delete  
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  componentSpecs:
+    - name: broker
+      componentDefRef: kafka-server
+      tls: false
+      replicas: 1
+      monitor: false
+      serviceAccountName: kb-kafka-cluster      
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"      
+      services:

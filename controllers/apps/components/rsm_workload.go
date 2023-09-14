@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type rsmComponentWorkloadBuilder struct {
@@ -34,7 +33,7 @@ var _ componentWorkloadBuilder = &rsmComponentWorkloadBuilder{}
 func (b *rsmComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		component := b.Comp.GetSynthesizedComponent()
-		obj, err := builder.BuildRSM(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		obj, err := factory.BuildRSM(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}

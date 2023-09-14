@@ -101,7 +101,6 @@ var _ = BeforeSuite(func() {
 	if len(version) == 0 {
 		log.Println("kubeblocks version is not specified")
 	}
-	log.Println("kb version:" + version)
 	Version = version
 	InitEnv = initEnv
 	TestType = testType
@@ -200,6 +199,7 @@ var _ = Describe("e2e test", func() {
 
 	var _ = Describe("show test report", AnalyzeE2eReport)
 
-	var _ = Describe("save test report to s3", UploadReport)
-
+	if initEnv {
+		var _ = Describe("save test report to s3", UploadReport)
+	}
 })

@@ -34,8 +34,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -62,7 +62,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		cluster.UID = types.UID("test-uid")
 	}
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(cluster, component)
+		envConfig, err := factory.BuildEnvConfig(cluster, component)
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			resources = append(resources, workload)
 		}()
 
-		svc, err := builder.BuildHeadlessSvc(cluster, component)
+		svc, err := factory.BuildHeadlessSvc(cluster, component)
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
 	if component.MinAvailable != nil {
-		pdb, err := builder.BuildPDB(cluster, component)
+		pdb, err := factory.BuildPDB(cluster, component)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		panic("this shouldn't happen")
 	}
 
-	svcList, err := builder.BuildSvcListWithCustomAttributes(cluster, component, func(svc *corev1.Service) {
+	svcList, err := factory.BuildSvcListWithCustomAttributes(cluster, component, func(svc *corev1.Service) {
 		switch component.WorkloadType {
 		case appsv1alpha1.Consensus:
 			addLeaderSelectorLabels(svc, component)
@@ -160,14 +160,14 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, cluster, component, "")
+				return factory.BuildDeploy(reqCtx, cluster, component, "")
 			}); err != nil {
 			return nil, err
 		}
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildSts(reqCtx, cluster, component, envConfig.Name)
+				return factory.BuildSts(reqCtx, cluster, component, envConfig.Name)
 			}); err != nil {
 			return nil, err
 		}
@@ -254,6 +254,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -303,6 +304,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0],
 			)
 			Expect(err).Should(Succeed())
@@ -366,6 +368,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -384,7 +387,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
-					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], generateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
+					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
 				}
 			}
 		})
@@ -427,6 +430,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -493,6 +497,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
@@ -549,6 +554,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 

@@ -105,81 +105,185 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
 2. Create BackupRepo.
 
-   <Tabs>
+   - Use kbcli
 
-   <TabItem value="kbcli" label="kbcli" default>
+     <Tabs>
 
-   ```bash
-   kbcli backuprepo create my-repo \
-     --provider s3 \
-     --region cn-northwest-1 \
-     --bucket test-kb-backup \
-     --access-key-id <ACCESS KEY> \
-     --secret-access-key <SECRET KEY> \
-     --default
-   ```
+     <TabItem value="S3" label="S3" default>
 
-   The above command creates a default backup repository `my-repo`.
+     ```bash
+     kbcli backuprepo create my-repo \
+       --provider s3 \
+       --region cn-northwest-1 \
+       --bucket test-kb-backup \
+       --access-key-id <ACCESS KEY> \
+       --secret-access-key <SECRET KEY> \
+       --default
+     ```
 
-   * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
-   * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
-   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
+     </TabItem>
 
-   After `kbcli backuprepo create` is executed successfully, the system creates the K8s resource whose type is `BackupRepo`. You can modify the annotation of this resource to adjust the default repository.
+     <TabItem value="OSS" label="OSS">
 
-   ```bash
-   # Canel the default repository
-   kubectl annotate backuprepo old-default-repo \
-     --overwrite=true \
-     dataprotection.kubeblocks.io/is-default-repo=false
-   ```
+     ```bash
+     kbcli backuprepo create my-repo \
+       --provider oss \
+       --region cn-zhangjiakou \
+       --bucket  test-kb-backup \
+       # --endpoint oss-cn-zhangjiakou-internal.aliyuncs.com \ To display the specified oss endpoint
+       --access-key-id <ACCESS KEY> \
+       --secret-access-key <SECRET KEY> \
+       --default
+     ```
 
-   ```bash
-   # Set a new default repository
-   kubectl annotate backuprepo backuprepo-4qms6 \
-     --overwrite=true \
-     dataprotection.kubeblocks.io/is-default-repo=true
-   ```
+     </TabItem>
 
-   </TabItem>
+     <TabItem value="MinIO" label="MinIO">
 
-   <TabItem value="kubectl" label="kubectl">
+     ```bash
+     kbcli backuprepo create my-repo \
+       --provider minio \
+       --endpoint <ip:port> \
+       --bucket test-minio \
+       --access-key-id <ACCESS KEY> \
+       --secret-access-key <SECRET KEY> \
+       --default
+     ```
 
-   `kubectl` is another option to create a BackupRepo, but the commands do not include parameter and default repository verification compared with kbcli, which is not convenient.
+     </TabItem>
 
-   ```bash
-   # Create a secret to save the access key for S3
-   kubectl create secret generic s3-credential-for-backuprepo \
-     -n kb-system \
-     --from-literal=accessKeyId=<ACCESS KEY> \
-     --from-literal=secretAccessKey=<SECRET KEY>
+     </Tabs>
 
-   # Create the BackupRepo resource
-   kubectl apply -f - <<-'EOF'
-   apiVersion: dataprotection.kubeblocks.io/v1alpha1
-   kind: BackupRepo
-   metadata:
-     name: repo-s3
-     annotations:
-       dataprotection.kubeblocks.io/is-default-repo: "true"
-   spec:
-     storageProviderRef: s3
-     pvReclaimPolicy: Retain
-     volumeCapacity: 100Gi
-     config:
-       bucket: test-kb-backup
-       endpoint: ""
-       mountOptions: --memory-limit 1000 --dir-mode 0777 --file-mode 0666
-       region: cn-northwest-1
-     credential:
-       name: s3-credential-for-backuprepo
-       namespace: kb-system
-   EOF
-   ```
+     The above command creates a default backup repository `my-repo`.
 
-   </TabItem>
+     * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
+     * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
+     * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
 
-   </Tabs>
+     After `kbcli backuprepo create` is executed successfully, the system creates the K8s resource whose type is `BackupRepo`. You can modify the annotation of this resource to adjust the default repository.
+
+     ```bash
+     # Canel the default repository
+     kubectl annotate backuprepo old-default-repo \
+       --overwrite=true \
+       dataprotection.kubeblocks.io/is-default-repo=false
+     ```
+
+     ```bash
+     # Set a new default repository
+     kubectl annotate backuprepo backuprepo-4qms6 \
+       --overwrite=true \
+       dataprotection.kubeblocks.io/is-default-repo=true
+     ```
+
+   - Use kubectl
+
+     `kubectl` is another option to create a BackupRepo, but the commands do not include parameter and default repository verification compared with kbcli, which is not convenient.
+
+     <Tabs>
+
+     <TabItem value="S3" label="S3" default>
+
+     ```bash
+     # Create a secret to save the access key for S3
+     kubectl create secret generic s3-credential-for-backuprepo \
+       -n kb-system \
+       --from-literal=accessKeyId=<ACCESS KEY> \
+       --from-literal=secretAccessKey=<SECRET KEY>
+
+     # Create the BackupRepo resource
+     kubectl apply -f - <<-'EOF'
+     apiVersion: dataprotection.kubeblocks.io/v1alpha1
+     kind: BackupRepo
+     metadata:
+       name: my-repo
+       annotations:
+         dataprotection.kubeblocks.io/is-default-repo: "true"
+     spec:
+       storageProviderRef: s3
+       pvReclaimPolicy: Retain
+       volumeCapacity: 100Gi
+       config:
+         bucket: test-kb-backup
+         endpoint: ""
+         mountOptions: --memory-limit 1000 --dir-mode 0777 --file-mode 0666
+         region: cn-northwest-1
+       credential:
+         name: s3-credential-for-backuprepo
+         namespace: kb-system
+     EOF
+     ```
+
+     </TabItem>
+
+     <TabItem value="OSS" label="OSS">
+
+     ```bash
+     # Create a secret to save the access key for OSS
+     kubectl create secret generic oss-credential-for-backuprepo \
+       -n kb-system \
+       --from-literal=accessKeyId=<ACCESS KEY> \
+       --from-literal=secretAccessKey=<SECRET KEY>
+
+     # Create the BackupRepo resource
+     kubectl apply -f - <<-'EOF'
+     apiVersion: dataprotection.kubeblocks.io/v1alpha1
+     kind: BackupRepo
+     metadata:
+       name: my-repo
+       annotations:
+         dataprotection.kubeblocks.io/is-default-repo: "true"
+     spec:
+       storageProviderRef: s3
+       pvReclaimPolicy: Retain
+       volumeCapacity: 100Gi
+       config:
+         bucket: test-kb-backup
+         mountOptions: ""
+         endpoint: ""
+         region: cn-zhangjiakou
+       credential:
+         name: oss-credential-for-backuprepo
+         namespace: kb-system
+     EOF
+     ```
+
+     </TabItem>
+
+     <TabItem value="MinIO" label="MinIO">
+
+     ```bash
+     # Create a secret to save the access key for minIO
+     kubectl create secret generic minio-credential-for-backuprepo \
+       -n kb-system \
+       --from-literal=accessKeyId=<ACCESS KEY> \
+       --from-literal=secretAccessKey=<SECRET KEY>
+
+     # Create the BackupRepo resource
+     kubectl apply -f - <<-'EOF'
+     apiVersion: dataprotection.kubeblocks.io/v1alpha1
+     kind: BackupRepo
+     metadata:
+       name: my-repo
+       annotations:
+         dataprotection.kubeblocks.io/is-default-repo: "true"
+     spec:
+       storageProviderRef: minio
+       pvReclaimPolicy: Retain
+       volumeCapacity: 100Gi
+       config:
+         bucket: test-kb-backup
+         mountOptions: ""
+         endpoint: <ip:port>
+       credential:
+         name: minio-credential-for-backuprepo
+         namespace: kb-system
+     EOF
+     ```
+
+     </TabItem>
+
+     </Tabs>
 
 ## (Optional) Change the backup repository for a cluster
 

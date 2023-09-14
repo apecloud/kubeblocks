@@ -34,8 +34,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -164,8 +164,8 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	}
 
 	// This sidecar container will be able to view and signal processes from other containers
-	checkAndUpdateSharProcessNamespace(podSpec, buildParams, configSpecMetas)
-	container, err := builder.BuildCfgManagerContainer(buildParams, component)
+	checkAndUpdateShareProcessNamespace(podSpec, buildParams, configSpecMetas)
+	container, err := factory.BuildCfgManagerContainer(buildParams, component)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	return nil
 }
 
-func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
+func checkAndUpdateShareProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
 	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
 	if shared {
 		podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()

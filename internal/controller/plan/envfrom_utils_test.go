@@ -96,6 +96,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -122,7 +123,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			configSpec.Keys = []string{"env-config"}
 
 			cmObj := origCMObject.DeepCopy()
-			cmObj.SetName(generateEnvFromName(origCMObject.Name))
+			cmObj.SetName(core.GenerateEnvFromName(origCMObject.Name))
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 				cmObj,
 				configConstraint,
@@ -141,7 +142,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 			configSpec.AsEnvFrom = nil
 			cmObj := origCMObject.DeepCopy()
-			cmObj.SetName(generateEnvFromName(origCMObject.Name))
+			cmObj.SetName(core.GenerateEnvFromName(origCMObject.Name))
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 				cmObj,
 				configConstraint,

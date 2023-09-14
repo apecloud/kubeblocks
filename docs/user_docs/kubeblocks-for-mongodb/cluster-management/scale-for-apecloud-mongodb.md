@@ -93,7 +93,7 @@ kbcli cluster list mongodb-cluster
                storage: 1Gi
      terminationPolicy: Halt
    ```
-  
+
 2. Validate the vertical scaling.
 
     ```bash
@@ -112,3 +112,15 @@ kbcli cluster list mongodb-cluster
   To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
   
   :::
+
+:::note
+
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+:::
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mongodb-cluster
+    ```

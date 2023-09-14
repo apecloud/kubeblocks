@@ -28,8 +28,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -66,7 +66,7 @@ type componentWorkloadBuilderBase struct {
 
 func (b *componentWorkloadBuilderBase) BuildEnv() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		envCfg, err := builder.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		envCfg, err := factory.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		b.EnvConfig = envCfg
 		b.LocalObjs = append(b.LocalObjs, envCfg)
 		return []client.Object{envCfg}, err
@@ -94,7 +94,7 @@ func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
+		sts, err := factory.BuildSts(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +111,7 @@ func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {
 		// conditionally build PodDisruptionBudget
 		synthesizedComponent := b.Comp.GetSynthesizedComponent()
 		if synthesizedComponent.MinAvailable != nil {
-			pdb, err := builder.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
+			pdb, err := factory.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
 			if err != nil {
 				return nil, err
 			}
@@ -156,7 +156,7 @@ func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuild
 
 func (b *componentWorkloadBuilderBase) BuildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
@@ -171,7 +171,7 @@ func (b *componentWorkloadBuilderBase) BuildService() componentWorkloadBuilder {
 
 func (b *componentWorkloadBuilderBase) BuildHeadlessService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svc, err := builder.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svc, err := factory.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		return []client.Object{svc}, err
 	}
 	return b.BuildWrapper(buildfn)
@@ -304,9 +304,9 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 	switch component.Issuer.Name {
 	case appsv1alpha1.IssuerKubeBlocks:
 		secretName = plan.GenerateTLSSecretName(clusterName, component.Name)
-		ca = builder.CAName
-		cert = builder.CertName
-		key = builder.KeyName
+		ca = factory.CAName
+		cert = factory.CertName
+		key = factory.KeyName
 	case appsv1alpha1.IssuerUserProvided:
 		secretName = component.Issuer.SecretRef.Name
 		ca = component.Issuer.SecretRef.CA
@@ -314,14 +314,14 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 		key = component.Issuer.SecretRef.Key
 	}
 	volume := corev1.Volume{
-		Name: builder.VolumeName,
+		Name: factory.VolumeName,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName: secretName,
 				Items: []corev1.KeyToPath{
-					{Key: ca, Path: builder.CAName},
-					{Key: cert, Path: builder.CertName},
-					{Key: key, Path: builder.KeyName},
+					{Key: ca, Path: factory.CAName},
+					{Key: cert, Path: factory.CertName},
+					{Key: key, Path: factory.KeyName},
 				},
 				Optional: func() *bool { o := false; return &o }(),
 			},
@@ -333,8 +333,8 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 
 func composeTLSVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      builder.VolumeName,
-		MountPath: builder.MountPath,
+		Name:      factory.VolumeName,
+		MountPath: factory.MountPath,
 		ReadOnly:  true,
 	}
 }

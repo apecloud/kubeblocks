@@ -251,6 +251,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - servicedescriptors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - servicedescriptors/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - servicedescriptors/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - batch
   resources:
   - cronjobs

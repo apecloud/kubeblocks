@@ -40,9 +40,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 var _ = Describe("replicationSet Util", func() {
@@ -178,7 +178,7 @@ var _ = Describe("replicationSet Util", func() {
 		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
 			SetInvolvedObject(objectRef).
 			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
-			SetReason(string(probeutil.CheckRoleOperation)).
+			SetReason(string(lorryutil.CheckRoleOperation)).
 			SetType(corev1.EventTypeNormal).
 			SetFirstTimestamp(metav1.NewTime(time.Now())).
 			SetLastTimestamp(metav1.NewTime(time.Now())).

@@ -21,6 +21,7 @@ package components
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -77,7 +78,18 @@ var _ = Describe("RSM Component", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, rsmCompDefRef, rsmCompName)
-			_ = testapps.MockRSMComponent(&testCtx, clusterName, rsmCompName)
+			rsm := testapps.MockRSMComponent(&testCtx, clusterName, rsmCompName)
+			Expect(testapps.ChangeObj(&testCtx, rsm, func(machine *workloads.ReplicatedStateMachine) {
+				annotations := machine.Annotations
+				if annotations == nil {
+					annotations = make(map[string]string, 0)
+				}
+				annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
+				machine.Annotations = annotations
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.ObservedGeneration = cluster.Generation
+			})).Should(Succeed())
 			rsmList := &workloads.ReplicatedStateMachineList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, rsmList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
@@ -97,10 +109,10 @@ var _ = Describe("RSM Component", func() {
 			}).Should(BeTrue())
 
 			By("test pods number of sts is 0")
-			rsm := &rsmList.Items[0]
+			rsm = &rsmList.Items[0]
 			clusterComponent := cluster.Spec.GetComponentByName(rsmCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			rsmComponent := newRSM(k8sClient, cluster, clusterComponent, *componentDef)
+			rsmComponent := newRSM(testCtx.Ctx, k8sClient, cluster, clusterDef, clusterComponent, *componentDef)
 			phase, _, _ := rsmComponent.GetPhaseWhenPodsNotReady(ctx, rsmCompName, false)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
@@ -122,6 +134,7 @@ var _ = Describe("RSM Component", func() {
 				rsm.Status.ReadyReplicas = availableReplicas
 				rsm.Status.Replicas = availableReplicas
 				rsm.Status.ObservedGeneration = 1
+				rsm.Status.CurrentGeneration = 1
 				rsm.Status.UpdateRevision = updateRevision
 			})).Should(Succeed())
 			podsReady, _ := rsmComponent.PodsReady(ctx, rsm)
@@ -146,12 +159,12 @@ var _ = Describe("RSM Component", func() {
 
 			By("expect component phase is Failed when pod of component is not ready and component is up running")
 			phase, _, _ = rsmComponent.GetPhaseWhenPodsNotReady(ctx, rsmCompName, true)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
-			By("expect component phase is Abnormal when pod of component is failed")
+			By("expect component phase is Failed when pod of component is failed")
 			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			phase, _, _ = rsmComponent.GetPhaseWhenPodsNotReady(ctx, rsmCompName, false)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
@@ -173,27 +186,22 @@ var _ = Describe("RSM Component", func() {
 			By("test pods are ready")
 			// mock sts is ready
 			testk8s.MockStatefulSetReady(sts)
-			mockRSMReady := func(rsm *workloads.ReplicatedStateMachine) {
-				rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
-				rsm.Status.ObservedGeneration = rsm.Generation
-				rsm.Status.Replicas = *rsm.Spec.Replicas
-				rsm.Status.ReadyReplicas = *rsm.Spec.Replicas
-				rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
-			}
-			mockRSMReady(rsm)
+			testk8s.MockRSMReady(rsm, podList...)
 			Eventually(func() bool {
 				podsReady, _ = rsmComponent.PodsReady(ctx, rsm)
 				return podsReady
 			}).Should(BeTrue())
 
 			By("test component.replicas is inconsistent with rsm.spec.replicas")
-			oldReplicas := clusterComponent.Replicas
+			oldReplicas := rsmComponent.SynthesizedComponent.Replicas
 			replicas := int32(4)
-			clusterComponent.Replicas = replicas
+			rsmComponent.SynthesizedComponent.Replicas = replicas
+			rsm.Annotations[constant.KubeBlocksGenerationKey] = "new-generation"
 			isRunning, _ := rsmComponent.IsRunning(ctx, rsm)
 			Expect(isRunning).Should(BeFalse())
 			// reset replicas
-			clusterComponent.Replicas = oldReplicas
+			rsmComponent.SynthesizedComponent.Replicas = oldReplicas
+			rsm.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
 
 			By("test component is running")
 			isRunning, _ = rsmComponent.IsRunning(ctx, rsm)

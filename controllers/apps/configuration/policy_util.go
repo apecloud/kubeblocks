@@ -203,14 +203,15 @@ func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
 	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
 }
 
-func restartStatelessComponent(client client.Client, ctx intctrlutil.RequestCtx, configKey string, expectedVersion string, deployObjs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+func restartStatelessComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, expectedVersion string, deployObjs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
 	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	deployRestart := func(deploy *appv1.Deployment, expectedVersion string) error {
+		patch := client.MergeFrom(deploy.DeepCopy())
 		if deploy.Spec.Template.Annotations == nil {
 			deploy.Spec.Template.Annotations = map[string]string{}
 		}
 		deploy.Spec.Template.Annotations[cfgAnnotationKey] = expectedVersion
-		if err := client.Update(ctx.Ctx, deploy); err != nil {
+		if err := cli.Patch(ctx.Ctx, deploy, patch); err != nil {
 			return err
 		}
 		return nil
@@ -234,14 +235,15 @@ func restartStatelessComponent(client client.Client, ctx intctrlutil.RequestCtx,
 	return nil, nil
 }
 
-func restartStatefulComponent(client client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+func restartStatefulComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
 	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	stsRestart := func(sts *appv1.StatefulSet, expectedVersion string) error {
+		patch := client.MergeFrom(sts.DeepCopy())
 		if sts.Spec.Template.Annotations == nil {
 			sts.Spec.Template.Annotations = map[string]string{}
 		}
 		sts.Spec.Template.Annotations[cfgAnnotationKey] = expectedVersion
-		if err := client.Update(ctx.Ctx, sts); err != nil {
+		if err := cli.Patch(ctx.Ctx, sts, patch); err != nil {
 			return err
 		}
 		return nil

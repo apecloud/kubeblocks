@@ -1,0 +1,63 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "risingwave": {
+            "type": "object",
+            "properties": {
+                "metaStore": {
+                    "type": "object",
+                    "properties": {
+                        "etcd": {
+                            "type": "object",
+                            "properties": {
+                                "endpoints": {
+                                    "title": "ETCD EndPoints",
+                                    "description": "Specify ETCD cluster endpoints of the form host:port",
+                                    "type": "string",
+                                    "pattern": "^.+:\\d+$"
+                                }
+                            }
+                        }
+                    }
+                },
+                "stateStore": {
+                    "type": "object",
+                    "properties": {
+                        "s3": {
+                            "type": "object",
+                            "properties": {
+                                "authentication": {
+                                    "type": "object",
+                                    "properties": {
+                                        "accessKey": {
+                                            "$ref": "#/definitions/nonEmptyString"
+                                        },
+                                        "secretAccessKey": {
+                                            "$ref": "#/definitions/nonEmptyString"
+                                        }
+                                    }
+                                },
+                                "bucket": {
+                                    "$ref": "#/definitions/nonEmptyString"
+                                },
+                                "endpoint": {
+                                    "$ref": "#/definitions/nonEmptyString"
+                                },
+                                "region": {
+                                    "$ref": "#/definitions/nonEmptyString"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "nonEmptyString": {
+            "type": "string",
+            "minLength": 1
+        }
+    }
+}

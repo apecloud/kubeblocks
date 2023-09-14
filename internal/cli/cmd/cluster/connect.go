@@ -41,7 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel/engine"
+	"github.com/apecloud/kubeblocks/lorry/engine"
 )
 
 var connectExample = templates.Examples(`

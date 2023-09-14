@@ -481,4 +481,30 @@ var _ = Describe("create", func() {
 		o.ClusterVersionRef = "test-not-match-cluster-version"
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
 	})
+
+	It("test build backup config", func() {
+		o := &CreateOptions{}
+		o.Cmd = NewCreateCmd(o.Factory, o.IOStreams)
+		cluster := testing.FakeCluster("clusterName", testing.Namespace)
+
+		By("test backup is not set")
+		Expect(o.buildBackupConfig(cluster)).To(Succeed())
+
+		By("test backup is with snapshot method")
+		o.BackupMethod = "snapshot"
+		Expect(o.Cmd.Flags().Set("backup", "snapshot")).To(Succeed())
+		Expect(o.buildBackupConfig(cluster)).To(Succeed())
+		Expect(string(o.BackupConfig.Method)).Should(Equal("snapshot"))
+
+		By("test backup is with wrong cron expression")
+		o.BackupCronExpression = "wrong-cron-expression"
+		Expect(o.Cmd.Flags().Set("backup-cron-expression", "wrong-corn-expression"))
+		Expect(o.buildBackupConfig(cluster)).To(HaveOccurred())
+
+		By("test backup is with correct corn expression")
+		o.BackupCronExpression = "0 0 * * *"
+		Expect(o.Cmd.Flags().Set("backup-cron-expression", "0 0 * * *")).To(Succeed())
+		Expect(o.buildBackupConfig(cluster)).To(Succeed())
+		Expect(o.BackupConfig.CronExpression).Should(Equal("0 0 * * *"))
+	})
 })

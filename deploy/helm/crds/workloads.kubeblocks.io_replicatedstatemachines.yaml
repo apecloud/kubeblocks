@@ -9390,6 +9390,11 @@ spec:
                   - type
                   type: object
                 type: array
+              currentGeneration:
+                description: CurrentGeneration, if not empty, indicates the version
+                  of the RSM used to generate the underlying workload
+                format: int64
+                type: integer
               currentReplicas:
                 description: currentReplicas is the number of Pods created by the
                   StatefulSet controller from the StatefulSet version indicated by

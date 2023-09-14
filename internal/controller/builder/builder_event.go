@@ -68,3 +68,18 @@ func (builder *EventBuilder) SetEventTime(eventTime metav1.MicroTime) *EventBuil
 	builder.get().EventTime = eventTime
 	return builder
 }
+
+func (builder *EventBuilder) SetReportingController(reportingController string) *EventBuilder {
+	builder.get().ReportingController = reportingController
+	return builder
+}
+
+func (builder *EventBuilder) SetReportingInstance(reportingInstance string) *EventBuilder {
+	builder.get().ReportingInstance = reportingInstance
+	return builder
+}
+
+func (builder *EventBuilder) SetAction(action string) *EventBuilder {
+	builder.get().Action = action
+	return builder
+}

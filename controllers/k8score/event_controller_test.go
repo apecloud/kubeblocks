@@ -85,6 +85,9 @@ var _ = Describe("Event Controller", func() {
 			SetFirstTimestamp(metav1.NewTime(initLastTS)).
 			SetLastTimestamp(metav1.NewTime(initLastTS)).
 			SetEventTime(metav1.NewMicroTime(initLastTS)).
+			SetReportingController("lorry").
+			SetReportingInstance(podName).
+			SetAction("mock-create-event-action").
 			GetObject()
 	}
 

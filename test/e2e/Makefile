@@ -40,9 +40,10 @@ ifeq ($(origin REGION), command line)
 else
     REGION ?= ""
 endif
-
 ifeq ($(origin INIT_ENV), command line)
     INIT_ENV ?= $(INIT_ENV)
+else
+    INIT_ENV ?= false
 endif
 
 .PHONY: run

@@ -25,11 +25,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/go-logr/zapr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/rand"
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
@@ -120,13 +119,14 @@ var _ = Describe("Volume Protection Operation", func() {
 			},
 		}
 		metadata = map[string]string{"sql": ""}
-		req      = &bindings.InvokeRequest{
+		req      = &ProbeRequest{
 			Data:      nil,
 			Metadata:  metadata,
 			Operation: util.VolumeProtection,
 		}
-		log = logger.NewLogger("volume-protection-test")
-		p   = BaseOperations{Logger: log}
+		d, _ = zap.NewDevelopment()
+		log  = zapr.NewLogger(d)
+		p    = BaseOperations{Logger: log}
 
 		dbManagerWithLock    = &DBManagerWithLock{}
 		dbManagerWithoutLock = &component.FakeManager{}
@@ -135,7 +135,7 @@ var _ = Describe("Volume Protection Operation", func() {
 	component.RegisterManager(DBWithLockCharacterType, workloadTypeForTest, dbManagerWithLock)
 	component.RegisterManager(DBWithoutLockCharacterType, workloadTypeForTest, dbManagerWithoutLock)
 
-	p.Init(bindings.Metadata{})
+	p.Init(component.Properties{})
 
 	setup := func() {
 		os.Setenv(constant.KBEnvPodName, podName)
@@ -146,7 +146,8 @@ var _ = Describe("Volume Protection Operation", func() {
 		dbManagerWithLock.instanceLocked = false
 		dbManagerWithLock.lockTimes = 0
 		dbManagerWithLock.unlockTimes = 0
-		optVolProt.Logger = logger.NewLogger("volume-protection-test")
+		development, _ := zap.NewDevelopment()
+		optVolProt.Logger = zapr.NewLogger(development)
 		optVolProt.Requester = &mockVolumeStatsRequester{}
 		optVolProt.SendEvent = false
 		optVolProt.Readonly = false
@@ -173,8 +174,9 @@ var _ = Describe("Volume Protection Operation", func() {
 	}
 
 	newVolumeProtectionObj := func() *operationVolumeProtection {
+		development, _ := zap.NewDevelopment()
 		return &operationVolumeProtection{
-			Logger:    logger.NewLogger("volume-protection-test"),
+			Logger:    zapr.NewLogger(development),
 			Requester: &mockVolumeStatsRequester{},
 			SendEvent: false,
 		}
@@ -198,7 +200,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			obj := optVolProt
 			obj.Requester = &mockErrorVolumeStatsRequester{initErr: true}
 			metadata := map[string]string{"sql": ""}
-			req := &bindings.InvokeRequest{
+			req := &ProbeRequest{
 				Data:      nil,
 				Metadata:  metadata,
 				Operation: util.VolumeProtection,

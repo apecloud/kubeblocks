@@ -22,7 +22,6 @@ package accounts
 import (
 	"net/http"
 
-	"github.com/dapr/components-contrib/bindings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,18 +81,18 @@ var _ = Describe("Grant Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			for _, op := range []bindings.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
+			for _, op := range []lorryutil.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 			}
-			for _, op := range []bindings.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp, lorryutil.DescribeUserOp, lorryutil.ListUsersOp} {
+			for _, op := range []lorryutil.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp, lorryutil.DescribeUserOp, lorryutil.ListUsersOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).Should(BeNil())
 			}
 		})
 
 		It("validate options", func() {
-			for _, op := range []bindings.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
+			for _, op := range []lorryutil.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 				args := []string{}

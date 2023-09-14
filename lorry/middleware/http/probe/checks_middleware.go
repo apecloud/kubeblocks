@@ -20,17 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package probe
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/middleware"
-	"github.com/dapr/kit/logger"
-	"github.com/valyala/fasthttp"
-
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 )
 
 const (
@@ -49,78 +48,37 @@ type RequestMeta struct {
 	Metadata  map[string]string `json:"metadata"`
 }
 
-// NewProbeMiddleware returns a new probe middleware.
-func NewProbeMiddleware(log logger.Logger) middleware.Middleware {
-	return &Middleware{logger: log}
+var Logger logr.Logger
+
+func init() {
+	development, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	Logger = zapr.NewLogger(development)
 }
 
-// Middleware is a probe middleware.
-type Middleware struct {
-	logger logger.Logger
-}
-
-var _ middleware.Middleware = &Middleware{}
-
-// type statusCodeWriter struct {
-// 	http.ResponseWriter
-// 	logger logger.Logger
-// }
-
-// func (scw *statusCodeWriter) WriteHeader(statusCode int) {
-// 	header := scw.ResponseWriter.Header()
-// 	scw.logger.Debugf("response header: %v", header)
-// 	if v, ok := header[statusCodeHeader]; ok {
-// 		scw.logger.Debugf("set statusCode: %v", v)
-// 		statusCode, _ = strconv.Atoi(v[0])
-// 		delete(header, statusCodeHeader)
-// 	}
-// 	scw.ResponseWriter.WriteHeader(statusCode)
-// }
-
-// GetHandler returns the HTTP handler provided by the middleware.
-func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthttp.RequestHandler) fasthttp.RequestHandler, error) {
-	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
-		return func(ctx *fasthttp.RequestCtx) {
-			uri := ctx.Request.URI()
-			method := string(ctx.Request.Header.Method())
-			if method == http.MethodGet && strings.HasPrefix(string(uri.Path()), bindingPath) {
-				ctx.Request.Header.SetMethod(http.MethodPost)
-
-				args := uri.QueryArgs()
-				switch operation := args.Peek(operationKey); bindings.OperationKind(operation) {
-				case CheckStatusOperation, CheckRunningOperation, CheckRoleOperation, VolumeProtection:
-					body := GetRequestBody(string(operation), args)
-					ctx.Request.SetBody(body)
-				default:
-					m.logger.Infof("unknown probe operation: %v", string(operation))
-				}
-			}
-
-			m.logger.Debugf("request: %v", ctx.Request.String())
-			next(ctx)
-			code := ctx.Response.Header.Peek(statusCodeHeader)
-			statusCode, err := strconv.Atoi(string(code))
-			if err == nil {
-				// header has a statusCodeHeader
-				ctx.Response.Header.SetStatusCode(statusCode)
-				m.logger.Debugf("response abnormal: %v", ctx.Response.String())
-			} else {
-				// header has no statusCodeHeader
-				m.logger.Debugf("response: %v", ctx.Response.String())
-			}
-		}
-	}, nil
-}
-
-func GetRequestBody(operation string, args *fasthttp.Args) []byte {
+func GetRequestBody(operation string, args map[string][]string) []byte {
 	metadata := make(map[string]string)
-	walkFunc := func(key, value []byte) {
-		if string(key) == operationKey {
+	walkFunc := func(key string, value []string) {
+		if key == operationKey {
 			return
 		}
-		metadata[string(key)] = string(value)
+		if len(value) == 1 {
+			metadata[key] = value[0]
+		} else {
+			marshal, err := json.Marshal(value)
+			if err != nil {
+				Logger.Error(err, "getRequestBody marshal json error")
+				return
+			}
+			metadata[key] = string(marshal)
+		}
 	}
-	args.VisitAll(walkFunc)
+
+	for k, v := range args {
+		walkFunc(k, v)
+	}
 
 	requestMeta := RequestMeta{
 		Operation: operation,
@@ -129,4 +87,36 @@ func GetRequestBody(operation string, args *fasthttp.Args) []byte {
 
 	body, _ := json.Marshal(requestMeta)
 	return body
+}
+
+func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		uri := request.URL
+		method := request.Method
+
+		if method == http.MethodGet && strings.HasPrefix(uri.Path, bindingPath) {
+			request.Method = http.MethodPost
+
+			operation := uri.Query().Get(operationKey)
+			if strings.HasPrefix(operation, "get") || strings.HasPrefix(operation, "check") || strings.HasPrefix(operation, "list") {
+				body := GetRequestBody(operation, uri.Query())
+				request.Body = io.NopCloser(bytes.NewReader(body))
+			} else {
+				Logger.Info("unknown probe operation", "operation", operation)
+			}
+		}
+
+		Logger.Info("receive request", "request", request.RequestURI)
+		next(writer, request)
+		code := writer.Header().Get(statusCodeHeader)
+		statusCode, err := strconv.Atoi(code)
+		if err == nil {
+			// header has a statusCodeHeader
+			writer.WriteHeader(statusCode)
+			Logger.Info("response abnormal")
+		} else {
+			// header has no statusCodeHeader
+			Logger.Info("response has no statusCodeHeader")
+		}
+	}
 }

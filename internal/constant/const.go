@@ -63,6 +63,7 @@ const (
 
 const (
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBProbeImage             = "KUBEBLOCKS_PROBE_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
@@ -225,6 +226,13 @@ const (
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
+
+	ProbeAgentMountName = "shell2http-mount"
+	ProbeAgentMountPath = "/shell2http"
+	ProbeAgent          = "shell2http"
+	ProbeAgentImage     = "msoap/shell2http:1.16.0"
+	OriginBinaryPath    = "/app/shell2http"
+	DefaultActionImage  = "busybox:latest"
 )
 
 const (

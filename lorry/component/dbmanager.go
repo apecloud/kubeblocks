@@ -25,7 +25,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -107,7 +107,7 @@ type DBManager interface {
 
 	MoveData(context.Context, *dcs.Cluster) error
 
-	GetLogger() logger.Logger
+	GetLogger() logr.Logger
 
 	ShutDownWithWait()
 }
@@ -119,7 +119,7 @@ type DBManagerBase struct {
 	ClusterCompName   string
 	Namespace         string
 	DataDir           string
-	Logger            logger.Logger
+	Logger            logr.Logger
 	DBStartupReady    bool
 	IsLocked          bool
 	DBState           *dcs.DBState
@@ -129,7 +129,7 @@ func (mgr *DBManagerBase) IsDBStartupReady() bool {
 	return mgr.DBStartupReady
 }
 
-func (mgr *DBManagerBase) GetLogger() logger.Logger {
+func (mgr *DBManagerBase) GetLogger() logr.Logger {
 	return mgr.Logger
 }
 
@@ -181,16 +181,16 @@ func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 // Start does not directly mean to start a database instance,
 // but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
-	mgr.Logger.Infof("send SIGUSR2 to activate sql channel")
+	mgr.Logger.Info("send SIGUSR2 to activate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		mgr.Logger.Error(err, "can't find sql channel process")
 		return err
 	}
 
 	err = sqlChannelProc.Signal(syscall.SIGUSR2)
 	if err != nil {
-		mgr.Logger.Errorf("send SIGUSR2 to sql channel failed, err:%v", err)
+		mgr.Logger.Error(err, "send SIGUSR2 to sql channel failed")
 		return err
 	}
 	return nil
@@ -199,16 +199,16 @@ func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
 // Stop does not directly mean to stop a database instance,
 // but rather to sends SIGUSR1 to deactivate sql channel to stop starting database
 func (mgr *DBManagerBase) Stop() error {
-	mgr.Logger.Infof("send SIGUSR1 to deactivate sql channel")
+	mgr.Logger.Info("send SIGUSR1 to deactivate sql channel")
 	sqlChannelProc, err := GetSQLChannelProc()
 	if err != nil {
-		mgr.Logger.Errorf("can't find sql channel process, err:%v", err)
+		mgr.Logger.Error(err, "can't find sql channel process")
 		return err
 	}
 
 	err = sqlChannelProc.Signal(syscall.SIGUSR1)
 	if err != nil {
-		mgr.Logger.Errorf("send SIGUSR1 to sql channel failed, err:%v", err)
+		mgr.Logger.Error(err, "send SIGUSR1 to sql channel failed")
 		return err
 	}
 	return nil
@@ -219,7 +219,7 @@ func (mgr *DBManagerBase) CreateRoot(context.Context) error {
 }
 
 func (mgr *DBManagerBase) ShutDownWithWait() {
-	mgr.Logger.Infof("Override me if need")
+	mgr.Logger.Info("Override me if need")
 }
 
 func RegisterManager(characterType, workloadType string, manager DBManager) {

@@ -1,9 +1,5 @@
-apiVersion: dapr.io/v1alpha1
-kind: Component
-metadata:
-  name: redis
+name: redis
 spec:
-  type: bindings.redis
   version: v1
   metadata:
   - name: redisHost

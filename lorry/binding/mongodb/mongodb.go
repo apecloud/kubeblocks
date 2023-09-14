@@ -23,10 +23,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/mongodb"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
@@ -76,15 +77,16 @@ type MongoDBOperations struct {
 // }
 
 // NewMongoDB returns a new MongoDB Binding
-func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
+func NewMongoDB() *MongoDBOperations {
+	logger := ctrl.Log.WithName("Mongo")
 	return &MongoDBOperations{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 // Init initializes the MongoDB Binding.
-func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
-	mongoOps.Logger.Debug("Initializing MongoDB binding")
-	mongoOps.BaseOperations.Init(metadata)
-	config, _ := mongodb.NewConfig(metadata.Properties)
+func (mongoOps *MongoDBOperations) Init(properties component.Properties) error {
+	mongoOps.Logger.Info("Initializing MongoDB binding")
+	mongoOps.BaseOperations.Init(properties)
+	config, _ := mongodb.NewConfig(mongoOps.Metadata)
 	manager, _ := mongodb.NewManager(mongoOps.Logger)
 
 	mongoOps.DBType = "mongodb"
@@ -143,11 +145,30 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 // 	return nil
 // }
 
-func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
 	return mongoOps.manager.GetMemberState(ctx)
 }
 
 func (mongoOps *MongoDBOperations) LockInstance(ctx context.Context) error {
 	// TODO: impl
 	return fmt.Errorf("NotSupported")
+}
+
+func (mongoOps *MongoDBOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
+	// TODO: impl
+	return nil, nil
+}
+
+func (mongoOps *MongoDBOperations) InternalExec(ctx context.Context, sql string) (int64, error) {
+	// TODO: impl
+	return 0, nil
+}
+
+func (mongoOps *MongoDBOperations) GetLogger() logr.Logger {
+	return mongoOps.Logger
+}
+
+func (mongoOps *MongoDBOperations) GetRunningPort() int {
+	// TODO: impl
+	return mongoOps.DBPort
 }

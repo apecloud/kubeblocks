@@ -1,9 +1,5 @@
-apiVersion: dapr.io/v1alpha1
-kind: Component
-metadata:
-  name: mongodb
+name: mongodb
 spec:
-  type: bindings.mongodb
   version: v1
   metadata:
     - name: host

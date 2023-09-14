@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,10 +49,10 @@ type RedisEntry struct {
 }
 
 type opsMetadata struct {
-	Operation bindings.OperationKind `json:"operation,omitempty"`
-	StartTime string                 `json:"startTime,omitempty"`
-	EndTime   string                 `json:"endTime,omitempty"`
-	Extra     string                 `json:"extra,omitempty"`
+	Operation OperationKind `json:"operation,omitempty"`
+	StartTime string        `json:"startTime,omitempty"`
+	EndTime   string        `json:"endTime,omitempty"`
+	Extra     string        `json:"extra,omitempty"`
 }
 
 // UserDefinedObjectType defines the interface for User Defined Objects.
@@ -70,10 +70,10 @@ type resultRender[T customizedObjType] func(interface{}) (interface{}, error)
 type objectValidator[T customizedObjType] func(object T) error
 
 // objectParser defines the interface to parse the User Defined Object from request.
-type objectParser[T customizedObjType] func(req *bindings.InvokeRequest, object *T) error
+type objectParser[T customizedObjType] func(req *ProbeRequest, object *T) error
 
-func ExecuteObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, req *bindings.InvokeRequest,
-	opsKind bindings.OperationKind, sqlTplRend cmdRender[T], msgTplRend cmdRender[T], object T) (OpsResult, error) {
+func ExecuteObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, req *ProbeRequest,
+	opsKind OperationKind, sqlTplRend cmdRender[T], msgTplRend cmdRender[T], object T) (OpsResult, error) {
 	var (
 		result = OpsResult{}
 		err    error
@@ -83,7 +83,7 @@ func ExecuteObject[T customizedObjType](ctx context.Context, ops BaseInternalOps
 
 	sql := sqlTplRend(object)
 	metadata.Extra = sql
-	ops.GetLogger().Debugf("ExecObject with cmd: %s", sql)
+	ops.GetLogger().Info("ExecObject with cmd", "cmd", sql)
 
 	if _, err = ops.InternalExec(ctx, sql); err != nil {
 		return opsTerminateOnErr(result, metadata, err)
@@ -91,8 +91,8 @@ func ExecuteObject[T customizedObjType](ctx context.Context, ops BaseInternalOps
 	return opsTerminateOnSucc(result, metadata, msgTplRend(object))
 }
 
-func QueryObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, req *bindings.InvokeRequest,
-	opsKind bindings.OperationKind, sqlTplRend cmdRender[T], dataProcessor resultRender[T], object T) (OpsResult, error) {
+func QueryObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, req *ProbeRequest,
+	opsKind OperationKind, sqlTplRend cmdRender[T], dataProcessor resultRender[T], object T) (OpsResult, error) {
 	var (
 		result = OpsResult{}
 		err    error
@@ -102,7 +102,7 @@ func QueryObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, 
 
 	sql := sqlTplRend(object)
 	metadata.Extra = sql
-	ops.GetLogger().Debugf("QueryObject() with cmd: %s", sql)
+	ops.GetLogger().Info("QueryObject() with cmd", "cmd", sql)
 
 	jsonData, err := ops.InternalQuery(ctx, sql)
 	if err != nil {
@@ -120,7 +120,7 @@ func QueryObject[T customizedObjType](ctx context.Context, ops BaseInternalOps, 
 	}
 }
 
-func ParseObjFromRequest[T customizedObjType](req *bindings.InvokeRequest, parse objectParser[T], validator objectValidator[T], object *T) error {
+func ParseObjFromRequest[T customizedObjType](req *ProbeRequest, parse objectParser[T], validator objectValidator[T], object *T) error {
 	if req == nil {
 		return fmt.Errorf("no request provided")
 	}
@@ -137,7 +137,7 @@ func ParseObjFromRequest[T customizedObjType](req *bindings.InvokeRequest, parse
 	return nil
 }
 
-func DefaultUserInfoParser(req *bindings.InvokeRequest, object *UserInfo) error {
+func DefaultUserInfoParser(req *ProbeRequest, object *UserInfo) error {
 	if req == nil || req.Metadata == nil {
 		return fmt.Errorf("no metadata provided")
 	} else if jsonData, err := json.Marshal(req.Metadata); err != nil {
@@ -221,11 +221,11 @@ func String2RoleType(roleName string) RoleType {
 	return CustomizedRole
 }
 
-func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger) {
-	log.Infof("send event: %v", opsResult)
+func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logr.Logger) {
+	log.Info(fmt.Sprintf("send event: %v", opsResult))
 	event, err := createProbeEvent(opsResult)
 	if err != nil {
-		log.Infof("generate event failed: %v", err)
+		log.Error(err, "generate event failed")
 		return
 	}
 
@@ -281,7 +281,7 @@ source:
 	event.Message = string(msg)
 	event.InvolvedObject.UID = types.UID(podUID)
 	event.Source.Host = nodeName
-	event.Reason = string(opsResult["operation"].(bindings.OperationKind))
+	event.Reason = string(opsResult["operation"].(OperationKind))
 	event.FirstTimestamp = metav1.Now()
 	event.LastTimestamp = metav1.Now()
 	event.EventTime = metav1.NowMicro()
@@ -292,16 +292,16 @@ source:
 	return event, nil
 }
 
-func sendEvent(ctx context.Context, log logger.Logger, event *corev1.Event) error {
+func sendEvent(ctx context.Context, log logr.Logger, event *corev1.Event) error {
 	config, err := ctlruntime.GetConfig()
 	if err != nil {
-		log.Errorf("get k8s client config failed: %v", err)
+		log.Error(err, "get k8s client config failed")
 		return err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Infof("k8s client create failed: %v", err)
+		log.Error(err, "k8s client create failed")
 		return err
 	}
 	namespace := os.Getenv(constant.KBEnvNamespace)
@@ -310,14 +310,14 @@ func sendEvent(ctx context.Context, log logger.Logger, event *corev1.Event) erro
 		if err == nil {
 			break
 		}
-		log.Errorf("send event failed: %v", err)
+		log.Error(err, "send event failed")
 		time.Sleep(10 * time.Second)
 	}
 	return err
 }
 
 func StartupCheckWraper(manager component.DBManager, operation Operation) Operation {
-	return func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
+	return func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (OpsResult, error) {
 		if !manager.IsDBStartupReady() {
 			opsRes := OpsResult{"event": OperationFailed, "message": "db not ready"}
 			return opsRes, nil

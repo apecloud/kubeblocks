@@ -1,9 +1,5 @@
-apiVersion: dapr.io/v1alpha1
-kind: Component
-metadata:
-  name: mysql
+name: mysql
 spec:
-  type: bindings.mysql
   version: v1
   metadata:
     - name: url # Required, define DB connection in DSN format

@@ -137,6 +137,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 		clusterDefObj,
 		clusterDefObj.GetComponentDefByName(statefulCompDefName),
 		clusterObj.Spec.GetComponentByName(statefulCompName),
+		nil,
 		clusterVersionObj.Spec.GetDefNameMappingComponents()[statefulCompDefName])
 	Expect(err).ShouldNot(HaveOccurred())
 

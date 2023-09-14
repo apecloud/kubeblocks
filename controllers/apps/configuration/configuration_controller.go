@@ -134,6 +134,7 @@ func (r *ConfigurationReconciler) runTasks(
 		fetcher.ClusterDefObj,
 		fetcher.ClusterDefComObj,
 		fetcher.ClusterComObj,
+		nil,
 		fetcher.ClusterVerComObj)
 	if err != nil {
 		return

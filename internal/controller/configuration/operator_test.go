@@ -34,6 +34,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -52,9 +53,9 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	mockStatefulSet := func() *appsv1.StatefulSet {
-		envConfig, err := builder.BuildEnvConfig(clusterObj, clusterComponent)
+		envConfig, err := factory.BuildEnvConfig(clusterObj, clusterComponent)
 		Expect(err).Should(Succeed())
-		stsObj, err := builder.BuildSts(intctrlutil.RequestCtx{
+		stsObj, err := factory.BuildSts(intctrlutil.RequestCtx{
 			Ctx: ctx,
 			Log: logger,
 		}, clusterObj, clusterComponent, envConfig.Name)

@@ -266,86 +266,68 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 }
 
 func PrintBackupList(o ListBackupOptions) error {
+	var backupNameMap = make(map[string]bool)
+	for _, name := range o.Names {
+		backupNameMap[name] = true
+	}
+
 	// if format is JSON or YAML, use default printer to output the result.
 	if o.Format == printer.JSON || o.Format == printer.YAML {
+		if o.BackupName != "" {
+			o.Names = []string{o.BackupName}
+		}
 		_, err := o.Run()
 		return err
 	}
-
-	// get and output the result
-	o.Print = false
-	r, err := o.Run()
+	dynamic, err := o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+	if o.AllNamespaces {
+		o.Namespace = ""
+	}
+	backupList, err := dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: o.LabelSelector,
+		FieldSelector: o.FieldSelector,
+	})
 	if err != nil {
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-
-	if len(infos) == 0 {
-		fmt.Fprintln(o.IOStreams.Out, "No backup found")
+	if len(backupList.Items) == 0 {
+		o.PrintNotFoundResources()
 		return nil
 	}
 
-	printRows := func(tbl *printer.TablePrinter) error {
-		// sort backups with .status.StartTimestamp
-		sort.SliceStable(infos, func(i, j int) bool {
-			toBackup := func(idx int) *dpv1alpha1.Backup {
-				backup := &dpv1alpha1.Backup{}
-				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(infos[idx].Object.(*unstructured.Unstructured).Object, backup); err != nil {
-					return nil
-				}
-				return backup
-			}
-			iBackup := toBackup(i)
-			jBackup := toBackup(j)
-			if iBackup == nil {
-				return true
-			}
-			if jBackup == nil {
-				return false
-			}
-			return iBackup.Status.StartTimestamp.Time.Before(jBackup.Status.StartTimestamp.Time)
-		})
-		for _, info := range infos {
-			backup := &dpv1alpha1.Backup{}
-			obj := info.Object.(*unstructured.Unstructured)
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
-				return err
-			}
-			sourceCluster := backup.Status.SourceCluster
-			if sourceCluster == "" {
-				sourceCluster = backup.Labels[constant.AppInstanceLabelKey]
-			}
-			durationStr := ""
-			if backup.Status.Duration != nil {
-				durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
-			}
-			statusString := string(backup.Status.Phase)
-			if backup.Status.Phase == dpv1alpha1.BackupRunning && backup.Status.AvailableReplicas != nil {
-				statusString = fmt.Sprintf("%s(AvailablePods: %d)", statusString, *backup.Status.AvailableReplicas)
-			}
-			tbl.AddRow(
-				backup.Name,
-				backup.Namespace,
-				sourceCluster,
-				backup.Spec.BackupType,
-				statusString,
-				backup.Status.TotalSize,
-				durationStr,
-				util.TimeFormat(&backup.CreationTimestamp),
-				util.TimeFormat(backup.Status.CompletionTimestamp),
-				util.TimeFormat(backup.Status.Expiration))
+	// sort the unstructured objects with the creationTimestamp in positive order
+	sort.Sort(unstructuredList(backupList.Items))
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.SetHeader("NAME", "NAMESPACE", "SOURCE-CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
+	for _, obj := range backupList.Items {
+		backup := &dpv1alpha1.Backup{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
+			return err
 		}
-		return nil
+		sourceCluster := backup.Status.SourceCluster
+		if sourceCluster == "" {
+			sourceCluster = backup.Labels[constant.AppInstanceLabelKey]
+		}
+		durationStr := ""
+		if backup.Status.Duration != nil {
+			durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
+		}
+		statusString := string(backup.Status.Phase)
+		if backup.Status.Phase == dpv1alpha1.BackupRunning && backup.Status.AvailableReplicas != nil {
+			statusString = fmt.Sprintf("%s(AvailablePods: %d)", statusString, *backup.Status.AvailableReplicas)
+		}
+		if len(o.Names) > 0 && !backupNameMap[backup.Name] {
+			continue
+		}
+		tbl.AddRow(backup.Name, backup.Namespace, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp),
+			util.TimeFormat(backup.Status.Expiration))
 	}
-
-	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "NAMESPACE", "SOURCE-CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION"); err != nil {
-		return err
-	}
+	tbl.Print()
 	return nil
 }
 
@@ -363,6 +345,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 				o.Names = []string{o.BackupName}
 			}
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			util.CheckErr(o.Complete())
 			util.CheckErr(PrintBackupList(*o))
 		},
 	}

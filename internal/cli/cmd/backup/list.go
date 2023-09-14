@@ -57,6 +57,7 @@ func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			}
 			o.Names = args
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(cluster.PrintBackupList(*o))
 		},
 	}

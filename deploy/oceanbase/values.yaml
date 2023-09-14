@@ -8,12 +8,8 @@ images:
   observer:
     repository: oceanbase-chart
     tag: 4.2.0.0-100010032023083021
-  obagent:
-    repository: obagent
-    tag: 1.2.1-snapshot
 
 zoneCount: 3
-monitorPassword: "demo"
 
 nameOverride: ""
 fullnameOverride: ""

@@ -13,6 +13,3 @@ spec:
       - name: observer-container
         image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.observer.repository }}:{{ .Values.images.observer.tag }}
         imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
-      - name: obagent-container
-        image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.obagent.repository }}:{{ .Values.images.obagent.tag }}
-        imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}

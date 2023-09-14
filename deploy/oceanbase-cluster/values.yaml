@@ -20,4 +20,3 @@ resources:
     data-file: 50Gi
     data-log: 50Gi
     log: 20Gi
-    monitor-conf: 2Gi

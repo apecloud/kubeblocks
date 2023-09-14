@@ -7,7 +7,6 @@ metadata:
 spec:
   connectionCredential:
     username: root
-    # password: "$(RANDOM_PASSWD)"
     password: ""
     endpoint: "$(SVC_FQDN):$(SVC_PORT_sql)"
     host: "$(SVC_FQDN)"
@@ -38,14 +37,6 @@ spec:
               - containerPort: 2882
                 name: rpc
                 protocol: TCP
-            # readinessProbe:
-            #   failureThreshold: 10
-            #   initialDelaySeconds: 5
-            #   periodSeconds: 2
-            #   successThreshold: 1
-            #   tcpSocket:
-            #     port: 2881
-            #   timeoutSeconds: 1
             resources:
               limits:
                 cpu: "2"
@@ -73,46 +64,3 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
-          - name: obagent-container
-            env:
-              - name: OB_MONITOR_STATUS
-                value: active
-              - name: CLUSTER_NAME
-                value: obcluster
-              - name: CLUSTER_ID
-                value: "1"
-              - name: MONITOR_USER
-                value: monitor
-              - name: MONITOR_PASSWORD
-                value: {{ .Values.monitorPassword | quote }}
-            ports:
-              - containerPort: 8088
-                name: http
-                protocol: TCP
-              - containerPort: 8089
-                name: pprof
-                protocol: TCP
-            readinessProbe:
-              failureThreshold: 3
-              httpGet:
-                path: /metrics/stat
-                port: 8088
-                scheme: HTTP
-              initialDelaySeconds: 5
-              periodSeconds: 2
-              successThreshold: 1
-              timeoutSeconds: 1
-            resources:
-              limits:
-                cpu: 200m
-                memory: 1Gi
-              requests:
-                cpu: 200m
-                memory: 1Gi
-            volumeMounts:
-              - mountPath: /home/admin/obagent/conf
-                name: monitor-conf
-            workingDir: /home/admin/obagent
-
-
-

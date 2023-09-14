@@ -93,6 +93,7 @@ func MockRSMReady(rsm *workloads.ReplicatedStateMachine, pods ...*corev1.Pod) {
 	rsm.Status.ReadyInitReplicas = *rsm.Spec.Replicas
 	rsm.Status.AvailableReplicas = *rsm.Spec.Replicas
 	rsm.Status.ObservedGeneration = rsm.Generation
+	rsm.Status.CurrentGeneration = rsm.Generation
 	rsm.Status.Replicas = *rsm.Spec.Replicas
 	rsm.Status.ReadyReplicas = *rsm.Spec.Replicas
 	rsm.Status.CurrentRevision = rsm.Status.UpdateRevision
@@ -175,5 +176,6 @@ func InitRSMStatus(testCtx testutil.TestContext, rsm *workloads.ReplicatedStateM
 		rsm.Status.UpdateRevision = controllerRevision
 		rsm.Status.CurrentRevision = controllerRevision
 		rsm.Status.ObservedGeneration = rsm.Generation
+		rsm.Status.CurrentGeneration = rsm.Generation
 	})).Should(gomega.Succeed())
 }

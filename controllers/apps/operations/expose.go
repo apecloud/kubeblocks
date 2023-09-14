@@ -80,7 +80,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		opsRequest.Status.Components = make(map[string]appsv1alpha1.OpsRequestComponentStatus)
 		for _, v := range opsRequest.Spec.ExposeList {
 			opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase: appsv1alpha1.SpecReconcilingClusterCompPhase, // appsv1alpha1.ExposingPhase,
+				Phase: appsv1alpha1.UpdatingClusterCompPhase, // appsv1alpha1.ExposingPhase,
 			}
 		}
 	}

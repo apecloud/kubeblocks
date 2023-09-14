@@ -4,7 +4,7 @@ description: ApeCloud FoxLake is an open-source cloud-native data warehouse.
 dependencies:
   - name: keda
     version: 2.10.2
-    repository: https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+    repository: https://apecloud.github.io/helm-charts
 
 annotations:
   category: Database

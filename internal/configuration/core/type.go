@@ -21,6 +21,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/StudioSol/set"
 	"github.com/go-logr/logr"
@@ -171,4 +172,9 @@ func getInstanceCfgCMName(objName, tplName string) string {
 // GetComponentCfgName is similar to getInstanceCfgCMName, while without statefulSet object.
 func GetComponentCfgName(clusterName, componentName, tplName string) string {
 	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
+}
+
+// GenerateEnvFromName generates env configmap name
+func GenerateEnvFromName(originName string) string {
+	return strings.Join([]string{originName, "envfrom"}, "-")
 }

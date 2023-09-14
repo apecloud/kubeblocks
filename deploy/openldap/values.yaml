@@ -1,0 +1,18 @@
+# Default values for openldap.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: osixia/openldap
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.5.0"
+
+service:
+  port: 389
+
+ldap:
+  replication: false
+  organisation: kubeblocks
+  domain: kubeblocks.io
+  adminPassword: admin

@@ -152,11 +152,11 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
-	// Rules defines the namespaced policy rules required by a component.
+	// PolicyRules defines the namespaced policy rules required by the component.
 	// If any rule application fails (e.g., due to lack of permissions), the provisioning of the component instance will also fail.
 	// Cannot be updated.
 	// +optional
-	Rules []rbacv1.PolicyRule `json:"rules,omitempty"`
+	PolicyRules []rbacv1.PolicyRule `json:"policyRules,omitempty"`
 
 	// Labels defines static labels that will be patched to all k8s resources created for the component.
 	// If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
@@ -165,10 +165,10 @@ type ComponentDefinitionSpec struct {
 	Labels map[string]BuiltInString `json:"labels,omitempty"`
 
 	// TODO: support other resources provisioning.
-	// Statement to create system account.
+	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// Cannot be updated.
 	// +optional
-	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
+	SystemAccounts *ComponentSystemAccount `json:"systemAccounts,omitempty"`
 
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
@@ -218,7 +218,7 @@ type ComponentDefinitionStatus struct {
 }
 
 type ComponentPersistentVolume struct {
-	// Name of the volume.
+	// The Name of the persistent volume.
 	// Must be a DNS_LABEL and unique within the pod.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// +required
@@ -229,7 +229,7 @@ type ComponentPersistentVolume struct {
 	// +optional
 	Synchronization bool `json:"synchronization,omitempty"`
 
-	// The high watermark threshold for the volume space usage.
+	// HighWatermark defines the high watermark threshold for the volume space usage.
 	// If there is any specified volumes who's space usage is over the threshold, the pre-defined "LOCK" action
 	// will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
 	// as read-only. And after that, if all volumes' space usage drops under the threshold later, the pre-defined
@@ -259,9 +259,14 @@ type ConnectionCredential struct {
 	// +required
 	Name string `json:"name"`
 
-	// ServiceName specifies the service spec to use for accessing the component service.
+	// ServiceName specifies the name of component service to use for accessing the component service.
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
+
+	// Headless specifies to use the default headless service.
+	// +kubebuilder:default=false
+	// +optional
+	HeadlessService bool `json:"headlessService,omitempty"`
 
 	// PortName specifies the name of the port to access the component service.
 	// If the service has multiple ports, you can specify a specific port to use here.
@@ -269,7 +274,13 @@ type ConnectionCredential struct {
 	// +optional
 	PortName string `json:"portName,omitempty"`
 
-	// CredentialSecret specifies the secret required to access the component service.
+	// AccountName specifies the account used to access the component service.
+	// If specified, the account must be defined in @SystemAccounts.
+	// +optional
+	AccountName string `json:"accountName,omitempty"`
+
+	// TODO: how to use the secret?
+	// CredentialSecret specifies the secret used to access the component service.
 	// +optional
 	CredentialSecret string `json:"credentialSecret,omitempty"`
 }
@@ -312,6 +323,21 @@ type ComponentReplicaRole struct {
 	//// +kubebuilder:default=true
 	//// +optional
 	// Leaderable bool `json:"leaderable,omitempty"`
+}
+
+type ComponentSystemAccount struct {
+	// PasswordConfig defines the policy to generate password.
+	// +kubebuilder:validation:Required
+	PasswordConfig PasswordConfig `json:"passwordConfig"`
+
+	// Accounts defines all the system accounts.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	Accounts []SystemAccountConfig `json:"accounts" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 // TargetPodSelector defines how to select pod(s) to execute a action.
@@ -530,4 +556,9 @@ type ComponentLifecycleActions struct {
 	// Cannot be updated.
 	// +optional
 	Reload *Action `json:"reload,omitempty"`
+
+	// AccountProvision defines how to provision accounts.
+	// Cannot be updated.
+	// +optional
+	AccountProvision *Action `json:"accountProvision,omitempty"`
 }

@@ -99,7 +99,7 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 	}
 
 	if len(infos) == 0 {
-		fmt.Fprintln(o.IOStreams.Out, "No backup found")
+		fmt.Fprintln(o.IOStreams.Out, "No backup Repo found")
 		return nil
 	}
 

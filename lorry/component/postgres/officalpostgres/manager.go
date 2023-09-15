@@ -452,9 +452,8 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 				case localLsn >= h.SwitchPoint:
 					needRewind = true
 				default:
-					checkPointEnd := mgr.getCheckPointEnd()
+					checkPointEnd := mgr.getCheckPointEnd(localTimeLine, localLsn)
 					needRewind = h.SwitchPoint != checkPointEnd
-					// TODO:get checkpoint end
 				}
 				exitFlag = true
 				break
@@ -472,8 +471,17 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 	return needRewind
 }
 
-func (mgr *Manager) getCheckPointEnd() int64 {
-	return 0
+func (mgr *Manager) getCheckPointEnd(timeLine, lsn int64) int64 {
+	lsnStr := postgres.FormatPgLsn(lsn)
+
+	resp, err := postgres.PgWalDump("-t", strconv.FormatInt(timeLine, 64), "-s", lsnStr, "-n", "2")
+	if err == nil || resp == "" {
+		return 0
+	}
+
+	checkPointEndStr := postgres.ParsePgWalDumpError(err.Error(), lsnStr)
+
+	return postgres.ParsePgLsn(checkPointEndStr)
 }
 
 func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {

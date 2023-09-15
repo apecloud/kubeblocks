@@ -172,10 +172,10 @@ func TestParsePGLsn(t *testing.T) {
 
 func TestFormatPgLsn(t *testing.T) {
 	t.Run("format lsn", func(t *testing.T) {
-		lsn := int64(97500059720)
+		lsn := int64(16777376)
 
 		lsnStr := FormatPgLsn(lsn)
-		assert.Equal(t, "16/B374D848", lsnStr)
+		assert.Equal(t, "0/010000A0", lsnStr)
 	})
 }
 
@@ -217,5 +217,23 @@ func TestParseHistory(t *testing.T) {
 		assert.Equal(t, int64(2), history.History[1].ParentTimeline)
 		assert.Equal(t, ParsePgLsn("0/50000A0 "), history.History[0].SwitchPoint)
 		assert.Equal(t, ParsePgLsn("0/60000A0 "), history.History[1].SwitchPoint)
+	})
+}
+
+func TestParsePgWalDumpError(t *testing.T) {
+	t.Run("parse success", func(t *testing.T) {
+		errorInfo := "pg_waldump: fatal: error in WAL record at 0/182E220: invalid record length at 0/182E298: wanted 24, got 0"
+
+		resp := ParsePgWalDumpError(errorInfo, "0/182E220")
+
+		assert.Equal(t, "0/182E298", resp)
+	})
+
+	t.Run("parse failed", func(t *testing.T) {
+		errorInfo := "pg_waldump: fatal: error in WAL record at 0/182E220: invalid record length at 0/182E298"
+
+		resp := ParsePgWalDumpError(errorInfo, "0/182E220")
+
+		assert.Equal(t, "", resp)
 	})
 }

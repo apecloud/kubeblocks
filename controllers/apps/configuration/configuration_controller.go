@@ -114,7 +114,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 func isAllReady(configuration *appsv1alpha1.Configuration) bool {
 	for _, item := range configuration.Spec.ConfigItemDetails {
 		itemStatus := configuration.Status.GetItemStatus(item.Name)
-		if itemStatus == nil || itemStatus.Phase != appsv1alpha1.CFinishedPhase {
+		if itemStatus != nil && !isFinishStatus(itemStatus.Phase) {
 			return false
 		}
 	}
@@ -129,7 +129,8 @@ func (r *ConfigurationReconciler) runTasks(
 	var errs []error
 	var synthesizedComp *component.SynthesizedComponent
 
-	synthesizedComp, err = component.BuildComponent(reqCtx, nil,
+	synthesizedComp, err = component.BuildComponent(reqCtx,
+		nil,
 		fetcher.ClusterObj,
 		fetcher.ClusterDefObj,
 		fetcher.ClusterDefComObj,
@@ -148,11 +149,6 @@ func (r *ConfigurationReconciler) runTasks(
 			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)
 			continue
-		}
-		if err := task.SyncStatus(fetcher, task.Status); err != nil {
-			task.Status.Phase = appsv1alpha1.CFailedPhase
-			task.Status.Message = cfgutil.ToPointer(err.Error())
-			errs = append(errs, err)
 		}
 	}
 
@@ -197,11 +193,11 @@ func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.Configurati
 }
 
 func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
-	return phase == appsv1alpha1.CRunningPhase ||
-		phase == appsv1alpha1.CInitPhase ||
-		phase == appsv1alpha1.CPendingPhase ||
-		phase == appsv1alpha1.CMergedPhase ||
-		phase == appsv1alpha1.CMergeFailedPhase ||
-		phase == appsv1alpha1.CUpgradingPhase ||
-		phase == appsv1alpha1.CFinishedPhase
+	return phase != "" &&
+		phase != appsv1alpha1.CCreatingPhase &&
+		phase != appsv1alpha1.CDeletingPhase
+}
+
+func isFinishStatus(phase appsv1alpha1.ConfigurationPhase) bool {
+	return phase == appsv1alpha1.CFinishedPhase || phase == appsv1alpha1.CFailedAndPausePhase
 }

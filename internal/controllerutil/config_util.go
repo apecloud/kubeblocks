@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
@@ -122,7 +121,7 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // IsApplyConfigChanged checks if the configuration is changed
-func IsApplyConfigChanged(configMap *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
+func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
 	if configMap == nil {
 		return false
 	}
@@ -131,7 +130,7 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item appsv1alpha1.Configu
 	if !ok {
 		return false
 	}
-	var target appsv1alpha1.ConfigurationItemDetail
+	var target v1alpha1.ConfigurationItemDetail
 	if err := json.Unmarshal([]byte(lastAppliedVersion), &target); err != nil {
 		return false
 	}
@@ -140,7 +139,7 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item appsv1alpha1.Configu
 }
 
 // IsRerender checks if the configuration template is changed
-func IsRerender(configMap *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
+func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
 	if configMap == nil {
 		return true
 	}
@@ -157,13 +156,13 @@ func IsRerender(configMap *corev1.ConfigMap, item appsv1alpha1.ConfigurationItem
 
 // GetConfigSpecReconcilePhase gets the configuration phase
 func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
-	item appsv1alpha1.ConfigurationItemDetail,
-	status *appsv1alpha1.ConfigurationItemDetailStatus) appsv1alpha1.ConfigurationPhase {
+	item v1alpha1.ConfigurationItemDetail,
+	status *v1alpha1.ConfigurationItemDetailStatus) v1alpha1.ConfigurationPhase {
 	if status == nil || status.Phase == "" {
-		return appsv1alpha1.CCreatingPhase
+		return v1alpha1.CCreatingPhase
 	}
 	if !IsApplyConfigChanged(configMap, item) {
-		return appsv1alpha1.CPendingPhase
+		return v1alpha1.CPendingPhase
 	}
 	return status.Phase
 }

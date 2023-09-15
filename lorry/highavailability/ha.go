@@ -52,7 +52,7 @@ func NewHa(logger logr.Logger) *Ha {
 	dcs, _ := dcs3.NewKubernetesStore(logger)
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
-		logger.Error(nil, "%s not set", constant.KBEnvCharacterType)
+		logger.Error(nil, "%s not set", "characterType", constant.KBEnvCharacterType)
 		return nil
 	}
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)

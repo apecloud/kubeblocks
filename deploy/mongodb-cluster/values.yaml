@@ -4,7 +4,7 @@
 
 ## @param version cluster version
 ##
-version: mongodb-5.0.14
+version: mongodb-5.0
 
 ## @param mode cluster topology mode, standalone or replicaset
 ##

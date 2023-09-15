@@ -22,8 +22,7 @@ package polardbx
 import (
 	"context"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
@@ -39,17 +38,17 @@ type PolardbxOperations struct {
 type QueryRes []map[string]interface{}
 
 // NewPolardbx returns a new polardbx output binding.
-func NewPolardbx(logger logger.Logger) bindings.OutputBinding {
+func NewPolardbx(logger logr.Logger) *PolardbxOperations {
 	return &PolardbxOperations{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 // Init initializes the polardbx binding.
-func (polardbxOps *PolardbxOperations) Init(metadata bindings.Metadata) error {
-	polardbxOps.Logger.Debug("Initializing polardbx binding")
+func (polardbxOps *PolardbxOperations) Init(metadata component.Properties) error {
+	polardbxOps.Logger.Info("Initializing polardbx binding")
 	polardbxOps.BaseOperations.Init(metadata)
-	config, err := polardbx.NewConfig(metadata.Properties)
+	config, err := polardbx.NewConfig(metadata)
 	if err != nil {
-		polardbxOps.Logger.Errorf("polardbx config initialize failed: %v", err)
+		polardbxOps.Logger.Error(err, "polardbx config initialize failed")
 		return err
 	}
 
@@ -57,7 +56,7 @@ func (polardbxOps *PolardbxOperations) Init(metadata bindings.Metadata) error {
 
 	manager, err = polardbx.NewManager(polardbxOps.Logger)
 	if err != nil {
-		polardbxOps.Logger.Errorf("polardbx DB Manager initialize failed: %v", err)
+		polardbxOps.Logger.Error(err, "polardbx DB Manager initialize failed")
 		return err
 	}
 
@@ -74,7 +73,7 @@ func (polardbxOps *PolardbxOperations) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-func (polardbxOps *PolardbxOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (polardbxOps *PolardbxOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
 	manager := polardbxOps.Manager.(*polardbx.Manager)
 	return manager.GetRole(ctx)
 }
@@ -83,7 +82,7 @@ func (polardbxOps *PolardbxOperations) GetRunningPort() int {
 	return 0
 }
 
-func (polardbxOps *PolardbxOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (polardbxOps *PolardbxOperations) ExecOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
@@ -95,7 +94,7 @@ func (polardbxOps *PolardbxOperations) ExecOps(ctx context.Context, req *binding
 	manager, _ := polardbxOps.Manager.(*polardbx.Manager)
 	count, err := manager.Exec(ctx, sql)
 	if err != nil {
-		polardbxOps.Logger.Infof("exec error: %v", err)
+		polardbxOps.Logger.Error(err, "exec error", "sql", sql)
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
@@ -105,7 +104,7 @@ func (polardbxOps *PolardbxOperations) ExecOps(ctx context.Context, req *binding
 	return result, nil
 }
 
-func (polardbxOps *PolardbxOperations) QueryOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (polardbxOps *PolardbxOperations) QueryOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
@@ -116,7 +115,7 @@ func (polardbxOps *PolardbxOperations) QueryOps(ctx context.Context, req *bindin
 	manager, _ := polardbxOps.Manager.(*polardbx.Manager)
 	data, err := manager.Query(ctx, sql)
 	if err != nil {
-		polardbxOps.Logger.Infof("Query error: %v", err)
+		polardbxOps.Logger.Error(err, "Query error", "sql", sql)
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {

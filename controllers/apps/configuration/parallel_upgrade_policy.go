@@ -50,7 +50,7 @@ func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatu
 
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	return p.restartPods(params, pods, funcs)
@@ -69,10 +69,10 @@ func (p *parallelUpgradePolicy) restartPods(params reconfigureParams, pods []cor
 			continue
 		}
 		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}
 	return makeReturnedStatus(ESNone), nil

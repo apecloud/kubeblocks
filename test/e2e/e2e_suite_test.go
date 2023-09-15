@@ -55,6 +55,7 @@ var secretID string
 var secretKey string
 var initEnv bool
 var testType string
+var skipCase string
 
 func init() {
 	viper.AutomaticEnv()
@@ -65,6 +66,7 @@ func init() {
 	flag.StringVar(&secretKey, "SECRET_KEY", "", "cloud-provider SECRET_KEY")
 	flag.BoolVar(&initEnv, "INIT_ENV", false, "cloud-provider INIT_ENV")
 	flag.StringVar(&testType, "TEST_TYPE", "", "test type")
+	flag.StringVar(&skipCase, "SKIP_CASE", "", "skip not execute cases")
 }
 
 func TestE2e(t *testing.T) {
@@ -105,6 +107,7 @@ var _ = BeforeSuite(func() {
 	InitEnv = initEnv
 	TestType = testType
 	log.Println("TestType is ：" + TestType)
+	SkipCase = skipCase
 	TestResults = make([]Result, 0)
 	if len(provider) > 0 && len(region) > 0 && len(secretID) > 0 && len(secretKey) > 0 {
 		Provider = provider

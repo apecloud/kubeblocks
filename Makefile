@@ -629,17 +629,32 @@ else ifeq ($(TEST_TYPE), starrocks)
 	$(HELM) template starrocks-cluster deploy/starrocks-cluster > test/e2e/testdata/smoketest/starrocks/00_starrocksbcluster.yaml
 else ifeq ($(TEST_TYPE), risingwave)
 	$(HELM) dependency build deploy/risingwave-cluster --skip-refresh
+	$(HELM) upgrade --install etcd deploy/etcd
 	$(HELM) upgrade --install risingwave deploy/risingwave
 	$(HELM) template risingwave-cluster deploy/risingwave-cluster > test/e2e/testdata/smoketest/risingwave/00_risingwavecluster.yaml
+else ifeq ($(TEST_TYPE), etcd)
+	$(HELM) dependency build deploy/etcd-cluster --skip-refresh
+	$(HELM) upgrade --install etcd deploy/etcd
+	$(HELM) template etcd-cluster deploy/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
+else ifeq ($(TEST_TYPE), oracle)
+	$(HELM) dependency build deploy/oracle-mysql-cluster --skip-refresh
+	$(HELM) upgrade --install oracle deploy/oracle-mysql
+	$(HELM) template oracle-cluster deploy/oracle-mysql-cluster > test/e2e/testdata/smoketest/oracle/00_oraclecluster.yaml
 else ifeq ($(TEST_TYPE), kafka)
 	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+	$(HELM) upgrade --install kafka deploy/kafka
+	$(HELM) template kafka-cluster deploy/kafka-cluster > test/e2e/testdata/smoketest/kafka/00_kafkacluster.yaml
+else ifeq ($(TEST_TYPE), foxlake)
+	$(HELM) dependency build deploy/foxlake-cluster --skip-refresh
+	$(HELM) upgrade --install etcd deploy/foxlake
+	$(HELM) template foxlake-cluster deploy/foxlake-cluster > test/e2e/testdata/smoketest/foxlake/00_foxlakecluster.yaml
 else
 	$(error "test type does not exist")
 endif
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV
@@ -660,7 +675,16 @@ else ifeq ($(TEST_TYPE), greptimedb)
 else ifeq ($(TEST_TYPE), starrocks)
 	$(HELM) upgrade --install starrocks deploy/starrocks
 else ifeq ($(TEST_TYPE), risingwave)
+	$(HELM) upgrade --install etcd deploy/etcd
 	$(HELM) upgrade --install risingwave deploy/risingwave
+else ifeq ($(TEST_TYPE), etcd)
+	$(HELM) upgrade --install etcd deploy/etcd
+else ifeq ($(TEST_TYPE), oracle)
+	$(HELM) upgrade --install oracle-mysql deploy/oracle-mysql
+else ifeq ($(TEST_TYPE), kafka)
+	$(HELM) upgrade --install kafka deploy/kafka
+else ifeq ($(TEST_TYPE), foxlake)
+	$(HELM) upgrade --install foxlake deploy/foxlake
 else
 	$(error "test type does not exist")
 endif

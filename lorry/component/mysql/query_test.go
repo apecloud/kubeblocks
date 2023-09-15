@@ -25,8 +25,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -101,7 +103,8 @@ func mockDatabase(t *testing.T) (*Manager, sqlmock.Sqlmock, error) {
 	}
 
 	manager := &Manager{}
-	manager.Logger = logger.NewLogger("test")
+	development, _ := zap.NewDevelopment()
+	manager.Logger = zapr.NewLogger(development)
 	manager.DB = db
 
 	return manager, mock, err

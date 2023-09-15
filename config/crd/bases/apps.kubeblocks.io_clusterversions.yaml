@@ -109,7 +109,7 @@ spec:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
-                          lazyRenderedConfigSpec:
+                          legacyRenderedConfigSpec:
                             description: 'lazyRenderedConfigSpec is optional: specify
                               the secondary rendered config spec.'
                             properties:
@@ -122,7 +122,7 @@ spec:
                                 pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               policy:
-                                default: patch
+                                default: none
                                 description: policy defines how to merge external
                                   imported templates into component templates.
                                 enum:

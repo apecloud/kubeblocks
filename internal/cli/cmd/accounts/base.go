@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/dapr/components-contrib/bindings"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +46,7 @@ type AccountBaseOptions struct {
 	PodName       string
 	Pod           *corev1.Pod
 	Verbose       bool
-	AccountOp     bindings.OperationKind
+	AccountOp     lorryutil.OperationKind
 	RequestMeta   map[string]interface{}
 	*exec.ExecOptions
 }
@@ -62,7 +61,7 @@ var (
 	errClusterNameorInstName = fmt.Errorf("specify either cluster name or --instance")
 )
 
-func NewAccountBaseOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op bindings.OperationKind) *AccountBaseOptions {
+func NewAccountBaseOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op lorryutil.OperationKind) *AccountBaseOptions {
 	return &AccountBaseOptions{
 		ExecOptions: exec.NewExecOptions(f, streams),
 		AccountOp:   op,

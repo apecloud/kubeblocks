@@ -29,7 +29,7 @@ const (
 
 const (
 	ProbeEventOperationNotImpl ProbeEventType = "OperationNotImplemented"
-	ProbeEventCheckRoleFailed  ProbeEventType = "checkRoleFailed"
+	ProbeEventCheckRoleFailed  ProbeEventType = "Failed"
 	ProbeEventRoleInvalid      ProbeEventType = "roleInvalid"
 	ProbeEventRoleChanged      ProbeEventType = "roleChanged"
 	ProbeEventRoleUnChanged    ProbeEventType = "roleUnChanged"

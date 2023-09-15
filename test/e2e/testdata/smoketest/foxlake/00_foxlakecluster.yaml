@@ -1,0 +1,82 @@
+---
+# Source: foxlake-cluster/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-foxlake-cluster
+  namespace: default
+  labels: 
+    helm.sh/chart: foxlake-cluster-0.5.0-alpha.3
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/instance: foxlake-cluster
+---
+# Source: foxlake-cluster/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kb-clusterrolebinding-default-foxlake-cluster
+  namespace: default
+  labels: 
+    helm.sh/chart: foxlake-cluster-0.5.0-alpha.3
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/instance: foxlake-cluster
+subjects:
+- kind: ServiceAccount
+  name: kb-foxlake-cluster
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: kb-foxlake-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: foxlake-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: foxlake-cluster
+  namespace: default
+  labels: 
+    helm.sh/chart: foxlake-cluster-0.5.0-alpha.3
+    app.kubernetes.io/version: "0.2.0"
+    app.kubernetes.io/instance: foxlake-cluster
+  annotations:
+    kubeblocks.io/extra-env: '{
+      "MPP_WORKER_TOLERATIONS":""
+    }'
+spec:
+  clusterDefinitionRef: foxlake  # ref clusterdefinition.name
+  clusterVersionRef: foxlake-0.2.0 # ref clusterversion.name
+  terminationPolicy: Delete
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: foxlake-server # user-defined
+      componentDefRef: foxlake-server # ref clusterdefinition componentDefs.name
+      serviceAccountName: kb-foxlake-cluster      
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      replicas: 1
+    - name: foxlake-metadb
+      componentDefRef: foxlake-metadb      
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      replicas: 1      
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
@@ -44,7 +44,7 @@ type Manager struct {
 	isLeader     int
 }
 
-func NewManager(logger logger.Logger) (*Manager, error) {
+func NewManager(logger logr.Logger) (*Manager, error) {
 	pool, err := pgxpool.NewWithConfig(context.Background(), config.pgxConfig)
 	if err != nil {
 		return nil, errors.Errorf("unable to ping the DB: %v", err)
@@ -81,13 +81,13 @@ func (mgr *Manager) IsRunning() bool {
 func (mgr *Manager) newProcessFromPidFile() error {
 	pidFile, err := readPidFile(mgr.DataDir)
 	if err != nil {
-		mgr.Logger.Errorf("read pid file failed, err:%v", err)
+		mgr.Logger.Error(err, "read pid file failed, err")
 		return err
 	}
 
 	proc, err := process.NewProcess(pidFile.pid)
 	if err != nil {
-		mgr.Logger.Errorf("new process failed, err:%v", err)
+		mgr.Logger.Error(err, "new process failed, err")
 		return err
 	}
 
@@ -146,7 +146,7 @@ func (mgr *Manager) ReadCheck(ctx context.Context, host string) bool {
 			// no healthy check records, return true
 			return true
 		}
-		mgr.Logger.Errorf("read check failed, err:%v", err)
+		mgr.Logger.Error(err, "read check failed")
 		return false
 	}
 	return true
@@ -159,7 +159,7 @@ func (mgr *Manager) WriteCheck(ctx context.Context, host string) bool {
 		`, component.CheckStatusType)
 	_, err := mgr.ExecWithHost(ctx, writeSQL, host)
 	if err != nil {
-		mgr.Logger.Errorf("write check failed, err:%v", err)
+		mgr.Logger.Error(err, "write check failed")
 		return false
 	}
 	return true
@@ -176,7 +176,7 @@ func (mgr *Manager) PgReload(ctx context.Context) error {
 func (mgr *Manager) IsPgReady(ctx context.Context) bool {
 	err := mgr.Pool.Ping(ctx)
 	if err != nil {
-		mgr.Logger.Warnf("DB is not ready, ping failed, err:%v", err)
+		mgr.Logger.Error(err, "DB is not ready, ping failed")
 		return false
 	}
 
@@ -188,16 +188,16 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err
 	}
 
 	if err = mgr.PgReload(ctx); err != nil {
-		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		mgr.Logger.Error(err, "reload conf failed")
 		return err
 	}
 
-	mgr.Logger.Infof("Lock db success: %s", reason)
+	mgr.Logger.Info(fmt.Sprintf("Lock db success: %s", reason))
 	return nil
 }
 
@@ -206,16 +206,16 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err
 	}
 
 	if err = mgr.PgReload(ctx); err != nil {
-		mgr.Logger.Errorf("reload conf failed, err:%v", err)
+		mgr.Logger.Error(err, "reload conf failed")
 		return err
 	}
 
-	mgr.Logger.Infof("UnLock db success")
+	mgr.Logger.Info("UnLock db success")
 	return nil
 }
 

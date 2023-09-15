@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -47,7 +47,7 @@ type WesqlManager struct {
 
 var _ component.DBManager = &WesqlManager{}
 
-func NewWesqlManager(logger logger.Logger) (*WesqlManager, error) {
+func NewWesqlManager(logger logr.Logger) (*WesqlManager, error) {
 	db, err := config.GetLocalDBConn()
 	if err != nil {
 		return nil, errors.Wrap(err, "connect to MySQL")
@@ -57,7 +57,7 @@ func NewWesqlManager(logger logger.Logger) (*WesqlManager, error) {
 		if err != nil {
 			derr := db.Close()
 			if derr != nil {
-				logger.Errorf("failed to close: %v", err)
+				logger.Error(err, "failed to close")
 			}
 		}
 	}()
@@ -172,12 +172,12 @@ func (mgr *WesqlManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluste
 func (mgr *WesqlManager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	db, err := mgr.GetLeaderConn(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Infof("Get leader conn failed: %v", err)
+		mgr.Logger.Error(err, "Get leader conn failed")
 		return err
 	}
 	addr := mgr.GetAddrWithMemberName(ctx, cluster, memberName)
 	if addr == "" {
-		mgr.Logger.Infof("member %s already deleted", memberName)
+		mgr.Logger.Info(fmt.Sprintf("member %s already deleted", memberName))
 		return nil
 	}
 
@@ -185,7 +185,7 @@ func (mgr *WesqlManager) LeaveMemberFromCluster(ctx context.Context, cluster *dc
 		"call dbms_consensus.drop_learner('%s');", addr, addr)
 	_, err = db.ExecContext(ctx, sql)
 	if err != nil {
-		mgr.Logger.Warnf("delete member from db cluster failed: %v", err)
+		mgr.Logger.Error(err, "delete member from db cluster failed")
 		return errors.Wrapf(err, "error executing %s", sql)
 	}
 	return nil
@@ -194,7 +194,7 @@ func (mgr *WesqlManager) LeaveMemberFromCluster(ctx context.Context, cluster *dc
 func (mgr *WesqlManager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	db, err := mgr.GetLeaderConn(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Infof("Get leader conn failed: %v", err)
+		mgr.Logger.Error(err, "Get leader conn failed")
 		return false
 	}
 	if db == nil {
@@ -211,7 +211,7 @@ func (mgr *WesqlManager) IsClusterHealthy(ctx context.Context, cluster *dcs.Clus
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
 		return false
 	}
 
@@ -237,7 +237,7 @@ func (mgr *WesqlManager) GetClusterInfo(ctx context.Context, cluster *dcs.Cluste
 	if cluster != nil {
 		db, err = mgr.GetLeaderConn(ctx, cluster)
 		if err != nil {
-			mgr.Logger.Infof("Get leader conn failed: %v", err)
+			mgr.Logger.Error(err, "Get leader conn failed")
 			return ""
 		}
 		if db != nil {
@@ -251,7 +251,7 @@ func (mgr *WesqlManager) GetClusterInfo(ctx context.Context, cluster *dcs.Cluste
 	err = db.QueryRowContext(ctx, "select cluster_id, cluster_info from mysql.consensus_info").
 		Scan(&clusterID, &clusterInfo)
 	if err != nil {
-		mgr.Logger.Error("Cluster info query failed: %v", err)
+		mgr.Logger.Error(err, "Cluster info query failed")
 	}
 	return clusterInfo
 }
@@ -274,11 +274,11 @@ func (mgr *WesqlManager) Promote(ctx context.Context, cluster *dcs.Cluster) erro
 	addr := cluster.GetMemberAddr(*currentMember)
 	resp, err := db.Exec(fmt.Sprintf("call dbms_consensus.change_leader('%s:13306');", addr))
 	if err != nil {
-		mgr.Logger.Errorf("promote err: %v", err)
+		mgr.Logger.Error(err, "promote err")
 		return err
 	}
 
-	mgr.Logger.Infof("promote success, resp:%v", resp)
+	mgr.Logger.Info("promote success", "resp", resp)
 	return nil
 }
 
@@ -302,7 +302,7 @@ func (mgr *WesqlManager) GetHealthiestMember(cluster *dcs.Cluster, candidate str
 func (mgr *WesqlManager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
 	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
 	if err != nil || clusterLocalInfo == nil {
-		mgr.Logger.Errorf("Get cluster local info failed: %v", err)
+		mgr.Logger.Error(err, "Get cluster local info failed")
 		return nil
 	}
 

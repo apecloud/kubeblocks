@@ -25,15 +25,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	dapr "github.com/dapr/go-sdk/client"
-	pb "github.com/dapr/go-sdk/dapr/proto/runtime/v1"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -41,48 +40,10 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
-type testDaprServer struct {
-	pb.UnimplementedDaprServer
-	state                       map[string][]byte
-	configurationSubscriptionID map[string]chan struct{}
-	cachedRequest               map[string]*response
-}
-
-type response struct {
-	bindingResponse *pb.InvokeBindingResponse
-	err             error
-}
-
-var _ pb.DaprServer = &testDaprServer{}
-
-func (s *testDaprServer) InvokeBinding(ctx context.Context, req *pb.InvokeBindingRequest) (*pb.InvokeBindingResponse, error) {
-	time.Sleep(100 * time.Millisecond)
-	darpRequest := dapr.InvokeBindingRequest{Name: req.Name, Operation: req.Operation, Data: req.Data, Metadata: req.Metadata}
-	resp, ok := s.cachedRequest[GetMapKeyFromRequest(&darpRequest)]
-	if ok {
-		return resp.bindingResponse, resp.err
-	} else {
-		return nil, fmt.Errorf("unexpected request")
-	}
-}
-
-func (s *testDaprServer) ExepctRequest(req *pb.InvokeBindingRequest, resp *pb.InvokeBindingResponse, err error) {
-	darpRequest := dapr.InvokeBindingRequest{Name: req.Name, Operation: req.Operation, Data: req.Data, Metadata: req.Metadata}
-	s.cachedRequest[GetMapKeyFromRequest(&darpRequest)] = &response{
-		bindingResponse: resp,
-		err:             err,
-	}
-}
-
 func TestNewClientWithPod(t *testing.T) {
-	daprServer := &testDaprServer{
-		state:                       make(map[string][]byte),
-		configurationSubscriptionID: map[string]chan struct{}{},
-		cachedRequest:               make(map[string]*response),
-	}
-
-	port, closer := newTCPServer(t, daprServer, 50001)
+	port, closer := newTCPServer(t, 50001)
 	defer closer()
+
 	podName := "pod-for-sqlchannel-test"
 	pod := testapps.NewPodFactory("default", podName).
 		AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
@@ -116,15 +77,6 @@ func TestNewClientWithPod(t *testing.T) {
 		}
 	})
 
-	t.Run("WithOutPodGPRCPort", func(t *testing.T) {
-		podWithoutGRPCPort := pod.DeepCopy()
-		podWithoutGRPCPort.Spec.Containers[0].Ports = podWithoutGRPCPort.Spec.Containers[0].Ports[:1]
-		_, err := NewClientWithPod(podWithoutGRPCPort, "mysql")
-		if err == nil {
-			t.Errorf("new sql channel client union")
-		}
-	})
-
 	t.Run("Success", func(t *testing.T) {
 		_, err := NewClientWithPod(pod, "mysql")
 		if err != nil {
@@ -133,39 +85,22 @@ func TestNewClientWithPod(t *testing.T) {
 	})
 }
 
-func TestGPRC(t *testing.T) {
-	url := os.Getenv("PROBE_GRPC_URL")
-	if url == "" {
-		t.SkipNow()
-	}
-	req := &dapr.InvokeBindingRequest{
-		Name:      "mongodb",
-		Operation: "getRole",
-		Data:      []byte(""),
-		Metadata:  map[string]string{},
-	}
-	cli, _ := dapr.NewClientWithAddress(url)
-	resp, _ := cli.InvokeBinding(context.Background(), req)
-	t.Logf("probe response metadata: %v", resp.Metadata)
-	result := map[string]string{}
-	_ = json.Unmarshal(resp.Data, &result)
-	t.Logf("probe response data: %v", result)
-
-}
-
 func TestGetRole(t *testing.T) {
-	daprServer, cli, closer, err := initSQLChannelClient(t)
+	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(200)
+		_, _ = writer.Write([]byte("{\"role\": \"leader\"}"))
+	}))
+
+	addr := s.Listener.Addr().String()
+	index := strings.LastIndex(addr, ":")
+	portStr := addr[index+1:]
+	port, _ := strconv.Atoi(portStr)
+
+	cli, closer, err := initSQLChannelClient(port, t)
 	if err != nil {
 		t.Errorf("new sql channel client error: %v", err)
 	}
 	defer closer()
-
-	daprServer.ExepctRequest(&pb.InvokeBindingRequest{
-		Name:      "mysql",
-		Operation: "getRole",
-	}, &pb.InvokeBindingResponse{
-		Data: []byte("{\"role\": \"leader\"}"),
-	}, nil)
 
 	t.Run("ResponseInTime", func(t *testing.T) {
 		cli.ReconcileTimeout = 1 * time.Second
@@ -179,9 +114,8 @@ func TestGetRole(t *testing.T) {
 	})
 
 	t.Run("ResponseTimeout", func(t *testing.T) {
-		cli.ReconcileTimeout = 50 * time.Millisecond
+		cli.ReconcileTimeout = 0 * time.Millisecond
 		_, err := cli.GetRole()
-
 		t.Logf("err: %v", err)
 		if err == nil {
 			t.Errorf("request should be timeout")
@@ -206,26 +140,28 @@ func TestGetRole(t *testing.T) {
 }
 
 func TestSystemAccounts(t *testing.T) {
-	daprServer, cli, closer, err := initSQLChannelClient(t)
-	if err != nil {
-		t.Errorf("new sql channel client error: %v", err)
-	}
-	defer closer()
-
 	roleNames, _ := json.Marshal([]string{"kbadmin", "kbprobe"})
 	sqlResponse := SQLChannelResponse{
 		Event:   RespEveSucc,
 		Message: string(roleNames),
 	}
 	respData, _ := json.Marshal(sqlResponse)
-	resp := &pb.InvokeBindingResponse{
-		Data: respData,
-	}
 
-	daprServer.ExepctRequest(&pb.InvokeBindingRequest{
-		Name:      "mysql",
-		Operation: string(ListSystemAccountsOp),
-	}, resp, nil)
+	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(200)
+		_, _ = writer.Write(respData)
+	}))
+
+	addr := s.Listener.Addr().String()
+	index := strings.LastIndex(addr, ":")
+	portStr := addr[index+1:]
+	port, _ := strconv.Atoi(portStr)
+
+	cli, closer, err := initSQLChannelClient(port, t)
+	if err != nil {
+		t.Errorf("new sql channel client error: %v", err)
+	}
+	defer closer()
 
 	t.Run("ResponseByCache", func(t *testing.T) {
 		cli.ReconcileTimeout = 200 * time.Millisecond
@@ -241,73 +177,63 @@ func TestSystemAccounts(t *testing.T) {
 }
 
 func TestJoinMember(t *testing.T) {
-	daprServer, cli, closer, err := initSQLChannelClient(t)
-	if err != nil {
-		t.Errorf("new sql channel client error: %v", err)
-	}
-	defer closer()
-
-	sqlResponse := SQLChannelResponse{
-		Event: RespEveSucc,
-	}
-	respData, _ := json.Marshal(sqlResponse)
-	resp := &pb.InvokeBindingResponse{
-		Data: respData,
-	}
 
 	t.Run("Join Member success", func(t *testing.T) {
-		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
-			Name:      "mysql",
-			Operation: string(JoinMemberOperation),
-		}, resp, nil)
+		sqlResponse := SQLChannelResponse{
+			Event: RespEveSucc,
+		}
+		respData, _ := json.Marshal(sqlResponse)
+		port := initHTTPServer(respData)
+
+		cli, closer, err := initSQLChannelClient(port, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.JoinMember(context.TODO())
+		err = cli.JoinMember(context.TODO())
 		assert.Nil(t, err)
 	})
 
 	t.Run("Join Member fail", func(t *testing.T) {
-		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
-			Name:      "mysql",
-			Operation: string(JoinMemberOperation),
-		}, nil, errors.New("join member failed"))
+		cli, closer, err := initSQLChannelClient(-1, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.JoinMember(context.TODO())
+		err = cli.JoinMember(context.TODO())
 		assert.NotNil(t, err)
 	})
 }
 
 func TestLeaveMember(t *testing.T) {
-	daprServer, cli, closer, err := initSQLChannelClient(t)
-	if err != nil {
-		t.Errorf("new sql channel client error: %v", err)
-	}
-	defer closer()
-
-	sqlResponse := SQLChannelResponse{
-		Event: RespEveSucc,
-	}
-	respData, _ := json.Marshal(sqlResponse)
-	resp := &pb.InvokeBindingResponse{
-		Data: respData,
-	}
 
 	t.Run("Leave Member success", func(t *testing.T) {
-		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
-			Name:      "mysql",
-			Operation: string(LeaveMemberOperation),
-		}, resp, nil)
+		sqlResponse := SQLChannelResponse{
+			Event: RespEveSucc,
+		}
+		respData, _ := json.Marshal(sqlResponse)
+		port := initHTTPServer(respData)
+
+		cli, closer, err := initSQLChannelClient(port, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.LeaveMember(context.TODO())
+		err = cli.LeaveMember(context.TODO())
 		assert.Nil(t, err)
 	})
 
-	t.Run("Join Member success", func(t *testing.T) {
-		daprServer.ExepctRequest(&pb.InvokeBindingRequest{
-			Name:      "mysql",
-			Operation: string(LeaveMemberOperation),
-		}, nil, errors.New("leave member failed"))
+	t.Run("Leave Member fail", func(t *testing.T) {
+		cli, closer, err := initSQLChannelClient(-1, t)
+		if err != nil {
+			t.Errorf("new sql channel client error: %v", err)
+		}
+		defer closer()
 		cli.ReconcileTimeout = 200 * time.Millisecond
-		err := cli.LeaveMember(context.TODO())
+		err = cli.LeaveMember(context.TODO())
 		assert.NotNil(t, err)
 	})
 }
@@ -363,7 +289,7 @@ func TestErrMsg(t *testing.T) {
 	assert.False(t, IsUnSupportedError(errors.New("test")))
 }
 
-func newTCPServer(t *testing.T, daprServer pb.DaprServer, port int) (int, func()) {
+func newTCPServer(t *testing.T, port int) (int, func()) {
 	var l net.Listener
 	for i := 0; i < 3; i++ {
 		l, _ = net.Listen("tcp", fmt.Sprintf(":%v", port))
@@ -375,36 +301,20 @@ func newTCPServer(t *testing.T, daprServer pb.DaprServer, port int) (int, func()
 	if l == nil {
 		t.Errorf("couldn't start listening")
 	}
-	s := grpc.NewServer()
-	pb.RegisterDaprServer(s, daprServer)
-
-	go func() {
-		if err := s.Serve(l); err != nil && err.Error() != "closed" {
-			t.Errorf("test server exited with error: %v", err)
-		}
-	}()
-
 	closer := func() {
-		s.Stop()
 		l.Close()
 	}
 	return port, closer
 }
 
-func initSQLChannelClient(t *testing.T) (*testDaprServer, *OperationClient, func(), error) {
-	daprServer := &testDaprServer{
-		state:                       make(map[string][]byte),
-		configurationSubscriptionID: map[string]chan struct{}{},
-		cachedRequest:               make(map[string]*response),
-	}
-
-	port, closer := newTCPServer(t, daprServer, 50001)
+func initSQLChannelClient(httpPort int, t *testing.T) (*OperationClient, func(), error) {
+	port, closer := newTCPServer(t, 50001)
 	podName := "pod-for-sqlchannel-test"
 	pod := testapps.NewPodFactory("default", podName).
 		AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).GetObject()
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
 		{
-			ContainerPort: int32(3501),
+			ContainerPort: int32(httpPort),
 			Name:          constant.ProbeHTTPPortName,
 			Protocol:      "TCP",
 		},
@@ -419,5 +329,17 @@ func initSQLChannelClient(t *testing.T) (*testDaprServer, *OperationClient, func
 	if err != nil {
 		t.Errorf("new sql channel client error: %v", err)
 	}
-	return daprServer, cli, closer, err
+	return cli, closer, err
+}
+
+func initHTTPServer(resp []byte) int {
+	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(200)
+		_, _ = writer.Write(resp)
+	}))
+	addr := s.Listener.Addr().String()
+	index := strings.LastIndex(addr, ":")
+	portStr := addr[index+1:]
+	port, _ := strconv.Atoi(portStr)
+	return port
 }

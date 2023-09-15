@@ -94,7 +94,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(BeEquivalentTo(updateErr))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 
 			// first upgrade, not pod is ready
 			status, err = simplePolicy.Upgrade(mockParam)
@@ -194,7 +194,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(BeEquivalentTo(updateErr))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 
 			// first upgrade, not pod is ready
 			status, err = simplePolicy.Upgrade(mockParam)

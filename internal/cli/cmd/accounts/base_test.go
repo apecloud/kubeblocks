@@ -22,7 +22,6 @@ package accounts
 import (
 	"net/http"
 
-	"github.com/dapr/components-contrib/bindings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +81,7 @@ var _ = Describe("Base Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			for _, op := range []bindings.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp,
+			for _, op := range []lorryutil.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp,
 				lorryutil.ListUsersOp, lorryutil.DescribeUserOp,
 				lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
 				o := NewAccountBaseOptions(tf, streams, op)

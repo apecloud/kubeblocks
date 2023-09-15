@@ -72,7 +72,7 @@ type ComponentTemplateSpec struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
-type LazyRenderedTemplateSpec struct {
+type ConfigTemplateExtension struct {
 	// Specify the name of the referenced the configuration template ConfigMap object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
@@ -88,9 +88,13 @@ type LazyRenderedTemplateSpec struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// policy defines how to merge external imported templates into component templates.
-	// +kubebuilder:default="patch"
+	// +kubebuilder:default="none"
 	// +optional
 	Policy MergedPolicy `json:"policy,omitempty"`
+}
+
+type LegacyRenderedTemplateSpec struct {
+	ConfigTemplateExtension `json:",inline"`
 }
 
 type ComponentConfigSpec struct {
@@ -104,7 +108,7 @@ type ComponentConfigSpec struct {
 
 	// lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.
 	// +optional
-	LazyRenderedConfigSpec *LazyRenderedTemplateSpec `json:"lazyRenderedConfigSpec,omitempty"`
+	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63

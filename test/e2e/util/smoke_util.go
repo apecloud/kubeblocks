@@ -318,19 +318,36 @@ func Check(command string, input string) (string, error) {
 }
 
 func GetName(fileName string) (name, ns string) {
-	conut, err := Count(fileName, "---")
+	file, err := os.Open(fileName)
 	if err != nil {
 		log.Println(err)
 	}
-	if conut > 1 {
-		name = StringSplit(ReadLineLast(fileName, "  name:"))
-	} else {
-		name = StringSplit(ReadLine(fileName, "  name:"))
-	}
-	if len(ReadLineLast(fileName, "  namespace:")) > 0 {
-		ns = StringSplit(ReadLineLast(fileName, "  namespace:"))
-	} else {
-		ns = "default"
+	br := bufio.NewReader(file)
+	for {
+		line, err := br.ReadString('\n')
+		if err == io.EOF {
+			break
+		}
+		if strings.Contains(line, "cluster.yaml") {
+			for {
+				line, err := br.ReadString('\n')
+				if err == io.EOF {
+					break
+				}
+				if strings.Contains(line, "---") {
+					break
+				}
+				if strings.Contains(line, "  name:") {
+					name = StringSplit(line)
+				}
+				if strings.Contains(line, "  namespace:") {
+					ns = StringSplit(line)
+				} else {
+					ns = "default"
+				}
+			}
+			break
+		}
 	}
 
 	return name, ns

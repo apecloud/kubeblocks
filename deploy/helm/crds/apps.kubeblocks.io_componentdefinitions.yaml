@@ -197,7 +197,7 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
-                    lazyRenderedConfigSpec:
+                    legacyRenderedConfigSpec:
                       description: 'lazyRenderedConfigSpec is optional: specify the
                         secondary rendered config spec.'
                       properties:
@@ -210,7 +210,7 @@ spec:
                           pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                           type: string
                         policy:
-                          default: patch
+                          default: none
                           description: policy defines how to merge external imported
                             templates into component templates.
                           enum:
@@ -269,10 +269,20 @@ spec:
                   be updated.
                 items:
                   properties:
-                    credentialSecret:
-                      description: CredentialSecret specifies the secret required
-                        to access the component service.
+                    accountName:
+                      description: AccountName specifies the account used to access
+                        the component service. If specified, the account must be defined
+                        in @SystemAccounts.
                       type: string
+                    credentialSecret:
+                      description: 'TODO: how to use the secret? CredentialSecret
+                        specifies the secret used to access the component service.'
+                      type: string
+                    headlessService:
+                      default: false
+                      description: Headless specifies to use the default headless
+                        service.
+                      type: boolean
                     name:
                       description: The name of the ConnectionCredential.
                       type: string
@@ -283,8 +293,8 @@ spec:
                         unique port of the service will be used.
                       type: string
                     serviceName:
-                      description: ServiceName specifies the service spec to use for
-                        accessing the component service.
+                      description: ServiceName specifies the name of component service
+                        to use for accessing the component service.
                       type: string
                   required:
                   - name
@@ -311,6 +321,249 @@ spec:
                   needed to interoperate with the component service and processes
                   for lifecycle management. Cannot be updated.
                 properties:
+                  accountProvision:
+                    description: AccountProvision defines how to provision accounts.
+                      Cannot be updated.
+                    properties:
+                      container:
+                        description: Container defines the name of the container within
+                          the target Pod where the action will be executed. If specified,
+                          it must be one of container declared in @Runtime. Cannot
+                          be updated.
+                        type: string
+                      env:
+                        description: List of environment variables to set in the container.
+                          Cannot be updated.
+                        items:
+                          description: EnvVar represents an environment variable present
+                            in a Container.
+                          properties:
+                            name:
+                              description: Name of the environment variable. Must
+                                be a C_IDENTIFIER.
+                              type: string
+                            value:
+                              description: 'Variable references $(VAR_NAME) are expanded
+                                using the previously defined environment variables
+                                in the container and any service environment variables.
+                                If a variable cannot be resolved, the reference in
+                                the input string will be unchanged. Double $$ are
+                                reduced to a single $, which allows for escaping the
+                                $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce
+                                the string literal "$(VAR_NAME)". Escaped references
+                                will never be expanded, regardless of whether the
+                                variable exists or not. Defaults to "".'
+                              type: string
+                            valueFrom:
+                              description: Source for the environment variable's value.
+                                Cannot be used if value is not empty.
+                              properties:
+                                configMapKeyRef:
+                                  description: Selects a key of a ConfigMap.
+                                  properties:
+                                    key:
+                                      description: The key to select.
+                                      type: string
+                                    name:
+                                      description: 'Name of the referent. More info:
+                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        TODO: Add other useful fields. apiVersion,
+                                        kind, uid?'
+                                      type: string
+                                    optional:
+                                      description: Specify whether the ConfigMap or
+                                        its key must be defined
+                                      type: boolean
+                                  required:
+                                  - key
+                                  type: object
+                                fieldRef:
+                                  description: 'Selects a field of the pod: supports
+                                    metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
+                                    `metadata.annotations[''<KEY>'']`, spec.nodeName,
+                                    spec.serviceAccountName, status.hostIP, status.podIP,
+                                    status.podIPs.'
+                                  properties:
+                                    apiVersion:
+                                      description: Version of the schema the FieldPath
+                                        is written in terms of, defaults to "v1".
+                                      type: string
+                                    fieldPath:
+                                      description: Path of the field to select in
+                                        the specified API version.
+                                      type: string
+                                  required:
+                                  - fieldPath
+                                  type: object
+                                resourceFieldRef:
+                                  description: 'Selects a resource of the container:
+                                    only resources limits and requests (limits.cpu,
+                                    limits.memory, limits.ephemeral-storage, requests.cpu,
+                                    requests.memory and requests.ephemeral-storage)
+                                    are currently supported.'
+                                  properties:
+                                    containerName:
+                                      description: 'Container name: required for volumes,
+                                        optional for env vars'
+                                      type: string
+                                    divisor:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      description: Specifies the output format of
+                                        the exposed resources, defaults to "1"
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    resource:
+                                      description: 'Required: resource to select'
+                                      type: string
+                                  required:
+                                  - resource
+                                  type: object
+                                secretKeyRef:
+                                  description: Selects a key of a secret in the pod's
+                                    namespace
+                                  properties:
+                                    key:
+                                      description: The key of the secret to select
+                                        from.  Must be a valid secret key.
+                                      type: string
+                                    name:
+                                      description: 'Name of the referent. More info:
+                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        TODO: Add other useful fields. apiVersion,
+                                        kind, uid?'
+                                      type: string
+                                    optional:
+                                      description: Specify whether the Secret or its
+                                        key must be defined
+                                      type: boolean
+                                  required:
+                                  - key
+                                  type: object
+                              type: object
+                          required:
+                          - name
+                          type: object
+                        type: array
+                      exec:
+                        description: Exec specifies the action to take. Cannot be
+                          updated.
+                        properties:
+                          command:
+                            description: Command is the command line to execute inside
+                              the container, the working directory for the command  is
+                              root ('/') in the container's filesystem. The command
+                              is simply exec'd, it is not run inside a shell, so traditional
+                              shell instructions ('|', etc) won't work. To use a shell,
+                              you need to explicitly call out to that shell. Exit
+                              status of 0 is treated as live/healthy and non-zero
+                              is unhealthy.
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      http:
+                        description: HTTP specifies the http request to perform. Cannot
+                          be updated.
+                        properties:
+                          host:
+                            description: Host name to connect to, defaults to the
+                              pod IP. You probably want to set "Host" in httpHeaders
+                              instead.
+                            type: string
+                          httpHeaders:
+                            description: Custom headers to set in the request. HTTP
+                              allows repeated headers.
+                            items:
+                              description: HTTPHeader describes a custom header to
+                                be used in HTTP probes
+                              properties:
+                                name:
+                                  description: The header field name
+                                  type: string
+                                value:
+                                  description: The header field value
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                          method:
+                            description: Method represents the HTTP request method,
+                              which can be one of the standard HTTP methods like "GET,"
+                              "POST," "PUT," etc. Defaults to Get.
+                            type: string
+                          path:
+                            description: Path to access on the HTTP server.
+                            type: string
+                          port:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: Name or number of the port to access on the
+                              container. Number must be in the range 1 to 65535. Name
+                              must be an IANA_SVC_NAME.
+                            x-kubernetes-int-or-string: true
+                          scheme:
+                            description: Scheme to use for connecting to the host.
+                              Defaults to HTTP.
+                            type: string
+                        required:
+                        - port
+                        type: object
+                      image:
+                        description: Image defines the container image to run the
+                          action. Cannot be updated.
+                        type: string
+                      matchingKey:
+                        description: MatchingKey uses to select the target pod(s)
+                          actually. If the selector is AnyReplica or AllReplicas,
+                          the matchingKey will be ignored. If the selector is RoleSelector,
+                          any replica which has the same role with matchingKey will
+                          be chosen. Cannot be updated.
+                        type: string
+                      preconditions:omitempty:
+                        description: Preconditions represent conditions that must
+                          be met before executing the action. If any precondition
+                          is not met, the action will not be executed. Cannot be updated.
+                        type: object
+                      retryPolicy:
+                        description: RetryPolicy defines the strategy for retrying
+                          the action in case of failure. Cannot be updated.
+                        properties:
+                          maxRetries:
+                            default: 0
+                            description: MaxRetries specifies the maximum number of
+                              times the action should be retried.
+                            type: integer
+                          retryInterval:
+                            default: 0
+                            description: RetryInterval specifies the interval between
+                              retry attempts.
+                            format: int64
+                            type: integer
+                        type: object
+                      targetPodSelector:
+                        description: TargetPodSelector defines the way that how to
+                          select the target Pod where the action will be performed,
+                          if there may not have a target replica by default. Cannot
+                          be updated.
+                        enum:
+                        - Any
+                        - All
+                        - Pod
+                        - Role
+                        - Ordinal
+                        type: string
+                      timeoutSeconds:omitempty:
+                        default: 0
+                        description: TimeoutSeconds defines the timeout duration for
+                          the action in seconds. Cannot be updated.
+                        format: int32
+                        type: integer
+                    type: object
                   dataAssemble:
                     description: 'DataAssemble defines how to assemble data synchronized
                       from external before starting the service for a new replica.
@@ -3119,50 +3372,11 @@ spec:
                     - scrapePort
                     type: object
                 type: object
-              provider:
-                description: Provider is the name of the component provider.
-                maxLength: 32
-                type: string
-              roleArbitrator:
-                default: External
-                description: RoleArbitrator defines the strategy for electing the
-                  component's active role. Cannot be updated.
-                enum:
-                - External
-                - Lorry
-                type: string
-              roles:
-                description: Roles defines all the roles that the component can assume.
-                  Cannot be updated.
-                items:
-                  description: ComponentReplicaRole represents a role that can be
-                    assumed by a component instance.
-                  properties:
-                    name:
-                      description: Name of the role. It will apply to "apps.kubeblocks.io/role"
-                        object label value. It cannot be empty.
-                      maxLength: 32
-                      pattern: ^.*[^\s]+.*$
-                      type: string
-                    serviceable:
-                      default: true
-                      description: Serviceable indicates whether a replica with this
-                        role can provide services.
-                      type: boolean
-                    writable:
-                      default: false
-                      description: Writable indicates whether a replica with this
-                        role is allowed to write data.
-                      type: boolean
-                  required:
-                  - name
-                  type: object
-                type: array
-              rules:
-                description: Rules defines the namespaced policy rules required by
-                  a component. If any rule application fails (e.g., due to lack of
-                  permissions), the provisioning of the component instance will also
-                  fail. Cannot be updated.
+              policyRules:
+                description: PolicyRules defines the namespaced policy rules required
+                  by the component. If any rule application fails (e.g., due to lack
+                  of permissions), the provisioning of the component instance will
+                  also fail. Cannot be updated.
                 items:
                   description: PolicyRule holds information that describes a policy
                     rule, but does not contain information about who the rule applies
@@ -3209,6 +3423,45 @@ spec:
                       type: array
                   required:
                   - verbs
+                  type: object
+                type: array
+              provider:
+                description: Provider is the name of the component provider.
+                maxLength: 32
+                type: string
+              roleArbitrator:
+                default: External
+                description: RoleArbitrator defines the strategy for electing the
+                  component's active role. Cannot be updated.
+                enum:
+                - External
+                - Lorry
+                type: string
+              roles:
+                description: Roles defines all the roles that the component can assume.
+                  Cannot be updated.
+                items:
+                  description: ComponentReplicaRole represents a role that can be
+                    assumed by a component instance.
+                  properties:
+                    name:
+                      description: Name of the role. It will apply to "apps.kubeblocks.io/role"
+                        object label value. It cannot be empty.
+                      maxLength: 32
+                      pattern: ^.*[^\s]+.*$
+                      type: string
+                    serviceable:
+                      default: true
+                      description: Serviceable indicates whether a replica with this
+                        role can provide services.
+                      type: boolean
+                    writable:
+                      default: false
+                      description: Writable indicates whether a replica with this
+                        role is allowed to write data.
+                      type: boolean
+                  required:
+                  - name
                   type: object
                 type: array
               runtime:
@@ -10673,11 +10926,12 @@ spec:
                   type: object
                 type: array
               systemAccounts:
-                description: 'TODO: support other resources provisioning. Statement
-                  to create system account. Cannot be updated.'
+                description: 'TODO: support other resources provisioning. SystemAccounts
+                  defines the pre-defined system accounts required to manage the component.
+                  Cannot be updated.'
                 properties:
                   accounts:
-                    description: accounts defines system account config settings.
+                    description: Accounts defines all the system accounts.
                     items:
                       description: SystemAccountConfig specifies how to create and
                         delete system accounts.
@@ -10753,145 +11007,8 @@ spec:
                     x-kubernetes-list-map-keys:
                     - name
                     x-kubernetes-list-type: map
-                  cmdExecutorConfig:
-                    description: cmdExecutorConfig configs how to get client SDK and
-                      perform statements.
-                    properties:
-                      args:
-                        description: args is used to perform statements.
-                        items:
-                          type: string
-                        type: array
-                      command:
-                        description: command to perform statements.
-                        items:
-                          type: string
-                        minItems: 1
-                        type: array
-                      env:
-                        description: envs is a list of environment variables.
-                        items:
-                          description: EnvVar represents an environment variable present
-                            in a Container.
-                          properties:
-                            name:
-                              description: Name of the environment variable. Must
-                                be a C_IDENTIFIER.
-                              type: string
-                            value:
-                              description: 'Variable references $(VAR_NAME) are expanded
-                                using the previously defined environment variables
-                                in the container and any service environment variables.
-                                If a variable cannot be resolved, the reference in
-                                the input string will be unchanged. Double $$ are
-                                reduced to a single $, which allows for escaping the
-                                $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce
-                                the string literal "$(VAR_NAME)". Escaped references
-                                will never be expanded, regardless of whether the
-                                variable exists or not. Defaults to "".'
-                              type: string
-                            valueFrom:
-                              description: Source for the environment variable's value.
-                                Cannot be used if value is not empty.
-                              properties:
-                                configMapKeyRef:
-                                  description: Selects a key of a ConfigMap.
-                                  properties:
-                                    key:
-                                      description: The key to select.
-                                      type: string
-                                    name:
-                                      description: 'Name of the referent. More info:
-                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion,
-                                        kind, uid?'
-                                      type: string
-                                    optional:
-                                      description: Specify whether the ConfigMap or
-                                        its key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                                fieldRef:
-                                  description: 'Selects a field of the pod: supports
-                                    metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                    `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                    spec.serviceAccountName, status.hostIP, status.podIP,
-                                    status.podIPs.'
-                                  properties:
-                                    apiVersion:
-                                      description: Version of the schema the FieldPath
-                                        is written in terms of, defaults to "v1".
-                                      type: string
-                                    fieldPath:
-                                      description: Path of the field to select in
-                                        the specified API version.
-                                      type: string
-                                  required:
-                                  - fieldPath
-                                  type: object
-                                resourceFieldRef:
-                                  description: 'Selects a resource of the container:
-                                    only resources limits and requests (limits.cpu,
-                                    limits.memory, limits.ephemeral-storage, requests.cpu,
-                                    requests.memory and requests.ephemeral-storage)
-                                    are currently supported.'
-                                  properties:
-                                    containerName:
-                                      description: 'Container name: required for volumes,
-                                        optional for env vars'
-                                      type: string
-                                    divisor:
-                                      anyOf:
-                                      - type: integer
-                                      - type: string
-                                      description: Specifies the output format of
-                                        the exposed resources, defaults to "1"
-                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                      x-kubernetes-int-or-string: true
-                                    resource:
-                                      description: 'Required: resource to select'
-                                      type: string
-                                  required:
-                                  - resource
-                                  type: object
-                                secretKeyRef:
-                                  description: Selects a key of a secret in the pod's
-                                    namespace
-                                  properties:
-                                    key:
-                                      description: The key of the secret to select
-                                        from.  Must be a valid secret key.
-                                      type: string
-                                    name:
-                                      description: 'Name of the referent. More info:
-                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion,
-                                        kind, uid?'
-                                      type: string
-                                    optional:
-                                      description: Specify whether the Secret or its
-                                        key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                              type: object
-                          required:
-                          - name
-                          type: object
-                        type: array
-                        x-kubernetes-preserve-unknown-fields: true
-                      image:
-                        description: image for Connector when executing the command.
-                        type: string
-                    required:
-                    - command
-                    - image
-                    type: object
                   passwordConfig:
-                    description: passwordConfig defines the pattern to generate password.
+                    description: PasswordConfig defines the policy to generate password.
                     properties:
                       length:
                         default: 10
@@ -10922,7 +11039,6 @@ spec:
                     type: object
                 required:
                 - accounts
-                - cmdExecutorConfig
                 - passwordConfig
                 type: object
               updateStrategy:
@@ -10946,20 +11062,20 @@ spec:
                   properties:
                     highWatermark:
                       default: 0
-                      description: The high watermark threshold for the volume space
-                        usage. If there is any specified volumes who's space usage
-                        is over the threshold, the pre-defined "LOCK" action will
-                        be triggered to degrade the service to protect volume from
-                        space exhaustion, such as to set the instance as read-only.
-                        And after that, if all volumes' space usage drops under the
-                        threshold later, the pre-defined "UNLOCK" action will be performed
-                        to recover the service normally.
+                      description: HighWatermark defines the high watermark threshold
+                        for the volume space usage. If there is any specified volumes
+                        who's space usage is over the threshold, the pre-defined "LOCK"
+                        action will be triggered to degrade the service to protect
+                        volume from space exhaustion, such as to set the instance
+                        as read-only. And after that, if all volumes' space usage
+                        drops under the threshold later, the pre-defined "UNLOCK"
+                        action will be performed to recover the service normally.
                       maximum: 100
                       minimum: 0
                       type: integer
                     name:
-                      description: 'Name of the volume. Must be a DNS_LABEL and unique
-                        within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      description: 'The Name of the persistent volume. Must be a DNS_LABEL
+                        and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                       type: string
                     synchronization:
                       default: false

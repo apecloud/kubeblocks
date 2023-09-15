@@ -709,7 +709,7 @@ else
 endif
 
 .PHONY: test-e2e
-test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
+test-e2e: helm-package install-s3-csi-driver render-smoke-testdata-manifests ## Run E2E tests.
 	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) CONFIG_TYPE=$(CONFIG_TYPE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local

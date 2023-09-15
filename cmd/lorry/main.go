@@ -44,7 +44,7 @@ var configDir string
 
 const (
 	DefaultPort       = 3501
-	DefaultConfigPath = "config/probe"
+	DefaultConfigPath = "/config/lorry/components"
 )
 
 func init() {

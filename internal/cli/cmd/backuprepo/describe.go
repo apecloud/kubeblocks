@@ -138,7 +138,7 @@ func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dataprotectionv1
 		return err
 	}
 	printer.PrintPairStringToLine("Backups", fmt.Sprintf("%d", backups))
-	printer.PrintPairStringToLine("TOTAL DATA SIZE", backupSize)
+	printer.PrintPairStringToLine("Total data size", backupSize)
 
 	printer.PrintLine("\nSpec:")
 	printer.PrintPairStringToLine("PvReclaimPolicy", string(backupRepo.Spec.PVReclaimPolicy))

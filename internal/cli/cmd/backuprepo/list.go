@@ -103,43 +103,44 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 		return nil
 	}
 
+	backupRepos := make([]*dataprotectionv1alpha1.BackupRepo, 0)
+	for _, info := range infos {
+		backupRepo := &dataprotectionv1alpha1.BackupRepo{}
+		obj := info.Object.(*unstructured.Unstructured)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupRepo); err != nil {
+			return err
+		}
+		backupRepos = append(backupRepos, backupRepo)
+	}
+
 	printRows := func(tbl *printer.TablePrinter) error {
-		// sort BackupRepos with .status.Phase then .metadata.name
-		sort.SliceStable(infos, func(i, j int) bool {
-			toBackupRepo := func(idx int) *dataprotectionv1alpha1.BackupRepo {
-				backupRepo := &dataprotectionv1alpha1.BackupRepo{}
-				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(infos[idx].Object.(*unstructured.Unstructured).Object, backupRepo); err != nil {
-					return nil
-				}
-				return backupRepo
-			}
-			iBackupRepo := toBackupRepo(i)
-			jBackupRepo := toBackupRepo(j)
+		// sort BackupRepos with isDefault, then phase and name
+		sort.SliceStable(backupRepos, func(i, j int) bool {
+			iBackupRepo := backupRepos[i]
+			jBackupRepo := backupRepos[j]
 			if iBackupRepo == nil {
 				return true
 			}
 			if jBackupRepo == nil {
 				return false
 			}
+			if iBackupRepo.Status.IsDefault != jBackupRepo.Status.IsDefault {
+				return iBackupRepo.Status.IsDefault
+			}
 			if iBackupRepo.Status.Phase == jBackupRepo.Status.Phase {
 				return iBackupRepo.GetName() < jBackupRepo.GetName()
 			}
 			return iBackupRepo.Status.Phase < jBackupRepo.Status.Phase
 		})
-		for _, info := range infos {
-			BackupRepo := &dataprotectionv1alpha1.BackupRepo{}
-			obj := info.Object.(*unstructured.Unstructured)
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, BackupRepo); err != nil {
-				return err
-			}
-			backups, backupSize, err := countBackupNumsAndSize(o.dynamic, BackupRepo)
+		for _, backupRepo := range backupRepos {
+			backups, backupSize, err := countBackupNumsAndSize(o.dynamic, backupRepo)
 			if err != nil {
 				return err
 			}
-			tbl.AddRow(BackupRepo.Name,
-				BackupRepo.Status.Phase,
-				BackupRepo.Spec.StorageProviderRef,
-				BackupRepo.Status.IsDefault,
+			tbl.AddRow(backupRepo.Name,
+				backupRepo.Status.Phase,
+				backupRepo.Spec.StorageProviderRef,
+				backupRepo.Status.IsDefault,
 				fmt.Sprintf("%d", backups),
 				backupSize,
 			)

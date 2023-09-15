@@ -35,6 +35,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -122,7 +123,15 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		return RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
+		return RenderConfigNScriptFiles(
+			&intctrlutil.ResourceCtx{
+				Context:       reqCtx.Ctx,
+				Client:        cli,
+				Namespace:     cluster.GetNamespace(),
+				ClusterName:   cluster.GetNamespace(),
+				ComponentName: component.Name,
+			},
+			clusterVer, cluster, component, workload, podSpec, nil)
 	}
 
 	// TODO: may add a PDB transform to Create/Update/Delete.
@@ -387,7 +396,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
-					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
+					Expect(configuration.CheckEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
 				}
 			}
 		})

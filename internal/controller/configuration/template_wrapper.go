@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"context"
@@ -67,7 +67,7 @@ func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *a
 	}
 }
 
-func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localObjs []client.Object) (bool, *corev1.ConfigMap, error) {
+func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localObjs []client.Object) (*corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      cfgCMName,
 		Namespace: wrapper.cluster.Namespace,
@@ -77,54 +77,113 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 	localObject := findMatchedLocalObject(localObjs, cmKey, generics.ToGVK(cmObj))
 	if localObject != nil {
 		if cm, ok := localObject.(*corev1.ConfigMap); ok {
-			return false, cm, nil
+			return cm, nil
 		}
 	}
 
 	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj)
 	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
 		// An unexpected error occurs
-		return false, nil, cmErr
+		return nil, cmErr
 	}
 	if cmErr != nil {
 		// Config is not exists
-		return true, nil, nil
+		return nil, nil
 	}
 
-	// Config is exists
-	return core.IsNotUserReconfigureOperation(cmObj), cmObj, nil
+	return cmObj, nil
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent, localObjs []client.Object) error {
+	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.Configuration) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, configSpec := range component.ConfigTemplates {
+		var item *appsv1alpha1.ConfigurationItemDetail
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
-		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
+		origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
 		if err != nil {
 			return err
 		}
-		if !enableRerender {
+		if origCMObj != nil {
 			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false)
 			continue
 		}
-		// Generate ConfigMap objects for config files
-		newCMObj, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
-			configSpec.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
-				return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
-			})
+		if configuration != nil {
+			item = configuration.Spec.GetConfigurationItem(configSpec.Name)
+		}
+		newCMObj, err := wrapper.rerenderConfigTemplate(cluster, component, configSpec, item)
 		if err != nil {
 			return err
 		}
-		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
+		if err := applyUpdatedParameters(item, newCMObj, configSpec, wrapper.cli, wrapper.ctx); err != nil {
 			return err
 		}
-		updateCMConfigSpecLabels(newCMObj, configSpec)
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme, configuration); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
+	var newData map[string]string
+	var configConstraint *appsv1alpha1.ConfigConstraint
+
+	if item == nil || len(item.ConfigFileParams) == 0 {
+		return
+	}
+	if configSpec.ConfigConstraintRef != "" {
+		configConstraint, err = fetchConfigConstraint(configSpec.ConfigConstraintRef, ctx, cli)
+	}
+	if err != nil {
+		return
+	}
+	newData, err = DoMerge(cm.Data, item.ConfigFileParams, configConstraint, configSpec)
+	if err != nil {
+		return
+	}
+	cm.Data = newData
+	return
+}
+
+func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	configSpec appsv1alpha1.ComponentConfigSpec,
+	item *appsv1alpha1.ConfigurationItemDetail,
+) (*corev1.ConfigMap, error) {
+	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
+	newCMObj, err := generateConfigMapFromTpl(cluster,
+		component,
+		wrapper.templateBuilder,
+		cmName,
+		configSpec.ConfigConstraintRef,
+		configSpec.ComponentTemplateSpec,
+		wrapper.ctx,
+		wrapper.cli,
+		func(m map[string]string) error {
+			return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
+		})
+	if err != nil {
+		return nil, err
+	}
+	// render user specified template
+	if item != nil && item.ImportTemplateRef != nil {
+		newData, err := mergerConfigTemplate(
+			&appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: *item.ImportTemplateRef,
+			},
+			wrapper.templateBuilder,
+			configSpec,
+			newCMObj.Data,
+			wrapper.ctx,
+			wrapper.cli)
+		if err != nil {
+			return nil, err
+		}
+		newCMObj.Data = newData
+	}
+	UpdateCMConfigSpecLabels(newCMObj, configSpec)
+	return newCMObj, nil
 }
 
 func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
@@ -145,17 +204,22 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 		if err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(templateSpec, cm, scheme); err != nil {
+		if err := wrapper.addRenderedObject(templateSpec, cm, scheme, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme, configuration *appsv1alpha1.Configuration) (err error) {
 	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
-	if err := controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme); err != nil {
+	if configuration != nil {
+		err = controllerutil.SetControllerReference(configuration, cm, scheme)
+	} else {
+		err = controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme)
+	}
+	if err != nil {
 		return err
 	}
 
@@ -172,7 +236,7 @@ func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.Compo
 	wrapper.templateAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
 }
 
-func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
+func (wrapper *renderWrapper) CheckAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
 	if origCMObj == nil {
 		return nil
 	}
@@ -206,7 +270,7 @@ func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, 
 	return nil
 }
 
-func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {
+func UpdateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
 	}
@@ -275,21 +339,29 @@ func renderConfigMapTemplate(
 	return renderedData, nil
 }
 
+func fetchConfigConstraint(ccName string, ctx context.Context, cli client.Client) (*appsv1alpha1.ConfigConstraint, error) {
+	ccKey := client.ObjectKey{
+		Name: ccName,
+	}
+	configConstraint := &appsv1alpha1.ConfigConstraint{}
+	if err := cli.Get(ctx, ccKey, configConstraint); err != nil {
+		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%s]", ccName)
+	}
+	return configConstraint, nil
+}
+
 // validateRenderedData validates config file against constraint
 func validateRenderedData(
 	renderedData map[string]string,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	ctx context.Context,
 	cli client.Client) error {
-	configConstraint := &appsv1alpha1.ConfigConstraint{}
 	if configSpec.ConfigConstraintRef == "" {
 		return nil
 	}
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: "",
-		Name:      configSpec.ConfigConstraintRef,
-	}, configConstraint); err != nil {
-		return core.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
+	configConstraint, err := fetchConfigConstraint(configSpec.ConfigConstraintRef, ctx, cli)
+	if err != nil {
+		return err
 	}
 	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
 }

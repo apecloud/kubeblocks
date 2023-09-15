@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"context"
@@ -155,7 +155,7 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 	return cm, cli.Create(ctx, cm)
 }
 
-func checkEnvFrom(container *corev1.Container, cmName string) bool {
+func CheckEnvFrom(container *corev1.Container, cmName string) bool {
 	for i := range container.EnvFrom {
 		source := &container.EnvFrom[i]
 		if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
@@ -169,7 +169,7 @@ func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName str
 	sets := cfgutil.NewSet(asEnvFrom...)
 	for i := range containers {
 		container := &containers[i]
-		if sets.InArray(container.Name) && !checkEnvFrom(container, cmName) {
+		if sets.InArray(container.Name) && !CheckEnvFrom(container, cmName) {
 			container.EnvFrom = append(container.EnvFrom,
 				corev1.EnvFromSource{
 					ConfigMapRef: &corev1.ConfigMapEnvSource{

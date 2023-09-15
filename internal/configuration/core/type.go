@@ -140,6 +140,11 @@ func FromConfigData(data map[string]string, cmKeys *set.LinkedHashSetString) *Co
 	}
 }
 
+// GenerateComponentConfigurationName generates configuration name for component
+func GenerateComponentConfigurationName(clusterName, componentName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, componentName)
+}
+
 // GenerateTPLUniqLabelKeyWithConfig generates uniq key for configuration template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
@@ -177,4 +182,8 @@ func GetComponentCfgName(clusterName, componentName, tplName string) string {
 // GenerateEnvFromName generates env configmap name
 func GenerateEnvFromName(originName string) string {
 	return strings.Join([]string{originName, "envfrom"}, "-")
+}
+
+func GenerateRevisionPhaseKey(revision string) string {
+	return strings.Join([]string{constant.LastConfigurationRevisionPhase, revision}, "-")
 }

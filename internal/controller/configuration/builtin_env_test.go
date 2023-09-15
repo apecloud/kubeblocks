@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"strconv"
@@ -43,6 +43,10 @@ bootstrap:
     - auth-host: md5
     - auth-local: trust
 `
+	const (
+		cmTemplateName   = "patroni-template-config"
+		cmConfigFileName = "postgresql.yaml"
+	)
 
 	var (
 		podSpec     *corev1.PodSpec
@@ -59,11 +63,11 @@ bootstrap:
 		mockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]coreclient.Object{
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "patroni-template-config",
+					Name:      cmTemplateName,
 					Namespace: "default",
 				},
 				Data: map[string]string{
-					"postgresql.yaml": patroniTemplate,
+					cmConfigFileName: patroniTemplate,
 				}},
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -158,9 +162,9 @@ bootstrap:
 							ValueFrom: &corev1.EnvVarSource{
 								ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 									LocalObjectReference: corev1.LocalObjectReference{
-										Name: "patroni-template-config",
+										Name: cmTemplateName,
 									},
-									Key: "postgresql.yaml",
+									Key: cmConfigFileName,
 								},
 							},
 						},
@@ -206,10 +210,10 @@ bootstrap:
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        "mysql-config-8.0.2",
-				TemplateRef: "mysql-config-8.0.2",
+				TemplateRef: "mysql-config",
 				VolumeName:  "config1",
 			},
-			ConfigConstraintRef: "mysql-config-8.0.2",
+			ConfigConstraintRef: "mysql-config-8.0.2-constraint",
 		}}
 	})
 
@@ -235,11 +239,11 @@ bootstrap:
 			localObjs := []coreclient.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "patroni-template-config",
+						Name:      cmTemplateName,
 						Namespace: "default",
 					},
 					Data: map[string]string{
-						"postgresql.yaml": patroniTemplate,
+						cmConfigFileName: patroniTemplate,
 					}},
 			}
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, localObjs)).Should(BeNil())

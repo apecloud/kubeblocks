@@ -17,110 +17,32 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var _ = Describe("ToolsImageBuilderTest", func() {
 
-	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
-	const clusterName = "test-cluster"
-	const mysqlCompDefName = "replicasets"
-	const configSpecName = "test-config-spec"
 	const kbToolsImage = "apecloud/kubeblocks-tools:latest"
 
+	var noneCommand = []string{"/bin/true"}
 	var clusterObj *appsv1alpha1.Cluster
 	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var ClusterDefObj *appsv1alpha1.ClusterDefinition
 	var clusterComponent *component.SynthesizedComponent
-
-	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
-		By("By assure an clusterDefinition obj")
-		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-			AddConfigTemplate(configSpecName, configSpecName, configSpecName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
-			GetObject()
-		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
-		}
-		return clusterDefObj
-	}
-
-	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
-		By("By assure an clusterVersion obj")
-		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponentVersion(mysqlCompDefName).
-			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			GetObject()
-		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
-		}
-		return clusterVersionObj
-	}
-
-	newAllFieldsClusterObj := func(
-		clusterDefObj *appsv1alpha1.ClusterDefinition,
-		clusterVersionObj *appsv1alpha1.ClusterVersion,
-		needCreate bool,
-	) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, types.NamespacedName) {
-		// setup Cluster obj requires default ClusterDefinition and ClusterVersion objects
-		if clusterDefObj == nil {
-			clusterDefObj = allFieldsClusterDefObj(needCreate)
-		}
-		if clusterVersionObj == nil {
-			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
-		}
-		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
-			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
-			GetObject()
-		key := client.ObjectKeyFromObject(clusterObj)
-		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
-		}
-		return clusterObj, clusterDefObj, clusterVersionObj, key
-	}
-
-	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
-		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
-		By("assign every available fields")
-		component, err := component.BuildComponent(
-			intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
-				Log: logger,
-			},
-			nil,
-			cluster,
-			clusterDef,
-			&clusterDef.Spec.ComponentDefs[0],
-			&cluster.Spec.ComponentSpecs[0],
-			nil,
-			&clusterVersion.Spec.ComponentVersions[0])
-		Expect(err).Should(Succeed())
-		Expect(component).ShouldNot(BeNil())
-		return component
-	}
 
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
@@ -130,6 +52,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	})
 
 	AfterEach(func() {
+		// Add any teardown steps that needs to be executed after each test
 	})
 
 	Context("ToolsImageBuilderTest", func() {
@@ -161,17 +84,17 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 							{
 								Name:    "test",
 								Image:   "test_images",
-								Command: []string{"/bin/true"},
+								Command: noneCommand,
 							},
 							{
 								Name:    "test2",
 								Image:   "",
-								Command: []string{"/bin/true"},
+								Command: noneCommand,
 							},
 							{
 								Name:    "test3",
 								Image:   "$(KUBEBLOCKS_TOOLS_IMAGE)",
-								Command: []string{"/bin/true"},
+								Command: noneCommand,
 							},
 						},
 					},
@@ -179,10 +102,12 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LazyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   testCtx.DefaultNamespace,
-				TemplateRef: "secondary_template",
-				Policy:      appsv1alpha1.NoneMergePolicy,
+			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   testCtx.DefaultNamespace,
+					TemplateRef: "secondary_template",
+					Policy:      appsv1alpha1.NoneMergePolicy,
+				},
 			}
 			Expect(buildConfigToolsContainer(cfgManagerParams, &sts.Spec.Template.Spec, clusterComponent)).Should(Succeed())
 			Expect(4).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))

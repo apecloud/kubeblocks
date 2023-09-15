@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"context"
@@ -38,7 +38,7 @@ type TemplateMerger interface {
 }
 
 type mergeContext struct {
-	template   appsv1alpha1.LazyRenderedTemplateSpec
+	template   appsv1alpha1.ConfigTemplateExtension
 	configSpec appsv1alpha1.ComponentConfigSpec
 	ccSpec     *appsv1alpha1.ConfigConstraintSpec
 
@@ -118,7 +118,7 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1alpha1.LazyRenderedTemplateSpec, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1alpha1.ConfigConstraintSpec) (TemplateMerger, error) {
+func NewTemplateMerger(template appsv1alpha1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1alpha1.ConfigConstraintSpec) (TemplateMerger, error) {
 	templateData := &mergeContext{
 		configSpec: configSpec,
 		template:   template,
@@ -144,7 +144,7 @@ func NewTemplateMerger(template appsv1alpha1.LazyRenderedTemplateSpec, ctx conte
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1alpha1.LazyRenderedTemplateSpec,
+func mergerConfigTemplate(template *appsv1alpha1.LegacyRenderedTemplateSpec,
 	builder *configTemplateBuilder,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	baseData map[string]string,
@@ -164,7 +164,7 @@ func mergerConfigTemplate(template *appsv1alpha1.LazyRenderedTemplateSpec,
 		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FormatterConfig, configSpec[%v]", configSpec)
 	}
 
-	templateMerger, err := NewTemplateMerger(*template, ctx, cli, builder, configSpec, &ccObj.Spec)
+	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, &ccObj.Spec)
 	if err != nil {
 		return nil, err
 	}

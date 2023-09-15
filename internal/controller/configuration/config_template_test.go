@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"strconv"
@@ -54,6 +54,7 @@ var _ = Describe("tpl template", func() {
 	)
 
 	const (
+		mysqlDataVolume    = "/data/mysql"
 		mysqlCfgName       = "my.cfg"
 		mysqlCfgTmpContext = `
 #test
@@ -93,7 +94,7 @@ single_thread_memory = 294912
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "data",
-							MountPath: "/data/mysql",
+							MountPath: mysqlDataVolume,
 						},
 						{
 							Name:      "log",
@@ -177,10 +178,10 @@ single_thread_memory = 294912
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        "mysql-config-8.0.2",
-				TemplateRef: "mysql-config-8.0.2",
+				TemplateRef: "mysql-config-8.0.2-tpl",
 				VolumeName:  "config1",
 			},
-			ConfigConstraintRef: "mysql-config-8.0.2",
+			ConfigConstraintRef: "mysql-config-8.0.2-constraint",
 		}}
 	})
 
@@ -256,7 +257,7 @@ single_thread_memory = 294912
 			// for test volumeMounts
 			Expect(rendered["a"]).Should(BeEquivalentTo("/log/mysql"))
 			// for test volumeMounts
-			Expect(rendered["b"]).Should(BeEquivalentTo("/data/mysql"))
+			Expect(rendered["b"]).Should(BeEquivalentTo(mysqlDataVolume))
 			// for test port
 			Expect(rendered["c"]).Should(BeEquivalentTo("3356"))
 			// for test resource
@@ -264,7 +265,7 @@ single_thread_memory = 294912
 			// for test args
 			Expect(rendered["e"]).Should(BeEquivalentTo(""))
 			// for test volumeMounts
-			Expect(rendered["f"]).Should(BeEquivalentTo("/data/mysql"))
+			Expect(rendered["f"]).Should(BeEquivalentTo(mysqlDataVolume))
 			// for test env
 			Expect(rendered["i"]).Should(BeEquivalentTo("b"))
 			// for test volume

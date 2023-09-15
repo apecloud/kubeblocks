@@ -20,121 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Reconfigure Controller", func() {
-	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
-	const clusterName = "test-cluster"
-	const statefulCompDefName = "replicasets"
-	const statefulCompName = "mysql"
-	const statefulSetName = "mysql-statefulset"
-	const configSpecName = "mysql-config-tpl"
-	const configVolumeName = "mysql-config"
-	const cmName = "mysql-tree-node-template-8.0"
-
-	var ctx = context.Background()
-
-	cleanEnv := func() {
-		// must wait till resources deleted and no longer existed before the testcases start,
-		// otherwise if later it needs to create some new resource objects with the same name,
-		// in race conditions, it will find the existence of old objects, resulting failure to
-		// create the new objects.
-		By("clean resources")
-
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
-
-		// delete rest mocked objects
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
-		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
-	}
-
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
 
 	Context("When updating configmap", func() {
 		It("Should rolling upgrade pod", func() {
-
-			By("creating a cluster")
-			configmap := testapps.CreateCustomizedObj(&testCtx,
-				"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
-				testCtx.UseDefaultNamespace(),
-				testapps.WithLabels(
-					constant.AppNameLabelKey, clusterName,
-					constant.AppInstanceLabelKey, clusterName,
-					constant.KBAppComponentLabelKey, statefulCompName,
-					constant.CMConfigurationTemplateNameLabelKey, configSpecName,
-					constant.CMConfigurationConstraintsNameLabelKey, cmName,
-					constant.CMConfigurationSpecProviderLabelKey, configSpecName,
-					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
-				),
-				testapps.WithAnnotations(constant.KBParameterUpdateSourceAnnotationKey,
-					constant.ReconfigureManagerSource,
-					constant.CMInsEnableRerenderTemplateKey, "true"))
-
-			constraint := testapps.CreateCustomizedObj(&testCtx,
-				"resources/mysql-config-constraint.yaml",
-				&appsv1alpha1.ConfigConstraint{})
-
-			By("Create a clusterDefinition obj")
-			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
-				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
-				AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-					core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(statefulCompDefName).
-				AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-					core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create(&testCtx).GetObject()
-
-			By("Creating a cluster")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
-
-			container := corev1.Container{
-				Name: "mock-container",
-				VolumeMounts: []corev1.VolumeMount{{
-					Name:      configVolumeName,
-					MountPath: "/mnt/config",
-				}},
-			}
-			_ = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
-				AddConfigmapVolume(configVolumeName, configmap.Name).
-				AddContainer(container).
-				AddAppNameLabel(clusterName).
-				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(statefulCompName).
-				AddAnnotations(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
-				Create(&testCtx).GetObject()
-
-			By("check config constraint")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
-				g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.AvailablePhase))
-			})).Should(Succeed())
+			configmap, _, clusterObj, _, _ := mockReconcileResource()
 
 			By("Check config for instance")
 			var configHash string

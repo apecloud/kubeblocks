@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
@@ -75,7 +75,7 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 
 func checkAndInstallToolsImageVolume(toolContainers []appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1alpha1.ToolConfig {
 	for _, buildParam := range buildParams {
-		if buildParam.ToolsImageSpec != nil && buildParam.ConfigSpec.LazyRenderedConfigSpec != nil {
+		if buildParam.ToolsImageSpec != nil && buildParam.ConfigSpec.LegacyRenderedConfigSpec != nil {
 			// auto install config_render tool
 			toolContainers = checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolsImageSpec.MountPoint)
 		}

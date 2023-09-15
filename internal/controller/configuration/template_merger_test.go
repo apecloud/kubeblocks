@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	"reflect"
@@ -61,6 +61,7 @@ max_connections=666
 
 		testConfigSpecName = "test-config"
 		testClusterName    = "test-cluster"
+		testConfigName     = "my.cnf"
 	)
 
 	var (
@@ -80,12 +81,12 @@ max_connections=666
 			&appsv1alpha1.ConfigConstraint{})
 		baseCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
-				"my.cnf": baseConfig,
+				testConfigName: baseConfig,
 			},
 		}
 		updatedCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
-				"my.cnf": extendConfig,
+				testConfigName: extendConfig,
 			},
 		}
 		baseCMObject.SetName(baseCMName)
@@ -126,12 +127,14 @@ max_connections=666
 	})
 
 	Context("with patch Merge", func() {
-		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace: "default",
-				// Name:        configSpec.Name,
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.PatchPolicy,
+		It("mergerConfigTemplate patch policy", func() {
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace: "default",
+					// Name:        configSpec.Name,
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.PatchPolicy,
+				},
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -141,7 +144,7 @@ max_connections=666
 			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
-			configObject := configReaders["my.cnf"]
+			configObject := configReaders[testConfigName]
 			Expect(configObject.Get("gtid_mode")).Should(BeEquivalentTo("OFF"))
 			Expect(configObject.Get("consensus_auto_leader_transfer")).Should(BeEquivalentTo("ON"))
 			Expect(configObject.Get("default_storage_engine")).Should(BeEquivalentTo("xengine"))
@@ -153,11 +156,13 @@ max_connections=666
 	})
 
 	Context("with replace Merge", func() {
-		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.ReplacePolicy,
+		It("test mergerConfigTemplate replace policy", func() {
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.ReplacePolicy,
+				},
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -168,7 +173,7 @@ max_connections=666
 			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
-			configObject := configReaders["my.cnf"]
+			configObject := configReaders[testConfigName]
 			Expect(configObject.Get("gtid_mode")).Should(BeNil())
 			Expect(configObject.Get("consensus_auto_leader_transfer")).Should(BeNil())
 			Expect(configObject.Get("default_storage_engine")).Should(BeEquivalentTo("xengine"))
@@ -177,11 +182,13 @@ max_connections=666
 	})
 
 	Context("with only add Merge", func() {
-		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.OnlyAddPolicy,
+		It("test mergerConfigTemplate add policy", func() {
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.OnlyAddPolicy,
+				},
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -191,11 +198,13 @@ max_connections=666
 	})
 
 	Context("with none Merge", func() {
-		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.NoneMergePolicy,
+		It("test mergerConfigTemplate none policy", func() {
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.NoneMergePolicy,
+				},
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -207,10 +216,12 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      "",
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      "",
+				},
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -219,10 +230,12 @@ max_connections=666
 		})
 
 		It("not configconstraint", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      "none",
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      "none",
+				},
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -233,10 +246,12 @@ max_connections=666
 		})
 
 		It("not formatter", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      "none",
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      "none",
+				},
 			}
 
 			tmpCM := baseCMObject.DeepCopy()

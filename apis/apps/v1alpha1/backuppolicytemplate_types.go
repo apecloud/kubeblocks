@@ -17,8 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
@@ -55,6 +56,20 @@ type BackupPolicy struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	// You can also combine the above durations. For example: 30d12h30m
+	// +optional
+	// +kubebuilder:default="7d"
+	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
+
 	// target instance for backup.
 	// +optional
 	Target TargetInstance `json:"target"`
@@ -65,12 +80,8 @@ type BackupPolicy struct {
 
 	// backupMethods defines the backup methods.
 	// +kubebuilder:validation:Required
-	BackupMethods []BackupMethod `json:"backupMethods"`
+	BackupMethods []dpv1alpha1.BackupMethod `json:"backupMethods"`
 }
-
-// RetentionPeriod represents a duration in the format "1y2mo3w4d5h6m", where
-// y=year, mo=month, w=week, d=day, h=hour, m=minute.
-type RetentionPeriod string
 
 type Schedule struct {
 	// enabled specifies whether the backup schedule is enabled or not.
@@ -85,80 +96,6 @@ type Schedule struct {
 	// see https://en.wikipedia.org/wiki/Cron.
 	// +kubebuilder:validation:Required
 	CronExpression string `json:"cronExpression"`
-
-	// the number of automatic backups to retain. Value must be non-negative integer.
-	// 0 means NO limit on the number of backups.
-	// +kubebuilder:default=7
-	// +optional
-	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
-
-	// retentionPeriod determines a duration up to which the backup should be kept.
-	// controller will remove all backups that are older than the RetentionPeriod.
-	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
-	// Sample duration format:
-	// - years: 	2y
-	// - months: 	6mo
-	// - days: 		30d
-	// - hours: 	12h
-	// - minutes: 	30m
-	// You can also combine the above durations. For example: 30d12h30m
-	// +optional
-	// +kubebuilder:default="7d"
-	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
-}
-
-// BackupMethod defines the backup method.
-type BackupMethod struct {
-	// the name of backup method.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// snapshotVolumes specifies whether to take snapshots of persistent volumes.
-	// if true, the BackupScript is not required, the controller will use the CSI
-	// volume snapshotter to create the snapshot.
-	// +optional
-	// +kubebuilder:default=false
-	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
-
-	// actionSetName refers to the ActionSet object that defines the backup actions.
-	// For volume snapshot backup, the actionSet is not required, the controller
-	// will use the CSI volume snapshotter to create the snapshot.
-	// +optional
-	ActionSetName string `json:"actionSetName,omitempty"`
-
-	// targetVolumes specifies which volumes from the target should be mounted in
-	// the backup workload.
-	// +optional
-	TargetVolumes *TargetVolumeInfo `json:"targetVolumes,omitempty"`
-
-	// env specifies the environment variables for the backup workload.
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// runtimeSettings specifies runtime settings for the backup workload container.
-	// +optional
-	RuntimeSettings *RuntimeSettings `json:"runtimeSettings,omitempty"`
-}
-
-type RuntimeSettings struct {
-	// resources specifies the resource required by container.
-	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
-	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-}
-
-// TargetVolumeInfo specifies the volumes and their mounts of the targeted application
-// that should be mounted in backup workload.
-type TargetVolumeInfo struct {
-	// Volumes indicates the list of volumes of targeted application that should
-	// be mounted on the backup job.
-	// +optional
-	Volumes []string `json:"volumes,omitempty"`
-
-	// volumeMounts specifies the mount for the volumes specified in `Volumes` section.
-	// +optional
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 type TargetInstance struct {

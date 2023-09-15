@@ -877,14 +877,14 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
-	backupType string) (*dataprotectionv1alpha1.Backup, error) {
+	backupMethod string) (*dataprotectionv1alpha1.Backup, error) {
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
 		"cluster":          cluster,
 		"component":        component,
 		"backupPolicyName": backupPolicyName,
 		"backupJobKey":     backupKey,
-		"backupType":       backupType,
+		"backupMethod":     backupMethod,
 	}, "backupJob", &backup); err != nil {
 		return nil, err
 	}

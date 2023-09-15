@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -119,7 +120,7 @@ type ClusterBackup struct {
 	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
 	// +kubebuilder:default="1d"
 	// +optional
-	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
+	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
 
 	// backup method name to use, that is defined in backupPolicy.
 	// +kubebuilder:validation:Required

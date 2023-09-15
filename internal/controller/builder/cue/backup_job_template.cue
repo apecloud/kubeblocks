@@ -29,7 +29,7 @@ backupJobKey: {
 	Name:      string
 	Namespace: string
 }
-backupType: string
+backupMethod: string
 backupJob: {
 	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "Backup"
@@ -37,7 +37,7 @@ backupJob: {
 		name:      backupJobKey.Name
 		namespace: backupJobKey.Namespace
 		labels: {
-			"dataprotection.kubeblocks.io/backup-type":         backupType
+			"dataprotection.kubeblocks.io/backup-method":       backupMethod
 			"apps.kubeblocks.io/managed-by":                    "cluster"
 			"backuppolicies.dataprotection.kubeblocks.io/name": backupPolicyName
 			"app.kubernetes.io/name":                           "\(component.clusterDefName)"
@@ -48,6 +48,6 @@ backupJob: {
 	}
 	spec: {
 		"backupPolicyName": backupPolicyName
-		"backupType":       backupType
+		"backupMethod":     backupMethod
 	}
 }

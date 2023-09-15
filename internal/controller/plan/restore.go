@@ -559,7 +559,7 @@ func (p *RestoreManager) BuildDatafileRestoreJob(synthesizedComponent *component
 
 func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *component.SynthesizedComponent,
 	backup *dpv1alpha1.Backup,
-	backupTool *dpv1alpha1.BackupTool,
+	actionSet *dpv1alpha1.ActionSet,
 	pvcNames []string,
 	labels map[string]string) (objs []client.Object, err error) {
 

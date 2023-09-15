@@ -407,8 +407,8 @@ func (r *Request) backupActionSetExists() bool {
 
 func (r *Request) targetServiceAccountName() string {
 	saName := r.BackupPolicy.Spec.Target.ServiceAccountName
-	if saName != nil && *saName != "" {
-		return *saName
+	if len(saName) > 0 {
+		return saName
 	}
 	// service account name is not specified, use the target pod service account
 	targetPod := r.TargetPods[0]

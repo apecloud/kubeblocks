@@ -854,7 +854,7 @@ var _ = Describe("Cluster Controller", func() {
 					}
 
 					By("Checking backup policy created from backup policy template")
-					policyName := DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
+					policyName := generateBackupPolicyName(clusterKey.Name, compDef.Name, "")
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
 						Type:                     policyType,
 						BackupPolicyTemplateName: backupPolicyTPLName,
@@ -2409,7 +2409,7 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(schedule.Datafile.Enable).Should(BeFalse())
 					}
 				}
-				policyName := DeriveBackupPolicyName(clusterKey.Name, compDefName, "")
+				policyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
 					func(g Gomega, policy *dataprotectionv1alpha1.BackupPolicy) {
 						if backup == nil {

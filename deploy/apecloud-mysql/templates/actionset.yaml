@@ -4,6 +4,7 @@ metadata:
   name: xtrabackup-for-apecloud-mysql
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   backupType: Full
   env:
@@ -11,7 +12,6 @@ spec:
     value: /data/mysql/data
   - name: LOG_BIN
     value: /data/mysql/binlog/mysql-bin
-
   backup:
     preBackup: []
     postBackup: []
@@ -55,4 +55,24 @@ spec:
         touch ${DATA_DIR}/.xtrabackup_restore_new_cluster
         rm -rf ${TMP_DIR}
         chmod -R 0777 ${DATA_DIR}
+    postReady: []
+---
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: volumesnapshot-for-apecloud-mysql
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  backupType: Full
+  env:
+  - name: DATA_DIR
+    value: /data/mysql/data
+  backup: {}
+  restore:
+    prepareData:
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      command:
+      - touch {{ .Values.mysqlConfigs.dataDir }}/.restore_new_cluster; sync
     postReady: []

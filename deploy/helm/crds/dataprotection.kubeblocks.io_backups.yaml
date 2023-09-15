@@ -19,11 +19,11 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.backupMethod
-      name: METHOD
-      type: string
     - jsonPath: .spec.backupPolicyName
       name: POLICY
+      type: string
+    - jsonPath: .spec.backupMethod
+      name: METHOD
       type: string
     - jsonPath: .status.backupRepoName
       name: REPO

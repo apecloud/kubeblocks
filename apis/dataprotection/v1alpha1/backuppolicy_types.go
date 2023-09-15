@@ -68,7 +68,7 @@ type BackupTarget struct {
 
 	// serviceAccountName specifies the service account to run the backup workload.
 	// +optional
-	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type PodSelector struct {

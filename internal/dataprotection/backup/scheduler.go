@@ -304,14 +304,6 @@ func (s *Scheduler) buildCronJob(
 }
 
 func (s *Scheduler) buildPodSpec(schedulePolicy *dpv1alpha1.SchedulePolicy) (*corev1.PodSpec, error) {
-	saName := func() string {
-		target := s.BackupPolicy.Spec.Target
-		if target.ServiceAccountName != nil {
-			return *target.ServiceAccountName
-		}
-		return ""
-	}
-
 	// TODO(ldm): add backup deletionPolicy
 	createBackupCmd := fmt.Sprintf(`
 kubectl create -f - <<EOF
@@ -341,7 +333,7 @@ EOF
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	podSpec := &corev1.PodSpec{
-		ServiceAccountName: saName(),
+		ServiceAccountName: s.BackupPolicy.Spec.Target.ServiceAccountName,
 		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         []corev1.Container{container},
 	}

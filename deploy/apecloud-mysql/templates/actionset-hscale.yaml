@@ -1,0 +1,67 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: xtrabackup-for-apecloud-mysql-for-hscale
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  backupType: Full
+  env:
+  - name: DATA_DIR
+    value: {{ .Values.mysqlConfigs.dataDir }}
+  - name: LOG_BIN
+    value: {{ .Values.mysqlConfigs.logBin }}
+  backup:
+    backupData:
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      scheduleToTargetPodNode: true
+      command:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p ${DP_BACKUP_DIR}
+        xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DP_DB_HOST} \
+        --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
+    preBackup: []
+    postBackup: []
+  restore:
+    prepareData:
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      command:
+      - sh
+      - -c
+      - |
+        set -e;
+        mkdir -p ${DATA_DIR}
+        mkdir -p /tmp/data/ && cd /tmp/data
+        xbstream -x < ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
+        xtrabackup --decompress  --target-dir=/tmp/data/
+        xtrabackup --prepare --target-dir=/tmp/data/
+        find . -name "*.qp"|xargs rm -f
+        xtrabackup --move-back --target-dir=/tmp/data/ --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
+        touch ${DATA_DIR}/.xtrabackup_restore
+        rm -rf /tmp/data/
+        chmod -R 0777 ${DATA_DIR}
+    postReady: []
+---
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: volumesnapshot-for-apecloud-mysql-for-hscale
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  backupType: Full
+  env:
+  - name: DATA_DIR
+    value: /data/mysql/data
+  backup: {}
+  restore:
+    prepareData:
+      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      command:
+      - touch {{ .Values.mysqlConfigs.dataDir }}/.restore; sync
+    postReady: []

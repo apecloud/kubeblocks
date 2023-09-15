@@ -10,14 +10,19 @@ spec:
   identifier: hscale
   backupPolicies:
   - componentDefRef: mysql
-    snapshot:
-      hooks:
-        containerName: mysql
-        preCommands:
-        - "touch {{ .Values.mysqlConfigs.dataDir }}/.restore; sync"
-        postCommands:
-        - "rm -f {{ .Values.mysqlConfigs.dataDir }}/.restore; sync"
-      target:
-        role: leader
-    datafile:
-      backupToolName: xtrabackup-for-apecloud-mysql-for-hscale
+    target:
+      role: leader
+    backupMethods:
+    - name: volume-snapshot
+      snapshotVolumes: true
+      actionSetName: volume-snapshot-for-apecloud-mysql-for-hscale
+      targetVolumes:
+        volumes:
+        - data
+    - name: xtrabackup
+      snapshotVolumes: false
+      actionSetName: xtrabackup-for-apecloud-mysql-for-hscale
+      targetVolumes:
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.mysqlConfigs.dataMountPath }}

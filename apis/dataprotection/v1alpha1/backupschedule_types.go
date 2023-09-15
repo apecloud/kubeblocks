@@ -55,7 +55,7 @@ type SchedulePolicy struct {
 
 	// the number of automatic backups to retain. Value must be non-negative integer.
 	// 0 means NO limit on the number of backups.
-	// +kubebuilder:default=7
+	// +kubebuilder:default=0
 	// +optional
 	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
 

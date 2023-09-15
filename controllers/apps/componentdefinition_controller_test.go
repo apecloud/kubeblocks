@@ -184,7 +184,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount("kubeblocks").
+				AddSystemAccount(appsv1alpha1.AdminAccount).
 				Create(&testCtx).GetObject()
 
 			By("checking the object as unavailable")
@@ -199,7 +199,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount("kubeblocks").
+				AddSystemAccount(appsv1alpha1.AdminAccount).
 				SetLifecycleAction("AccountProvision", defaultAction).
 				Create(&testCtx).GetObject()
 

@@ -247,9 +247,9 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddSystemAccount(name string) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName appsv1alpha1.AccountName) *MockComponentDefinitionFactory {
 	account := appsv1alpha1.SystemAccountConfig{
-		Name: appsv1alpha1.AccountName(name),
+		Name: accountName,
 	}
 	if f.get().Spec.SystemAccounts == nil {
 		f.get().Spec.SystemAccounts = &appsv1alpha1.ComponentSystemAccount{
@@ -258,7 +258,7 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(name string) *MockComp
 		}
 	}
 	for _, it := range f.get().Spec.SystemAccounts.Accounts {
-		if string(it.Name) == name {
+		if it.Name == accountName {
 			return f
 		}
 	}

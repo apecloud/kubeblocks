@@ -219,6 +219,10 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {
+	if component.RSMSpec != nil {
+		return getComponentRoles2(component)
+	}
+
 	var roles = map[string]string{}
 	if component.ConsensusSpec == nil {
 		return roles
@@ -231,6 +235,17 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 	}
 	if consensus.Learner != nil {
 		roles[strings.ToLower(consensus.Learner.Name)] = string(consensus.Learner.AccessMode)
+	}
+	return roles
+}
+
+func getComponentRoles2(component *SynthesizedComponent) map[string]string {
+	roles := make(map[string]string, 0)
+	if component.RSMSpec == nil {
+		return roles
+	}
+	for _, role := range component.RSMSpec.Roles {
+		roles[strings.ToLower(role.Name)] = string(role.AccessMode)
 	}
 	return roles
 }

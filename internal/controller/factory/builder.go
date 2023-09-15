@@ -546,6 +546,10 @@ func separateServices(services []corev1.Service) (*corev1.Service, []corev1.Serv
 }
 
 func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleProbe, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
+	if component.RSMSpec != nil {
+		return buildRoleInfo2(component)
+	}
+
 	var (
 		roles           []workloads.ReplicaRole
 		probe           *workloads.RoleProbe
@@ -578,6 +582,11 @@ func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.Repli
 	}
 
 	return roles, probe, reconfiguration, strategy
+}
+
+func buildRoleInfo2(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleProbe, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
+	rsmSpec := component.RSMSpec
+	return rsmSpec.Roles, rsmSpec.RoleProbe, rsmSpec.MembershipReconfiguration, rsmSpec.MemberUpdateStrategy
 }
 
 func buildRoleInfoFromReplication() []workloads.ReplicaRole {

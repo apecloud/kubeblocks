@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -378,19 +379,29 @@ type ClusterComponentDefinition struct {
 
 	// statelessSpec defines stateless related spec if workloadType is Stateless.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	StatelessSpec *StatelessSetSpec `json:"statelessSpec,omitempty"`
 
 	// statefulSpec defines stateful related spec if workloadType is Stateful.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	StatefulSpec *StatefulSetSpec `json:"statefulSpec,omitempty"`
 
 	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
 	// replicationSpec defines replication related spec if workloadType is Replication.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	ReplicationSpec *ReplicationSetSpec `json:"replicationSpec,omitempty"`
+
+	// RSMSpec defines workload related spec of this component.
+	// start from KB 0.7.0, RSM(ReplicatedStateMachineSpec) will be the underlying CR which powers all kinds of workload in KB.
+	// RSM is an enhanced stateful workload extension dedicated for heavy-state workloads like databases.
+	// +optional
+	RSMSpec *v1alpha1.ReplicatedStateMachineSpec `json:"rsmSpec,omitempty"`
 
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
@@ -701,6 +712,7 @@ type ClusterDefinitionProbes struct {
 
 	// Probe for DB role changed check.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
 
 	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,

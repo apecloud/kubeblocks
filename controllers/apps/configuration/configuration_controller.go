@@ -102,7 +102,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
 	}
 
-	if err := r.runTasks(reqCtx, configuration, fetcherTask, tasks); err != nil {
+	if err := r.runTasks(TaskContext{configuration, reqCtx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
 	if !isAllReady(configuration) {
@@ -121,30 +121,32 @@ func isAllReady(configuration *appsv1alpha1.Configuration) bool {
 	return true
 }
 
-func (r *ConfigurationReconciler) runTasks(
-	reqCtx intctrlutil.RequestCtx,
-	configuration *appsv1alpha1.Configuration,
-	fetcher *Task,
-	tasks []Task) (err error) {
-	var errs []error
-	var synthesizedComp *component.SynthesizedComponent
+func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (err error) {
+	var (
+		errs            []error
+		synthesizedComp *component.SynthesizedComponent
 
-	synthesizedComp, err = component.BuildComponent(reqCtx,
+		ctx           = taskCtx.reqCtx.Ctx
+		configuration = taskCtx.configuration
+	)
+
+	synthesizedComp, err = component.BuildComponent(taskCtx.reqCtx,
 		nil,
-		fetcher.ClusterObj,
-		fetcher.ClusterDefObj,
-		fetcher.ClusterDefComObj,
-		fetcher.ClusterComObj,
+		taskCtx.fetcher.ClusterObj,
+		taskCtx.fetcher.ClusterDefObj,
+		taskCtx.fetcher.ClusterDefComObj,
+		taskCtx.fetcher.ClusterComObj,
 		nil,
-		fetcher.ClusterVerComObj)
+		taskCtx.fetcher.ClusterVerComObj)
 	if err != nil {
 		return err
 	}
 
+	// TODO manager multiple version
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	patch := client.MergeFrom(configuration.DeepCopy())
 	for _, task := range tasks {
-		if err := task.Do(fetcher, synthesizedComp, revision); err != nil {
+		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
 			task.Status.Phase = appsv1alpha1.CMergeFailedPhase
 			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)
@@ -155,7 +157,7 @@ func (r *ConfigurationReconciler) runTasks(
 	if len(errs) > 0 {
 		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
 	}
-	if err := r.Client.Status().Patch(reqCtx.Ctx, configuration, patch); err != nil {
+	if err := r.Client.Status().Patch(ctx, configuration, patch); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {

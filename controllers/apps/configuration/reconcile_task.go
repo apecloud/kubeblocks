@@ -40,6 +40,12 @@ type Task struct {
 	Do func(fetcher *Task, component *component.SynthesizedComponent, revision string) error
 }
 
+type TaskContext struct {
+	configuration *appsv1alpha1.Configuration
+	reqCtx        intctrlutil.RequestCtx
+	fetcher       *Task
+}
+
 func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
@@ -51,7 +57,6 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 			if err := fetcher.ConfigMap(item.Name).Complete(); err != nil {
 				return err
 			}
-
 			// Do reconcile for config template
 			configMap := fetcher.ConfigMapObj
 			switch intctrlutil.GetConfigSpecReconcilePhase(configMap, item, status) {

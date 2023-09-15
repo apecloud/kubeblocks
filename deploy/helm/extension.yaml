@@ -18,7 +18,7 @@ keywords:
 home: https://kubeblocks.io
 sources:
   - https://github.com/apecloud/kubeblocks
-kubeVersion: ">=1.19.0"
+kubeVersion: '>=1.22.0-0'
 ksVersion: ">=4.0.0-alpha"
 maintainers:
   - name: "ApeCloud"
@@ -42,7 +42,7 @@ screenshots:
     # installationMode describes how to install subcharts, it can be HostOnly or Multicluster.
     # In Multicluster mode, the subchart with tag `extension` will only be deployed to the host cluster,
   # and the subchart with tag `agent` will be deployed to all selected clusters.
-installationMode: HostOnly
+installationMode: Multicluster
 # external dependencies example
 #externalDependencies:
 #  - name: a

@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -57,12 +58,19 @@ func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
+	opts := zap.Options{
+		Development: true,
+	}
+	opts.BindFlags(flag.CommandLine)
+
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
 		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
 	}
+
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	err = component.GetAllComponent(configDir) // find all builtin config file and read
 	if err != nil {                            // Handle errors reading the config file

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -44,8 +45,15 @@ var (
 	`)
 )
 
+type listBackupRepoOptions struct {
+	dynamic dynamic.Interface
+	*list.ListOptions
+}
+
 func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.BackupRepoGVR())
+	o := &listBackupRepoOptions{
+		ListOptions: list.NewListOptions(f, streams, types.BackupRepoGVR()),
+	}
 	cmd := &cobra.Command{
 		Use:               "list",
 		Short:             "List BackupRepo.",
@@ -54,6 +62,7 @@ func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupRepoGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Names = args
+			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(printBackupRepoList(o))
 		},
 	}
@@ -61,7 +70,16 @@ func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-func printBackupRepoList(o *list.ListOptions) error {
+func (o *listBackupRepoOptions) Complete() error {
+	var err error
+	o.dynamic, err = o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func printBackupRepoList(o *listBackupRepoOptions) error {
 	// if format is JSON or YAML, use default printer to output the result.
 	if o.Format == printer.JSON || o.Format == printer.YAML {
 		_, err := o.Run()
@@ -114,17 +132,23 @@ func printBackupRepoList(o *list.ListOptions) error {
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, BackupRepo); err != nil {
 				return err
 			}
+			backups, backupSize, err := countBackupNumsAndSize(o.dynamic, BackupRepo)
+			if err != nil {
+				return err
+			}
 			tbl.AddRow(BackupRepo.Name,
 				BackupRepo.Status.Phase,
 				BackupRepo.Spec.StorageProviderRef,
 				BackupRepo.Status.IsDefault,
+				fmt.Sprintf("%d", backups),
+				backupSize,
 			)
 		}
 		return nil
 	}
 
 	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "STATUS", "STORAGEPROVIDER", "DEFAULT"); err != nil {
+		"NAME", "STATUS", "STORAGE-PROVIDER", "DEFAULT", "BACKUPS", "TOTAL-SIZE"); err != nil {
 		return err
 	}
 	return nil

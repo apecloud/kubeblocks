@@ -208,13 +208,17 @@ type ComponentDefinitionSpec struct {
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition
 type ComponentDefinitionStatus struct {
 	// ObservedGeneration is the most recent generation observed for this ComponentDefinition.
-	// It corresponds to the ComponentDefinition's generation, which is updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Phase valid values are ``, `Available`, 'Unavailable`.
-	// Available is ComponentDefinition become available, and can be referenced for co-related objects.
+	// Available is ComponentDefinition become available, and can be used for co-related objects.
+	// +optional
 	Phase Phase `json:"phase,omitempty"`
+
+	// Extra message for current phase.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 type ComponentPersistentVolume struct {

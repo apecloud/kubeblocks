@@ -85,11 +85,10 @@ var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ snapshotv1.Vol
 
 var ClusterSignature = func(_ appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList) {}
 var ClusterVersionSignature = func(_ appsv1alpha1.ClusterVersion, _ appsv1alpha1.ClusterVersionList) {}
-var ClusterDefinitionSignature = func(_ appsv1alpha1.ClusterDefinition, _ appsv1alpha1.ClusterDefinitionList) {
-}
+var ClusterDefinitionSignature = func(_ appsv1alpha1.ClusterDefinition, _ appsv1alpha1.ClusterDefinitionList) {}
+var ComponentDefinitionSignature = func(_ appsv1alpha1.ComponentDefinition, _ appsv1alpha1.ComponentDefinitionList) {}
 var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequestList) {}
-var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ appsv1alpha1.ConfigConstraintList) {
-}
+var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ appsv1alpha1.ConfigConstraintList) {}
 
 var BackupPolicyTemplateSignature = func(_ appsv1alpha1.BackupPolicyTemplate, _ appsv1alpha1.BackupPolicyTemplateList) {
 }

@@ -44,6 +44,9 @@ spec:
           - name: grpc-qdrant
             port: 6334
             targetPort: grpc-qdrant
+          - name: web-ui
+            port: 3000
+            targetPort: web-ui
       volumeTypes:
         - name: data
           type: data
@@ -65,6 +68,21 @@ spec:
           - mountPath: /qdrant/tools
             name: tools
         containers:
+          - name: web-ui
+            imagePullPolicy: {{ .Values.images.pullPolicy | default "IfNotPresent"  }}
+            securityContext:
+              runAsUser: 0
+            command:
+              - bash
+              - -c
+              - |
+                echo VITE_PORT=6333 >> .env
+                echo VITE_HOSTNAME=http://127.0.0.1 >> .env
+                npm run build
+                cd dist/ && serve
+            ports:
+              - name: http
+                containerPort: 3000
           - name: qdrant
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
             securityContext:
@@ -145,40 +163,3 @@ spec:
                 fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
         - emptyDir: {}
           name: tools
-    - name: qdrant-web-ui
-      workloadType: Stateless
-      characterType: qdrant
-      service:
-        ports:
-          - name: web-ui
-            port: 3000
-            targetPort: web-ui
-      podSpec:
-        containers:
-          - name: web-ui
-            imagePullPolicy: IfNotPresent
-            command:
-              - bash
-              - -c
-              - |
-                echo VITE_PORT=$QDRANT_SVC_PORT >> .env
-                echo VITE_HOSTNAME=http://$QDRANT_SVC_NAME >> .env
-                npm run build
-                cd dist/ && serve
-
-{{/*                sleep 10000*/}}
-
-      componentDefRef:
-        - componentDefName: qdrant
-          componentRefEnv:
-            - name: QDRANT_POD_NAME
-              valueFrom:
-                type: HeadlessServiceRef
-                format: $(POD_NAME)
-            - name: QDRANT_SVC_NAME
-              valueFrom:
-                type: ServiceRef
-            - name: QDRANT_SVC_PORT
-              valueFrom:
-                type: FieldRef
-                fieldPath: $.componentDef.service.ports[?(@.name == "tcp-qdrant")].port

@@ -15,8 +15,7 @@ spec:
         containers:
           - name: qdrant
             image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ include "qdrant.version" . | default .Values.images.tag }}
-    - componentDefRef: qdrant-web-ui
-      versionsContext:
-        containers:
           - name: web-ui
             image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.web_ui.repository}}:{{ .Values.images.web_ui.tag | default "latest" }}
+
+

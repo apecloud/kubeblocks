@@ -294,6 +294,45 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
    1 row in set (0.09 sec)
    ```
 
+## Reconfigure parameters with edit-config
+
+For your convenience, kbcli offers a tool `edit-config` to help you to visually edit configurations.
+
+For Linux and macOS, you can edit configuration files by vi and for Windows, you can edit files on notepad.
+
+1. Edit the configutation file.
+
+   ```bash
+   kbcli cluster edit-config mysql-cluster
+   >
+   test
+   ```
+
+:::note
+
+If there are multiple components in a cluster, use `--component` to specify a component.
+
+:::
+
+2. View the status of the parameter reconfiguration.
+
+   ```bash
+   kbcli cluster describe-ops xxx -n default
+   ```
+
+3. Connect to the database to verify whether the parameters are modified
+
+   ```bash
+   kbcli cluster connect mysql-cluster
+   ```
+
+:::note
+
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be editted at the same time.
+2. Deleting a paramter will be supported in later version.
+
+:::
+
 ## View history and compare differences
 
 After the reconfiguration is completed, you can search the reconfiguration history and compare the parameter differences.

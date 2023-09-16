@@ -156,7 +156,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
 			FromClusterPhases: []ClusterPhase{RunningClusterPhase},
-			ToClusterPhase:    SpecReconcilingClusterPhase, // original VersionUpgradingPhase,
+			ToClusterPhase:    UpdatingClusterPhase, // original VersionUpgradingPhase,
 		}
 		// TODO: do VersionUpgradingPhase condition value check
 
@@ -168,10 +168,10 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("Test existing other operations in cluster")
 		// update cluster existing operations
-		addClusterRequestAnnotation(cluster, "testOpsName", SpecReconcilingClusterPhase)
+		addClusterRequestAnnotation(cluster, "testOpsName", UpdatingClusterPhase)
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("existing OpsRequest: testOpsName"))
 		// test opsRequest reentry
-		addClusterRequestAnnotation(cluster, opsRequest.Name, SpecReconcilingClusterPhase)
+		addClusterRequestAnnotation(cluster, opsRequest.Name, UpdatingClusterPhase)
 
 		By("By creating a upgrade opsRequest, it should be succeed")
 		opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
@@ -530,7 +530,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		createReconfigureObj := func(compName string) *Reconfigure {
 			return &Reconfigure{
 				ComponentOps: ComponentOps{ComponentName: compName},
-				Configurations: []Configuration{{Name: "for-test",
+				Configurations: []ConfigurationItem{{Name: "for-test",
 					Keys: []ParameterConfig{{
 						Key: "test",
 						Parameters: []ParameterPair{{

@@ -1,0 +1,8 @@
+name: mongodb
+spec:
+  version: v1
+  metadata:
+    - name: host
+      value: "127.0.0.1:27017"
+    - name: params
+      value: "?directConnection=true"

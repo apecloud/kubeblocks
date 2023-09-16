@@ -1,0 +1,39 @@
+---
+# Source: oracle-mysql-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: oracle-cluster
+  labels: 
+    helm.sh/chart: oracle-mysql-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "8.0.32"
+    app.kubernetes.io/instance: oracle-cluster
+spec:
+  clusterVersionRef: oracle-mysql-8.0.32
+  terminationPolicy: Delete  
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  clusterDefinitionRef: oracle-mysql # ref clusterdefinition.name
+  componentSpecs:
+    - name: mysql-comp
+      componentDefRef: mysql-compdef # ref clusterdefinition componentDefs.name
+      replicas: 1      
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi      
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"      
+      services:

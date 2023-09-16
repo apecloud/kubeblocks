@@ -92,7 +92,7 @@ func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	var (
@@ -123,10 +123,10 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 			continue
 		}
 		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}
 

@@ -36,14 +36,14 @@ func NewCUETplFromBytes(b []byte, err error) (*CUETpl, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewCUETpl(string(b)), nil
+	return NewCUETpl(b), nil
 }
 
-func NewCUETpl(templateContents string) *CUETpl {
+func NewCUETpl(templateContents []byte) *CUETpl {
 	cueValue := CUETpl{
 		Ctx: cuecontext.New(),
 	}
-	temValue := cueValue.Ctx.CompileString(templateContents)
+	temValue := cueValue.Ctx.CompileBytes(templateContents)
 	cueValue.Value = temValue
 	return &cueValue
 }

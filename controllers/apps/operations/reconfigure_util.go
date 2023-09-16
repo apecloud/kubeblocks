@@ -33,7 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -49,7 +49,7 @@ type updateReconfigureStatus func(params []core.ParamPairs, orinalData map[strin
 
 // Deprecated: use NewPipeline instead
 // updateConfigConfigmapResource merges parameters of the config into the configmap, and verifies final configuration file.
-func updateConfigConfigmapResource(config appsv1alpha1.Configuration,
+func updateConfigConfigmapResource(config appsv1alpha1.ConfigurationItem,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
 	ctx context.Context,
@@ -147,7 +147,7 @@ func syncConfigmap(
 	}
 	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
 	core.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
-	if err := plan.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
+	if err := configuration.SyncEnvConfigmap(configSpec, cmObj, cc, cli, ctx); err != nil {
 		return err
 	}
 	return cli.Patch(ctx, cmObj, patch)

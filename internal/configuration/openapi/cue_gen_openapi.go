@@ -27,10 +27,10 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/encoding/openapi"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 const (
@@ -161,14 +161,14 @@ func deReferenceSchema(props *apiextv1.JSONSchemaProps, resolveFn func(path stri
 	if props.AdditionalProperties != nil && props.AdditionalProperties.Schema != nil {
 		props.AdditionalProperties.Schema, err = oneProps(props.AdditionalProperties.Schema)
 		if err != nil {
-			return
+			return err
 		}
 	}
 	for key := range props.Properties {
 		schemaProps := util.ToPointer(props.Properties[key])
 		schemaProps, err = oneProps(schemaProps)
 		if err != nil {
-			return
+			return err
 		}
 		props.Properties[key] = *schemaProps
 	}

@@ -1,0 +1,5 @@
+name: custom
+spec:
+  type: bindings.custom
+  version: v1
+  metadata: []

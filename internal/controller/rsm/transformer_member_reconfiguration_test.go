@@ -46,9 +46,11 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			}
 			membersStatus = append(membersStatus, status)
 		}
+		leaderIndex := 0
 		if replicas > 1 {
-			membersStatus[1].ReplicaRole = workloads.ReplicaRole{Name: "leader", IsLeader: true}
+			leaderIndex = 1
 		}
+		membersStatus[leaderIndex].ReplicaRole = workloads.ReplicaRole{Name: "leader", IsLeader: true}
 		return membersStatus
 	}
 	setRSMStatus := func(replicas int) {
@@ -123,7 +125,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		transformer = &MemberReconfigurationTransformer{}
 	})
 
-	Context("cluster initialization", func() {
+	Context("roleful cluster initialization", func() {
 		It("should initialize well", func() {
 			By("initialReplicas=0")
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
@@ -136,9 +138,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(rsm.Status.ReadyInitReplicas).Should(BeEquivalentTo(1))
 
 			By("all members initialized")
-			membersStatus = buildMembersStatus(int(*rsm.Spec.Replicas))
-			rsm.Status.MembersStatus = membersStatus
-			rsm.Status.UpdatedReplicas = *rsm.Spec.Replicas
+			setRSMStatus(int(*rsm.Spec.Replicas))
 			k8sMock.EXPECT().
 				List(gomock.Any(), &batchv1.JobList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *batchv1.JobList, _ ...client.ListOption) error {
@@ -149,12 +149,24 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		})
 	})
 
+	Context("stateful cluster initialization", func() {
+		It("should work well", func() {
+			By("set spec.roles to nil")
+			rsm.Spec.Roles = nil
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			Expect(rsm.Status.InitReplicas).Should(BeEquivalentTo(0))
+			Expect(rsm.Status.ReadyInitReplicas).Should(BeEquivalentTo(0))
+		})
+	})
+
 	Context("scale-out", func() {
 		It("should work well", func() {
 			By("make rsm ready for scale-out")
 			setRSMStatus(int(*rsm.Spec.Replicas))
-			rsm.Generation = 2
-			rsm.Status.ObservedGeneration = 2
+			generation := int64(2)
+			rsm.Generation = generation
+			rsm.Status.ObservedGeneration = generation
+			rsm.Status.CurrentGeneration = generation
 			stsOld := mockUnderlyingSts(*rsm, rsm.Generation)
 			// rsm spec updated
 			rsm.Generation = 3
@@ -168,6 +180,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			expectStsImmutable(dag, false)
 
 			rsm.Status.ObservedGeneration = rsm.Generation
+			rsm.Status.CurrentGeneration = rsm.Generation
 
 			By("prepare member 3 joining")
 			sts = mockUnderlyingSts(*rsm, rsm.Generation)
@@ -219,8 +232,10 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			}
 			By("make rsm ready for scale-in")
 			setRSMStatus(int(*rsm.Spec.Replicas))
-			rsm.Generation = 2
-			rsm.Status.ObservedGeneration = 2
+			generation := int64(2)
+			rsm.Generation = generation
+			rsm.Status.ObservedGeneration = generation
+			rsm.Status.CurrentGeneration = generation
 			stsOld := mockUnderlyingSts(*rsm, rsm.Generation)
 			// rsm spec updated
 			rsm.Generation = 3
@@ -241,6 +256,9 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			action := mockAction(2, jobTypeMemberLeaveNotifying, false)
 			graphCli.Create(dagExpected, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+
+			// after the first reconciliation, observedGeneration should be updated
+			rsm.Status.ObservedGeneration = rsm.Generation
 
 			By("make member 2 leaving successfully and prepare member 1 switchover")
 			setRSMMembersStatus(2)
@@ -276,8 +294,20 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			graphCli.Create(dagExpected, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
-			By("make member 1 leaving successfully and cleanup")
+			By("make member 1 leaving successfully")
 			setRSMMembersStatus(1)
+			dag = mockDAG(stsOld, sts)
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			expectStsImmutable(dag, false)
+			dagExpected = mockDAG(stsOld, sts)
+			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+
+			By("update rsm status")
+			rsm.Status.CurrentGeneration = rsm.Generation
+			rsm.Status.Replicas = replicas
+			rsm.Status.ReadyReplicas = replicas
+			rsm.Status.AvailableReplicas = replicas
+			rsm.Status.UpdatedReplicas = replicas
 			action = mockAction(1, jobTypeMemberLeaveNotifying, true)
 			dag = mockDAG(stsOld, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())

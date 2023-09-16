@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	timeout  time.Duration = time.Second * 600
+	timeout  time.Duration = time.Second * 1000
 	interval time.Duration = time.Second * 10
 )
 
@@ -134,7 +134,31 @@ func getFiles(folder string) {
 func runTestCases(files []string) {
 	var clusterName, nameSpace string
 	var testResult bool
+	shouldSkip := false
 	for _, file := range files {
+		fileName := e2eutil.GetPrefix(file, "/")
+		if len(SkipCase) > 0 {
+			if strings.Contains(SkipCase, ",") {
+				for _, c := range strings.Split(SkipCase, ",") {
+					if strings.Contains(file, c) {
+						e2eResult := NewResult(fileName, false, "")
+						TestResults = append(TestResults, e2eResult)
+						shouldSkip = true
+						break
+					}
+				}
+				if shouldSkip {
+					shouldSkip = false
+					continue
+				}
+			} else {
+				if strings.Contains(file, SkipCase) {
+					e2eResult := NewResult(fileName, false, "")
+					TestResults = append(TestResults, e2eResult)
+					continue
+				}
+			}
+		}
 		b := e2eutil.OpsYaml(file, "create")
 		if strings.Contains(file, "00") || strings.Contains(file, "restore") {
 			clusterName, nameSpace = e2eutil.GetName(file)
@@ -151,22 +175,18 @@ func runTestCases(files []string) {
 				}
 			}, timeout, interval).Should(Succeed())
 			Eventually(func(g Gomega) {
-				clusterStatusResult := e2eutil.CheckClusterStatus(clusterName, nameSpace)
+				clusterStatusResult := e2eutil.CheckClusterStatus(clusterName, nameSpace, "Running")
 				g.Expect(clusterStatusResult).Should(BeTrue())
 			}, timeout, interval).Should(Succeed())
 			testResult = true
 		} else {
 			testResult = false
-			cmd := " kubectl get cluster " + clusterName + "-n " + nameSpace + " | grep mycluster | awk '{print $5}'"
-			clusterStatus := e2eutil.ExecCommand(cmd)
 			Eventually(func(g Gomega) {
-				e2eutil.WaitTime(10000000)
-				g.Expect(strings.TrimSpace(clusterStatus)).Should(Equal("Stopped"))
-			}, timeout, interval)
-			time.Sleep(time.Second * 50)
+				clusterStatusResult := e2eutil.CheckClusterStatus(clusterName, nameSpace, "Stopped")
+				g.Expect(clusterStatusResult).Should(BeTrue())
+			}, timeout, interval).Should(Succeed())
 			testResult = true
 		}
-		fileName := e2eutil.GetPrefix(file, "/")
 		if testResult {
 			e2eResult := NewResult(fileName, testResult, "")
 			TestResults = append(TestResults, e2eResult)

@@ -33,8 +33,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -261,7 +261,7 @@ func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.Cluste
 				Ctx: transCtx.Context,
 				Log: log.Log.WithName("rbac"),
 			}
-			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil)
+			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -321,7 +321,7 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 		if _, ok := serviceAccounts[serviceAccountName]; ok {
 			continue
 		}
-		serviceAccount, err := builder.BuildServiceAccount(cluster)
+		serviceAccount, err := factory.BuildServiceAccount(cluster)
 		serviceAccount.Name = serviceAccountName
 		if err != nil {
 			return nil, nil, err
@@ -336,7 +336,7 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 }
 
 func buildReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.RoleBinding, error) {
-	roleBinding, err := builder.BuildRoleBinding(cluster)
+	roleBinding, err := factory.BuildRoleBinding(cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func buildReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]
 }
 
 func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.ClusterRoleBinding, error) {
-	clusterRoleBinding, err := builder.BuildClusterRoleBinding(cluster)
+	clusterRoleBinding, err := factory.BuildClusterRoleBinding(cluster)
 	if err != nil {
 		return nil, err
 	}

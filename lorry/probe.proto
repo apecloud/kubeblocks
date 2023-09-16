@@ -1,0 +1,58 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+syntax = "proto3";
+
+package probe.proto.v1;
+
+// Probe service provides APIs to kubeblocks operator to exec component operation.
+service Probe {
+  // ProbeComponent take a specify operation to a component
+  rpc ProbeComponent(ProbeRequest) returns (stream ProbeResponse) {}
+}
+
+// ProbeRequest is the message to send data to output bindings
+message ProbeRequest {
+  // The name of the output binding to invoke.
+  string name = 1;
+
+  // The data which will be sent to output binding.
+  bytes data = 2;
+
+  // The metadata passing to output binding components
+  // 
+  // Common metadata property:
+  // - ttlInSeconds : the time to live in seconds for the message. 
+  // If set in the binding definition will cause all messages to 
+  // have a default time to live. The message ttl overrides any value
+  // in the binding definition.
+  map<string, string> metadata = 3;
+
+  // The name of the operation type for the binding to invoke
+  string operation = 4;
+}
+
+// ProbeResponse is the message returned from an output binding invocation
+message ProbeResponse {
+  // The data which will be sent to output binding.
+  bytes data = 1;
+
+  // The metadata returned from an external system
+  map<string, string> metadata = 2;
+}

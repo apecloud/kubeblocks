@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type statelessComponentWorkloadBuilder struct {
@@ -33,7 +32,7 @@ var _ componentWorkloadBuilder = &statelessComponentWorkloadBuilder{}
 
 func (b *statelessComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		deploy, err := builder.BuildDeploy(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
+		deploy, err := factory.BuildDeploy(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}

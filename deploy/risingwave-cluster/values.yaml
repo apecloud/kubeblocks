@@ -138,7 +138,7 @@ risingwave:
       ## @param risingwave.metaStore.etcd.endpoint
       ## etcd endpoint.
       ##
-      endpoints: "etcd:2379"
+      endpoints: ""
 
       ## @param risingwave.metaStore.etcd.authentication
       ## etcd authentication.

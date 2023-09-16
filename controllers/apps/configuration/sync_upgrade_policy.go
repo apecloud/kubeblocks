@@ -69,7 +69,7 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	return sync(params, updatedParameters, pods, funcs)
 }
@@ -106,7 +106,7 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		pods, err = matchLabel(pods, params.ConfigConstraint.Selector)
 	}
 	if err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) == 0 {
 		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %s", params.ConfigConstraint.Selector.String()))
@@ -125,11 +125,11 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		}
 		err = funcs.OnlineUpdatePodFunc(&pod, ctx, params.ReconfigureClientFactory, params.ConfigSpecName, updatedParameters)
 		if err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		err = updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, params.Client, ctx)
 		if err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		progress++
 	}

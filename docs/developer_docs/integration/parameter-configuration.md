@@ -281,7 +281,7 @@ History modifications:
 OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PROGRESS   CREATED-TIME   VALID-UPDATED
 ```
 
-### 3.3 更新参数
+### 3.3 Update parameters
 
 Reconfigure the max_connection of MySQL, for example.
 

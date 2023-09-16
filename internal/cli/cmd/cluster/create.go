@@ -1602,7 +1602,7 @@ func rebuildCompStorage(pvcMaps map[string][]map[storageKey]string, specs []*app
 	buildClusterComponentVolumeClaimTemplate := func(storageSet map[storageKey]string) appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 		// set the default value
 		res := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-			Name: "data",
+			Name: cluster.GenerateName(),
 			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,

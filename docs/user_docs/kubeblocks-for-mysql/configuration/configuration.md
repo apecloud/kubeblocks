@@ -291,12 +291,10 @@ For your convenience, kbcli offers a tool `edit-config` to help you to visually 
 
 For Linux and macOS, you can edit configuration files by vi and for Windows, you can edit files on notepad.
 
-1. Edit the configutation file.
+1. Edit the configuration file.
 
    ```bash
    kbcli cluster edit-config mysql-cluster
-   >
-   test
    ```
 
 :::note
@@ -319,8 +317,8 @@ If there are multiple components in a cluster, use `--component` to specify a co
 
 :::note
 
-1. For the `edit-config` function, static parameters and dynamic parameters cannot be editted at the same time.
-2. Deleting a paramter will be supported in later version.
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported in later version.
 
 :::
 

@@ -76,3 +76,40 @@ The example below reconfigures velocity to 1.
     root@mongodb-cluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
     verbosity: "1"
    ```
+
+## Reconfigure parameters with edit-config
+
+For your convenience, kbcli offers a tool `edit-config` to help you to visually edit configurations.
+
+For Linux and macOS, you can edit configuration files by vi and for Windows, you can edit files on notepad.
+
+1. Edit the configuration file.
+
+   ```bash
+   kbcli cluster edit-config mongodb-cluster
+   ```
+
+:::note
+
+If there are multiple components in a cluster, use `--component` to specify a component.
+
+:::
+
+2. View the status of the parameter reconfiguration.
+
+   ```bash
+   kbcli cluster describe-ops xxx -n default
+   ```
+
+3. Connect to the database to verify whether the parameters are modified
+
+   ```bash
+   kbcli cluster connect mongodb-cluster
+   ```
+
+:::note
+
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported in later version.
+
+:::

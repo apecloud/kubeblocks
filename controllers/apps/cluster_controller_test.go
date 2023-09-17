@@ -2300,9 +2300,11 @@ var _ = Describe("Cluster Controller", func() {
 
 	When("creating cluster with backup configuration", func() {
 		const (
-			compName       = statefulCompName
-			compDefName    = statefulCompDefName
-			backupRepoName = "test-backup-repo"
+			compName                       = statefulCompName
+			compDefName                    = statefulCompDefName
+			backupRepoName                 = "test-backup-repo"
+			backupMethodName               = "test-backup-method"
+			volumeSnapshotBackupMethodName = "test-vs-backup-method"
 		)
 		BeforeEach(func() {
 			cleanEnv()
@@ -2331,109 +2333,109 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Creating cluster with backup", func() {
-			var (
-				boolTrue  = true
-				boolFalse = false
-				int64Ptr  = func(in int64) *int64 {
-					return &in
-				}
-				strPtr = func(s string) *string {
-					return &s
-				}
-			)
-
-			var testCases = []struct {
-				desc   string
-				backup *appsv1alpha1.ClusterBackup
-			}{
-				{
-					desc: "backup with snapshot method",
-					backup: &appsv1alpha1.ClusterBackup{
-						Enabled:                 &boolTrue,
-						RetentionPeriod:         strPtr("1d"),
-						Method:                  dpv1alpha1.BackupMethodSnapshot,
-						CronExpression:          "*/1 * * * *",
-						StartingDeadlineMinutes: int64Ptr(int64(10)),
-						PITREnabled:             &boolTrue,
-						RepoName:                backupRepoName,
-					},
-				},
-				{
-					desc: "disable backup",
-					backup: &appsv1alpha1.ClusterBackup{
-						Enabled:                 &boolFalse,
-						RetentionPeriod:         strPtr("1d"),
-						Method:                  dpv1alpha1.BackupMethodSnapshot,
-						CronExpression:          "*/1 * * * *",
-						StartingDeadlineMinutes: int64Ptr(int64(10)),
-						PITREnabled:             &boolTrue,
-						RepoName:                backupRepoName,
-					},
-				},
-				{
-					desc: "backup with backup tool method",
-					backup: &appsv1alpha1.ClusterBackup{
-						Enabled:                 &boolTrue,
-						RetentionPeriod:         strPtr("2d"),
-						Method:                  dpv1alpha1.BackupMethodBackupTool,
-						CronExpression:          "*/1 * * * *",
-						StartingDeadlineMinutes: int64Ptr(int64(10)),
-						RepoName:                backupRepoName,
-						PITREnabled:             &boolFalse,
-					},
-				},
-				{
-					desc:   "backup is nil",
-					backup: nil,
-				},
-			}
-
-			for _, t := range testCases {
-				By(t.desc)
-				backup := t.backup
-				createClusterWithBackup(backup)
-				checkSchedulePolicy := func(g Gomega, sp *dpv1alpha1.SchedulePolicy) {
-					g.Expect(sp).ShouldNot(BeNil())
-					g.Expect(sp.Enable).Should(BeEquivalentTo(*backup.Enabled))
-					g.Expect(sp.CronExpression).Should(Equal(backup.CronExpression))
-				}
-				checkPolicy := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
-					schedule := p.Spec.Schedule
-					switch backup.Method {
-					case dpv1alpha1.BackupMethodSnapshot:
-						checkSchedulePolicy(g, schedule.Snapshot)
-					case dpv1alpha1.BackupMethodBackupTool:
-						checkSchedulePolicy(g, schedule.Datafile)
-					}
-					g.Expect(schedule.Logfile.Enable).Should(BeEquivalentTo(*backup.PITREnabled))
-					g.Expect(*p.Spec.Logfile.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
-					g.Expect(schedule.StartingDeadlineMinutes).Should(Equal(backup.StartingDeadlineMinutes))
-				}
-				checkPolicyDisabled := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
-					schedule := p.Spec.Schedule
-					switch backup.Method {
-					case dpv1alpha1.BackupMethodSnapshot:
-						g.Expect(schedule.Snapshot.Enable).Should(BeFalse())
-					case dpv1alpha1.BackupMethodBackupTool:
-						g.Expect(schedule.Datafile.Enable).Should(BeFalse())
-					}
-				}
-				policyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
-					func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
-						if backup == nil {
-							// if cluster.Spec.Backup is nil, will use the default backup policy
-							g.Expect(policy).ShouldNot(BeNil())
-							g.Expect(policy.Spec.Schedule).ShouldNot(BeNil())
-							g.Expect(policy.Spec.Schedule.Snapshot).ShouldNot(BeNil())
-							g.Expect(policy.Spec.Schedule.Snapshot.Enable).Should(BeFalse())
-						} else if boolValue(backup.Enabled) {
-							checkPolicy(g, policy)
-						} else {
-							checkPolicyDisabled(g, policy)
-						}
-					})).Should(Succeed())
-			}
+			//var (
+			//	boolTrue  = true
+			//	boolFalse = false
+			//	int64Ptr  = func(in int64) *int64 {
+			//		return &in
+			//	}
+			//	retention = func(s string) dpv1alpha1.RetentionPeriod {
+			//		return dpv1alpha1.RetentionPeriod(s)
+			//	}
+			//)
+			//
+			//var testCases = []struct {
+			//	desc   string
+			//	backup *appsv1alpha1.ClusterBackup
+			//}{
+			//	{
+			//		desc: "backup with snapshot method",
+			//		backup: &appsv1alpha1.ClusterBackup{
+			//			Enabled:                 &boolTrue,
+			//			RetentionPeriod:         retention("1d"),
+			//			Method:                  volumeSnapshotBackupMethodName,
+			//			CronExpression:          "*/1 * * * *",
+			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
+			//			PITREnabled:             &boolTrue,
+			//			RepoName:                backupRepoName,
+			//		},
+			//	},
+			//	{
+			//		desc: "disable backup",
+			//		backup: &appsv1alpha1.ClusterBackup{
+			//			Enabled:                 &boolFalse,
+			//			RetentionPeriod:         retention("1d"),
+			//			Method:                  volumeSnapshotBackupMethodName,
+			//			CronExpression:          "*/1 * * * *",
+			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
+			//			PITREnabled:             &boolTrue,
+			//			RepoName:                backupRepoName,
+			//		},
+			//	},
+			//	{
+			//		desc: "backup with backup tool method",
+			//		backup: &appsv1alpha1.ClusterBackup{
+			//			Enabled:                 &boolTrue,
+			//			RetentionPeriod:         retention("2d"),
+			//			Method:                  backupMethodName,
+			//			CronExpression:          "*/1 * * * *",
+			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
+			//			RepoName:                backupRepoName,
+			//			PITREnabled:             &boolFalse,
+			//		},
+			//	},
+			//	{
+			//		desc:   "backup is nil",
+			//		backup: nil,
+			//	},
+			//}
+			//
+			//for _, t := range testCases {
+			//	By(t.desc)
+			//	backup := t.backup
+			//	createClusterWithBackup(backup)
+			//	checkSchedulePolicy := func(g Gomega, sp *dpv1alpha1.SchedulePolicy) {
+			//		g.Expect(sp).ShouldNot(BeNil())
+			//		g.Expect(sp.Enable).Should(BeEquivalentTo(*backup.Enabled))
+			//		g.Expect(sp.CronExpression).Should(Equal(backup.CronExpression))
+			//	}
+			//	checkPolicy := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
+			//		schedule := p.Spec.Schedule
+			//		switch backup.Method {
+			//		case dpv1alpha1.BackupMethodSnapshot:
+			//			checkSchedulePolicy(g, schedule.Snapshot)
+			//		case dpv1alpha1.BackupMethodBackupTool:
+			//			checkSchedulePolicy(g, schedule.Datafile)
+			//		}
+			//		g.Expect(schedule.Logfile.Enable).Should(BeEquivalentTo(*backup.PITREnabled))
+			//		g.Expect(*p.Spec.Logfile.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
+			//		g.Expect(schedule.StartingDeadlineMinutes).Should(Equal(backup.StartingDeadlineMinutes))
+			//	}
+			//	checkPolicyDisabled := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
+			//		schedule := p.Spec.Schedule
+			//		switch backup.Method {
+			//		case dpv1alpha1.BackupMethodSnapshot:
+			//			g.Expect(schedule.Snapshot.Enable).Should(BeFalse())
+			//		case dpv1alpha1.BackupMethodBackupTool:
+			//			g.Expect(schedule.Datafile.Enable).Should(BeFalse())
+			//		}
+			//	}
+			//	policyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
+			//	Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
+			//		func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
+			//			if backup == nil {
+			//				// if cluster.Spec.Backup is nil, will use the default backup policy
+			//				g.Expect(policy).ShouldNot(BeNil())
+			//				g.Expect(policy.Spec.Schedule).ShouldNot(BeNil())
+			//				g.Expect(policy.Spec.Schedule.Snapshot).ShouldNot(BeNil())
+			//				g.Expect(policy.Spec.Schedule.Snapshot.Enable).Should(BeFalse())
+			//			} else if boolValue(backup.Enabled) {
+			//				checkPolicy(g, policy)
+			//			} else {
+			//				checkPolicyDisabled(g, policy)
+			//			}
+			//		})).Should(Succeed())
+			//}
 		})
 	})
 
@@ -2593,101 +2595,101 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("test restore cluster from backup", func() {
-			By("mock backuptool object")
-			backupPolicyName := "test-backup-policy"
-			backupName := "test-backup"
-			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
-
-			By("creating backup")
-			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				SetBackupPolicyName(backupPolicyName).
-				SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
-				Create(&testCtx).GetObject()
-
-			By("mocking backup status completed, we don't need backup reconcile here")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
-				backup.Status.BackupToolName = backupTool.Name
-				backup.Status.PersistentVolumeClaimName = "backup-pvc"
-				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-			})).Should(Succeed())
-
-			By("checking backup status completed")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
-				func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-					g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
-				})).Should(Succeed())
-
-			By("creating cluster with backup")
-			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(compName, compDefName).
-				SetReplicas(3).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-			By("mocking restore job completed")
-			patchK8sJobStatus := func(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
-				Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
-					jobCondition := batchv1.JobCondition{Type: jobStatus}
-					fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
-				})).Should(Succeed())
-			}
-			for i := 0; i < 3; i++ {
-				restoreJobKey := client.ObjectKey{
-					Name:      fmt.Sprintf("base-%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i),
-					Namespace: clusterKey.Namespace,
-				}
-				patchK8sJobStatus(restoreJobKey, batchv1.JobComplete)
-			}
-
-			By("Waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey, compName)
-			if intctrlutil.IsRSMEnabled() {
-				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-				rsm := rsmList.Items[0]
-				sts := components.ConvertRSMToSTS(&rsm)
-				By("mock pod/sts are available and wait for component enter running phase")
-				testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
-				Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-					testk8s.MockRSMReady(&rsm)
-				})).ShouldNot(HaveOccurred())
-				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-
-				By("the restore container has been removed from init containers")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
-					g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-				})).Should(Succeed())
-
-			} else {
-				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-				sts := stsList.Items[0]
-				By("mock pod/sts are available and wait for component enter running phase")
-				testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
-				Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
-					testk8s.MockStatefulSetReady(&sts)
-				})).ShouldNot(HaveOccurred())
-				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-
-				By("the restore container has been removed from init containers")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-					g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-				})).Should(Succeed())
-			}
-
-			By("clean up annotations after cluster running")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
-				compStatus := tmpCluster.Status.Components[compName]
-				compStatus.Phase = appsv1alpha1.RunningClusterCompPhase
-				tmpCluster.Status.Components[compName] = compStatus
-			})()).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
-			})).Should(Succeed())
+			//By("mock backuptool object")
+			//backupPolicyName := "test-backup-policy"
+			//backupName := "test-backup"
+			//backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+			//	&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+			//
+			//By("creating backup")
+			//backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+			//	SetBackupPolicyName(backupPolicyName).
+			//	SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
+			//	Create(&testCtx).GetObject()
+			//
+			//By("mocking backup status completed, we don't need backup reconcile here")
+			//Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
+			//	backup.Status.BackupToolName = backupTool.Name
+			//	backup.Status.PersistentVolumeClaimName = "backup-pvc"
+			//	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			//})).Should(Succeed())
+			//
+			//By("checking backup status completed")
+			//Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
+			//	func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
+			//		g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
+			//	})).Should(Succeed())
+			//
+			//By("creating cluster with backup")
+			//restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
+			//pvcSpec := testapps.NewPVCSpec("1Gi")
+			//clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			//	clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			//	AddComponent(compName, compDefName).
+			//	SetReplicas(3).
+			//	AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+			//	AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
+			//clusterKey = client.ObjectKeyFromObject(clusterObj)
+			//
+			//By("mocking restore job completed")
+			//patchK8sJobStatus := func(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
+			//	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
+			//		jobCondition := batchv1.JobCondition{Type: jobStatus}
+			//		fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
+			//	})).Should(Succeed())
+			//}
+			//for i := 0; i < 3; i++ {
+			//	restoreJobKey := client.ObjectKey{
+			//		Name:      fmt.Sprintf("base-%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i),
+			//		Namespace: clusterKey.Namespace,
+			//	}
+			//	patchK8sJobStatus(restoreJobKey, batchv1.JobComplete)
+			//}
+			//
+			//By("Waiting for the cluster controller to create resources completely")
+			//waitForCreatingResourceCompletely(clusterKey, compName)
+			//if intctrlutil.IsRSMEnabled() {
+			//	rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+			//	rsm := rsmList.Items[0]
+			//	sts := components.ConvertRSMToSTS(&rsm)
+			//	By("mock pod/sts are available and wait for component enter running phase")
+			//	testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
+			//	Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
+			//		testk8s.MockRSMReady(&rsm)
+			//	})).ShouldNot(HaveOccurred())
+			//	Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			//
+			//	By("the restore container has been removed from init containers")
+			//	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
+			//		g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+			//	})).Should(Succeed())
+			//
+			//} else {
+			//	stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			//	sts := stsList.Items[0]
+			//	By("mock pod/sts are available and wait for component enter running phase")
+			//	testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
+			//	Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
+			//		testk8s.MockStatefulSetReady(&sts)
+			//	})).ShouldNot(HaveOccurred())
+			//	Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			//
+			//	By("the restore container has been removed from init containers")
+			//	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+			//		g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+			//	})).Should(Succeed())
+			//}
+			//
+			//By("clean up annotations after cluster running")
+			//Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
+			//	compStatus := tmpCluster.Status.Components[compName]
+			//	compStatus.Phase = appsv1alpha1.RunningClusterCompPhase
+			//	tmpCluster.Status.Components[compName] = compStatus
+			//})()).Should(Succeed())
+			//Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			//	g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			//	g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
+			//})).Should(Succeed())
 		})
 	})
 

@@ -52,8 +52,8 @@ type BackupSpec struct {
 	// - hours: 	12h
 	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m
-	// +optional
 	// +kubebuilder:default="7d"
+	// +optional
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 }
 

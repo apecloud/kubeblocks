@@ -131,11 +131,14 @@ spec:
                       will use the default backupRepo.
                     type: string
                   retentionPeriod:
-                    default: 1d
-                    description: retentionPeriod is a time string ending with the
-                      'd'|'D'|'h'|'H' character to describe how long the Backup should
-                      be retained. if not set, will be retained forever.
-                    pattern: ^\d+[d|D|h|H]$
+                    default: 7d
+                    description: "retentionPeriod determines a duration up to which
+                      the backup should be kept. controller will remove all backups
+                      that are older than the RetentionPeriod. For example, RetentionPeriod
+                      of `30d` will keep only the backups of last 30 days. Sample
+                      duration format: - years: \t2y - months: \t6mo - days: \t\t30d
+                      - hours: \t12h - minutes: \t30m You can also combine the above
+                      durations. For example: 30d12h30m"
                     type: string
                   startingDeadlineMinutes:
                     description: startingDeadlineMinutes defines the deadline in minutes
@@ -145,8 +148,6 @@ spec:
                     maximum: 1440
                     minimum: 0
                     type: integer
-                required:
-                - method
                 type: object
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an

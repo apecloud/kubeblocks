@@ -60,7 +60,7 @@ spec:
                         is defined in backupPolicy.
                       type: string
                     backupsHistoryLimit:
-                      default: 7
+                      default: 0
                       description: the number of automatic backups to retain. Value
                         must be non-negative integer. 0 means NO limit on the number
                         of backups.

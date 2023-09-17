@@ -63,6 +63,7 @@ const (
 
 const (
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBProbeImage             = "KUBEBLOCKS_PROBE_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
@@ -106,7 +107,9 @@ const (
 	CMTemplateNameLabelKey                   = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey              = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey           = "config.kubeblocks.io/config-hash"
+	CMInsCurrentConfigurationHashLabelKey    = "config.kubeblocks.io/update-config-hash"
 	CMConfigurationConstraintsNameLabelKey   = "config.kubeblocks.io/config-constraints-name"
+	CMConfigurationTemplateVersion           = "config.kubeblocks.io/config-template-version"
 	ConsensusSetAccessModeLabelKey           = "cs.apps.kubeblocks.io/access-mode"
 	BackupTypeLabelKeyKey                    = "dataprotection.kubeblocks.io/backup-type"
 	DataProtectionLabelBackupNameKey         = "dataprotection.kubeblocks.io/backup-name"
@@ -145,6 +148,7 @@ const (
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
+	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleChangedEventTimestampAnnotationKey  = "apps.kubeblocks.io/last-role-changed-event-timestamp"
@@ -161,6 +165,12 @@ const (
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
+	// ConfigurationRevision defines the current revision
+	// TODO support multi version
+	ConfigurationRevision          = "config.kubeblocks.io/configuration-revision"
+	LastConfigurationRevisionPhase = "config.kubeblocks.io/revision-reconcile-phase"
+
+	// Deprecated: only compatible with version 0.6, will be removed in 0.8
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
@@ -225,6 +235,13 @@ const (
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
+
+	ProbeAgentMountName = "shell2http-mount"
+	ProbeAgentMountPath = "/shell2http"
+	ProbeAgent          = "shell2http"
+	ProbeAgentImage     = "msoap/shell2http:1.16.0"
+	OriginBinaryPath    = "/app/shell2http"
+	DefaultActionImage  = "busybox:latest"
 )
 
 const (

@@ -78,7 +78,7 @@ var _ = Describe("Reconfigure util test", func() {
 				ConfigConstraintRef: "cfg_constraint_obj",
 				Keys:                []string{"my.cnf"},
 			}
-			updatedCfg := appsv1alpha1.Configuration{
+			updatedCfg := appsv1alpha1.ConfigurationItem{
 				Keys: []appsv1alpha1.ParameterConfig{{
 					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
@@ -138,7 +138,7 @@ var _ = Describe("Reconfigure util test", func() {
 
 			By("update validate failed.")
 			// check diff
-			r = updateConfigConfigmapResource(appsv1alpha1.Configuration{
+			r = updateConfigConfigmapResource(appsv1alpha1.ConfigurationItem{
 				Keys: []appsv1alpha1.ParameterConfig{{
 					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
@@ -183,7 +183,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 			// normal params update
 			By("normal file update with configSpec keys")
 			{
-				updatedFiles := appsv1alpha1.Configuration{
+				updatedFiles := appsv1alpha1.ConfigurationItem{
 					Keys: []appsv1alpha1.ParameterConfig{{
 						Key: "my.cnf",
 						FileContent: `
@@ -218,7 +218,7 @@ z2=y2
 # for test
 # not valid parameter
 `
-				updatedFiles := appsv1alpha1.Configuration{
+				updatedFiles := appsv1alpha1.ConfigurationItem{
 					Keys: []appsv1alpha1.ParameterConfig{{
 						Key:         "my.cnf",
 						FileContent: newMyCfg,
@@ -241,7 +241,7 @@ z2=y2
 
 			By("normal file update without configSpec keys")
 			{
-				updatedFiles := appsv1alpha1.Configuration{
+				updatedFiles := appsv1alpha1.ConfigurationItem{
 					Keys: []appsv1alpha1.ParameterConfig{{
 						Key:         "config2.txt",
 						FileContent: `# for test`,

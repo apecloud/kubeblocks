@@ -688,3 +688,41 @@ func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool 
 	}
 	return false
 }
+
+// AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.
+func AddAnnotationScope(scope AnnotationScope, annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+	scopedAnnotations := make(map[string]string, len(annotations))
+	for k, v := range annotations {
+		scopedAnnotations[fmt.Sprintf("%s%s", k, scope)] = v
+	}
+	return scopedAnnotations
+}
+
+// ParseAnnotationsOfScope parses all annotations with AnnotationScope defined by 'scope'.
+// the AnnotationScope suffix of keys in result map will be trimmed.
+func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string]string) map[string]string {
+	if scopedAnnotations == nil {
+		return nil
+	}
+
+	annotations := make(map[string]string, 0)
+	if scope == RootScope {
+		for k, v := range scopedAnnotations {
+			if strings.HasSuffix(k, scopeSuffix) {
+				continue
+			}
+			annotations[k] = v
+		}
+		return annotations
+	}
+
+	for k, v := range scopedAnnotations {
+		if strings.HasSuffix(k, string(scope)) {
+			annotations[strings.TrimSuffix(k, string(scope))] = v
+		}
+	}
+	return annotations
+}

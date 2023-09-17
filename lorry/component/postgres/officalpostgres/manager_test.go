@@ -25,11 +25,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dapr/kit/logger"
 	"github.com/pashagolub/pgxmock/v2"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -55,7 +55,7 @@ func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewManager(logger.NewLogger("test"))
+	manager, err := NewManager(ctrl.Log.WithName("test"))
 	if err != nil {
 		t.Fatal(err)
 	}

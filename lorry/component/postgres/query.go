@@ -22,6 +22,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -44,7 +45,7 @@ func (mgr *Manager) QueryWithHost(ctx context.Context, sql string, host string) 
 		rows, err = mgr.QueryOthers(ctx, sql, host)
 	}
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
 		return nil, err
 	}
 	defer func() {
@@ -54,7 +55,7 @@ func (mgr *Manager) QueryWithHost(ctx context.Context, sql string, host string) 
 
 	result, err = parseRows(rows)
 	if err != nil {
-		mgr.Logger.Errorf("parse query:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("parse query:%s failed", sql))
 		return nil, err
 	}
 
@@ -64,7 +65,7 @@ func (mgr *Manager) QueryWithHost(ctx context.Context, sql string, host string) 
 func (mgr *Manager) QueryOthers(ctx context.Context, sql string, host string) (rows pgx.Rows, err error) {
 	conn, err := pgx.Connect(ctx, config.GetConnectURLWithHost(host))
 	if err != nil {
-		mgr.Logger.Errorf("get host:%s connection failed, err:%v", host, err)
+		mgr.Logger.Error(err, fmt.Sprintf("get host:%s connection failed", host))
 		return nil, err
 	}
 	defer func() {

@@ -111,7 +111,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			status, err := parallelPolicy.Upgrade(mockParam)
 			// first failed
 			Expect(err).Should(BeEquivalentTo(getPodsError))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 		})
 	})
 
@@ -150,12 +150,12 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			status, err := parallelPolicy.Upgrade(mockParam)
 			// first failed
 			Expect(err).Should(BeEquivalentTo(stopError))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 
 			status, err = parallelPolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to stop container"))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 		})
 	})
 
@@ -191,7 +191,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			status, err := parallelPolicy.Upgrade(mockParam)
 			// first failed
 			Expect(err).Should(BeEquivalentTo(patchError))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 		})
 	})
 

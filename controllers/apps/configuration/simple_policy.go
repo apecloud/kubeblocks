@@ -81,12 +81,12 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 		param.Ctx.Recorder.Eventf(obj,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureRestartFailed,
 			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), param.Cluster.Name, newVersion)
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	pods, err := funcs.GetPodsFunc(param)
 	if err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) != 0 {
 		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)

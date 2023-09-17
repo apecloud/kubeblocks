@@ -42,7 +42,7 @@ import (
 // ESRetry describes fsm is running.
 // ESFailed describes fsm is failed and exited.
 // ESNotSupport describes fsm does not support the feature.
-// ESAndRetryFailed describes fsm is failed in current state, but can be retried.
+// ESFailedAndRetry describes fsm is failed in current state, but can be retried.
 // +enum
 type ExecStatus string
 
@@ -51,7 +51,7 @@ const (
 	ESRetry          ExecStatus = "Retry"
 	ESFailed         ExecStatus = "Failed"
 	ESNotSupport     ExecStatus = "NotSupport"
-	ESAndRetryFailed ExecStatus = "FailedAndRetry"
+	ESFailedAndRetry ExecStatus = "FailedAndRetry"
 )
 
 type ReturnedStatus struct {

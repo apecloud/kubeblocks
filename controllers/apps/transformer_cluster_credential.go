@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -73,7 +73,7 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		}
 	}
 	if synthesizedComponent != nil {
-		secret, err := builder.BuildConnCredential(transCtx.ClusterDef, cluster, synthesizedComponent)
+		secret, err := factory.BuildConnCredential(transCtx.ClusterDef, cluster, synthesizedComponent)
 		if err != nil {
 			return err
 		}

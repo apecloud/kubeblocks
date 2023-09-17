@@ -9,11 +9,6 @@ sidebar_position: 1
 
 The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
 
-## Before you start
-
-1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) and wait until the cluster status is Running.
-
 ## View parameter information
 
 View the current configuration file of a cluster.
@@ -194,10 +189,6 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 Static parameter reconfiguring requires restarting the pod. The following example reconfigures `ngram_token_size`.
 
 1. Search the current value of `ngram_token_size` and the default value is 2.
-
-    ```bash
-    kbcli cluster explain-config mysql-cluster --param=ngram_token_size
-    ```
 
     ```bash
     kbcli cluster connect mysql-cluster

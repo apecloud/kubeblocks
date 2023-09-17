@@ -1,7 +1,7 @@
 package kubernetes
 
 import (
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
@@ -12,10 +12,10 @@ import (
 )
 
 // GetClientSet returns a kubernetes clientset.
-func GetClientSet(logger logger.Logger) (*kubernetes.Clientset, error) {
+func GetClientSet(logger logr.Logger) (*kubernetes.Clientset, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		logger.Errorf("kubeconfig not found: %v", err)
+		logger.Error(err, "kubeconfig not found")
 	}
 	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
@@ -26,10 +26,10 @@ func GetClientSet(logger logger.Logger) (*kubernetes.Clientset, error) {
 }
 
 // GetRESTClient returns a kubernetes restclient for KubeBlocks types.
-func GetRESTClient(logger logger.Logger) (*rest.RESTClient, error) {
+func GetRESTClient(logger logr.Logger) (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		logger.Errorf("kubeconfig not found: %v", err)
+		logger.Error(err, "kubeconfig not found")
 	}
 	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
 	restConfig.GroupVersion = &appsv1alpha1.GroupVersion

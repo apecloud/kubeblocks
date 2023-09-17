@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type replicationComponentWorkloadBuilder struct {
@@ -38,7 +38,7 @@ func (b *replicationComponentWorkloadBuilder) BuildWorkload() componentWorkloadB
 
 func (b *replicationComponentWorkloadBuilder) BuildService() componentWorkloadBuilder {
 	buildFn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}

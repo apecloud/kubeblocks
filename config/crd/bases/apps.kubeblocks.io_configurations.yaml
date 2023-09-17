@@ -1,0 +1,263 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: configurations.apps.kubeblocks.io
+spec:
+  group: apps.kubeblocks.io
+  names:
+    kind: Configuration
+    listKind: ConfigurationList
+    plural: configurations
+    singular: configuration
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Configuration is the Schema for the configurations API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ConfigurationSpec defines the desired state of Configuration
+            properties:
+              clusterDefRef:
+                description: clusterDefRef referencing ClusterDefinition name. This
+                  is an immutable attribute.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              clusterRef:
+                description: clusterRef references Cluster name.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
+              clusterVerRef:
+                description: clusterVerRef referencing ClusterVersion name.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              componentName:
+                description: componentName is cluster component name.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
+              configItemDetails:
+                description: customConfigurationItems describes user-defined config
+                  template.
+                items:
+                  properties:
+                    configFileParams:
+                      additionalProperties:
+                        properties:
+                          content:
+                            description: fileContent indicates the configuration file
+                              content.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            description: updated parameters for a single configuration
+                              file.
+                            type: object
+                        type: object
+                      description: configFileParams is used to set the parameters
+                        to be updated.
+                      type: object
+                    importTemplateRef:
+                      description: Specify the configuration template.
+                      properties:
+                        namespace:
+                          default: default
+                          description: Specify the namespace of the referenced the
+                            configuration template ConfigMap object. An empty namespace
+                            is equivalent to the "default" namespace.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          default: none
+                          description: policy defines how to merge external imported
+                            templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specify the name of the referenced the configuration
+                            template ConfigMap object.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
+                    name:
+                      description: Specify the name of configuration template.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    version:
+                      description: version is the version of configuration template.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+            required:
+            - clusterDefRef
+            - clusterRef
+            - componentName
+            type: object
+          status:
+            description: ConfigurationStatus defines the observed state of Configuration
+            properties:
+              conditions:
+                description: conditions describes opsRequest detail status.
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              configurationStatus:
+                description: configurationStatus describes the status of the component
+                  reconfiguring.
+                items:
+                  properties:
+                    lastDoneRevision:
+                      description: lastDoneRevision is the last done revision of configurationItem.
+                      type: string
+                    message:
+                      description: message field describes the reasons of abnormal
+                        status.
+                      type: string
+                    name:
+                      description: name is a config template name.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    phase:
+                      description: phase is status of configurationItem.
+                      enum:
+                      - Init
+                      - Running
+                      - Pending
+                      - Merged
+                      - MergeFailed
+                      - FailedAndPause
+                      - Upgrading
+                      - Deleting
+                      - FailedAndRetry
+                      - Finished
+                      type: string
+                    updateRevision:
+                      description: updateRevision is the update revision of configurationItem.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              message:
+                description: message field describes the reasons of abnormal status.
+                type: string
+              observedGeneration:
+                description: observedGeneration is the latest generation observed
+                  for this ClusterDefinition. It refers to the ConfigConstraint's
+                  generation, which is updated by the API Server.
+                format: int64
+                type: integer
+            required:
+            - configurationStatus
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

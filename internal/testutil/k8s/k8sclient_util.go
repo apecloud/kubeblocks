@@ -57,8 +57,9 @@ type callHelper struct {
 }
 
 type K8sClientMockHelper struct {
-	ctrl      *gomock.Controller
-	k8sClient *mock_client.MockClient
+	ctrl         *gomock.Controller
+	k8sClient    *mock_client.MockClient
+	statusWriter *mock_client.MockStatusWriter
 
 	getCaller    callHelper
 	createCaller callHelper
@@ -79,6 +80,10 @@ func (helper *K8sClientMockHelper) Client() client.Client {
 	return helper.k8sClient
 }
 
+func (helper *K8sClientMockHelper) StatusWriter() *mock_client.MockStatusWriter {
+	return helper.statusWriter
+}
+
 func (helper *K8sClientMockHelper) Controller() *gomock.Controller {
 	return helper.ctrl
 }
@@ -97,6 +102,14 @@ func (helper *K8sClientMockHelper) mockMethod(callHelper *callHelper, options ..
 			f(callHelper, call)
 		}
 	}
+}
+
+func (helper *K8sClientMockHelper) MockStatusMethod() *mock_client.MockStatusWriter {
+	if helper.statusWriter == nil {
+		helper.statusWriter = mock_client.NewMockStatusWriter(helper.ctrl)
+	}
+	helper.k8sClient.EXPECT().Status().Return(helper.statusWriter).AnyTimes()
+	return helper.statusWriter
 }
 
 func (helper *K8sClientMockHelper) MockGetMethod(options ...any) {
@@ -211,7 +224,6 @@ func NewK8sMockClient() *K8sClientMockHelper {
 		ctrl:      ctrl,
 		k8sClient: client,
 	}
-
 	return &clientHelper
 }
 
@@ -322,7 +334,9 @@ func WithCreatedFailedResult() HandleCreateReturnedObject {
 	}
 }
 
-func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObject {
+type Getter = func(key client.ObjectKey, obj client.Object) (bool, error)
+
+func WithConstructSimpleGetResult(mockObjs []client.Object, get ...Getter) HandleGetReturnedObject {
 	mockMap := make(map[client.ObjectKey]client.Object, len(mockObjs))
 	for _, obj := range mockObjs {
 		mockMap[client.ObjectKeyFromObject(obj)] = obj
@@ -331,6 +345,12 @@ func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObj
 		if mockObj, ok := mockMap[key]; ok {
 			SetGetReturnedObject(obj, mockObj)
 			return nil
+		}
+		if len(get) > 0 {
+			processed, err := get[0](key, obj)
+			if processed {
+				return err
+			}
 		}
 		return apierrors.NewNotFound(schema.GroupResource{Group: "unknown", Resource: "unknown"}, key.Name)
 	}

@@ -36,6 +36,7 @@ const (
 	statePulsarBroker = "pulsar-broker"
 	statePulsarProxy  = "pulsar-proxy"
 	stateFoxLake      = "foxlake"
+	stateOceanbase    = "oceanbase"
 )
 
 const (
@@ -94,6 +95,8 @@ func New(typeName string) (ClusterCommands, error) {
 		return newPulsar("proxy"), nil
 	case stateFoxLake:
 		return newFoxLake(), nil
+	case stateOceanbase:
+		return newOceanbase(), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}

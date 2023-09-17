@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -665,15 +664,15 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 
 func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backupStatus, error) {
 	job := v1.Job{}
-	restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
-	jobName := restoreMgr.GetDatafileRestoreJobName(pvcKey.Name)
-	if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: pvcKey.Namespace, Name: jobName}, &job); err != nil {
-		if errors.IsNotFound(err) {
-			return backupStatusNotCreated, nil
-		} else {
-			return backupStatusNotCreated, err
-		}
-	}
+	//restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
+	//jobName := restoreMgr.GetDatafileRestoreJobName(pvcKey.Name)
+	//if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: pvcKey.Namespace, Name: jobName}, &job); err != nil {
+	//	if errors.IsNotFound(err) {
+	//		return backupStatusNotCreated, nil
+	//	} else {
+	//		return backupStatusNotCreated, err
+	//	}
+	//}
 	if job.Status.Succeeded == 1 {
 		return backupStatusReadyToUse, nil
 	}

@@ -53,7 +53,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 const (
@@ -306,7 +306,7 @@ func (o *createOptions) validate(cmd *cobra.Command) error {
 			return err
 		}
 		for _, item := range list.Items {
-			if item.GetAnnotations()[constant.DefaultBackupRepoAnnotationKey] == "true" {
+			if item.GetAnnotations()[dptypes.DefaultBackupRepoAnnotationKey] == "true" {
 				name := item.GetName()
 				return fmt.Errorf("there is already a default backup repo \"%s\","+
 					" please don't specify the --default flag,\n"+
@@ -371,7 +371,7 @@ func (o *createOptions) buildBackupRepoObject(secret *corev1.Secret) (*unstructu
 	}
 	if o.isDefault {
 		backupRepo.Annotations = map[string]string{
-			constant.DefaultBackupRepoAnnotationKey: "true",
+			dptypes.DefaultBackupRepoAnnotationKey: "true",
 		}
 	}
 	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(backupRepo)

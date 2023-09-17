@@ -113,7 +113,7 @@ package dataprotection
 //
 //	When("creating backup policy with default settings", func() {
 //		var backupToolName string
-//		getCronjobKey := func(backupType dpv1alpha1.BackupType) types.NamespacedName {
+//		getCronjobKey := func(backupType dpv1alpha1.BackupMethod) types.NamespacedName {
 //			return types.NamespacedName{
 //				Name:      fmt.Sprintf("%s-%s-%s", backupPolicyName, testCtx.DefaultNamespace, backupType),
 //				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),

@@ -21,7 +21,6 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
@@ -32,16 +31,16 @@ type MockRestoreJobFactory struct {
 
 func NewRestoreJobFactory(namespace, name string) *MockRestoreJobFactory {
 	f := &MockRestoreJobFactory{}
-	f.init(namespace, name,
-		&dataprotectionv1alpha1.RestoreJob{
-			Spec: dataprotectionv1alpha1.RestoreJobSpec{
-				Target: dataprotectionv1alpha1.TargetCluster{
-					LabelsSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{},
-					},
-				},
-			},
-		}, f)
+	//f.init(namespace, name,
+	//	&dataprotectionv1alpha1.RestoreJob{
+	//		Spec: dataprotectionv1alpha1.RestoreJobSpec{
+	//			Target: dataprotectionv1alpha1.TargetCluster{
+	//				LabelsSelector: &metav1.LabelSelector{
+	//					MatchLabels: map[string]string{},
+	//				},
+	//			},
+	//		},
+	//	}, f)
 	return f
 }
 
@@ -51,14 +50,14 @@ func (factory *MockRestoreJobFactory) SetBackupJobName(backupJobName string) *Mo
 }
 
 func (factory *MockRestoreJobFactory) AddTargetMatchLabels(keyAndValues ...string) *MockRestoreJobFactory {
-	for k, v := range WithMap(keyAndValues...) {
-		factory.get().Spec.Target.LabelsSelector.MatchLabels[k] = v
-	}
+	//for k, v := range WithMap(keyAndValues...) {
+	//	factory.get().Spec.Target.LabelsSelector.MatchLabels[k] = v
+	//}
 	return factory
 }
 
 func (factory *MockRestoreJobFactory) SetTargetSecretName(name string) *MockRestoreJobFactory {
-	factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
+	//factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
 	return factory
 }
 

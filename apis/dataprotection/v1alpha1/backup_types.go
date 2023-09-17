@@ -128,6 +128,10 @@ type BackupStatus struct {
 	// actions records the actions information for this backup.
 	// +optional
 	Actions []ActionStatus `json:"actions,omitempty"`
+
+	// volumeSnapshots records the volume snapshot status for the action.
+	// +optional
+	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
 }
 
 // BackupTimeRange records the time range of backed up data, for PITR, this is the
@@ -217,6 +221,26 @@ type ActionStatus struct {
 	// time range of recoverable data.
 	// +optional
 	TimeRange *BackupTimeRange `json:"timeRange,omitempty"`
+
+	// volumeSnapshots records the volume snapshot status for the action.
+	// +optional
+	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
+}
+
+type VolumeSnapshotStatus struct {
+	// name is the name of the volume snapshot.
+	Name string `json:"name,omitempty"`
+
+	// contentName is the name of the volume snapshot content.
+	ContentName string `json:"contentName,omitempty"`
+
+	// volumeName is the name of the volume.
+	// +optional
+	VolumeName string `json:"volumeName,omitempty"`
+
+	// size is the size of the volume snapshot.
+	// +optional
+	Size string `json:"size,omitempty"`
 }
 
 type ActionPhase string

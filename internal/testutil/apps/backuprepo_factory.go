@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 type MockBackupRepoFactory struct {
@@ -74,9 +74,9 @@ func (factory *MockBackupRepoFactory) SetAsDefaultRepo(v bool) *MockBackupRepoFa
 		if obj.Annotations == nil {
 			obj.Annotations = map[string]string{}
 		}
-		obj.Annotations[constant.DefaultBackupRepoAnnotationKey] = "true"
+		obj.Annotations[dptypes.DefaultBackupRepoAnnotationKey] = "true"
 	} else {
-		delete(factory.get().Annotations, constant.DefaultBackupRepoAnnotationKey)
+		delete(factory.get().Annotations, dptypes.DefaultBackupRepoAnnotationKey)
 	}
 	return factory
 }

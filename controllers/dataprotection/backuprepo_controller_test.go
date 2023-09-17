@@ -37,6 +37,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -210,7 +211,7 @@ parameters:
 				dataProtectionBackupRepoKey:  repoKey.Name,
 				dataProtectionNeedRepoPVCKey: "true",
 			}
-			obj.Spec.BackupType = dpv1alpha1.BackupTypeSnapshot
+			obj.Spec.BackupMethod = "test-backup-method"
 			obj.Spec.BackupPolicyName = "default"
 			if mutateFunc != nil {
 				mutateFunc(obj)
@@ -628,7 +629,7 @@ parameters:
 			By("making the repo default")
 			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 				repo.Annotations = map[string]string{
-					constant.DefaultBackupRepoAnnotationKey: trueVal,
+					dptypes.DefaultBackupRepoAnnotationKey: trueVal,
 				}
 			})).Should(Succeed())
 			By("checking the repo is default")

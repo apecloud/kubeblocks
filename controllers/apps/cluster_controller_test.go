@@ -51,12 +51,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	rsmpkg "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	lorry "github.com/apecloud/kubeblocks/internal/sqlchannel"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -126,7 +127,7 @@ var _ = Describe("Cluster Controller", func() {
 		consensusCompDefName   = "consensus"
 		replicationCompName    = "replication"
 		replicationCompDefName = "replication"
-		backupToolName         = "test-backup-tool"
+		actionSetName          = "test-actionset"
 	)
 
 	var (
@@ -370,9 +371,10 @@ var _ = Describe("Cluster Controller", func() {
 		By("Mocking a retained backup")
 		backupPolicyName := "test-backup-policy"
 		backupName := "test-backup"
+		backupMethod := "test-backup-method"
 		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			SetBackupPolicyName(backupPolicyName).
-			SetBackupMethod(dataprotectionv1alpha1.BackupTypeDataFile).
+			SetBackupMethod(backupMethod).
 			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
@@ -387,7 +389,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 
 		By("Checking backup should exist")
-		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dataprotectionv1alpha1.Backup{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
 	}
 
 	testDoNotTerminate := func(compName, compDefName string) {
@@ -630,10 +632,9 @@ var _ = Describe("Cluster Controller", func() {
 					clusterKey.Name, comp.Name),
 					Namespace: testCtx.DefaultNamespace}
 				By("Mocking backup status to completed")
-				Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
-					backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dpv1alpha1.Backup) {
+					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = "backup-data"
-					backup.Status.BackupToolName = backupToolName
 				})()).Should(Succeed())
 
 				if viper.GetBool("VOLUMESNAPSHOT") {
@@ -644,7 +645,7 @@ var _ = Describe("Cluster Controller", func() {
 							Name:      backupKey.Name,
 							Namespace: backupKey.Namespace,
 							Labels: map[string]string{
-								constant.DataProtectionLabelBackupNameKey: backupKey.Name,
+								dptypes.DataProtectionLabelBackupNameKey: backupKey.Name,
 							}},
 						Spec: snapshotv1.VolumeSnapshotSpec{
 							Source: snapshotv1.VolumeSnapshotSource{
@@ -861,30 +862,38 @@ var _ = Describe("Cluster Controller", func() {
 					}
 
 					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
-						&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
+						&dpv1alpha1.BackupPolicy{}, true)).Should(Succeed())
 
 					if policyType == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
-						By("creating backup tool if backup policy is backup")
-						backupTool := &dataprotectionv1alpha1.BackupTool{
+						By("creating actionSet if backup policy is backup")
+						actionSet := &dpv1alpha1.ActionSet{
 							ObjectMeta: metav1.ObjectMeta{
-								Name:      backupToolName,
+								Name:      actionSetName,
 								Namespace: clusterKey.Namespace,
 								Labels: map[string]string{
 									constant.ClusterDefLabelKey: clusterDef.Name,
 								},
 							},
-							Spec: dataprotectionv1alpha1.BackupToolSpec{
-								BackupCommands: []string{""},
-								Image:          "xtrabackup",
+							Spec: dpv1alpha1.ActionSetSpec{
 								Env: []corev1.EnvVar{
 									{
 										Name:  "test-name",
 										Value: "test-value",
 									},
 								},
-								Physical: &dataprotectionv1alpha1.PhysicalConfig{
-									BackupToolRestoreCommand: dataprotectionv1alpha1.BackupToolRestoreCommand{
-										RestoreCommands: []string{
+								BackupType: dpv1alpha1.BackupTypeFull,
+								Backup: &dpv1alpha1.BackupActionSpec{
+									BackupData: &dpv1alpha1.BackupDataActionSpec{
+										JobActionSpec: dpv1alpha1.JobActionSpec{
+											Image:   "xtrabackup",
+											Command: []string{""},
+										},
+									},
+								},
+								Restore: &dpv1alpha1.RestoreActionSpec{
+									PrepareData: &dpv1alpha1.JobActionSpec{
+										Image: "xtrabackup",
+										Command: []string{
 											"sh",
 											"-c",
 											"/backup_scripts.sh",
@@ -893,7 +902,7 @@ var _ = Describe("Cluster Controller", func() {
 								},
 							},
 						}
-						testapps.CheckedCreateK8sResource(&testCtx, backupTool)
+						testapps.CheckedCreateK8sResource(&testCtx, actionSet)
 					}
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -1753,14 +1762,14 @@ var _ = Describe("Cluster Controller", func() {
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
 		By("Mocking backup status to failed")
-		backupList := dataprotectionv1alpha1.BackupList{}
+		backupList := dpv1alpha1.BackupList{}
 		Expect(testCtx.Cli.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
 		backupKey := types.NamespacedName{
 			Namespace: backupList.Items[0].Namespace,
 			Name:      backupList.Items[0].Name,
 		}
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
-			backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseFailed
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dpv1alpha1.Backup) {
+			backup.Status.Phase = dpv1alpha1.BackupPhaseFailed
 		})()).Should(Succeed())
 
 		By("Checking cluster status failed with backup error")
@@ -2342,7 +2351,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1alpha1.ClusterBackup{
 						Enabled:                 &boolTrue,
 						RetentionPeriod:         strPtr("1d"),
-						Method:                  dataprotectionv1alpha1.BackupMethodSnapshot,
+						Method:                  dpv1alpha1.BackupMethodSnapshot,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						PITREnabled:             &boolTrue,
@@ -2354,7 +2363,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1alpha1.ClusterBackup{
 						Enabled:                 &boolFalse,
 						RetentionPeriod:         strPtr("1d"),
-						Method:                  dataprotectionv1alpha1.BackupMethodSnapshot,
+						Method:                  dpv1alpha1.BackupMethodSnapshot,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						PITREnabled:             &boolTrue,
@@ -2366,7 +2375,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1alpha1.ClusterBackup{
 						Enabled:                 &boolTrue,
 						RetentionPeriod:         strPtr("2d"),
-						Method:                  dataprotectionv1alpha1.BackupMethodBackupTool,
+						Method:                  dpv1alpha1.BackupMethodBackupTool,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						RepoName:                backupRepoName,
@@ -2383,35 +2392,35 @@ var _ = Describe("Cluster Controller", func() {
 				By(t.desc)
 				backup := t.backup
 				createClusterWithBackup(backup)
-				checkSchedulePolicy := func(g Gomega, sp *dataprotectionv1alpha1.SchedulePolicy) {
+				checkSchedulePolicy := func(g Gomega, sp *dpv1alpha1.SchedulePolicy) {
 					g.Expect(sp).ShouldNot(BeNil())
 					g.Expect(sp.Enable).Should(BeEquivalentTo(*backup.Enabled))
 					g.Expect(sp.CronExpression).Should(Equal(backup.CronExpression))
 				}
-				checkPolicy := func(g Gomega, p *dataprotectionv1alpha1.BackupPolicy) {
+				checkPolicy := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
 					schedule := p.Spec.Schedule
 					switch backup.Method {
-					case dataprotectionv1alpha1.BackupMethodSnapshot:
+					case dpv1alpha1.BackupMethodSnapshot:
 						checkSchedulePolicy(g, schedule.Snapshot)
-					case dataprotectionv1alpha1.BackupMethodBackupTool:
+					case dpv1alpha1.BackupMethodBackupTool:
 						checkSchedulePolicy(g, schedule.Datafile)
 					}
 					g.Expect(schedule.Logfile.Enable).Should(BeEquivalentTo(*backup.PITREnabled))
 					g.Expect(*p.Spec.Logfile.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
 					g.Expect(schedule.StartingDeadlineMinutes).Should(Equal(backup.StartingDeadlineMinutes))
 				}
-				checkPolicyDisabled := func(g Gomega, p *dataprotectionv1alpha1.BackupPolicy) {
+				checkPolicyDisabled := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
 					schedule := p.Spec.Schedule
 					switch backup.Method {
-					case dataprotectionv1alpha1.BackupMethodSnapshot:
+					case dpv1alpha1.BackupMethodSnapshot:
 						g.Expect(schedule.Snapshot.Enable).Should(BeFalse())
-					case dataprotectionv1alpha1.BackupMethodBackupTool:
+					case dpv1alpha1.BackupMethodBackupTool:
 						g.Expect(schedule.Datafile.Enable).Should(BeFalse())
 					}
 				}
 				policyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
-					func(g Gomega, policy *dataprotectionv1alpha1.BackupPolicy) {
+					func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
 						if backup == nil {
 							// if cluster.Spec.Backup is nil, will use the default backup policy
 							g.Expect(policy).ShouldNot(BeNil())
@@ -2588,25 +2597,25 @@ var _ = Describe("Cluster Controller", func() {
 			backupPolicyName := "test-backup-policy"
 			backupName := "test-backup"
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 
 			By("creating backup")
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
-				SetBackupMethod(dataprotectionv1alpha1.BackupTypeDataFile).
+				SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
 				Create(&testCtx).GetObject()
 
 			By("mocking backup status completed, we don't need backup reconcile here")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dataprotectionv1alpha1.Backup) {
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
 				backup.Status.BackupToolName = backupTool.Name
 				backup.Status.PersistentVolumeClaimName = "backup-pvc"
-				backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
+				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 			})).Should(Succeed())
 
 			By("checking backup status completed")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
-				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
-					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupPhaseCompleted))
+				func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
 				})).Should(Succeed())
 
 			By("creating cluster with backup")

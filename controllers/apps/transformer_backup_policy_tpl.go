@@ -125,6 +125,11 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 				// merge cluster backup configuration into the backup schedule.
 				// If the backup schedule is nil, create a new backup schedule
 				// based on the cluster backup configuration.
+				if dpBackupSchedule == nil {
+					action = ictrltypes.ActionCreatePtr()
+				} else if action == nil {
+					action = ictrltypes.ActionUpdatePtr()
+				}
 				dpBackupSchedule = r.mergeClusterBackup(backupPolicy, dpBackupSchedule)
 				if dpBackupSchedule == nil {
 					return

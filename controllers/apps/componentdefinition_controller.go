@@ -307,7 +307,7 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd
 	if cmpd.Spec.SystemAccounts == nil {
 		return fmt.Errorf("there is no account defined for connection credential: %s", cc.Name)
 	}
-	for _, account := range cmpd.Spec.SystemAccounts.Accounts {
+	for _, account := range cmpd.Spec.SystemAccounts {
 		if string(account.Name) == cc.AccountName {
 			return nil
 		}
@@ -327,15 +327,13 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if cmpd.Spec.SystemAccounts == nil {
-		return nil
-	}
-	if len(cmpd.Spec.SystemAccounts.Accounts) == 0 {
+	if len(cmpd.Spec.SystemAccounts) == 0 {
 		return nil
 	}
 	if cmpd.Spec.LifecycleActions.AccountProvision != nil {
 		return nil
 	}
+	// TODO: check name & bootstrap uniquely, check password config
 	return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
 }
 

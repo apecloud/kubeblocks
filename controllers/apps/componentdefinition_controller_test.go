@@ -184,7 +184,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(appsv1alpha1.AdminAccount).
+				SetSystemAccount(string(appsv1alpha1.AdminAccount), true).
 				Create(&testCtx).GetObject()
 
 			By("checking the object as unavailable")
@@ -199,7 +199,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(appsv1alpha1.AdminAccount).
+				SetSystemAccount(string(appsv1alpha1.AdminAccount), true).
 				SetLifecycleAction("AccountProvision", defaultAction).
 				Create(&testCtx).GetObject()
 

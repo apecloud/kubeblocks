@@ -165,9 +165,10 @@ type ComponentDefinitionSpec struct {
 
 	// TODO: support other resources provisioning.
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
+	// TODO: accounts KB required
 	// Cannot be updated.
 	// +optional
-	SystemAccounts *ComponentSystemAccount `json:"systemAccounts,omitempty"`
+	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
 
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
@@ -326,18 +327,27 @@ type ComponentReplicaRole struct {
 }
 
 type ComponentSystemAccount struct {
-	// PasswordConfig defines the policy to generate password.
+	// The name of the account.
+	// Others can refer to this account by the name.
 	// +kubebuilder:validation:Required
-	PasswordConfig PasswordConfig `json:"passwordConfig"`
+	Name string `json:"name"`
 
-	// Accounts defines all the system accounts.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	Accounts []SystemAccountConfig `json:"accounts" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	// Bootstrap specifies whether the account will be used during bootstrapping.
+	// +kubebuilder:default=false
+	// +optional
+	Bootstrap bool `json:"bootstrap,omitempty"`
+
+	// Statement specifies the statement used to create the account with required privileges.
+	// +optional
+	Statement string `json:"statement,omitempty"`
+
+	// PasswordGenerationPolicy defines the policy for generating the account's password.
+	// +optional
+	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
+
+	// SecretRef specifies the secret from which data will be copied to create the new account.
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
 // TargetPodSelector defines how to select pod(s) to execute a action.

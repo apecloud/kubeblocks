@@ -245,22 +245,21 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName appsv1alpha1.AccountName) *MockComponentDefinitionFactory {
-	account := appsv1alpha1.SystemAccountConfig{
-		Name: accountName,
+func (f *MockComponentDefinitionFactory) SetSystemAccount(accountName string, bootstrap bool) *MockComponentDefinitionFactory {
+	account := appsv1alpha1.ComponentSystemAccount{
+		Name:      accountName,
+		Bootstrap: bootstrap,
 	}
 	if f.get().Spec.SystemAccounts == nil {
-		f.get().Spec.SystemAccounts = &appsv1alpha1.ComponentSystemAccount{
-			PasswordConfig: appsv1alpha1.PasswordConfig{},
-			Accounts:       make([]appsv1alpha1.SystemAccountConfig, 0),
-		}
+		f.get().Spec.SystemAccounts = make([]appsv1alpha1.ComponentSystemAccount, 0)
 	}
-	for _, it := range f.get().Spec.SystemAccounts.Accounts {
+	for i, it := range f.get().Spec.SystemAccounts {
 		if it.Name == accountName {
+			f.get().Spec.SystemAccounts[i] = account
 			return f
 		}
 	}
-	f.get().Spec.SystemAccounts.Accounts = append(f.get().Spec.SystemAccounts.Accounts, account)
+	f.get().Spec.SystemAccounts = append(f.get().Spec.SystemAccounts, account)
 	return f
 }
 

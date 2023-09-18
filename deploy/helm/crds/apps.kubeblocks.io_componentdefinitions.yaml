@@ -10924,118 +10924,70 @@ spec:
                 description: 'TODO: support other resources provisioning. SystemAccounts
                   defines the pre-defined system accounts required to manage the component.
                   Cannot be updated.'
-                properties:
-                  accounts:
-                    description: Accounts defines all the system accounts.
-                    items:
-                      description: SystemAccountConfig specifies how to create and
-                        delete system accounts.
+                items:
+                  properties:
+                    bootstrap:
+                      default: false
+                      description: Bootstrap specifies whether the account will be
+                        used during bootstrapping.
+                      type: boolean
+                    name:
+                      description: The name of the account. Others can refer to this
+                        account by the name.
+                      type: string
+                    passwordGenerationPolicy:
+                      description: PasswordGenerationPolicy defines the policy for
+                        generating the account's password.
+                      properties:
+                        length:
+                          default: 16
+                          description: length defines the length of password.
+                          format: int32
+                          maximum: 32
+                          minimum: 8
+                          type: integer
+                        letterCase:
+                          default: MixedCases
+                          description: letterCase defines to use lower-cases, upper-cases
+                            or mixed-cases of letters.
+                          type: string
+                        numDigits:
+                          default: 4
+                          description: numDigits defines number of digits.
+                          format: int32
+                          maximum: 20
+                          minimum: 0
+                          type: integer
+                        numSymbols:
+                          default: 4
+                          description: numSymbols defines number of symbols.
+                          format: int32
+                          maximum: 20
+                          minimum: 0
+                          type: integer
+                      type: object
+                    secretRef:
+                      description: SecretRef specifies the secret from which data
+                        will be copied to create the new account.
                       properties:
                         name:
-                          description: name is the name of a system account.
-                          enum:
-                          - kbadmin
-                          - kbdataprotection
-                          - kbprobe
-                          - kbmonitoring
-                          - kbreplicator
+                          description: name refers to the name of the secret.
                           type: string
-                        provisionPolicy:
-                          description: provisionPolicy defines how to create account.
-                          properties:
-                            scope:
-                              default: AnyPods
-                              description: scope is the scope to provision account,
-                                and the scope could be `AnyPods` or `AllPods`.
-                              type: string
-                            secretRef:
-                              description: secretRef will be used when Type is ReferToExisting.
-                              properties:
-                                name:
-                                  description: name refers to the name of the secret.
-                                  type: string
-                                namespace:
-                                  description: namespace refers to the namespace of
-                                    the secret.
-                                  type: string
-                              required:
-                              - name
-                              - namespace
-                              type: object
-                            statements:
-                              description: statements will be used when Type is CreateByStmt.
-                              properties:
-                                creation:
-                                  description: creation specifies statement how to
-                                    create this account with required privileges.
-                                  type: string
-                                deletion:
-                                  description: 'deletion specifies statement how to
-                                    delete this account. Used in combination with
-                                    `CreateionStatement` to delete the account before
-                                    create it. For instance, one usually uses `drop
-                                    user if exists` statement followed by `create
-                                    user` statement to create an account. Deprecated:
-                                    this field is deprecated, use `update` instead.'
-                                  type: string
-                                update:
-                                  description: update specifies statement how to update
-                                    account's password.
-                                  type: string
-                              required:
-                              - creation
-                              type: object
-                            type:
-                              description: type defines the way to provision an account,
-                                either `CreateByStmt` or `ReferToExisting`.
-                              type: string
-                          required:
-                          - scope
-                          - type
-                          type: object
+                        namespace:
+                          description: namespace refers to the namespace of the secret.
+                          type: string
                       required:
                       - name
-                      - provisionPolicy
+                      - namespace
                       type: object
-                    minItems: 1
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                  passwordConfig:
-                    description: PasswordConfig defines the policy to generate password.
-                    properties:
-                      length:
-                        default: 10
-                        description: length defines the length of password.
-                        format: int32
-                        maximum: 32
-                        minimum: 8
-                        type: integer
-                      letterCase:
-                        default: MixedCases
-                        description: letterCase defines to use lower-cases, upper-cases
-                          or mixed-cases of letters.
-                        type: string
-                      numDigits:
-                        default: 2
-                        description: numDigits defines number of digits.
-                        format: int32
-                        maximum: 20
-                        minimum: 0
-                        type: integer
-                      numSymbols:
-                        default: 0
-                        description: numSymbols defines number of symbols.
-                        format: int32
-                        maximum: 20
-                        minimum: 0
-                        type: integer
-                    type: object
-                required:
-                - accounts
-                - passwordConfig
-                type: object
+                    statement:
+                      description: Statement specifies the statement used to create
+                        the account with required privileges.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               updateStrategy:
                 default: Serial
                 description: UpdateStrategy defines the strategy for updating the

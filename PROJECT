@@ -39,7 +39,7 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: apps
+  group: dataprotection
   kind: ActionSet
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
@@ -75,9 +75,9 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: dataprotection
+  group: apps
   kind: BackupPolicyTemplate
-  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1

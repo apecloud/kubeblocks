@@ -278,19 +278,14 @@ spec:
                       description: 'TODO: how to use the secret? CredentialSecret
                         specifies the secret used to access the component service.'
                       type: string
-                    headlessService:
-                      default: false
-                      description: Headless specifies to use the default headless
-                        service.
-                      type: boolean
                     name:
                       description: The name of the ConnectionCredential.
                       type: string
                     portName:
                       description: PortName specifies the name of the port to access
                         the component service. If the service has multiple ports,
-                        you can specify a specific port to use here. Otherwise, the
-                        unique port of the service will be used.
+                        a specific port must be specified to use here. Otherwise,
+                        the unique port of the service will be used.
                       type: string
                     serviceName:
                       description: ServiceName specifies the name of component service
@@ -10587,8 +10582,7 @@ spec:
                 type: string
               services:
                 description: Services defines endpoints that can be used to access
-                  the service provided by the component. If specified, a headless
-                  service will be created with some attributes of Services[0] by default.
+                  the component service to manage the component.
                 items:
                   properties:
                     allocateLoadBalancerNodePorts:
@@ -10783,7 +10777,8 @@ spec:
                         type: string
                       type: array
                     name:
-                      description: The name of the component service.
+                      description: The name of the component service. Others can refer
+                        to this service by this name.
                       type: string
                     ports:
                       description: 'The list of ports that are exposed by this service.
@@ -10879,7 +10874,7 @@ spec:
                     serviceName:
                       description: ServiceName defines the name of the service object.
                         If not specified, the default service name with pattern <CLUSTER_NAME>-<COMPONENT_NAME>
-                        will be used.
+                        will be used. Only one default service name is allowed.
                       type: string
                     sessionAffinity:
                       description: 'Supports "ClientIP" and "None". Used to maintain
@@ -11094,15 +11089,17 @@ spec:
           status:
             description: ComponentDefinitionStatus defines the observed state of ComponentDefinition
             properties:
+              message:
+                description: Extra message for current phase.
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
-                  for this ComponentDefinition. It corresponds to the ComponentDefinition's
-                  generation, which is updated on mutation by the API Server.
+                  for this ComponentDefinition.
                 format: int64
                 type: integer
               phase:
                 description: Phase valid values are ``, `Available`, 'Unavailable`.
-                  Available is ComponentDefinition become available, and can be referenced
+                  Available is ComponentDefinition become available, and can be used
                   for co-related objects.
                 enum:
                 - Available

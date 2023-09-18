@@ -111,8 +111,7 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Volumes []ComponentPersistentVolume `json:"volumes"`
 
-	// Services defines endpoints that can be used to access the service provided by the component.
-	// If specified, a headless service will be created with some attributes of Services[0] by default.
+	// Services defines endpoints that can be used to access the component service to manage the component.
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
@@ -247,13 +246,15 @@ type ComponentPersistentVolume struct {
 
 type ComponentService struct {
 	// The name of the component service.
+	// Others can refer to this service by this name.
 	// +required
 	Name string `json:"name"`
 
 	// ServiceName defines the name of the service object.
 	// If not specified, the default service name with pattern <CLUSTER_NAME>-<COMPONENT_NAME> will be used.
+	// Only one default service name is allowed.
 	// +optional
-	ServiceName string `json:"serviceName,omitempty"`
+	ServiceName BuiltInString `json:"serviceName,omitempty"`
 
 	corev1.ServiceSpec `json:",inline"`
 }
@@ -267,13 +268,8 @@ type ConnectionCredential struct {
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
-	// Headless specifies to use the default headless service.
-	// +kubebuilder:default=false
-	// +optional
-	HeadlessService bool `json:"headlessService,omitempty"`
-
 	// PortName specifies the name of the port to access the component service.
-	// If the service has multiple ports, you can specify a specific port to use here.
+	// If the service has multiple ports, a specific port must be specified to use here.
 	// Otherwise, the unique port of the service will be used.
 	// +optional
 	PortName string `json:"portName,omitempty"`

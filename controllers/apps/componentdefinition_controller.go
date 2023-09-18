@@ -35,6 +35,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+var (
+	defaultServiceName = fmt.Sprintf("%s-%s", appsv1alpha1.KB_CLUSTER_NAME, appsv1alpha1.KB_COMPONENT_NAME)
+)
+
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
 type ComponentDefinitionReconciler struct {
 	client.Client
@@ -190,6 +194,31 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
+	checkedAdd := func(table *map[string]interface{}, name string) bool {
+		if _, ok := (*table)[name]; ok {
+			return false
+		}
+		(*table)[name] = true
+		return true
+	}
+	names := make(map[string]interface{}, 0)
+	svcNames := make(map[string]interface{}, 0)
+	for _, svc := range cmpd.Spec.Services {
+		if ok := checkedAdd(&names, svc.Name); !ok {
+			return fmt.Errorf("there are multiple component services with the same name: %s", svc.Name)
+		}
+		svcName := defaultServiceName
+		if len(svc.ServiceName) > 0 {
+			svcName = string(svc.ServiceName)
+		}
+		if ok := checkedAdd(&svcNames, svcName); !ok {
+			if svcName == defaultServiceName {
+				return fmt.Errorf("there are multiple services with default name")
+			} else {
+				return fmt.Errorf("there are multiple services with the same name: %s", svcName)
+			}
+		}
+	}
 	return nil
 }
 
@@ -239,16 +268,8 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredential(cli client.
 
 func (r *ComponentDefinitionReconciler) validateConnectionCredentialService(cmpd *appsv1alpha1.ComponentDefinition,
 	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.ServiceName) == 0 && !cc.HeadlessService {
-		return fmt.Errorf("nether service name nor headless service is defined for connection credential: %s", cc.Name)
-	}
-	if len(cmpd.Spec.Services) == 0 {
-		return fmt.Errorf("there is no service defined which is needed by connection credentials")
-	}
-
-	if cc.HeadlessService {
-		// TODO: other headless service ports
-		return r.validateConnectionCredentialPort(cmpd, cc, cmpd.Spec.Services[0].Ports)
+	if len(cc.ServiceName) == 0 {
+		return fmt.Errorf("there is no component service name defined for connection credential: %s", cc.Name)
 	}
 	for _, svc := range cmpd.Spec.Services {
 		if svc.Name == cc.ServiceName {

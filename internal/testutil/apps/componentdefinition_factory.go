@@ -123,7 +123,7 @@ func (f *MockComponentDefinitionFactory) SetService(name, serviceName string, po
 func (f *MockComponentDefinitionFactory) SetServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec) *MockComponentDefinitionFactory {
 	svc := appsv1alpha1.ComponentService{
 		Name:        name,
-		ServiceName: serviceName,
+		ServiceName: appsv1alpha1.BuiltInString(serviceName),
 		ServiceSpec: serviceSpec,
 	}
 	if f.get().Spec.Services == nil {
@@ -215,14 +215,12 @@ func (f *MockComponentDefinitionFactory) SetScriptTemplate(name, configTemplateR
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetConnectionCredential(name, serviceName string, headless bool,
-	portName, accountName string) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetConnectionCredential(name, serviceName, portName, accountName string) *MockComponentDefinitionFactory {
 	credential := appsv1alpha1.ConnectionCredential{
-		Name:            name,
-		ServiceName:     serviceName,
-		HeadlessService: headless,
-		PortName:        portName,
-		AccountName:     accountName,
+		Name:        name,
+		ServiceName: serviceName,
+		PortName:    portName,
+		AccountName: accountName,
 	}
 	if f.get().Spec.ConnectionCredentials == nil {
 		f.get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)

@@ -1,11 +1,11 @@
 {{- $logFiles := dict }}
-{{- range $name, $component := .Values.componentDefs }}
+{{- range $name, $component := .componentDefs }}
 {{- if eq $component.name "mysql" }}
-{{- range $name, $filePathPattern := $component.logConfigs }}
-{{- set $logFiles $name $filePathPattern }}
+{{- range $_, $logConfig := $component.logConfigs }}
+{{- $_ = set $logFiles $logConfig.name $logConfig.filePathPattern }}
 {{- end }}
 {{- end }}
-{{- end }}
+{{- end -}}
 apecloudmysql:
   endpoint: ${env:ENDPOINT}
   username: ${env:MYSQL_USER}
@@ -19,7 +19,7 @@ apecloudmysql:
 filelog/mysql/error:
   # from cd.spec.componentDefs[?(@.name=="mysql")].logConfigs[?(@.name=="error")].filePathPattern
   include:
-    - {{ $logFiles["error"] }}
+    - {{ $logFiles.error }}
   include_file_name: false
   start_at: beginning
 {{- end }}
@@ -28,7 +28,7 @@ filelog/mysql/error:
 filelog/mysql/slow:
   # from cd.spec.componentDefs[?(@.name=="mysql")].logConfigs[?(@.name=="slow")].filePathPattern
   include:
-    - {{ $logFiles["slow"] }}
+    - {{ $logFiles.slow }}
   include_file_name: false
   start_at: beginning
 {{- end }}

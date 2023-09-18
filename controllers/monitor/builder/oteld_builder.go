@@ -20,18 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"strings"
 
-	"gopkg.in/yaml.v2"
+	yaml2 "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	builder2 "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
-func createConfigFromTemplate(ctx context.Context, cli client.Client, tplName string, cdName string) (*yaml.MapItem, error) {
+type Config map[string]any
+
+func createConfigFromTemplate(ctx context.Context, cli client.Client, tplName string, cdName string) (Config, error) {
 	cd := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cdName}, cd); err != nil {
 		return nil, err
@@ -51,17 +55,26 @@ func createConfigFromTemplate(ctx context.Context, cli client.Client, tplName st
 		return nil, err
 	}
 
-	return builder2.BuildResourceFromYaml(yaml.MapItem{}, s)
+	var ret map[string]interface{}
+	content, err := yaml2.NewYAMLReader(bufio.NewReader(strings.NewReader(s))).Read()
+	if err != nil {
+		return nil, cfgcore.WrapError(err, "failed to read the cluster yaml")
+	}
+	err = yaml2.Unmarshal(content, &ret)
+	if err != nil {
+		return nil, cfgcore.WrapError(err, "failed to unmarshal the cluster yaml")
+	}
+	return ret, nil
 }
 
-func buildMysqlReceiverObject(ctx context.Context, cli client.Client) (*yaml.MapItem, error) {
+func buildMysqlReceiverObject(ctx context.Context, cli client.Client) (Config, error) {
 	return createConfigFromTemplate(ctx, cli, MysqlReceiverTemplate, MysqlCDName)
 }
 
-func buildPG12ReceiverObject(ctx context.Context, cli client.Client) (*yaml.MapItem, error) {
-	return createConfigFromTemplate(ctx, cli, PG12ReceiverTemplate, PGCDName)
-}
-
-func buildPG14ReceiverObject(ctx context.Context, cli client.Client) (*yaml.MapItem, error) {
-	return createConfigFromTemplate(ctx, cli, PG14ReceiverTemplate, PGCDName)
-}
+// func buildPG12ReceiverObject(ctx context.Context, cli client.Client) (Config, error) {
+//	return createConfigFromTemplate(ctx, cli, PG12ReceiverTemplate, PGCDName)
+// }
+//
+// func buildPG14ReceiverObject(ctx context.Context, cli client.Client) (Config, error) {
+//	return createConfigFromTemplate(ctx, cli, PG14ReceiverTemplate, PGCDName)
+// }

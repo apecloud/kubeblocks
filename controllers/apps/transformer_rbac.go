@@ -82,7 +82,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			}
 		}
 		if saNotExist {
-			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabed, but service account is not exist")
+			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
 		}
 		return nil
 	}
@@ -102,19 +102,19 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		parentVertex = ictrltypes.LifecycleObjectCreate(dag, crb, parentVertex)
 	}
 
-	saVertexs := createSaVertex(serviceAccounts, dag, parentVertex)
+	saVertexes := createSaVertex(serviceAccounts, dag, parentVertex)
 	statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
 	for _, statefulSetVertex := range statefulSetVertices {
-		// serviceaccount must be created before statefulset
-		for _, saVertex := range saVertexs {
+		// serviceAccount must be created before statefulSet
+		for _, saVertex := range saVertexes {
 			dag.Connect(statefulSetVertex, saVertex)
 		}
 	}
 
 	deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
 	for _, deploymentVertex := range deploymentVertices {
-		// serviceaccount must be created before deployment
-		for _, saVertex := range saVertexs {
+		// serviceAccount must be created before deployment
+		for _, saVertex := range saVertexes {
 			dag.Connect(deploymentVertex, saVertex)
 		}
 	}
@@ -305,15 +305,19 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 	}
 	for _, compSpec := range componentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
+		volumeProtectionEnable := isVolumeProtectionEnabled(clusterDef, &compSpec)
+		dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, &compSpec)
 		if serviceAccountName == "" {
-			if !isProbesEnabled(clusterDef, &compSpec) && !isVolumeProtectionEnabled(clusterDef, &compSpec) && !isDataProtectionEnabled(backupPolicyTPL, &compSpec) {
+			// If probe, volume protection, and data protection are disabled at the same tme, then do not create a service account.
+			if !isProbesEnabled(clusterDef, &compSpec) && !volumeProtectionEnable && !dataProtectionEnable {
 				continue
 			}
 			serviceAccountName = "kb-" + cluster.Name
 		}
 
 		if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
-			if !isVolumeProtectionEnabled(clusterDef, &compSpec) || isClusterRoleBindingExist(transCtx, serviceAccountName) {
+			// Volume protection requires the clusterRoleBinding permission, if volume protection is not enabled or the corresponding clusterRoleBinding already exists, then skip.
+			if !volumeProtectionEnable || isClusterRoleBindingExist(transCtx, serviceAccountName) {
 				continue
 			}
 		}
@@ -328,7 +332,8 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 		}
 		serviceAccounts[serviceAccountName] = serviceAccount
 
-		if isVolumeProtectionEnabled(clusterDef, &compSpec) {
+		// If volume protection is enabled, the service account needs to be bound to the clusterRoleBinding.
+		if volumeProtectionEnable {
 			serviceAccountsNeedCrb[serviceAccountName] = serviceAccount
 		}
 	}
@@ -370,11 +375,11 @@ func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[
 }
 
 func createSaVertex(serviceAccounts map[string]*corev1.ServiceAccount, dag *graph.DAG, parentVertex *ictrltypes.LifecycleVertex) []*ictrltypes.LifecycleVertex {
-	saVertexs := []*ictrltypes.LifecycleVertex{}
+	saVertexes := make([]*ictrltypes.LifecycleVertex, 0, len(serviceAccounts))
 	for _, sa := range serviceAccounts {
-		// serviceaccount must be created before rolebinding and clusterrolebinding
+		// serviceAccount must be created before roleBinding and clusterRoleBinding
 		saVertex := ictrltypes.LifecycleObjectCreate(dag, sa, parentVertex)
-		saVertexs = append(saVertexs, saVertex)
+		saVertexes = append(saVertexes, saVertex)
 	}
-	return saVertexs
+	return saVertexes
 }

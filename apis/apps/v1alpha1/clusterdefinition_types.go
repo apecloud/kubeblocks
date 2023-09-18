@@ -17,13 +17,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition

@@ -24,9 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/rsm"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"os"
 	"text/template"
 	"time"
@@ -41,7 +38,10 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )

@@ -524,14 +524,16 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 }
 
 func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[string]string {
-	var leader *workloads.ReplicaRole
-	for _, role := range rsm.Spec.Roles {
-		if role.IsLeader && len(role.Name) > 0 {
-			leader = &role
-			break
+	selectors := make(map[string]string, 0)
+
+	if !headless {
+		for _, role := range rsm.Spec.Roles {
+			if role.IsLeader && len(role.Name) > 0 {
+				selectors[constant.RoleLabelKey] = role.Name
+				break
+			}
 		}
 	}
-	selectors := make(map[string]string, 0)
 
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		keys := []string{
@@ -544,17 +546,11 @@ func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[st
 				selectors[key] = value
 			}
 		}
-		if leader != nil && !headless {
-			selectors[constant.RoleLabelKey] = leader.Name
-		}
 		return selectors
 	}
 
 	for k, v := range rsm.Spec.Selector.MatchLabels {
 		selectors[k] = v
-	}
-	if leader != nil && !headless {
-		selectors[rsmAccessModeLabelKey] = string(leader.AccessMode)
 	}
 	return selectors
 }

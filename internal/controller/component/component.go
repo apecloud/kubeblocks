@@ -524,3 +524,13 @@ func getCloudProvider() CloudProvider {
 	}
 	return CloudProviderUnknown
 }
+
+func GetConfigSpecByName(component *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {
+	for i := range component.ConfigTemplates {
+		template := &component.ConfigTemplates[i]
+		if template.Name == configSpec {
+			return template
+		}
+	}
+	return nil
+}

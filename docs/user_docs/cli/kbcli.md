@@ -56,6 +56,7 @@ kbcli [flags]
 
 * [kbcli addon](kbcli_addon.md)	 - Addon command.
 * [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
+* [kbcli backup](kbcli_backup.md)	 - Backup command.
 * [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 * [kbcli builder](kbcli_builder.md)	 - builder command.

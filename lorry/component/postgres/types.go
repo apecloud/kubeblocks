@@ -22,6 +22,7 @@ package postgres
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -323,6 +324,10 @@ func ParsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
+func FormatPgLsn(lsn int64) string {
+	return fmt.Sprintf("%X/%08X", lsn>>32, lsn&0xFFFFFFFF)
+}
+
 func ParsePrimaryConnInfo(str string) map[string]string {
 	infos := strings.Split(str, " ")
 	result := make(map[string]string)
@@ -335,4 +340,18 @@ func ParsePrimaryConnInfo(str string) map[string]string {
 	}
 
 	return result
+}
+
+func ParsePgWalDumpError(errorInfo string, lsnStr string) string {
+	prefixPattern := fmt.Sprintf("error in WAL record at %s: invalid record length at ", lsnStr)
+	suffixPattern := ": wanted "
+
+	startIndex := strings.Index(errorInfo, prefixPattern) + len(prefixPattern)
+	endIndex := strings.Index(errorInfo, suffixPattern)
+
+	if startIndex == -1 || endIndex == -1 {
+		return ""
+	}
+
+	return errorInfo[startIndex:endIndex]
 }

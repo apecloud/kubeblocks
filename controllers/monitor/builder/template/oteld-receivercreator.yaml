@@ -1,0 +1,123 @@
+receivers:
+  apecloudkubeletstats:
+    rule: type == "k8s.node"
+    config:
+      auth_type: serviceAccount
+      collection_interval: {{ .Values.metrics.collection_interval }}
+      endpoint: '`endpoint`:`kubelet_endpoint_port`'
+      extra_metadata_labels:
+        - k8s.volume.type
+        - kubeblocks
+      metric_groups:
+        - container
+        - pod
+        - volume
+    resource_attributes:
+      receiver: apecloudkubeletstats
+  apecloudnode:
+    rule: type == "k8s.node"
+    config:
+      collection_interval: {{ .Values.metrics.collection_interval }}
+    resource_attributes:
+      receiver: apecloudnode
+  apecloudmysql:
+    rule: type == "pod" && labels["app.kubernetes.io/component"] == "mysql"
+    config:
+      endpoint: '`endpoint`:`"conn_port" in labels ? labels["conn_port"] : 3306`'
+      username: '`labels["conn_username"]`'
+      password: '`labels["conn_password"]`'
+      allow_native_passwords: true
+      database:
+      collection_interval: { { .Values.metrics.receivers.mysql.collection_interval } }
+      transport: tcp
+    resource_attributes:
+      receiver: apecloudmysql
+  apecloudpostgresql/12:
+    rule: type == "pod" && labels["app.kubernetes.io/component"] == "postgresql" && labels["app.kubernetes.io/version"] == "postgresql-12.14.0"
+    config:
+      endpoint: '`endpoint`:`"conn_port" in labels ? labels["conn_port"] : 5432`'
+      username: '`labels["conn_username"]`'
+      password: '`labels["conn_password"]`'
+      databases:
+        - postgres
+      exclude_databases:
+        - template0
+        - template1
+      query_path: /opt/apecloud/pg12/pg12_queries.yaml
+      collection_interval: { { .Values.metrics.receivers.postgresql.collection_interval } }
+      transport: tcp
+      tls:
+        insecure: true
+        insecure_skip_verify: true
+    resource_attributes:
+      receiver: apecloudpostgresql
+  apecloudpostgresql/14:
+    rule: type == "pod" && labels["app.kubernetes.io/component"] == "postgresql" && labels["app.kubernetes.io/version"] == "postgresql-14.7.1"
+    config:
+      endpoint: '`endpoint`:`"conn_port" in labels ? labels["conn_port"] : 5432`'
+      username: '`labels["conn_username"]`'
+      password: '`labels["conn_password"]`'
+      databases:
+        - postgres
+      exclude_databases:
+        - template0
+        - template1
+      query_path: /opt/apecloud/pg14/pg14_queries.yaml
+      collection_interval: { { .Values.metrics.receivers.postgresql.collection_interval } }
+      transport: tcp
+      tls:
+        insecure: true
+        insecure_skip_verify: true
+    resource_attributes:
+      receiver: apecloudpostgresql
+  apecloudmongodb:
+    rule: type == "pod" && labels["app.kubernetes.io/component"] == "mongodb"
+    config:
+      endpoint: '`endpoint`:`"conn_port" in labels ? labels["conn_port"] : 27017`'
+      username: '`labels["conn_username"]`'
+      password: '`labels["conn_password"]`'
+      collect_all: true
+      collection_interval: { { .Values.metrics.receivers.mongodb.collection_interval } }
+      direct_connect: true
+      global_conn_pool: false
+    resource_attributes:
+      receiver: apecloudmongodb
+  apecloudredis:
+    rule: type == "pod" && labels["app.kubernetes.io/component"] == "redis"
+    config:
+      endpoint: '`endpoint`:`"conn_port" in labels ? labels["conn_port"] : 6379`'
+      username: '`labels["conn_username"]`'
+      password: '`labels["conn_password"]`'
+      password_file: ""
+      lua_script: ""
+      collection_interval: { { .Values.metrics.receivers.redis.collection_interval } }
+      tls:
+        insecure: true
+        insecure_skip_verify: true
+    resource_attributes:
+      receiver: apecloudredis
+resource_attributes:
+  k8s.node:
+    kubernetes_io_arch: '`labels["kubernetes.io/arch"]`'
+    kubernetes_io_hostname: '`labels["kubernetes.io/hostname"]`'
+    kubernetes_io_os: '`labels["kubernetes.io/os"]`'
+    node: '`name`'
+    hostname: '`hostname`'
+    # set namespace and pod to empty string to avoid prometheus scrape add unnecessary labels
+    # which will create multiple timeseries for the same node when agamotto restarts
+    namespace: ''
+    pod: ''
+    instance: '`endpoint`:`kubelet_endpoint_port`'
+    job: agamotto
+  pod:
+    app_kubernetes_io_component: '`labels["app.kubernetes.io/component"]`'
+    app_kubernetes_io_instance: '`labels["app.kubernetes.io/instance"]`'
+    app_kubernetes_io_managed_by: '`labels["app.kubernetes.io/managed-by"]`'
+    app_kubernetes_io_name: '`labels["app.kubernetes.io/name"]`'
+    app_kubernetes_io_version: '`labels["app.kubernetes.io/version"]`'
+    apps_kubeblocks_io_component_name: '`labels["apps.kubeblocks.io/component-name"]`'
+    node: ${env:NODE_NAME}
+    namespace: '`namespace`'
+    pod: '`name`'
+    instance: '`endpoint`:`"conn_port" in labels ? labels["conn_port"] : 0`'
+    job: agamotto

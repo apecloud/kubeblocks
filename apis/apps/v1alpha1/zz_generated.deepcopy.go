@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -458,6 +459,11 @@ func (in *ClusterComponentDefinition) DeepCopyInto(out *ClusterComponentDefiniti
 	if in.ReplicationSpec != nil {
 		in, out := &in.ReplicationSpec, &out.ReplicationSpec
 		*out = new(ReplicationSetSpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.RSMSpec != nil {
+		in, out := &in.RSMSpec, &out.RSMSpec
+		*out = new(workloadsv1alpha1.ReplicatedStateMachineSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.HorizontalScalePolicy != nil {

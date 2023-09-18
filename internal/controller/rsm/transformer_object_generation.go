@@ -443,6 +443,17 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 			Value: string(roleProbe.RoleUpdateMechanism),
 		})
 
+	// lorry related envs
+	env = append(env,
+		corev1.EnvVar{
+			Name: constant.KBEnvPodName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		})
+
 	// build container
 	container := corev1.Container{
 		Name:            roleProbeName,

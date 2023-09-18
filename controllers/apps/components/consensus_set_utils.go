@@ -194,7 +194,7 @@ func updateConsensusSetRoleLabel(cli client.Client,
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
-	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = event.LastTimestamp.Time.Format(time.RFC3339)
+	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = event.EventTime.Time.Format(time.RFC3339Nano)
 	return cli.Patch(ctx, pod, patch)
 }
 
@@ -364,6 +364,10 @@ func updateConsensusRoleInfo(ctx context.Context,
 	vertexes := make([]graph.Vertex, 0)
 	for idx := range configList.Items {
 		config := configList.Items[idx]
+		if config.Data == nil {
+			config.Data = make(map[string]string)
+		}
+
 		config.Data["KB_LEADER"] = leader
 		config.Data["KB_FOLLOWERS"] = followers
 		// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant

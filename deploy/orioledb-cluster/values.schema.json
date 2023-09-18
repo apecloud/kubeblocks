@@ -6,7 +6,7 @@
       "title": "Version",
       "description": "Cluster version.",
       "type": "string",
-      "default": "postgresql-14.8.0"
+      "default": "orioledb-beta1"
     },
     "mode": {
       "title": "Mode",

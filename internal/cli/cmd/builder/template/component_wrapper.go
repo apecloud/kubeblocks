@@ -38,8 +38,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -328,7 +328,7 @@ func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.Request
 	if err != nil {
 		return nil, nil, err
 	}
-	secret, err := builder.BuildConnCredential(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
+	secret, err := factory.BuildConnCredential(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
 	if err != nil {
 		return nil, nil, err
 	}

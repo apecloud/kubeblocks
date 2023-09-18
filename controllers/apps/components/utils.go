@@ -372,22 +372,29 @@ func getComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
 	workload metav1.Object,
 	componentReplicas,
 	availableReplicas int32,
+	checkLeaderIsReady func(pod *corev1.Pod, workload metav1.Object) bool,
 	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.ClusterComponentPhase {
 	podCount := len(podList.Items)
 	if podCount == 0 || availableReplicas == 0 {
 		return getPhaseWithNoAvailableReplicas(componentReplicas)
 	}
-	var existLatestRevisionFailedPod bool
+	var (
+		existLatestRevisionFailedPod bool
+		leaderIsReady                bool
+	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
 			return ""
 		}
+		if checkLeaderIsReady == nil || checkLeaderIsReady(&v, workload) {
+			leaderIsReady = true
+		}
 		if checkFailedPodRevision != nil && checkFailedPodRevision(&v, workload) {
 			existLatestRevisionFailedPod = true
 		}
 	}
-	return getCompPhaseByConditions(existLatestRevisionFailedPod, true,
+	return getCompPhaseByConditions(existLatestRevisionFailedPod, leaderIsReady,
 		componentReplicas, int32(podCount), availableReplicas)
 }
 
@@ -637,10 +644,15 @@ func updateKubeBlocksToolsImage(pc *corev1.Container) {
 
 func getImageName(image string) string {
 	subs := strings.Split(image, ":")
-	if len(subs) != 2 {
+	switch len(subs) {
+	case 2:
+		return subs[0]
+	case 3:
+		lastIndex := strings.LastIndex(image, ":")
+		return image[:lastIndex]
+	default:
 		return ""
 	}
-	return subs[0]
 }
 
 // getCustomLabelSupportKind returns the kinds that support custom label.
@@ -805,4 +817,41 @@ func updateCustomLabelToObjs(clusterName, uid, componentName string,
 		}
 	}
 	return nil
+}
+
+// IsComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
+func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Client,
+	cluster *appsv1alpha1.Cluster, rsm *workloads.ReplicatedStateMachine) (bool, error) {
+	if cluster == nil || rsm == nil {
+		return false, nil
+	}
+	// check whether component spec has been sent to rsm
+	rsmComponentGeneration := rsm.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	if cluster.Status.ObservedGeneration != cluster.Generation ||
+		rsmComponentGeneration != strconv.FormatInt(cluster.Generation, 10) {
+		return false, nil
+	}
+	// check whether rsm spec has been sent to the underlying workload(sts)
+	if rsm.Status.ObservedGeneration != rsm.Generation ||
+		rsm.Status.CurrentGeneration != rsm.Generation {
+		return false, nil
+	}
+	// check whether the underlying workload(sts) has sent the latest template to pods
+	sts := &appsv1.StatefulSet{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(rsm), sts); err != nil {
+		return false, err
+	}
+	if sts.Status.ObservedGeneration != sts.Generation {
+		return false, nil
+	}
+	pods, err := listPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
+	if err != nil {
+		return false, err
+	}
+	for _, pod := range pods {
+		if intctrlutil.GetPodRevision(pod) != sts.Status.UpdateRevision {
+			return false, nil
+		}
+	}
+	return true, nil
 }

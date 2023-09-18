@@ -181,12 +181,15 @@ type ClusterStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// phase describes the phase of the Cluster, the detail information of the phases are as following:
-	// Running: cluster is running, all its components are available. [terminal state]
-	// Stopped: cluster has stopped, all its components are stopped. [terminal state]
-	// Failed: cluster is unavailable. [terminal state]
-	// Abnormal: Cluster is still running, but part of its components are Abnormal/Failed. [terminal state]
-	// Creating: Cluster has entered creating process.
-	// Updating: Cluster has entered updating process, triggered by Spec. updated.
+	// Creating: all components are in `Creating` phase.
+	// Running: all components are in `Running` phase, means the cluster is working well.
+	// Updating: all components are in `Creating`, `Running` or `Updating` phase,
+	// and at least one component is in `Creating` or `Updating` phase, means the cluster is doing an update.
+	// Stopping: at least one component is in `Stopping` phase, means the cluster is in a stop progress.
+	// Stopped: all components are in 'Stopped` phase, means the cluster has stopped and didn't provide any function anymore.
+	// Failed: all components are in `Failed` phase, means the cluster is unavailable.
+	// Abnormal: some components are in `Failed` or `Abnormal` phase, means the cluster in a fragile state. troubleshoot need to be done.
+	// Deleting: the cluster is being deleted.
 	// +optional
 	Phase ClusterPhase `json:"phase,omitempty"`
 
@@ -226,6 +229,14 @@ type ClusterComponentSpec struct {
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+
+	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
+	// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
+	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
+	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
+	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
+	// +optional
+	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
 	// monitor is a switch to enable monitoring and is set as false by default.
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
@@ -317,14 +328,14 @@ type ComponentMessageMap map[string]string
 // ClusterComponentStatus records components status.
 type ClusterComponentStatus struct {
 	// phase describes the phase of the component and the detail information of the phases are as following:
-	// Running: the component is running. [terminal state]
-	// Stopped: the component is stopped, as no running pod. [terminal state]
-	// Failed: the component is unavailable, i.e. all pods are not ready for Stateless/Stateful component and
-	// Leader/Primary pod is not ready for Consensus/Replication component. [terminal state]
-	// Abnormal: the component is running but part of its pods are not ready.
-	// Leader/Primary pod is ready for Consensus/Replication component. [terminal state]
-	// Creating: the component has entered creating process.
-	// Updating: the component has entered updating process, triggered by Spec. updated.
+	// Creating: `Creating` is a special `Updating` with previous phase `empty`(means "") or `Creating`.
+	// Running: component replicas > 0 and all pod specs are latest with a Running state.
+	// Updating: component replicas > 0 and has no failed pods. the component is being updated.
+	// Abnormal: component replicas > 0 but having some failed pods. the component basically works but in a fragile state.
+	// Failed: component replicas > 0 but having some failed pods. the component doesn't work anymore.
+	// Stopping: component replicas = 0 and has terminating pods.
+	// Stopped: component replicas = 0 and all pods have been deleted.
+	// Deleting: the component is being deleted.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
@@ -605,6 +616,34 @@ type ClusterNetwork struct {
 	PubliclyAccessible bool `json:"publiclyAccessible,omitempty"`
 }
 
+type ServiceRef struct {
+	// name of the service reference declaration. references the serviceRefDeclaration name defined in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// namespace defines the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
+	// If not set, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current cluster by default.
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+
+	// When referencing a service provided by other KubeBlocks cluster, you need to provide the name of the Cluster being referenced.
+	// By default, when other KubeBlocks Cluster are referenced, the ClusterDefinition.spec.connectionCredential secret corresponding to the referenced Cluster will be used to bind to the current component.
+	// Currently, if a KubeBlocks cluster is to be referenced, the connection credential secret should include and correspond to the following fields: endpoint, port, username, and password.
+	// Under this referencing approach, the ServiceKind and ServiceVersion of service reference declaration defined in the ClusterDefinition will not be validated.
+	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
+	// +optional
+	Cluster string `json:"cluster,omitempty"`
+
+	// serviceDescriptor defines the service descriptor of the service provided by external sources.
+	// When referencing a service provided by external sources, you need to provide the ServiceDescriptor object name to establish the service binding.
+	// And serviceDescriptor is the name of the ServiceDescriptor object, furthermore, the ServiceDescriptor.spec.serviceKind and ServiceDescriptor.spec.serviceVersion
+	// should match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind
+	// and the regular expression defines in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion.
+	// If both Cluster and ServiceDescriptor are specified, the Cluster takes precedence.
+	// +optional
+	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`
+}
+
 // +genclient
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
@@ -833,7 +872,7 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 func GetReconfiguringRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
-		SpecReconcilingClusterPhase, // enable partial running for reconfiguring
+		UpdatingClusterPhase, // enable partial running for reconfiguring
 		AbnormalClusterPhase,
 		FailedClusterPhase,
 	}

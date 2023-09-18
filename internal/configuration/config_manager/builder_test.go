@@ -270,9 +270,11 @@ formatterConfig:
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
 				buildParam.ReloadType = appsv1alpha1.TPLScriptType
-				buildParam.ConfigSpec.LazyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
-					Namespace:   scriptsNS,
-					TemplateRef: lazyRenderedTemplateName,
+				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
+					ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+						Namespace:   scriptsNS,
+						TemplateRef: lazyRenderedTemplateName,
+					},
 				}
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())

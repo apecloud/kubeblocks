@@ -326,12 +326,21 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&configuration.ReconfigureRequestReconciler{
+		if err = (&configuration.ReconfigureReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigurationReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
 			os.Exit(1)
 		}
 
@@ -368,6 +377,14 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("class-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Class")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ServiceDescriptorReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
 			os.Exit(1)
 		}
 	}
@@ -433,6 +450,11 @@ func main() {
 
 		if err = (&workloadsv1alpha1.ReplicatedStateMachine{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ReplicatedStateMachine")
+			os.Exit(1)
+		}
+
+		if err = (&appsv1alpha1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
 			os.Exit(1)
 		}
 

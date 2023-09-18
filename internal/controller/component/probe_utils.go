@@ -39,9 +39,12 @@ import (
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
 	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
+	getGlobalInfoFormat       = "/v1.0/bindings/%s?operation=getGlobalInfo"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
+
+	dataVolume = "data"
 )
 
 var (
@@ -78,9 +81,11 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return err
 	}
 
+	// injectHttp2Shell(component.PodSpec)
+
 	if componentProbes.RoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
+		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort), component.PodSpec)
 		probeContainers = append(probeContainers, *roleChangedContainer)
 	}
 
@@ -134,23 +139,39 @@ func buildProbeContainer() (*corev1.Container, error) {
 func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"probe", "--app-id", "batch-sdk",
-		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
-		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
-		"--log-level", logLevel,
-		"--config", "/config/probe/config.yaml",
-		"--components-path", "/config/probe/components"}
+	container.Command = []string{"probe",
+		"--port", strconv.Itoa(probeSvcHTTPPort)}
 
-	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
+	if len(component.PodSpec.Containers) > 0 {
 		mainContainer := component.PodSpec.Containers[0]
-		port := mainContainer.Ports[0]
-		dbPort := port.ContainerPort
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      constant.KBEnvServicePort,
-			Value:     strconv.Itoa(int(dbPort)),
-			ValueFrom: nil,
-		})
+		if len(mainContainer.Ports) > 0 {
+			port := mainContainer.Ports[0]
+			dbPort := port.ContainerPort
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:      constant.KBEnvServicePort,
+				Value:     strconv.Itoa(int(dbPort)),
+				ValueFrom: nil,
+			})
+		}
+
+		dataVolumeName := dataVolume
+		for _, v := range component.VolumeTypes {
+			if v.Type == appsv1alpha1.VolumeTypeData {
+				dataVolumeName = v.Name
+			}
+		}
+		for _, volumeMount := range mainContainer.VolumeMounts {
+			if volumeMount.Name != dataVolumeName {
+				continue
+			}
+			vm := volumeMount.DeepCopy()
+			container.VolumeMounts = []corev1.VolumeMount{*vm}
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:      constant.KBEnvDataPath,
+				Value:     vm.MountPath,
+				ValueFrom: nil,
+			})
+		}
 	}
 
 	roles := getComponentRoles(component)
@@ -170,6 +191,12 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Env = append(container.Env, corev1.EnvVar{
 		Name:      constant.KBEnvWorkloadType,
 		Value:     string(component.WorkloadType),
+		ValueFrom: nil,
+	})
+
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      "KB_RSM_ACTION_SVC_LIST",
+		Value:     viper.GetString("KB_RSM_ACTION_SVC_LIST"),
 		ValueFrom: nil,
 	})
 
@@ -209,7 +236,7 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 }
 
 func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
-	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int, pod *corev1.PodSpec) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(component.CharacterType)
@@ -223,6 +250,26 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+
+	// -> uncomment it to enable snapshot to cluster
+
+	// base := probeSvcHTTPPort + 2
+	// portNeeded := len(probeSetting.Actions)
+	// activePorts := make([]int32, portNeeded)
+	// for i := 0; i < portNeeded; i++ {
+	//	 activePorts[i] = int32(base + i)
+	// }
+	// activePorts, err := getAvailableContainerPorts(pod.Containers, activePorts)
+	// if err != nil {
+	//	 return
+	// }
+	// marshal, err := json.Marshal(activePorts)
+	// if err != nil {
+	//	 return
+	// }
+	// viper.Set("KB_RSM_ACTION_SVC_LIST", string(marshal))
+
+	// injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkrole", roleChangedContainer.Env)
 }
 
 func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
@@ -283,3 +330,72 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 		Value: string(value),
 	}
 }
+
+// func injectHttp2Shell(pod *corev1.PodSpec) {
+//	// inject shared volume
+//	agentVolume := corev1.Volume{
+//		Name: constant.ProbeAgentMountName,
+//		VolumeSource: corev1.VolumeSource{
+//			EmptyDir: &corev1.EmptyDirVolumeSource{},
+//		},
+//	}
+//	pod.Volumes = append(pod.Volumes, agentVolume)
+//
+//	// inject shell2http
+//	volumeMount := corev1.VolumeMount{
+//		Name:      constant.ProbeAgentMountName,
+//		MountPath: constant.ProbeAgentMountPath,
+//	}
+//	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
+//	initContainer := corev1.Container{
+//		Name:            constant.ProbeAgent,
+//		Image:           constant.ProbeAgentImage,
+//		ImagePullPolicy: corev1.PullIfNotPresent,
+//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
+//		Command: []string{
+//			"cp",
+//			constant.OriginBinaryPath,
+//			binPath,
+//		},
+//	}
+//	pod.InitContainers = append(pod.InitContainers, initContainer)
+//}
+//
+// func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
+//	port []int32, path, usage string,
+//	credentialEnv []corev1.EnvVar) {
+//	// todo: uncomment to enable new lorry way
+//	// actions := probeSetting.Actions
+//	// volumeMount := corev1.VolumeMount{
+//	//	Name:      constant.ProbeAgentMountName,
+//	//	MountPath: constant.ProbeAgentMountPath,
+//	// }
+//	// binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
+//	//
+//	// for i, action := range actions {
+//	//	image := action.Image
+//	//	if len(action.Image) == 0 {
+//	//		image = constant.DefaultActionImage
+//	//	}
+//	//
+//	//	command := []string{
+//	//		binPath,
+//	//		"-port", fmt.Sprintf("%d", port[i]),
+//	//		"-export-all-vars",
+//	//		"-form",
+//	//		path,
+//	//		strings.Join(action.Command, " "),
+//	//	}
+//	//
+//	//	container := corev1.Container{
+//	//		Name:            fmt.Sprintf("%s-action-%d", usage, i),
+//	//		Image:           image,
+//	//		ImagePullPolicy: corev1.PullIfNotPresent,
+//	//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
+//	//		Env:             credentialEnv,
+//	//		Command:         command,
+//	//	}
+//	//
+//	//	pod.Containers = append(pod.Containers, container)
+//	// }
+// }

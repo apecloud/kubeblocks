@@ -21,6 +21,7 @@ kbcli kubeblocks upgrade [flags]
 ### Options
 
 ```
+      --auto-approve             Skip interactive approval before upgrading KubeBlocks
       --check                    Check kubernetes environment before upgrade (default true)
   -h, --help                     help for upgrade
       --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)

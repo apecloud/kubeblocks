@@ -131,6 +131,10 @@ type OpsRequestSpec struct {
 	// scriptSpec defines the script to be executed.
 	// +optional
 	ScriptSpec *ScriptSpec `json:"scriptSpec,omitempty"`
+
+	// backupSpec defines how to backup the cluster.
+	// +optional
+	BackupSpec *BackupSpec `json:"backupSpec,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -219,7 +223,7 @@ type Reconfigure struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	Configurations []Configuration `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	Configurations []ConfigurationItem `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// TTL(Time to Live) defines the time period during which changing parameters is valid.
 	// +optional
@@ -237,7 +241,7 @@ type Reconfigure struct {
 	// Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
-type Configuration struct {
+type ConfigurationItem struct {
 	// name is a config template name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
@@ -350,6 +354,26 @@ type ScriptSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
 	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
+}
+
+type BackupSpec struct {
+	// backupName is the name of the backup.
+	// +optional
+	BackupName string `json:"backupName,omitempty"`
+
+	// Which backupPolicy is applied to perform this backup
+	// +optional
+	BackupPolicyName string `json:"backupPolicyName"`
+
+	// Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.
+	// +kubebuilder:default=datafile
+	// +kubeBuilder:validation:Enum={datafile,logfile,snapshot}
+	// +optional
+	BackupType string `json:"backupType"`
+
+	// if backupType is incremental, parentBackupName is required.
+	// +optional
+	ParentBackupName string `json:"parentBackupName,omitempty"`
 }
 
 // ScriptSecret defines the secret to be used to execute the script.
@@ -529,10 +553,10 @@ type ReconfiguringStatus struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ConfigurationStatus []ConfigurationStatus `json:"configurationStatus"`
+	ConfigurationStatus []ConfigurationItemStatus `json:"configurationStatus"`
 }
 
-type ConfigurationStatus struct {
+type ConfigurationItemStatus struct {
 	// name is a config template name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63

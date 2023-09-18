@@ -29,6 +29,7 @@ options: {
 	nodeLabels: {}
 	tolerations: [...]
 	annotations: {}
+	backupConfig: {}
 }
 
 // required, k8s api resource content
@@ -49,6 +50,7 @@ content: {
 			nodeLabels:      options.nodeLabels
 			tenancy:         options.tenancy
 		}
+		backup:            options.backupConfig
 		tolerations:       options.tolerations
 		componentSpecs:    options.componentSpecs
 		terminationPolicy: options.terminationPolicy

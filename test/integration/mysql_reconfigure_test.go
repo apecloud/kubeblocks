@@ -92,7 +92,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		opsRequest = testapps.NewOpsRequestObj(randomOpsName, testCtx.DefaultNamespace,
 			clusterName, appsv1alpha1.ReconfiguringType)
 		opsRequest.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
-			Configurations: []appsv1alpha1.Configuration{{
+			Configurations: []appsv1alpha1.ConfigurationItem{{
 				Name: configName,
 				Keys: []appsv1alpha1.ParameterConfig{{
 					Key: configFile,
@@ -184,8 +184,8 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Checking Cluster and changed component phase is Reconfiguring")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))                               // appsv1alpha1.ReconfiguringPhase
-			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.UpdatingClusterPhase))                               // appsv1alpha1.ReconfiguringPhase
+			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
 			// TODO: add status condition check
 		})).Should(Succeed())
 

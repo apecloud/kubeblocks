@@ -31,6 +31,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
@@ -42,12 +43,13 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -72,6 +74,27 @@ var clusterUpdateExample = templates.Examples(`
 
 	# enable cluster monitor and edit
     # kbcli cluster update mycluster --monitor=true --edit
+
+	# enable cluster auto backup
+	kbcli cluster update mycluster --backup-enabled=true
+	
+	# update cluster backup retention period
+	kbcli cluster update mycluster --backup-retention-period=1d
+
+	# update cluster backup method
+	kbcli cluster update mycluster --backup-method=snapshot
+
+	# update cluster backup cron expression
+	kbcli cluster update mycluster --backup-cron-expression="0 0 * * *"
+
+	# update cluster backup starting deadline minutes
+	kbcli cluster update mycluster --backup-starting-deadline-minutes=10
+
+	# update cluster backup repo name
+	kbcli cluster update mycluster --backup-repo-name=repo1
+
+	# update cluster backup pitr enabled
+	kbcli cluster update mycluster --pitr-enabled=true
 `)
 
 type updateOptions struct {
@@ -183,6 +206,10 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		return o.buildComponents(field, v.String())
 	}
 
+	buildBackup := func(obj map[string]interface{}, v pflag.Value, field string) error {
+		return o.buildBackup(field, v.String())
+	}
+
 	spec := map[string]interface{}{}
 	affinity := map[string]interface{}{}
 	type filedObj struct {
@@ -204,6 +231,15 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		// monitor and logs
 		"monitoring-interval": {field: "monitor", obj: nil, fn: buildComps},
 		"enable-all-logs":     {field: "enable-all-logs", obj: nil, fn: buildComps},
+
+		// backup config
+		"backup-enabled":                   {field: "enabled", obj: nil, fn: buildBackup},
+		"backup-retention-period":          {field: "retentionPeriod", obj: nil, fn: buildBackup},
+		"backup-method":                    {field: "method", obj: nil, fn: buildBackup},
+		"backup-cron-expression":           {field: "cronExpression", obj: nil, fn: buildBackup},
+		"backup-starting-deadline-minutes": {field: "startingDeadlineMinutes", obj: nil, fn: buildBackup},
+		"backup-repo-name":                 {field: "repoName", obj: nil, fn: buildBackup},
+		"pitr-enabled":                     {field: "pitrEnabled", obj: nil, fn: buildBackup},
 	}
 
 	for _, flag := range flags {
@@ -227,6 +263,10 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		}
 
 		if err = unstructured.SetNestedField(spec, data["componentSpecs"], "componentSpecs"); err != nil {
+			return err
+		}
+
+		if err = unstructured.SetNestedField(spec, data["backup"], "backup"); err != nil {
 			return err
 		}
 	}
@@ -258,6 +298,35 @@ func (o *updateOptions) buildComponents(field string, val string) error {
 		return o.updateMonitor(val)
 	case "enable-all-logs":
 		return o.updateEnabledLog(val)
+	default:
+		return nil
+	}
+}
+
+func (o *updateOptions) buildBackup(field string, val string) error {
+	if o.cluster == nil {
+		c, err := cluster.GetClusterByName(o.dynamic, o.Names[0], o.namespace)
+		if err != nil {
+			return err
+		}
+		o.cluster = c
+	}
+
+	switch field {
+	case "enabled":
+		return o.updateBackupEnabled(val)
+	case "retentionPeriod":
+		return o.updateBackupRetentionPeriod(val)
+	case "method":
+		return o.updateBackupMethod(val)
+	case "cronExpression":
+		return o.updateBackupCronExpression(val)
+	case "startingDeadlineMinutes":
+		return o.updateBackupStartingDeadlineMinutes(val)
+	case "repoName":
+		return o.updateBackupRepoName(val)
+	case "pitrEnabled":
+		return o.updateBackupPitrEnabled(val)
 	default:
 		return nil
 	}
@@ -383,7 +452,7 @@ func findConfigTemplateInfo(dynamic dynamic.Interface, configSpec *appsv1alpha1.
 }
 
 func newConfigTemplateEngine() *template.Template {
-	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil, nil)
+	customizedFuncMap := configuration.BuiltInCustomFunctions(nil, nil, nil)
 	engine := gotemplate.NewTplEngine(nil, customizedFuncMap, logsTemplateName, nil, context.TODO())
 	return engine.GetTplEngine()
 }
@@ -440,8 +509,8 @@ func buildLogsReconfiguringOps(clusterName, namespace, compName, configName, key
 		Key:        keyName,
 		Parameters: parameterPairs,
 	})
-	var configurations []appsv1alpha1.Configuration
-	configurations = append(configurations, appsv1alpha1.Configuration{
+	var configurations []appsv1alpha1.ConfigurationItem
+	configurations = append(configurations, appsv1alpha1.ConfigurationItem{
 		Keys: keys,
 		Name: configName,
 	})
@@ -460,5 +529,73 @@ func (o *updateOptions) updateMonitor(val string) error {
 	for i := range o.cluster.Spec.ComponentSpecs {
 		o.cluster.Spec.ComponentSpecs[i].Monitor = intVal != 0
 	}
+	return nil
+}
+
+func (o *updateOptions) updateBackupEnabled(val string) error {
+	boolVal, err := strconv.ParseBool(val)
+	if err != nil {
+		return err
+	}
+	o.cluster.Spec.Backup.Enabled = &boolVal
+	return nil
+}
+
+func (o *updateOptions) updateBackupRetentionPeriod(val string) error {
+	// if val is empty, do nothing
+	if len(val) == 0 {
+		return nil
+	}
+
+	// judge whether val end with the 'd'|'D'|'h'|'H' character
+	lastChar := val[len(val)-1]
+	if lastChar != 'd' && lastChar != 'D' && lastChar != 'h' && lastChar != 'H' {
+		return fmt.Errorf("invalid retention period: %s, only support d|D|h|H", val)
+	}
+
+	o.cluster.Spec.Backup.RetentionPeriod = &val
+	return nil
+}
+
+func (o *updateOptions) updateBackupMethod(val string) error {
+	method := dataprotectionv1alpha1.BackupMethod(val)
+	if method != dataprotectionv1alpha1.BackupMethodSnapshot && method != dataprotectionv1alpha1.BackupMethodBackupTool {
+		return fmt.Errorf("invalid backup method: %s, only support %s and %s", val,
+			dataprotectionv1alpha1.BackupMethodSnapshot, dataprotectionv1alpha1.BackupMethodBackupTool)
+	}
+	o.cluster.Spec.Backup.Method = dataprotectionv1alpha1.BackupMethod(val)
+	return nil
+}
+
+func (o *updateOptions) updateBackupCronExpression(val string) error {
+	// judge whether val is a valid cron expression
+	if _, err := cron.ParseStandard(val); err != nil {
+		return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", val)
+	}
+
+	o.cluster.Spec.Backup.CronExpression = val
+	return nil
+}
+
+func (o *updateOptions) updateBackupStartingDeadlineMinutes(val string) error {
+	intVal, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return err
+	}
+	o.cluster.Spec.Backup.StartingDeadlineMinutes = &intVal
+	return nil
+}
+
+func (o *updateOptions) updateBackupRepoName(val string) error {
+	o.cluster.Spec.Backup.RepoName = val
+	return nil
+}
+
+func (o *updateOptions) updateBackupPitrEnabled(val string) error {
+	boolVal, err := strconv.ParseBool(val)
+	if err != nil {
+		return err
+	}
+	o.cluster.Spec.Backup.PITREnabled = &boolVal
 	return nil
 }

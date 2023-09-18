@@ -310,9 +310,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
 				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
 				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
-				Eventually(testapps.GetAndChangeObj(&testCtx, cmKey, func(cm *corev1.ConfigMap) {
-					cm.Annotations[constant.CMInsEnableRerenderTemplateKey] = "true"
-				})).Should(Succeed())
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}
 					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
@@ -334,6 +331,13 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
 				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+				conf := &appsv1alpha1.Configuration{}
+				confKey := client.ObjectKey{Namespace: sts.Namespace, Name: cfgcore.GenerateComponentConfigurationName(clusterObj.Name, clusterObj.Spec.ComponentSpecs[0].Name)}
+				Expect(k8sClient.Get(ctx, confKey, conf)).Should(Succeed())
+				patch2 := client.MergeFrom(conf.DeepCopy())
+				conf.Spec.ConfigItemDetails[0].Version = "v1"
+				Expect(k8sClient.Patch(ctx, conf, patch2)).Should(Succeed())
 				Eventually(hasTLSSettings).Should(BeTrue())
 
 				By("update tls to disabled")
@@ -341,6 +345,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = false
 				clusterObj.Spec.ComponentSpecs[0].Issuer = nil
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+				Expect(k8sClient.Get(ctx, confKey, conf)).Should(Succeed())
+				patch2 = client.MergeFrom(conf.DeepCopy())
+				conf.Spec.ConfigItemDetails[0].Version = "v2"
+				Expect(k8sClient.Patch(ctx, conf, patch2)).Should(Succeed())
+
 				Eventually(hasTLSSettings).Should(BeFalse())
 			})
 		})

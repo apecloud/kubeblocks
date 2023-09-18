@@ -33,8 +33,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -50,6 +50,7 @@ type dataClone interface {
 
 	checkBackupStatus() (backupStatus, error)
 	backup() ([]client.Object, error)
+	pvcKeysToRestore() []types.NamespacedName
 	checkRestoreStatus(types.NamespacedName) (backupStatus, error)
 	restore(name types.NamespacedName) ([]client.Object, error)
 }
@@ -274,7 +275,7 @@ func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate)
 			} else if exist {
 				continue
 			}
-			pvc, err := builder.BuildPVC(d.cluster, d.component, vct, pvcKey, "")
+			pvc, err := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, "")
 			if err != nil {
 				return nil, err
 			}
@@ -311,7 +312,7 @@ func (d *dummyDataClone) clearTmpResources() ([]client.Object, error) {
 }
 
 func (d *dummyDataClone) checkBackupStatus() (backupStatus, error) {
-	panic("runtime error: dummyDataClone.checkBackupStatus called")
+	return backupStatusReadyToUse, nil
 }
 
 func (d *dummyDataClone) backup() ([]client.Object, error) {
@@ -319,7 +320,7 @@ func (d *dummyDataClone) backup() ([]client.Object, error) {
 }
 
 func (d *dummyDataClone) checkRestoreStatus(types.NamespacedName) (backupStatus, error) {
-	panic("runtime error: dummyDataClone.checkRestoreStatus called")
+	return backupStatusReadyToUse, nil
 }
 
 func (d *dummyDataClone) restore(name types.NamespacedName) ([]client.Object, error) {
@@ -372,7 +373,6 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 	if backupPolicy == nil {
 		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
-
 	// choose backup method to use
 	backupMethods := getBackupMethods(backupPolicy, true)
 	if len(backupMethods) == 0 {
@@ -380,7 +380,7 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 	} else if len(backupMethods) > 1 {
 		return nil, fmt.Errorf("more than one volume snapshot backup methods found in backup policy %s", backupPolicy.Name)
 	}
-	backup, err := builder.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, backupMethods[0])
+	backup, err := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, backupMethods[0])
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +489,7 @@ func (d *snapshotDataClone) createPVCFromSnapshot(
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	snapshotName string) (client.Object, error) {
-	pvc, err := builder.BuildPVC(d.cluster, d.component, vct, pvcKey, snapshotName)
+	pvc, err := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, snapshotName)
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +611,7 @@ func (d *backupDataClone) backup() ([]client.Object, error) {
 	} else if len(backupMethods) > 1 {
 		return nil, fmt.Errorf("more than one backup methods found in backup policy %s", backupPolicy.Name)
 	}
-	backup, err := builder.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, backupMethods[0])
+	backup, err := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, backupMethods[0])
 	if err != nil {
 		return nil, err
 	}
@@ -639,27 +639,26 @@ func (d *backupDataClone) checkBackupStatus() (backupStatus, error) {
 
 func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object, error) {
 	//objs := make([]client.Object, 0)
-	//backup := dpv1alpha1.Backup{}
+	//backup := dataprotectionv1alpha1.Backup{}
 	//if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
 	//	return nil, err
 	//}
-	//pvc, err := builder.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
+	//pvc, err := factory.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
 	//if err != nil {
 	//	return nil, err
 	//}
 	//objs = append(objs, pvc)
-	//actionSet := &dpv1alpha1.ActionSet{}
-	//if err = d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backup.Status.BackupMethod.ActionSetName}, actionSet); err != nil {
+	//backupTool := &dataprotectionv1alpha1.BackupTool{}
+	//if err = d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backup.Status.BackupToolName}, backupTool); err != nil {
 	//	return nil, err
 	//}
 	//restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
-	//restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, actionSet, []string{pvc.Name}, d.getBackupMatchingLabels())
+	//restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, backupTool, []string{pvc.Name}, d.getBackupMatchingLabels())
 	//if err != nil {
 	//	return nil, err
 	//}
 	//objs = append(objs, restoreJobs...)
 	//return objs, nil
-	return nil, nil
 }
 
 func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backupStatus, error) {

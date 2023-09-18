@@ -325,6 +325,9 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 			logger.Error(err, "failed to get config template cm object!")
 			return nil, err
 		}
+		if configSpec.VolumeName == "" && len(configSpec.AsEnvFrom) == 0 {
+			return nil, core.MakeError("config template volume name and envFrom is empty!")
+		}
 		if configSpec.ConfigConstraintRef == "" {
 			return nil, nil
 		}

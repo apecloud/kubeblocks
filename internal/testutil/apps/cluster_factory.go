@@ -224,3 +224,12 @@ func (factory *MockClusterFactory) SetBackup(backup *appsv1alpha1.ClusterBackup)
 	factory.get().Spec.Backup = backup
 	return factory
 }
+
+func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1alpha1.ServiceRef) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].ServiceRefs = serviceRefs
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}

@@ -79,6 +79,6 @@ var _ = Describe("kubeblocks list versions", func() {
 
 		// TODO: use a mock helm chart to test
 		By("list versions")
-		Expect(o.listVersions()).Should(HaveOccurred())
+		Expect(o.listVersions()).Should(Succeed())
 	})
 })

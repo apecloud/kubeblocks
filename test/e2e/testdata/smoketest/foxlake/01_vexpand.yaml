@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: foxlake-cluster-vexpand-
+spec:
+  clusterRef: foxlake-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: foxlake-metadb
+      volumeClaimTemplates:
+        - name: data
+          storage: "21Gi"

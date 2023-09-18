@@ -1,0 +1,8 @@
+name: redis
+spec:
+  version: v1
+  metadata:
+  - name: redisHost
+    value: 127.0.0.1:6379
+  - name: enableTLS
+    value: false

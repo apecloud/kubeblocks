@@ -41,3 +41,7 @@ proxyEnabled: false
 extra:
   podAntiAffinity: Required
   terminationPolicy: Delete
+
+
+serviceAccount:
+  name:

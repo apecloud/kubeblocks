@@ -21,7 +21,6 @@ package builder
 
 import (
 	"context"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,9 +35,7 @@ var _ = Describe("Monitor builder test", func() {
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	const clusterDefName = "test-clusterdef"
-	const statefulCompDefName = "replicasets"
-	const configSpecName = "mysql-config-tpl"
-	const configVolumeName = "mysql-config"
+	const statefulCompDefName = "mysql"
 
 	BeforeEach(func() {
 		k8sMockClient = testutil.NewK8sMockClient()
@@ -51,11 +48,9 @@ var _ = Describe("Monitor builder test", func() {
 
 	Context("When updating configuration", func() {
 		It("Should reconcile success", func() {
-
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				GetObject()
-
 			clusterDefObj.Spec.ComponentDefs[0].LogConfigs = []appsv1alpha1.LogConfig{{
 				Name:            "error",
 				FilePathPattern: "/data/mysql/log/mysqld-error.log",
@@ -65,11 +60,13 @@ var _ = Describe("Monitor builder test", func() {
 			}}
 			k8sMockClient.MockGetMethod(
 				testutil.WithGetReturned(testutil.WithConstructGetResult(clusterDefObj)))
-			Expect(buildMysqlReceiverObject(context.TODO(), k8sMockClient.Client())).ShouldNot(Succeed())
+			ret, err := buildMysqlReceiverObject(context.TODO(), k8sMockClient.Client())
+			Expect(err).Should(Succeed())
+			Expect(len(ret)).Should(Equal(3))
+			Expect(ret["apecloudmysql"]).ShouldNot(BeNil())
+			Expect(ret["filelog/mysql/error"]).ShouldNot(BeNil())
+			Expect(ret["filelog/mysql/slow"]).ShouldNot(BeNil())
 		})
 	})
 
 })
-
-func Test_buildMysqlReceiverObject(t *testing.T) {
-}

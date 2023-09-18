@@ -1,5 +1,5 @@
 auth_type: serviceAccount
-collection_interval: {{ .Values.metrics.collection_interval }}
+collection_interval: {{ .metrics.collection_interval }}
 endpoint: '`endpoint`:`kubelet_endpoint_port`'
 extra_metadata_labels:
   - k8s.volume.type

@@ -1,0 +1,9 @@
+endpoint: ${env:ENDPOINT}
+username: ${env:REDIS_USER}
+password: ${env:REDIS_PASSWORD}
+collection_interval: ${env:COLLECTION_INTERVAL}
+password_file: ""
+lua_script: ""
+tls:
+  insecure: true
+  insecure_skip_verify: true

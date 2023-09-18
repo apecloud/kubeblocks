@@ -1,0 +1,8 @@
+endpoint: 127.0.0.1:27017
+username: ${env:MONGODB_ROOT_USER}
+password: ${env:MONGODB_ROOT_PASSWORD}
+collection_interval: ${env:COLLECTION_INTERVAL}
+connect_params: admin?ssl=false&authSource=admin
+direct_connect: true
+global_conn_pool: false
+compatible_mode: true

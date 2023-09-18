@@ -1,0 +1,34 @@
+{{- $logFiles := dict }}
+{{- range $name, $component := .Values.componentDefs }}
+{{- if eq $component.name "mysql" }}
+{{- range $name, $filePathPattern := $component.logConfigs }}
+{{- set $logFiles $name $filePathPattern }}
+{{- end }}
+{{- end }}
+{{- end }}
+apecloudmysql:
+  endpoint: ${env:ENDPOINT}
+  username: ${env:MYSQL_USER}
+  password: ${env:MYSQL_PASSWORD}
+  allow_native_passwords: true
+  transport: tcp
+  ## for scraperhelper.ScraperControllerSettings
+  collection_interval: ${env:COLLECTION_INTERVAL}
+
+{{- if hasKey $logFiles "error" }}
+filelog/mysql/error:
+  # from cd.spec.componentDefs[?(@.name=="mysql")].logConfigs[?(@.name=="error")].filePathPattern
+  include:
+    - {{ $logFiles["error"] }}
+  include_file_name: false
+  start_at: beginning
+{{- end }}
+
+{{- if hasKey $logFiles "slow" }}
+filelog/mysql/slow:
+  # from cd.spec.componentDefs[?(@.name=="mysql")].logConfigs[?(@.name=="slow")].filePathPattern
+  include:
+    - {{ $logFiles["slow"] }}
+  include_file_name: false
+  start_at: beginning
+{{- end }}

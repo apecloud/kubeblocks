@@ -1609,7 +1609,7 @@ func rebuildCompStorage(pvcMaps map[string][]map[storageKey]string, specs []*app
 				},
 				Resources: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("20Gi"),
+						corev1.ResourceStorage: resource.MustParse(viper.GetString(types.CfgKeyClusterDefaultStorageSize)),
 					},
 				},
 			},

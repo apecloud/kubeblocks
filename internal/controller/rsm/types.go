@@ -69,7 +69,7 @@ const (
 	jobScenarioMembership       = "membership-reconfiguration"
 	jobScenarioUpdate           = "pod-update"
 
-	roleProbeName              = "role-observe"
+	roleProbeName              = "kb-role-probe"
 	roleAgentVolumeName        = "role-agent"
 	roleAgentInstallerName     = "role-agent-installer"
 	roleAgentVolumeMountPath   = "/role-probe"
@@ -77,9 +77,9 @@ const (
 	shell2httpImage            = "msoap/shell2http:1.16.0"
 	shell2httpBinaryPath       = "/app/shell2http"
 	shell2httpServePath        = "/role"
-	defaultRoleProbeAgentImage = "apecloud/kubeblocks-role-agent:latest"
+	defaultRoleProbeAgentImage = "apecloud/kubeblocks-tools:latest"
 	defaultRoleProbeDaemonPort = 7373
-	roleProbeURIFormat         = "-addr=localhost:%s"
+	roleProbeURI               = "/v1.0/bindings/custom?operation=checkRole"
 	defaultActionImage         = "busybox:latest"
 	usernameCredentialVarName  = "KB_RSM_USERNAME"
 	passwordCredentialVarName  = "KB_RSM_PASSWORD"

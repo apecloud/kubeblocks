@@ -217,22 +217,14 @@ const (
 	ProbeHTTPPortName                  = "probe-http-port"
 	ProbeGRPCPortName                  = "probe-grpc-port"
 	ProbeInitContainerName             = "kb-initprobe"
-	RoleProbeContainerName             = "kb-checkrole"
+	LorryContainerName                 = "kb-lorry"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
-	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
-
-	ProbeAgentMountName = "shell2http-mount"
-	ProbeAgentMountPath = "/shell2http"
-	ProbeAgent          = "shell2http"
-	ProbeAgentImage     = "msoap/shell2http:1.16.0"
-	OriginBinaryPath    = "/app/shell2http"
-	DefaultActionImage  = "busybox:latest"
 )
 
 const (

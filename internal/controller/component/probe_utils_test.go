@@ -45,7 +45,7 @@ var _ = Describe("probe_utils", func() {
 
 		BeforeEach(func() {
 			var err error
-			container, err = buildProbeContainer()
+			container, err = buildLorryContainer()
 			Expect(err).NotTo(HaveOccurred())
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
@@ -95,20 +95,13 @@ var _ = Describe("probe_utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
 			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})
 
-		It("should build role changed probe container", func() {
-			synthesizedComponent := &SynthesizedComponent{CharacterType: "wesql"}
-			pod := &corev1.PodSpec{}
-			buildRoleProbeContainer(synthesizedComponent, container, clusterDefProbe, probeServiceHTTPPort, pod)
-			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
-		})
-
 		It("should build role service container", func() {
-			buildProbeServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
+			buildLorryServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 
@@ -140,7 +133,7 @@ var _ = Describe("probe_utils", func() {
 					},
 				},
 			}
-			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
 			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
 		})
 
@@ -163,7 +156,7 @@ var _ = Describe("probe_utils", func() {
 				},
 			}
 			viper.SetDefault(constant.EnableRBACManager, true)
-			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
+			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
 			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
 			spec := &appsv1alpha1.VolumeProtectionSpec{}
 			for _, e := range component.PodSpec.Containers[0].Env {

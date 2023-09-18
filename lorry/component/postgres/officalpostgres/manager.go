@@ -474,7 +474,7 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 func (mgr *Manager) getCheckPointEnd(timeLine, lsn int64) int64 {
 	lsnStr := postgres.FormatPgLsn(lsn)
 
-	resp, err := postgres.PgWalDump("-t", strconv.FormatInt(timeLine, 64), "-s", lsnStr, "-n", "2")
+	resp, err := postgres.PgWalDump("-t", strconv.FormatInt(timeLine, 10), "-s", lsnStr, "-n", "2")
 	if err == nil || resp == "" {
 		return 0
 	}

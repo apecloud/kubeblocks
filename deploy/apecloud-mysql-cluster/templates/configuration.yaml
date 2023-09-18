@@ -1,0 +1,29 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Configuration
+metadata:
+  name: {{ include "kblib.clusterName" . }}-mysql
+  namespace: {{ .Release.Namespace }}
+spec:
+  clusterDefRef: apecloud-mysql
+  clusterRef: {{ include "kblib.clusterName" . }}
+  clusterVerRef: {{ .Values.version }}
+  componentName: mysql
+  configItemDetails:
+    - name: mysql-consensusset-config
+      {{- if .Values.userConfigTemplate }}
+      importTemplateRef:
+        {{- .Values.userConfigTemplate | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if or (gt (len .Values.configurations) 0) .Values.smartEngineEnabled }}
+      configFileParams:
+        my.cnf:
+          parameters:
+            {{- if .Values.smartEngineEnabled }}
+            loose_smartengine: ON
+            binlog_format: ROW
+            default_storage_engine: smartengine
+            {{- end }}
+            {{- range $key, $value := .Values.configurations }}
+            {{ $key }}: "{{ $value }}"
+            {{- end }}
+      {{- end }}

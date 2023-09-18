@@ -42,3 +42,13 @@ proxyEnabled: false
 ## customized default values to override kblib chart's values
 extra:
   podAntiAffinity: Required
+
+smartEngineEnabled: false
+
+configurations: { }
+
+# customized config template
+#userConfigTemplate:
+#  templateRef: custom-mysql-config-tpl
+#  namespace: default
+#  policy: none

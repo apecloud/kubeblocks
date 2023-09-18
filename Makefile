@@ -654,7 +654,7 @@ endif
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV

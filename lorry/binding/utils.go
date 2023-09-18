@@ -28,7 +28,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -301,7 +300,7 @@ source:
 	event.EventTime = metav1.NowMicro()
 	event.ReportingController = "lorry"
 	event.ReportingInstance = podName
-	event.Action = string(opsResult["operation"].(bindings.OperationKind))
+	event.Action = string(opsResult["operation"].(OperationKind))
 
 	return event, nil
 }

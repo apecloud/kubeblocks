@@ -105,8 +105,9 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 			return "", err
 		}
 	}
+	role := string(lastOutput)
 
-	return string(lastOutput), nil
+	return strings.TrimSpace(role), nil
 }
 
 func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {

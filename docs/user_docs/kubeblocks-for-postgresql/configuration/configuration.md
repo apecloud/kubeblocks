@@ -19,7 +19,7 @@ kbcli cluster describe-config pg-cluster
 
 From the meta information, you can find the configuration files of this PostgreSQL cluster.
 
-You can also view the details of this configuration file and parameters. Some databse engine my have multiple 
+You can also view the details of this configuration file and parameters.
 
 * View the details of the current configuration file.
 

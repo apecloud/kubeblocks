@@ -436,6 +436,13 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 			})
 	}
 
+	// inject role update mechanism env
+	env = append(env,
+		corev1.EnvVar{
+			Name:  RoleUpdateMechanismVarName,
+			Value: string(roleProbe.RoleUpdateMechanism),
+		})
+
 	// build container
 	container := corev1.Container{
 		Name:            roleProbeName,

@@ -87,6 +87,7 @@ const (
 	actionSvcListVarName       = "KB_RSM_ACTION_SVC_LIST"
 	leaderHostVarName          = "KB_RSM_LEADER_HOST"
 	targetHostVarName          = "KB_RSM_TARGET_HOST"
+	RoleUpdateMechanismVarName = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	roleProbeEventFieldPath    = "spec.containers{" + roleProbeName + "}"
 	actionSvcPortBase          = int32(36500)
 )

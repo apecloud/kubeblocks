@@ -26,11 +26,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	v3 "go.etcd.io/etcd/client/v3"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -49,13 +50,14 @@ const (
 )
 
 // NewEtcd returns a new etcd binding instance.
-func NewEtcd(logger logger.Logger) bindings.OutputBinding {
+func NewEtcd() *Etcd {
+	logger := ctrl.Log.WithName("Etcd")
 	return &Etcd{BaseOperations: BaseOperations{Logger: logger}}
 }
 
-func (e *Etcd) Init(metadata bindings.Metadata) error {
-	e.endpoint = metadata.Properties[endpoint]
+func (e *Etcd) Init(metadata component.Properties) error {
 	_ = e.BaseOperations.Init(metadata)
+	e.endpoint = e.Metadata[endpoint]
 	e.DBType = "etcd"
 	e.InitIfNeed = e.initIfNeed
 	e.DBPort = e.GetRunningPort()
@@ -68,7 +70,7 @@ func (e *Etcd) initIfNeed() bool {
 	if e.etcd == nil {
 		go func() {
 			err := e.InitDelay()
-			e.Logger.Errorf("Etcd connection init failed: %v", err)
+			e.Logger.Error(err, "Etcd connection init failed")
 		}()
 		return true
 	}
@@ -104,7 +106,7 @@ func (e *Etcd) InitDelay() error {
 	return nil
 }
 
-func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (e *Etcd) GetRole(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	etcdResp, err := e.etcd.Status(ctx, e.endpoint)
 	if err != nil {
 		return "", err
@@ -121,7 +123,7 @@ func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *b
 	return role, nil
 }
 
-func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (e *Etcd) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	role, err := e.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
@@ -144,7 +146,21 @@ func (e *Etcd) GetRunningPort() int {
 	return port
 }
 
-func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *ProbeResponse) ([]byte, error) {
 	// TODO implement me when proposal is passed
 	return nil, nil
+}
+
+func (e *Etcd) GetLogger() logr.Logger {
+	return e.Logger
+}
+
+func (e *Etcd) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
+	// TODO: impl
+	return nil, nil
+}
+
+func (e *Etcd) InternalExec(ctx context.Context, sql string) (int64, error) {
+	// TODO: impl
+	return 0, nil
 }

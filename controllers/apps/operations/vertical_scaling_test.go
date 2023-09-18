@@ -146,7 +146,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("mock opsRequest is Running")
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp)
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
 				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}

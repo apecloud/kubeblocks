@@ -22,19 +22,17 @@ package kafka
 import (
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
-	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // Test case for Init() function
 func TestInit(t *testing.T) {
 	kafkaOps := mockKafkaOps(t)
-
-	err := kafkaOps.Init(kafkaOps.Metadata)
+	metada := make(component.Properties)
+	err := kafkaOps.Init(metada)
 	if err != nil {
 		t.Errorf("Error during Init(): %s", err)
 	}
@@ -49,14 +47,6 @@ func TestCheckStatusOps(t *testing.T) {
 }
 
 func mockKafkaOps(t *testing.T) *KafkaOperations {
-	m := bindings.Metadata{
-		Base: metadata.Base{
-			Properties: map[string]string{},
-		},
-	}
-
-	kafkaOps := NewKafka(logger.NewLogger("test")).(*KafkaOperations)
-	_ = kafkaOps.Init(m)
-
+	kafkaOps := NewKafka()
 	return kafkaOps
 }

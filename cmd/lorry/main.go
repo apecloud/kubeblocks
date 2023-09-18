@@ -22,56 +22,80 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/dapr/kit/logger"
 	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
-	"github.com/apecloud/kubeblocks/lorry/apiserver"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/lorry/hypervisor"
+	"github.com/apecloud/kubeblocks/lorry/middleware/http/probe"
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
-var (
-	log   = logger.NewLogger("lorry.runtime")
-	logHa = logger.NewLogger("lorry.ha")
+var port int
+var configDir string
+
+const (
+	DefaultPort       = 3501
+	DefaultConfigPath = "/config/lorry/components"
 )
 
 func init() {
 	viper.AutomaticEnv()
+	flag.IntVar(&port, "port", DefaultPort, "probe default port")
+	flag.StringVar(&configDir, "config-path", DefaultConfigPath, "probe default config directory for builtin type")
 }
 
 func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
-	// start apiserver for HTTP and GRPC
-	rt, err := apiserver.StartDapr()
-	if err != nil {
-		log.Fatalf("Start ApiServer failed: %s", err)
+	opts := zap.Options{
+		Development: true,
 	}
+	opts.BindFlags(flag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	err = viper.BindPFlags(pflag.CommandLine)
+	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
 		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
 	}
-	viper.SetConfigFile(viper.GetString("config")) // path to look for the config file in
-	err = viper.ReadInConfig()                     // Find and read the config file
-	if err != nil {                                // Handle errors reading the config file
+
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	err = component.GetAllComponent(configDir) // find all builtin config file and read
+	if err != nil {                            // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
+
+	err = probe.RegisterBuiltin() // register all builtin component
+	if err != nil {
+		panic(fmt.Errorf("fatal error register builtin: %v", err))
+	}
+
+	http.HandleFunc("/", probe.SetMiddleware(probe.GetRouter()))
+	go func() {
+		addr := fmt.Sprintf(":%d", port)
+		err := http.ListenAndServe(addr, nil)
+		if err != nil {
+			panic(fmt.Errorf("fatal error listen on port %d", port))
+		}
+	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	logHa := ctrl.Log.WithName("HA")
 	ha := highavailability.NewHa(logHa)
 
 	if util.IsHAAvailable(characterType, workloadType) {
@@ -81,14 +105,14 @@ func main() {
 		}
 	}
 
-	hypervisor, err := hypervisor.NewHypervisor(log)
+	logHyper := ctrl.Log.WithName("hypervisor")
+	hypervisor, err := hypervisor.NewHypervisor(logHyper)
 	if err != nil {
-		log.Errorf("Hypervisor initialize failed: %s", err)
+		ctrl.Log.Error(err, "Hypervisor initialize failed: %s")
 	}
 	hypervisor.Start()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
 	hypervisor.StopAndWait()
-	rt.ShutdownWithWait()
 }

@@ -25,6 +25,16 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
+## [backup](kbcli_backup.md)
+
+Backup command.
+
+* [kbcli backup create](kbcli_backup_create.md)	 - Create a backup for the cluster.
+* [kbcli backup delete](kbcli_backup_delete.md)	 - Delete a backup.
+* [kbcli backup describe](kbcli_backup_describe.md)	 - Describe a backup
+* [kbcli backup list](kbcli_backup_list.md)	 - List backups.
+
+
 ## [backuprepo](kbcli_backuprepo.md)
 
 BackupRepo command.

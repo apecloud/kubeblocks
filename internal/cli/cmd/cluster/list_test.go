@@ -73,7 +73,7 @@ var _ = Describe("list", func() {
 			Status: metav1.ConditionFalse,
 			Reason: verticalScalingReason,
 		})
-		clusterWithVerticalScaling.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+		clusterWithVerticalScaling.Status.Phase = appsv1alpha1.UpdatingClusterPhase
 		clusterWithAbnormalPhase := testing.FakeCluster(clusterName2, namespace)
 		clusterWithAbnormalPhase.Status.Phase = appsv1alpha1.AbnormalClusterPhase
 		pods := testing.FakePods(3, namespace, clusterName)
@@ -115,7 +115,7 @@ var _ = Describe("list", func() {
 
 		cmd.Run(cmd, []string{clusterName, clusterName1, clusterName2})
 		Expect(out.String()).Should(ContainSubstring(testing.ClusterDefName))
-		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.SpecReconcilingClusterPhase)))
+		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.UpdatingClusterPhase)))
 		Expect(out.String()).Should(ContainSubstring(cluster.ConditionsError))
 		Expect(out.String()).Should(ContainSubstring(string(appsv1alpha1.AbnormalClusterPhase)))
 	})

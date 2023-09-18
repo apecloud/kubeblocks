@@ -32,8 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -58,7 +60,7 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
 
-type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationStatus) error
+type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
 
 // reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the common function to reconcile opsRequest status when the opsRequest will affect the lifecycle of the components.
@@ -96,7 +98,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
-	opsIsCompleted := opsRequestHasProcessed(*opsRes)
+	opsIsCompleted := opsRequestHasProcessed(reqCtx, cli, *opsRes)
 	for k, v := range opsRes.Cluster.Status.Components {
 		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
 			continue
@@ -146,8 +148,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	// check if the cluster has applied the changes of the opsRequest and wait for the cluster to finish processing the ops.
-	if opsRes.ToClusterPhase == opsRes.Cluster.Status.Phase ||
-		opsRes.Cluster.Status.ObservedGeneration < opsRes.OpsRequest.Status.ClusterGeneration {
+	if !opsIsCompleted {
 		return opsRequestPhase, 0, nil
 	}
 
@@ -165,9 +166,27 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 }
 
 // opsRequestHasProcessed checks if the opsRequest has been processed.
-func opsRequestHasProcessed(opsRes OpsResource) bool {
-	return opsRes.ToClusterPhase != opsRes.Cluster.Status.Phase &&
-		opsRes.Cluster.Status.ObservedGeneration >= opsRes.OpsRequest.Status.ClusterGeneration
+func opsRequestHasProcessed(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes OpsResource) bool {
+	if opsRes.ToClusterPhase == opsRes.Cluster.Status.Phase {
+		return false
+	}
+	// if all pods of all components are with latest revision, ops has processed
+	rsmList := &workloads.ReplicatedStateMachineList{}
+	if err := cli.List(reqCtx.Ctx, rsmList,
+		client.InNamespace(opsRes.Cluster.Namespace),
+		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		return false
+	}
+	for _, rsm := range rsmList.Items {
+		isLatestRevision, err := components.IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, opsRes.Cluster, &rsm)
+		if err != nil {
+			return false
+		}
+		if !isLatestRevision {
+			return false
+		}
+	}
+	return true
 }
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
@@ -340,7 +359,7 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 		}
 	}
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)
-	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationStatus{
+	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationItemStatus{
 		Name:   tplName,
 		Status: appsv1alpha1.ReasonReconfigureMerging,
 	})
@@ -362,7 +381,7 @@ func patchReconfigureOpsStatus(
 	var opsRequest = opsRes.OpsRequest
 	if opsRequest.Status.ReconfiguringStatus == nil {
 		opsRequest.Status.ReconfiguringStatus = &appsv1alpha1.ReconfiguringStatus{
-			ConfigurationStatus: make([]appsv1alpha1.ConfigurationStatus, 0),
+			ConfigurationStatus: make([]appsv1alpha1.ConfigurationItemStatus, 0),
 		}
 	}
 
@@ -371,8 +390,8 @@ func patchReconfigureOpsStatus(
 }
 
 // getSlowestReconfiguringProgress gets the progress of the reconfiguring operations.
-func getSlowestReconfiguringProgress(status []appsv1alpha1.ConfigurationStatus) string {
-	slowest := appsv1alpha1.ConfigurationStatus{
+func getSlowestReconfiguringProgress(status []appsv1alpha1.ConfigurationItemStatus) string {
+	slowest := appsv1alpha1.ConfigurationItemStatus{
 		SucceedCount:  math.MaxInt32,
 		ExpectedCount: -1,
 	}

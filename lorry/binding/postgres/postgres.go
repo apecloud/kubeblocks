@@ -26,13 +26,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"golang.org/x/exp/slices"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+	. "github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres/apecloudpostgres"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres/officalpostgres"
@@ -90,31 +91,32 @@ type PostgresOperations struct {
 var _ BaseInternalOps = &PostgresOperations{}
 
 // NewPostgres returns a new PostgreSQL output binding.
-func NewPostgres(logger logger.Logger) bindings.OutputBinding {
+func NewPostgres() *PostgresOperations {
+	logger := ctrl.Log.WithName("Postgres")
 	return &PostgresOperations{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 // Init initializes the PostgreSql binding.
-func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
-	pgOps.Logger.Debug("Initializing Postgres binding")
+func (pgOps *PostgresOperations) Init(metadata Properties) error {
+	pgOps.Logger.Info("Initializing Postgres binding")
 	_ = pgOps.BaseOperations.Init(metadata)
 	pgOps.workloadType = viper.GetString(constant.KBEnvWorkloadType)
-	config, err := postgres.NewConfig(metadata.Properties)
+	config, err := postgres.NewConfig(metadata)
 	if err != nil {
-		pgOps.Logger.Errorf("new postgresql config failed, err:%v", err)
+		pgOps.Logger.Error(err, "new postgresql config failed")
 	}
 
 	var manager postgres.PgIFace
 	if strings.EqualFold(pgOps.workloadType, constant.Consensus) {
 		manager, err = apecloudpostgres.NewManager(pgOps.Logger)
 		if err != nil {
-			pgOps.Logger.Errorf("ApeCloud PostgreSQL DB Manager initialize failed: %v", err)
+			pgOps.Logger.Error(err, "ApeCloud PostgreSQL DB Manager initialize failed")
 			return err
 		}
 	} else {
 		manager, err = officalpostgres.NewManager(pgOps.Logger)
 		if err != nil {
-			pgOps.Logger.Errorf("PostgreSQL DB Manager initialize failed: %v", err)
+			pgOps.Logger.Error(err, "PostgreSQL DB Manager initialize failed")
 			return err
 		}
 	}
@@ -144,11 +146,11 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 	return 0
 }
 
-func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
 	return pgOps.manager.GetMemberRoleWithHost(ctx, "")
 }
 
-func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
@@ -158,7 +160,7 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	}
 	count, err := pgOps.manager.Exec(ctx, sql)
 	if err != nil {
-		pgOps.Logger.Infof("exec error: %v", err)
+		pgOps.Logger.Error(err, "exec error")
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
@@ -168,7 +170,7 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	return result, nil
 }
 
-func (pgOps *PostgresOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) CheckStatusOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	rwSQL := fmt.Sprintf(`begin;
 create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));
 insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do update set check_ts = CURRENT_TIMESTAMP;
@@ -192,11 +194,11 @@ insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do u
 
 	result := OpsResult{}
 	if err != nil {
-		pgOps.Logger.Infof("CheckStatus error: %v", err)
+		pgOps.Logger.Error(err, "CheckStatus error")
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		if pgOps.CheckStatusFailedCount%pgOps.FailedEventReportFrequency == 0 {
-			pgOps.Logger.Infof("status checks failed %v times continuously", pgOps.CheckStatusFailedCount)
+			pgOps.Logger.Info("status checks failed continuously", "times", pgOps.CheckStatusFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		pgOps.CheckStatusFailedCount++
@@ -208,7 +210,7 @@ insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do u
 	return result, nil
 }
 
-func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
@@ -218,7 +220,7 @@ func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *bindings.Inv
 	}
 	data, err := pgOps.manager.Query(ctx, sql)
 	if err != nil {
-		pgOps.Logger.Infof("Query error: %v", err)
+		pgOps.Logger.Error(err, "Query error")
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 	} else {
@@ -239,11 +241,11 @@ func (pgOps *PostgresOperations) InternalExec(ctx context.Context, sql string) (
 }
 
 // GetLogger is used for getting logger, implements BaseInternalOps interface
-func (pgOps *PostgresOperations) GetLogger() logger.Logger {
+func (pgOps *PostgresOperations) GetLogger() logr.Logger {
 	return pgOps.Logger
 }
 
-func (pgOps *PostgresOperations) createUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) createUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object  = UserInfo{}
 		opsKind = CreateUserOp
@@ -266,7 +268,7 @@ func (pgOps *PostgresOperations) createUserOps(ctx context.Context, req *binding
 	return ExecuteObject(ctx, pgOps, req, opsKind, sqlTplRend, msgTplRend, object)
 }
 
-func (pgOps *PostgresOperations) deleteUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) deleteUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object     = UserInfo{}
 		opsKind    = CreateUserOp
@@ -287,21 +289,21 @@ func (pgOps *PostgresOperations) deleteUserOps(ctx context.Context, req *binding
 	return ExecuteObject(ctx, pgOps, req, opsKind, sqlTplRend, msgTplRend, object)
 }
 
-func (pgOps *PostgresOperations) grantUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) grantUserRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s granted to user: %s"
 	)
 	return pgOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
 }
 
-func (pgOps *PostgresOperations) revokeUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) revokeUserRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s revoked from user: %s"
 	)
 	return pgOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
 }
 
-func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *bindings.InvokeRequest, op bindings.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
+func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *ProbeRequest, op OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
 	var (
 		object = UserInfo{}
 
@@ -332,7 +334,7 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *bind
 	return ExecuteObject(ctx, pgOps, req, op, sqlTplRend, msgTplRend, object)
 }
 
-func (pgOps *PostgresOperations) listUsersOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) listUsersOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		opsKind    = ListUsersOp
 		sqlTplRend = func(user UserInfo) string {
@@ -342,7 +344,7 @@ func (pgOps *PostgresOperations) listUsersOps(ctx context.Context, req *bindings
 	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, pgUserRolesProcessor, UserInfo{})
 }
 
-func (pgOps *PostgresOperations) listSystemAccountsOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) listSystemAccountsOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		opsKind    = ListUsersOp
 		sqlTplRend = func(user UserInfo) string {
@@ -372,7 +374,7 @@ func (pgOps *PostgresOperations) listSystemAccountsOps(ctx context.Context, req 
 	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, dataProcessor, UserInfo{})
 }
 
-func (pgOps *PostgresOperations) describeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (pgOps *PostgresOperations) describeUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		object  = UserInfo{}
 		opsKind = DescribeUserOp

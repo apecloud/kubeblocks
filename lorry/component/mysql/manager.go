@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
@@ -53,7 +53,7 @@ type Manager struct {
 
 var _ component.DBManager = &Manager{}
 
-func NewManager(logger logger.Logger) (*Manager, error) {
+func NewManager(logger logr.Logger) (*Manager, error) {
 	db, err := config.GetLocalDBConn()
 	if err != nil {
 		return nil, errors.Wrap(err, "connect to MySQL")
@@ -63,7 +63,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		if err != nil {
 			derr := db.Close()
 			if derr != nil {
-				logger.Errorf("failed to close: %v", err)
+				logger.Error(err, "failed to close")
 			}
 		}
 	}()
@@ -107,11 +107,11 @@ func (mgr *Manager) IsRunning() bool {
 		if driverErr, ok := err.(*mysql.MySQLError); ok {
 			// Now the error number is accessible directly
 			if driverErr.Number == 1040 {
-				mgr.Logger.Infof("Too many connections: %v", err)
+				mgr.Logger.Error(err, "Too many connections")
 				return true
 			}
 		}
-		mgr.Logger.Infof("DB is not ready: %v", err)
+		mgr.Logger.Error(err, "DB is not ready")
 		return false
 	}
 
@@ -128,12 +128,12 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	// test if db is ready to connect or not
 	err := mgr.DB.PingContext(ctx)
 	if err != nil {
-		mgr.Logger.Infof("DB is not ready: %v", err)
+		mgr.Logger.Error(err, "DB is not ready")
 		return false
 	}
 
 	mgr.DBStartupReady = true
-	mgr.Logger.Infof("DB startup ready")
+	mgr.Logger.Info("DB startup ready")
 	return true
 }
 
@@ -144,7 +144,7 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
-			mgr.Logger.Infof("Get Member conn failed: %v", err)
+			mgr.Logger.Error(err, "Get Member conn failed")
 			return false, err
 		}
 		if db != nil {
@@ -160,7 +160,7 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 		Scan(&mgr.hostname, &mgr.version, &readonly, &mgr.binlogFormat,
 			&mgr.logbinEnabled, &mgr.logReplicationUpdatesEnabled)
 	if err != nil {
-		mgr.Logger.Infof("Get global readonly failed: %v", err)
+		mgr.Logger.Error(err, "Get global readonly failed")
 		return false, err
 	}
 	return readonly, nil
@@ -237,7 +237,7 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	var err error
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
-		mgr.Logger.Warnf("No leader DBstate info")
+		mgr.Logger.Info("No leader DBstate info")
 		return false, 0
 	}
 	leaderDBState = cluster.Leader.DBState
@@ -246,7 +246,7 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
-			mgr.Logger.Infof("Get Member conn failed: %v", err)
+			mgr.Logger.Error(err, "Get Member conn failed")
 			return false, 0
 		}
 		if db != nil {
@@ -257,14 +257,14 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	}
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
 	if err != nil {
-		mgr.Logger.Infof("get op timestamp failed: %v", err)
+		mgr.Logger.Error(err, "get op timestamp failed")
 		return false, 0
 	}
 
 	if leaderDBState.OpTimestamp-opTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
 		return false, 0
 	}
-	mgr.Logger.Warnf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-opTimestamp)
+	mgr.Logger.Info(fmt.Sprintf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-opTimestamp))
 	return true, leaderDBState.OpTimestamp - opTimestamp
 }
 
@@ -275,7 +275,7 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
-			mgr.Logger.Infof("Get Member conn failed: %v", err)
+			mgr.Logger.Error(err, "Get Member conn failed")
 			return false
 		}
 		if db != nil {
@@ -302,25 +302,25 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 
 	globalState, err := mgr.GetGlobalState(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Infof("select global failed: %v", err)
+		mgr.Logger.Error(err, "select global failed")
 		return nil
 	}
 
 	masterStatus, err := mgr.GetMasterStatus(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Infof("show master status failed: %v", err)
+		mgr.Logger.Error(err, "show master status failed")
 		return nil
 	}
 
 	slaveStatus, err := mgr.GetSlaveStatus(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Infof("show slave status failed: %v", err)
+		mgr.Logger.Error(err, "show slave status failed")
 		return nil
 	}
 
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Infof("get op timestamp failed: %v", err)
+		mgr.Logger.Error(err, "get op timestamp failed")
 		return nil
 	}
 
@@ -365,7 +365,7 @@ INSERT INTO kubeblocks.kb_health_check VALUES(%d, UNIX_TIMESTAMP()) ON DUPLICATE
 COMMIT;`, component.CheckStatusType)
 	_, err := db.ExecContext(ctx, writeSQL)
 	if err != nil {
-		mgr.Logger.Infof("SQL %s executing failed: %v", writeSQL, err)
+		mgr.Logger.Error(err, fmt.Sprintf("SQL %s executing failed", writeSQL))
 		return false
 	}
 	return true
@@ -382,7 +382,7 @@ func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
 			// no healthy database, return true
 			return true
 		}
-		mgr.Logger.Infof("Read check failed: %v", err)
+		mgr.Logger.Error(err, "Read check failed")
 		return false
 	}
 
@@ -423,7 +423,7 @@ func (mgr *Manager) GetSlaveStatus(ctx context.Context, db *sql.DB) (RowMap, err
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		mgr.Logger.Error(err, "error executing %s")
 		return nil, err
 	}
 	return rowMap, nil
@@ -438,7 +438,7 @@ func (mgr *Manager) GetMasterStatus(ctx context.Context, db *sql.DB) (RowMap, er
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
 		return nil, err
 	}
 	return rowMap, nil
@@ -475,19 +475,19 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	var serverID uint
 	err := mgr.DB.QueryRowContext(ctx, "select @@global.server_id").Scan(&serverID)
 	if err != nil {
-		mgr.Logger.Infof("Get global server id failed: %v", err)
+		mgr.Logger.Error(err, "Get global server id failed: %v")
 		return false, err
 	}
 	if serverID == mgr.serverID {
 		return true, nil
 	}
-	mgr.Logger.Infof("Set global server id : %v")
+	mgr.Logger.Info("Set global server id : ")
 
 	setServerID := fmt.Sprintf(`set global server_id = %d`, mgr.serverID)
-	mgr.Logger.Infof("Set global server id : %v", setServerID)
+	mgr.Logger.Info("Set global server id", "server-id", setServerID)
 	_, err = mgr.DB.Exec(setServerID)
 	if err != nil {
-		mgr.Logger.Errorf("set server id err: %v", err)
+		mgr.Logger.Error(err, "set server id err")
 		return false, err
 	}
 
@@ -504,11 +504,11 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
 	if err != nil {
-		mgr.Logger.Errorf("promote err: %v", err)
+		mgr.Logger.Error(err, "promote err")
 		return err
 	}
 
-	mgr.Logger.Infof("promote success, resp:%v", resp)
+	mgr.Logger.Info(fmt.Sprintf("promote success, resp:%v", resp))
 	return nil
 }
 
@@ -517,7 +517,7 @@ func (mgr *Manager) Demote(context.Context) error {
 
 	_, err := mgr.DB.Exec(setReadOnly)
 	if err != nil {
-		mgr.Logger.Errorf("demote err: %v", err)
+		mgr.Logger.Error(err, "demote err")
 		return err
 	}
 	return nil
@@ -530,7 +530,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	}
 
 	if mgr.CurrentMemberName == cluster.Leader.Name {
-		mgr.Logger.Infof("i get the leader key, don't need to follow")
+		mgr.Logger.Info("i get the leader key, don't need to follow")
 		return nil
 	}
 
@@ -545,10 +545,10 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 
 	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)
 	if err != nil {
-		mgr.Logger.Errorf("sql query failed, err:%v", err)
+		mgr.Logger.Error(err, "sql query failed, err")
 	}
 
-	mgr.Logger.Infof("successfully follow new leader:%s", leaderMember.Name)
+	mgr.Logger.Info("successfully follow new leader", "leader-name", leaderMember.Name)
 	return nil
 }
 
@@ -562,7 +562,7 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	ioError := rowMap.GetString("Last_IO_Error")
 	sqlError := rowMap.GetString("Last_SQL_Error")
 	if ioError != "" || sqlError != "" {
-		mgr.Logger.Infof("slave status error, sqlError: %s, ioError: %s", sqlError, ioError)
+		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, sqlError: %s, ioError: %s", sqlError, ioError))
 		return true
 	}
 
@@ -593,7 +593,7 @@ func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
 		return false, err
 	}
 
@@ -659,7 +659,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 
 	_, err := mgr.DB.Exec(setReadOnly)
 	if err != nil {
-		mgr.Logger.Errorf("Lock err: %v", err)
+		mgr.Logger.Error(err, "Lock err")
 		return err
 	}
 	mgr.IsLocked = true
@@ -671,7 +671,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 
 	_, err := mgr.DB.Exec(setReadOnlyOff)
 	if err != nil {
-		mgr.Logger.Errorf("Unlock err: %v", err)
+		mgr.Logger.Error(err, "Unlock err")
 		return err
 	}
 	mgr.IsLocked = false

@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: openldap-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "openldap.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: openldap
+  componentVersions:
+    - componentDefRef: openldap-compdef
+      versionsContext:
+        containers:
+          - name: openldap-container
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

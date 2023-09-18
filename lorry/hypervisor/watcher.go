@@ -24,7 +24,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 )
 
 type Watcher struct {
@@ -32,7 +32,7 @@ type Watcher struct {
 	cancel     context.CancelFunc
 	DaemonChan chan *Daemon
 	Processes  map[int]chan *ProcStatus
-	Logger     logger.Logger
+	Logger     logr.Logger
 }
 
 type ProcStatus struct {
@@ -40,7 +40,7 @@ type ProcStatus struct {
 	err   error
 }
 
-func NewWatcher(logger logger.Logger) *Watcher {
+func NewWatcher(logger logr.Logger) *Watcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	daemonChan := make(chan *Daemon, 1)
 	processes := make(map[int]chan *ProcStatus)
@@ -57,18 +57,18 @@ func NewWatcher(logger logger.Logger) *Watcher {
 func (watcher *Watcher) Start() {
 	for daemon := range watcher.DaemonChan {
 		if daemon.Stopped {
-			watcher.Logger.Infof("Daemon %s is stopped by manual. Will not be restarted.", daemon)
+			watcher.Logger.Info("Daemon is stopped by manual. Will not be restarted.", "daemon", daemon)
 			continue
 		}
-		watcher.Logger.Infof("Restarting daemon")
+		watcher.Logger.Info("Restarting daemon")
 		if daemon.IsAlive() {
-			watcher.Logger.Warnf("Daemon %s was supposed to be dead, but it is alive.", daemon)
+			watcher.Logger.Info("Daemon was supposed to be dead, but it is alive.", "daemon", daemon)
 		}
 
 		time.Sleep(time.Second)
 		err := daemon.Start()
 		if err != nil {
-			watcher.Logger.Warnf("Could not restart process %s due to %s.", daemon, err)
+			watcher.Logger.Error(err, "Could not restart daemon.", "daemon", daemon)
 		}
 
 		watcher.Watch(daemon)
@@ -77,12 +77,12 @@ func (watcher *Watcher) Start() {
 
 func (watcher *Watcher) Watch(daemon *Daemon) {
 	if daemon.Process == nil {
-		watcher.Logger.Infof("There is no process for the daemon %s", daemon)
+		watcher.Logger.Info("There is no process for the daemon", "daemon", daemon)
 		return
 	}
 
 	if _, ok := watcher.Processes[daemon.Process.Pid]; ok {
-		watcher.Logger.Infof("The daemon is arealdy under watching")
+		watcher.Logger.Info("The daemon is arealdy under watching")
 	}
 
 	statusChan := make(chan *ProcStatus, 1)
@@ -90,7 +90,7 @@ func (watcher *Watcher) Watch(daemon *Daemon) {
 
 	watcher.Processes[pid] = statusChan
 	go func() {
-		watcher.Logger.Infof("Starting watcher on daemon %s", daemon)
+		watcher.Logger.Info("Starting watcher on daemon", "daemon", daemon)
 		state, err := daemon.Wait()
 		statusChan <- &ProcStatus{
 			state: state,
@@ -103,8 +103,7 @@ func (watcher *Watcher) Watch(daemon *Daemon) {
 		select {
 		case procStatus := <-statusChan:
 			if procStatus != nil {
-				watcher.Logger.Infof("Daemon %s exists", daemon)
-				watcher.Logger.Infof("State is %s", procStatus.state.String())
+				watcher.Logger.Info("Daemon exists", "daemon", daemon, "state", procStatus.state.String())
 				watcher.DaemonChan <- daemon
 				close(statusChan)
 			}
@@ -119,7 +118,7 @@ func (watcher *Watcher) StopAndWait() {
 	for _, statusChan := range watcher.Processes {
 		procStatus := <-statusChan
 		if procStatus != nil {
-			watcher.Logger.Infof("Daemon exists, State is %s", procStatus.state.String())
+			watcher.Logger.Info("Daemon exists", "state", procStatus.state.String())
 			close(statusChan)
 		}
 	}

@@ -23,14 +23,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"strings"
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/zapr"
 	"github.com/go-redis/redismock/v9"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
@@ -71,10 +70,10 @@ func TestRedisInvokeCreate(t *testing.T) {
 	defer r.Close()
 
 	result := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Data:      []byte(testData),
 		Metadata:  map[string]string{"key": testKey},
-		Operation: bindings.CreateOperation,
+		Operation: CreateOperation,
 	}
 	// mock expectation
 	mock.ExpectDo("SET", testKey, testData).SetVal("ok")
@@ -95,9 +94,9 @@ func TestRedisInvokeGet(t *testing.T) {
 	defer r.Close()
 
 	opsResult := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Metadata:  map[string]string{"key": testKey},
-		Operation: bindings.GetOperation,
+		Operation: GetOperation,
 	}
 	// mock expectation, set to nil
 	mock.ExpectDo("GET", testKey).RedisNil()
@@ -129,9 +128,9 @@ func TestRedisInvokeDelete(t *testing.T) {
 	defer r.Close()
 
 	opsResult := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Metadata:  map[string]string{"key": testKey},
-		Operation: bindings.DeleteOperation,
+		Operation: DeleteOperation,
 	}
 	// mock expectation, set to err
 	mock.ExpectDo("DEL", testKey).SetVal("ok")
@@ -151,7 +150,7 @@ func TestRedisGetRoles(t *testing.T) {
 	defer r.Close()
 
 	opsResult := OpsResult{}
-	request := &bindings.InvokeRequest{
+	request := &ProbeRequest{
 		Operation: GetRoleOperation,
 	}
 
@@ -187,7 +186,7 @@ func TestRedisAccounts(t *testing.T) {
 	t.Run("List Accounts", func(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
-		response, err := r.Invoke(ctx, &bindings.InvokeRequest{
+		response, err := r.Invoke(ctx, &ProbeRequest{
 			Operation: ListUsersOp,
 		})
 
@@ -214,8 +213,8 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
-			request   = &bindings.InvokeRequest{
+			response  *ProbeResponse
+			request   = &ProbeRequest{
 				Operation: CreateUserOp,
 			}
 		)
@@ -270,7 +269,7 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
+			response  *ProbeResponse
 		)
 
 		testCases := []redisTestCase{
@@ -308,12 +307,12 @@ func TestRedisAccounts(t *testing.T) {
 			},
 		}
 
-		for _, ops := range []bindings.OperationKind{GrantUserRoleOp, RevokeUserRoleOp} {
+		for _, ops := range []OperationKind{GrantUserRoleOp, RevokeUserRoleOp} {
 			// mock exepctation
 			args := tokenizeCmd2Args(fmt.Sprintf("ACL SETUSER %s %s", userName, r.role2Priv(ops, (string)(roleName))))
 			mock.ExpectDo(args...).SetVal("ok")
 
-			request := &bindings.InvokeRequest{
+			request := &ProbeRequest{
 				Operation: ops,
 			}
 			for _, accTest := range testCases {
@@ -337,8 +336,8 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
-			request   = &bindings.InvokeRequest{
+			response  *ProbeResponse
+			request   = &ProbeRequest{
 				Operation: DescribeUserOp,
 			}
 			// mock a user, describing it as an array of interface{}
@@ -438,8 +437,8 @@ func TestRedisAccounts(t *testing.T) {
 		var (
 			err       error
 			opsResult = OpsResult{}
-			response  *bindings.InvokeResponse
-			request   = &bindings.InvokeRequest{
+			response  *ProbeResponse
+			request   = &ProbeRequest{
 				Operation: DeleteUserOp,
 			}
 		)
@@ -534,7 +533,7 @@ func TestRedisAccounts(t *testing.T) {
 	t.Run("List System Accounts", func(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
-		response, err := r.Invoke(ctx, &bindings.InvokeRequest{
+		response, err := r.Invoke(ctx, &ProbeRequest{
 			Operation: ListSystemAccountsOp,
 		})
 
@@ -566,10 +565,11 @@ func mockRedisOps(t *testing.T) (*Redis, redismock.ClientMock) {
 		return nil, nil
 	}
 	r := &Redis{}
-	r.Logger = logger.NewLogger("test")
+	development, _ := zap.NewDevelopment()
+	r.Logger = zapr.NewLogger(development)
 	r.client = client
 	r.ctx, r.cancel = context.WithCancel(context.Background())
-	_ = r.Init(bindings.Metadata{})
+	_ = r.Init(nil)
 	r.DBPort = 6379
 	return r, mock
 }

@@ -28,7 +28,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 )
 
 // Daemon represents the managed DB process.
@@ -42,10 +42,10 @@ type Daemon struct {
 	Stderr  *os.File
 	Status  *os.ProcessState
 	Process *os.Process
-	Logger  logger.Logger
+	Logger  logr.Logger
 }
 
-func NewDaemon(args []string, logger logger.Logger) (*Daemon, error) {
+func NewDaemon(args []string, logger logr.Logger) (*Daemon, error) {
 	argCount := len(args)
 
 	if argCount == 0 {
@@ -108,10 +108,10 @@ func (daemon *Daemon) Start() error {
 		},
 	}
 	args := append([]string{daemon.Cmd}, daemon.Args...)
-	daemon.Logger.Infof("Start DB Service: %s", daemon)
+	daemon.Logger.Info("Start DB Service", "command", daemon)
 	process, err := os.StartProcess(daemon.Cmd, args, procAtr)
 	if err != nil {
-		daemon.Logger.Errorf("Start DB Service failed: %s", err)
+		daemon.Logger.Error(err, "Start DB Service failed")
 		return err
 	}
 	daemon.Process = process

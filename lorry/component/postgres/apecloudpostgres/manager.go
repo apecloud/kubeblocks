@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
@@ -45,7 +45,7 @@ type Manager struct {
 
 var Mgr *Manager
 
-func NewManager(logger logger.Logger) (*Manager, error) {
+func NewManager(logger logr.Logger) (*Manager, error) {
 	Mgr = &Manager{}
 
 	baseManager, err := postgres.NewManager(logger)
@@ -67,21 +67,21 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("check is leader failed, err:%v", err)
+		mgr.Logger.Error(err, "check is leader failed")
 		return nil
 	}
 	mgr.SetIsLeader(isLeader)
 
 	memberAddrs := mgr.GetMemberAddrs(ctx, cluster)
 	if memberAddrs == nil {
-		mgr.Logger.Errorf("get member addrs failed")
+		mgr.Logger.Error(nil, "get member addrs failed")
 		return nil
 	}
 	mgr.memberAddrs = memberAddrs
 
 	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, cluster.GetMemberWithName(mgr.CurrentMemberName))
 	if err != nil {
-		mgr.Logger.Errorf("get member health status failed, err:%v", err)
+		mgr.Logger.Error(err, "get member health status failed")
 		return nil
 	}
 	mgr.healthStatus = healthStatus
@@ -124,7 +124,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	}
 
 	mgr.DBStartupReady = true
-	mgr.Logger.Infof("DB startup ready")
+	mgr.Logger.Info("DB startup ready")
 	return true
 }
 
@@ -132,13 +132,13 @@ func (mgr *Manager) isConsensusReadyUp(ctx context.Context) bool {
 	sql := `SELECT extname FROM pg_extension WHERE extname = 'consensus_monitor';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
 		return false
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
 		return false
 	}
 
@@ -147,7 +147,7 @@ func (mgr *Manager) isConsensusReadyUp(ctx context.Context) bool {
 
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if !mgr.IsFirstMember() {
-		mgr.Logger.Infof("I am not the first member, just skip and wait for the first member to initialize the cluster.")
+		mgr.Logger.Info("I am not the first member, just skip and wait for the first member to initialize the cluster.")
 		return true, nil
 	}
 
@@ -158,13 +158,13 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	sql := `SELECT usename FROM pg_user WHERE usename = 'replicator';`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
 		return false, err
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
 		return false, err
 	}
 
@@ -184,13 +184,13 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 
 	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
 		return "", err
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
 		return "", err
 	}
 
@@ -206,7 +206,7 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	case 3:
 		role = binding.LEARNER
 	default:
-		mgr.Logger.Warnf("get invalid role number:%d", cast.ToInt(resMap[0]["paxos_role"]))
+		mgr.Logger.Info(fmt.Sprintf("get invalid role number:%d", cast.ToInt(resMap[0]["paxos_role"])))
 		role = ""
 	}
 
@@ -221,13 +221,13 @@ func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []
 	sql := `select ip_port from consensus_cluster_status;`
 	resp, err := mgr.QueryLeader(ctx, sql, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("query %s with leader failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query %s with leader failed", sql))
 		return nil
 	}
 
 	result, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
 		return nil
 	}
 
@@ -257,10 +257,10 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, member)
 	if errors.Is(err, postgres.ClusterHasNoLeader) {
-		mgr.Logger.Infof("cluster has no leader, will compete the leader lock")
+		mgr.Logger.Info("cluster has no leader, will compete the leader lock")
 		return true
 	} else if err != nil {
-		mgr.Logger.Errorf("check member healthy failed, err:%v", err)
+		mgr.Logger.Error(err, "check member healthy failed")
 		return false
 	}
 
@@ -298,10 +298,10 @@ func (mgr *Manager) getMemberHealthStatus(ctx context.Context, cluster *dcs.Clus
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
 	healthStatus, err := mgr.getMemberHealthStatus(ctx, cluster, member)
 	if errors.Is(err, postgres.ClusterHasNoLeader) {
-		mgr.Logger.Infof("cluster has no leader, so member has no lag")
+		mgr.Logger.Info("cluster has no leader, so member has no lag")
 		return false, 0
 	} else if err != nil {
-		mgr.Logger.Errorf("check member lag failed, err:%v", err)
+		mgr.Logger.Error(err, "check member lag failed")
 		return true, cluster.HaConfig.GetMaxLagOnSwitchover() + 1
 	}
 
@@ -314,7 +314,7 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 
 	_, err := mgr.ExecLeader(ctx, sql, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err
 	}
 
@@ -328,7 +328,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	// only leader can delete member, so don't need to get pool
 	_, err := mgr.ExecWithHost(ctx, sql, "")
 	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err
 	}
 
@@ -339,7 +339,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		mgr.Logger.Infof("cluster has no leader, wait for leader to take the lock")
+		mgr.Logger.Info("cluster has no leader, wait for leader to take the lock")
 		// when cluster has no leader, the health status of the cluster is assumed to be true by default,
 		// in order to proceed with the logic of competing for the leader lock
 		return true
@@ -355,7 +355,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
-		mgr.Logger.Infof("i am already the leader, don't need to promote")
+		mgr.Logger.Info("i am already the leader, don't need to promote")
 		return nil
 	}
 
@@ -363,7 +363,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	sql := `select ip_port from consensus_cluster_status where server_id = (select current_leader from consensus_member_status);`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
 		return err
 	}
 
@@ -376,7 +376,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	promoteSQL := fmt.Sprintf(`alter system consensus CHANGE LEADER TO '%s:%d';`, cluster.GetMemberAddrWithName(mgr.CurrentMemberName), mgr.Config.GetDBPort())
 	_, err = mgr.ExecWithHost(ctx, promoteSQL, currentLeaderAddr)
 	if err != nil {
-		mgr.Logger.Errorf("exec sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err
 	}
 
@@ -398,13 +398,13 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	sql := `select ip_port from consensus_cluster_status where server_id = (select current_leader from consensus_member_status);`
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
 		return nil
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", err)
+		mgr.Logger.Error(err, "parse query response failed")
 		return nil
 	}
 

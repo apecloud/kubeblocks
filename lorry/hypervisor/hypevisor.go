@@ -22,19 +22,19 @@ package hypervisor
 import (
 	"errors"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 )
 
 type Hypervisor struct {
-	Logger    logger.Logger
+	Logger    logr.Logger
 	DBService *Daemon
 	Watcher   *Watcher
 }
 
 var hypervisor *Hypervisor
 
-func NewHypervisor(logger logger.Logger) (*Hypervisor, error) {
+func NewHypervisor(logger logr.Logger) (*Hypervisor, error) {
 	args := pflag.Args()
 	daemon, err := NewDaemon(args, logger)
 	if err != nil {
@@ -60,7 +60,7 @@ func (hypervisor *Hypervisor) Start() {
 
 	err := hypervisor.DBService.Start()
 	if err != nil {
-		hypervisor.Logger.Warnf("Start DB Service failed: %s", err)
+		hypervisor.Logger.Error(err, "Start DB Service failed")
 		return
 	}
 
@@ -99,7 +99,7 @@ func StartDBService() error {
 
 	err := hypervisor.DBService.Start()
 	if err != nil {
-		hypervisor.Logger.Warnf("Start DB Service failed: %s", err)
+		hypervisor.Logger.Error(err, "Start DB Service failed")
 		return err
 	}
 

@@ -1,0 +1,11 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: foxlake-cluster-start-
+spec:
+  clusterRef: foxlake-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Start
+  restart:
+    - componentName: foxlake-server
+    - componentName: foxlake-metadb

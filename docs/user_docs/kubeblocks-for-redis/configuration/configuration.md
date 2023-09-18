@@ -9,11 +9,6 @@ sidebar_position: 1
 
 The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
 
-## Before you start
-
-1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Create a Redis cluster](./../cluster-management/create-and-connect-a-redis-cluster.md) and wait until the cluster status is Running.
-
 ## View parameter information
 
 View the current configuration file of a cluster.

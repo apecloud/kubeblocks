@@ -101,7 +101,9 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build role changed probe container", func() {
-			buildRoleProbeContainer(component, container, clusterDefProbe, probeServiceHTTPPort)
+			synthesizedComponent := &SynthesizedComponent{CharacterType: "wesql"}
+			pod := &corev1.PodSpec{}
+			buildRoleProbeContainer(synthesizedComponent, container, clusterDefProbe, probeServiceHTTPPort, pod)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 

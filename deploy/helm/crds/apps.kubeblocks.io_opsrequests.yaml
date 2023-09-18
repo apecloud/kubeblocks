@@ -658,12 +658,14 @@ spec:
                       description: phase describes the component phase, reference
                         Cluster.status.component.phase.
                       enum:
+                      - Creating
                       - Running
+                      - Updating
+                      - Stopping
                       - Stopped
+                      - Deleting
                       - Failed
                       - Abnormal
-                      - Creating
-                      - Updating
                       type: string
                     progressDetails:
                       description: progressDetails describes the progress details

@@ -57,7 +57,7 @@ metadata:
     app.kubernetes.io/version: "5.0.14"
     app.kubernetes.io/instance: mongodb-cluster
 spec:
-  clusterVersionRef: mongodb-5.0.14
+  clusterVersionRef: mongodb-5.0
   terminationPolicy: Delete  
   affinity:
     podAntiAffinity: Preferred

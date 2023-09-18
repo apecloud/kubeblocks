@@ -22,7 +22,8 @@ package polardbx
 import (
 	"context"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -36,7 +37,7 @@ type Manager struct {
 
 var _ component.DBManager = &Manager{}
 
-func NewManager(logger logger.Logger) (*Manager, error) {
+func NewManager(logger logr.Logger) (*Manager, error) {
 	mysqlMgr, err := mysql.NewManager(logger)
 	if err != nil {
 		return nil, err
@@ -54,7 +55,7 @@ func (mgr *Manager) GetRole(ctx context.Context) (string, error) {
 
 	rows, err := mgr.DB.QueryContext(ctx, sql)
 	if err != nil {
-		mgr.Logger.Infof("error executing %s: %v", sql, err)
+		mgr.Logger.Error(err, "error executing sql", "sql", sql)
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
@@ -67,7 +68,7 @@ func (mgr *Manager) GetRole(ctx context.Context) (string, error) {
 	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&role); err != nil {
-			mgr.Logger.Errorf("Role query error: %v", err)
+			mgr.Logger.Error(err, "Role query error")
 			return role, err
 		}
 		isReady = true

@@ -148,24 +148,26 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	// mergeAnnotations keeps the original annotations.
-	mergeAnnotations := func(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
-		if targetAnnotations == nil || originalAnnotations == nil {
+	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
+		if targetMap == nil || originalMap == nil {
 			return
 		}
-		if *targetAnnotations == nil {
-			*targetAnnotations = map[string]string{}
+		if *targetMap == nil {
+			*targetMap = map[string]string{}
 		}
-		for k, v := range originalAnnotations {
+		for k, v := range originalMap {
 			// if the annotation not exist in targetAnnotations, copy it from original.
-			if _, ok := (*targetAnnotations)[k]; !ok {
-				(*targetAnnotations)[k] = v
+			if _, ok := (*targetMap)[k]; !ok {
+				(*targetMap)[k] = v
 			}
 		}
 	}
 
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
+		mergeMetadataMap(oldSts.Labels, &newSts.Labels)
+		oldSts.Labels = newSts.Labels
 		// if annotations exist and are replaced, the StatefulSet will be updated.
-		mergeAnnotations(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
+		mergeMetadataMap(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
 		oldSts.Spec.Replicas = newSts.Spec.Replicas
 		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
@@ -173,13 +175,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		// remove original monitor annotations
-		if len(oldSvc.Annotations) > 0 {
-			maps.DeleteFunc(oldSvc.Annotations, func(k, v string) bool {
-				return strings.HasPrefix(k, "monitor.kubeblocks.io")
-			})
-		}
-		mergeAnnotations(oldSvc.Annotations, &newSvc.Annotations)
+		mergeMetadataMap(oldSvc.Annotations, &newSvc.Annotations)
 		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec
 		return oldSvc
@@ -208,9 +204,11 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	if rsm.Spec.Service == nil {
 		return nil
 	}
+	annotations := ParseAnnotationsOfScope(ServiceScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, false)
 	return builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
+		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(rsm.Spec.Service.Labels).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
@@ -223,6 +221,7 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 	if rsm.Spec.Service == nil {
 		return nil
 	}
+	annotations := ParseAnnotationsOfScope(AlternativeServiceScope, rsm.Annotations)
 	svcLabels := getLabels(&rsm)
 	var services []*corev1.Service
 	for i := range rsm.Spec.AlternativeServices {
@@ -238,23 +237,26 @@ func buildAlternativeSvs(rsm workloads.ReplicatedStateMachine) []*corev1.Service
 			labels[k] = v
 		}
 		service.Labels = labels
+		newAnnotations := make(map[string]string, 0)
+		maps.Copy(newAnnotations, service.Annotations)
+		maps.Copy(newAnnotations, annotations)
+		if len(newAnnotations) > 0 {
+			service.Annotations = newAnnotations
+		}
 		services = append(services, &service)
 	}
 	return services
 }
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	selectors := getSvcSelector(&rsm, true)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
-		AddSelectorsInMap(selectors)
-	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
-	// if component.Monitor.Enable {
-	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
-	//		AddAnnotations("prometheus.io/port", strconv.Itoa(int(component.Monitor.ScrapePort))).
-	//		AddAnnotations("prometheus.io/scheme", "http")
-	// }
+		AddSelectorsInMap(selectors).
+		AddAnnotationsInMap(annotations)
+
 	for _, container := range rsm.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
@@ -277,10 +279,12 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	template := buildStsPodTemplate(rsm, envConfig)
+	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
 		AddLabelsInMap(labels).
-		AddAnnotationsInMap(rsm.Annotations).
+		AddLabels(rsmGenerationLabelKey, strconv.FormatInt(rsm.Generation, 10)).
+		AddAnnotationsInMap(annotations).
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
 		SetReplicas(*rsm.Spec.Replicas).
@@ -293,11 +297,13 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
+	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	labels := getLabels(&rsm)
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
 	}
 	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-rsm-env").
+		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
 }

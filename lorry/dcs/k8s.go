@@ -27,7 +27,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -55,10 +56,10 @@ type KubernetesStore struct {
 	client             *rest.RESTClient
 	clientset          *kubernetes.Clientset
 	LeaderObservedTime int64
-	logger             logger.Logger
+	logger             logr.Logger
 }
 
-func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
+func NewKubernetesStore(logger logr.Logger) (*KubernetesStore, error) {
 	ctx := context.Background()
 	clientset, err := k8scomponent.GetClientSet(logger)
 	if err != nil {
@@ -112,7 +113,7 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 }
 
 func (store *KubernetesStore) Initialize(cluster *Cluster) error {
-	store.logger.Infof("k8s store initializing")
+	store.logger.Info("k8s store initializing")
 	_, err := store.GetCluster()
 	if err != nil {
 		return err
@@ -120,12 +121,12 @@ func (store *KubernetesStore) Initialize(cluster *Cluster) error {
 
 	err = store.CreateHaConfig(cluster)
 	if err != nil {
-		store.logger.Warnf("Create Ha ConfigMap failed: %s", err)
+		store.logger.Error(err, "Create Ha ConfigMap failed")
 	}
 
 	err = store.CreateLock()
 	if err != nil {
-		store.logger.Warnf("Create Leader ConfigMap failed: %s", err)
+		store.logger.Error(err, "Create Leader ConfigMap failed")
 	}
 	return err
 }
@@ -149,7 +150,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		Into(clusterResource)
 	// store.logger.Debugf("cluster resource: %v", clusterResource)
 	if err != nil {
-		store.logger.Errorf("k8s get cluster error: %v", err)
+		store.logger.Error(err, "k8s get cluster error")
 		return nil, err
 	}
 
@@ -163,22 +164,22 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	members, err := store.GetMembers()
 	if err != nil {
-		store.logger.Errorf("get members error: %v", err)
+		store.logger.Error(err, "get members error")
 	}
 
 	leader, err := store.GetLeader()
 	if err != nil {
-		store.logger.Errorf("get leader error: %v", err)
+		store.logger.Error(err, "get leader error")
 	}
 
 	switchover, err := store.GetSwitchover()
 	if err != nil {
-		store.logger.Errorf("get switchover error: %v", err)
+		store.logger.Error(err, "get switchover error")
 	}
 
 	haConfig, err := store.GetHaConfig()
 	if err != nil {
-		store.logger.Errorf("get HaConfig error: %v", err)
+		store.logger.Error(err, "get HaConfig error")
 	}
 
 	cluster := &Cluster{
@@ -204,13 +205,13 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	}
 
 	selector := labels.SelectorFromSet(labelsMap)
-	store.logger.Infof("pod selector: %s", selector.String())
+	store.logger.Info(fmt.Sprintf("pod selector: %s", selector.String()))
 	podList, err := store.clientset.CoreV1().Pods(store.namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
 
-	store.logger.Debugf("podlist: %d", len(podList.Items))
+	store.logger.Info(fmt.Sprintf("podlist: %d", len(podList.Items)))
 	members := make([]Member, len(podList.Items))
 	for i, pod := range podList.Items {
 		member := &members[i]
@@ -235,10 +236,10 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 	leaderConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, leaderName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			store.logger.Errorf("Leader configmap [%s] is not found", leaderName)
+			store.logger.Error(err, fmt.Sprintf("Leader configmap [%s] is not found", leaderName))
 			return nil, nil
 		}
-		store.logger.Errorf("Get Leader configmap failed: %v", err)
+		store.logger.Error(err, "Get Leader configmap failed")
 	}
 	return leaderConfigMap, err
 }
@@ -247,7 +248,7 @@ func (store *KubernetesStore) IsLockExist() (bool, error) {
 	leaderConfigMap, err := store.GetLeaderConfigMap()
 	appCluster, ok := store.cluster.resource.(*appsv1alpha1.Cluster)
 	if leaderConfigMap != nil && ok && leaderConfigMap.CreationTimestamp.Before(&appCluster.CreationTimestamp) {
-		store.logger.Infof("A previous leader configmap resource exists, delete it %s", leaderConfigMap.Name)
+		store.logger.Info("A previous leader configmap resource exists, delete it", "name", leaderConfigMap.Name)
 		_ = store.DeleteLeader()
 		return false, nil
 	}
@@ -278,10 +279,10 @@ func (store *KubernetesStore) CreateLock() error {
 		},
 	}
 
-	store.logger.Infof("K8S store initializing, create leader ConfigMap: %s", leaderConfigMapName)
+	store.logger.Info(fmt.Sprintf("K8S store initializing, create leader ConfigMap: %s", leaderConfigMapName))
 	err = store.createConfigMap(leaderConfigMap)
 	if err != nil {
-		store.logger.Errorf("Create Leader ConfigMap failed: %v", err)
+		store.logger.Error(err, "Create Leader ConfigMap failed")
 		return err
 	}
 	return nil
@@ -317,12 +318,12 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		dbState = new(DBState)
 		err = json.Unmarshal([]byte(stateStr), &dbState)
 		if err != nil {
-			store.logger.Infof("get leader dbstate failed: %v, annotations: %v", err, annotations)
+			store.logger.Error(err, fmt.Sprintf("get leader dbstate failed, annotations: %v", annotations))
 		}
 	}
 
 	if ttl > 0 && time.Now().Unix()-renewTime > int64(ttl) {
-		store.logger.Infof("lock expired: %v, now: %d", annotations, time.Now().Unix())
+		store.logger.Info(fmt.Sprintf("lock expired: %v, now: %d", annotations, time.Now().Unix()))
 		leader = ""
 	}
 
@@ -341,7 +342,7 @@ func (store *KubernetesStore) DeleteLeader() error {
 	leaderName := store.getLeaderName()
 	err := store.clientset.CoreV1().ConfigMaps(store.namespace).Delete(store.ctx, leaderName, metav1.DeleteOptions{})
 	if err != nil {
-		store.logger.Errorf("Delete leader configmap failed: %v", err)
+		store.logger.Error(err, "Delete leader configmap failed")
 	}
 	return err
 }
@@ -365,7 +366,7 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 	}
 	cm, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
-		store.logger.Errorf("Acquire lock failed: %v", err)
+		store.logger.Error(err, "Acquire lock failed")
 	} else {
 		store.cluster.Leader.Resource = cm
 	}
@@ -409,7 +410,7 @@ func (store *KubernetesStore) ReleaseLock() error {
 	}
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
-		store.logger.Errorf("release lock failed: %v", err)
+		store.logger.Error(err, "release lock failed")
 	}
 	// TODO: if response status code is 409, it means operation conflict.
 	return err
@@ -422,7 +423,7 @@ func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
 		return nil
 	}
 
-	store.logger.Infof("Create Ha ConfigMap: %s", haName)
+	store.logger.Info(fmt.Sprintf("Create Ha ConfigMap: %s", haName))
 	ttl := viper.GetString(constant.KBEnvTTL)
 	maxLag := viper.GetString("KB_MAX_LAG")
 	haConfigMap := &corev1.ConfigMap{
@@ -437,7 +438,7 @@ func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
 
 	err := store.createConfigMap(haConfigMap)
 	if err != nil {
-		store.logger.Infof("Create Ha ConfigMap failed: %v", err)
+		store.logger.Error(err, "Create Ha ConfigMap failed")
 	}
 	return err
 }
@@ -447,7 +448,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	configmap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(context.TODO(), configmapName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			store.logger.Errorf("Get ha configmap [%s] error: %v", configmapName, err)
+			store.logger.Error(err, fmt.Sprintf("Get ha configmap [%s] error", configmapName))
 		} else {
 			err = nil
 		}
@@ -472,7 +473,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	if str != "" {
 		err := json.Unmarshal([]byte(str), &deleteMembers)
 		if err != nil {
-			store.logger.Errorf("Get delete members [%s] errors: %v", str, err)
+			store.logger.Error(err, fmt.Sprintf("Get delete members [%s] error", str))
 		}
 	}
 
@@ -496,7 +497,7 @@ func (store *KubernetesStore) UpdateHaConfig() error {
 	annotations["ttl"] = strconv.Itoa(haConfig.ttl)
 	deleteMembers, err := json.Marshal(haConfig.DeleteMembers)
 	if err != nil {
-		store.logger.Errorf("marsha delete members [%v] errors: %v", haConfig, err)
+		store.logger.Error(err, fmt.Sprintf("marsha delete members [%v]", haConfig))
 	}
 	annotations["delete-members"] = string(deleteMembers)
 	annotations["MaxLagOnSwitchover"] = strconv.Itoa(int(haConfig.maxLagOnSwitchover))
@@ -510,10 +511,10 @@ func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error
 	switchOverConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, switchoverName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			store.logger.Debugf("no switchOver [%s] setting", switchoverName)
+			store.logger.Info(fmt.Sprintf("no switchOver [%s] setting", switchoverName))
 			return nil, nil
 		}
-		store.logger.Errorf("Get switchOver configmap failed: %v", err)
+		store.logger.Error(err, "Get switchOver configmap failed")
 	}
 	return switchOverConfigMap, err
 }
@@ -536,7 +537,7 @@ func (store *KubernetesStore) CreateSwitchover(leader, candidate string) error {
 		return fmt.Errorf("there is another switchover %s unfinished", switchoverName)
 	}
 
-	store.logger.Infof("Create switchover configmap %s", switchoverName)
+	store.logger.Info(fmt.Sprintf("Create switchover configmap %s", switchoverName))
 	swConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: switchoverName,
@@ -549,7 +550,7 @@ func (store *KubernetesStore) CreateSwitchover(leader, candidate string) error {
 
 	err := store.createConfigMap(swConfigMap)
 	if err != nil {
-		store.logger.Infof("Create switchover configmap failed %v", err)
+		store.logger.Error(err, "Create switchover configmap failed")
 		return err
 	}
 	return nil
@@ -559,7 +560,7 @@ func (store *KubernetesStore) DeleteSwitchover() error {
 	switchoverName := store.getSwitchoverName()
 	err := store.clientset.CoreV1().ConfigMaps(store.namespace).Delete(store.ctx, switchoverName, metav1.DeleteOptions{})
 	if err != nil {
-		store.logger.Errorf("Delete switchOver configmap failed: %v", err)
+		store.logger.Error(err, "Delete switchOver configmap failed")
 	}
 	return err
 }

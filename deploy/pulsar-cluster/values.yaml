@@ -167,3 +167,19 @@ clusterDomain: ".cluster.local"
 tests:
   benchmark:
     kafka2Kafka: true
+
+# Service reference configuration, such as using an external ZooKeeper or a ZooKeeper service deployed in a separate cluster,
+# currently supports configuring the ZooKeeper service reference.
+# For more information about service references, please refer to the Cluster API definition.
+# You can also use the `kubectl explain cluster.spec.componentSpecs.serviceRefs` command for detailed explanations.
+serviceReference:
+  enable: false
+  zookeeper:
+    ## namespace of cluster or serviceDescriptor object
+    namespace: ""
+    ## if zookeeper service is provided by another KubeBlocks Cluster，please specify cluster name which is referenced.
+    ## Please do not specify both cluster and serviceDescriptor at the same time.
+    cluster: ""
+    ## if zookeeper service is provided by external source, please create the ServiceDescriptor Object of zookeeper in target namespace firstly, then specify the serviceDescriptor name here.
+    ## Please do not specify both cluster and serviceDescriptor at the same time.
+    serviceDescriptor: ""

@@ -21,35 +21,25 @@ package custom
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/component"
+	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 func TestInit(t *testing.T) {
-	s := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			_, _ = w.Write([]byte("leader"))
-		}),
-	)
+	hs, s := setUpHost("leader", t)
 	defer s.Close()
-
-	addr := s.Listener.Addr().String()
-	index := strings.LastIndex(addr, ":")
-	portStr := addr[index+1:]
-	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", "["+portStr+"]")
-	m := bindings.Metadata{}
-	hs := NewHTTPCustom(logger.NewLogger("test"))
-	err := hs.Init(m)
-	require.NoError(t, err)
 
 	tests := map[string]struct {
 		input     string
@@ -69,10 +59,10 @@ func TestInit(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			response, err := hs.Invoke(context.TODO(), &bindings.InvokeRequest{
+			response, err := hs.Invoke(context.TODO(), &binding.ProbeRequest{
 				Data:      []byte(tc.input),
 				Metadata:  tc.metadata,
-				Operation: bindings.OperationKind(tc.operation),
+				Operation: OperationKind(tc.operation),
 			})
 			if tc.err == "" {
 				require.NoError(t, err)
@@ -83,4 +73,68 @@ func TestInit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGlobalInfo(t *testing.T) {
+	var lines []string
+	for i := 0; i < 3; i++ {
+		podName := "pod-" + strconv.Itoa(i)
+		var role string
+		if i == 0 {
+			role = "leader"
+		} else {
+			role = "follower"
+		}
+		lines = append(lines, fmt.Sprintf("%d,%s,%s", 1, podName, role))
+	}
+	join := strings.Join(lines, "\n")
+	hs, s := setUpHost(join, t)
+	defer s.Close()
+
+	tests := map[string]struct {
+		input     string
+		operation string
+		metadata  map[string]string
+		path      string
+		err       string
+	}{
+		"get": {
+			input:     join,
+			operation: "getGlobalInfo",
+			metadata:  nil,
+			path:      "/",
+			err:       "",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			response := binding.ProbeResponse{}
+			info, err := hs.GetGlobalInfo(context.TODO(), &binding.ProbeRequest{
+				Operation: OperationKind(tc.operation),
+			}, &response)
+			require.NoError(t, err)
+			assert.Equal(t, OperationSuccess, info.Event)
+			assert.Equal(t, 3, len(info.PodName2Role))
+			assert.Equal(t, 1, info.Term)
+		})
+	}
+
+}
+
+func setUpHost(respContent string, t *testing.T) (*HTTPCustom, *httptest.Server) {
+	s := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			_, _ = w.Write([]byte(respContent))
+		}),
+	)
+	addr := s.Listener.Addr().String()
+	index := strings.LastIndex(addr, ":")
+	portStr := addr[index+1:]
+	viper.Set("KB_RSM_ACTION_SVC_LIST", "["+portStr+"]")
+	hs := NewHTTPCustom()
+	metadata := make(component.Properties)
+	err := hs.Init(metadata)
+	require.NoError(t, err)
+	return hs, s
 }

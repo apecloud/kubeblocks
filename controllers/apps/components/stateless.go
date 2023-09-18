@@ -269,7 +269,7 @@ func (c *statelessComponent) createWorkload() {
 	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 	c.WorkloadVertex.Obj = deployProto
 	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
-	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
+	c.SetStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "Component workload created")
 }
 
 func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
@@ -288,7 +288,7 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 		updatePodSpecSystemFields(&deployObjCopy.Spec.Template.Spec)
 		c.WorkloadVertex.Obj = deployObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
-		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")
+		c.SetStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "Component workload updated")
 	}
 }
 

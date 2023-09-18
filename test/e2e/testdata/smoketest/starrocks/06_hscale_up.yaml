@@ -8,5 +8,3 @@ spec:
   horizontalScaling:
     - componentName: be
       replicas: 3
-    - componentName: fe
-      replicas: 3

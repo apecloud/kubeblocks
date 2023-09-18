@@ -31,6 +31,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -91,6 +92,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			return nil
 		}
 		var cmObj *corev1.ConfigMap
+		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, componentName)).
+			ClusterRef(clusterName).
+			Component(componentName).
+			ClusterDefRef(clusterDefinitionName).
+			ClusterVerRef(clusterVersionName)
 		for _, configSpec := range cdComponent.ConfigSpecs {
 			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
 			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
@@ -106,9 +112,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)
+			configuration.AddConfigurationItem(configSpec.Name)
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 			cmObj = cfgCM
 		}
+		Expect(testCtx.CheckedCreateObj(ctx, configuration.GetObject())).Should(Succeed())
 		return cmObj
 	}
 
@@ -195,7 +203,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
-				Configurations: []appsv1alpha1.Configuration{{
+				Configurations: []appsv1alpha1.ConfigurationItem{{
 					Name: "mysql-test",
 					Keys: []appsv1alpha1.ParameterConfig{{
 						Key: "my.cnf",
@@ -260,7 +268,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
-				Configurations: []appsv1alpha1.Configuration{{
+				Configurations: []appsv1alpha1.ConfigurationItem{{
 					Name: "mysql-test",
 					Keys: []appsv1alpha1.ParameterConfig{{
 						Key: "my.cnf",
@@ -302,12 +310,12 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				clusterObject.Status.Components[consensusComp] = compStatus
 				Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 			}
-			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase)
+			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase)
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 
 			By("check cluster.status.components[*].phase == Reconfiguring")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
+			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
 			// TODO: add status condition expect
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Running

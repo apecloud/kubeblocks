@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -50,18 +51,30 @@ func checkEnableCfgUpgrade(object client.Object) bool {
 	return true
 }
 
-func setCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, flag bool) error {
+func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase appsv1alpha1.ConfigurationPhase, failed bool, retry bool) (ctrl.Result, error) {
+	revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]
+	if !ok || revision == "" {
+		return intctrlutil.Reconciled()
+	}
+
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
-	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
-		return err
+	if failed {
+		config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(true)
 	}
 
-	return nil
+	GcConfigRevision(config)
+	config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(phase)
+	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
+		return intctrlutil.RequeueWithError(err, ctx.Log, "")
+	}
+	if retry {
+		return intctrlutil.RequeueAfter(ConfigReconcileInterval, ctx.Log, "")
+	}
+	return intctrlutil.Reconciled()
 }
 
 // checkAndApplyConfigsChanged check if configs changed
@@ -89,6 +102,10 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
+	GcConfigRevision(config)
+	if revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]; ok && revision != "" {
+		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(appsv1alpha1.CFinishedPhase)
+	}
 	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)
 	hash, err := util.ComputeHash(config.Data)
 	if err != nil {

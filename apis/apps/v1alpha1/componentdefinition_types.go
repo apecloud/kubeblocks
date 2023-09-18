@@ -163,12 +163,13 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Labels map[string]BuiltInString `json:"labels,omitempty"`
 
-	// TODO: support other resources provisioning.
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// TODO: accounts KB required
 	// Cannot be updated.
 	// +optional
 	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
+
+	// TODO: support other resources provisioning.
 
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
@@ -203,6 +204,10 @@ type ComponentDefinitionSpec struct {
 	// +listMapKey=componentDefName
 	// +optional
 	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
+
+	// serviceRefDeclarations is used to declare the service reference of the current component.
+	// +optional
+	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
 }
 
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition

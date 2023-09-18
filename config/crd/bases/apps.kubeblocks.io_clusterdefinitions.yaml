@@ -9219,14 +9219,14 @@ spec:
                               default: 4
                               description: numDigits defines number of digits.
                               format: int32
-                              maximum: 20
+                              maximum: 8
                               minimum: 0
                               type: integer
                             numSymbols:
                               default: 4
                               description: numSymbols defines number of symbols.
                               format: int32
-                              maximum: 20
+                              maximum: 8
                               minimum: 0
                               type: integer
                           type: object

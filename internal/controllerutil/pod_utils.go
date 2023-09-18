@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -357,12 +358,13 @@ func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 
 // GetProbeContainerName gets the probe container from pod
 func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+	lorryImage := viper.GetString(constant.KBToolsImage)
 	for _, container := range pod.Spec.Containers {
-		if container.Name == constant.RoleProbeContainerName {
-			return constant.RoleProbeContainerName, nil
+		if container.Image == lorryImage {
+			return container.Name, nil
 		}
 	}
-	return "", fmt.Errorf("container %s not found", constant.RoleProbeContainerName)
+	return "", fmt.Errorf("container %s not found", lorryImage)
 
 }
 

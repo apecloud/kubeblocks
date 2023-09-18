@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
@@ -144,7 +143,7 @@ func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'`)
 	cmd.Flags().StringSliceVar(&o.ExtraArgs, "extra-args", nil, "extra arguments for benchmark")
 
-	registerClusterCompletionFunc(cmd, o.factory)
+	util.RegisterClusterCompletionFunc(cmd, o.factory)
 }
 
 // NewBenchCmd creates the bench command
@@ -442,15 +441,6 @@ func (o *benchDescribeOption) run() error {
 		}
 	}
 	return nil
-}
-
-func registerClusterCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
-	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"cluster",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
-		},
-	))
 }
 
 func registerBenchmarkCompletionFunc(cmd *cobra.Command, f cmdutil.Factory, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

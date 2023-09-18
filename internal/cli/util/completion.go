@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 func ResourceNameCompletionFunc(f cmdutil.Factory, gvr schema.GroupVersionResource) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
@@ -111,4 +113,17 @@ func CompGetFromTemplateWithLabels(template *string, f cmdutil.Factory, namespac
 		}
 	}
 	return comps
+}
+
+func RegisterClusterCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	if cmd.Flags().Lookup("cluster") == nil {
+		return
+	}
+
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cluster",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.CompGetResource(f, cmd, GVRToString(types.ClusterGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+	))
 }

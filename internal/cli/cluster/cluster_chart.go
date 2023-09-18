@@ -220,6 +220,7 @@ func ValidateValues(c *ChartInfo, values map[string]interface{}) error {
 }
 
 func loadHelmChart(ci *ChartInfo, t ClusterType) error {
+	// cf references cluster config
 	cf, ok := ClusterTypeCharts[t]
 	if !ok {
 		return fmt.Errorf("failed to find the helm chart of %s", t)
@@ -233,7 +234,7 @@ func loadHelmChart(ci *ChartInfo, t ClusterType) error {
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {
-			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.getChartFileName(), err)
+			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.GetChartFileName(), err)
 		}
 	}
 

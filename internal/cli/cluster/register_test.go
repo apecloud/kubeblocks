@@ -37,7 +37,7 @@ var _ = Describe("cluster register", func() {
 		}
 		Expect(mysql.register("mysql")).Should(HaveOccurred())
 		Expect(mysql.register("mysql-other")).Should(Succeed())
-		Expect(mysql.getChartFileName()).Should(Equal("apecloud-mysql-cluster.tgz"))
+		Expect(mysql.GetChartFileName()).Should(Equal("apecloud-mysql-cluster.tgz"))
 		Expect(mysql.getAlias()).Should(Equal(""))
 		chart, err := mysql.loadChart()
 		Expect(err).Should(Succeed())
@@ -48,12 +48,13 @@ var _ = Describe("cluster register", func() {
 
 	It("test external chart", func() {
 		fakeChart := &TypeInstance{
-			Name:  "fake",
-			URL:   "www.fake-chart-hub/fake.tgz",
-			Alias: "",
+			Name:      "fake",
+			URL:       "www.fake-chart-hub/fake.tgz",
+			Alias:     "",
+			ChartName: "fake.tgz",
 		}
 		Expect(fakeChart.getAlias()).Should(Equal(""))
-		Expect(fakeChart.getChartFileName()).Should(Equal("fake.tgz"))
+		Expect(fakeChart.GetChartFileName()).Should(Equal("fake.tgz"))
 		_, err := fakeChart.loadChart()
 		Expect(err).Should(HaveOccurred())
 		Expect(fakeChart.register("fake")).Should(HaveOccurred())
@@ -93,7 +94,7 @@ var _ = Describe("cluster register", func() {
 			Expect(tempCLusterConfig.WriteConfigs(tempConfigPath)).Should(Succeed())
 
 			file, _ := os.ReadFile(tempConfigPath)
-			Expect(string(file)).Should(Equal("- name: orioledb\n  helmChartUrl: https://fakeurl.com\n  alias: \"\"\n"))
+			Expect(string(file)).Should(Equal("- name: orioledb\n  helmChartUrl: https://fakeurl.com\n  alias: \"\"\n  chartName: \"\"\n"))
 		})
 
 	})

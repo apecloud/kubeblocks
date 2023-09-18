@@ -24,7 +24,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
@@ -136,7 +135,7 @@ func ClearCharts(c ClusterType) {
 			klog.V(2).Info(fmt.Sprintf("Warning: auto clear %s config fail due to: %s\n", c, err.Error()))
 
 		}
-		if err := os.Remove(filepath.Join(CliChartsCacheDir, ClusterTypeCharts[c].getChartFileName())); err != nil {
+		if err := os.Remove(filepath.Join(CliChartsCacheDir, ClusterTypeCharts[c].GetChartFileName())); err != nil {
 			klog.V(2).Info(fmt.Sprintf("Warning: auto clear %s config fail due to: %s\n", c, err.Error()))
 		}
 		CacheFiles = GetChartCacheFiles()
@@ -148,14 +147,16 @@ type TypeInstance struct {
 	Name  ClusterType `yaml:"name"`
 	URL   string      `yaml:"helmChartUrl"`
 	Alias string      `yaml:"alias"`
+	// chartName is the filename cached locally
+	ChartName string `yaml:"chartName"`
 }
 
 func (h *TypeInstance) loadChart() (io.ReadCloser, error) {
-	return os.Open(filepath.Join(CliChartsCacheDir, h.getChartFileName()))
+	return os.Open(filepath.Join(CliChartsCacheDir, h.GetChartFileName()))
 }
 
-func (h *TypeInstance) getChartFileName() string {
-	return path.Base(h.URL)
+func (h *TypeInstance) GetChartFileName() string {
+	return h.ChartName
 }
 
 func (h *TypeInstance) getAlias() string {
@@ -169,7 +170,7 @@ func (h *TypeInstance) register(subcmd ClusterType) error {
 	ClusterTypeCharts[subcmd] = h
 
 	for _, f := range CacheFiles {
-		if f.Name() == h.getChartFileName() {
+		if f.Name() == h.GetChartFileName() {
 			return nil
 		}
 	}

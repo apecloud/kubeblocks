@@ -52,7 +52,7 @@ func (e *embedConfig) loadChart() (io.ReadCloser, error) {
 	return e.chartFS.Open(fmt.Sprintf("charts/%s", e.name))
 }
 
-func (e *embedConfig) getChartFileName() string {
+func (e *embedConfig) GetChartFileName() string {
 	return e.name
 }
 
@@ -69,6 +69,10 @@ var (
 	//go:embed charts/mongodb-cluster.tgz
 	mongodbChart embed.FS
 )
+
+func IsbuiltinCharts(chart string) bool {
+	return chart == "mysql" || chart == "postgresql" || chart == "kafka" || chart == "redis" || chart == "mongodb"
+}
 
 // internal_chart registers embed chart
 

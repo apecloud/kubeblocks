@@ -30,7 +30,7 @@ You can also view the details of this configuration file and parameters.
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config mysql-cluster |head -n 20
+  kbcli cluster explain-config mysql-cluster | head -n 20
   ```
 
 * View the user guide of a specified parameter.
@@ -64,7 +64,9 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Reconfigure dynamic parameters
+## Reconfigure parameters with --set flag
+
+### Reconfigure dynamic parameters
 
 The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
@@ -184,7 +186,7 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
    1 row in set (0.00 sec)
    ```
 
-## Reconfigure static parameters
+### Reconfigure static parameters
 
 Static parameter reconfiguring requires restarting the pod. The following example reconfigures `ngram_token_size`.
 
@@ -290,6 +292,8 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
 For your convenience, kbcli offers a tool `edit-config` to help you to visually edit configurations.
 
 For Linux and macOS, you can edit configuration files by vi and for Windows, you can edit files on notepad.
+
+The following steps take configuring MySQL Standalone as an example.
 
 1. Edit the configuration file.
 

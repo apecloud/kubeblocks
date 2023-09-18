@@ -63,7 +63,9 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Reconfigure dynamic parameters
+## Reconfigure parameters with --set flag
+
+### Reconfigure dynamic parameters
 
 The example below reconfigures `acllog-max-len`.
 
@@ -155,7 +157,7 @@ The example below reconfigures `acllog-max-len`.
    2) "256"
    ```
 
-## Reconfigure static parameters
+### Reconfigure static parameters
 
 The example below reconfigures `maxclients` and `databases`.
 

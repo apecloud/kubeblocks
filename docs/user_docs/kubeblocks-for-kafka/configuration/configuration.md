@@ -62,7 +62,9 @@ You can also view the details of this configuration file and parameters.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. Currerntly, Kafka only supports static strategy, i.e. `Dynamic` is `false`. Restarting is required to make reconfiguration effective since using kbcli to configure parameters triggers broker restarting.
   * Description: It describes the parameter definition.
 
-## Reconfigure static parameters
+## Reconfigure parameters with --set flag
+
+### Reconfigure static parameters
 
 Static parameter reconfiguring requires restarting the pod.
 

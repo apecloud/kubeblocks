@@ -36,7 +36,7 @@ You can also view the details of this configuration file and parameters.
    kbcli cluster describe-config mongodb-cluster --show-detail
    ```
 
-## Reconfigure parameters
+## Reconfigure parameters with --set flag
 
 The example below reconfigures velocity to 1.
 

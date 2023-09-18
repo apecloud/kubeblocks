@@ -41,7 +41,7 @@ Table 1 lists four common refresh methods, including UNIX Signal, SQL, Auto, etc
 | Methods     | Descriptions | Applicability |
 | :---------- | :----------- | :------------ |
 | Unix Signal | For example, PostgreSQL. <br /> If you need to reload the configuration file after parameter changes, send a `SIGHUP` signal to PG. | Applicable to engines that support Unix Signal updates. |
-| SQL         | For example, MySQL. <br /> Parameter changes need to be made through the SQL statement `SET GLOBAL VARIABLE <var> =<value>`. | Applicable to most RDBMS engines. <br /> **Note**: The execSQL interface is required. Currently, KubeBlocks only supports MySQL and Postgres. |
+| SQL         | For example, MySQL. <br /> Parameter changes need to be made through the SQL statement `SET GLOBAL <var> =<value>`. | Applicable to most RDBMS engines. <br /> **Note**: The execSQL interface is required. Currently, KubeBlocks only supports MySQL and Postgres. |
 | Tools       | For example, Redis or Mongo. <br /> Related tools are provided for updating parameters. | Implemented via custom scripts or local tools, highly versatile. |
 | Auto        | The engine itself watches for changes in configuration files, and updates automatically when a change is detected. | Dependent on whether the engine supports automatic loading. |
 

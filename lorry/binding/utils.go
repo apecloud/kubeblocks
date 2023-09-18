@@ -241,7 +241,7 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, resp *ProbeRespons
 
 		_ = sendEvent(ctx, log, event)
 	default:
-		log.Info("no event sent, RoleUpdateMechanism: %s", roleUpdateMechanism)
+		log.Info(fmt.Sprintf("no event sent, RoleUpdateMechanism: %s", roleUpdateMechanism))
 	}
 }
 

@@ -104,6 +104,7 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 		if err != nil {
 			return "", err
 		}
+		h.Logger.Info("action succeed", "url", u, "output", lastOutput)
 	}
 	role := string(lastOutput)
 

@@ -207,7 +207,7 @@ max_connections = '1000'
 				ClusterVer:  clusterVersionObj,
 				Component:   clusterComponent,
 				PodSpec:     clusterComponent.PodSpec,
-			}, item, &configurationObj.Status.ConfigurationItemStatus[0])
+			}, item, &configurationObj.Status.ConfigurationItemStatus[0], nil)
 
 			By("update configuration resource")
 			err = reconcileTask.InitConfigSpec().

@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -42,17 +43,20 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 	return Task{
 		Name:   item.Name,
 		Status: status,
-		Do: func(fetcher *Task, component *component.SynthesizedComponent, revision string) error {
+		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, revision string) error {
+			configSpec := component.GetConfigSpecByName(synComponent, item.Name)
+			if configSpec == nil {
+				return core.MakeError("not found config spec: %s", item.Name)
+			}
 			reconcileTask := configuration.NewReconcilePipeline(configuration.ReconcileCtx{
 				ResourceCtx: fetcher.ResourceCtx,
 				Cluster:     fetcher.ClusterObj,
 				ClusterVer:  fetcher.ClusterVerObj,
-				Component:   component,
-				PodSpec:     component.PodSpec,
-			}, item, status)
-			return reconcileTask.InitConfigSpec().
-				ConfigMap(item.Name).
-				ConfigConstraints(reconcileTask.ConfigSpec().ConfigConstraintRef).
+				Component:   synComponent,
+				PodSpec:     synComponent.PodSpec,
+			}, item, status, configSpec)
+			return reconcileTask.ConfigMap(item.Name).
+				ConfigConstraints(configSpec.ConfigConstraintRef).
 				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().

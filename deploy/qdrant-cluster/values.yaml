@@ -1,34 +1,47 @@
-# Default values for wesqlcluster.
+# Default values for qdrant cluster.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 1
-terminationPolicy: Delete
+fullnameOverride:
 
-clusterVersionOverride: ""
-nameOverride: ""
-fullnameOverride: ""
+## @param version Qdrant cluster version
+##
+version: qdrant-1.5.0
 
-monitor:
-  enabled: false
+## @param replicas specify cluster replicas
+##
+replicas: 1
 
-resources: { }
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+## @param cpu
+##
+cpu: 0.5
 
-  # limits:
-  #   cpu: 500m
-  #   memory: 2Gi
-  # requests:
-  #   cpu: 100m
-  #   memory: 1Gi 
-persistence:
-  enabled: true
-  data:
-    storageClassName:
-    size: 10Gi
+## @param memory, the unit is Gi
+##
+memory: 2
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
+## @param storage size, the unit is Gi
+##
+storage: 20
+
+## @param proxyEnabled if true, enable the proxy
+## if mode is standalone, proxyEnabled is always false
+## if mode is raftGroup, proxyEnabled can be true or false
+##
+proxyEnabled: false
+
+## customized default values to override kblib chart's values
+extra:
+  podAntiAffinity: Required
+  terminationPolicy: Delete
+
 
 serviceAccount:
   name:

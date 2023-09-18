@@ -22,6 +22,9 @@ images:
   tools:
     repository: apecloud/curl-jq
     tag: latest
+  web_ui:
+    repository: apecloud/qdrant-web-ui
+    tag: latest
 
 ## @param debugEnabled enables containers' debug logging
 ##

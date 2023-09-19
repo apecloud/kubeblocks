@@ -187,6 +187,10 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 		return nil, fmt.Errorf("targetVolumes is required for snapshotVolumes")
 	}
 
+	if !utils.VolumeSnapshotEnabled() {
+		return nil, fmt.Errorf("volume snapshot is not enabled")
+	}
+
 	pvcs, err := getPVCsByVolumeNames(r.Client, targetPod, r.BackupMethod.TargetVolumes.Volumes)
 	if err != nil {
 		return nil, err
@@ -204,7 +208,7 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 			Labels:    BuildBackupWorkloadLabels(r.Backup),
 		},
 		Owner:                    r.Backup,
-		VolumeSnapshotNamePrefix: r.Backup.Name,
+		VolumeSnapshotNamePrefix: GetVolumeSnapshotNamePrefix(r.Backup),
 		PersistentVolumeClaims:   pvcs,
 	}, nil
 }

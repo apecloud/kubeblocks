@@ -66,3 +66,7 @@ func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj c
 	controllerutil.RemoveFinalizer(obj, dptypes.DataProtectionFinalizerName)
 	return cli.Patch(ctx, obj, patch)
 }
+
+func VolumeSnapshotEnabled() bool {
+	return viper.GetBool("VOLUMESNAPSHOT")
+}

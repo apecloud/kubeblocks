@@ -92,8 +92,8 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 	)
 	for _, pvc := range c.PersistentVolumeClaims {
 		key := client.ObjectKey{Namespace: pvc.Namespace, Name: c.VolumeSnapshotNamePrefix + pvc.Name}
-		// create volume snapshot
-		if err = c.createVolumeSnapshot(ctx, vsCli, &pvc, key); err != nil {
+		// check if volume snapshot exists, if not, create it
+		if err = c.createVolumeSnapshotIfNotExist(ctx, vsCli, &pvc, key); err != nil {
 			return handleErr(err)
 		}
 
@@ -129,11 +129,11 @@ func (c *CreateVolumeSnapshotAction) validate() error {
 	return nil
 }
 
-func (c *CreateVolumeSnapshotAction) createVolumeSnapshot(ctx Context,
+// createVolumeSnapshotIfNotExist check volume snapshot exists, if not, create it.
+func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	vsCli intctrlutil.VolumeSnapshotCompatClient,
 	pvc *corev1.PersistentVolumeClaim,
 	key client.ObjectKey) error {
-	// get volumeSnapshotClass, if not exists, create one
 	var (
 		err error
 		vsc *vsv1.VolumeSnapshotClass
@@ -145,14 +145,14 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshot(ctx Context,
 		return err
 	}
 
-	// If the volume snapshot already exists, skip creating it.
+	// if the volume snapshot already exists, skip creating it.
 	if exists {
 		return nil
 	}
 
 	// create volume snapshot
 	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
-		vsc, err = getOrCreateVolumeSnapshotClass(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName)
+		vsc, err = createVolumeSnapshotClassIfNotExist(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName)
 		if err != nil {
 			return err
 		}
@@ -188,7 +188,7 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshot(ctx Context,
 	return nil
 }
 
-func getOrCreateVolumeSnapshotClass(
+func createVolumeSnapshotClassIfNotExist(
 	ctx context.Context,
 	cli client.Client,
 	vsCli intctrlutil.VolumeSnapshotCompatClient,

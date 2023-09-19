@@ -46,21 +46,17 @@ import (
 
 var _ = Describe("Backup Controller test", func() {
 	const (
-		clusterName         = "wesql-cluster"
-		componentName       = "replicasets-primary"
-		containerName       = "mysql"
-		backupPolicyName    = "test-backup-policy"
-		backupRemotePVCName = "backup-remote-pvc"
-		defaultSchedule     = "0 3 * * *"
-		defaultTTL          = "7d"
-		backupName          = "test-backup"
-		storageClassName    = "test-storage-class"
-		backupRepoName      = "test-backup-repo"
-		backupMethodName    = "xtrabackup"
-		volumeMountPath     = "/var/lib/mysql"
-		pathPrefix          = "/backup"
-		vsBackupMethodName  = "volume-snapshot"
-		actionSetName       = "test-actionset"
+		clusterName        = "wesql-cluster"
+		componentName      = "replicasets-primary"
+		containerName      = "mysql"
+		backupPolicyName   = "test-backup-policy"
+		backupName         = "test-backup"
+		storageClassName   = "test-storage-class"
+		backupMethodName   = "xtrabackup"
+		volumeMountPath    = "/var/lib/mysql"
+		pathPrefix         = "/backup"
+		vsBackupMethodName = "volume-snapshot"
+		actionSetName      = "test-actionset"
 	)
 
 	var (
@@ -150,7 +146,6 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
-		testapps.ClearResources(&testCtx, generics.CronJobSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 
 		// non-namespaced
@@ -287,13 +282,13 @@ var _ = Describe("Backup Controller test", func() {
 			It("should fail after job fails", func() {
 				patchK8sJobStatus(jobKey(), batchv1.JobFailed)
 
-				By("Check backup job failed")
+				By("check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, jobKey(), func(g Gomega, fetched *batchv1.Job) {
 					_, finishedType := dputils.IsJobFinished(fetched)
 					g.Expect(finishedType).To(Equal(batchv1.JobFailed))
 				})).Should(Succeed())
 
-				By("Check backup failed")
+				By("check backup failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
@@ -404,7 +399,7 @@ var _ = Describe("Backup Controller test", func() {
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 				vsKey = client.ObjectKey{
-					Name:      dpbackup.GenerateVolumeSnapshotName(backup, pvcName),
+					Name:      dpbackup.GetVolumeSnapshotNamePrefix(backup) + pvcName,
 					Namespace: backup.Namespace,
 				}
 			})
@@ -416,8 +411,11 @@ var _ = Describe("Backup Controller test", func() {
 				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 			})
 
-			It("should success after all jobs complete", func() {
+			It("should success after all volume snapshot ready", func() {
+				By("patching volumesnapshot status to ready")
 				patchVolumeSnapshotStatus(vsKey, true)
+
+				By("checking volume snapshot source is equal to pvc")
 				Eventually(testapps.CheckObj(&testCtx, vsKey, func(g Gomega, fetched *vsv1.VolumeSnapshot) {
 					g.Expect(*fetched.Spec.Source.PersistentVolumeClaimName).To(Equal(pvcName))
 				})).Should(Succeed())
@@ -457,32 +455,32 @@ var _ = Describe("Backup Controller test", func() {
 			It("should fail when disable volumesnapshot", func() {
 				viper.Set("VOLUMESNAPSHOT", "false")
 
-				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				By("creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupMethod(vsBackupMethodName).
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 
-				By("Check backup failed")
+				By("check backup failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
 
 			It("should fail without pvc", func() {
-				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				By("creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupMethod(vsBackupMethodName).
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
-				By("Check backup job failed")
+
+				By("check backup failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
-
 		})
 	})
 

@@ -206,6 +206,6 @@ func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
 }
 
-func GenerateVolumeSnapshotName(backup *dpv1alpha1.Backup, pvcName string) string {
-	return fmt.Sprintf("%s-%s", backup.Name, pvcName)
+func GetVolumeSnapshotNamePrefix(backup *dpv1alpha1.Backup) string {
+	return fmt.Sprintf("%s-", backup.Name)
 }

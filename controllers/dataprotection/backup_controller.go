@@ -57,6 +57,7 @@ import (
 	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
 	dperrors "github.com/apecloud/kubeblocks/internal/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -261,7 +262,7 @@ func (r *BackupReconciler) handleNewPhase(
 
 	// set and patch backup status
 	if err = r.patchBackupStatus(backup, request); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	}
 	return intctrlutil.Reconciled()
 }
@@ -314,6 +315,12 @@ func (r *BackupReconciler) prepareBackupRequest(
 	snapshotVolumes := boolptr.IsSetToTrue(backupMethod.SnapshotVolumes)
 	if !snapshotVolumes && backupMethod.ActionSetName == "" {
 		return nil, fmt.Errorf("backup method %s should specify snapshotVolumes or actionSetName", backupMethod.Name)
+	}
+
+	// if backup method use volume snapshots to back up, the volume snapshot
+	// feature should be enabled.
+	if snapshotVolumes && !dputils.VolumeSnapshotEnabled() {
+		return nil, fmt.Errorf("current backup method depends on volume snapshot, but volume snapshot is not enabled")
 	}
 
 	if backupMethod.ActionSetName != "" {

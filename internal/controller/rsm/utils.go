@@ -22,12 +22,6 @@ package rsm
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -36,8 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sort"
+	"strconv"
+	"strings"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -136,7 +134,7 @@ func composeRolePriorityMap(rsm workloads.ReplicatedStateMachine) map[string]int
 
 // updatePodRoleLabel updates pod role label when internal container role changed
 func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version time.Time) error {
+	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version string) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(rsm)
 	// role not defined in CR, ignore it
@@ -157,7 +155,7 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
-	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = version.Format(time.RFC3339Nano)
+	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = version
 	return cli.Patch(ctx, pod, patch)
 }
 

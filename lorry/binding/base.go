@@ -46,8 +46,8 @@ type PodRoleNamePair struct {
 	RoleName string `json:"roleName,omitempty"`
 }
 
-type GlobalInfo struct {
-	Term             int64             `json:"term,omitempty"`
+type GlobalRoleSnapshot struct {
+	Version          string            `json:"term,omitempty"`
 	PodRoleNamePairs []PodRoleNamePair `json:"PodRoleNamePairs,omitempty"`
 }
 
@@ -79,7 +79,7 @@ type BaseOperations struct {
 	DBAddress              string
 	DBType                 string
 	OriRole                string
-	OriGlobalInfo          *GlobalInfo
+	OriGlobalInfo          *GlobalRoleSnapshot
 	DBRoles                map[string]AccessMode
 	Logger                 logr.Logger
 	Metadata               map[string]string

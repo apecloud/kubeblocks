@@ -34,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/lorry/binding"
 )
 
 // TODO(free6om): dedup copied funcs from event_controllers.go
@@ -109,45 +110,65 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 	role := strings.ToLower(message.Role)
 
-	podName := types.NamespacedName{
-		Namespace: event.InvolvedObject.Namespace,
-		Name:      event.InvolvedObject.Name,
-	}
-	// get pod
-	pod := &corev1.Pod{}
-	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
-		return role, err
-	}
-	// event belongs to old pod with the same name, ignore it
-	if pod.UID != event.InvolvedObject.UID {
-		return role, nil
-	}
-
-	// compare the EventTime of the current event object with the lastTimestamp of the last recorded in the pod annotation,
-	// if the current event's EventTime is earlier than the recorded lastTimestamp in the pod annotation,
-	// it indicates that the current event has arrived out of order and is expired, so it should not be processed.
-	lastTimestampStr, ok := pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]
-	if ok {
-		lastTimestamp, err := time.Parse(time.RFC3339Nano, lastTimestampStr)
-		if err != nil {
-			reqCtx.Log.Info("failed to parse last role changed event timestamp from pod annotation", "pod", pod.Name, "error", err.Error())
-			return role, err
+	snapshot := parseGlobalRoleSnapshot(role, event)
+	for _, pair := range snapshot.PodRoleNamePairs {
+		podName := types.NamespacedName{
+			Namespace: event.InvolvedObject.Namespace,
+			Name:      pair.PodName,
 		}
-		eventLastTS := event.EventTime.Time
-		if !eventLastTS.After(lastTimestamp) {
-			reqCtx.Log.Info("event's EventTime is earlier than the recorded lastTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event EventTime", event.EventTime.Time.String(), "annotation lastTimestamp", lastTimestampStr)
-			return role, nil
+		// get pod
+		pod := &corev1.Pod{}
+		if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+			return pair.RoleName, err
+		}
+		// event belongs to old pod with the same name, ignore it
+		if pod.Name == pair.PodName && pod.UID != event.InvolvedObject.UID {
+			return pair.RoleName, nil
+		}
+
+		// compare the EventTime of the current event object with the lastTimestamp of the last recorded in the pod annotation,
+		// if the current event's EventTime is earlier than the recorded lastTimestamp in the pod annotation,
+		// it indicates that the current event has arrived out of order and is expired, so it should not be processed.
+		lastTimestampStr, ok := pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]
+		if ok {
+			lastTimestamp, err := time.Parse(time.RFC3339Nano, lastTimestampStr)
+			if err != nil {
+				reqCtx.Log.Info("failed to parse last role changed event timestamp from pod annotation", "pod", pod.Name, "error", err.Error())
+				return pair.RoleName, err
+			}
+			eventLastTS, err := time.Parse(time.RFC3339Nano, snapshot.Version)
+			if !eventLastTS.After(lastTimestamp) {
+				reqCtx.Log.Info("event's EventTime is earlier than the recorded lastTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event EventTime", event.EventTime.Time.String(), "annotation lastTimestamp", lastTimestampStr)
+				return pair.RoleName, nil
+			}
+		}
+
+		name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+		rsm := &workloads.ReplicatedStateMachine{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
+			return "", err
+		}
+		reqCtx.Log.V(1).Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+
+		if err := updatePodRoleLabel(cli, reqCtx, *rsm, pod, pair.RoleName, snapshot.Version); err != nil {
+			return "", err
 		}
 	}
+	return role, nil
+}
 
-	name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
-	rsm := &workloads.ReplicatedStateMachine{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
-		return "", err
+func parseGlobalRoleSnapshot(role string, event *corev1.Event) *binding.GlobalRoleSnapshot {
+	snapshot := &binding.GlobalRoleSnapshot{}
+	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
+		return snapshot
 	}
-	reqCtx.Log.V(1).Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
-
-	return role, updatePodRoleLabel(cli, reqCtx, *rsm, pod, role, event.EventTime.Time)
+	snapshot.Version = event.EventTime.Time.Format(time.RFC3339Nano)
+	pair := binding.PodRoleNamePair{
+		PodName:  event.InvolvedObject.Name,
+		RoleName: role,
+	}
+	snapshot.PodRoleNamePairs = append(snapshot.PodRoleNamePairs, pair)
+	return snapshot
 }
 
 // parseProbeEventMessage parses probe event message.

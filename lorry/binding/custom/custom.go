@@ -28,7 +28,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -115,22 +114,17 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 
 	// csv format: term,podName,role
 	parseCSV := func(input string) (string, error) {
-		res := GlobalInfo{}
+		res := GlobalRoleSnapshot{}
 		lines := strings.Split(input, "\n")
 		for _, line := range lines {
-			fields := strings.Split(line, ",")
+			fields := strings.Split(strings.TrimSpace(line), ",")
 			if len(fields) != 3 {
 				return "", err
 			}
-			res.Term, err = strconv.ParseInt(fields[0], 10, 64)
-			if err != nil {
-				return "", err
-			}
-			k := fields[1]
-			v := fields[2]
+			res.Version = strings.TrimSpace(fields[0])
 			pair := PodRoleNamePair{
-				PodName:  k,
-				RoleName: v,
+				PodName:  strings.TrimSpace(fields[1]),
+				RoleName: strings.ToLower(strings.TrimSpace(fields[2])),
 			}
 			res.PodRoleNamePairs = append(res.PodRoleNamePairs, pair)
 		}

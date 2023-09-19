@@ -517,7 +517,6 @@ func (mgr *Manager) getLocalTimeLineAndLsn(ctx context.Context) (bool, int64, in
 		return mgr.getLocalTimeLineAndLsnFromControlData()
 	}
 
-	// TODO:check in recovery
 	inRecovery = true
 	timeLine := mgr.getReceivedTimeLine(ctx, "")
 	lsn, _ := mgr.getLsnWithHost(ctx, "replay", "")

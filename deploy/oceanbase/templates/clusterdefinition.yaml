@@ -23,6 +23,8 @@ spec:
           - name: rpc
             port: 2882
             targetPort: 2882
+      statefulSpec:
+        minReadySeconds: 30
       podSpec:
         containers:
           - name: observer-container
@@ -37,6 +39,15 @@ spec:
               - containerPort: 2882
                 name: rpc
                 protocol: TCP
+            readinessProbe:
+              failureThreshold: 10
+              initialDelaySeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - cat
+                  - /tmp/ready
             resources:
               limits:
                 cpu: "2"
@@ -59,6 +70,10 @@ spec:
                 value: {{ .Values.zoneCount | quote }}
               - name: CLUSTER_NAME
                 value: "$(KB_CLUSTER_COMP_NAME)"
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
               - name: DB_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:

@@ -99,12 +99,12 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 	)
 
 	for _, port := range *h.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_RSM_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
 		lastOutput, err = h.callAction(ctx, u)
 		if err != nil {
 			return "", err
 		}
-		h.Logger.Info("action succeed", "url", u, "output", lastOutput)
+		h.Logger.Info("action succeed", "url", u, "output", string(lastOutput))
 	}
 	role := string(lastOutput)
 
@@ -132,7 +132,7 @@ func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp 
 	)
 
 	for _, port := range *h.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_RSM_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
 		lastOutput, err = h.callAction(ctx, u)
 		if err != nil {
 			return GlobalInfo{}, err

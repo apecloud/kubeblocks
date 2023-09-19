@@ -566,7 +566,7 @@ func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.Repli
 		probe.FailureThreshold = roleProbe.FailureThreshold
 		// set to default value
 		probe.SuccessThreshold = 1
-		probe.RoleUpdateMechanism = workloads.DirectAPIServerEventUpdate
+		probe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
 	}
 
 	// TODO(free6om): set default reconfiguration actions after relative addon refactored

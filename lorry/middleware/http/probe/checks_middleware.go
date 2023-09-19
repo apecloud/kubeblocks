@@ -108,7 +108,7 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if err == nil {
 			// header has a statusCodeHeader
 			writer.WriteHeader(statusCode)
-			logger.Info("response abnormal")
+			logger.Info("write response with header", "statusCode", statusCode)
 		} else {
 			// header has no statusCodeHeader
 			logger.Info("response has no statusCodeHeader")

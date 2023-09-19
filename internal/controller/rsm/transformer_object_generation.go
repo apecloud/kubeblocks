@@ -452,7 +452,32 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 					FieldPath: "metadata.name",
 				},
 			},
-		})
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvNamespace,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvPodUID,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.uid",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvNodeName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "spec.nodeName",
+				},
+			},
+		},
+	)
 
 	// build container
 	container := corev1.Container{

@@ -57,7 +57,9 @@ const (
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != roleProbeEventFieldPath {
+	if event.InvolvedObject.FieldPath != readinessProbeEventFieldPath &&
+		event.InvolvedObject.FieldPath != directAPIServerEventFieldPath &&
+		event.InvolvedObject.FieldPath != legacyEventFieldPath {
 		return nil
 	}
 	var (
@@ -126,17 +128,30 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *probeMessage {
 	message := &probeMessage{}
 
-	matches := roleMessageRegex.FindStringSubmatch(event.Message)
-	if len(matches) != 2 {
-		reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
+	tryUnmarshalDirectAPIServerEvent := func() error {
+		return json.Unmarshal([]byte(event.Message), message)
+	}
+	tryUnmarshalReadinessProbeEvent := func() error {
+		matches := roleMessageRegex.FindStringSubmatch(event.Message)
+		if len(matches) != 2 {
+			reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
+			return fmt.Errorf("parser Readiness probe event message failed: %s", event.Message)
+		}
+		msg := matches[1]
+		err := json.Unmarshal([]byte(msg), message)
+		if err != nil {
+			// not role related message, ignore it
+			reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
+			return err
+		}
 		return nil
 	}
-	msg := matches[1]
-	err := json.Unmarshal([]byte(msg), message)
-	if err != nil {
-		// not role related message, ignore it
-		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
-		return nil
+
+	if err := tryUnmarshalDirectAPIServerEvent(); err == nil {
+		return message
 	}
-	return message
+	if err := tryUnmarshalReadinessProbeEvent(); err == nil {
+		return message
+	}
+	return nil
 }

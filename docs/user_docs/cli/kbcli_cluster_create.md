@@ -107,6 +107,7 @@ kbcli cluster create [NAME] [flags]
   -o, --output format                          Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pitr-enabled                           Specify whether enabled point in time recovery
       --pod-anti-affinity string               Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --pvc stringArray                        Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)
       --rbac-enabled                           Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources
       --restore-to-time string                 Set a time for point in time recovery
       --set stringArray                        Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -48,7 +47,7 @@ type SynthesizedComponent struct {
 	StatefulSpec          *v1alpha1.StatefulSetSpec              `json:"statefulSpec,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
 	ReplicationSpec       *v1alpha1.ReplicationSetSpec           `json:"replicationSpec,omitempty"`
-	RSMSpec               *workloads.ReplicatedStateMachineSpec  `json:"rsmSpec,omitempty"`
+	RSMSpec               *v1alpha1.RSMSpec                      `json:"rsmSpec,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
 	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`

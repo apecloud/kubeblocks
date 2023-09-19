@@ -132,13 +132,14 @@ const (
 
 // DataProtection API group
 const (
-	DPAPIGroup             = "dataprotection.kubeblocks.io"
-	DPAPIVersion           = "v1alpha1"
-	ResourceBackups        = "backups"
-	ResourceBackupTools    = "backuptools"
-	ResourceRestoreJobs    = "restorejobs"
-	ResourceBackupPolicies = "backuppolicies"
-	ResourceBackupRepos    = "backuprepos"
+	DPAPIGroup              = "dataprotection.kubeblocks.io"
+	DPAPIVersion            = "v1alpha1"
+	ResourceBackups         = "backups"
+	ResourceActionSets      = "actionsets"
+	ResourceRestoreJobs     = "restorejobs"
+	ResourceBackupPolicies  = "backuppolicies"
+	ResourceBackupRepos     = "backuprepos"
+	ResourceBackupSchedules = "backupschedules"
 )
 
 // Extensions API group
@@ -251,8 +252,12 @@ func BackupPolicyGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicies}
 }
 
-func BackupToolGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTools}
+func BackupScheduleGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupSchedules}
+}
+
+func ActionSetGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceActionSets}
 }
 
 func BackupRepoGVR() schema.GroupVersionResource {

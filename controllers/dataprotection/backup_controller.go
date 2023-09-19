@@ -26,9 +26,8 @@ import (
 	"reflect"
 	"time"
 
-	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/factory"
-	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -130,9 +129,9 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.Predicates{})
+			b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
 		} else {
-			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.Predicates{})
+			b.Owns(&vsv1.VolumeSnapshot{}, builder.Predicates{})
 		}
 	}
 
@@ -530,7 +529,7 @@ func (r *BackupReconciler) handleRunningPhase(
 		request.Status.Duration = &metav1.Duration{Duration: duration}
 	}
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
-	if err := r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
+	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()

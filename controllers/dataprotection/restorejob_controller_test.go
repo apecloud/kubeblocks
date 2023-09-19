@@ -94,7 +94,7 @@ package dataprotection
 //			AddDataFilePolicy().
 //			AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 //			SetSchedule("0 3 * * *", true).
-//			SetTTL("7d").
+//			SetRetentionPeriod("7d").
 //			SetBackupToolName(backupTool).
 //			SetTargetSecretName("mycluster-cluster-secret").
 //			SetPVC("backup-host-path-pvc").

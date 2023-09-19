@@ -638,7 +638,7 @@ func (d *backupDataClone) checkBackupStatus() (backupStatus, error) {
 }
 
 func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object, error) {
-	//objs := make([]client.Object, 0)
+	objs := make([]client.Object, 0)
 	//backup := dataprotectionv1alpha1.Backup{}
 	//if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
 	//	return nil, err
@@ -658,7 +658,7 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 	//	return nil, err
 	//}
 	//objs = append(objs, restoreJobs...)
-	//return objs, nil
+	return objs, nil
 }
 
 func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backupStatus, error) {

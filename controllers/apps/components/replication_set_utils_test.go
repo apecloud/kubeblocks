@@ -101,7 +101,7 @@ var _ = Describe("replicationSet Util", func() {
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
 			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
-			AddAppManangedByLabel().
+			AddAppManagedByLabel().
 			SetReplicas(2).
 			Create(&testCtx).GetObject()
 
@@ -208,7 +208,7 @@ var _ = Describe("replicationSet Util", func() {
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
 			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
-			AddAppManangedByLabel().
+			AddAppManagedByLabel().
 			SetReplicas(2).
 			Create(&testCtx).GetObject()
 

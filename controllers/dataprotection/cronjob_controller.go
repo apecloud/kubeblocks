@@ -73,8 +73,8 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	patch := client.MergeFrom(backupSchedule.DeepCopy())
 	if cronJob.Status.LastScheduleTime != nil {
-		//backupPolicy.Status.LastScheduleTime = cronJob.Status.LastScheduleTime
-		//backupPolicy.Status.LastSuccessfulTime = cronJob.Status.LastSuccessfulTime
+		// backupPolicy.Status.LastScheduleTime = cronJob.Status.LastScheduleTime
+		// backupPolicy.Status.LastSuccessfulTime = cronJob.Status.LastSuccessfulTime
 		if err := r.Client.Status().Patch(ctx, backupSchedule, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}

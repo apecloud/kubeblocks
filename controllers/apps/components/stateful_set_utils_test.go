@@ -126,7 +126,7 @@ var _ = Describe("StatefulSet utils test", func() {
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
-				AddAppManangedByLabel().
+				AddAppManagedByLabel().
 				AddRoleLabel(role).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()

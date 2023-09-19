@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -286,7 +286,7 @@ func setMonitor(monitoringInterval uint8, components []map[string]interface{}) {
 	}
 }
 
-func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compSpecsCount int, firstCompName string) (string, error) {
+func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, compSpecsCount int, firstCompName string) (string, error) {
 	componentName := backup.Labels[constant.KBAppComponentLabelKey]
 	if len(componentName) == 0 {
 		if compSpecsCount != 1 {
@@ -298,7 +298,7 @@ func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compS
 	return restoreFromBackupAnnotation, nil
 }
 
-func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
+func getSourceClusterFromBackup(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	sourceCluster := &appsv1alpha1.Cluster{}
 	sourceClusterJSON := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 	if err := json.Unmarshal([]byte(sourceClusterJSON), sourceCluster); err != nil {
@@ -308,7 +308,7 @@ func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1a
 	return sourceCluster, nil
 }
 
-func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1alpha1.Backup) error {
+func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dpv1alpha1.Backup) error {
 	if o.Backup != "" {
 		if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
 			return err
@@ -344,7 +344,7 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 	if o.Backup == "" && o.RestoreTime == "" && o.SourceCluster == "" {
 		return nil
 	}
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 	if err := getBackupObjectFromRestoreArgs(o, backup); err != nil {
 		return err
 	}
@@ -385,11 +385,11 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	if len(backupName) == 0 || len(components) == 0 {
 		return nil
 	}
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
 		return err
 	}
-	if backup.Status.Phase != dataprotectionv1alpha1.BackupPhaseCompleted {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf(`backup "%s" is not completed`, backup.Name)
 	}
 	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(components), components[0]["name"].(string))
@@ -1370,9 +1370,7 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 
 func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 	// set default backup config
-	o.BackupConfig = &appsv1alpha1.ClusterBackup{
-		Method: dataprotectionv1alpha1.BackupMethodSnapshot,
-	}
+	o.BackupConfig = &appsv1alpha1.ClusterBackup{}
 
 	// if the cls.Backup isn't nil, use the backup config in cluster
 	if cls != nil && cls.Spec.Backup != nil {
@@ -1393,9 +1391,9 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 		case "backup-enabled":
 			o.BackupConfig.Enabled = &o.BackupEnabled
 		case "backup-retention-period":
-			o.BackupConfig.RetentionPeriod = &o.BackupRetentionPeriod
+			o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
 		case "backup-method":
-			o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(o.BackupMethod)
+			o.BackupConfig.Method = o.BackupMethod
 		case "backup-cron-expression":
 			if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
 				return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)

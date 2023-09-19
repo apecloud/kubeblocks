@@ -29,9 +29,10 @@ import (
 	"strings"
 	"time"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -67,6 +68,10 @@ import (
 
 const (
 	backupPolicyTPLName = "test-backup-policy-template-mysql"
+	backupMethodName    = "test-backup-method"
+	vsBackupMethodName  = "test-vs-backup-method"
+	actionSetName       = "test-action-set"
+	vsActionSetName     = "test-vs-action-set"
 )
 
 var (
@@ -2362,7 +2367,7 @@ var _ = Describe("Cluster Controller", func() {
 			//		backup: &appsv1alpha1.ClusterBackup{
 			//			Enabled:                 &boolTrue,
 			//			RetentionPeriod:         retention("1d"),
-			//			Method:                  volumeSnapshotBackupMethodName,
+			//			Method:                  vsBackupMethodName,
 			//			CronExpression:          "*/1 * * * *",
 			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
 			//			PITREnabled:             &boolTrue,
@@ -2374,7 +2379,7 @@ var _ = Describe("Cluster Controller", func() {
 			//		backup: &appsv1alpha1.ClusterBackup{
 			//			Enabled:                 &boolFalse,
 			//			RetentionPeriod:         retention("1d"),
-			//			Method:                  volumeSnapshotBackupMethodName,
+			//			Method:                  vsBackupMethodName,
 			//			CronExpression:          "*/1 * * * *",
 			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
 			//			PITREnabled:             &boolTrue,
@@ -2409,7 +2414,7 @@ var _ = Describe("Cluster Controller", func() {
 			//		g.Expect(sp.CronExpression).Should(Equal(backup.CronExpression))
 			//	}
 			//	checkPolicy := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
-			//		schedule := p.Spec.Schedule
+			//		schedule := p.Spec.SchedulePolicy
 			//		switch backup.Method {
 			//		case dpv1alpha1.BackupMethodSnapshot:
 			//			checkSchedulePolicy(g, schedule.Snapshot)
@@ -2421,7 +2426,7 @@ var _ = Describe("Cluster Controller", func() {
 			//		g.Expect(schedule.StartingDeadlineMinutes).Should(Equal(backup.StartingDeadlineMinutes))
 			//	}
 			//	checkPolicyDisabled := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
-			//		schedule := p.Spec.Schedule
+			//		schedule := p.Spec.SchedulePolicy
 			//		switch backup.Method {
 			//		case dpv1alpha1.BackupMethodSnapshot:
 			//			g.Expect(schedule.Snapshot.Enable).Should(BeFalse())
@@ -2435,9 +2440,9 @@ var _ = Describe("Cluster Controller", func() {
 			//			if backup == nil {
 			//				// if cluster.Spec.Backup is nil, will use the default backup policy
 			//				g.Expect(policy).ShouldNot(BeNil())
-			//				g.Expect(policy.Spec.Schedule).ShouldNot(BeNil())
-			//				g.Expect(policy.Spec.Schedule.Snapshot).ShouldNot(BeNil())
-			//				g.Expect(policy.Spec.Schedule.Snapshot.Enable).Should(BeFalse())
+			//				g.Expect(policy.Spec.SchedulePolicy).ShouldNot(BeNil())
+			//				g.Expect(policy.Spec.SchedulePolicy.Snapshot).ShouldNot(BeNil())
+			//				g.Expect(policy.Spec.SchedulePolicy.Snapshot.Enable).Should(BeFalse())
 			//			} else if boolValue(backup.Enabled) {
 			//				checkPolicy(g, policy)
 			//			} else {
@@ -2946,9 +2951,11 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
-		bpt = bpt.AddBackupPolicy(v.Name).AddSnapshotPolicy().SetSchedule("0 0 * * *", false)
-		bpt = bpt.AddDatafilePolicy().SetSchedule("0 0 * * *", false)
-		bpt = bpt.AddIncrementalPolicy().SetSchedule("0 0 * * *", false)
+		bpt = bpt.AddBackupPolicy(v.Name).
+			AddBackupMethod(backupMethodName, false, actionSetName).
+			SetBackupMethodVolumeMounts("data", "/data").
+			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
+			SetBackupMethodVolumes([]string{"data"})
 		switch v.WorkloadType {
 		case appsv1alpha1.Consensus:
 			bpt.SetTargetRole("leader")

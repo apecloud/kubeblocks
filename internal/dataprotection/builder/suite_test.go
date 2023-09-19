@@ -17,18 +17,31 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package utils
+package builder
 
 import (
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType) {
-	for _, c := range job.Status.Conditions {
-		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == corev1.ConditionTrue {
-			return true, c.Type
-		}
-	}
-	return false, ""
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+func TestAPIs(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Builder Suite")
 }
+
+var _ = BeforeSuite(func() {
+	// +kubebuilder:scaffold:scheme
+
+	go func() {
+		defer GinkgoRecover()
+	}()
+})
+
+var _ = AfterSuite(func() {
+})

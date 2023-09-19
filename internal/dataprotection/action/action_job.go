@@ -32,7 +32,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 )
 
@@ -114,7 +113,7 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 		},
 	}
 
-	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
+	controllerutil.AddFinalizer(job, types.DataProtectionFinalizerName)
 	if err = controllerutil.SetControllerReference(j.Owner, job, ctx.Scheme); err != nil {
 		return handleErr(err)
 	}

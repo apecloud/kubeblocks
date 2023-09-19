@@ -28,18 +28,20 @@ import (
 
 type MockBackupPolicyFactory struct {
 	BaseFactory[dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy, MockBackupPolicyFactory]
-	backupType dpv1alpha1.BackupType
 }
 
 func NewBackupPolicyFactory(namespace, name string) *MockBackupPolicyFactory {
 	f := &MockBackupPolicyFactory{}
-	f.init(namespace, name,
-		&dpv1alpha1.BackupPolicy{}, f)
+	f.init(namespace, name, &dpv1alpha1.BackupPolicy{}, f)
 	return f
 }
 
 func (f *MockBackupPolicyFactory) SetBackupRepoName(backupRepoName string) *MockBackupPolicyFactory {
-	f.get().Spec.BackupRepoName = &backupRepoName
+	if backupRepoName == "" {
+		f.get().Spec.BackupRepoName = nil
+	} else {
+		f.get().Spec.BackupRepoName = &backupRepoName
+	}
 	return f
 }
 
@@ -60,6 +62,7 @@ func (f *MockBackupPolicyFactory) AddBackupMethod(name string,
 			Name:            name,
 			SnapshotVolumes: &snapshotVolumes,
 			ActionSetName:   actionSetName,
+			TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
 		})
 	return f
 }

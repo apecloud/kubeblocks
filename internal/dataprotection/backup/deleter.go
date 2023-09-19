@@ -149,7 +149,7 @@ func (d *Deleter) createDeleteBackupFileJob(
 			fi;
 			curr="${parent}";
 		done
-	`, backupVolumeMountPath, backupFilePath)
+	`, RepoVolumeMountPath, backupFilePath)
 
 	runAsUser := int64(0)
 	container := corev1.Container{

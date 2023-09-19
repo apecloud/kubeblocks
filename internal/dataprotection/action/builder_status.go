@@ -73,16 +73,6 @@ func (b *statusBuilder) completionTimestamp(timestamp *metav1.Time) *statusBuild
 	return b
 }
 
-func (b *statusBuilder) actionType(actionType dpv1alpha1.ActionType) *statusBuilder {
-	b.status.ActionType = actionType
-	return b
-}
-
-func (b *statusBuilder) availableReplicas(replicas int32) *statusBuilder {
-	b.status.AvailableReplicas = &replicas
-	return b
-}
-
 func (b *statusBuilder) objectRef(objectRef *corev1.ObjectReference) *statusBuilder {
 	b.status.ObjectRef = objectRef
 	return b

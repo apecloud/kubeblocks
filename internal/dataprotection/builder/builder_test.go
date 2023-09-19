@@ -17,8 +17,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package backup
+package builder
 
-func BuildDeleteBackupFileJob() {
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
 
-}
+var _ = Describe("builder", func() {
+	It("builds volume snapshot class correctly", func() {
+		className := "vsc-test"
+		driverName := "csi-driver-test"
+		obj := BuildVolumeSnapshotClass(className, driverName)
+		Expect(obj).ShouldNot(BeNil())
+		Expect(obj.Name).Should(Equal(className))
+		Expect(obj.Driver).Should(Equal(driverName))
+	})
+})

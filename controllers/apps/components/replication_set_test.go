@@ -124,7 +124,7 @@ var _ = Describe("Replication Component", func() {
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddAppInstanceLabel(clusterObj.Name).
 				AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
-				AddAppManangedByLabel().
+				AddAppManagedByLabel().
 				SetReplicas(replicas).
 				Create(&testCtx).GetObject()
 			stsObjectKey := client.ObjectKey{Name: replicationSetSts.Name, Namespace: testCtx.DefaultNamespace}

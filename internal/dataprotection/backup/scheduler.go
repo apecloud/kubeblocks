@@ -159,7 +159,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 				ComponentOps: appsv1alpha1.ComponentOps{
 					ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
 				},
-				Configurations: []appsv1alpha1.Configuration{
+				Configurations: []appsv1alpha1.ConfigurationItem{
 					{
 						Name: configRef.Name,
 						Keys: []appsv1alpha1.ParameterConfig{

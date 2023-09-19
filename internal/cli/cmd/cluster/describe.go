@@ -241,17 +241,17 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		//backupSchedule := printer.NoneString
 		//backupType := printer.NoneString
 		//scheduleEnable := "Disabled"
-		//if policy.Spec.Schedule.Snapshot != nil {
-		//	if policy.Spec.Schedule.Snapshot.Enable {
+		//if policy.Spec.SchedulePolicy.Snapshot != nil {
+		//	if policy.Spec.SchedulePolicy.Snapshot.Enable {
 		//		scheduleEnable = "Enabled"
-		//		backupSchedule = policy.Spec.Schedule.Snapshot.CronExpression
+		//		backupSchedule = policy.Spec.SchedulePolicy.Snapshot.CronExpression
 		//		backupType = string(dpv1alpha1.BackupTypeSnapshot)
 		//	}
 		//}
-		//if policy.Spec.Schedule.Datafile != nil {
-		//	if policy.Spec.Schedule.Datafile.Enable {
+		//if policy.Spec.SchedulePolicy.Datafile != nil {
+		//	if policy.Spec.SchedulePolicy.Datafile.Enable {
 		//		scheduleEnable = "Enabled"
-		//		backupSchedule = policy.Spec.Schedule.Datafile.CronExpression
+		//		backupSchedule = policy.Spec.SchedulePolicy.Datafile.CronExpression
 		//		backupType = string(dpv1alpha1.BackupTypeDataFile)
 		//	}
 		//}

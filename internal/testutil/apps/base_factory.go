@@ -89,7 +89,7 @@ func (factory *BaseFactory[T, PT, F]) AddAppComponentLabel(value string) *F {
 	return factory.AddLabels(constant.KBAppComponentLabelKey, value)
 }
 
-func (factory *BaseFactory[T, PT, F]) AddAppManangedByLabel() *F {
+func (factory *BaseFactory[T, PT, F]) AddAppManagedByLabel() *F {
 	return factory.AddLabels(constant.AppManagedByLabelKey, constant.AppName)
 }
 

@@ -153,7 +153,7 @@ package dataprotection
 //					SetBackupsHistoryLimit(1).
 //					SetSchedule(defaultSchedule, true).
 //					SetScheduleStartingDeadlineMinutes(&startingDeadlineMinutes).
-//					SetTTL(defaultTTL).
+//					SetRetentionPeriod(defaultTTL).
 //					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 //					SetTargetSecretName(clusterName).
 //					AddHookPreCommand("touch /data/mysql/.restore;sync").
@@ -406,7 +406,7 @@ package dataprotection
 //					backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 //						SetOwnerReferences("apps.kubeblocks.io/v1alpha1", "Cluster", cluster).
 //						AddLogfilePolicy().
-//						SetTTL("7d").
+//						SetRetentionPeriod("7d").
 //						SetSchedule("*/1 * * * *", false).
 //						SetBackupToolName(backupTool.Name).
 //						SetPVC(backupRemotePVCName).

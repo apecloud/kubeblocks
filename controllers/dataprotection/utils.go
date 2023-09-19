@@ -162,13 +162,6 @@ func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 }
 
-// filterCreatedBySchedule filters the workloads which are create by backupSchedule.
-func filterCreatedBySchedule(object client.Object) bool {
-	labels := object.GetLabels()
-	_, ok := labels[dataProtectionLabelBackupScheduleKey]
-	return labels[dataProtectionLabelAutoBackupKey] == "true" && ok
-}
-
 // sendWarningEventForError sends warning event for backup controller error
 func sendWarningEventForError(recorder record.EventRecorder, backup *dpv1alpha1.Backup, err error) {
 	controllerErr := intctrlutil.UnwrapControllerError(err)

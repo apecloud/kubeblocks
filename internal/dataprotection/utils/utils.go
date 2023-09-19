@@ -22,6 +22,7 @@ package utils
 import (
 	"context"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +50,15 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 		}
 	}
 	return nil
+}
+
+func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType) {
+	for _, c := range job.Status.Conditions {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == corev1.ConditionTrue {
+			return true, c.Type
+		}
+	}
+	return false, ""
 }
 
 func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj client.Object) error {

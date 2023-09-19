@@ -76,14 +76,14 @@ type BackupPolicy struct {
 
 	// schedule policy for backup.
 	// +optional
-	Schedules []Schedule `json:"schedules,omitempty"`
+	Schedules []SchedulePolicy `json:"schedules,omitempty"`
 
 	// backupMethods defines the backup methods.
 	// +kubebuilder:validation:Required
 	BackupMethods []dpv1alpha1.BackupMethod `json:"backupMethods"`
 }
 
-type Schedule struct {
+type SchedulePolicy struct {
 	// enabled specifies whether the backup schedule is enabled or not.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`

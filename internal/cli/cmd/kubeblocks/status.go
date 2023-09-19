@@ -70,7 +70,7 @@ var (
 	}
 
 	kubeBlocksGlobalCustomResources = []schema.GroupVersionResource{
-		types.BackupToolGVR(),
+		types.ActionSetGVR(),
 		types.ClusterDefGVR(),
 		types.ClusterVersionGVR(),
 		types.ConfigConstraintGVR(),

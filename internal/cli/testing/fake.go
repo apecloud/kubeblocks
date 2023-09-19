@@ -66,6 +66,7 @@ const (
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupMethodName    = "fake-backup-method"
 	ActionSetName       = "fake-action-set"
+	BackupName          = "fake-backup-name"
 
 	IsDefault    = true
 	IsNotDefault = false

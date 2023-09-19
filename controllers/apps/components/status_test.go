@@ -165,7 +165,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					SetOwnerReferences("apps/v1", constant.DeploymentKind, deployment).
 					AddAppInstanceLabel(clusterName).
 					AddAppComponentLabel(compName).
-					AddAppManangedByLabel().
+					AddAppManagedByLabel().
 					AddControllerRevisionHashLabel(controllerRevision).
 					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
 					Create(&testCtx).GetObject()
@@ -241,7 +241,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
-						AddAppManangedByLabel().
+						AddAppManagedByLabel().
 						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
@@ -334,7 +334,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
-						AddAppManangedByLabel().
+						AddAppManagedByLabel().
 						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
@@ -439,7 +439,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
-						AddAppManangedByLabel().
+						AddAppManagedByLabel().
 						AddRoleLabel(podRole).
 						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).

@@ -13,9 +13,10 @@ spec:
       command:
       - sh
       - -c
-      - echo "DB_HOST=${DB_HOST} DB_USER=${DB_USER} DB_PASSWORD=${DB_PASSWORD} DATA_DIR=${DATA_DIR} BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME}";
+      - echo "DB_HOST=${DP_DB_HOST} DB_USER=${DP_DB_USER} DB_PASSWORD=${DP_DB_PASSWORD} DATA_DIR=${DATA_DIR} BACKUP_DIR=${DP_BACKUP_DIR} BACKUP_NAME=${DP_BACKUP_NAME}";
         mkdir -p /${BACKUP_DIR};
-        xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+        xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DP_DB_HOST} \
+        --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > /${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
   restore:
     prepareData:
       image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
@@ -23,9 +24,9 @@ spec:
       - sh
       - -c
       - |
-        echo "BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME} DATA_DIR=${DATA_DIR}" && \
+        echo "BACKUP_DIR=${DP_BACKUP_DIR} BACKUP_NAME=${DP_BACKUP_NAME} DATA_DIR=${DATA_DIR}" && \
         mkdir -p /tmp/data/ && cd /tmp/data \
-        && xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream \
+        && xbstream -x < /${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream \
         && xtrabackup --decompress  --target-dir=/tmp/data/ \
         && find . -name "*.qp"|xargs rm -f \
         && rm -rf ${DATA_DIR}/* \

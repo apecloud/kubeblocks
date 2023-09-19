@@ -59,6 +59,10 @@ const (
 	Class1c1gName                 = "general-1c1g"
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
+
+	// data protection constant
+	BackupMethodName   = "backup-method"
+	VSBackupMethodName = "vs-backup-method"
 )
 
 var (

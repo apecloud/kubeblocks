@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"

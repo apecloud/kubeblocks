@@ -17,15 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package backup
+package boolptr
 
-// FormatVersion is the backup file format version, including major, minor, and patch version.
-const (
-	FormatVersion = "0.1.0"
-
-	// RepoVolumeMountPath is the backup repo volume mount path.
-	RepoVolumeMountPath = "/backupdata"
-
-	// backupInfoFileName is the backup info file name in the backup path.
-	backupInfoFileName = "backup.info"
+import (
+	"testing"
 )
+
+func TestBoolPtr(t *testing.T) {
+	if !IsSetToTrue(True()) {
+		t.Errorf("True() should return a pointer to true")
+	}
+	if IsSetToTrue(False()) {
+		t.Errorf("False() should return a pointer to false")
+	}
+	if IsSetToFalse(True()) {
+		t.Errorf("True() should return a pointer to true")
+	}
+	if !IsSetToFalse(False()) {
+		t.Errorf("False() should return a pointer to false")
+	}
+}

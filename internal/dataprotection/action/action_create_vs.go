@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/builder"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
@@ -108,7 +108,7 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 	}
 
 	// volume snapshot is ready and status is not error
-	// TODO: now only support one volume to take snapshot, set its time to status
+	// TODO: now only support one volume to take snapshot, set its time, size to status
 	return sb.phase(dpv1alpha1.ActionPhaseCompleted).
 		phase(dpv1alpha1.ActionPhaseCompleted).
 		totalSize(snap.Status.RestoreSize.String()).
@@ -211,11 +211,8 @@ func getOrCreateVolumeSnapshotClass(
 
 	// not found matched volume snapshot class, create one
 	vscName := fmt.Sprintf("vsc-%s-%s", scName, scObj.UID[:8])
-	newVsc, err := builder.BuildVolumeSnapshotClass(vscName, scObj.Provisioner)
-	if err != nil {
-		return nil, err
-	}
-	if err = vsCli.Create(newVsc); err != nil {
+	newVsc := builder.BuildVolumeSnapshotClass(vscName, scObj.Provisioner)
+	if err := vsCli.Create(newVsc); err != nil {
 		return nil, err
 	}
 	return newVsc, nil

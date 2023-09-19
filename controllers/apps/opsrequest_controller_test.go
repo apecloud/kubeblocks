@@ -42,6 +42,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -520,7 +521,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			By("mock backup status is ready, component phase should change to Updating when component is horizontally scaling.")
-			backupKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+			backupKey := client.ObjectKey{Name: fmt.Sprintf("%s-%s-scaling",
 				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
 			backup := &dataprotectionv1alpha1.Backup{}
 			Expect(k8sClient.Get(testCtx.Ctx, backupKey, backup)).Should(Succeed())
@@ -536,7 +537,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			vs.Name = backupKey.Name
 			vs.Namespace = backupKey.Namespace
 			vs.Labels = map[string]string{
-				constant.DataProtectionLabelBackupNameKey: backupKey.Name,
+				dptypes.DataProtectionLabelBackupNameKey: backupKey.Name,
 			}
 			pvcName := ""
 			vs.Spec = snapshotv1.VolumeSnapshotSpec{

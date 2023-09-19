@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	backupDataJobNamePrefix   = "dp-backupdata"
+	BackupDataJobNamePrefix   = "dp-backup"
 	prebackupJobNamePrefix    = "dp-prebackup"
 	postbackupJobNamePrefix   = "dp-postbackup"
 	backupDataContainerName   = "backupdata"
@@ -164,11 +164,10 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 		r.injectSyncProgressContainer(podSpec, backupDataAct.SyncProgress)
 	}
 
-	switch r.ActionSet.Spec.BackupType {
-	case dpv1alpha1.BackupTypeFull:
+	if r.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeFull {
 		return &action.JobAction{
-			Name:         backupDataJobNamePrefix,
-			ObjectMeta:   *buildBackupJobObjMeta(r.Backup, backupDataJobNamePrefix),
+			Name:         BackupDataJobNamePrefix,
+			ObjectMeta:   *buildBackupJobObjMeta(r.Backup, BackupDataJobNamePrefix),
 			Owner:        r.Backup,
 			PodSpec:      podSpec,
 			BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,

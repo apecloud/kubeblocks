@@ -124,7 +124,7 @@ func MockConsensusComponentStsPod(
 		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(consensusCompName).
-		AddAppManangedByLabel().
+		AddAppManagedByLabel().
 		AddRoleLabel(podRole).
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).

@@ -394,13 +394,13 @@ var _ = Describe("DataProtection", func() {
 	})
 })
 
-func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any, backupMethod string) {
+func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, timeRange map[string]any, backupMethod string) {
 	clusterString := fmt.Sprintf(`{"metadata":{"name":"deleted-cluster","namespace":"%s"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"name":"mysql","componentDefRef":"mysql","replicas":1}]}}`, testing.Namespace)
 	backupStatus := &unstructured.Unstructured{
 		Object: map[string]any{
 			"status": map[string]any{
 				"phase":     "Completed",
-				"manifests": manifests,
+				"timeRange": timeRange,
 			},
 			"metadata": map[string]any{
 				"name": backupName,

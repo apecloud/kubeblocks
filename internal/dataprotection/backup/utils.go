@@ -115,13 +115,13 @@ func getPVCsByVolumeNames(cli client.Client,
 	return all, nil
 }
 
-func backupRepoVolumeName(pvcName string) string {
+func GenerateBackupRepoVolumeName(pvcName string) string {
 	return fmt.Sprintf("dp-backup-%s", pvcName)
 }
 
 func buildBackupRepoVolume(pvcName string) corev1.Volume {
 	return corev1.Volume{
-		Name: backupRepoVolumeName(pvcName),
+		Name: GenerateBackupRepoVolumeName(pvcName),
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: pvcName,
@@ -132,8 +132,8 @@ func buildBackupRepoVolume(pvcName string) corev1.Volume {
 
 func buildBackupRepoVolumeMount(pvcName string) corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      backupRepoVolumeName(pvcName),
-		MountPath: backupVolumeMountPath,
+		Name:      GenerateBackupRepoVolumeName(pvcName),
+		MountPath: RepoVolumeMountPath,
 	}
 }
 
@@ -157,13 +157,13 @@ func BuildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 
 func buildBackupJobObjMeta(backup *dpv1alpha1.Backup, prefix string) *metav1.ObjectMeta {
 	return &metav1.ObjectMeta{
-		Name:      generateBackupJobName(backup, prefix),
+		Name:      GenerateBackupJobName(backup, prefix),
 		Namespace: backup.Namespace,
 		Labels:    BuildBackupWorkloadLabels(backup),
 	}
 }
 
-func generateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
+func GenerateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
 	name := fmt.Sprintf("%s-%s-%s", prefix, backup.Name, backup.UID[:8])
 	// job name cannot exceed 63 characters for label name limit.
 	if len(name) > 63 {
@@ -194,7 +194,7 @@ func buildBackupInfoFilePath(backup *dpv1alpha1.Backup, pathPrefix string) strin
 }
 
 func buildBackupPathInContainer(backup *dpv1alpha1.Backup, pathPrefix string) string {
-	return backupVolumeMountPath + BuildBackupPath(backup, pathPrefix)
+	return RepoVolumeMountPath + BuildBackupPath(backup, pathPrefix)
 }
 
 // BuildBackupPath builds the path to storage backup datas in backup repository.
@@ -204,4 +204,8 @@ func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
 	}
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
+}
+
+func GenerateVolumeSnapshotName(backup *dpv1alpha1.Backup, pvcName string) string {
+	return fmt.Sprintf("%s-%s", backup.Name, pvcName)
 }

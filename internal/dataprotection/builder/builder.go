@@ -19,6 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package builder
 
-type Builder interface {
-	Build() interface{}
+import (
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
+)
+
+func BuildVolumeSnapshotClass(name string, driver string) *vsv1.VolumeSnapshotClass {
+	vsc := &vsv1.VolumeSnapshotClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.KBManagedByKey: constant.AppName,
+			},
+		},
+		Driver:         driver,
+		DeletionPolicy: vsv1.VolumeSnapshotContentDelete,
+	}
+	return vsc
 }

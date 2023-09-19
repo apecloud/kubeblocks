@@ -23,8 +23,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"

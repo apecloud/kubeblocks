@@ -31,7 +31,7 @@ type MockRestoreJobFactory struct {
 
 func NewRestoreJobFactory(namespace, name string) *MockRestoreJobFactory {
 	f := &MockRestoreJobFactory{}
-	//f.init(namespace, name,
+	// f.init(namespace, name,
 	//	&dataprotectionv1alpha1.RestoreJob{
 	//		Spec: dataprotectionv1alpha1.RestoreJobSpec{
 	//			Target: dataprotectionv1alpha1.TargetCluster{
@@ -50,14 +50,14 @@ func (factory *MockRestoreJobFactory) SetBackupJobName(backupJobName string) *Mo
 }
 
 func (factory *MockRestoreJobFactory) AddTargetMatchLabels(keyAndValues ...string) *MockRestoreJobFactory {
-	//for k, v := range WithMap(keyAndValues...) {
+	// for k, v := range WithMap(keyAndValues...) {
 	//	factory.get().Spec.Target.LabelsSelector.MatchLabels[k] = v
-	//}
+	// }
 	return factory
 }
 
 func (factory *MockRestoreJobFactory) SetTargetSecretName(name string) *MockRestoreJobFactory {
-	//factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
+	// factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
 	return factory
 }
 

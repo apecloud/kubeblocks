@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 )

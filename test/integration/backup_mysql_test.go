@@ -100,7 +100,6 @@ var _ = Describe("MySQL data protection function", func() {
 			Create(&testCtx).GetObject()
 
 		By("Create a cluster obj")
-
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
@@ -118,18 +117,17 @@ var _ = Describe("MySQL data protection function", func() {
 	}
 
 	createBackupObj := func() {
-		By("By creating a backupTool")
-		backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-			&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+		By("By creating a actionSet")
+		actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+			&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
 
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
 		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
-			AddDataFilePolicy().
-			SetBackupToolName(backupTool.Name).
-			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
-			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
-			SetPVC(backupRemotePVCName).
+			SetTarget(constant.AppInstanceLabelKey, clusterKey.Name).
+			SetTargetConnectionCredential(component.GenerateConnCredential(clusterKey.Name)).
+			AddBackupMethod(testapps.BackupMethodName, false, actionSet.Name).
+			SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data").
 			Create(&testCtx).GetObject()
 		backupPolicyKey := client.ObjectKeyFromObject(backupPolicyObj)
 
@@ -149,7 +147,7 @@ var _ = Describe("MySQL data protection function", func() {
 		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
 			SetBackupPolicyName(backupPolicyKey.Name).
-			SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
+			SetBackupMethod(testapps.BackupMethodName).
 			Create(&testCtx).GetObject()
 		backupKey = client.ObjectKeyFromObject(backup)
 	}

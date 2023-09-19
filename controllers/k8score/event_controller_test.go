@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -123,9 +124,30 @@ var _ = Describe("Event Controller", func() {
 				Create(&testCtx).GetObject()
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
+			rsmName := fmt.Sprintf("%s-%s", clusterObj.Name, consensusCompName)
+			rsm := testapps.NewRSMFactory(clusterObj.Namespace, rsmName, clusterObj.Name, consensusCompName).
+				SetReplicas(int32(3)).
+				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+				Create(&testCtx).GetObject()
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(rsm), func(tmpRSM *workloads.ReplicatedStateMachine) {
+				tmpRSM.Spec.Roles = []workloads.ReplicaRole{
+					{
+						Name:       "leader",
+						IsLeader:   true,
+						AccessMode: workloads.ReadWriteMode,
+						CanVote:    true,
+					},
+					{
+						Name:       "follower",
+						IsLeader:   false,
+						AccessMode: workloads.ReadonlyMode,
+						CanVote:    true,
+					},
+				}
+			})()).Should(Succeed())
 			By("create involved pod")
 			var uid types.UID
-			podName := "foo"
+			podName := fmt.Sprintf("%s-%d", rsmName, 0)
 			pod := createInvolvedPod(podName, clusterObj.Name, consensusCompName)
 			Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
 			Eventually(func() error {
@@ -165,7 +187,7 @@ var _ = Describe("Event Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
 				g.Expect(e).ShouldNot(BeNil())
 				g.Expect(e.Annotations).ShouldNot(BeNil())
-				g.Expect(e.Annotations[roleChangedAnnotKey]).Should(Equal(trueStr))
+				g.Expect(e.Annotations[roleChangedAnnotKey]).Should(Equal("count-0"))
 			})).Should(Succeed())
 
 			By("check whether the duration and number of events reach the threshold")

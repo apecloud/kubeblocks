@@ -91,7 +91,9 @@ const (
 	directAPIServerEventFieldPath = "spec.containers{sqlchannel}"
 	readinessProbeEventFieldPath  = "spec.containers{" + roleProbeName + "}"
 	legacyEventFieldPath          = "spec.containers{kb-checkrole}"
-	actionSvcPortBase             = int32(36500)
+	checkRoleEventReason          = "checkRole"
+
+	actionSvcPortBase = int32(36500)
 )
 
 type rsmTransformContext struct {

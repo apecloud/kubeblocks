@@ -44,6 +44,11 @@ type PodRoleEventHandler struct{}
 // probeEventType defines the type of probe event.
 type probeEventType string
 
+const (
+	successEvent     = "Success"
+	roleChangedEvent = "roleChanged"
+)
+
 type probeMessage struct {
 	Event        probeEventType `json:"event,omitempty"`
 	Message      string         `json:"message,omitempty"`
@@ -61,7 +66,8 @@ var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != readinessProbeEventFieldPath &&
 		event.InvolvedObject.FieldPath != directAPIServerEventFieldPath &&
-		event.InvolvedObject.FieldPath != legacyEventFieldPath {
+		event.InvolvedObject.FieldPath != legacyEventFieldPath &&
+		event.Reason != checkRoleEventReason {
 		return nil
 	}
 	var (
@@ -97,7 +103,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 
 	// if probe event operation is not impl, check role failed or role invalid, ignore it
-	if message.Event != "Success" {
+	if message.Event != successEvent && message.Event != roleChangedEvent {
 		reqCtx.Log.Info("probe event failed", "message", message.Message)
 		return "", nil
 	}

@@ -21,7 +21,9 @@ package custom
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -110,13 +112,14 @@ func TestGlobalInfo(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			response := binding.ProbeResponse{}
-			info, err := hs.GetGlobalInfo(context.TODO(), &binding.ProbeRequest{
+			info, err := hs.GetRole(context.TODO(), &binding.ProbeRequest{
 				Operation: OperationKind(tc.operation),
 			}, &response)
 			require.NoError(t, err)
-			assert.Equal(t, OperationSuccess, info.Event)
-			assert.Equal(t, 3, len(info.PodName2Role))
-			assert.Equal(t, 1, info.Term)
+			snapshot := &common.GlobalRoleSnapshot{}
+			assert.NoError(t, json.Unmarshal([]byte(info), snapshot))
+			assert.Equal(t, 3, len(snapshot.PodRoleNamePairs))
+			assert.Equal(t, "1", snapshot.Version)
 		})
 	}
 

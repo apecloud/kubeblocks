@@ -81,7 +81,6 @@ func (c *statelessComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli clien
 			Comp:          c,
 			DefaultAction: action,
 			Error:         nil,
-			EnvConfig:     nil,
 			Workload:      nil,
 		},
 	}

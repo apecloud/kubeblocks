@@ -78,7 +78,6 @@ func (c *replicationComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli cli
 			Comp:          c,
 			DefaultAction: action,
 			Error:         nil,
-			EnvConfig:     nil,
 			Workload:      nil,
 		},
 	}

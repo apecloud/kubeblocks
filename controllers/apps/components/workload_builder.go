@@ -58,7 +58,6 @@ type componentWorkloadBuilderBase struct {
 	DefaultAction   *ictrltypes.LifecycleAction
 	ConcreteBuilder componentWorkloadBuilder
 	Error           error
-	EnvConfig       *corev1.ConfigMap
 	Workload        client.Object
 	LocalObjs       []client.Object // cache the objects needed for configuration, should remove this after refactoring the configuration
 }
@@ -90,21 +89,15 @@ func (b *componentWorkloadBuilderBase) BuildConfig() componentWorkloadBuilder {
 }
 
 func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType string) componentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		if b.EnvConfig == nil {
-			return nil, fmt.Errorf("build %s workload but env config is nil, cluster: %s, component: %s",
-				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
-		}
-
+	buildFn := func() ([]client.Object, error) {
 		sts, err := factory.BuildSts(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
 		b.Workload = sts
-
 		return nil, nil // don't return sts here
 	}
-	return b.BuildWrapper(buildfn)
+	return b.BuildWrapper(buildFn)
 }
 
 func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {

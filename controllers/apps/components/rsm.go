@@ -78,7 +78,6 @@ func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Clie
 			Comp:          c,
 			DefaultAction: action,
 			Error:         nil,
-			EnvConfig:     nil,
 			Workload:      nil,
 		},
 	}

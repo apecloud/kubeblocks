@@ -76,7 +76,6 @@ func (c *statefulComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client
 			Comp:          c,
 			DefaultAction: action,
 			Error:         nil,
-			EnvConfig:     nil,
 			Workload:      nil,
 		},
 	}

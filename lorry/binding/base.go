@@ -31,7 +31,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/internal/common"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
@@ -70,7 +69,6 @@ type BaseOperations struct {
 	DBAddress              string
 	DBType                 string
 	OriRole                string
-	OriGlobalInfo          *common.GlobalRoleSnapshot
 	DBRoles                map[string]AccessMode
 	Logger                 logr.Logger
 	Metadata               map[string]string

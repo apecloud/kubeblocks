@@ -36,7 +36,6 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	getGlobalInfoFormat       = "/v1.0/bindings/%s?operation=getGlobalInfo"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"

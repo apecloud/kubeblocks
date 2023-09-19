@@ -77,7 +77,7 @@ func TestInit(t *testing.T) {
 	}
 }
 
-func TestGlobalInfo(t *testing.T) {
+func TestGlobalRoleSnapshot(t *testing.T) {
 	var lines []string
 	for i := 0; i < 3; i++ {
 		podName := "pod-" + strconv.Itoa(i)
@@ -102,7 +102,7 @@ func TestGlobalInfo(t *testing.T) {
 	}{
 		"get": {
 			input:     join,
-			operation: "getGlobalInfo",
+			operation: "getRole",
 			metadata:  nil,
 			path:      "/",
 			err:       "",

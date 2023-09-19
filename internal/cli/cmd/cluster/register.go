@@ -28,13 +28,14 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/asaskevich/govalidator"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
@@ -134,8 +135,8 @@ func (o *registerOption) validate() error {
 }
 
 func (o *registerOption) run() error {
-	if _, err := url.ParseRequestURI(o.source); err == nil {
 
+	if govalidator.IsURL(o.source) {
 		// source is URL
 		chartsDownloader, err := helm.NewDownloader(helm.NewConfig("default", "", "", false))
 		if err != nil {
@@ -152,19 +153,28 @@ func (o *registerOption) run() error {
 		}
 		_ = os.Remove(tempPath)
 	} else {
-		// source is local_path
-		// todo：check absolutely path error
 		if err := copyFile(o.source, filepath.Join(cluster.CliChartsCacheDir, o.cachedName)); err != nil {
 			return err
 		}
 	}
-	// update config
-	cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
-		Name:      o.clusterType,
-		URL:       o.source,
-		Alias:     o.alias,
-		ChartName: o.cachedName,
-	})
+
+	if o.replace {
+		// update config
+		cluster.GlobalClusterChartConfig.UpdateConfig(&cluster.TypeInstance{
+			Name:      o.clusterType,
+			URL:       o.source,
+			Alias:     o.alias,
+			ChartName: o.cachedName,
+		})
+	} else {
+		cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
+			Name:      o.clusterType,
+			URL:       o.source,
+			Alias:     o.alias,
+			ChartName: o.cachedName,
+		})
+	}
+
 	return cluster.GlobalClusterChartConfig.WriteConfigs(cluster.CliClusterChartConfig)
 }
 

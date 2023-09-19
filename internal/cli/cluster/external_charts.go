@@ -75,6 +75,15 @@ func (c *clusterConfig) AddConfig(add *TypeInstance) {
 	*c = append(*c, add)
 }
 
+// UpdateConfig will update the existed TypeInstance in c
+func (c *clusterConfig) UpdateConfig(update *TypeInstance) {
+	for i, instance := range *c {
+		if instance.Name == update.Name {
+			(*c)[i] = update
+		}
+	}
+}
+
 // RemoveConfig remove a ClusterType from current config
 func (c *clusterConfig) RemoveConfig(name ClusterType) bool {
 	tempList := *c

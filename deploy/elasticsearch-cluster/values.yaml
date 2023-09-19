@@ -4,6 +4,9 @@
 
 replicaCount: 1
 
+## @param mode for elasticsearch cluster mode: single-node or multi-node
+mode: multi-node
+
 terminationPolicy: Delete
 
 imagePullSecrets: []

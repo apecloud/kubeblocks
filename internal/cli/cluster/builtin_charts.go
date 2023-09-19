@@ -52,7 +52,7 @@ func (e *embedConfig) loadChart() (io.ReadCloser, error) {
 	return e.chartFS.Open(fmt.Sprintf("charts/%s", e.name))
 }
 
-func (e *embedConfig) GetChartFileName() string {
+func (e *embedConfig) getChartFileName() string {
 	return e.name
 }
 

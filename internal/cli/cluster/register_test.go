@@ -37,7 +37,7 @@ var _ = Describe("cluster register", func() {
 		}
 		Expect(mysql.register("mysql")).Should(HaveOccurred())
 		Expect(mysql.register("mysql-other")).Should(Succeed())
-		Expect(mysql.GetChartFileName()).Should(Equal("apecloud-mysql-cluster.tgz"))
+		Expect(mysql.getChartFileName()).Should(Equal("apecloud-mysql-cluster.tgz"))
 		Expect(mysql.getAlias()).Should(Equal(""))
 		chart, err := mysql.loadChart()
 		Expect(err).Should(Succeed())
@@ -54,7 +54,7 @@ var _ = Describe("cluster register", func() {
 			ChartName: "fake.tgz",
 		}
 		Expect(fakeChart.getAlias()).Should(Equal(""))
-		Expect(fakeChart.GetChartFileName()).Should(Equal("fake.tgz"))
+		Expect(fakeChart.getChartFileName()).Should(Equal("fake.tgz"))
 		_, err := fakeChart.loadChart()
 		Expect(err).Should(HaveOccurred())
 		Expect(fakeChart.register("fake")).Should(HaveOccurred())

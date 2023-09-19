@@ -33,7 +33,7 @@ type chartLoader interface {
 	// loadChart loads the chart content during building sub-command
 	loadChart() (io.ReadCloser, error)
 	// GetChartFileName returns the chart file name, include the extension
-	GetChartFileName() string
+	getChartFileName() string
 	// getAlias returns the chart alias, this alias will be used as the command alias
 	getAlias() string
 	// register registers the cluster type as a sub	cmd into create cluster command

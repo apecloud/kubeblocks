@@ -146,7 +146,7 @@ func ClearCharts(c ClusterType) {
 			klog.V(2).Info(fmt.Sprintf("Warning: auto clear %s config fail due to: %s\n", c, err.Error()))
 
 		}
-		if err := os.Remove(filepath.Join(CliChartsCacheDir, ClusterTypeCharts[c].GetChartFileName())); err != nil {
+		if err := os.Remove(filepath.Join(CliChartsCacheDir, ClusterTypeCharts[c].getChartFileName())); err != nil {
 			klog.V(2).Info(fmt.Sprintf("Warning: auto clear %s config fail due to: %s\n", c, err.Error()))
 		}
 		CacheFiles = GetChartCacheFiles()
@@ -175,11 +175,11 @@ func (h *TypeInstance) PreCheck() error {
 		c, err := loader.LoadArchive(file)
 		if err != nil {
 			if err == gzip.ErrHeader {
-				return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", h.GetChartFileName(), err)
+				return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", h.getChartFileName(), err)
 			}
 		}
 		if c == nil {
-			return fmt.Errorf("failed to load cluster helm chart %s", h.GetChartFileName())
+			return fmt.Errorf("failed to load cluster helm chart %s", h.getChartFileName())
 		}
 		chartInfo.Chart = c
 	}
@@ -190,10 +190,10 @@ func (h *TypeInstance) PreCheck() error {
 }
 
 func (h *TypeInstance) loadChart() (io.ReadCloser, error) {
-	return os.Open(filepath.Join(CliChartsCacheDir, h.GetChartFileName()))
+	return os.Open(filepath.Join(CliChartsCacheDir, h.getChartFileName()))
 }
 
-func (h *TypeInstance) GetChartFileName() string {
+func (h *TypeInstance) getChartFileName() string {
 	return h.ChartName
 }
 
@@ -208,7 +208,7 @@ func (h *TypeInstance) register(subcmd ClusterType) error {
 	ClusterTypeCharts[subcmd] = h
 
 	for _, f := range CacheFiles {
-		if f.Name() == h.GetChartFileName() {
+		if f.Name() == h.getChartFileName() {
 			return nil
 		}
 	}

@@ -234,7 +234,7 @@ func loadHelmChart(ci *ChartInfo, t ClusterType) error {
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {
-			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.GetChartFileName(), err)
+			return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.getChartFileName(), err)
 		}
 	}
 

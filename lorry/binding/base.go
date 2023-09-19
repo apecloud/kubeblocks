@@ -204,6 +204,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *ProbeRequest) (*Prob
 	if err != nil {
 		return nil, err
 	}
+	ops.Logger.Info("operation called", "operation", req.Operation, "result", opsRes)
 	if opsRes != nil {
 		res, _ := json.Marshal(opsRes)
 		resp.Data = res

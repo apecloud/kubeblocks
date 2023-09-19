@@ -124,6 +124,7 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 
 		// route the request to engine
 		probeResp, err := route(character, request.Context(), probeRequest)
+		logger.Info("request routed", "request", probeRequest, "response", probeResp)
 
 		if err != nil {
 			logger.Error(err, "exec ops failed")

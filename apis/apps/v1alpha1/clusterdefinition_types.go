@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
@@ -402,7 +402,7 @@ type ClusterComponentDefinition struct {
 	// start from KB 0.7.0, RSM(ReplicatedStateMachineSpec) will be the underlying CR which powers all kinds of workload in KB.
 	// RSM is an enhanced stateful workload extension dedicated for heavy-state workloads like databases.
 	// +optional
-	RSMSpec *v1alpha1.ReplicatedStateMachineSpec `json:"rsmSpec,omitempty"`
+	RSMSpec *RSMSpec `json:"rsmSpec,omitempty"`
 
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
@@ -892,6 +892,30 @@ type ConsensusMember struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+}
+
+type RSMSpec struct {
+	// Roles, a list of roles defined in the system.
+	// +optional
+	Roles []workloads.ReplicaRole `json:"roles,omitempty"`
+
+	// RoleProbe provides method to probe role.
+	// +optional
+	RoleProbe *workloads.RoleProbe `json:"roleProbe,omitempty"`
+
+	// MembershipReconfiguration provides actions to do membership dynamic reconfiguration.
+	// +optional
+	MembershipReconfiguration *workloads.MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
+
+	// MemberUpdateStrategy, Members(Pods) update strategy.
+	// serial: update Members one by one that guarantee minimum component unavailable time.
+	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
+	// bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
+	// parallel: force parallel
+	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +optional
+	MemberUpdateStrategy *workloads.MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 }
 
 type ReplicationSetSpec struct {

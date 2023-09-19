@@ -88,10 +88,6 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 	return appsv1alpha1.Stateful
 }
 
-func (c *statefulComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
-	return c.statefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
-}
-
 func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return c.statefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }

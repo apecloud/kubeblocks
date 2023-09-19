@@ -42,7 +42,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -95,26 +94,6 @@ func (c *rsmComponentBase) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, cl
 		return nil, fmt.Errorf("more than one workloads found for the component, cluster: %s, component: %s, cnt: %d",
 			c.GetClusterName(), c.GetName(), cnt)
 	}
-}
-
-func (c *rsmComponentBase) GetBuiltObjects(builder componentWorkloadBuilder) ([]client.Object, error) {
-	dagSnapshot := c.Dag
-	defer func() {
-		c.Dag = dagSnapshot
-	}()
-
-	c.Dag = graph.NewDAG()
-	if err := c.init(intctrlutil.RequestCtx{}, nil, builder, false); err != nil {
-		return nil, err
-	}
-
-	objs := make([]client.Object, 0)
-	for _, v := range c.Dag.Vertices() {
-		if vv, ok := v.(*ictrltypes.LifecycleVertex); ok {
-			objs = append(objs, vv.Obj)
-		}
-	}
-	return objs, nil
 }
 
 func (c *rsmComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {

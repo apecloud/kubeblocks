@@ -35,7 +35,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -89,26 +88,6 @@ func (c *statefulComponentBase) loadRunningWorkload(reqCtx intctrlutil.RequestCt
 		return nil, fmt.Errorf("more than one workloads found for the component, cluster: %s, component: %s, cnt: %d",
 			c.GetClusterName(), c.GetName(), cnt)
 	}
-}
-
-func (c *statefulComponentBase) GetBuiltObjects(builder componentWorkloadBuilder) ([]client.Object, error) {
-	dag := c.Dag
-	defer func() {
-		c.Dag = dag
-	}()
-
-	c.Dag = graph.NewDAG()
-	if err := c.init(intctrlutil.RequestCtx{}, nil, builder, false); err != nil {
-		return nil, err
-	}
-
-	objs := make([]client.Object, 0)
-	for _, v := range c.Dag.Vertices() {
-		if vv, ok := v.(*ictrltypes.LifecycleVertex); ok {
-			objs = append(objs, vv.Obj)
-		}
-	}
-	return objs, nil
 }
 
 func (c *statefulComponentBase) Create(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder) error {

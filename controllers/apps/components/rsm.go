@@ -90,10 +90,6 @@ func (c *rsmComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 	return workloadType
 }
 
-func (c *rsmComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
-	return c.rsmComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
-}
-
 func (c *rsmComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return c.rsmComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }

@@ -173,9 +173,6 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*rsm)
 	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(&pod) != rsm.Status.UpdateRevision {
-			continue
-		}
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}

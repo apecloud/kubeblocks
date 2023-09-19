@@ -157,22 +157,21 @@ func (o *registerOption) run() error {
 			return err
 		}
 	}
+	instance := &cluster.TypeInstance{
+		Name:      o.clusterType,
+		URL:       o.source,
+		Alias:     o.alias,
+		ChartName: o.cachedName,
+	}
+	if err := instance.PreCheck(); err != nil {
+		return fmt.Errorf("register helm chart pre-check failed: %s", err.Error())
+	}
 
 	if o.replace {
 		// update config
-		cluster.GlobalClusterChartConfig.UpdateConfig(&cluster.TypeInstance{
-			Name:      o.clusterType,
-			URL:       o.source,
-			Alias:     o.alias,
-			ChartName: o.cachedName,
-		})
+		cluster.GlobalClusterChartConfig.UpdateConfig(instance)
 	} else {
-		cluster.GlobalClusterChartConfig.AddConfig(&cluster.TypeInstance{
-			Name:      o.clusterType,
-			URL:       o.source,
-			Alias:     o.alias,
-			ChartName: o.cachedName,
-		})
+		cluster.GlobalClusterChartConfig.AddConfig(instance)
 	}
 
 	return cluster.GlobalClusterChartConfig.WriteConfigs(cluster.CliClusterChartConfig)

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"compress/gzip"
 	"fmt"
 	"io"
 	"io/fs"
@@ -27,6 +28,7 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
+	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/klog"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -158,6 +160,33 @@ type TypeInstance struct {
 	Alias string      `yaml:"alias"`
 	// chartName is the filename cached locally
 	ChartName string `yaml:"chartName"`
+}
+
+// PreCheck is used by `cluster register` command
+func (h *TypeInstance) PreCheck() error {
+	chartInfo := &ChartInfo{}
+	// load helm chart from embed tgz file
+	{
+		file, err := h.loadChart()
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		c, err := loader.LoadArchive(file)
+		if err != nil {
+			if err == gzip.ErrHeader {
+				return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", h.GetChartFileName(), err)
+			}
+		}
+		if c == nil {
+			return fmt.Errorf("failed to load cluster helm chart %s", h.GetChartFileName())
+		}
+		chartInfo.Chart = c
+	}
+	if err := chartInfo.buildClusterSchema(); err != nil {
+		return err
+	}
+	return chartInfo.buildClusterDef()
 }
 
 func (h *TypeInstance) loadChart() (io.ReadCloser, error) {

@@ -33,7 +33,7 @@ var _ componentWorkloadBuilder = &rsmComponentWorkloadBuilder{}
 func (b *rsmComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		component := b.Comp.GetSynthesizedComponent()
-		obj, err := factory.BuildRSM(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		obj, err := factory.BuildRSM(b.Comp.GetCluster(), component)
 		if err != nil {
 			return nil, err
 		}

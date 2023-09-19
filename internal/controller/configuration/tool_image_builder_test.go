@@ -30,7 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -57,10 +56,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 	Context("ToolsImageBuilderTest", func() {
 		It("TestScriptSpec", func() {
-			sts, err := factory.BuildSts(intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
-				Log: logger,
-			}, clusterObj, clusterComponent, "for_test_env")
+			sts, err := factory.BuildSts(clusterObj, clusterComponent)
 			Expect(err).Should(Succeed())
 
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
@@ -68,7 +64,6 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				CharacterType: clusterComponent.CharacterType,
 				ComponentName: clusterComponent.Name,
 				SecreteName:   component.GenerateConnCredential(clusterObj.Name),
-				EnvConfigName: component.GenerateComponentEnvName(clusterObj.Name, clusterComponent.Name),
 				Image:         viper.GetString(constant.KBToolsImage),
 				Volumes:       make([]corev1.VolumeMount, 0),
 				Cluster:       clusterObj,

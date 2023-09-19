@@ -267,17 +267,15 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds StatefulSet correctly", func() {
-			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			envConfigName := "test-env-config-name"
 
-			sts, err := BuildSts(reqCtx, cluster, synthesizedComponent, envConfigName)
+			sts, err := BuildSts(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			// test  replicas = 0
 			newComponent := *synthesizedComponent
 			newComponent.Replicas = 0
-			sts, err = BuildSts(reqCtx, cluster, &newComponent, envConfigName)
+			sts, err = BuildSts(cluster, &newComponent)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
@@ -287,7 +285,7 @@ var _ = Describe("builder", func() {
 			replComponent := *synthesizedComponent
 			replComponent.Replicas = 2
 			replComponent.WorkloadType = appsv1alpha1.Replication
-			sts, err = BuildSts(reqCtx, cluster, &replComponent, envConfigName)
+			sts, err = BuildSts(cluster, &replComponent)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
@@ -306,18 +304,16 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds RSM correctly", func() {
-			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			envConfigName := "test-env-config-name"
 
-			rsm, err := BuildRSM(reqCtx, cluster, synthesizedComponent, envConfigName)
+			rsm, err := BuildRSM(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 
 			By("set replicas = 0")
 			newComponent := *synthesizedComponent
 			newComponent.Replicas = 0
-			rsm, err = BuildRSM(reqCtx, cluster, &newComponent, envConfigName)
+			rsm, err = BuildRSM(cluster, &newComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 			Expect(*rsm.Spec.Replicas).Should(Equal(int32(0)))
@@ -328,7 +324,7 @@ var _ = Describe("builder", func() {
 			replComponent := *synthesizedComponent
 			replComponent.Replicas = 2
 			replComponent.WorkloadType = appsv1alpha1.Replication
-			rsm, err = BuildRSM(reqCtx, cluster, &replComponent, envConfigName)
+			rsm, err = BuildRSM(cluster, &replComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 			Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(2))
@@ -386,7 +382,7 @@ var _ = Describe("builder", func() {
 			csComponent.CharacterType = "mysql"
 			csComponent.ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 			csComponent.ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
-			rsm, err = BuildRSM(reqCtx, cluster, &csComponent, envConfigName)
+			rsm, err = BuildRSM(cluster, &csComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 
@@ -403,9 +399,8 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds Deploy correctly", func() {
-			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent, "")
+			deploy, err := BuildDeploy(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(deploy).ShouldNot(BeNil())
 		})
@@ -447,20 +442,17 @@ var _ = Describe("builder", func() {
 
 		It("builds config manager sidecar container correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
 				SecreteName:   "test-secret",
 				ComponentName: synthesizedComponent.Name,
 				CharacterType: synthesizedComponent.CharacterType,
-				EnvConfigName: cfg.Name,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
 				Cluster:       cluster,
 			}
-			Expect(err).Should(BeNil())
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
@@ -555,7 +547,6 @@ var _ = Describe("builder", func() {
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:               constant.ConfigSidecarName,
 				SecreteName:               component.GenerateConnCredential(cluster.Name),
-				EnvConfigName:             component.GenerateComponentEnvName(cluster.Name, synthesizedComponent.Name),
 				Image:                     viper.GetString(constant.KBToolsImage),
 				Cluster:                   cluster,
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),

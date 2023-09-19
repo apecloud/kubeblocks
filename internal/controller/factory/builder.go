@@ -107,17 +107,15 @@ func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, targ
 	return nil
 }
 
-func processContainersInjection(reqCtx intctrlutil.RequestCtx,
-	cluster *appsv1alpha1.Cluster,
+func processContainersInjection(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	envConfigName string,
 	podSpec *corev1.PodSpec) error {
 	for _, cc := range []*[]corev1.Container{
 		&podSpec.Containers,
 		&podSpec.InitContainers,
 	} {
 		for i := range *cc {
-			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
+			if err := injectEnvs(cluster, component, &(*cc)[i]); err != nil {
 				return err
 			}
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&(*cc)[i])
@@ -126,7 +124,7 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
+func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, c *corev1.Container) error {
 	// can not use map, it is unordered
 	envFieldPathSlice := []struct {
 		name      string
@@ -204,22 +202,19 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		}
 	}
 
+	// build env from componentRefEnv
+	if component.ComponentRefEnvs != nil {
+		for _, env := range component.ComponentRefEnvs {
+			toInjectEnvs = append(toInjectEnvs, *env)
+		}
+	}
+
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
 	} else {
 		c.Env = append(toInjectEnvs, c.Env...)
 	}
-	if envConfigName == "" {
-		return nil
-	}
-	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
-		ConfigMapRef: &corev1.ConfigMapEnvSource{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: envConfigName,
-			},
-		},
-	})
 	return nil
 }
 
@@ -291,8 +286,7 @@ func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.Synthe
 	return &service, nil
 }
 
-func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent, envConfigName string) (*appsv1.StatefulSet, error) {
+func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1.StatefulSet, error) {
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
@@ -346,14 +340,13 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		}
 	}
 
-	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &sts.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(cluster, component, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return sts, nil
 }
 
-func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent, envConfigName string) (*workloads.ReplicatedStateMachine, error) {
+func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
@@ -490,7 +483,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		}
 	}
 
-	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &rsm.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(cluster, component, &rsm.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return rsm, nil
@@ -836,7 +829,7 @@ func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	return &pdb, nil
 }
 
-func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string) (*appsv1.Deployment, error) {
+func BuildDeploy(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
 	deploy := appsv1.Deployment{}
 	if err := buildFromCUE(tplFile, map[string]any{
@@ -849,7 +842,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 	if component.StatelessSpec != nil {
 		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
 	}
-	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &deploy.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(cluster, component, &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &deploy, nil
@@ -872,30 +865,6 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 	}
 	BuildPersistentVolumeClaimLabels(component, &pvc, vct.Name)
 	return &pvc, nil
-}
-
-// BuildEnvConfig builds cluster component context ConfigMap object, which is to be used in workload container's
-// envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
-func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
-	const tplFile = "env_config_template.cue"
-	envData := map[string]string{}
-
-	// add component envs
-	if component.ComponentRefEnvs != nil {
-		for _, env := range component.ComponentRefEnvs {
-			envData[env.Name] = env.Value
-		}
-	}
-
-	config := corev1.ConfigMap{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":     cluster,
-		"component":   component,
-		"config.data": envData,
-	}, "config", &config); err != nil {
-		return nil, err
-	}
-	return &config, nil
 }
 
 func BuildBackup(cluster *appsv1alpha1.Cluster,
@@ -1005,7 +974,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 		return nil, err
 	}
 
-	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
+	if err := injectEnvs(sidecarRenderedParam.Cluster, component, &container); err != nil {
 		return nil, err
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
@@ -1050,7 +1019,7 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 	}
 	containers := job.Spec.Template.Spec.Containers
 	if len(containers) > 0 {
-		if err := injectEnvs(cluster, synthesizedComponent, "", &containers[0]); err != nil {
+		if err := injectEnvs(cluster, synthesizedComponent, &containers[0]); err != nil {
 			return nil, err
 		}
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&containers[0])
@@ -1079,7 +1048,7 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 	}
 	for i := range toolContainers {
 		container := &toolContainers[i]
-		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, container); err != nil {
+		if err := injectEnvs(sidecarRenderedParam.Cluster, component, container); err != nil {
 			return nil, err
 		}
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)

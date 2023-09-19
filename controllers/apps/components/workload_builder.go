@@ -39,7 +39,6 @@ import (
 
 type componentWorkloadBuilder interface {
 	//	runtime, config, script, env, volume, service, monitor, probe
-	BuildEnv() componentWorkloadBuilder
 	BuildConfig() componentWorkloadBuilder
 	BuildWorkload() componentWorkloadBuilder
 	BuildPDB() componentWorkloadBuilder
@@ -62,16 +61,6 @@ type componentWorkloadBuilderBase struct {
 	EnvConfig       *corev1.ConfigMap
 	Workload        client.Object
 	LocalObjs       []client.Object // cache the objects needed for configuration, should remove this after refactoring the configuration
-}
-
-func (b *componentWorkloadBuilderBase) BuildEnv() componentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		envCfg, err := factory.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		b.EnvConfig = envCfg
-		b.LocalObjs = append(b.LocalObjs, envCfg)
-		return []client.Object{envCfg}, err
-	}
-	return b.BuildWrapper(buildfn)
 }
 
 func (b *componentWorkloadBuilderBase) BuildConfig() componentWorkloadBuilder {
@@ -107,7 +96,7 @@ func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		sts, err := factory.BuildSts(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
+		sts, err := factory.BuildSts(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}

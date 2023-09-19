@@ -59,8 +59,7 @@ type rsmComponentBase struct {
 func (c *rsmComponentBase) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
 	var err error
 	if builder != nil {
-		if err = builder.BuildEnv().
-			BuildWorkload().
+		if err = builder.BuildWorkload().
 			BuildPDB().
 			BuildConfig().
 			BuildTLSVolume().
@@ -662,9 +661,6 @@ func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli cl
 		return err
 	}
 
-	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
-	c.updatePodEnvConfig()
-
 	reqCtx.Recorder.Eventf(c.Cluster,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
@@ -677,17 +673,6 @@ func (c *rsmComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli cl
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
 func (c *rsmComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) int {
 	return int(c.Component.Replicas - *stsObj.Spec.Replicas)
-}
-
-func (c *rsmComponentBase) updatePodEnvConfig() {
-	for _, v := range ictrltypes.FindAll[*corev1.ConfigMap](c.Dag) {
-		node := v.(*ictrltypes.LifecycleVertex)
-		// TODO: need a way to reference the env config.
-		envConfigName := fmt.Sprintf("%s-%s-env", c.GetClusterName(), c.GetName())
-		if node.Obj.GetName() == envConfigName {
-			node.Action = ictrltypes.ActionUpdatePtr()
-		}
-	}
 }
 
 func (c *rsmComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {

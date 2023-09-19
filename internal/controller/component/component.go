@@ -475,10 +475,6 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 	}
 }
 
-func GenerateComponentEnvName(clusterName, componentName string) string {
-	return fmt.Sprintf("%s-%s-env", clusterName, componentName)
-}
-
 func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec, clsMgr *class.Manager) error {
 	if ignoreResourceConstraint(cluster) {
 		return nil

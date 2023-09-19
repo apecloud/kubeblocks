@@ -57,12 +57,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	mockStatefulSet := func() *appsv1.StatefulSet {
-		envConfig, err := factory.BuildEnvConfig(clusterObj, clusterComponent)
-		Expect(err).Should(Succeed())
-		stsObj, err := factory.BuildSts(intctrlutil.RequestCtx{
-			Ctx: ctx,
-			Log: logger,
-		}, clusterObj, clusterComponent, envConfig.Name)
+		stsObj, err := factory.BuildSts(clusterObj, clusterComponent)
 		Expect(err).Should(Succeed())
 		return stsObj
 	}
@@ -180,7 +175,7 @@ max_connections = '1000'
 
 			err := createPipeline.Prepare().
 				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
+				Configuration(). // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().

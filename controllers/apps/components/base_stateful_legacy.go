@@ -51,8 +51,7 @@ type statefulComponentBase struct {
 func (c *statefulComponentBase) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
 	var err error
 	if builder != nil {
-		if err = builder.BuildEnv().
-			BuildWorkload().
+		if err = builder.BuildWorkload().
 			BuildPDB().
 			BuildHeadlessService().
 			BuildConfig().
@@ -472,9 +471,6 @@ func (c *statefulComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, c
 		return err
 	}
 
-	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
-	c.updatePodEnvConfig()
-
 	reqCtx.Recorder.Eventf(c.Cluster,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
@@ -487,17 +483,6 @@ func (c *statefulComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, c
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
 func (c *statefulComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) int {
 	return int(c.Component.Replicas - *stsObj.Spec.Replicas)
-}
-
-func (c *statefulComponentBase) updatePodEnvConfig() {
-	for _, v := range ictrltypes.FindAll[*corev1.ConfigMap](c.Dag) {
-		node := v.(*ictrltypes.LifecycleVertex)
-		// TODO: need a way to reference the env config.
-		envConfigName := fmt.Sprintf("%s-%s-env", c.GetClusterName(), c.GetName())
-		if node.Obj.GetName() == envConfigName {
-			node.Action = ictrltypes.ActionUpdatePtr()
-		}
-	}
 }
 
 func (c *statefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {
@@ -637,8 +622,6 @@ func (c *statefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.Req
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
-	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
-	c.updatePodEnvConfig()
 	return nil
 }
 

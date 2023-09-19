@@ -225,7 +225,6 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		CharacterType:             comp.CharacterType,
 		ComponentName:             comp.Name,
 		SecreteName:               component.GenerateConnCredential(cluster.Name),
-		EnvConfigName:             component.GenerateComponentEnvName(cluster.Name, comp.Name),
 		Image:                     viper.GetString(constant.KBToolsImage),
 		Volumes:                   volumeDirs,
 		Cluster:                   cluster,

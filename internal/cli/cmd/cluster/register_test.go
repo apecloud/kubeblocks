@@ -63,11 +63,12 @@ var _ = Describe("cluster register", func() {
 		Expect(o.validate()).Should(HaveOccurred())
 
 		o.clusterType = "mysql"
-		// already exist
+		// builtin chart
 		Expect(o.validate()).Should(HaveOccurred())
 
 		o.clusterType = "oracle"
 		Expect(o.validate()).Should(Succeed())
+
 	})
 
 	It("test validateSource", func() {

@@ -373,10 +373,7 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 	if backupPolicy == nil {
 		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
-	backup, err := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "snapshot")
-	if err != nil {
-		return nil, err
-	}
+	backup := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "snapshot")
 	objs = append(objs, backup)
 	d.reqCtx.Recorder.Eventf(d.cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", d.key.Name)
 	return objs, nil
@@ -598,10 +595,7 @@ func (d *backupDataClone) backup() ([]client.Object, error) {
 	if backupPolicy == nil {
 		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
-	backup, err := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "datafile")
-	if err != nil {
-		return nil, err
-	}
+	backup := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "datafile")
 	objs = append(objs, backup)
 	return objs, nil
 }

@@ -902,18 +902,18 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
-	backupType string) (*dataprotectionv1alpha1.Backup, error) {
-	backup := dataprotectionv1alpha1.Backup{}
-	if err := buildFromCUE("backup_job_template.cue", map[string]any{
-		"cluster":          cluster,
-		"component":        component,
-		"backupPolicyName": backupPolicyName,
-		"backupJobKey":     backupKey,
-		"backupType":       backupType,
-	}, "backupJob", &backup); err != nil {
-		return nil, err
-	}
-	return &backup, nil
+	backupType string) *dataprotectionv1alpha1.Backup {
+	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
+		AddLabels(constant.BackupTypeLabelKeyKey, backupType).
+		AddLabels(constant.KBManagedByKey, "clster").
+		AddLabels("backuppolicies.dataprotection.kubeblocks.io/name", backupPolicyName).
+		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
+		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+		AddLabels(constant.KBAppComponentLabelKey, component.Name).
+		SetBackupPolicyName(backupPolicyName).
+		SetBackType(dataprotectionv1alpha1.BackupType(backupType)).
+		GetObject()
 }
 
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,

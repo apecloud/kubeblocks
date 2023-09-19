@@ -424,8 +424,7 @@ var _ = Describe("builder", func() {
 				Name:      "test-backup-job",
 			}
 			backupPolicyName := "test-backup-policy"
-			backupJob, err := BuildBackup(cluster, synthesizedComponent, backupPolicyName, backupJobKey, "snapshot")
-			Expect(err).Should(BeNil())
+			backupJob := BuildBackup(cluster, synthesizedComponent, backupPolicyName, backupJobKey, "snapshot")
 			Expect(backupJob).ShouldNot(BeNil())
 		})
 

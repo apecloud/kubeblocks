@@ -497,8 +497,7 @@ var _ = Describe("builder", func() {
 				},
 			}
 			key := types.NamespacedName{Name: "backup", Namespace: "default"}
-			job, err := BuildBackupManifestsJob(key, backup, podSpec)
-			Expect(err).Should(BeNil())
+			job := BuildBackupManifestsJob(key, backup, podSpec)
 			Expect(job).ShouldNot(BeNil())
 			Expect(job.Name).Should(Equal(key.Name))
 		})

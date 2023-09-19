@@ -1012,20 +1012,22 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	return &container, nil
 }
 
-func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
-	const tplFile = "backup_manifests_template.cue"
-	job := &batchv1.Job{}
-	if err := buildFromCUE(tplFile,
-		map[string]any{
-			"job.metadata.name":      key.Name,
-			"job.metadata.namespace": key.Namespace,
-			"backup":                 backup,
-			"podSpec":                podSpec,
-		},
-		"job", job); err != nil {
-		return nil, err
+func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) *batchv1.Job {
+	spec := podSpec.DeepCopy()
+	spec.RestartPolicy = corev1.RestartPolicyNever
+	ctx := spec.SecurityContext
+	if ctx == nil {
+		ctx = &corev1.PodSecurityContext{}
 	}
-	return job, nil
+	user := int64(0)
+	ctx.RunAsUser = &user
+	spec.SecurityContext = ctx
+	return builder.NewJobBuilder(key.Namespace, key.Name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+		SetPodTemplateSpec(corev1.PodTemplateSpec{Spec: *spec}).
+		SetBackoffLimit(3).
+		SetTTLSecondsAfterFinished(10).
+		GetObject()
 }
 
 func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,

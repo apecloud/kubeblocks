@@ -1335,9 +1335,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	if err != nil {
 		return err
 	}
-	if job, err = ctrlbuilder.BuildBackupManifestsJob(key, backup, &jobPodSpec); err != nil {
-		return err
-	}
+	job = ctrlbuilder.BuildBackupManifestsJob(key, backup, &jobPodSpec)
 	msg := fmt.Sprintf("creating job %s", key.Name)
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -114,6 +116,24 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	if pod.UID != event.InvolvedObject.UID {
 		return role, nil
 	}
+
+	// compare the EventTime of the current event object with the lastTimestamp of the last recorded in the pod annotation,
+	// if the current event's EventTime is earlier than the recorded lastTimestamp in the pod annotation,
+	// it indicates that the current event has arrived out of order and is expired, so it should not be processed.
+	lastTimestampStr, ok := pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]
+	if ok {
+		lastTimestamp, err := time.Parse(time.RFC3339Nano, lastTimestampStr)
+		if err != nil {
+			reqCtx.Log.Info("failed to parse last role changed event timestamp from pod annotation", "pod", pod.Name, "error", err.Error())
+			return role, err
+		}
+		eventLastTS := event.EventTime.Time
+		if !eventLastTS.After(lastTimestamp) {
+			reqCtx.Log.Info("event's EventTime is earlier than the recorded lastTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event EventTime", event.EventTime.Time.String(), "annotation lastTimestamp", lastTimestampStr)
+			return role, nil
+		}
+	}
+
 	name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
 	rsm := &workloads.ReplicatedStateMachine{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
@@ -121,7 +141,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 	reqCtx.Log.V(1).Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 
-	return role, updatePodRoleLabel(cli, reqCtx, *rsm, pod, role)
+	return role, updatePodRoleLabel(cli, reqCtx, *rsm, pod, role, event.EventTime.Time)
 }
 
 // parseProbeEventMessage parses probe event message.

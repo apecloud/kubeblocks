@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -134,10 +135,8 @@ func composeRolePriorityMap(rsm workloads.ReplicatedStateMachine) map[string]int
 }
 
 // updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
-	rsm workloads.ReplicatedStateMachine,
-	pod *corev1.Pod, roleName string) error {
+func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
+	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version time.Time) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(rsm)
 	// role not defined in CR, ignore it
@@ -154,6 +153,11 @@ func updatePodRoleLabel(cli client.Client,
 		delete(pod.Labels, roleLabelKey)
 		delete(pod.Labels, rsmAccessModeLabelKey)
 	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = version.Format(time.RFC3339Nano)
 	return cli.Patch(ctx, pod, patch)
 }
 

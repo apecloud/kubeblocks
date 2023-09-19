@@ -25,12 +25,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
+	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -51,15 +53,15 @@ const (
 
 func init() {
 	viper.AutomaticEnv()
-	flag.IntVar(&port, "port", DefaultPort, "probe default port")
-	flag.StringVar(&configDir, "config-path", DefaultConfigPath, "probe default config directory for builtin type")
+	flag.IntVar(&port, "port", DefaultPort, "lorry default port")
+	flag.StringVar(&configDir, "config-path", DefaultConfigPath, "lorry default config directory for builtin type")
 }
 
 func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
-	opts := zap.Options{
+	opts := kzap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
@@ -71,7 +73,11 @@ func main() {
 		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	kopts := []kzap.Opts{kzap.UseFlagOptions(&opts)}
+	if strings.EqualFold("debug", viper.GetString("zap-log-level")) {
+		kopts = append(kopts, kzap.RawZapOpts(zap.AddCaller()))
+	}
+	ctrl.SetLogger(kzap.New(kopts...))
 
 	err = component.GetAllComponent(configDir) // find all builtin config file and read
 	if err != nil {                            // Handle errors reading the config file
@@ -108,7 +114,7 @@ func main() {
 	logHyper := ctrl.Log.WithName("hypervisor")
 	hypervisor, err := hypervisor.NewHypervisor(logHyper)
 	if err != nil {
-		ctrl.Log.Error(err, "Hypervisor initialize failed: %s")
+		ctrl.Log.Error(err, "Hypervisor initialize failed")
 	}
 	hypervisor.Start()
 	stop := make(chan os.Signal, 1)

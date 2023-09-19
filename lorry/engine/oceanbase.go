@@ -34,6 +34,21 @@ type oceanbase struct {
 	examples map[ClientType]buildConnectExample
 }
 
+func newOceanbase() *oceanbase {
+	return &oceanbase{
+		info: EngineInfo{
+			Client: "mysql",
+		},
+		examples: map[ClientType]buildConnectExample{
+			CLI: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# oceanbase client connection example
+mysql -h %s -P %s -u %s
+`, info.Host, info.Port, info.User)
+			},
+		},
+	}
+}
+
 func (r *oceanbase) ConnectCommand(connectInfo *AuthInfo) []string {
 	userName := "root"
 	userPass := ""
@@ -46,9 +61,9 @@ func (r *oceanbase) ConnectCommand(connectInfo *AuthInfo) []string {
 	var obCmd []string
 
 	if userPass != "" {
-		obCmd = []string{fmt.Sprintf("%s -P2881 -u%s -A -p%s", r.info.Client, userName, userPass)}
+		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -A -p%s", r.info.Client, userName, userPass)}
 	} else {
-		obCmd = []string{fmt.Sprintf("%s -P2881 -u%s -A", r.info.Client, userName)}
+		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -A", r.info.Client, userName)}
 	}
 
 	return []string{"bash", "-c", strings.Join(obCmd, " ")}
@@ -66,9 +81,9 @@ func (r *oceanbase) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar,
 	cmd := []string{}
 	cmd = append(cmd, "/bin/bash", "-c", "-ex")
 	if envVarMap[password] == "" {
-		cmd = append(cmd, fmt.Sprintf("%s -P2881 -u%s -e %s", r.info.Client, envVarMap[user], strconv.Quote(strings.Join(scripts, " "))))
+		cmd = append(cmd, fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -e %s", r.info.Client, envVarMap[user], strconv.Quote(strings.Join(scripts, " "))))
 	} else {
-		cmd = append(cmd, fmt.Sprintf("%s -P2881 -u%s -p%s -e %s", r.info.Client,
+		cmd = append(cmd, fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -p%s -e %s", r.info.Client,
 			fmt.Sprintf("$%s", envVarMap[user]),
 			fmt.Sprintf("$%s", envVarMap[password]),
 			strconv.Quote(strings.Join(scripts, " "))))

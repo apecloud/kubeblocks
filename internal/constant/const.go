@@ -151,7 +151,7 @@ const (
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
-	LastRoleChangedEventTimestampAnnotationKey  = "apps.kubeblocks.io/last-role-changed-event-timestamp"
+	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

@@ -126,19 +126,13 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 			return pair.RoleName, nil
 		}
 
-		// compare the EventTime of the current event object with the lastTimestamp of the last recorded in the pod annotation,
-		// if the current event's EventTime is earlier than the recorded lastTimestamp in the pod annotation,
-		// it indicates that the current event has arrived out of order and is expired, so it should not be processed.
-		lastTimestampStr, ok := pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]
+		// compare the version of the current role snapshot with the last version recorded in the pod annotation,
+		// stale role snapshot will be ignored.
+		lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
 		if ok {
-			lastTimestamp, err := time.Parse(time.RFC3339Nano, lastTimestampStr)
-			if err != nil {
-				reqCtx.Log.Info("failed to parse last role changed event timestamp from pod annotation", "pod", pod.Name, "error", err.Error())
-				return pair.RoleName, err
-			}
-			eventLastTS, err := time.Parse(time.RFC3339Nano, snapshot.Version)
-			if !eventLastTS.After(lastTimestamp) {
-				reqCtx.Log.Info("event's EventTime is earlier than the recorded lastTimestamp in the pod annotation, it should not be processed.", "event uid", event.UID, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole, "event EventTime", event.EventTime.Time.String(), "annotation lastTimestamp", lastTimestampStr)
+
+			if snapshot.Version >= lastSnapshotVersion {
+				reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
 				return pair.RoleName, nil
 			}
 		}

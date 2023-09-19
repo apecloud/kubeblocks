@@ -156,7 +156,7 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
-	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = version
+	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
 	return cli.Patch(ctx, pod, patch)
 }
 

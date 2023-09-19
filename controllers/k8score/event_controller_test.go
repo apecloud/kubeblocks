@@ -181,7 +181,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]).Should(Equal(sndEvent.EventTime.Time.Format(time.RFC3339Nano)))
+				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(sndEvent.EventTime.Time.Format(time.RFC3339Nano)))
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
@@ -212,7 +212,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).ShouldNot(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]).ShouldNot(Equal(sndInvalidEvent.EventTime.Time.Format(time.RFC3339Nano)))
+				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).ShouldNot(Equal(sndInvalidEvent.EventTime.Time.Format(time.RFC3339Nano)))
 			})).Should(Succeed())
 
 			By("send role changed event with afterLastTS later than pod last role changes event timestamp annotation should be update successfully")
@@ -234,7 +234,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]).Should(Equal(sndValidEvent.EventTime.Time.Format(time.RFC3339Nano)))
+				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(sndValidEvent.EventTime.Time.Format(time.RFC3339Nano)))
 			})).Should(Succeed())
 		})
 	})

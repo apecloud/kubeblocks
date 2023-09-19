@@ -102,7 +102,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	// compare the EventTime of the current event object with the lastTimestamp of the last recorded in the pod annotation,
 	// if the current event's EventTime is earlier than the recorded lastTimestamp in the pod annotation,
 	// it indicates that the current event has arrived out of order and is expired, so it should not be processed.
-	lastTimestampStr, ok := pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey]
+	lastTimestampStr, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
 	if ok {
 		lastTimestamp, err := time.Parse(time.RFC3339Nano, lastTimestampStr)
 		if err != nil {

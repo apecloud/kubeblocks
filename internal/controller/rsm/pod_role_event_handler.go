@@ -131,7 +131,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
 		if ok {
 
-			if snapshot.Version >= lastSnapshotVersion {
+			if snapshot.Version <= lastSnapshotVersion {
 				reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
 				return pair.RoleName, nil
 			}

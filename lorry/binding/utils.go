@@ -39,7 +39,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
@@ -226,8 +225,8 @@ func String2RoleType(roleName string) RoleType {
 func SentProbeEvent(ctx context.Context, opsResult OpsResult, resp *ProbeResponse, log logr.Logger) {
 	log.Info(fmt.Sprintf("send event: %v", opsResult))
 	roleUpdateMechanism := workloads.NoneUpdate
-	if viper.IsSet(rsm.RoleUpdateMechanismVarName) {
-		roleUpdateMechanism = workloads.RoleUpdateMechanism(viper.GetString(rsm.RoleUpdateMechanismVarName))
+	if viper.IsSet(rsmRoleUpdateMechanismVarName) {
+		roleUpdateMechanism = workloads.RoleUpdateMechanism(viper.GetString(rsmRoleUpdateMechanismVarName))
 	}
 	switch roleUpdateMechanism {
 	case workloads.ReadinessProbeEventUpdate:

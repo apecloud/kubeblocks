@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"io"
 	"net"
 	"net/http"
@@ -114,7 +115,7 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 
 	// csv format: term,podName,role
 	parseCSV := func(input string) (string, error) {
-		res := GlobalRoleSnapshot{}
+		res := common.GlobalRoleSnapshot{}
 		lines := strings.Split(input, "\n")
 		for _, line := range lines {
 			fields := strings.Split(strings.TrimSpace(line), ",")
@@ -122,7 +123,7 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 				return "", err
 			}
 			res.Version = strings.TrimSpace(fields[0])
-			pair := PodRoleNamePair{
+			pair := common.PodRoleNamePair{
 				PodName:  strings.TrimSpace(fields[1]),
 				RoleName: strings.ToLower(strings.TrimSpace(fields[2])),
 			}

@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/lorry/binding"
 )
 
 // TODO(free6om): dedup copied funcs from event_controllers.go
@@ -157,13 +157,13 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	return role, nil
 }
 
-func parseGlobalRoleSnapshot(role string, event *corev1.Event) *binding.GlobalRoleSnapshot {
-	snapshot := &binding.GlobalRoleSnapshot{}
+func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRoleSnapshot {
+	snapshot := &common.GlobalRoleSnapshot{}
 	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
 		return snapshot
 	}
 	snapshot.Version = event.EventTime.Time.Format(time.RFC3339Nano)
-	pair := binding.PodRoleNamePair{
+	pair := common.PodRoleNamePair{
 		PodName:  event.InvolvedObject.Name,
 		RoleName: role,
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
+	"github.com/apecloud/kubeblocks/internal/common"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
@@ -40,16 +41,6 @@ import (
 type Operation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
-
-type PodRoleNamePair struct {
-	PodName  string `json:"podName,omitempty"`
-	RoleName string `json:"roleName,omitempty"`
-}
-
-type GlobalRoleSnapshot struct {
-	Version          string            `json:"term,omitempty"`
-	PodRoleNamePairs []PodRoleNamePair `json:"PodRoleNamePairs,omitempty"`
-}
 
 // AccessMode defines SVC access mode enums.
 // +enum
@@ -79,7 +70,7 @@ type BaseOperations struct {
 	DBAddress              string
 	DBType                 string
 	OriRole                string
-	OriGlobalInfo          *GlobalRoleSnapshot
+	OriGlobalInfo          *common.GlobalRoleSnapshot
 	DBRoles                map[string]AccessMode
 	Logger                 logr.Logger
 	Metadata               map[string]string

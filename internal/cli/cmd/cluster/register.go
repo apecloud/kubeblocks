@@ -85,6 +85,8 @@ func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 	cmd.Flags().StringVarP(&o.source, "source", "S", "", "Specify the cluster type chart source, support a URL or a local file path")
 	cmd.Flags().StringVar(&o.alias, "alias", "", "Set the cluster type alias")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval when register an existed cluster type")
+
 	_ = cmd.MarkFlagRequired("source")
 
 	return cmd

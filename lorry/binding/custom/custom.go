@@ -27,6 +27,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,8 @@ type HTTPCustom struct {
 	client         *http.Client
 	BaseOperations
 }
+
+var perNodeRegx = regexp.MustCompile("[a-zA-Z0-9]+")
 
 // NewHTTPCustom returns a new HTTPCustom.
 func NewHTTPCustom() *HTTPCustom {
@@ -81,9 +84,7 @@ func (h *HTTPCustom) Init(metadata component.Properties) error {
 
 	h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
-	h.BaseOperations.GetGlobalInfo = h.GetGlobalInfo
 	h.OperationsMap[CheckRoleOperation] = h.CheckRoleOps
-	h.OperationsMap[GetGlobalInfoOperation] = h.GetGlobalInfoOps
 
 	return nil
 }
@@ -106,9 +107,37 @@ func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *Probe
 		}
 		h.Logger.Info("action succeed", "url", u, "output", string(lastOutput))
 	}
-	role := string(lastOutput)
+	finalOutput := strings.TrimSpace(string(lastOutput))
 
-	return strings.TrimSpace(role), nil
+	if perNodeRegx.MatchString(finalOutput) {
+		return finalOutput, nil
+	}
+
+	// csv format: term,podName,role
+	parseCSV := func(input string) (string, error) {
+		res := GlobalInfo{}
+		lines := strings.Split(input, "\n")
+		for _, line := range lines {
+			fields := strings.Split(line, ",")
+			if len(fields) != 3 {
+				return "", err
+			}
+			res.Term, err = strconv.ParseInt(fields[0], 10, 64)
+			if err != nil {
+				return "", err
+			}
+			k := fields[1]
+			v := fields[2]
+			pair := PodRoleNamePair{
+				PodName:  k,
+				RoleName: v,
+			}
+			res.PodRoleNamePairs = append(res.PodRoleNamePairs, pair)
+		}
+		resByte, err := json.Marshal(res)
+		return string(resByte), err
+	}
+	return parseCSV(finalOutput)
 }
 
 func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
@@ -119,55 +148,6 @@ func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *Pr
 	opsRes := OpsResult{}
 	opsRes["role"] = role
 	return opsRes, nil
-}
-
-func (h *HTTPCustom) GetGlobalInfo(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (GlobalInfo, error) {
-	if h.actionSvcPorts == nil {
-		return GlobalInfo{}, nil
-	}
-
-	var (
-		lastOutput []byte
-		err        error
-	)
-
-	for _, port := range *h.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_RSM_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
-		lastOutput, err = h.callAction(ctx, u)
-		if err != nil {
-			return GlobalInfo{}, err
-		}
-	}
-
-	// csv format: term,podname,role
-	parseCSV := func(input []byte) (GlobalInfo, error) {
-		res := GlobalInfo{PodName2Role: map[string]string{}}
-		str := string(input)
-		lines := strings.Split(str, "\n")
-		for _, line := range lines {
-			fields := strings.Split(line, ",")
-			if len(fields) != 3 {
-				return res, err
-			}
-			res.Term, err = strconv.Atoi(fields[0])
-			if err != nil {
-				return res, err
-			}
-			k := fields[1]
-			v := fields[2]
-			res.PodName2Role[k] = v
-		}
-		return res, nil
-	}
-
-	res, err := parseCSV(lastOutput)
-	if err != nil {
-		return GlobalInfo{}, err
-	}
-	res.Event = OperationSuccess
-	h.Logger.Info("GetGlobalInfo get result", "result", res)
-
-	return res, nil
 }
 
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort

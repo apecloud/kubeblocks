@@ -41,11 +41,14 @@ type Operation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse)
 
 type OpsResult map[string]interface{}
 
+type PodRoleNamePair struct {
+	PodName  string `json:"podName,omitempty"`
+	RoleName string `json:"roleName,omitempty"`
+}
+
 type GlobalInfo struct {
-	Event        string            `json:"event,omitempty"`
-	Term         int               `json:"term,omitempty"`
-	PodName2Role map[string]string `json:"map,omitempty"`
-	Message      string            `json:"message,omitempty"`
+	Term             int64             `json:"term,omitempty"`
+	PodRoleNamePairs []PodRoleNamePair `json:"PodRoleNamePairs,omitempty"`
 }
 
 // AccessMode defines SVC access mode enums.
@@ -83,7 +86,6 @@ type BaseOperations struct {
 	InitIfNeed             func() bool
 	Manager                component.DBManager
 	GetRole                func(context.Context, *ProbeRequest, *ProbeResponse) (string, error)
-	GetGlobalInfo          func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error)
 
 	OperationsMap map[OperationKind]Operation
 }
@@ -292,51 +294,6 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 	}
 	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
-	return opsRes, nil
-}
-
-func (ops *BaseOperations) GetGlobalInfoOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
-	opsRes := OpsResult{}
-	opsRes["operation"] = GetGlobalInfoOperation
-	if ops.GetGlobalInfo == nil {
-		message := fmt.Sprintf("getGlobalInfo operation is not implemented for %v", ops.DBType)
-		ops.Logger.Error(fmt.Errorf("not implemented"), message)
-		opsRes["event"] = OperationNotImplemented
-		opsRes["message"] = message
-		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
-		return opsRes, nil
-	}
-
-	globalInfo, err := ops.GetGlobalInfo(ctx, req, resp)
-	if err != nil {
-		ops.Logger.Error(err, "error executing GlobalInfo")
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = err.Error()
-		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
-			ops.Logger.Info("getRole failed continuously", "failed times", ops.CheckRoleFailedCount)
-			SentProbeEvent(ctx, opsRes, resp, ops.Logger)
-		}
-		// just reuse the checkRoleFailCount temporarily
-		ops.CheckRoleFailedCount++
-		return opsRes, nil
-	}
-
-	ops.CheckRoleFailedCount = 0
-
-	for _, role := range globalInfo.PodName2Role {
-		if isValid, message := ops.roleValidate(role); !isValid {
-			opsRes["event"] = OperationInvalid
-			opsRes["message"] = message
-			return opsRes, nil
-		}
-	}
-
-	globalInfo.Transform(opsRes)
-	if ops.OriGlobalInfo == nil || globalInfo.ShouldUpdate(*ops.OriGlobalInfo) {
-		ops.OriGlobalInfo = &globalInfo
-		SentProbeEvent(ctx, opsRes, resp, ops.Logger)
-	}
-
 	return opsRes, nil
 }
 
@@ -549,30 +506,4 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest
 	opsRes["event"] = OperationSuccess
 	opsRes["message"] = "left of the current member is complete"
 	return opsRes, nil
-}
-
-func (g *GlobalInfo) ShouldUpdate(another GlobalInfo) bool {
-	if g.Term != another.Term {
-		return g.Term < another.Term
-	}
-	if g.Message != another.Message || g.Event != another.Event {
-		return true
-	}
-	for k, v := range g.PodName2Role {
-		if s, ok := another.PodName2Role[k]; ok {
-			if s != v {
-				return true
-			}
-		} else {
-			return true
-		}
-	}
-	return false
-}
-
-func (g *GlobalInfo) Transform(result OpsResult) {
-	result["event"] = g.Event
-	result["term"] = g.Term
-	result["message"] = g.Message
-	result["map"] = g.PodName2Role
 }

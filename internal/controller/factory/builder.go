@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -279,16 +280,52 @@ func BuildSvcList(cluster *appsv1alpha1.Cluster, component *component.Synthesize
 	return result, nil
 }
 
-func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.Service, error) {
-	const tplFile = "headless_service_template.cue"
-	service := corev1.Service{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   cluster,
-		"component": component,
-	}, "service", &service); err != nil {
-		return nil, err
-	}
-	return &service, nil
+func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *corev1.Service {
+	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
+	monitorAnnotations := func() map[string]string {
+		annotations := make(map[string]string, 0)
+		falseStr := "false"
+		trueStr := "true"
+		switch {
+		case !component.Monitor.Enable:
+			annotations["monitor.kubeblocks.io/scrape"] = falseStr
+			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
+		case component.Monitor.BuiltIn:
+			annotations["monitor.kubeblocks.io/scrape"] = falseStr
+			annotations["monitor.kubeblocks.io/agamotto"] = trueStr
+		default:
+			annotations["monitor.kubeblocks.io/scrape"] = trueStr
+			annotations["monitor.kubeblocks.io/path"] = component.Monitor.ScrapePath
+			annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(component.Monitor.ScrapePort))
+			annotations["monitor.kubeblocks.io/scheme"] = "http"
+			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
+		}
+		return annotations
+	}()
+	servicePorts := func() []corev1.ServicePort {
+		var servicePorts []corev1.ServicePort
+		for _, container := range component.PodSpec.Containers {
+			for _, port := range container.Ports {
+				servicePort := corev1.ServicePort{
+					Name:       port.Name,
+					Protocol:   port.Protocol,
+					Port:       port.ContainerPort,
+					TargetPort: intstr.FromString(port.Name),
+				}
+				servicePorts = append(servicePorts, servicePort)
+			}
+		}
+		return servicePorts
+	}()
+	return builder.NewHeadlessServiceBuilder(cluster.Namespace, fmt.Sprintf("%s-%s-headless", cluster.Name, component.Name)).
+		AddLabelsInMap(wellKnownLabels).
+		AddAnnotationsInMap(monitorAnnotations).
+		AddSelector(constant.AppInstanceLabelKey, cluster.Name).
+		AddSelector(constant.AppManagedByLabelKey, constant.AppName).
+		AddSelector(constant.KBAppComponentLabelKey, component.Name).
+		AddPorts(servicePorts...).
+		GetObject()
 }
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,

@@ -76,10 +76,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			resources = append(resources, workload)
 		}()
 
-		svc, err := factory.BuildHeadlessSvc(cluster, component)
-		if err != nil {
-			return err
-		}
+		svc := factory.BuildHeadlessSvc(cluster, component)
 		resources = append(resources, svc)
 
 		var podSpec *corev1.PodSpec

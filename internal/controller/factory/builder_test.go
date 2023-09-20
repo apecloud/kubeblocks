@@ -524,8 +524,7 @@ var _ = Describe("builder", func() {
 		It("builds headless svc correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			expectSvcName := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
-			obj, err := BuildHeadlessSvc(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
+			obj := BuildHeadlessSvc(cluster, synthesizedComponent)
 			Expect(obj).ShouldNot(BeNil())
 			Expect(obj.Name).Should(Equal(expectSvcName))
 		})

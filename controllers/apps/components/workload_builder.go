@@ -184,8 +184,8 @@ func (b *componentWorkloadBuilderBase) BuildService() componentWorkloadBuilder {
 
 func (b *componentWorkloadBuilderBase) BuildHeadlessService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svc, err := factory.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		return []client.Object{svc}, err
+		svc := factory.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		return []client.Object{svc}, nil
 	}
 	return b.BuildWrapper(buildfn)
 }

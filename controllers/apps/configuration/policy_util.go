@@ -99,7 +99,9 @@ func getRSMPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	// TODO: should resolve the dependency on consensus module
-	rsm.SortPods(pods, rsm.ComposeRolePriorityMap(params.Component.RSMSpec.Roles), true)
+	if params.Component.RSMSpec != nil {
+		rsm.SortPods(pods, rsm.ComposeRolePriorityMap(params.Component.RSMSpec.Roles), true)
+	}
 	return pods, nil
 }
 

@@ -608,7 +608,7 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 			if pvc.Spec.Resources.Requests == nil {
 				pvc.Spec.Resources.Requests = corev1.ResourceList{}
 			}
-			// note: pvc.Spec.Resources.Requests.Storage() never return nil
+			// note: pvc.Spec.Resources.Requests.Storage() never returns nil
 			if pvc.Spec.Resources.Requests.Storage().IsZero() {
 				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = repo.Spec.VolumeCapacity
 			}

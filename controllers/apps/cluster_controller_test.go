@@ -2709,17 +2709,6 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 					testk8s.MockRSMReady(rsm, mockPods...)
 				})).ShouldNot(HaveOccurred())
-			} else {
-				stsList := testk8s.ListAndCheckStatefulSetItemsCount(&testCtx, clusterKey, 1)
-				sts = &stsList.Items[0]
-				Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-					testk8s.MockStatefulSetReady(sts)
-				})).ShouldNot(HaveOccurred())
-				for i := int32(0); i < *sts.Spec.Replicas; i++ {
-					podName := fmt.Sprintf("%s-%d", sts.Name, i)
-					testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
-						compDefName, podName, components.DefaultRole(i))
-				}
 			}
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})

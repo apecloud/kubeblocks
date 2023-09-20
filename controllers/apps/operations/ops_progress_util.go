@@ -554,7 +554,6 @@ func handleScaleDownProgress(
 				Message:   fmt.Sprintf("Start to delete pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name),
 			})
 	}
-	var workloadType = pgRes.clusterComponentDef.WorkloadType
 	var componentName = pgRes.clusterComponent.Name
 	minReadySeconds, err := components.GetComponentStsMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {

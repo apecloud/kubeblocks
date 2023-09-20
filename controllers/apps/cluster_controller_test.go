@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1541,7 +1542,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-		pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		names := make([]string, 0)
@@ -1609,7 +1610,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking pods' role are changed accordingly")
 		Eventually(func(g Gomega) {
-			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// should have 3 pods
 			g.Expect(pods).Should(HaveLen(3))
@@ -1636,7 +1637,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
-			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(pods).Should(HaveLen(int(*sts.Spec.Replicas)))
 			for _, pod := range pods {
@@ -1648,7 +1649,7 @@ var _ = Describe("Cluster Controller", func() {
 			rsmPatch := client.MergeFrom(rsm.DeepCopy())
 			By("Updating RSM's status")
 			rsm.Status.UpdateRevision = "mock-version"
-			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			Expect(err).Should(BeNil())
 			var podList []*corev1.Pod
 			for i := range pods {

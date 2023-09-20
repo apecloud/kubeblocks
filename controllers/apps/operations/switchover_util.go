@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -69,8 +70,8 @@ func needDoSwitchover(ctx context.Context,
 		if err != nil {
 			return false, err
 		}
-		podParent, _ := components.ParseParentNameAndOrdinal(pod.Name)
-		siParent, o := components.ParseParentNameAndOrdinal(switchover.InstanceName)
+		podParent, _ := common.ParseParentNameAndOrdinal(pod.Name)
+		siParent, o := common.ParseParentNameAndOrdinal(switchover.InstanceName)
 		if podParent != siParent || o < 0 || o >= int32(len(podList.Items)) {
 			return false, errors.New("switchover.InstanceName is invalid")
 		}

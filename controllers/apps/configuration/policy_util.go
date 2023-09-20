@@ -22,8 +22,9 @@ package configuration
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/common"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	"net"
-	"sort"
 	"strconv"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -57,7 +58,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		pods, err := common.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -82,28 +83,9 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 	return readyPods
 }
 
-func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
-	if len(params.ComponentUnits) != 1 {
-		return nil, core.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
-	}
-
-	stsObj := &params.ComponentUnits[0]
-	pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
-	if err != nil {
-		return nil, err
-	}
-
-	sort.SliceStable(pods, func(i, j int) bool {
-		_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
-		_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
-		return ordinal1 < ordinal2
-	})
-	return pods, nil
-}
-
-func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
+func getRSMPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) > 1 {
-		return nil, core.MakeError("consensus component require only one statefulset, actual %d components", len(params.ComponentUnits))
+		return nil, core.MakeError("rsm component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	if len(params.ComponentUnits) == 0 {
@@ -111,18 +93,14 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	stsObj := &params.ComponentUnits[0]
-	pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := common.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: should resolve the dependency on consensus module
-	components.SortPods(pods, components.ComposeRolePriorityMap(params.Component.ConsensusSpec), constant.RoleLabelKey)
-	r := make([]corev1.Pod, 0, len(pods))
-	for i := len(pods); i > 0; i-- {
-		r = append(r, pods[i-1:i]...)
-	}
-	return r, nil
+	rsm.SortPods(pods, rsm.ComposeRolePriorityMap(params.Component.RSMSpec.Roles), true)
+	return pods, nil
 }
 
 // TODO commonOnlineUpdateWithPod migrate to sql command pipeline

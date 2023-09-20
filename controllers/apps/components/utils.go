@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -71,14 +70,6 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 
 func listRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
 	return listObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
-}
-
-func listStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
-	return listObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
-}
-
-func listDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
-	return listObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
 }
 
 func listPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
@@ -371,22 +362,6 @@ func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 		}, nil
 	}
 	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
-}
-
-// SortPods sorts pods by their role priority
-func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) {
-	// make a Serial pod list,
-	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
-	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[idLabelKey]
-		roleJ := pods[j].Labels[idLabelKey]
-		if priorityMap[roleI] == priorityMap[roleJ] {
-			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
-			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
-			return ordinal1 < ordinal2
-		}
-		return priorityMap[roleI] < priorityMap[roleJ]
-	})
 }
 
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package components
+package common
 
 import (
 	"context"
@@ -26,10 +26,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -48,69 +47,6 @@ func getParentName(pod *corev1.Pod) string {
 // IsMemberOf tests if pod is a member of set.
 func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
-}
-
-// isStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefulSet have the same revision.
-func isStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
-	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
-	if err != nil {
-		return false, err
-	}
-
-	revisionConsistent := true
-	if len(pods) != int(*sts.Spec.Replicas) {
-		return false, nil
-	}
-
-	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(&pod) != sts.Status.UpdateRevision {
-			revisionConsistent = false
-			break
-		}
-	}
-	return revisionConsistent, nil
-}
-
-// getPods4Delete gets all pods for delete
-func getPods4Delete(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) ([]*corev1.Pod, error) {
-	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
-		return nil, nil
-	}
-
-	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
-	if err != nil {
-		return nil, nil
-	}
-
-	podList := make([]*corev1.Pod, 0)
-	for i, pod := range pods {
-		// do nothing if the pod is terminating
-		if pod.DeletionTimestamp != nil {
-			continue
-		}
-		// do nothing if the pod has the latest version
-		if intctrlutil.GetPodRevision(&pod) == sts.Status.UpdateRevision {
-			continue
-		}
-
-		podList = append(podList, &pods[i])
-	}
-	return podList, nil
-}
-
-// deleteStsPods deletes pods of the StatefulSet manually
-func deleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
-	pods, err := getPods4Delete(ctx, cli, sts)
-	if err != nil {
-		return err
-	}
-	for _, pod := range pods {
-		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, pod); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
 }
 
 // statefulSetOfComponentIsReady checks if statefulSet of component is ready.
@@ -158,12 +94,13 @@ func ParseParentNameAndOrdinal(s string) (string, int32) {
 // GetPodListByStatefulSet gets statefulSet pod list.
 func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
+	selector, err := metav1.LabelSelectorAsMap(stsObj.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{
-			constant.KBAppComponentLabelKey: stsObj.Labels[constant.KBAppComponentLabelKey],
-			constant.AppInstanceLabelKey:    stsObj.Labels[constant.AppInstanceLabelKey],
-		}); err != nil {
+		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}
 	var pods []corev1.Pod
@@ -173,23 +110,4 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 		}
 	}
 	return pods, nil
-}
-
-// getPodOwnerReferencesSts gets the owner reference statefulSet of the pod.
-func getPodOwnerReferencesSts(ctx context.Context, cli client.Client, podObj *corev1.Pod) (*appsv1.StatefulSet, error) {
-	stsList := &appsv1.StatefulSetList{}
-	if err := cli.List(ctx, stsList,
-		&client.ListOptions{Namespace: podObj.Namespace},
-		client.MatchingLabels{
-			constant.KBAppComponentLabelKey: podObj.Labels[constant.KBAppComponentLabelKey],
-			constant.AppInstanceLabelKey:    podObj.Labels[constant.AppInstanceLabelKey],
-		}); err != nil {
-		return nil, err
-	}
-	for _, sts := range stsList.Items {
-		if IsMemberOf(&sts, podObj) {
-			return &sts, nil
-		}
-	}
-	return nil, nil
 }

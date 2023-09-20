@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -53,20 +52,7 @@ func init() {
 }
 
 func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	var (
-		funcs RollingUpgradeFuncs
-		cType = params.WorkloadType()
-	)
-
-	switch cType {
-	case appsv1alpha1.Consensus:
-		funcs = GetConsensusRollingUpgradeFuncs()
-	case appsv1alpha1.Stateful:
-		funcs = GetStatefulSetRollingUpgradeFuncs()
-	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", cType)
-	}
-	return performRollingUpgrade(params, funcs)
+	return performRollingUpgrade(params, GetRSMRollingUpgradeFuncs())
 }
 
 func (r *rollingUpgradePolicy) GetPolicyName() string {

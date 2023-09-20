@@ -17,21 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package components
+package common
 
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	apps "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -97,65 +90,3 @@ func TestSStatefulSetOfComponentIsReady(t *testing.T) {
 		t.Errorf("StatefulSet should not be ready")
 	}
 }
-
-var _ = Describe("StatefulSet utils test", func() {
-	var (
-		clusterName = "test-replication-cluster"
-		stsName     = "test-sts"
-		role        = "Primary"
-	)
-	cleanAll := func() {
-		By("Cleaning resources")
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
-		// clear rest resources
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// namespaced resources
-		// testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
-	}
-
-	BeforeEach(cleanAll)
-	AfterEach(cleanAll)
-
-	When("Updating a StatefulSet with `OnDelete` UpdateStrategy", func() {
-		It("will not update pods of the StatefulSet util the pods have been manually deleted", func() {
-			By("Creating a StatefulSet")
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompSpecName).
-				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
-				AddAppManangedByLabel().
-				AddRoleLabel(role).
-				SetReplicas(1).
-				Create(&testCtx).GetObject()
-
-			By("Creating pods by the StatefulSet")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
-			Expect(isStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
-
-			By("Updating the StatefulSet's UpdateRevision")
-			sts.Status.UpdateRevision = "new-mock-revision"
-			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, sts.Status)
-			podList, err := GetPodListByStatefulSet(ctx, k8sClient, sts)
-			Expect(err).To(Succeed())
-			Expect(len(podList)).To(Equal(1))
-
-			By("Testing get the StatefulSet of the pod")
-			ownerSts, err := getPodOwnerReferencesSts(ctx, k8sClient, &podList[0])
-			Expect(err).To(Succeed())
-			Expect(ownerSts).ShouldNot(BeNil())
-
-			By("Deleting the pods of StatefulSet")
-			Expect(deleteStsPods(testCtx.Ctx, k8sClient, sts)).Should(Succeed())
-			podList, err = GetPodListByStatefulSet(ctx, k8sClient, sts)
-			Expect(err).To(Succeed())
-			Expect(len(podList)).To(Equal(0))
-
-			By("Creating new pods by StatefulSet with new UpdateRevision")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
-			Expect(isStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
-		})
-	})
-})

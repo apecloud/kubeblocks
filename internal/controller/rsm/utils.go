@@ -63,10 +63,10 @@ const (
 
 var podNameRegex = regexp.MustCompile(`(.*)-([0-9]+)$`)
 
-// sortPods sorts pods by their role priority
+// SortPods sorts pods by their role priority
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
-func sortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
+func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	getRoleFunc := func(i int) string {
 		return getRoleName(pods[i])
 	}
@@ -88,11 +88,12 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 	sortMembers(membersStatus, rolePriorityMap, getRoleFunc, getOrdinalFunc, true)
 }
 
-func sortMembers[T any](membersStatus []T,
+// sortMembers sorts items by role priority and pod ordinal.
+func sortMembers[T any](items []T,
 	rolePriorityMap map[string]int,
 	getRoleFunc getRole, getOrdinalFunc getOrdinal,
 	reverse bool) {
-	sort.SliceStable(membersStatus, func(i, j int) bool {
+	sort.SliceStable(items, func(i, j int) bool {
 		if reverse {
 			i, j = j, i
 		}
@@ -107,11 +108,11 @@ func sortMembers[T any](membersStatus []T,
 	})
 }
 
-// composeRolePriorityMap generates a priority map based on roles.
-func composeRolePriorityMap(rsm workloads.ReplicatedStateMachine) map[string]int {
+// ComposeRolePriorityMap generates a priority map based on roles.
+func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
-	for _, role := range rsm.Spec.Roles {
+	for _, role := range roles {
 		roleName := strings.ToLower(role.Name)
 		switch {
 		case role.IsLeader:
@@ -189,11 +190,12 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	}
 
 	// sort and set
-	rolePriorityMap := composeRolePriorityMap(*rsm)
+	rolePriorityMap := ComposeRolePriorityMap(rsm.Spec.Roles)
 	sortMembersStatus(newMembersStatus, rolePriorityMap)
 	rsm.Status.MembersStatus = newMembersStatus
 }
 
+// getRoleName gets role name of pod 'pod'
 func getRoleName(pod corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }

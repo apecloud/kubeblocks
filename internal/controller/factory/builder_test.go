@@ -22,12 +22,10 @@ package factory
 import (
 	"encoding/json"
 	"fmt"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/leaanthony/debme"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,18 +46,6 @@ import (
 )
 
 var tlog = ctrl.Log.WithName("builder_testing")
-
-func TestReadCUETplFromEmbeddedFS(t *testing.T) {
-	cueFS, err := debme.FS(cueTemplates, "cue")
-	if err != nil {
-		t.Error("Expected no error", err)
-	}
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("conn_credential_template.cue"))
-	if err != nil {
-		t.Error("Expected no error", err)
-	}
-	tlog.Info("", "cueValue", cueTpl)
-}
 
 var _ = Describe("builder", func() {
 	const clusterDefName = "test-clusterdef"

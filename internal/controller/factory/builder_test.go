@@ -212,15 +212,13 @@ var _ = Describe("builder", func() {
 				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject()
 				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
 			)
-			credential, err := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
+			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
 			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(BeEmpty())
 			By("setting type")
 			characterType := "test-character-type"
 			clusterDef.Spec.Type = characterType
-			credential, err = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
+			credential = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
 			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(Equal(characterType))
 			// "username":      "root",

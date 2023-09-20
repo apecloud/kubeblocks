@@ -747,19 +747,19 @@ func randomString(length int) string {
 }
 
 func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) (*corev1.Secret, error) {
-	const tplFile = "conn_credential_template.cue"
-
-	connCredential := corev1.Secret{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"clusterdefinition": clusterDefinition,
-		"cluster":           cluster,
-	}, "secret", &connCredential); err != nil {
-		return nil, err
+	component *component.SynthesizedComponent) *corev1.Secret {
+	wellKnownLabels := buildWellKnownLabels(clusterDefinition.Name, cluster.Name, "")
+	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
+	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, fmt.Sprintf("%s-conn-credential", cluster.Name)).
+		AddLabelsInMap(wellKnownLabels).
+		SetStringData(clusterDefinition.Spec.ConnectionCredential)
+	if len(clusterDefinition.Spec.Type) > 0 {
+		credentialBuilder.AddLabels("apps.kubeblocks.io/cluster-type", clusterDefinition.Spec.Type)
 	}
+	connCredential := credentialBuilder.GetObject()
 
 	if len(connCredential.StringData) == 0 {
-		return &connCredential, nil
+		return connCredential
 	}
 
 	replaceVarObjects := func(k, v *string, i int, origValue string, varObjectsMap map[string]string) {
@@ -825,7 +825,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		m[fmt.Sprintf("$(CONN_CREDENTIAL).%s", k)] = v
 	}
 	replaceData(m)
-	return &connCredential, nil
+	return connCredential
 }
 
 func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*policyv1.PodDisruptionBudget, error) {

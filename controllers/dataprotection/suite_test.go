@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -112,7 +112,7 @@ var _ = BeforeSuite(func() {
 	err = appsv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = dataprotectionv1alpha1.AddToScheme(scheme)
+	err = dpv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = storagev1alpha1.AddToScheme(scheme)
@@ -125,10 +125,11 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	uncachedObjects := []client.Object{
-		&dataprotectionv1alpha1.BackupPolicy{},
-		//&dataprotectionv1alpha1.BackupTool{},
-		&dataprotectionv1alpha1.Backup{},
-		&dataprotectionv1alpha1.RestoreJob{},
+		&dpv1alpha1.BackupPolicy{},
+		&dpv1alpha1.BackupSchedule{},
+		&dpv1alpha1.ActionSet{},
+		&dpv1alpha1.Backup{},
+		&dpv1alpha1.RestoreJob{},
 		&snapshotv1.VolumeSnapshot{},
 		&snapshotv1beta1.VolumeSnapshot{},
 		&batchv1.Job{},
@@ -156,13 +157,20 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	//err = (&BackupPolicyReconciler{
-	//	Client:   k8sManager.GetClient(),
-	//	Scheme:   k8sManager.GetScheme(),
-	//	Recorder: k8sManager.GetEventRecorderFor("backup-tool-controller"),
-	//}).SetupWithManager(k8sManager)
-	//Expect(err).ToNot(HaveOccurred())
-	//
+	err = (&BackupPolicyReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("backup-policy-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&ActionSetReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("actionset-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	//err = (&RestoreJobReconciler{
 	//	Client:   k8sManager.GetClient(),
 	//	Scheme:   k8sManager.GetScheme(),

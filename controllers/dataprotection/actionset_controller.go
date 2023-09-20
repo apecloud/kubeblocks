@@ -80,12 +80,12 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		actionSet.Status.Phase = phase
 		actionSet.Status.Message = message
 		actionSet.Status.ObservedGeneration = actionSet.Generation
-		return r.Status().Patch(ctx, actionSet, patch)
+		return r.Client.Status().Patch(reqCtx.Ctx, actionSet, patch)
 	}
 
 	// TODO(ldm): validate actionSet
 
-	if err = patchStatus(dpv1alpha1.AvailablePhase, ""); err != nil {
+	if err := patchStatus(dpv1alpha1.AvailablePhase, ""); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, actionSet)

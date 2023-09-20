@@ -41,93 +41,11 @@ import (
 	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var _ = Describe("Backup Controller test", func() {
-	const (
-		clusterName        = "wesql-cluster"
-		componentName      = "replicasets-primary"
-		containerName      = "mysql"
-		backupPolicyName   = "test-backup-policy"
-		backupName         = "test-backup"
-		storageClassName   = "test-storage-class"
-		backupMethodName   = "xtrabackup"
-		volumeMountPath    = "/var/lib/mysql"
-		pathPrefix         = "/backup"
-		vsBackupMethodName = "volume-snapshot"
-		actionSetName      = "test-actionset"
-	)
-
-	var (
-		nodeName    string
-		pvcName     string
-		volumeName  string
-		cluster     *appsv1alpha1.Cluster
-		sp          *storagev1alpha1.StorageProvider
-		repo        *dpv1alpha1.BackupRepo
-		repoPVCName string
-	)
-
-	createActionSet := func(name string) *dpv1alpha1.ActionSet {
-		return testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
-			&dpv1alpha1.ActionSet{}, testapps.WithName(name))
-	}
-
-	createBackupPolicy := func(repoName string) *dpv1alpha1.BackupPolicy {
-		builder := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-			SetBackupRepoName(repoName).
-			SetTarget(constant.AppInstanceLabelKey, clusterName,
-				constant.KBAppComponentLabelKey, componentName,
-				constant.RoleLabelKey, constant.Leader).
-			SetPathPrefix(pathPrefix).
-			SetTargetConnectionCredential(clusterName).
-			AddBackupMethod(backupMethodName, false, actionSetName).
-			SetBackupMethodVolumeMounts(pvcName, volumeMountPath).
-			AddBackupMethod(vsBackupMethodName, true, "").
-			SetBackupMethodVolumes([]string{pvcName})
-		return builder.Create(&testCtx).GetObject()
-	}
-
-	createBackup := func(policy *dpv1alpha1.BackupPolicy, change func(*dpv1alpha1.Backup)) *dpv1alpha1.Backup {
-		if change == nil {
-			change = func(*dpv1alpha1.Backup) {} // set nop
-		}
-		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-			SetBackupPolicyName(backupPolicyName).
-			SetBackupMethod(backupMethodName).
-			Apply(change).
-			Create(&testCtx).GetObject()
-		return backup
-	}
-
-	createStorageProvider := func() *storagev1alpha1.StorageProvider {
-		sp := testapps.CreateCustomizedObj(&testCtx, "backup/storageprovider.yaml",
-			&storagev1alpha1.StorageProvider{})
-		// the storage provider controller is not running, so set the status manually
-		Expect(testapps.ChangeObjStatus(&testCtx, sp, func() {
-			sp.Status.Phase = storagev1alpha1.StorageProviderReady
-		})).Should(Succeed())
-		return sp
-	}
-
-	createRepo := func(change func(repo *dpv1alpha1.BackupRepo)) (*dpv1alpha1.BackupRepo, string) {
-		repo := testapps.CreateCustomizedObj(&testCtx, "backup/backuprepo.yaml",
-			&dpv1alpha1.BackupRepo{}, func(obj *dpv1alpha1.BackupRepo) {
-				obj.Spec.StorageProviderRef = sp.Name
-				if change != nil {
-					change(obj)
-				}
-			})
-		var name string
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(repo), func(g Gomega, repo *dpv1alpha1.BackupRepo) {
-			g.Expect(repo.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupRepoReady))
-			g.Expect(repo.Status.BackupPVCName).ShouldNot(BeEmpty())
-			name = repo.Status.BackupPVCName
-		})).Should(Succeed())
-		return repo, name
-	}
-
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -138,90 +56,58 @@ var _ = Describe("Backup Controller test", func() {
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 	}
 
+	var clusterInfo *testdp.BackupClusterInfo
+
 	BeforeEach(func() {
 		cleanEnv()
-		viper.Set(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
-		By("mock a cluster")
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			"test-cd", "test-cv").Create(&testCtx).GetObject()
-		podGenerateName := clusterName + "-" + componentName
-		By("By mocking a storage class")
-		_ = testapps.CreateStorageClass(&testCtx, storageClassName, true)
-
-		By("By mocking a pvc belonging to the pod")
-		pvc := testapps.NewPersistentVolumeClaimFactory(
-			testCtx.DefaultNamespace, "data-"+podGenerateName+"-0", clusterName, componentName, "data").
-			SetStorage("1Gi").
-			SetStorageClass(storageClassName).
-			Create(&testCtx).GetObject()
-		pvcName = pvc.Name
-		volumeName = pvcName
-
-		By("By mocking a pvc belonging to the pod2")
-		pvc2 := testapps.NewPersistentVolumeClaimFactory(
-			testCtx.DefaultNamespace, "data-"+podGenerateName+"-1", clusterName, componentName, "data").
-			SetStorage("1Gi").
-			SetStorageClass(storageClassName).
-			Create(&testCtx).GetObject()
-
-		By("By mocking a pod belonging to the statefulset")
-		volume := corev1.Volume{Name: volumeName, VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
-		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podGenerateName+"-0").
-			AddAppInstanceLabel(clusterName).
-			AddRoleLabel("leader").
-			AddAppComponentLabel(componentName).
-			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-			AddVolume(volume).
-			Create(&testCtx).GetObject()
-		nodeName = pod.Spec.NodeName
-
-		By("By mocking a pod 2 belonging to the statefulset")
-		volume2 := corev1.Volume{Name: pvc2.Name, VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc2.Name}}}
-		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, podGenerateName+"-1").
-			AddAppInstanceLabel(clusterName).
-			AddAppComponentLabel(componentName).
-			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-			AddVolume(volume2).
-			Create(&testCtx).GetObject()
+		clusterInfo = testdp.NewFakeCluster(&testCtx)
 	})
 
 	AfterEach(func() {
 		cleanEnv()
-		viper.Set(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 	})
 
 	When("with default settings", func() {
-		var backupPolicy *dpv1alpha1.BackupPolicy
+		var (
+			backupPolicy *dpv1alpha1.BackupPolicy
+			repoPVCName  string
+			cluster      *appsv1alpha1.Cluster
+			pvcName      string
+			targetPod    *corev1.Pod
+		)
 
 		BeforeEach(func() {
 			By("creating an actionSet")
-			actionSet := createActionSet(actionSetName)
+			actionSet := testdp.NewFakeActionSet(&testCtx)
+
+			By("creating storage provider")
+			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
 
 			By("creating backup repo")
-			sp = createStorageProvider()
-			repo, repoPVCName = createRepo(nil)
+			_, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
 
 			By("By creating a backupPolicy from actionSet: " + actionSet.Name)
-			backupPolicy = createBackupPolicy(repo.Name)
+			backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
+
+			cluster = clusterInfo.Cluster
+			pvcName = clusterInfo.TargetPVC
+			targetPod = clusterInfo.TargetPod
 		})
 
 		Context("creates a backup", func() {
@@ -238,11 +124,8 @@ var _ = Describe("Backup Controller test", func() {
 			}
 
 			BeforeEach(func() {
-				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetBackupPolicyName(backupPolicyName).
-					SetBackupMethod(backupMethodName).
-					Create(&testCtx).GetObject()
+				By("By creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup = testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
@@ -251,11 +134,12 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 				})).Should(Succeed())
 
 				By("Check backup job's nodeName equals pod's nodeName")
 				Eventually(testapps.CheckObj(&testCtx, jobKey(), func(g Gomega, fetched *batchv1.Job) {
-					g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(nodeName))
+					g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(targetPod.Spec.NodeName))
 				})).Should(Succeed())
 
 				patchK8sJobStatus(jobKey(), batchv1.JobComplete)
@@ -270,8 +154,8 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Labels[dptypes.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
-					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
-					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
+					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(testdp.ClusterName))
+					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(testdp.ComponentName))
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
@@ -301,11 +185,8 @@ var _ = Describe("Backup Controller test", func() {
 				backup    *dpv1alpha1.Backup
 			)
 			BeforeEach(func() {
-				By("creating a backup from backupPolicy " + backupPolicyName)
-				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetBackupPolicyName(backupPolicyName).
-					SetBackupMethod(backupMethodName).
-					Create(&testCtx).GetObject()
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup = testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 
 				By("waiting for finalizers to be added")
@@ -384,19 +265,10 @@ var _ = Describe("Backup Controller test", func() {
 
 			BeforeEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
-				viper.Set(constant.CfgKeyCtrlrMgrNS, "default")
-				viper.Set(constant.CfgKeyCtrlrMgrAffinity,
-					"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
-				viper.Set(constant.CfgKeyCtrlrMgrTolerations,
-					"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
-				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
-				snapshotBackupName := "test-vs-backup"
-
-				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, snapshotBackupName).
-					SetBackupPolicyName(backupPolicyName).
-					SetBackupMethod(vsBackupMethodName).
-					Create(&testCtx).GetObject()
+				By("By creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup = testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupMethod = testdp.VSBackupMethodName
+				})
 				backupKey = client.ObjectKeyFromObject(backup)
 				vsKey = client.ObjectKey{
 					Name:      dpbackup.GetVolumeSnapshotNamePrefix(backup) + pvcName,
@@ -406,9 +278,6 @@ var _ = Describe("Backup Controller test", func() {
 
 			AfterEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "false")
-				viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
-				viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
-				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 			})
 
 			It("should success after all volume snapshot ready", func() {
@@ -454,12 +323,10 @@ var _ = Describe("Backup Controller test", func() {
 
 			It("should fail when disable volumesnapshot", func() {
 				viper.Set("VOLUMESNAPSHOT", "false")
-
-				By("creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetBackupPolicyName(backupPolicyName).
-					SetBackupMethod(vsBackupMethodName).
-					Create(&testCtx).GetObject()
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupMethod = testdp.VSBackupMethodName
+				})
 				backupKey = client.ObjectKeyFromObject(backup)
 
 				By("check backup failed")
@@ -469,11 +336,10 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("should fail without pvc", func() {
-				By("creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetBackupPolicyName(backupPolicyName).
-					SetBackupMethod(vsBackupMethodName).
-					Create(&testCtx).GetObject()
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupMethod = testdp.VSBackupMethodName
+				})
 				backupKey = client.ObjectKeyFromObject(backup)
 
 				By("check backup failed")
@@ -488,15 +354,12 @@ var _ = Describe("Backup Controller test", func() {
 		Context("creates a backup with non-existent backup policy", func() {
 			var backupKey types.NamespacedName
 			BeforeEach(func() {
-				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-					SetBackupPolicyName(backupPolicyName).
-					SetBackupMethod(backupMethodName).
-					Create(&testCtx).GetObject()
+				By("By creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup := testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
-			It("Should fail", func() {
-				By("Check backup status failed")
+			It("should fail", func() {
+				By("check backup status failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
@@ -505,20 +368,26 @@ var _ = Describe("Backup Controller test", func() {
 	})
 
 	When("with backup repo", func() {
+		var (
+			repoPVCName string
+			sp          *storagev1alpha1.StorageProvider
+			repo        *dpv1alpha1.BackupRepo
+		)
+
 		BeforeEach(func() {
 			By("creating backup repo")
-			sp = createStorageProvider()
-			repo, repoPVCName = createRepo(nil)
+			sp = testdp.NewFakeStorageProvider(&testCtx, nil)
+			repo, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
 
 			By("creating actionSet")
-			_ = createActionSet(actionSetName)
+			_ = testdp.NewFakeActionSet(&testCtx)
 		})
 
 		Context("explicitly specify backup repo", func() {
 			It("should use the backup repo specified in the policy", func() {
 				By("creating backup policy and backup")
-				policy := createBackupPolicy(repo.Name)
-				backup := createBackup(policy, nil)
+				_ = testdp.NewFakeBackupPolicy(&testCtx, nil)
+				backup := testdp.NewFakeBackup(&testCtx, nil)
 				By("checking backup, it should use the PVC from the backup repo")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
 					g.Expect(backup.Status.PersistentVolumeClaimName).Should(BeEquivalentTo(repoPVCName))
@@ -527,10 +396,14 @@ var _ = Describe("Backup Controller test", func() {
 
 			It("should use the backup repo specified in the backup object", func() {
 				By("creating a second backup repo")
-				repo2, repoPVCName2 := createRepo(nil)
+				repo2, repoPVCName2 := testdp.NewFakeBackupRepo(&testCtx, func(repo *dpv1alpha1.BackupRepo) {
+					repo.Name += "2"
+				})
 				By("creating backup policy and backup")
-				policy := createBackupPolicy(repo.Name)
-				backup := createBackup(policy, func(backup *dpv1alpha1.Backup) {
+				_ = testdp.NewFakeBackupPolicy(&testCtx, func(backupPolicy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupRepoName = &repo.Name
+				})
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					if backup.Labels == nil {
 						backup.Labels = map[string]string{}
 					}
@@ -546,8 +419,8 @@ var _ = Describe("Backup Controller test", func() {
 		Context("default backup repo", func() {
 			It("should use the default backup repo if it's not specified", func() {
 				By("creating backup policy and backup")
-				policy := createBackupPolicy("")
-				backup := createBackup(policy, nil)
+				_ = testdp.NewFakeBackupPolicy(&testCtx, nil)
+				backup := testdp.NewFakeBackup(&testCtx, nil)
 				By("checking backup, it should use the PVC from the backup repo")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
 					g.Expect(backup.Status.PersistentVolumeClaimName).Should(BeEquivalentTo(repoPVCName))
@@ -556,15 +429,15 @@ var _ = Describe("Backup Controller test", func() {
 
 			It("should associate the default backup repo with the backup object", func() {
 				By("creating backup policy and backup")
-				policy := createBackupPolicy("")
-				backup := createBackup(policy, nil)
+				_ = testdp.NewFakeBackupPolicy(&testCtx, nil)
+				backup := testdp.NewFakeBackup(&testCtx, nil)
 				By("checking backup labels")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
 					g.Expect(backup.Labels[dataProtectionBackupRepoKey]).Should(BeEquivalentTo(repo.Name))
 				})).Should(Succeed())
 
 				By("creating backup2")
-				backup2 := createBackup(policy, func(backup *dpv1alpha1.Backup) {
+				backup2 := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Name += "2"
 				})
 				By("checking backup2 labels")
@@ -576,20 +449,25 @@ var _ = Describe("Backup Controller test", func() {
 
 			Context("multiple default backup repos", func() {
 				var repoPVCName2 string
-				var policy *dpv1alpha1.BackupPolicy
 				BeforeEach(func() {
 					By("creating a second backup repo")
-					sp2 := createStorageProvider()
-					_, repoPVCName2 = createRepo(func(repo *dpv1alpha1.BackupRepo) {
+					sp2 := testdp.NewFakeStorageProvider(&testCtx, func(sp *storagev1alpha1.StorageProvider) {
+						sp.Name += "2"
+					})
+					_, repoPVCName2 = testdp.NewFakeBackupRepo(&testCtx, func(repo *dpv1alpha1.BackupRepo) {
+						repo.Name += "2"
 						repo.Spec.StorageProviderRef = sp2.Name
 					})
 					By("creating backup policy")
-					policy = createBackupPolicy("")
+					_ = testdp.NewFakeBackupPolicy(&testCtx, func(backupPolicy *dpv1alpha1.BackupPolicy) {
+						// set backupRepoName in backupPolicy to nil to make it use the default backup repo
+						backupPolicy.Spec.BackupRepoName = nil
+					})
 				})
 
 				It("should fail if there are multiple default backup repos", func() {
 					By("creating backup")
-					backup := createBackup(policy, nil)
+					backup := testdp.NewFakeBackup(&testCtx, nil)
 					By("checking backup, it should fail because there are multiple default backup repos")
 					Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
 						g.Expect(backup.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupPhaseFailed))
@@ -608,7 +486,7 @@ var _ = Describe("Backup Controller test", func() {
 							g.Expect(repo.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupRepoFailed))
 						})).Should(Succeed())
 					By("creating backup")
-					backup := createBackup(policy, func(backup *dpv1alpha1.Backup) {
+					backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 						backup.Name = "second-backup"
 					})
 					By("checking backup, it should use the PVC from repo2")
@@ -626,8 +504,10 @@ var _ = Describe("Backup Controller test", func() {
 					delete(repo.Annotations, dptypes.DefaultBackupRepoAnnotationKey)
 				})).Should(Succeed())
 				By("creating backup")
-				policy := createBackupPolicy("")
-				backup := createBackup(policy, nil)
+				_ = testdp.NewFakeBackupPolicy(&testCtx, func(backupPolicy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupRepoName = nil
+				})
+				backup := testdp.NewFakeBackup(&testCtx, nil)
 				By("checking backup, it should fail because the backup repo are not available")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
 					g.Expect(backup.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupPhaseFailed))

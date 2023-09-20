@@ -42,19 +42,18 @@ package dataprotection
 //	viper "github.com/apecloud/kubeblocks/internal/viperx"
 //)
 //
-//var _ = Describe("Backup Policy Controller", func() {
-//	const clusterName = "wesql-cluster"
-//	const componentName = "replicasets-primary"
-//	const containerName = "mysql"
-//	const defaultPVCSize = "1Gi"
-//	const backupPolicyName = "test-backup-policy"
-//	const backupRemotePVCName = "backup-remote-pvc"
-//	const defaultSchedule = "0 3 * * *"
-//	const defaultTTL = "7d"
-//	const backupNamePrefix = "test-backup-job-"
-//	const mgrNamespace = "kube-system"
-//
-//	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
+//var _ = Describe("Backup Schedule Controller", func() {
+//	const (
+//		clusterName         = "wesql-cluster"
+//		componentName       = "replicasets-primary"
+//		containerName       = "mysql"
+//		defaultPVCSize      = "1Gi"
+//		backupPolicyName    = "test-backup-policy"
+//		backupRemotePVCName = "backup-remote-pvc"
+//		defaultSchedule     = "0 3 * * *"
+//		defaultTTL          = "7d"
+//		backupNamePrefix    = "test-backup-job-"
+//	)
 //
 //	cleanEnv := func() {
 //		// must wait till resources deleted and no longer existed before the testcases start,
@@ -62,7 +61,6 @@ package dataprotection
 //		// in race conditions, it will find the existence of old objects, resulting failure to
 //		// create the new objects.
 //		By("clean resources")
-//		viper.SetDefault(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
 //		// delete rest mocked objects
 //		inNS := client.InNamespace(testCtx.DefaultNamespace)
 //		ml := client.HasLabels{testCtx.TestObjLabelKey}
@@ -70,18 +68,17 @@ package dataprotection
 //		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
 //		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 //		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-//
 //		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+//		testapps.ClearResources(&testCtx, intctrlutil.BackupScheduleSignature, inNS, ml)
 //		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
 //		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS)
 //		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 //		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 //		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
-//		// mgr namespaced
-//		inMgrNS := client.InNamespace(mgrNamespace)
-//		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)
+//		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+//
 //		// non-namespaced
-//		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+//		testapps.ClearResources(&testCtx, intctrlutil.ActionSetSignature, ml)
 //	}
 //
 //	BeforeEach(func() {
@@ -112,7 +109,7 @@ package dataprotection
 //	AfterEach(cleanEnv)
 //
 //	When("creating backup policy with default settings", func() {
-//		var backupToolName string
+//		var actionSetName string
 //		getCronjobKey := func(backupType dpv1alpha1.BackupMethod) types.NamespacedName {
 //			return types.NamespacedName{
 //				Name:      fmt.Sprintf("%s-%s-%s", backupPolicyName, testCtx.DefaultNamespace, backupType),
@@ -121,7 +118,6 @@ package dataprotection
 //		}
 //
 //		BeforeEach(func() {
-//			viper.Set(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
 //			viper.Set(constant.CfgKeyCtrlrMgrAffinity,
 //				"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
 //			viper.Set(constant.CfgKeyCtrlrMgrTolerations,
@@ -129,13 +125,12 @@ package dataprotection
 //			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
 //
 //			By("By creating a backupTool")
-//			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-//				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
-//			backupToolName = backupTool.Name
+//			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+//				&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
+//			actionSetName = actionSet.Name
 //		})
 //
 //		AfterEach(func() {
-//			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 //			viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
 //			viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
 //			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
@@ -146,7 +141,7 @@ package dataprotection
 //			var backupPolicy *dpv1alpha1.BackupPolicy
 //			var startingDeadlineMinutes int64 = 60
 //			BeforeEach(func() {
-//				By("By creating a backupPolicy from backupTool: " + backupToolName)
+//				By("By creating a backupPolicy from actionSet: " + actionSetName)
 //				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 //					AddDataFilePolicy().
 //					SetBackupToolName(backupToolName).

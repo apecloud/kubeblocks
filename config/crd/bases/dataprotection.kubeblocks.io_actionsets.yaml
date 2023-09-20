@@ -514,6 +514,8 @@ spec:
                     - image
                     type: object
                 type: object
+            required:
+            - backupType
             type: object
           status:
             description: ActionSetStatus defines the observed state of ActionSet
@@ -536,4 +538,5 @@ spec:
         type: object
     served: true
     storage: true
-    subresources: {}
+    subresources:
+      status: {}

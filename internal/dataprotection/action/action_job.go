@@ -64,7 +64,7 @@ func (j *JobAction) Type() dpv1alpha1.ActionType {
 func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 	sb := newStatusBuilder(j)
 	handleErr := func(err error) (*dpv1alpha1.ActionStatus, error) {
-		return sb.build(), err
+		return sb.withErr(err).build(), err
 	}
 
 	if err := j.validate(); err != nil {

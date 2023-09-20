@@ -3,6 +3,7 @@ kind: ActionSet
 metadata:
   name: action-set-
 spec:
+  backupType: Full
   env:
   - name: DATA_DIR
     value: /var/lib/mysql

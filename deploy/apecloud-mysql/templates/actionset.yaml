@@ -4,7 +4,6 @@ metadata:
   name: xtrabackup-for-apecloud-mysql
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
-    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   backupType: Full
   env:
@@ -63,7 +62,6 @@ metadata:
   name: volumesnapshot-for-apecloud-mysql
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
-    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   backupType: Full
   env:

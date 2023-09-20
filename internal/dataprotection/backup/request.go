@@ -294,22 +294,15 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	}
 
 	buildVolumes := func() []corev1.Volume {
-		volumes := []corev1.Volume{
+		return append([]corev1.Volume{
 			buildBackupRepoVolume(r.BackupRepoPVC.Name),
-		}
-		volumes = append(volumes,
-			getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
-		return volumes
+		}, getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 	}
 
 	buildVolumeMounts := func() []corev1.VolumeMount {
-		volumeMounts := []corev1.VolumeMount{
+		return append([]corev1.VolumeMount{
 			buildBackupRepoVolumeMount(r.BackupRepoPVC.Name),
-		}
-		if r.BackupMethod.TargetVolumes != nil {
-			volumeMounts = append(volumeMounts, r.BackupMethod.TargetVolumes.VolumeMounts...)
-		}
-		return volumeMounts
+		}, getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 	}
 
 	runAsUser := int64(0)

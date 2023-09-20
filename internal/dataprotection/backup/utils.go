@@ -75,6 +75,8 @@ func getVolumesByMounts(pod *corev1.Pod, mounts []corev1.VolumeMount) []corev1.V
 }
 
 // TODO: if the result is empty, should we return the pod's volumes?
+//
+//	if volumes can not found in the pod spec, maybe output a warning log?
 func getVolumesByVolumeInfo(pod *corev1.Pod, volumeInfo *dpv1alpha1.TargetVolumeInfo) []corev1.Volume {
 	if volumeInfo == nil {
 		return nil
@@ -86,6 +88,21 @@ func getVolumesByVolumeInfo(pod *corev1.Pod, volumeInfo *dpv1alpha1.TargetVolume
 		volumes = getVolumesByMounts(pod, volumeInfo.VolumeMounts)
 	}
 	return volumes
+}
+
+func getVolumeMountsByVolumeInfo(pod *corev1.Pod, info *dpv1alpha1.TargetVolumeInfo) []corev1.VolumeMount {
+	if info == nil || len(info.VolumeMounts) == 0 {
+		return nil
+	}
+	var mounts []corev1.VolumeMount
+	for _, v := range pod.Spec.Volumes {
+		for _, m := range info.VolumeMounts {
+			if v.Name == m.Name {
+				mounts = append(mounts, m)
+			}
+		}
+	}
+	return mounts
 }
 
 func getPVCsByVolumeNames(cli client.Client,

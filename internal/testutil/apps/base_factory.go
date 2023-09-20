@@ -137,7 +137,9 @@ func (factory *BaseFactory[T, PT, F]) AddFinalizers(finalizers []string) *F {
 }
 
 func (factory *BaseFactory[T, PT, F]) Apply(changeFn func(PT)) *F {
-	changeFn(factory.object)
+	if changeFn != nil {
+		changeFn(factory.object)
+	}
 	return factory.concreteFactory
 }
 

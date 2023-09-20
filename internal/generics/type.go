@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -93,15 +93,17 @@ var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ appsv1al
 
 var BackupPolicyTemplateSignature = func(_ appsv1alpha1.BackupPolicyTemplate, _ appsv1alpha1.BackupPolicyTemplateList) {
 }
-var BackupPolicySignature = func(_ dataprotectionv1alpha1.BackupPolicy, _ dataprotectionv1alpha1.BackupPolicyList) {
+var BackupPolicySignature = func(_ dpv1alpha1.BackupPolicy, _ dpv1alpha1.BackupPolicyList) {
 }
-var BackupSignature = func(_ dataprotectionv1alpha1.Backup, _ dataprotectionv1alpha1.BackupList) {
+var BackupScheduleSignature = func(_ dpv1alpha1.BackupSchedule, _ dpv1alpha1.BackupScheduleList) {
 }
-var ActionSetSignature = func(_ dataprotectionv1alpha1.ActionSet, _ dataprotectionv1alpha1.ActionSetList) {
+var BackupSignature = func(_ dpv1alpha1.Backup, _ dpv1alpha1.BackupList) {
 }
-var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList) {
+var ActionSetSignature = func(_ dpv1alpha1.ActionSet, _ dpv1alpha1.ActionSetList) {
 }
-var BackupRepoSignature = func(_ dataprotectionv1alpha1.BackupRepo, _ dataprotectionv1alpha1.BackupRepoList) {
+var RestoreJobSignature = func(_ dpv1alpha1.RestoreJob, _ dpv1alpha1.RestoreJobList) {
+}
+var BackupRepoSignature = func(_ dpv1alpha1.BackupRepo, _ dpv1alpha1.BackupRepoList) {
 }
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList) {
 }

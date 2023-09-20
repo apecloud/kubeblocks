@@ -30,7 +30,7 @@ type ActionSetSpec struct {
 	// +kubebuilder:validation:Enum={Full,Continuous}
 	// +kubebuilder:default=Full
 	// +kubebuilder:validation:Required
-	BackupType BackupType `json:"backupType,omitempty"`
+	BackupType BackupType `json:"backupType"`
 
 	// List of environment variables to set in the container.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -206,12 +206,13 @@ const (
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=as
 // +kubebuilder:printcolumn:name="BACKUP-TYPE",type="string",JSONPath=".spec.backupType"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ActionSet is the Schema for the backuptools API (defined by provider)
+// ActionSet is the Schema for the actionsets API
 type ActionSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

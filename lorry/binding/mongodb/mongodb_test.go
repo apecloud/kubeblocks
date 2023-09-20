@@ -23,13 +23,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/zapr"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+	"go.uber.org/zap"
 
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 )
@@ -55,16 +54,14 @@ func TestGetRole(t *testing.T) {
 		"username":     "username",
 		"password":     "password",
 	}
-	bm := bindings.Metadata{
-		Base: metadata.Base{Properties: properties},
-	}
+	development, _ := zap.NewDevelopment()
 	m := &MongoDBOperations{
-		BaseOperations: BaseOperations{Logger: logger.NewLogger("mongodb-test")},
+		BaseOperations: BaseOperations{Logger: zapr.NewLogger(development)},
 	}
-	err := m.Init(bm)
+	err := m.Init(properties)
 	assert.Nil(t, err)
 	m.manager.Client = mt.Client
-	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+	role, err := m.GetRole(context.Background(), &ProbeRequest{}, &ProbeResponse{})
 	if err != nil {
 		t.Errorf("getRole error: %s", err)
 	}

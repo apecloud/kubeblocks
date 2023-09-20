@@ -66,10 +66,10 @@ type componentWorkloadBuilderBase struct {
 
 func (b *componentWorkloadBuilderBase) BuildEnv() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		envCfg, err := factory.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		envCfg := factory.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		b.EnvConfig = envCfg
 		b.LocalObjs = append(b.LocalObjs, envCfg)
-		return []client.Object{envCfg}, err
+		return []client.Object{envCfg}, nil
 	}
 	return b.BuildWrapper(buildfn)
 }
@@ -80,8 +80,21 @@ func (b *componentWorkloadBuilderBase) BuildConfig() componentWorkloadBuilder {
 			return nil, fmt.Errorf("build config but workload is nil, cluster: %s, component: %s",
 				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
-		err := plan.RenderConfigNScriptFiles(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
-			b.Comp.GetSynthesizedComponent(), b.Workload, b.getRuntime(), b.LocalObjs, b.ReqCtx.Ctx, b.Client)
+
+		err := plan.RenderConfigNScriptFiles(
+			&intctrlutil.ResourceCtx{
+				Context:       b.ReqCtx.Ctx,
+				Client:        b.Client,
+				Namespace:     b.Comp.GetNamespace(),
+				ClusterName:   b.Comp.GetClusterName(),
+				ComponentName: b.Comp.GetName(),
+			},
+			b.Comp.GetClusterVersion(),
+			b.Comp.GetCluster(),
+			b.Comp.GetSynthesizedComponent(),
+			b.Workload,
+			b.getRuntime(),
+			b.LocalObjs)
 		return nil, err
 	}
 	return b.BuildWrapper(buildfn)
@@ -111,10 +124,7 @@ func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {
 		// conditionally build PodDisruptionBudget
 		synthesizedComponent := b.Comp.GetSynthesizedComponent()
 		if synthesizedComponent.MinAvailable != nil {
-			pdb, err := factory.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
-			if err != nil {
-				return nil, err
-			}
+			pdb := factory.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
 			return []client.Object{pdb}, nil
 		} else {
 			panic("this shouldn't happen")
@@ -156,23 +166,20 @@ func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuild
 
 func (b *componentWorkloadBuilderBase) BuildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		if err != nil {
-			return nil, err
-		}
+		svcList := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		objs := make([]client.Object, 0)
 		for _, svc := range svcList {
 			objs = append(objs, svc)
 		}
-		return objs, err
+		return objs, nil
 	}
 	return b.BuildWrapper(buildfn)
 }
 
 func (b *componentWorkloadBuilderBase) BuildHeadlessService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svc, err := factory.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		return []client.Object{svc}, err
+		svc := factory.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		return []client.Object{svc}, nil
 	}
 	return b.BuildWrapper(buildfn)
 }

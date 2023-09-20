@@ -1,7 +1,3 @@
-apiVersion: dapr.io/v1alpha1
-kind: Component
-metadata:
-  name: probe
+name: probe
 spec:
-  type: middleware.http.probe
   version: v1

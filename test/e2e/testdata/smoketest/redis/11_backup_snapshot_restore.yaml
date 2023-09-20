@@ -1,3 +1,5 @@
+---
+# Source: redis-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -34,7 +36,7 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 1Gi
+                storage: 21Gi
     - name: redis-sentinel # user-defined
       componentDefRef: redis-sentinel # ref clusterDefinition componentDefs.name
       replicas: 3
@@ -52,4 +54,4 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 1Gi
+                storage: 21Gi

@@ -830,7 +830,7 @@ func (c *rsmComponent) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	for _, pod := range pods {
 		subs := strings.Split(pod.Name, "-")
-		if ordinal, err := strconv.Atoi(subs[len(subs)-1]); err != nil {
+		if ordinal, err := strconv.ParseInt(subs[len(subs)-1], 10, 32); err != nil {
 			return err
 		} else if int32(ordinal) < c.Component.Replicas {
 			continue

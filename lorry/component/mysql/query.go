@@ -21,12 +21,13 @@ package mysql
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 )
 
 func (mgr *Manager) Query(ctx context.Context, sql string) ([]byte, error) {
-	mgr.Logger.Debugf("query: %s", sql)
+	mgr.Logger.Info(fmt.Sprintf("query: %s", sql))
 	rows, err := mgr.DB.QueryContext(ctx, sql)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error executing %s", sql)
@@ -43,7 +44,7 @@ func (mgr *Manager) Query(ctx context.Context, sql string) ([]byte, error) {
 }
 
 func (mgr *Manager) Exec(ctx context.Context, sql string) (int64, error) {
-	mgr.Logger.Debugf("exec: %s", sql)
+	mgr.Logger.Info(fmt.Sprintf("exec: %s", sql))
 	res, err := mgr.DB.ExecContext(ctx, sql)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error executing %s", sql)

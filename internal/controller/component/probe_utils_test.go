@@ -44,9 +44,7 @@ var _ = Describe("probe_utils", func() {
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			var err error
-			container, err = buildProbeContainer()
-			Expect(err).NotTo(HaveOccurred())
+			container = buildProbeContainer()
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
@@ -101,7 +99,9 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build role changed probe container", func() {
-			buildRoleProbeContainer(component, container, clusterDefProbe, probeServiceHTTPPort)
+			synthesizedComponent := &SynthesizedComponent{CharacterType: "wesql"}
+			pod := &corev1.PodSpec{}
+			buildRoleProbeContainer(synthesizedComponent, container, clusterDefProbe, probeServiceHTTPPort, pod)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 

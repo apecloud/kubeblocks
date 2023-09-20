@@ -8,7 +8,7 @@ type: application
 version: 0.7.0-alpha.0
 
 # This is the version number of qdrant.
-appVersion: "1.1.0"
+appVersion: "1.5.0"
 
 home: https://qdrant.tech/
 icon: https://qdrant.tech/images/logo_with_text.svg

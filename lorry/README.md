@@ -40,7 +40,7 @@ KB_SERVICE_ROLES: The mapping of roles and accessmode, eg. {"follower":"Readonly
 You can run the following command to start Probe once built
 
 ```shell
-$ probe --app-id batch-sdk  --dapr-http-port 3502 --dapr-grpc-port 54215 --app-protocol http  --components-path ../../config/dapr/components --config ../../config/dapr/config.yaml
+$ probe --config-path config/probe --port 7373
 ```
 
 

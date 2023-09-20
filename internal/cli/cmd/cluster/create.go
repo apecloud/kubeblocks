@@ -167,6 +167,27 @@ var setKeyCfg = map[setKey]string{
 	keyReplicas: types.CfgKeyClusterDefaultReplicas,
 }
 
+// With the access of various databases, the simple way of specifying the capacity of storage by --set
+// no longer meets the current demand, because many clusters' components are set up with multiple pvc, so we split the way of setting storage from `--set`.
+type storageKey string
+
+// map[string]map[storageKey]string `json:"-"`
+const (
+	// storageKeyType is the key of CreateOptions.Storages, reference to a cluster component name
+	storageKeyType storageKey = "type"
+	// storageKeyName is the name of a pvc in volumeClaimTemplates, like "data" or "log"
+	storageKeyName storageKey = "name"
+	// storageKeyStorageClass is the storageClass of a pvc
+	storageKeyStorageClass storageKey = "storageClass"
+	// storageAccessMode is the storageAccessMode of a pvc, could be ReadWriteOnce,ReadOnlyMany,ReadWriteMany.
+	// more information in https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
+	storageAccessMode storageKey = "mode"
+	// storageKeySize is the size of a pvc
+	storageKeySize storageKey = "size"
+
+	storageKeyUnknown storageKey = "unknown"
+)
+
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
 	// Options for cluster termination policy
@@ -204,7 +225,7 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 	RBACEnabled       bool                     `json:"-"`
-
+	Storages          []string                 `json:"-"`
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
 	RestoreTime   string `json:"restoreTime,omitempty"`
@@ -238,6 +259,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
+	cmd.Flags().StringArrayVar(&o.Storages, "pvc", []string{}, "Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
@@ -558,6 +580,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		err       error
 		cd        *appsv1alpha1.ClusterDefinition
 		compSpecs []*appsv1alpha1.ClusterComponentSpec
+		storages  map[string][]map[storageKey]string
 	)
 
 	cd, err = cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
@@ -573,6 +596,13 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	if err != nil {
 		return nil, err
 	}
+	if len(o.Storages) != 0 {
+		storages, err = buildCompStorages(o.Storages, cd)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	overrideComponentBySets := func(comp, setComp *appsv1alpha1.ClusterComponentSpec, setValues map[setKey]string) {
 		for k := range setValues {
 			switch k {
@@ -619,6 +649,10 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if len(storages) != 0 {
+		compSpecs = rebuildCompStorage(storages, compSpecs)
 	}
 
 	var comps []map[string]interface{}
@@ -1445,6 +1479,16 @@ func setKeys() []string {
 	}
 }
 
+func storageSetKey() []string {
+	return []string{
+		string(storageKeyType),
+		string(storageKeyName),
+		string(storageKeyStorageClass),
+		string(storageAccessMode),
+		string(storageKeySize),
+	}
+}
+
 // validateDefaultSCInConfig will verify if the ConfigMap of Kubeblocks is configured with the DEFAULT_STORAGE_CLASS.
 // When we install Kubeblocks, certain configurations will be rendered in a ConfigMap named kubeblocks-manager-config.
 // You can find the details in deploy/helm/template/configmap.yaml.
@@ -1474,4 +1518,135 @@ func validateDefaultSCInConfig(dynamic dynamic.Interface) (bool, error) {
 		return false, nil
 	}
 	return len(config["DEFAULT_STORAGE_CLASS"].(string)) != 0, nil
+}
+
+// buildCompStorages will override the storage configurations by --set, and it fixes out the case where there are multiple pvc's in a component
+func buildCompStorages(pvcs []string, cd *appsv1alpha1.ClusterDefinition) (map[string][]map[storageKey]string, error) {
+	pvcSets := map[string][]map[storageKey]string{}
+	parseKey := func(key string) storageKey {
+		for _, k := range storageSetKey() {
+			if strings.EqualFold(k, key) {
+				return storageKey(k)
+			}
+		}
+		return storageKeyUnknown
+	}
+
+	buildPVCMap := func(sets []string) (map[storageKey]string, error) {
+		res := map[storageKey]string{}
+		for _, set := range sets {
+			kv := strings.Split(set, "=")
+			if len(kv) != 2 {
+				return nil, fmt.Errorf("unknown set format \"%s\", should be like key1=value1", set)
+			}
+
+			// only record the supported key
+			k := parseKey(kv[0])
+			if k == storageKeyUnknown {
+				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(storageSetKey(), ","))
+			}
+			res[k] = kv[1]
+		}
+		return res, nil
+	}
+
+	for _, pvc := range pvcs {
+		pvcMap, err := buildPVCMap(strings.Split(pvc, ","))
+		if err != nil {
+			return nil, err
+		}
+		if len(pvcMap) == 0 {
+			continue
+		}
+		compDefName := pvcMap[storageKeyType]
+
+		// type is not specified by user, use the default component definition name, now only
+		// support cluster definition with one component
+		if len(compDefName) == 0 {
+			name, err := cluster.GetDefaultCompName(cd)
+			if err != nil {
+				return nil, err
+			}
+
+			// if the number of component definitions is more than one, default use the first one and output a log
+			if len(cd.Spec.ComponentDefs) > 1 {
+				klog.V(1).Infof("the component is not specified, use the default component \"%s\" in cluster definition \"%s\"", name, cd.Name)
+			}
+			compDefName = name
+		} else {
+			// check the type is a valid component definition name
+			valid := false
+			for _, c := range cd.Spec.ComponentDefs {
+				if c.Name == compDefName {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return nil, fmt.Errorf("the type \"%s\" is not a valid component definition name", compDefName)
+			}
+		}
+
+		pvcSets[compDefName] = append(pvcSets[compDefName], pvcMap)
+	}
+	return pvcSets, nil
+}
+
+// rebuildCompStorage will rewrite the cluster component specs with the values in pvcMaps
+func rebuildCompStorage(pvcMaps map[string][]map[storageKey]string, specs []*appsv1alpha1.ClusterComponentSpec) []*appsv1alpha1.ClusterComponentSpec {
+	validateAccessMode := func(mode string) bool {
+		return mode == string(corev1.ReadWriteOnce) || mode == string(corev1.ReadOnlyMany) || mode == string(corev1.ReadWriteMany) || mode == string(corev1.ReadWriteOncePod)
+	}
+
+	// todo: now each ClusterComponentVolumeClaimTemplate can only set one AccessModes
+	buildClusterComponentVolumeClaimTemplate := func(storageSet map[storageKey]string) appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+		// set the default value
+		res := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+			Name: cluster.GenerateName(),
+			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(viper.GetString(types.CfgKeyClusterDefaultStorageSize)),
+					},
+				},
+			},
+		}
+		if name, ok := storageSet[storageKeyName]; ok {
+			res.Name = name
+		}
+		if accessMode, ok := storageSet[storageAccessMode]; ok {
+			if validateAccessMode(accessMode) {
+				res.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.PersistentVolumeAccessMode(accessMode)}
+			} else {
+				fmt.Printf("Warning: PV access dode %s is invalid, use `ReadWriteOnce` by default", accessMode)
+			}
+		}
+		if storageClass, ok := storageSet[storageKeyStorageClass]; ok {
+			res.Spec.StorageClassName = &storageClass
+		}
+		if storageSize, ok := storageSet[storageKeySize]; ok {
+			res.Spec.Resources = corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(storageSize),
+				},
+			}
+		}
+		return res
+	}
+
+	for componentNames, pvcs := range pvcMaps {
+		var compPvcs []appsv1alpha1.ClusterComponentVolumeClaimTemplate
+		for i := range pvcs {
+			compPvcs = append(compPvcs, buildClusterComponentVolumeClaimTemplate(pvcs[i]))
+		}
+		for i := range specs {
+			if specs[i].Name == componentNames {
+				specs[i].VolumeClaimTemplates = compPvcs
+			}
+		}
+	}
+	return specs
 }

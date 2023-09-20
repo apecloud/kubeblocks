@@ -108,6 +108,8 @@ spec:
               value: "1"
             - name: ELASTICSEARCH_CLUSTER_MASTER_HOSTS
               value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-0"
+            - name: ELASTICSEARCH_ENABLE_SECURITY
+              value: "false"
             - name: ELASTICSEARCH_MINIMUM_MASTER_NODES
               value: "1"
             - name: ELASTICSEARCH_ADVERTISED_HOSTNAME

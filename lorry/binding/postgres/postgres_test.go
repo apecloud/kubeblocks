@@ -28,12 +28,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
-	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 
-	. "github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -49,14 +47,10 @@ const (
 )
 
 func TestOperations(t *testing.T) {
-	pgOps := NewPostgres(logger.NewLogger("test")).(*PostgresOperations)
-	metadata := bindings.Metadata{
-		Base: metadata.Base{
-			Properties: map[string]string{},
-		},
-	}
-	metadata.Properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
-	_ = pgOps.Init(metadata)
+	pgOps := NewPostgres()
+	properties := make(component.Properties)
+	properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
+	_ = pgOps.Init(properties)
 	assert.Equal(t, "postgresql", pgOps.DBType)
 	assert.NotNil(t, pgOps.GetRole)
 	assert.Equal(t, 5432, pgOps.DBPort)
@@ -89,16 +83,15 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 
 	// live DB test
-	b := NewPostgres(logger.NewLogger("test")).(*PostgresOperations)
-	m := bindings.Metadata{Base: metadata.Base{Properties: map[string]string{connectionURLKey: url}}}
-	if err := b.Init(m); err != nil {
+	b := NewPostgres()
+	if err := b.Init(nil); err != nil {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
 	assert.False(t, b.InitIfNeed())
 
 	// create table
-	req := &bindings.InvokeRequest{
+	req := &binding.ProbeRequest{
 		Operation: ExecOperation,
 		Metadata:  map[string]string{commandSQLKey: testTableDDL},
 	}
@@ -207,9 +200,10 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 	}
 
 	// live DB test
-	b := NewPostgres(logger.NewLogger("test")).(*PostgresOperations)
-	m := bindings.Metadata{Base: metadata.Base{Properties: map[string]string{connectionURLKey: url}}}
-	if err := b.Init(m); err != nil {
+	b := NewPostgres()
+	properties := make(component.Properties)
+	properties[connectionURLKey] = url
+	if err := b.Init(properties); err != nil {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
@@ -224,7 +218,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			roleName = "readonly"
 		)
 		// delete user to clean up
-		req := &bindings.InvokeRequest{
+		req := &binding.ProbeRequest{
 			Operation: DeleteUserOp,
 			Metadata:  map[string]string{},
 		}
@@ -235,7 +229,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		assertResponse(t, res, err, RespEveSucc)
 
 		// create user
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: CreateUserOp,
 			Metadata:  map[string]string{},
 		}
@@ -247,7 +241,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		assertResponse(t, res, err, RespEveSucc)
 
 		// describe user
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: DescribeUserOp,
 			Metadata:  map[string]string{},
 		}
@@ -258,7 +252,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		assertResponse(t, res, err, RespEveSucc)
 
 		// list users
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: ListUsersOp,
 			Metadata:  map[string]string{},
 		}
@@ -266,7 +260,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		assertResponse(t, res, err, RespEveSucc)
 
 		// list system users
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: ListSystemAccountsOp,
 			Metadata:  map[string]string{},
 		}
@@ -274,7 +268,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		assertResponse(t, res, err, RespEveSucc)
 
 		// grant role
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: GrantUserRoleOp,
 			Metadata:  map[string]string{},
 		}
@@ -301,7 +295,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 		}
 
 		// revoke role
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: RevokeUserRoleOp,
 			Metadata:  map[string]string{},
 		}
@@ -327,7 +321,7 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 			assertResponse(t, res, err, RespEveSucc)
 		}
 		// delete user
-		req = &bindings.InvokeRequest{
+		req = &binding.ProbeRequest{
 			Operation: DeleteUserOp,
 			Metadata:  map[string]string{},
 		}
@@ -339,11 +333,11 @@ func TestPostgresIntegrationAccounts(t *testing.T) {
 	})
 }
 
-func assertResponse(t *testing.T, res *bindings.InvokeResponse, err error, event string) {
+func assertResponse(t *testing.T, res *binding.ProbeResponse, err error, event string) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.NotNil(t, res.Metadata)
-	opsRes := OpsResult{}
+	opsRes := binding.OpsResult{}
 	err = json.Unmarshal(res.Data, &opsRes)
 	assert.NoError(t, err)
 	t.Logf("ops result: %v", opsRes)

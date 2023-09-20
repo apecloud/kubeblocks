@@ -38,6 +38,10 @@ func PgCtl(arg string) (string, error) {
 	return ExecCommand("su", args...)
 }
 
+func PgWalDump(args ...string) (string, error) {
+	return ExecCommand("pg_waldump", args...)
+}
+
 func ExecCommand(name string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(name, args...)

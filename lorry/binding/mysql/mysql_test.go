@@ -30,14 +30,12 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
-	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/mysql"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
@@ -54,7 +52,7 @@ func TestInit(t *testing.T) {
 	viper.Set("KB_SERVICE_PASSWORD", "testpassword")
 
 	mysqlOps, _, _ := mockDatabase(t)
-	mysqlOps.Metadata.Properties["url"] = urlWithPort
+	mysqlOps.Metadata["url"] = urlWithPort
 	// Call the function being tested
 	err := mysqlOps.Init(mysqlOps.Metadata)
 	if err != nil {
@@ -91,7 +89,7 @@ func TestGetRole(t *testing.T) {
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
 		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnRows(rows)
 
-		role, err := mysqlOps.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+		role, err := mysqlOps.GetRole(context.Background(), &ProbeRequest{}, &ProbeResponse{})
 		assert.Nil(t, err)
 		assert.Equal(t, "Follower", role)
 	})
@@ -99,7 +97,7 @@ func TestGetRole(t *testing.T) {
 	t.Run("GetRole fails", func(t *testing.T) {
 		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnError(errors.New("no record"))
 
-		role, err := mysqlOps.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+		role, err := mysqlOps.GetRole(context.Background(), &ProbeRequest{}, &ProbeResponse{})
 		assert.Equal(t, "", role)
 		assert.NotNil(t, err)
 	})
@@ -107,7 +105,7 @@ func TestGetRole(t *testing.T) {
 
 func TestGetLagOps(t *testing.T) {
 	mysqlOps, mock, _ := mockDatabase(t)
-	req := &bindings.InvokeRequest{Metadata: map[string]string{}}
+	req := &ProbeRequest{}
 
 	t.Run("GetLagOps succeed", func(t *testing.T) {
 		col1 := sqlmock.NewColumn("CURRENT_LEADER").OfType("VARCHAR", "")
@@ -120,7 +118,7 @@ func TestGetLagOps(t *testing.T) {
 		}
 		mock.ExpectQuery("show slave status").WillReturnRows(rows)
 
-		result, err := mysqlOps.GetLagOps(context.Background(), req, &bindings.InvokeResponse{})
+		result, err := mysqlOps.GetLagOps(context.Background(), req, &ProbeResponse{})
 		assert.NoError(t, err)
 
 		// Assert that the event and message are correct
@@ -132,7 +130,7 @@ func TestGetLagOps(t *testing.T) {
 
 func TestQueryOps(t *testing.T) {
 	mysqlOps, mock, _ := mockDatabase(t)
-	req := &bindings.InvokeRequest{Metadata: map[string]string{}}
+	req := &ProbeRequest{Metadata: map[string]string{}}
 	req.Metadata["sql"] = "select .* from information_schema.wesql_cluster_local"
 
 	t.Run("QueryOps succeed", func(t *testing.T) {
@@ -142,7 +140,7 @@ func TestQueryOps(t *testing.T) {
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
 		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnRows(rows)
 
-		result, err := mysqlOps.QueryOps(context.Background(), req, &bindings.InvokeResponse{})
+		result, err := mysqlOps.QueryOps(context.Background(), req, &ProbeResponse{})
 		assert.NoError(t, err)
 
 		// Assert that the event and message are correct
@@ -158,7 +156,7 @@ func TestQueryOps(t *testing.T) {
 	t.Run("QueryOps fails", func(t *testing.T) {
 		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnError(errors.New("no record"))
 
-		result, err := mysqlOps.QueryOps(context.Background(), req, &bindings.InvokeResponse{})
+		result, err := mysqlOps.QueryOps(context.Background(), req, &ProbeResponse{})
 		assert.NoError(t, err)
 
 		// Assert that the event and message are correct
@@ -174,13 +172,13 @@ func TestQueryOps(t *testing.T) {
 
 func TestExecOps(t *testing.T) {
 	mysqlOps, mock, _ := mockDatabase(t)
-	req := &bindings.InvokeRequest{Metadata: map[string]string{}}
+	req := &ProbeRequest{Metadata: map[string]string{}}
 	req.Metadata["sql"] = "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')"
 
 	t.Run("ExecOps succeed", func(t *testing.T) {
 		mock.ExpectExec("INSERT INTO foo \\(id, v1, ts\\) VALUES \\(.*\\)").WillReturnResult(sqlmock.NewResult(1, 1))
 
-		result, err := mysqlOps.ExecOps(context.Background(), req, &bindings.InvokeResponse{})
+		result, err := mysqlOps.ExecOps(context.Background(), req, &ProbeResponse{})
 		assert.NoError(t, err)
 
 		// Assert that the event and message are correct
@@ -196,7 +194,7 @@ func TestExecOps(t *testing.T) {
 	t.Run("ExecOps fails", func(t *testing.T) {
 		mock.ExpectExec("INSERT INTO foo \\(id, v1, ts\\) VALUES \\(.*\\)").WillReturnError(errors.New("insert error"))
 
-		result, err := mysqlOps.ExecOps(context.Background(), req, &bindings.InvokeResponse{})
+		result, err := mysqlOps.ExecOps(context.Background(), req, &ProbeResponse{})
 		assert.NoError(t, err)
 
 		// Assert that the event and message are correct
@@ -212,8 +210,8 @@ func TestExecOps(t *testing.T) {
 
 func TestCheckStatusOps(t *testing.T) {
 	ctx := context.Background()
-	req := &bindings.InvokeRequest{}
-	resp := &bindings.InvokeResponse{Metadata: map[string]string{}}
+	req := &ProbeRequest{}
+	resp := &ProbeResponse{Metadata: map[string]string{}}
 	mysqlOps, mock, _ := mockDatabase(t)
 
 	t.Run("Check follower", func(t *testing.T) {
@@ -224,7 +222,7 @@ func TestCheckStatusOps(t *testing.T) {
 		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).
 			AddRow(1, 1, time.Now())
 
-		roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
+		roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
 		mock.ExpectQuery(roSQL).WillReturnRows(rows)
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)
@@ -246,7 +244,7 @@ func TestCheckStatusOps(t *testing.T) {
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
+	select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType, component.CheckStatusType)
 		mock.ExpectExec(regexp.QuoteMeta(rwSQL)).WillReturnResult(sqlmock.NewResult(1, 1))
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)
@@ -285,7 +283,7 @@ func TestCheckStatusOps(t *testing.T) {
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
+	select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType, component.CheckStatusType)
 		mock.ExpectExec(regexp.QuoteMeta(rwSQL)).WillReturnError(errors.New("insert error"))
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)
@@ -304,7 +302,7 @@ func TestCheckStatusOps(t *testing.T) {
 
 func TestMySQLAccounts(t *testing.T) {
 	ctx := context.Background()
-	resp := &bindings.InvokeResponse{Metadata: map[string]string{}}
+	resp := &ProbeResponse{}
 	mysqlOps, mock, _ := mockDatabase(t)
 
 	const (
@@ -316,7 +314,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var err error
 		var result OpsResult
 
-		req := &bindings.InvokeRequest{}
+		req := &ProbeRequest{}
 		req.Operation = CreateUserOp
 		req.Metadata = map[string]string{}
 
@@ -344,7 +342,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var err error
 		var result OpsResult
 
-		req := &bindings.InvokeRequest{}
+		req := &ProbeRequest{}
 		req.Operation = CreateUserOp
 		req.Metadata = map[string]string{}
 
@@ -365,7 +363,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var err error
 		var result OpsResult
 
-		req := &bindings.InvokeRequest{}
+		req := &ProbeRequest{}
 		req.Operation = CreateUserOp
 		req.Metadata = map[string]string{}
 
@@ -401,7 +399,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var err error
 		var result OpsResult
 
-		req := &bindings.InvokeRequest{}
+		req := &ProbeRequest{}
 		req.Operation = CreateUserOp
 		req.Metadata = map[string]string{}
 
@@ -429,7 +427,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var err error
 		var result OpsResult
 
-		req := &bindings.InvokeRequest{}
+		req := &ProbeRequest{}
 		req.Operation = CreateUserOp
 		req.Metadata = map[string]string{}
 
@@ -459,7 +457,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var err error
 		var result OpsResult
 
-		req := &bindings.InvokeRequest{}
+		req := &ProbeRequest{}
 		req.Operation = CreateUserOp
 		req.Metadata = map[string]string{}
 
@@ -488,7 +486,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var err error
 		var result OpsResult
 
-		req := &bindings.InvokeRequest{}
+		req := &ProbeRequest{}
 		req.Operation = CreateUserOp
 		req.Metadata = map[string]string{}
 
@@ -520,14 +518,10 @@ func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	metadata := bindings.Metadata{
-		Base: metadata.Base{
-			Properties: map[string]string{},
-		},
-	}
-	metadata.Properties["url"] = urlWithPort
-	mysqlOps := NewMysql(logger.NewLogger("test")).(*MysqlOperations)
-	_ = mysqlOps.Init(metadata)
+	properties := make(component.Properties)
+	properties["url"] = urlWithPort
+	mysqlOps := NewMysql()
+	_ = mysqlOps.Init(properties)
 	mysqlOps.Manager.(*mysql.WesqlManager).DB = db
 
 	return mysqlOps, mock, err

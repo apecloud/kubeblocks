@@ -22,12 +22,13 @@ package highavailability
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	probing "github.com/prometheus-community/pro-bing"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -40,29 +41,29 @@ type Ha struct {
 	ctx        context.Context
 	dbManager  component.DBManager
 	dcs        dcs3.DCS
-	logger     logger.Logger
+	logger     logr.Logger
 	deleteLock sync.Mutex
 }
 
 var ha *Ha
 
-func NewHa(logger logger.Logger) *Ha {
+func NewHa(logger logr.Logger) *Ha {
 
 	dcs, _ := dcs3.NewKubernetesStore(logger)
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
-		logger.Errorf("%s not set", constant.KBEnvCharacterType)
+		logger.Error(nil, "%s not set", "characterType", constant.KBEnvCharacterType)
 		return nil
 	}
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if workloadType == "" {
-		logger.Errorf("%s not set", constant.KBEnvWorkloadType)
+		logger.Error(nil, fmt.Sprintf("%s not set", constant.KBEnvWorkloadType))
 		return nil
 	}
 
 	manager := component.GetManager(characterType, workloadType)
 	if manager == nil {
-		logger.Errorf("No DB Manager for character type %s, workload type %s", characterType, workloadType)
+		logger.Error(nil, fmt.Sprintf("No DB Manager for character type %s, workload type %s", characterType, workloadType))
 		return nil
 	}
 
@@ -82,7 +83,7 @@ func GetHa() *Ha {
 func (ha *Ha) RunCycle() {
 	cluster, err := ha.dcs.GetCluster()
 	if err != nil {
-		ha.logger.Warnf("Get Cluster err: %v.", err)
+		ha.logger.Error(err, "Get Cluster err")
 		return
 	}
 
@@ -95,7 +96,7 @@ func (ha *Ha) RunCycle() {
 	}
 
 	if !ha.dbManager.IsRunning() {
-		ha.logger.Infof("DB Service is not running,  wait for lorryctl to start it")
+		ha.logger.Info("DB Service is not running,  wait for lorryctl to start it")
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
 		}
@@ -114,36 +115,36 @@ func (ha *Ha) RunCycle() {
 	// For Replication cluster IsClusterHealthy will always return true,
 	// and its cluster's healthy is equal to leader member's healthy.
 	case !ha.dbManager.IsClusterHealthy(ha.ctx, cluster):
-		ha.logger.Errorf("The cluster is not healthy, wait...")
+		ha.logger.Error(nil, "The cluster is not healthy, wait...")
 
 	case !ha.dbManager.IsCurrentMemberInCluster(ha.ctx, cluster) && int(cluster.Replicas) > len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)):
-		ha.logger.Infof("Current member is not in cluster, add it to cluster")
+		ha.logger.Info("Current member is not in cluster, add it to cluster")
 		_ = ha.dbManager.JoinCurrentMemberToCluster(ha.ctx, cluster)
 
 	case !ha.dbManager.IsCurrentMemberHealthy(ha.ctx, cluster):
-		ha.logger.Infof("DB Service is not healthy,  do some recover")
+		ha.logger.Info("DB Service is not healthy,  do some recover")
 		if ha.dcs.HasLock() {
 			_ = ha.dcs.ReleaseLock()
 		}
 	//	dbManager.Recover()
 
 	case !cluster.IsLocked():
-		ha.logger.Infof("Cluster has no leader, attempt to take the leader")
+		ha.logger.Info("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			cluster.Leader.DBState = DBState
 			if ha.dcs.AttempAcquireLock() == nil {
 				err := ha.dbManager.Promote(ha.ctx, cluster)
 				if err != nil {
-					ha.logger.Infof("Take the leader failed: %v", err)
+					ha.logger.Error(err, "Take the leader failed")
 					_ = ha.dcs.ReleaseLock()
 				} else {
-					ha.logger.Infof("Take the leader success!")
+					ha.logger.Info("Take the leader success!")
 				}
 			}
 		}
 
 	case ha.dcs.HasLock():
-		ha.logger.Infof("This member is Cluster's leader")
+		ha.logger.Info("This member is Cluster's leader")
 		if cluster.Switchover != nil {
 			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() ||
 				(cluster.Switchover.Candidate != "" && cluster.Switchover.Candidate != ha.dbManager.GetCurrentMemberName()) {
@@ -166,17 +167,17 @@ func (ha *Ha) RunCycle() {
 			// this case is applicable only to consensus cluster, where the db's internal
 			// role services as the source of truth.
 			// for replicationset cluster,  HasOtherHealthyLeader will always be false.
-			ha.logger.Infof("Release leader")
+			ha.logger.Info("Release leader")
 			_ = ha.dcs.ReleaseLock()
 			break
 		}
 		err := ha.dbManager.Promote(ha.ctx, cluster)
 		if err != nil {
-			ha.logger.Infof("promote failed: %v", err)
+			ha.logger.Error(err, "promote failed")
 			break
 		}
 
-		ha.logger.Infof("Refresh leader ttl")
+		ha.logger.Info("Refresh leader ttl")
 		_ = ha.dcs.UpdateLock()
 
 		if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)) && cluster.Replicas != 0 {
@@ -204,43 +205,43 @@ func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
 	cluster, err := ha.dcs.GetCluster()
 	if cluster == nil {
-		ha.logger.Errorf("Get Cluster %s error: %v, so HA exists.", ha.dcs.GetClusterName(), err)
+		ha.logger.Error(err, "Get Cluster error, so HA exists.", "cluster-name", ha.dcs.GetClusterName())
 		return
 	}
 
 	isPodReady, err := ha.IsPodReady()
 	for err != nil || !isPodReady {
-		ha.logger.Infof("Waiting for dns resolution to be ready")
+		ha.logger.Info("Waiting for dns resolution to be ready")
 		time.Sleep(3 * time.Second)
 		isPodReady, err = ha.IsPodReady()
 	}
-	ha.logger.Infof("dns resolution is ready")
+	ha.logger.Info("dns resolution is ready")
 
-	ha.logger.Debugf("cluster: %v", cluster)
+	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	for err != nil || !isInitialized {
-		ha.logger.Infof("Waiting for the database cluster to be initialized.")
+		ha.logger.Info("Waiting for the database cluster to be initialized.")
 		// TODO: implement dbmanager initialize to replace pod's entrypoint scripts
 		// if I am the node of index 0, then do initialization
 		if err == nil && !isInitialized && ha.dbManager.IsFirstMember() {
-			ha.logger.Infof("Initialize cluster.")
+			ha.logger.Info("Initialize cluster.")
 			err := ha.dbManager.InitializeCluster(ha.ctx, cluster)
 			if err != nil {
-				ha.logger.Warnf("Cluster initialize failed: %v", err)
+				ha.logger.Error(err, "Cluster initialize failed")
 			}
 		}
 		time.Sleep(5 * time.Second)
 		isInitialized, err = ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	}
-	ha.logger.Infof("The database cluster is initialized.")
+	ha.logger.Info("The database cluster is initialized.")
 
 	isRootCreated, err := ha.dbManager.IsRootCreated(ha.ctx)
 	for err != nil || !isRootCreated {
 		if err == nil && !isRootCreated && ha.dbManager.IsFirstMember() {
-			ha.logger.Infof("Create Root.")
+			ha.logger.Info("Create Root.")
 			err := ha.dbManager.CreateRoot(ha.ctx)
 			if err != nil {
-				ha.logger.Warnf("Cluster initialize failed: %v", err)
+				ha.logger.Error(err, "Cluster initialize failed")
 			}
 		}
 		time.Sleep(5 * time.Second)
@@ -253,7 +254,7 @@ func (ha *Ha) Start() {
 			_ = ha.dcs.Initialize(cluster)
 			break
 		}
-		ha.logger.Infof("Waiting for the database Leader to be ready.")
+		ha.logger.Info("Waiting for the database Leader to be ready.")
 		time.Sleep(5 * time.Second)
 		isExist, _ = ha.dcs.IsLockExist()
 	}
@@ -268,13 +269,13 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs3.Cluster) {
 	hosts := ha.dbManager.GetMemberAddrs(ha.ctx, cluster)
 	sort.Strings(hosts)
 	deleteHost := hosts[len(hosts)-1]
-	ha.logger.Infof("Delete member: %s", deleteHost)
+	ha.logger.Info("Delete member", "name", deleteHost)
 	// The pods in the cluster are managed by a StatefulSet. If the replica count is decreased,
 	// then the last pod will be removed first.
 	//
 	if strings.HasPrefix(deleteHost, ha.dbManager.GetCurrentMemberName()) {
-		ha.logger.Infof("The last pod %s is the primary member and cannot be deleted. waiting "+
-			"for The controller to perform a switchover to a new primary member before this pod can be removed. ", deleteHost)
+		ha.logger.Info(fmt.Sprintf("The last pod %s is the primary member and cannot be deleted. waiting "+
+			"for The controller to perform a switchover to a new primary member before this pod can be removed. ", deleteHost))
 		_ = ha.dbManager.Demote(ha.ctx)
 		_ = ha.dcs.ReleaseLock()
 		return
@@ -282,7 +283,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs3.Cluster) {
 	memberName := strings.Split(deleteHost, ".")[0]
 	member := cluster.GetMemberWithName(memberName)
 	if member != nil {
-		ha.logger.Infof("member %s exists, do not delete", memberName)
+		ha.logger.Info(fmt.Sprintf("member %s exists, do not delete", memberName))
 		return
 	}
 	_ = ha.dbManager.LeaveMemberFromCluster(ha.ctx, cluster, memberName)
@@ -297,24 +298,24 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs3.Cluster) boo
 		candidate := switchover.Candidate
 
 		if leader == currentMemberName {
-			ha.logger.Infof("manual switchover to other member")
+			ha.logger.Info("manual switchover to other member")
 			return false
 		}
 
 		if candidate == currentMemberName {
-			ha.logger.Infof("manual switchover to current member: %s", candidate)
+			ha.logger.Info("manual switchover to current member", "member", candidate)
 			return true
 		}
 
 		if candidate != "" {
-			ha.logger.Infof("manual switchover to new leader: %s", candidate)
+			ha.logger.Info("manual switchover to new leader", "new leader", candidate)
 			return false
 		}
 		return ha.isMinimumLag(ctx, cluster, currentMember)
 	}
 
 	if member := ha.dbManager.HasOtherHealthyLeader(ctx, cluster); member != nil {
-		ha.logger.Infof("there is a healthy leader exists: %s", member.Name)
+		ha.logger.Info("there is a healthy leader exists", "leader", member.Name)
 		return false
 	}
 
@@ -373,7 +374,7 @@ func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs3.Cluster) er
 
 		err := ha.dcs.CreateSwitchover(leaderMember.Name, "")
 		if err != nil {
-			ha.logger.Infof("switchover failed: %v", err)
+			ha.logger.Error(err, "switchover failed")
 			return err
 		}
 
@@ -384,14 +385,14 @@ func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs3.Cluster) er
 	// redistribute the data of the current member among other members if needed
 	err := ha.dbManager.MoveData(ctx, cluster)
 	if err != nil {
-		ha.logger.Warnf("Move data failed: %v", err)
+		ha.logger.Error(err, "Move data failed")
 		return err
 	}
 
 	// remove current member from db cluster
 	err = ha.dbManager.LeaveMemberFromCluster(ctx, cluster, ha.dbManager.GetCurrentMemberName())
 	if err != nil {
-		ha.logger.Warnf("Delete member form cluster failed: %v", err)
+		ha.logger.Error(err, "Delete member form cluster failed")
 		return err
 	}
 	cluster.HaConfig.FinishDeleted(currentMember)
@@ -403,7 +404,7 @@ func (ha *Ha) IsPodReady() (bool, error) {
 	domain := viper.GetString("KB_POD_FQDN")
 	pinger, err := probing.NewPinger(domain)
 	if err != nil {
-		ha.logger.Errorf("new pinger failed, err:%v", err)
+		ha.logger.Error(err, "new pinger failed")
 		return false, err
 	}
 
@@ -412,7 +413,7 @@ func (ha *Ha) IsPodReady() (bool, error) {
 	pinger.Interval = 500 * time.Millisecond
 	err = pinger.Run()
 	if err != nil {
-		ha.logger.Errorf("ping domain:%s failed, err:%v", domain, err)
+		ha.logger.Error(err, fmt.Sprintf("ping domain:%s failed", domain))
 		return false, err
 	}
 

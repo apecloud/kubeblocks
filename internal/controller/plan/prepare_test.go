@@ -33,7 +33,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
@@ -149,14 +148,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	}
 
 	return resources, nil
-}
-
-// TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
-	leader := component.ConsensusSpec.Leader
-	if len(leader.Name) > 0 {
-		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
-	}
 }
 
 var _ = Describe("Cluster Controller", func() {

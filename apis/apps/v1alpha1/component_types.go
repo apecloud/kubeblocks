@@ -93,10 +93,6 @@ type ComponentSpec struct {
 	// +kubebuilder:validation:Required
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
-	//// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
-	//// +optional
-	// SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
-
 	// +kubebuilder:default=false
 	// +optional
 	TLS bool `json:"tls,omitempty"`

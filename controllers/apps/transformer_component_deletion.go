@@ -20,22 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	corev1 "k8s.io/api/core/v1"
-	"strings"
 )
 
-// componentDeletionTransformer handles component deletion
-type componentDeletionTransformer struct{}
+// ComponentDeletionTransformer handles component deletion
+type ComponentDeletionTransformer struct{}
 
-var _ graph.Transformer = &componentDeletionTransformer{}
+var _ graph.Transformer = &ComponentDeletionTransformer{}
 
-func (t *componentDeletionTransformer) Transform(ictx graph.TransformContext, dag *graph.DAG) error {
-	ctx, _ := ictx.(*componentTransformContext)
-	if ctx.Comp.GetDeletionTimestamp().IsZero() {
+func (t *ComponentDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ComponentTransformContext)
+	if transCtx.Component.GetDeletionTimestamp().IsZero() {
 		return nil
 	}
 
@@ -44,11 +46,13 @@ func (t *componentDeletionTransformer) Transform(ictx graph.TransformContext, da
 		return err
 	}
 
-	ctx.Comp.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
+	// TODO: get the resource own by component for example rsm and delete them
+
+	transCtx.Component.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
 	root.Action = ictrltypes.ActionDeletePtr()
 
-	ctx.GetRecorder().Eventf(ctx.Comp, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s:%s",
-		strings.ToLower(ctx.Comp.GetObjectKind().GroupVersionKind().Kind), ctx.Comp.GetName())
+	ctx.GetRecorder().Eventf(transCtx.Component, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s:%s",
+		strings.ToLower(transCtx.Component.GetObjectKind().GroupVersionKind().Kind), transCtx.Component.GetName())
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop

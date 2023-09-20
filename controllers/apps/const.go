@@ -24,11 +24,9 @@ const (
 	maxConcurReconClusterDefKey     = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
 	// name of our custom finalizer
-	dbClusterDefFinalizerName        = "clusterdefinition.kubeblocks.io/finalizer"
-	clusterVersionFinalizerName      = "clusterversion.kubeblocks.io/finalizer"
-	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
-	componentFinalizerName           = "component.kubeblocks.io/finalizer"
-	opsRequestFinalizerName          = "opsrequest.kubeblocks.io/finalizer"
+	dbClusterDefFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
+	clusterVersionFinalizerName = "clusterversion.kubeblocks.io/finalizer"
+	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
 
 	// annotations keys
 	// lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"

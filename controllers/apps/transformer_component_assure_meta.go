@@ -26,30 +26,30 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type componentAssureMetaTransformer struct{}
+type ComponentAssureMetaTransformer struct{}
 
-var _ graph.Transformer = &componentAssureMetaTransformer{}
+var _ graph.Transformer = &ComponentAssureMetaTransformer{}
 
-func (t *componentAssureMetaTransformer) Transform(ictx graph.TransformContext, dag *graph.DAG) error {
-	ctx, _ := ictx.(*componentTransformContext)
-	comp := ctx.Comp
+func (t *ComponentAssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ComponentTransformContext)
+	component := transCtx.Component
 
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
-	if !controllerutil.ContainsFinalizer(comp, componentFinalizerName) {
-		controllerutil.AddFinalizer(comp, componentFinalizerName)
+	if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {
+		controllerutil.AddFinalizer(component, constant.DBComponentFinalizerName)
 	}
 
 	// patch the label to prevent the label from being modified by the user.
-	labels := comp.Labels
+	labels := component.Labels
 	if labels == nil {
 		labels = map[string]string{}
 	}
 	labelName := labels[constant.ComponentDefinitionLabelKey]
-	if labelName != comp.Spec.CompDef {
-		labels[constant.ComponentDefinitionLabelKey] = comp.Spec.CompDef
-		comp.Labels = labels
+	if labelName != component.Spec.CompDef {
+		labels[constant.ComponentDefinitionLabelKey] = component.Spec.CompDef
+		component.Labels = labels
 	}
 	return nil
 }

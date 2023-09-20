@@ -22,37 +22,39 @@ package apps
 import (
 	"errors"
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/types"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"k8s.io/apimachinery/pkg/types"
 )
 
-// componentLoadResourcesTransformer handles referenced resources validation and load them into context
-type componentLoadResourcesTransformer struct{}
+// ComponentLoadResourcesTransformer handles referenced resources validation and load them into context
+type ComponentLoadResourcesTransformer struct{}
 
-var _ graph.Transformer = &componentLoadResourcesTransformer{}
+var _ graph.Transformer = &ComponentLoadResourcesTransformer{}
 
-func (t *componentLoadResourcesTransformer) Transform(ictx graph.TransformContext, dag *graph.DAG) error {
-	ctx, _ := ictx.(*componentTransformContext)
-	comp := ctx.Comp
+func (t *ComponentLoadResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*ComponentTransformContext)
+	comp := transCtx.Component
 
 	var err error
 	defer func() {
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
-	cmpd := &appsv1alpha1.ComponentDefinition{}
-	err = ctx.Client.Get(ctx.ReqCtx.Ctx, types.NamespacedName{Name: comp.Spec.CompDef}, cmpd)
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: comp.Spec.CompDef}, compDef)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if cmpd.Status.Phase != appsv1alpha1.AvailablePhase {
-		message := fmt.Sprintf("ComponentDefinition referenced is unavailable: %s", cmpd.Name)
+	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
+		message := fmt.Sprintf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
 		err = errors.New(message)
 		return newRequeueError(requeueDuration, message)
 	}
 
-	ctx.CompDef = cmpd
+	transCtx.CompDef = compDef
 	return nil
 }

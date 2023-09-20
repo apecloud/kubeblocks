@@ -21,18 +21,15 @@ package apps
 
 import (
 	"context"
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ComponentReconciler reconciles a Component object
@@ -52,40 +49,42 @@ type ComponentReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	rctx := intctrlutil.RequestCtx{
+	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Log:      log.FromContext(ctx).WithValues("component", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
-	rctx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(intctrlutil.RequeueError); ok {
-			return intctrlutil.RequeueAfter(re.RequeueAfter(), rctx.Log, re.Reason())
+			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		return intctrlutil.RequeueWithError(err, rctx.Log, "")
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	planBuilder := NewClusterPlanBuilder(rctx, r.Client, req)
+	planBuilder := NewComponentPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	plan, errBuild := planBuilder.
 		AddTransformer(
 			// handle component deletion first
-			&componentDeletionTransformer{},
+			&ComponentDeletionTransformer{},
 			// update finalizer and component definition labels
-			&componentAssureMetaTransformer{},
+			&ComponentAssureMetaTransformer{},
 			// validate ref objects existence and availability
-			&componentLoadResourcesTransformer{},
+			&ComponentLoadResourcesTransformer{},
 			// validate config
 			&ValidateEnableLogsTransformer{},
 			// create cluster connection credential secret object
+			// TODO: delete it
 			&ClusterCredentialTransformer{},
 			// create all components objects
+			// TODO: refactor it
 			&ComponentTransformer{Client: r.Client},
 			// add our finalizer to all objects
 			&OwnershipTransformer{},
@@ -113,29 +112,4 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
 		Complete(r)
-}
-
-type componentTransformContext struct {
-	ReqCtx  intctrlutil.RequestCtx
-	Client  roclient.ReadonlyClient
-	Comp    *appsv1alpha1.Component
-	CompDef *appsv1alpha1.ComponentDefinition
-}
-
-var _ graph.TransformContext = &componentTransformContext{}
-
-func (c *componentTransformContext) GetContext() context.Context {
-	return c.ReqCtx.Ctx
-}
-
-func (c *componentTransformContext) GetClient() roclient.ReadonlyClient {
-	return c.Client
-}
-
-func (c *componentTransformContext) GetRecorder() record.EventRecorder {
-	return c.ReqCtx.Recorder
-}
-
-func (c *componentTransformContext) GetLogger() logr.Logger {
-	return c.ReqCtx.Log
 }

@@ -62,7 +62,6 @@ const (
 )
 
 var (
-	//go:embed cue/*
 	cueTemplates embed.FS
 	cacheCtx     = map[string]interface{}{}
 )

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -48,9 +47,6 @@ const (
 )
 
 var (
-	//go:embed cue/*
-	cueTemplates embed.FS
-
 	// default probe setting for volume protection.
 	defaultVolumeProtectionProbe = appsv1alpha1.ClusterDefinitionProbe{
 		PeriodSeconds:    60,

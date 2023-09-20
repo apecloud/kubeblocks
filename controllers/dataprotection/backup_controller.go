@@ -1251,11 +1251,8 @@ func (r *BackupReconciler) getVolumeSnapshotClassOrCreate(ctx context.Context, s
 	}
 	// not found matched volume snapshot class, create one
 	vscName := fmt.Sprintf("vsc-%s-%s", storageClassName, storageClassObj.UID[:8])
-	newVSC, err := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
-	if err != nil {
-		return err
-	}
-	if err = r.snapshotCli.Create(newVSC); err != nil {
+	newVSC := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
+	if err := r.snapshotCli.Create(newVSC); err != nil {
 		return err
 	}
 	*vsc = *newVSC

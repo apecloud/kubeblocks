@@ -1114,18 +1114,12 @@ func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta)
 	})
 }
 
-func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSnapshotClass, error) {
-	const tplFile = "volumesnapshotclass.cue"
-	vsc := &snapshotv1.VolumeSnapshotClass{}
-	if err := buildFromCUE(tplFile,
-		map[string]any{
-			"class.metadata.name": name,
-			"class.driver":        driver,
-		},
-		"class", vsc); err != nil {
-		return nil, err
-	}
-	return vsc, nil
+func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnapshotClass {
+	return builder.NewVolumeSnapshotClassBuilder("", name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+		SetDriver(driver).
+		SetDeletionPolicy(snapshotv1.VolumeSnapshotContentDelete).
+		GetObject()
 }
 
 func BuildServiceAccount(cluster *appsv1alpha1.Cluster) *corev1.ServiceAccount {

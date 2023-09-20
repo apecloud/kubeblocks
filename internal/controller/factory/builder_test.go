@@ -512,8 +512,7 @@ var _ = Describe("builder", func() {
 		It("builds volume snapshot class correctly", func() {
 			className := "vsc-test"
 			driverName := "csi-driver-test"
-			obj, err := BuildVolumeSnapshotClass(className, driverName)
-			Expect(err).Should(BeNil())
+			obj := BuildVolumeSnapshotClass(className, driverName)
 			Expect(obj).ShouldNot(BeNil())
 			Expect(obj.Name).Should(Equal(className))
 			Expect(obj.Driver).Should(Equal(driverName))

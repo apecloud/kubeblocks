@@ -5,8 +5,6 @@
       componentDefRef: postgresql
       {{- include "kblib.componentMonitor" . | indent 6 }}
       {{- include "official-postgresql-cluster.replicaCount" . | indent 6 }}
-      enabledLogs:
-        - running
       serviceAccountName: {{ include "kblib.serviceAccountName" . }}
       switchPolicy:
         type: Noop

@@ -1030,24 +1030,35 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 
 func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
-	const tplFile = "restore_job_template.cue"
-	job := &batchv1.Job{}
-	fillMaps := map[string]any{
-		"job.metadata.name":              name,
-		"job.metadata.namespace":         cluster.Namespace,
-		"job.spec.template.spec.volumes": volumes,
-		"container.image":                image,
-		"container.command":              command,
-		"container.volumeMounts":         volumeMounts,
-		"container.env":                  env,
+	container := corev1.Container{
+		Name:            "restore",
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command:         command,
+		VolumeMounts:    volumeMounts,
+		Env:             env,
 	}
 	if resources != nil {
-		fillMaps["container.resources"] = *resources
+		container.Resources = *resources
 	}
 
-	if err := buildFromCUE(tplFile, fillMaps, "job", job); err != nil {
-		return nil, err
+	ctx := corev1.PodSecurityContext{}
+	user := int64(0)
+	ctx.RunAsUser = &user
+	pod := builder.NewPodBuilder(cluster.Namespace, "").
+		AddContainer(container).
+		AddVolumes(volumes...).
+		SetRestartPolicy(corev1.RestartPolicyOnFailure).
+		SetSecurityContext(ctx).
+		GetObject()
+	template := corev1.PodTemplateSpec{
+		Spec: pod.Spec,
 	}
+
+	job := builder.NewJobBuilder(cluster.Namespace, name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+		SetPodTemplateSpec(template).
+		GetObject()
 	containers := job.Spec.Template.Spec.Containers
 	if len(containers) > 0 {
 		if err := injectEnvs(cluster, synthesizedComponent, "", &containers[0]); err != nil {

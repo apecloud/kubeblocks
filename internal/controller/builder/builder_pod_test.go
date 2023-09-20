@@ -55,9 +55,33 @@ var _ = Describe("pod builder", func() {
 				},
 			},
 		}
+		volumes := []corev1.Volume{
+			{
+				Name: "data",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+		restartPolicy := corev1.RestartPolicyOnFailure
+		user := int64(0)
+		ctx := corev1.PodSecurityContext{
+			RunAsUser: &user,
+		}
+		tolerations := []corev1.Toleration{
+			{
+				Key:      "node",
+				Operator: corev1.TolerationOpEqual,
+				Value:    "node-0",
+			},
+		}
 		pod := NewPodBuilder(ns, name).
 			SetContainers(containers).
 			AddContainer(container).
+			AddVolumes(volumes...).
+			SetRestartPolicy(restartPolicy).
+			SetSecurityContext(ctx).
+			AddTolerations(tolerations...).
 			GetObject()
 
 		Expect(pod.Name).Should(Equal(name))
@@ -65,5 +89,12 @@ var _ = Describe("pod builder", func() {
 		Expect(pod.Spec.Containers).Should(HaveLen(2))
 		Expect(pod.Spec.Containers[0]).Should(Equal(containers[0]))
 		Expect(pod.Spec.Containers[1]).Should(Equal(container))
+		Expect(pod.Spec.Volumes).Should(HaveLen(1))
+		Expect(pod.Spec.Volumes[0]).Should(Equal(volumes[0]))
+		Expect(pod.Spec.RestartPolicy).Should(Equal(restartPolicy))
+		Expect(pod.Spec.SecurityContext).ShouldNot(BeNil())
+		Expect(*pod.Spec.SecurityContext).Should(Equal(ctx))
+		Expect(pod.Spec.Tolerations).Should(HaveLen(1))
+		Expect(pod.Spec.Tolerations[0]).Should(Equal(tolerations[0]))
 	})
 })

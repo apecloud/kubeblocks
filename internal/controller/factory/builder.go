@@ -953,7 +953,7 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	backupType string) *dataprotectionv1alpha1.Backup {
 	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
 		AddLabels(constant.BackupTypeLabelKeyKey, backupType).
-		AddLabels(constant.KBManagedByKey, "clster").
+		AddLabels(constant.KBManagedByKey, "cluster").
 		AddLabels("backuppolicies.dataprotection.kubeblocks.io/name", backupPolicyName).
 		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).

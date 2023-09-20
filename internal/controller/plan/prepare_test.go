@@ -217,7 +217,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env", func() {
+		It("should construct pdb", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -238,10 +238,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
-				"ConfigMap",
-				"Service",
-				"Deployment",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
@@ -289,9 +285,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -352,9 +346,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -414,9 +406,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -479,9 +469,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(err).Should(Succeed())
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -517,7 +505,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service, statefuset object, besides an external service object", func() {
+		It("should construct env, statefuset object", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -536,14 +524,10 @@ var _ = Describe("Cluster Controller", func() {
 			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
 			Expect(err).Should(Succeed())
 
-			// REVIEW: (free6om)
-			//  missing connection credential, TLS secret objs check?
-			Expect(resources).Should(HaveLen(5))
+			Expect(resources).Should(HaveLen(3))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("PodDisruptionBudget"))
-			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("StatefulSet"))
+			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("ConfigMap"))
+			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
 		})
 	})
 

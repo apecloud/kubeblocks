@@ -19,11 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package common
 
+// PodRoleNamePair defines a pod name and role name pair.
 type PodRoleNamePair struct {
 	PodName  string `json:"podName,omitempty"`
 	RoleName string `json:"roleName,omitempty"`
 }
 
+// GlobalRoleSnapshot defines a global(leader) perspective of all pods role.
+// KB provides two role probe methods: per-pod level role probe and retrieving all node roles from the leader node.
+// The latter is referred to as the global role snapshot. This data structure is used to represent a snapshot of global role information.
+// The snapshot contains two types of information: the mapping relationship between all node names and role names,
+// and the version of the snapshot. The purpose of the snapshot version is to ensure that only role information
+// that is more up-to-date than the current role information on the Pod Label will be updated. This resolves the issue of
+// role information disorder in scenarios such as KB upgrades or exceptions causing restarts,
+// network partitioning leading to split-brain situations, node crashes, and similar occurrences.
 type GlobalRoleSnapshot struct {
 	Version          string            `json:"term,omitempty"`
 	PodRoleNamePairs []PodRoleNamePair `json:"PodRoleNamePairs,omitempty"`

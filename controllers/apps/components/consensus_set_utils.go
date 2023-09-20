@@ -194,7 +194,7 @@ func updateConsensusSetRoleLabel(cli client.Client,
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
-	pod.Annotations[constant.LastRoleChangedEventTimestampAnnotationKey] = event.EventTime.Time.Format(time.RFC3339Nano)
+	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = event.EventTime.Time.Format(time.RFC3339Nano)
 	return cli.Patch(ctx, pod, patch)
 }
 

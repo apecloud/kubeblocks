@@ -134,10 +134,8 @@ func composeRolePriorityMap(rsm workloads.ReplicatedStateMachine) map[string]int
 }
 
 // updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
-	rsm workloads.ReplicatedStateMachine,
-	pod *corev1.Pod, roleName string) error {
+func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
+	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version string) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(rsm)
 	// role not defined in CR, ignore it
@@ -154,6 +152,11 @@ func updatePodRoleLabel(cli client.Client,
 		delete(pod.Labels, roleLabelKey)
 		delete(pod.Labels, rsmAccessModeLabelKey)
 	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
 	return cli.Patch(ctx, pod, patch)
 }
 
@@ -170,9 +173,6 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*rsm)
 	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(&pod) != rsm.Status.UpdateRevision {
-			continue
-		}
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
@@ -524,14 +524,16 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 }
 
 func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[string]string {
-	var leader *workloads.ReplicaRole
-	for _, role := range rsm.Spec.Roles {
-		if role.IsLeader && len(role.Name) > 0 {
-			leader = &role
-			break
+	selectors := make(map[string]string, 0)
+
+	if !headless {
+		for _, role := range rsm.Spec.Roles {
+			if role.IsLeader && len(role.Name) > 0 {
+				selectors[constant.RoleLabelKey] = role.Name
+				break
+			}
 		}
 	}
-	selectors := make(map[string]string, 0)
 
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		keys := []string{
@@ -544,17 +546,11 @@ func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[st
 				selectors[key] = value
 			}
 		}
-		if leader != nil && !headless {
-			selectors[constant.RoleLabelKey] = leader.Name
-		}
 		return selectors
 	}
 
 	for k, v := range rsm.Spec.Selector.MatchLabels {
 		selectors[k] = v
-	}
-	if leader != nil && !headless {
-		selectors[rsmAccessModeLabelKey] = string(leader.AccessMode)
 	}
 	return selectors
 }

@@ -518,10 +518,7 @@ func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.Synthesi
 	for i := int32(0); i < synthesizedComponent.Replicas; i++ {
 		pvcName := fmt.Sprintf("%s-%s-%s-%d", vct.Name, p.Cluster.Name, synthesizedComponent.Name, i)
 		pvcKey := types.NamespacedName{Namespace: p.Cluster.Namespace, Name: pvcName}
-		pvc, err := factory.BuildPVC(p.Cluster, synthesizedComponent, &vct, pvcKey, snapshotName)
-		if err != nil {
-			return err
-		}
+		pvc := factory.BuildPVC(p.Cluster, synthesizedComponent, &vct, pvcKey, snapshotName)
 		// Prevents halt recovery from checking uncleaned resources
 		if pvc.Annotations == nil {
 			pvc.Annotations = map[string]string{}
@@ -529,7 +526,7 @@ func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.Synthesi
 		pvc.Annotations[constant.LastAppliedClusterAnnotationKey] =
 			fmt.Sprintf(`{"metadata":{"uid":"%s","name":"%s"}}`, p.Cluster.UID, p.Cluster.Name)
 
-		if err = p.Client.Create(p.Ctx, pvc); err != nil && !apierrors.IsAlreadyExists(err) {
+		if err := p.Client.Create(p.Ctx, pvc); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}

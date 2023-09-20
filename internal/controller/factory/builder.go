@@ -897,19 +897,27 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
-	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
-	pvc := corev1.PersistentVolumeClaim{}
-	if err := buildFromCUE("pvc_template.cue", map[string]any{
-		"cluster":             cluster,
-		"component":           component,
-		"volumeClaimTemplate": vct,
-		"pvc_key":             pvcKey,
-		"snapshot_name":       snapshotName,
-	}, "pvc", &pvc); err != nil {
-		return nil, err
+	snapshotName string) *corev1.PersistentVolumeClaim {
+	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
+		AddLabelsInMap(wellKnownLabels).
+		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
+		SetAccessModes(vct.Spec.AccessModes).
+		SetResources(vct.Spec.Resources)
+	if vct.Spec.StorageClassName != nil {
+		pvcBuilder.SetStorageClass(*vct.Spec.StorageClassName)
 	}
-	BuildPersistentVolumeClaimLabels(component, &pvc, vct.Name)
-	return &pvc, nil
+	if len(snapshotName) > 0 {
+		apiGroup := "snapshot.storage.k8s.io"
+		pvcBuilder.SetDataSource(corev1.TypedLocalObjectReference{
+			APIGroup: &apiGroup,
+			Kind:     "VolumeSnapshot",
+			Name:     snapshotName,
+		})
+	}
+	pvc := pvcBuilder.GetObject()
+	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name)
+	return pvc
 }
 
 // BuildEnvConfig builds cluster component context ConfigMap object, which is to be used in workload container's

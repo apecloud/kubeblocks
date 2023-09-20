@@ -35,3 +35,18 @@ func (builder *PVCBuilder) SetResources(resources corev1.ResourceRequirements) *
 	builder.get().Spec.Resources = resources
 	return builder
 }
+
+func (builder *PVCBuilder) SetAccessModes(accessModes []corev1.PersistentVolumeAccessMode) *PVCBuilder {
+	builder.get().Spec.AccessModes = accessModes
+	return builder
+}
+
+func (builder *PVCBuilder) SetStorageClass(sc string) *PVCBuilder {
+	builder.get().Spec.StorageClassName = &sc
+	return builder
+}
+
+func (builder *PVCBuilder) SetDataSource(dataSource corev1.TypedLocalObjectReference) *PVCBuilder {
+	builder.get().Spec.DataSource = &dataSource
+	return builder
+}

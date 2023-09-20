@@ -177,8 +177,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
-			Expect(err).Should(BeNil())
+			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))

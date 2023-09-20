@@ -1251,11 +1251,8 @@ func (r *BackupReconciler) getVolumeSnapshotClassOrCreate(ctx context.Context, s
 	}
 	// not found matched volume snapshot class, create one
 	vscName := fmt.Sprintf("vsc-%s-%s", storageClassName, storageClassObj.UID[:8])
-	newVSC, err := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
-	if err != nil {
-		return err
-	}
-	if err = r.snapshotCli.Create(newVSC); err != nil {
+	newVSC := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
+	if err := r.snapshotCli.Create(newVSC); err != nil {
 		return err
 	}
 	*vsc = *newVSC
@@ -1335,9 +1332,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	if err != nil {
 		return err
 	}
-	if job, err = ctrlbuilder.BuildBackupManifestsJob(key, backup, &jobPodSpec); err != nil {
-		return err
-	}
+	job = ctrlbuilder.BuildBackupManifestsJob(key, backup, &jobPodSpec)
 	msg := fmt.Sprintf("creating job %s", key.Name)
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))

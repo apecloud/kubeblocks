@@ -28,8 +28,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
@@ -48,14 +47,10 @@ type RequestMeta struct {
 	Metadata  map[string]string `json:"metadata"`
 }
 
-var Logger logr.Logger
+var logger logr.Logger
 
 func init() {
-	development, err := zap.NewProduction()
-	if err != nil {
-		panic(err)
-	}
-	Logger = zapr.NewLogger(development)
+	logger = ctrl.Log.WithName("middleware")
 }
 
 func GetRequestBody(operation string, args map[string][]string) []byte {
@@ -69,7 +64,7 @@ func GetRequestBody(operation string, args map[string][]string) []byte {
 		} else {
 			marshal, err := json.Marshal(value)
 			if err != nil {
-				Logger.Error(err, "getRequestBody marshal json error")
+				logger.Error(err, "getRequestBody marshal json error")
 				return
 			}
 			metadata[key] = string(marshal)
@@ -102,21 +97,21 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				body := GetRequestBody(operation, uri.Query())
 				request.Body = io.NopCloser(bytes.NewReader(body))
 			} else {
-				Logger.Info("unknown probe operation", "operation", operation)
+				logger.Info("unknown probe operation", "operation", operation)
 			}
 		}
 
-		Logger.Info("receive request", "request", request.RequestURI)
+		logger.Info("receive request", "request", request.RequestURI)
 		next(writer, request)
 		code := writer.Header().Get(statusCodeHeader)
 		statusCode, err := strconv.Atoi(code)
 		if err == nil {
 			// header has a statusCodeHeader
 			writer.WriteHeader(statusCode)
-			Logger.Info("response abnormal")
+			logger.Info("write response with header", "statusCode", statusCode)
 		} else {
 			// header has no statusCodeHeader
-			Logger.Info("response has no statusCodeHeader")
+			logger.Info("response has no statusCodeHeader")
 		}
 	}
 }

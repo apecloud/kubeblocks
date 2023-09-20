@@ -73,10 +73,7 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		}
 	}
 	if synthesizedComponent != nil {
-		secret, err := factory.BuildConnCredential(transCtx.ClusterDef, cluster, synthesizedComponent)
-		if err != nil {
-			return err
-		}
+		secret := factory.BuildConnCredential(transCtx.ClusterDef, cluster, synthesizedComponent)
 		if secret != nil {
 			ictrltypes.LifecycleObjectCreate(dag, secret, root)
 		}

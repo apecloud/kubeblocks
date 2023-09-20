@@ -38,10 +38,7 @@ func (b *consensusComponentWorkloadBuilder) BuildWorkload() componentWorkloadBui
 
 func (b *consensusComponentWorkloadBuilder) BuildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		if err != nil {
-			return nil, err
-		}
+		svcList := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		objs := make([]client.Object, 0, len(svcList))
 		leader := b.Comp.GetConsensusSpec().Leader
 		for _, svc := range svcList {
@@ -50,7 +47,7 @@ func (b *consensusComponentWorkloadBuilder) BuildService() componentWorkloadBuil
 			}
 			objs = append(objs, svc)
 		}
-		return objs, err
+		return objs, nil
 	}
 	return b.BuildWrapper(buildfn)
 }

@@ -70,6 +70,10 @@ var (
 	mongodbChart embed.FS
 )
 
+func IsbuiltinCharts(chart string) bool {
+	return chart == "mysql" || chart == "postgresql" || chart == "kafka" || chart == "redis" || chart == "mongodb"
+}
+
 // internal_chart registers embed chart
 
 func init() {

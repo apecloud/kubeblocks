@@ -880,10 +880,8 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 
 // BuildEnvConfig builds cluster component context ConfigMap object, which is to be used in workload container's
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
-func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
-	const tplFile = "env_config_template.cue"
+func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *corev1.ConfigMap {
 	envData := map[string]string{}
-
 	// add component envs
 	if component.ComponentRefEnvs != nil {
 		for _, env := range component.ComponentRefEnvs {
@@ -891,15 +889,13 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 		}
 	}
 
-	config := corev1.ConfigMap{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":     cluster,
-		"component":   component,
-		"config.data": envData,
-	}, "config", &config); err != nil {
-		return nil, err
-	}
-	return &config, nil
+	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
+	return builder.NewConfigMapBuilder(cluster.Namespace, fmt.Sprintf("%s-%s-env", cluster.Name, component.Name)).
+		AddLabelsInMap(wellKnownLabels).
+		AddLabels(constant.AppConfigTypeLabelKey, "kubeblocks-env").
+		SetData(envData).
+		GetObject()
 }
 
 func BuildBackup(cluster *appsv1alpha1.Cluster,

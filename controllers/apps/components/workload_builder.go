@@ -66,10 +66,10 @@ type componentWorkloadBuilderBase struct {
 
 func (b *componentWorkloadBuilderBase) BuildEnv() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		envCfg, err := factory.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		envCfg := factory.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		b.EnvConfig = envCfg
 		b.LocalObjs = append(b.LocalObjs, envCfg)
-		return []client.Object{envCfg}, err
+		return []client.Object{envCfg}, nil
 	}
 	return b.BuildWrapper(buildfn)
 }

@@ -429,7 +429,7 @@ var _ = Describe("builder", func() {
 
 		It("builds config manager sidecar container correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
+			cfg := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
 				SecreteName:   "test-secret",
@@ -442,7 +442,6 @@ var _ = Describe("builder", func() {
 				Volumes:       []corev1.VolumeMount{},
 				Cluster:       cluster,
 			}
-			Expect(err).Should(BeNil())
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())

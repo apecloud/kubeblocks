@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package factory
 
 import (
-	"embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -32,7 +31,6 @@ import (
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -60,53 +58,6 @@ const (
 	KeyName    = "tls.key"
 	MountPath  = "/etc/pki/tls"
 )
-
-var (
-	//go:embed cue/*
-	cueTemplates embed.FS
-	cacheCtx     = map[string]interface{}{}
-)
-
-func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, error)) (*intctrlutil.CUETpl, error) {
-	vIf, ok := cacheCtx[key]
-	if ok {
-		return vIf.(*intctrlutil.CUETpl), nil
-	}
-	v, err := valueCreator()
-	if err != nil {
-		return nil, err
-	}
-	cacheCtx[key] = v
-	return v, err
-}
-
-func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, target any) error {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := getCacheCUETplValue(tplName, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))
-	})
-	if err != nil {
-		return err
-	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	for k, v := range fillMap {
-		if err := cueValue.FillObj(k, v); err != nil {
-			return err
-		}
-	}
-
-	b, err := cueValue.Lookup(lookupKey)
-	if err != nil {
-		return err
-	}
-
-	if err = json.Unmarshal(b, target); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
@@ -888,25 +839,6 @@ func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddSelectorsInMap(wellKnownLabels).
 		GetObject()
-}
-
-func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string) (*appsv1.Deployment, error) {
-	const tplFile = "deployment_template.cue"
-	deploy := appsv1.Deployment{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   cluster,
-		"component": component,
-	}, "deployment", &deploy); err != nil {
-		return nil, err
-	}
-
-	if component.StatelessSpec != nil {
-		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
-	}
-	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &deploy.Spec.Template.Spec); err != nil {
-		return nil, err
-	}
-	return &deploy, nil
 }
 
 func BuildPVC(cluster *appsv1alpha1.Cluster,

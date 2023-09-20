@@ -157,13 +157,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	// - need higher level abstraction handling
 	// - or move this module to part operator controller handling
 	switch component.WorkloadType {
-	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return factory.BuildDeploy(reqCtx, cluster, component, "")
-			}); err != nil {
-			return nil, err
-		}
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {

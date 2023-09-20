@@ -382,14 +382,6 @@ var _ = Describe("builder", func() {
 			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})
 
-		It("builds Deploy correctly", func() {
-			reqCtx := newReqCtx()
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent, "")
-			Expect(err).Should(BeNil())
-			Expect(deploy).ShouldNot(BeNil())
-		})
-
 		It("builds PDB correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			pdb := BuildPDB(cluster, synthesizedComponent)

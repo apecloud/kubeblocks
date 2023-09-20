@@ -328,10 +328,7 @@ func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.Request
 	if err != nil {
 		return nil, nil, err
 	}
-	secret, err := factory.BuildConnCredential(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
-	if err != nil {
-		return nil, nil, err
-	}
+	secret := factory.BuildConnCredential(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
 	cli.AppendMockObjects(secret)
 	if err = component.Create(ctx, cli); err != nil {
 		return nil, nil, err

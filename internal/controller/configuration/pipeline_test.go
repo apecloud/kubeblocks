@@ -57,8 +57,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	mockStatefulSet := func() *appsv1.StatefulSet {
-		envConfig, err := factory.BuildEnvConfig(clusterObj, clusterComponent)
-		Expect(err).Should(Succeed())
+		envConfig := factory.BuildEnvConfig(clusterObj, clusterComponent)
 		stsObj, err := factory.BuildSts(intctrlutil.RequestCtx{
 			Ctx: ctx,
 			Log: logger,

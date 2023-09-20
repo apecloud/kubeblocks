@@ -176,6 +176,9 @@ const (
 
 	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
 	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
+
+	RBACRoleName        = "kubeblocks-cluster-pod-role"
+	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
 )
 
 const (

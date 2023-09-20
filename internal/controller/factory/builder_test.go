@@ -182,13 +182,6 @@ var _ = Describe("builder", func() {
 			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
-		It("builds Service correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			svcList, err := BuildSvcListWithCustomAttributes(cluster, synthesizedComponent, nil)
-			Expect(err).Should(BeNil())
-			Expect(svcList).ShouldNot(BeEmpty())
-		})
-
 		It("builds Conn. Credential correctly", func() {
 			var (
 				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject()
@@ -505,14 +498,6 @@ var _ = Describe("builder", func() {
 			Expect(obj).ShouldNot(BeNil())
 			Expect(obj.Name).Should(Equal(className))
 			Expect(obj.Driver).Should(Equal(driverName))
-		})
-
-		It("builds headless svc correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			expectSvcName := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
-			obj := BuildHeadlessSvc(cluster, synthesizedComponent)
-			Expect(obj).ShouldNot(BeNil())
-			Expect(obj.Name).Should(Equal(expectSvcName))
 		})
 
 		It("builds cfg manager tools  correctly", func() {

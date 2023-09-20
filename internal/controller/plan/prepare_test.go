@@ -76,9 +76,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			resources = append(resources, workload)
 		}()
 
-		svc := factory.BuildHeadlessSvc(cluster, component)
-		resources = append(resources, svc)
-
 		var podSpec *corev1.PodSpec
 		sts, ok := workload.(*appsv1.StatefulSet)
 		if ok {
@@ -136,21 +133,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		resources = append(resources, pdb)
 	} else {
 		panic("this shouldn't happen")
-	}
-
-	svcList, err := factory.BuildSvcListWithCustomAttributes(cluster, component, func(svc *corev1.Service) {
-		switch component.WorkloadType {
-		case appsv1alpha1.Consensus:
-			addLeaderSelectorLabels(svc, component)
-		case appsv1alpha1.Replication:
-			svc.Spec.Selector[constant.RoleLabelKey] = "primary"
-		}
-	})
-	if err != nil {
-		return nil, err
-	}
-	for _, svc := range svcList {
-		resources = append(resources, svc)
 	}
 
 	// REVIEW/TODO:

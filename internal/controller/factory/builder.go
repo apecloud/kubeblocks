@@ -37,7 +37,6 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -195,94 +194,6 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 			}
 		}
 	}
-}
-
-func BuildSvcListWithCustomAttributes(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
-	customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
-	services := BuildSvcList(cluster, component)
-	if customAttributeSetter != nil {
-		for _, svc := range services {
-			customAttributeSetter(svc)
-		}
-	}
-	return services, nil
-}
-
-func BuildSvcList(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) []*corev1.Service {
-	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
-	selectors := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	delete(selectors, constant.AppNameLabelKey)
-	var result = make([]*corev1.Service, 0)
-	for _, item := range component.Services {
-		if len(item.Spec.Ports) == 0 {
-			continue
-		}
-		name := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
-		if len(item.Name) > 0 {
-			name = fmt.Sprintf("%s-%s-%s", cluster.Name, component.Name, item.Name)
-		}
-
-		svcBuilder := builder.NewServiceBuilder(cluster.Namespace, name).
-			AddLabelsInMap(wellKnownLabels).
-			AddAnnotationsInMap(item.Annotations).
-			AddSelectorsInMap(selectors).
-			AddPorts(item.Spec.Ports...)
-		if len(item.Spec.Type) > 0 {
-			svcBuilder.SetType(item.Spec.Type)
-		}
-		svc := svcBuilder.GetObject()
-		result = append(result, svc)
-	}
-	return result
-}
-
-func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *corev1.Service {
-	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
-	monitorAnnotations := func() map[string]string {
-		annotations := make(map[string]string, 0)
-		falseStr := "false"
-		trueStr := "true"
-		switch {
-		case !component.Monitor.Enable:
-			annotations["monitor.kubeblocks.io/scrape"] = falseStr
-			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
-		case component.Monitor.BuiltIn:
-			annotations["monitor.kubeblocks.io/scrape"] = falseStr
-			annotations["monitor.kubeblocks.io/agamotto"] = trueStr
-		default:
-			annotations["monitor.kubeblocks.io/scrape"] = trueStr
-			annotations["monitor.kubeblocks.io/path"] = component.Monitor.ScrapePath
-			annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(component.Monitor.ScrapePort))
-			annotations["monitor.kubeblocks.io/scheme"] = "http"
-			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
-		}
-		return annotations
-	}()
-	servicePorts := func() []corev1.ServicePort {
-		var servicePorts []corev1.ServicePort
-		for _, container := range component.PodSpec.Containers {
-			for _, port := range container.Ports {
-				servicePort := corev1.ServicePort{
-					Name:       port.Name,
-					Protocol:   port.Protocol,
-					Port:       port.ContainerPort,
-					TargetPort: intstr.FromString(port.Name),
-				}
-				servicePorts = append(servicePorts, servicePort)
-			}
-		}
-		return servicePorts
-	}()
-	return builder.NewHeadlessServiceBuilder(cluster.Namespace, fmt.Sprintf("%s-%s-headless", cluster.Name, component.Name)).
-		AddLabelsInMap(wellKnownLabels).
-		AddAnnotationsInMap(monitorAnnotations).
-		AddSelector(constant.AppInstanceLabelKey, cluster.Name).
-		AddSelector(constant.AppManagedByLabelKey, constant.AppName).
-		AddSelector(constant.KBAppComponentLabelKey, component.Name).
-		AddPorts(servicePorts...).
-		GetObject()
 }
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,

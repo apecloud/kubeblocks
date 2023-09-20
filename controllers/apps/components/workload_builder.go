@@ -44,8 +44,6 @@ type componentWorkloadBuilder interface {
 	BuildWorkload() componentWorkloadBuilder
 	BuildPDB() componentWorkloadBuilder
 	BuildVolumeMount() componentWorkloadBuilder
-	BuildService() componentWorkloadBuilder
-	BuildHeadlessService() componentWorkloadBuilder
 	BuildTLSCert() componentWorkloadBuilder
 	BuildTLSVolume() componentWorkloadBuilder
 
@@ -100,24 +98,6 @@ func (b *componentWorkloadBuilderBase) BuildConfig() componentWorkloadBuilder {
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType string) componentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		if b.EnvConfig == nil {
-			return nil, fmt.Errorf("build %s workload but env config is nil, cluster: %s, component: %s",
-				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
-		}
-
-		sts, err := factory.BuildSts(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
-		if err != nil {
-			return nil, err
-		}
-		b.Workload = sts
-
-		return nil, nil // don't return sts here
-	}
-	return b.BuildWrapper(buildfn)
-}
-
 func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		// if without this handler, the cluster controller will occur error during reconciling.
@@ -160,26 +140,6 @@ func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuild
 			podSpec.Volumes = volumes
 		}
 		return nil, nil
-	}
-	return b.BuildWrapper(buildfn)
-}
-
-func (b *componentWorkloadBuilderBase) BuildService() componentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		svcList := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		objs := make([]client.Object, 0)
-		for _, svc := range svcList {
-			objs = append(objs, svc)
-		}
-		return objs, nil
-	}
-	return b.BuildWrapper(buildfn)
-}
-
-func (b *componentWorkloadBuilderBase) BuildHeadlessService() componentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		svc := factory.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		return []client.Object{svc}, nil
 	}
 	return b.BuildWrapper(buildfn)
 }

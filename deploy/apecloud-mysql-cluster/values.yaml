@@ -50,7 +50,7 @@ smartEngineEnabled: false
 configurations: { }
 
 # customized config template
-#userConfigTemplate:
+userConfigTemplate: { }
 #  templateRef: custom-mysql-config-tpl
 #  namespace: default
 #  policy: none

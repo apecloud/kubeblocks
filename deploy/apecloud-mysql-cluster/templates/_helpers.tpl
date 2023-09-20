@@ -64,8 +64,10 @@ Define userConfigTemplate.
 */}}
 {{- define "apecloud-mysql-cluster.userConfigTemplate" }}
 {{- if .Values.userConfigTemplate }}
+{{- if ne .Values.userConfigTemplate.templateRef "" }}
 importTemplateRef:
 {{- .Values.userConfigTemplate | toYaml | nindent 2 }}
+{{- end }}
 {{- end }}
 {{- end -}}
 

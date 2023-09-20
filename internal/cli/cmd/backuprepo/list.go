@@ -118,12 +118,6 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 		sort.SliceStable(backupRepos, func(i, j int) bool {
 			iBackupRepo := backupRepos[i]
 			jBackupRepo := backupRepos[j]
-			if iBackupRepo == nil {
-				return true
-			}
-			if jBackupRepo == nil {
-				return false
-			}
 			if iBackupRepo.Status.IsDefault != jBackupRepo.Status.IsDefault {
 				return iBackupRepo.Status.IsDefault
 			}

@@ -145,7 +145,7 @@ jobs:
   check-image:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
@@ -157,7 +157,7 @@ jobs:
   check-tools-image:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
     with:
       MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
@@ -169,7 +169,7 @@ jobs:
   check-datascript-image:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
     with:
       IMG: "apecloud/kubeblocks-datascript"
       BUILDX_PLATFORMS: "linux/amd64"
@@ -179,7 +179,7 @@ jobs:
   check-dataprotection-image:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
     with:
       IMG: "apecloud/kubeblocks-dataprotection"
       BUILDX_PLATFORMS: "linux/amd64"
@@ -190,13 +190,13 @@ jobs:
     name: check helm
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.24
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.7.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      APECD_REF: "v0.1.12"
+      APECD_REF: "v0.1.24"
     secrets: inherit
 
   check-kbcli:

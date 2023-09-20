@@ -48,9 +48,10 @@ var _ = Describe("cluster register", func() {
 
 	It("test external chart", func() {
 		fakeChart := &TypeInstance{
-			Name:  "fake",
-			URL:   "www.fake-chart-hub/fake.tgz",
-			Alias: "",
+			Name:      "fake",
+			URL:       "www.fake-chart-hub/fake.tgz",
+			Alias:     "",
+			ChartName: "fake.tgz",
 		}
 		Expect(fakeChart.getAlias()).Should(Equal(""))
 		Expect(fakeChart.getChartFileName()).Should(Equal("fake.tgz"))
@@ -93,7 +94,7 @@ var _ = Describe("cluster register", func() {
 			Expect(tempCLusterConfig.WriteConfigs(tempConfigPath)).Should(Succeed())
 
 			file, _ := os.ReadFile(tempConfigPath)
-			Expect(string(file)).Should(Equal("- name: orioledb\n  helmChartUrl: https://fakeurl.com\n  alias: \"\"\n"))
+			Expect(string(file)).Should(Equal("- name: orioledb\n  helmChartUrl: https://fakeurl.com\n  alias: \"\"\n  chartName: \"\"\n"))
 		})
 
 	})

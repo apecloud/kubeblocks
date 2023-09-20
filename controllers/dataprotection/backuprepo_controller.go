@@ -608,7 +608,8 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 			if pvc.Spec.Resources.Requests == nil {
 				pvc.Spec.Resources.Requests = corev1.ResourceList{}
 			}
-			if storageRequest := pvc.Spec.Resources.Requests.Storage(); storageRequest == nil || storageRequest.IsZero() {
+			// note: pvc.Spec.Resources.Requests.Storage() never return nil
+			if pvc.Spec.Resources.Requests.Storage().IsZero() {
 				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = repo.Spec.VolumeCapacity
 			}
 			if err := controllerutil.SetControllerReference(repo, pvc, r.Scheme); err != nil {

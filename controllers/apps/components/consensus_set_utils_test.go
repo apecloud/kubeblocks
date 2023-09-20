@@ -20,15 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
-	"strconv"
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"strconv"
+	"testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -162,47 +160,4 @@ func TestSortPods(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestComposeRoleEnv(t *testing.T) {
-	componentDef := &appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType: appsv1alpha1.Consensus,
-		ConsensusSpec: &appsv1alpha1.ConsensusSetSpec{
-			Leader: appsv1alpha1.ConsensusMember{
-				Name:       "leader",
-				AccessMode: appsv1alpha1.ReadWrite,
-			},
-			Followers: []appsv1alpha1.ConsensusMember{
-				{
-					Name:       "follower",
-					AccessMode: appsv1alpha1.Readonly,
-				},
-			},
-		},
-	}
-
-	set := testk8s.NewFakeStatefulSet("foo", 3)
-	pods := make([]v1.Pod, 0)
-	for i := 0; i < 5; i++ {
-		pod := testk8s.NewFakeStatefulSetPod(set, i)
-		pod.Status.Conditions = []v1.PodCondition{
-			{
-				Type:   v1.PodReady,
-				Status: v1.ConditionTrue,
-			},
-		}
-		pod.Labels = map[string]string{constant.RoleLabelKey: "follower"}
-		pods = append(pods, *pod)
-	}
-	pods[0].Labels = map[string]string{constant.RoleLabelKey: "leader"}
-	leader, followers := composeRoleEnv(componentDef.ConsensusSpec, pods)
-	assert.Equal(t, "foo-0", leader)
-	assert.Equal(t, "foo-1,foo-2,foo-3,foo-4", followers)
-
-	dt := time.Now()
-	pods[3].DeletionTimestamp = &metav1.Time{Time: dt}
-	pods[4].DeletionTimestamp = &metav1.Time{Time: dt}
-	leader, followers = composeRoleEnv(componentDef.ConsensusSpec, pods)
-	assert.Equal(t, "foo-0", leader)
-	assert.Equal(t, "foo-1,foo-2", followers)
 }

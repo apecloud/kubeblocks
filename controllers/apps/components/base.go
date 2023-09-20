@@ -20,14 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
-	"context"
 	"fmt"
 	"reflect"
-	"strconv"
-	"strings"
 	"time"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +52,6 @@ type componentBase struct {
 	Cluster        *appsv1alpha1.Cluster
 	ClusterVersion *appsv1alpha1.ClusterVersion    // building config needs the cluster version
 	Component      *component.SynthesizedComponent // built synthesized component, replace it with component workload proto
-	ComponentSet   componentSet
 	Dag            *graph.DAG
 	WorkloadVertex *ictrltypes.LifecycleVertex // DAG vertex of main workload object
 }
@@ -229,52 +224,6 @@ func (c *componentBase) UpdatePDB(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	return nil
 }
 
-func (c *componentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	svcObjList, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.ServiceSignature, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	svcProtoList := ictrltypes.FindAll[*corev1.Service](c.Dag)
-
-	// create new services or update existing services
-	for _, vertex := range svcProtoList {
-		node, _ := vertex.(*ictrltypes.LifecycleVertex)
-		svcProto, _ := node.Obj.(*corev1.Service)
-
-		if pos := slices.IndexFunc(svcObjList, func(svc *corev1.Service) bool {
-			return svc.GetName() == svcProto.GetName()
-		}); pos < 0 {
-			node.Action = ictrltypes.ActionCreatePtr()
-		} else {
-			svcObj := svcObjList[pos]
-			// remove original monitor annotations
-			if len(svcObj.Annotations) > 0 {
-				maps.DeleteFunc(svcObj.Annotations, func(k, v string) bool {
-					return strings.HasPrefix(k, "monitor.kubeblocks.io")
-				})
-			}
-			mergeAnnotations(svcObj.Annotations, &svcProto.Annotations)
-			svcObj.Annotations = svcProto.Annotations
-			svcObj.Spec = svcProto.Spec
-			node.Obj = svcObj
-			node.Action = ictrltypes.ActionUpdatePtr()
-		}
-	}
-
-	// delete useless services
-	for _, svc := range svcObjList {
-		if pos := slices.IndexFunc(svcProtoList, func(vertex graph.Vertex) bool {
-			node, _ := vertex.(*ictrltypes.LifecycleVertex)
-			svcProto, _ := node.Obj.(*corev1.Service)
-			return svcProto.GetName() == svc.GetName()
-		}); pos < 0 {
-			c.DeleteResource(svc, nil)
-		}
-	}
-	return nil
-}
-
 // SetStatusPhase sets the cluster component phase and messages conditionally.
 func (c *componentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 	statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
@@ -295,135 +244,6 @@ func (c *componentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 	if err := c.updateStatus(phaseTransitionMsg, updatefn); err != nil {
 		panic(fmt.Sprintf("unexpected error occurred while updating component status: %s", err.Error()))
 	}
-}
-
-func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object, txn *statusReconciliationTxn) error {
-	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
-	//	return nil
-	// }
-
-	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-	if err != nil {
-		return err
-	}
-
-	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
-	if err != nil {
-		return err
-	}
-
-	var podsReady *bool
-	if c.Component.Replicas > 0 {
-		podsReadyForComponent, err := c.ComponentSet.PodsReady(reqCtx.Ctx, obj)
-		if err != nil {
-			return err
-		}
-		podsReady = &podsReadyForComponent
-	}
-
-	hasFailedPodTimedOut := false
-	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
-	var delayedRequeueError error
-	isLatestWorkload := obj.GetAnnotations()[constant.KubeBlocksGenerationKey] == strconv.FormatInt(c.Cluster.Generation, 10)
-	// check if it is the latest obj after cluster does updates.
-	if !isRunning && !appsv1alpha1.ComponentPodsAreReady(podsReady) && isLatestWorkload {
-		var requeueAfter time.Duration
-		if hasFailedPodTimedOut, timedOutPodStatusMessage, requeueAfter = hasFailedAndTimedOutPod(pods); requeueAfter != 0 {
-			delayedRequeueError = intctrlutil.NewDelayedRequeueError(requeueAfter, "requeue for workload status to reconcile.")
-		}
-	}
-
-	phase, statusMessage, err := c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage)
-	if err != nil {
-		if !intctrlutil.IsDelayedRequeueError(err) {
-			return err
-		}
-		delayedRequeueError = err
-	}
-
-	phaseTransitionCondMsg := ""
-	if podsReady == nil {
-		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: nil, PodsTimedout: %v", isRunning, hasFailedPodTimedOut)
-	} else {
-		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: %v, PodsTimedout: %v", isRunning, *podsReady, hasFailedPodTimedOut)
-	}
-
-	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
-		if phase != "" {
-			status.Phase = phase
-		}
-		status.SetMessage(statusMessage)
-		if !appsv1alpha1.ComponentPodsAreReady(podsReady) {
-			status.PodsReadyTime = nil
-		} else if !appsv1alpha1.ComponentPodsAreReady(status.PodsReady) {
-			// set podsReadyTime when pods of component are ready at the moment.
-			status.PodsReadyTime = &metav1.Time{Time: time.Now()}
-		}
-		status.PodsReady = podsReady
-		return nil
-	}
-
-	if txn != nil {
-		txn.propose(phase, func() {
-			if err = c.updateStatus(phaseTransitionCondMsg, updatefn); err != nil {
-				panic(fmt.Sprintf("unexpected error occurred while updating component status: %s", err.Error()))
-			}
-		})
-		return delayedRequeueError
-	}
-	// TODO(refactor): wait = true to requeue.
-	if err = c.updateStatus(phaseTransitionCondMsg, updatefn); err != nil {
-		return err
-	}
-	return delayedRequeueError
-}
-
-func (c *componentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
-	hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
-	var (
-		err           error
-		phase         appsv1alpha1.ClusterComponentPhase
-		statusMessage appsv1alpha1.ComponentMessageMap
-	)
-	if isRunning {
-		if c.Component.Replicas == 0 {
-			// if replicas number of component is zero, the component has stopped.
-			// 'Stopped' is a special 'Running' status for workload(StatefulSet/Deployment).
-			phase = appsv1alpha1.StoppedClusterCompPhase
-		} else {
-			// change component phase to Running when workloads of component are running.
-			phase = appsv1alpha1.RunningClusterCompPhase
-		}
-		return phase, statusMessage, nil
-	}
-
-	if appsv1alpha1.ComponentPodsAreReady(podsReady) {
-		// check if the role probe timed out when component phase is not Running but all pods of component are ready.
-		phase, statusMessage = c.ComponentSet.GetPhaseWhenPodsReadyAndProbeTimeout(pods)
-		// if component is not running and probe is not timed out, requeue.
-		if phase == "" {
-			c.Recorder.Event(c.Cluster, corev1.EventTypeNormal, "WaitingForProbeSuccess", "Waiting for probe success")
-			return phase, statusMessage, intctrlutil.NewDelayedRequeueError(time.Second*10, "Waiting for probe success")
-		}
-		return phase, statusMessage, nil
-	}
-
-	// get the phase if failed pods have timed out or the pods are not running when there are no changes to the component.
-	originPhaseIsUpRunning := slices.Contains(appsv1alpha1.GetComponentUpRunningPhase(), c.GetPhase())
-	if hasFailedPodTimedOut || originPhaseIsUpRunning {
-		phase, statusMessage, err = c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName(), originPhaseIsUpRunning)
-		if err != nil {
-			return "", nil, err
-		}
-	}
-	if statusMessage == nil {
-		statusMessage = timedOutPodStatusMessage
-	} else {
-		for k, v := range timedOutPodStatusMessage {
-			statusMessage[k] = v
-		}
-	}
-	return phase, statusMessage, nil
 }
 
 // updateStatus updates the cluster component status by @updatefn, with additional message to explain the transition occurred.

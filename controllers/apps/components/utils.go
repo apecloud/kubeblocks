@@ -353,75 +353,6 @@ func getCompRelatedObjectList(ctx context.Context,
 	return podList, nil
 }
 
-// availableReplicasAreConsistent checks if expected replicas number of component is consistent with
-// the number of available workload replicas.
-func availableReplicasAreConsistent(componentReplicas, podCount, workloadAvailableReplicas int32) bool {
-	return workloadAvailableReplicas == componentReplicas && componentReplicas == podCount
-}
-
-// getPhaseWithNoAvailableReplicas gets the component phase when the workload of component has no available replicas.
-func getPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.ClusterComponentPhase {
-	if componentReplicas == 0 {
-		return ""
-	}
-	return appsv1alpha1.FailedClusterCompPhase
-}
-
-// getComponentPhaseWhenPodsNotReady gets the component phase when pods of component are not ready.
-func getComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
-	workload metav1.Object,
-	componentReplicas,
-	availableReplicas int32,
-	checkLeaderIsReady func(pod *corev1.Pod, workload metav1.Object) bool,
-	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.ClusterComponentPhase {
-	podCount := len(podList.Items)
-	if podCount == 0 || availableReplicas == 0 {
-		return getPhaseWithNoAvailableReplicas(componentReplicas)
-	}
-	var (
-		existLatestRevisionFailedPod bool
-		leaderIsReady                bool
-	)
-	for _, v := range podList.Items {
-		// if the pod is terminating, ignore it
-		if v.DeletionTimestamp != nil {
-			return ""
-		}
-		if checkLeaderIsReady == nil || checkLeaderIsReady(&v, workload) {
-			leaderIsReady = true
-		}
-		if checkFailedPodRevision != nil && checkFailedPodRevision(&v, workload) {
-			existLatestRevisionFailedPod = true
-		}
-	}
-	return getCompPhaseByConditions(existLatestRevisionFailedPod, leaderIsReady,
-		componentReplicas, int32(podCount), availableReplicas)
-}
-
-// getCompPhaseByConditions gets the component phase according to the following conditions:
-// 1. if the failed pod is not controlled by the latest revision, ignore it.
-// 2. if the primary replicas are not available, the component is failed.
-// 3. finally if expected replicas number of component is inconsistent with
-// the number of available workload replicas, the component is abnormal.
-func getCompPhaseByConditions(existLatestRevisionFailedPod bool,
-	primaryReplicasAvailable bool,
-	compReplicas,
-	podCount,
-	availableReplicas int32) appsv1alpha1.ClusterComponentPhase {
-	// if the failed pod is not controlled by the latest revision, ignore it.
-	if !existLatestRevisionFailedPod {
-		return ""
-	}
-	if !primaryReplicasAvailable {
-		return appsv1alpha1.FailedClusterCompPhase
-	}
-	// checks if expected replicas number of component is consistent with the number of available workload replicas.
-	if !availableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
-		return appsv1alpha1.AbnormalClusterCompPhase
-	}
-	return ""
-}
-
 // parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
 func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	patterns := strings.Split(pattern, "/")
@@ -462,15 +393,6 @@ func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) 
 func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace string) string {
 	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
-}
-
-// getRunningPods gets the running pods of the specified statefulSet.
-func getRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
-	sts := convertToStatefulSet(obj)
-	if sts == nil || sts.Generation != sts.Status.ObservedGeneration {
-		return nil, nil
-	}
-	return GetPodListByStatefulSet(ctx, cli, sts)
 }
 
 // resolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.

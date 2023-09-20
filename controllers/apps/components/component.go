@@ -22,11 +22,6 @@ package components
 import (
 	"context"
 	"fmt"
-	"time"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,22 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-// PodIsAvailable checks whether a pod is available with respect to the workload type.
-// Deprecated: provide for ops request using, remove this interface later.
-func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
-	if pod == nil {
-		return false
-	}
-	switch workloadType {
-	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
-		return intctrlutil.PodIsReadyWithLabel(*pod)
-	case appsv1alpha1.Stateful, appsv1alpha1.Stateless:
-		return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
-	default:
-		panic("unknown workload type")
-	}
-}
 
 func NewComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -102,22 +81,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, nil
 	}
 
-	if intctrlutil.IsRSMEnabled() {
-		return newRSMComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
-	}
-
-	switch compDef.WorkloadType {
-	case appsv1alpha1.Replication:
-		return newReplicationComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
-	case appsv1alpha1.Consensus:
-		return newConsensusComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
-	case appsv1alpha1.Stateful:
-		return newStatefulComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
-	case appsv1alpha1.Stateless:
-		return newStatelessComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
-	}
-	panic(fmt.Sprintf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
-		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef))
+	return newRSMComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 }
 
 func getClassManager(ctx context.Context, cli types2.ReadonlyClient, cluster *appsv1alpha1.Cluster) (*class.Manager, error) {

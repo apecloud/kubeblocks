@@ -21,6 +21,7 @@ package operations
 
 import (
 	"fmt"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -292,7 +293,7 @@ func handleCancelProgressForPodsRollingUpdate(
 		objectKey := getProgressObjectKey(pod.Kind, pod.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		if !pod.CreationTimestamp.Before(&opsCancelTime) &&
-			components.PodIsAvailable(workloadType, &pod, minReadySeconds) {
+			podIsAvailable(workloadType, &pod, minReadySeconds) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
@@ -303,6 +304,20 @@ func handleCancelProgressForPodsRollingUpdate(
 		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &pod)
 	}
 	return completedCount
+}
+
+func podIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	switch workloadType {
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
+		return intctrlutil.PodIsReadyWithLabel(*pod)
+	case appsv1alpha1.Stateful, appsv1alpha1.Stateless:
+		return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+	default:
+		panic("unknown workload type")
+	}
 }
 
 // handlePendingProgressDetail handles the pending progressDetail and sets it to progressDetails.

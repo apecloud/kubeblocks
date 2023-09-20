@@ -286,8 +286,8 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			}
 			status.PodsReady = &ready
 			if ready {
-				time := metav1.Now()
-				status.PodsReadyTime = &time
+				now := metav1.Now()
+				status.PodsReadyTime = &now
 			}
 			return nil
 		})

@@ -20,27 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-type JobBuilder struct {
-	BaseBuilder[batchv1.Job, *batchv1.Job, JobBuilder]
+type PDBBuilder struct {
+	BaseBuilder[policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudget, PDBBuilder]
 }
 
-func NewJobBuilder(namespace, name string) *JobBuilder {
-	builder := &JobBuilder{}
-	builder.init(namespace, name, &batchv1.Job{}, builder)
+func NewPDBBuilder(namespace, name string) *PDBBuilder {
+	builder := &PDBBuilder{}
+	builder.init(namespace, name, &policyv1.PodDisruptionBudget{}, builder)
 	return builder
 }
 
-func (builder *JobBuilder) SetPodTemplateSpec(template corev1.PodTemplateSpec) *JobBuilder {
-	builder.get().Spec.Template = template
+func (builder *PDBBuilder) SetMinAvailable(minAvailable intstr.IntOrString) *PDBBuilder {
+	builder.get().Spec.MinAvailable = &minAvailable
 	return builder
 }
 
-func (builder *JobBuilder) AddSelector(key, value string) *JobBuilder {
+func (builder *PDBBuilder) AddSelector(key, value string) *PDBBuilder {
 	selector := builder.get().Spec.Selector
 	if selector == nil {
 		selector = &metav1.LabelSelector{
@@ -52,17 +52,20 @@ func (builder *JobBuilder) AddSelector(key, value string) *JobBuilder {
 	return builder
 }
 
-func (builder *JobBuilder) SetSuspend(suspend bool) *JobBuilder {
-	builder.get().Spec.Suspend = &suspend
-	return builder
+func (builder *PDBBuilder) AddSelectors(keyValues ...string) *PDBBuilder {
+	return builder.AddSelectorsInMap(WithMap(keyValues...))
 }
 
-func (builder *JobBuilder) SetBackoffLimit(limit int32) *JobBuilder {
-	builder.get().Spec.BackoffLimit = &limit
-	return builder
-}
-
-func (builder *JobBuilder) SetTTLSecondsAfterFinished(ttl int32) *JobBuilder {
-	builder.get().Spec.TTLSecondsAfterFinished = &ttl
+func (builder *PDBBuilder) AddSelectorsInMap(keyValues map[string]string) *PDBBuilder {
+	selector := builder.get().Spec.Selector
+	if selector == nil {
+		selector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{},
+		}
+	}
+	for k, v := range keyValues {
+		selector.MatchLabels[k] = v
+	}
+	builder.get().Spec.Selector = selector
 	return builder
 }

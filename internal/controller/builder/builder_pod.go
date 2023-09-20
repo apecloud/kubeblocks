@@ -42,3 +42,23 @@ func (builder *PodBuilder) AddContainer(container corev1.Container) *PodBuilder 
 	builder.get().Spec.Containers = containers
 	return builder
 }
+
+func (builder *PodBuilder) AddVolumes(volumes ...corev1.Volume) *PodBuilder {
+	builder.get().Spec.Volumes = append(builder.get().Spec.Volumes, volumes...)
+	return builder
+}
+
+func (builder *PodBuilder) SetRestartPolicy(policy corev1.RestartPolicy) *PodBuilder {
+	builder.get().Spec.RestartPolicy = policy
+	return builder
+}
+
+func (builder *PodBuilder) SetSecurityContext(ctx corev1.PodSecurityContext) *PodBuilder {
+	builder.get().Spec.SecurityContext = &ctx
+	return builder
+}
+
+func (builder *PodBuilder) AddTolerations(tolerations ...corev1.Toleration) *PodBuilder {
+	builder.get().Spec.Tolerations = append(builder.get().Spec.Tolerations, tolerations...)
+	return builder
+}

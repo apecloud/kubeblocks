@@ -1,7 +1,7 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-# This file is part of KubeBlocks project
+This file is part of KubeBlocks project
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,24 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package backuprepo
+package builder
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func NewBackupRepoCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "backuprepo COMMAND",
-		Short: "BackupRepo command.",
-	}
-	cmd.AddCommand(
-		newCreateCommand(nil, f, streams),
-		// newUpdateCommand(f, streams), // TODO:
-		newListCommand(f, streams),
-		newDescribeCmd(f, streams), // TODO:
-	)
-	return cmd
-}
+var _ = Describe("service account builder", func() {
+	It("should work well", func() {
+		const (
+			name = "foo"
+			ns   = "default"
+		)
+		sa := NewServiceAccountBuilder(ns, name).
+			GetObject()
+
+		Expect(sa.Name).Should(Equal(name))
+		Expect(sa.Namespace).Should(Equal(ns))
+	})
+})

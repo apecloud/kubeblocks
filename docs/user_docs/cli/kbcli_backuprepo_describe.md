@@ -1,13 +1,24 @@
 ---
-title: kbcli backuprepo
+title: kbcli backuprepo describe
 ---
 
-BackupRepo command.
+Describe a backuprepo.
+
+```
+kbcli backuprepo describe [flags]
+```
+
+### Examples
+
+```
+  # Describe a backuprepo
+  kbcli backuprepo describe my-backuprepo
+```
 
 ### Options
 
 ```
-  -h, --help   help for backuprepo
+  -h, --help   help for describe
 ```
 
 ### Options inherited from parent commands
@@ -36,10 +47,7 @@ BackupRepo command.
 
 ### SEE ALSO
 
-
-* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
-* [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backuprepo.
-* [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List BackupRepo.
+* [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

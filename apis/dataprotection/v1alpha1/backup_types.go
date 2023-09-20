@@ -257,17 +257,17 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		}
 		return backups[i].Status.StartTimestamp.Before(backups[j].Status.StartTimestamp)
 	})
-	getLogfileStartTimeAndStopTime := func() (metav1.Time, metav1.Time) {
+	getLogfileStartTimeAndStopTime := func() (*metav1.Time, *metav1.Time) {
 		var (
-			startTime metav1.Time
-			stopTime  metav1.Time
+			startTime *metav1.Time
+			stopTime  *metav1.Time
 		)
 		for _, b := range backups {
 			if b.Spec.BackupType != BackupTypeLogFile {
 				continue
 			}
-			startTime = *b.Status.GetStartTime()
-			stopTime = *b.Status.GetStopTime()
+			startTime = b.Status.GetStartTime()
+			stopTime = b.Status.GetStopTime()
 			break
 		}
 		return startTime, stopTime
@@ -285,8 +285,8 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 			}
 			backupStopTime := b.Status.GetStopTime()
 			// checks if the baseBackup stop time is between logfileStartTime and logfileStopTime.
-			if !backupStopTime.Before(&logfileStartTime) &&
-				backupStopTime.Before(&logfileStopTime) {
+			if !backupStopTime.Before(logfileStartTime) &&
+				backupStopTime.Before(logfileStopTime) {
 				return &b
 			}
 		}
@@ -297,6 +297,6 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		return nil
 	}
 	// range of recoverable time
-	return []BackupLogStatus{{StopTime: &logfileStopTime,
+	return []BackupLogStatus{{StopTime: logfileStopTime,
 		StartTime: firstRecoverableBaseBackup.Status.GetStopTime()}}
 }

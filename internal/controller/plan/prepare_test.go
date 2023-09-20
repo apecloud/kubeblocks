@@ -63,10 +63,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		cluster.UID = types.UID("test-uid")
 	}
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := factory.BuildEnvConfig(cluster, component)
-		if err != nil {
-			return err
-		}
+		envConfig := factory.BuildEnvConfig(cluster, component)
 		resources = append(resources, envConfig)
 
 		workload, err := customSetup(envConfig)
@@ -79,10 +76,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			resources = append(resources, workload)
 		}()
 
-		svc, err := factory.BuildHeadlessSvc(cluster, component)
-		if err != nil {
-			return err
-		}
+		svc := factory.BuildHeadlessSvc(cluster, component)
 		resources = append(resources, svc)
 
 		var podSpec *corev1.PodSpec
@@ -138,10 +132,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
 	if component.MinAvailable != nil {
-		pdb, err := factory.BuildPDB(cluster, component)
-		if err != nil {
-			return nil, err
-		}
+		pdb := factory.BuildPDB(cluster, component)
 		resources = append(resources, pdb)
 	} else {
 		panic("this shouldn't happen")

@@ -394,7 +394,7 @@ func podProcessedSuccessful(workloadType appsv1alpha1.WorkloadType,
 	minReadySeconds int32,
 	componentPhase appsv1alpha1.ClusterComponentPhase,
 	opsIsCompleted bool) bool {
-	if !podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()}) {
+	if !podIsAvailable(workloadType, pod, minReadySeconds) {
 		return false
 	}
 	return (opsIsCompleted && componentPhase == appsv1alpha1.RunningClusterCompPhase) || !pod.CreationTimestamp.Before(&opsStartTime)
@@ -521,7 +521,7 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 		objectKey := getProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		pgRes.opsMessageKey = "create"
-		if podutils.IsPodAvailable(&v, minReadySeconds, metav1.Time{Time: time.Now()}) {
+		if podIsAvailable(workloadType, &v, minReadySeconds) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
@@ -554,6 +554,7 @@ func handleScaleDownProgress(
 				Message:   fmt.Sprintf("Start to delete pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name),
 			})
 	}
+	var workloadType = pgRes.clusterComponentDef.WorkloadType
 	var componentName = pgRes.clusterComponent.Name
 	minReadySeconds, err := components.GetComponentStsMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {
@@ -586,7 +587,7 @@ func handleScaleDownProgress(
 			}
 			// handle the re-created pods if these pods are failed before doing horizontal scaling.
 			pgRes.opsMessageKey = "re-create"
-			if podutils.IsPodAvailable(&pod, minReadySeconds, metav1.Time{Time: time.Now()}) {
+			if podIsAvailable(workloadType, &pod, minReadySeconds) {
 				completedCount += 1
 				handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 				continue

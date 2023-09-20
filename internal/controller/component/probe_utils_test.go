@@ -44,9 +44,7 @@ var _ = Describe("probe_utils", func() {
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			var err error
-			container, err = buildProbeContainer()
-			Expect(err).NotTo(HaveOccurred())
+			container = buildProbeContainer()
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}

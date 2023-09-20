@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -96,6 +97,20 @@ var _ = Describe("container builder", func() {
 				Protocol:      corev1.ProtocolUDP,
 			},
 		}
+		readinessProbe := corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{},
+				},
+			},
+		}
+		startupProbe := corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(12345),
+				},
+			},
+		}
 		container := NewContainerBuilder(name).
 			AddCommands(commands...).
 			AddArgs(args...).
@@ -106,6 +121,8 @@ var _ = Describe("container builder", func() {
 			SetSecurityContext(ctx).
 			SetResources(resources).
 			AddPorts(ports...).
+			SetReadinessProbe(readinessProbe).
+			SetStartupProbe(startupProbe).
 			GetObject()
 
 		Expect(container.Name).Should(Equal(name))
@@ -119,5 +136,9 @@ var _ = Describe("container builder", func() {
 		Expect(*container.SecurityContext).Should(Equal(ctx))
 		Expect(container.Resources).Should(Equal(resources))
 		Expect(container.Ports).Should(Equal(ports))
+		Expect(container.ReadinessProbe).ShouldNot(BeNil())
+		Expect(*container.ReadinessProbe).Should(Equal(readinessProbe))
+		Expect(container.StartupProbe).ShouldNot(BeNil())
+		Expect(*container.StartupProbe).Should(Equal(startupProbe))
 	})
 })

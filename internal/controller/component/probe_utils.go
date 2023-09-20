@@ -26,12 +26,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leaanthony/debme"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -60,11 +60,7 @@ var (
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
-	container, err := buildProbeContainer()
-	if err != nil {
-		return err
-	}
-
+	container := buildProbeContainer()
 	probeContainers := []corev1.Container{}
 	componentProbes := component.Probes
 	if componentProbes == nil {
@@ -117,23 +113,37 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 	return nil
 }
 
-func buildProbeContainer() (*corev1.Container, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	probeContainerByte, err := cueValue.Lookup("probeContainer")
-	if err != nil {
-		return nil, err
-	}
-	container := &corev1.Container{}
-	if err = json.Unmarshal(probeContainerByte, container); err != nil {
-		return nil, err
-	}
-	return container, nil
+func buildProbeContainer() *corev1.Container {
+	return builder.NewContainerBuilder("string").
+		SetImage("registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6").
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddCommands("/pause").
+		AddEnv(corev1.EnvVar{
+			Name: "KB_SERVICE_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key:                  "username",
+					LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
+				},
+			}},
+			corev1.EnvVar{
+				Name: "KB_SERVICE_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key:                  "password",
+						LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
+					},
+				},
+			}).
+		SetReadinessProbe(corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{Command: []string{}},
+			}}).
+		SetStartupProbe(corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3501)},
+			}}).
+		GetObject()
 }
 
 func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {

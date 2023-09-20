@@ -90,3 +90,13 @@ func (builder *ContainerBuilder) AddPorts(ports ...corev1.ContainerPort) *Contai
 	builder.get().Ports = append(builder.get().Ports, ports...)
 	return builder
 }
+
+func (builder *ContainerBuilder) SetReadinessProbe(probe corev1.Probe) *ContainerBuilder {
+	builder.get().ReadinessProbe = &probe
+	return builder
+}
+
+func (builder *ContainerBuilder) SetStartupProbe(probe corev1.Probe) *ContainerBuilder {
+	builder.get().StartupProbe = &probe
+	return builder
+}

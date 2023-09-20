@@ -92,6 +92,9 @@ func newMockStatefulSet(replicas int, name string, labels map[string]string) app
 			UID:       types.UID(uid),
 		},
 		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+			MatchLabels: labels,
+			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

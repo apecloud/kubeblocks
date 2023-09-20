@@ -22,6 +22,7 @@ package configuration
 import (
 	"context"
 	"fmt"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -52,7 +53,15 @@ func init() {
 }
 
 func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	return performRollingUpgrade(params, GetRSMRollingUpgradeFuncs())
+	var funcs RollingUpgradeFuncs
+
+	switch params.WorkloadType() {
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication, appsv1alpha1.Stateful:
+		funcs = GetRSMRollingUpgradeFuncs()
+	default:
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", params.WorkloadType())
+	}
+	return performRollingUpgrade(params, funcs)
 }
 
 func (r *rollingUpgradePolicy) GetPolicyName() string {

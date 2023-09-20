@@ -52,3 +52,12 @@ func GetRSMRollingUpgradeFuncs() RollingUpgradeFuncs {
 		RestartComponent:     restartStatefulComponent,
 	}
 }
+
+func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getDeploymentRollingPods,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
+		RestartComponent:     restartStatelessComponent,
+	}
+}

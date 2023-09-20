@@ -53,7 +53,16 @@ func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 		return makeReturnedStatus(ESNone), nil
 	}
 
-	funcs := GetRSMRollingUpgradeFuncs()
+	var funcs RollingUpgradeFuncs
+	switch params.WorkloadType() {
+	default:
+		return makeReturnedStatus(ESNotSupport), core.MakeError("not support component workload type[%s]", params.WorkloadType())
+	case appsv1alpha1.Stateless:
+		funcs = GetDeploymentRollingUpgradeFuncs()
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication, appsv1alpha1.Stateful:
+		funcs = GetRSMRollingUpgradeFuncs()
+	}
+
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err

@@ -981,39 +981,69 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 }
 
 func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {
-	const tplFile = "config_manager_sidecar.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
+	var env []corev1.EnvVar
+	env = append(env, corev1.EnvVar{
+		Name: "CONFIG_MANAGER_POD_IP",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "status.podIP",
+			},
+		},
 	})
-	if err != nil {
-		return nil, err
+	if len(sidecarRenderedParam.CharacterType) > 0 {
+		env = append(env, corev1.EnvVar{
+			Name:  "DB_TYPE",
+			Value: sidecarRenderedParam.CharacterType,
+		})
 	}
+	if sidecarRenderedParam.CharacterType == "mysql" {
+		env = append(env, corev1.EnvVar{
+			Name: "MYSQL_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key:                  "username",
+					LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
+				},
+			},
+		},
+			corev1.EnvVar{
+				Name: "MYSQL_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key:                  "password",
+						LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
+					},
+				},
+			},
+			corev1.EnvVar{
+				Name:  "DATA_SOURCE_NAME",
+				Value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/",
+			},
+		)
+	}
+	containerBuilder := builder.NewContainerBuilder(sidecarRenderedParam.ManagerName).
+		AddCommands("env").
+		AddArgs("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)").
+		AddArgs("/bin/reloader").
+		AddArgs(sidecarRenderedParam.Args...).
+		AddEnv(env...).
+		SetImage(sidecarRenderedParam.Image).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddVolumeMounts(sidecarRenderedParam.Volumes...)
+	if sidecarRenderedParam.ShareProcessNamespace {
+		user := int64(0)
+		containerBuilder.SetSecurityContext(corev1.SecurityContext{
+			RunAsUser: &user,
+		})
+	}
+	container := containerBuilder.GetObject()
 
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	paramBytes, err := json.Marshal(sidecarRenderedParam)
-	if err != nil {
+	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, container); err != nil {
 		return nil, err
 	}
-
-	if err = cueValue.Fill("parameter", paramBytes); err != nil {
-		return nil, err
-	}
-
-	containerStrByte, err := cueValue.Lookup("template")
-	if err != nil {
-		return nil, err
-	}
-	container := corev1.Container{}
-	if err = json.Unmarshal(containerStrByte, &container); err != nil {
-		return nil, err
-	}
-
-	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
-		return nil, err
-	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
-	return &container, nil
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	return container, nil
 }
 
 func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) *batchv1.Job {
@@ -1036,23 +1066,22 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 
 func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
-	container := corev1.Container{
-		Name:            "restore",
-		Image:           image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         command,
-		VolumeMounts:    volumeMounts,
-		Env:             env,
-	}
+	containerBuilder := builder.NewContainerBuilder("restore").
+		SetImage(image).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddCommands(command...).
+		AddVolumeMounts(volumeMounts...).
+		AddEnv(env...)
 	if resources != nil {
-		container.Resources = *resources
+		containerBuilder.SetResources(*resources)
 	}
+	container := containerBuilder.GetObject()
 
 	ctx := corev1.PodSecurityContext{}
 	user := int64(0)
 	ctx.RunAsUser = &user
 	pod := builder.NewPodBuilder(cluster.Namespace, "").
-		AddContainer(container).
+		AddContainer(*container).
 		AddVolumes(volumes...).
 		SetRestartPolicy(corev1.RestartPolicyOnFailure).
 		SetSecurityContext(ctx).
@@ -1083,16 +1112,14 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
-		toolContainer := corev1.Container{
-			Name:            toolConfig.Name,
-			Command:         toolConfig.Command,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			VolumeMounts:    sidecarRenderedParam.Volumes,
+		toolContainerBuilder := builder.NewContainerBuilder(toolConfig.Name).
+			AddCommands(toolConfig.Command...).
+			SetImagePullPolicy(corev1.PullIfNotPresent).
+			AddVolumeMounts(sidecarRenderedParam.Volumes...)
+		if len(toolConfig.Image) > 0 {
+			toolContainerBuilder.SetImage(toolConfig.Image)
 		}
-		if toolConfig.Image != "" {
-			toolContainer.Image = toolConfig.Image
-		}
-		toolContainers = append(toolContainers, toolContainer)
+		toolContainers = append(toolContainers, *toolContainerBuilder.GetObject())
 	}
 	for i := range toolContainers {
 		container := &toolContainers[i]

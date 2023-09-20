@@ -31,29 +31,20 @@ var _ = Describe("pod builder", func() {
 		name := "foo"
 		ns := "default"
 		port := int32(12345)
-		container := corev1.Container{
-			Name:  "foo-1",
-			Image: "bar-2",
-			Ports: []corev1.ContainerPort{
-				{
-					Name:          "foo-1",
+		container := *NewContainerBuilder("foo-1").
+			SetImage("bar-1").
+			AddPorts(corev1.ContainerPort{
+				Name:          "foo-1",
+				Protocol:      corev1.ProtocolTCP,
+				ContainerPort: port,
+			}).GetObject()
+		containers := []corev1.Container{
+			*NewContainerBuilder("foo-2").SetImage("bar-2").
+				AddPorts(corev1.ContainerPort{
+					Name:          "foo-2",
 					Protocol:      corev1.ProtocolTCP,
 					ContainerPort: port,
-				},
-			},
-		}
-		containers := []corev1.Container{
-			{
-				Name:  "foo-2",
-				Image: "bar-2",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          "foo-2",
-						Protocol:      corev1.ProtocolTCP,
-						ContainerPort: port,
-					},
-				},
-			},
+				}).GetObject(),
 		}
 		volumes := []corev1.Volume{
 			{

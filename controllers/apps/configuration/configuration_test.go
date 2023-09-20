@@ -113,13 +113,11 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
-	container := corev1.Container{
-		Name: "mock-container",
-		VolumeMounts: []corev1.VolumeMount{{
+	container := *builder.NewContainerBuilder("mock-container").
+		AddVolumeMounts(corev1.VolumeMount{
 			Name:      configVolumeName,
 			MountPath: "/mnt/config",
-		}},
-	}
+		}).GetObject()
 	_ = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
 		AddConfigmapVolume(configVolumeName, configmap.Name).
 		AddContainer(container).

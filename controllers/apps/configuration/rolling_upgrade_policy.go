@@ -22,13 +22,13 @@ package configuration
 import (
 	"context"
 	"fmt"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"

@@ -21,7 +21,6 @@ package configuration
 
 import (
 	"fmt"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
@@ -36,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -93,7 +93,7 @@ func newMockStatefulSet(replicas int, name string, labels map[string]string) app
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
-			MatchLabels: labels,
+				MatchLabels: labels,
 			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Template: corev1.PodTemplateSpec{
@@ -207,16 +207,16 @@ func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.Com
 			params.Component.RSMSpec = &appsv1alpha1.RSMSpec{
 				Roles: []workloads.ReplicaRole{
 					{
-						Name: "leader",
-						IsLeader: true,
+						Name:       "leader",
+						IsLeader:   true,
 						AccessMode: workloads.ReadWriteMode,
-						CanVote: true,
+						CanVote:    true,
 					},
 					{
-						Name: "follower",
-						IsLeader: false,
+						Name:       "follower",
+						IsLeader:   false,
 						AccessMode: workloads.ReadonlyMode,
-						CanVote: true,
+						CanVote:    true,
 					},
 				},
 			}

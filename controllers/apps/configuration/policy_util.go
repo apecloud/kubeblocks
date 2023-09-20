@@ -22,8 +22,6 @@ package configuration
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/common"
-	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	"net"
 	"strconv"
 
@@ -32,9 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )

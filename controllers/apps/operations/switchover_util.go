@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/common"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -36,6 +35,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlcomputil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"

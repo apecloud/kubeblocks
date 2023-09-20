@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -30,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )

@@ -18,7 +18,6 @@ package appstest
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/common"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -49,6 +48,7 @@ import (
 	dpctrl "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/common"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"

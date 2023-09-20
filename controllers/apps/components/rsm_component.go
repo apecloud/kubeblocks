@@ -22,13 +22,13 @@ package components
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1114,7 +1114,7 @@ func (c *rsmComponent) updateMembersStatus() {
 		}
 		for _, memberStatus := range membersStatus {
 			status := appsv1alpha1.ReplicationMemberStatus{
-				Pod:        memberStatus.PodName,
+				Pod: memberStatus.PodName,
 			}
 			switch {
 			case memberStatus.IsLeader:

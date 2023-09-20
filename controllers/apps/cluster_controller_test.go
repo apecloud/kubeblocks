@@ -61,7 +61,6 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 const (
@@ -1541,32 +1540,6 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	}
 
-	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
-		pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
-		Expect(err).To(Succeed())
-
-		events := make([]corev1.Event, 0)
-		for _, pod := range pods {
-			event := corev1.Event{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pod.Name + "-event",
-					Namespace: testCtx.DefaultNamespace,
-				},
-				Reason:  string(lorryutil.CheckRoleOperation),
-				Message: `{"event":"Success","originalRole":"Leader","role":"Follower"}`,
-				InvolvedObject: corev1.ObjectReference{
-					Name:      pod.Name,
-					Namespace: testCtx.DefaultNamespace,
-					UID:       pod.UID,
-					FieldPath: constant.ProbeCheckRolePath,
-				},
-			}
-			events = append(events, event)
-		}
-		events[0].Message = `{"event":"Success","originalRole":"Leader","role":"Leader"}`
-		return events
-	}
-
 	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
 		pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
@@ -1615,7 +1588,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Creating mock pods in StatefulSet, and set controller reference")
 		pods := mockPodsForTest(clusterObj, replicas)
-		for _, pod := range pods {
+		for i, pod := range pods {
 			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			patch := client.MergeFrom(pod.DeepCopy())
@@ -1624,15 +1597,14 @@ var _ = Describe("Cluster Controller", func() {
 				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,
 			}}
-			// ERROR: the object has been modified; please apply your changes to the latest version and try again
 			Eventually(k8sClient.Status().Patch(ctx, &pod, patch)).Should(Succeed())
-		}
-
-		By("Creating mock role changed events")
-		// pod.Labels[intctrlutil.RoleLabelKey] will be filled with the role
-		events := mockRoleChangedEvent(clusterKey, sts)
-		for _, event := range events {
-			Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
+			role := "follower"
+			if i == 0 {
+				role = "leader"
+			}
+			patch = client.MergeFrom(pod.DeepCopy())
+			pod.Labels[constant.RoleLabelKey] = role
+			Eventually(k8sClient.Patch(ctx, &pod, patch)).Should(Succeed())
 		}
 
 		By("Checking pods' role are changed accordingly")

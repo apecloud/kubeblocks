@@ -842,6 +842,12 @@ func (c *rsmComponent) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cl
 			}
 			continue
 		}
+
+		if lorryCli == nil {
+			// no lorry in the pod
+			continue
+		}
+
 		if err2 := lorryCli.LeaveMember(reqCtx.Ctx); err2 != nil {
 			if err == nil {
 				err = err2

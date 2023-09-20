@@ -17,23 +17,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package k8score
-
-import (
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/controller/rsm"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-)
-
-type EventHandler interface {
-	Handle(client.Client, intctrlutil.RequestCtx, record.EventRecorder, *corev1.Event) error
-}
-
-var EventHandlerMap = map[string]EventHandler{}
-
-func init() {
-	EventHandlerMap["rsm-event-handler"] = &rsm.PodRoleEventHandler{}
-}
+/*
+Package common provides types and utils shared by all KubeBlocks components: KubeBlocks Core, KBCLI, Lorry etc.
+will promote to pkg/common when stable.
+*/
+package common

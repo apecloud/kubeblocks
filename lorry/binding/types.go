@@ -49,6 +49,8 @@ const (
 	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleDetectionThreshold     = 300
+
+	rsmRoleUpdateMechanismVarName = "KB_RSM_ROLE_UPDATE_MECHANISM"
 )
 
 const (

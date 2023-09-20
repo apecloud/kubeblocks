@@ -31,8 +31,6 @@ import (
 	"strconv"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -84,8 +83,7 @@ var (
 )
 
 func init() {
-	production, _ := zap.NewProduction()
-	logVolProt = zapr.NewLogger(production)
+	logVolProt = ctrl.Log.WithName("Volume-protection")
 	optVolProt = &operationVolumeProtection{
 		Logger: logVolProt,
 		Requester: &httpsVolumeStatsRequester{

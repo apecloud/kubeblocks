@@ -35,15 +35,14 @@ type MockComponentDefinitionFactory struct {
 }
 
 func NewComponentDefinitionFactory(name string) *MockComponentDefinitionFactory {
-	return NewComponentDefinitionFactoryExt(name, "", "", "", "", "")
+	return NewComponentDefinitionFactoryExt(name, "", "", "", "")
 }
 
-func NewComponentDefinitionFactoryExt(name, version, provider, description, serviceKind, serviceVersion string) *MockComponentDefinitionFactory {
+func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, serviceVersion string) *MockComponentDefinitionFactory {
 	f := &MockComponentDefinitionFactory{}
 	f.init("", name,
 		&appsv1alpha1.ComponentDefinition{
 			Spec: appsv1alpha1.ComponentDefinitionSpec{
-				Version:        version,
 				Provider:       provider,
 				Description:    description,
 				ServiceKind:    serviceKind,
@@ -92,14 +91,14 @@ func (f *MockComponentDefinitionFactory) AddVolumeMounts(containerName string, v
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetVolume(name string, sync bool, watermark int) *MockComponentDefinitionFactory {
-	vol := appsv1alpha1.ComponentPersistentVolume{
-		Name:            name,
-		Synchronization: sync,
-		HighWatermark:   watermark,
+func (f *MockComponentDefinitionFactory) SetVolume(name string, snapshot bool, watermark int) *MockComponentDefinitionFactory {
+	vol := appsv1alpha1.ComponentVolume{
+		Name:          name,
+		NeedSnapshot:  snapshot,
+		HighWatermark: watermark,
 	}
 	if f.get().Spec.Volumes == nil {
-		f.get().Spec.Volumes = make([]appsv1alpha1.ComponentPersistentVolume, 0)
+		f.get().Spec.Volumes = make([]appsv1alpha1.ComponentVolume, 0)
 	}
 	for i, it := range f.get().Spec.Volumes {
 		if it.Name == name {
@@ -245,10 +244,10 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetSystemAccount(accountName string, bootstrap bool) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetSystemAccount(accountName string, isSystemInitAccount bool) *MockComponentDefinitionFactory {
 	account := appsv1alpha1.ComponentSystemAccount{
-		Name:      accountName,
-		Bootstrap: bootstrap,
+		Name:                accountName,
+		IsSystemInitAccount: isSystemInitAccount,
 	}
 	if f.get().Spec.SystemAccounts == nil {
 		f.get().Spec.SystemAccounts = make([]appsv1alpha1.ComponentSystemAccount, 0)

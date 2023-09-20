@@ -21,10 +21,6 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - description: component version
-      jsonPath: .spec.version
-      name: VERSION
-      type: string
     - description: service
       jsonPath: .spec.serviceKind
       name: SERVICE
@@ -59,14 +55,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: ComponentDefinitionSpec provides a workload component specification,
+            description: ComponentDefinitionSpec provides a workload component specification
               with attributes that strongly work with stateful workloads and day-2
-              operations behaviors.
+              operation behaviors.
             properties:
               componentDefRef:
                 description: ComponentDefRef is used to inject values from other components
                   into the current component. values will be saved and updated in
-                  a configmap and mounted to the current component.
+                  a configmap and mounted to the current component. Cannot be updated.
                 items:
                   description: ComponentDefRef is used to select the component and
                     its fields to be referenced.
@@ -163,7 +159,7 @@ spec:
               configs:
                 description: The configs field provided by provider, and finally this
                   configTemplateRefs will be rendered into the user's own configuration
-                  file according to the user's cluster.
+                  file according to the user's cluster. Cannot be updated.
                 items:
                   properties:
                     asEnvFrom:
@@ -272,32 +268,34 @@ spec:
                     accountName:
                       description: AccountName specifies the account used to access
                         the component service. If specified, the account must be defined
-                        in @SystemAccounts.
+                        in @SystemAccounts. Cannot be updated.
                       type: string
                     credentialSecret:
                       description: 'TODO: how to use the secret? CredentialSecret
-                        specifies the secret used to access the component service.'
+                        specifies the secret used to access the component service.
+                        Cannot be updated.'
                       type: string
                     name:
-                      description: The name of the ConnectionCredential.
+                      description: The name of the ConnectionCredential. Cannot be
+                        updated.
                       type: string
                     portName:
                       description: PortName specifies the name of the port to access
                         the component service. If the service has multiple ports,
                         a specific port must be specified to use here. Otherwise,
-                        the unique port of the service will be used.
+                        the unique port of the service will be used. Cannot be updated.
                       type: string
                     serviceName:
                       description: ServiceName specifies the name of component service
-                        to use for accessing the component service.
+                        to use for accessing the component service. Cannot be updated.
                       type: string
                   required:
                   - name
                   type: object
                 type: array
               description:
-                description: Description is a brief description of the component definition.
-                maxLength: 512
+                description: Description is a brief description of the component.
+                maxLength: 256
                 type: string
               labels:
                 additionalProperties:
@@ -1050,155 +1048,6 @@ spec:
                         default: 0
                         description: TimeoutSeconds defines the timeout duration for
                           the action in seconds. Cannot be updated.
-                        format: int32
-                        type: integer
-                    type: object
-                  livenessProbe:
-                    description: LivenessProbe defines how to probe the liveness of
-                      replicas periodically. Cannot be updated.
-                    properties:
-                      exec:
-                        description: Exec specifies the action to take.
-                        properties:
-                          command:
-                            description: Command is the command line to execute inside
-                              the container, the working directory for the command  is
-                              root ('/') in the container's filesystem. The command
-                              is simply exec'd, it is not run inside a shell, so traditional
-                              shell instructions ('|', etc) won't work. To use a shell,
-                              you need to explicitly call out to that shell. Exit
-                              status of 0 is treated as live/healthy and non-zero
-                              is unhealthy.
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      failureThreshold:
-                        description: Minimum consecutive failures for the probe to
-                          be considered failed after having succeeded. Defaults to
-                          3. Minimum value is 1.
-                        format: int32
-                        type: integer
-                      grpc:
-                        description: GRPC specifies an action involving a GRPC port.
-                          This is a beta field and requires enabling GRPCContainerProbe
-                          feature gate.
-                        properties:
-                          port:
-                            description: Port number of the gRPC service. Number must
-                              be in the range 1 to 65535.
-                            format: int32
-                            type: integer
-                          service:
-                            description: "Service is the name of the service to place
-                              in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-                              \n If this is not specified, the default behavior is
-                              defined by gRPC."
-                            type: string
-                        required:
-                        - port
-                        type: object
-                      httpGet:
-                        description: HTTPGet specifies the http request to perform.
-                        properties:
-                          host:
-                            description: Host name to connect to, defaults to the
-                              pod IP. You probably want to set "Host" in httpHeaders
-                              instead.
-                            type: string
-                          httpHeaders:
-                            description: Custom headers to set in the request. HTTP
-                              allows repeated headers.
-                            items:
-                              description: HTTPHeader describes a custom header to
-                                be used in HTTP probes
-                              properties:
-                                name:
-                                  description: The header field name
-                                  type: string
-                                value:
-                                  description: The header field value
-                                  type: string
-                              required:
-                              - name
-                              - value
-                              type: object
-                            type: array
-                          path:
-                            description: Path to access on the HTTP server.
-                            type: string
-                          port:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            description: Name or number of the port to access on the
-                              container. Number must be in the range 1 to 65535. Name
-                              must be an IANA_SVC_NAME.
-                            x-kubernetes-int-or-string: true
-                          scheme:
-                            description: Scheme to use for connecting to the host.
-                              Defaults to HTTP.
-                            type: string
-                        required:
-                        - port
-                        type: object
-                      initialDelaySeconds:
-                        description: 'Number of seconds after the container has started
-                          before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                        format: int32
-                        type: integer
-                      periodSeconds:
-                        description: How often (in seconds) to perform the probe.
-                          Default to 10 seconds. Minimum value is 1.
-                        format: int32
-                        type: integer
-                      successThreshold:
-                        description: Minimum consecutive successes for the probe to
-                          be considered successful after having failed. Defaults to
-                          1. Must be 1 for liveness and startup. Minimum value is
-                          1.
-                        format: int32
-                        type: integer
-                      tcpSocket:
-                        description: TCPSocket specifies an action involving a TCP
-                          port.
-                        properties:
-                          host:
-                            description: 'Optional: Host name to connect to, defaults
-                              to the pod IP.'
-                            type: string
-                          port:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            description: Number or name of the port to access on the
-                              container. Number must be in the range 1 to 65535. Name
-                              must be an IANA_SVC_NAME.
-                            x-kubernetes-int-or-string: true
-                        required:
-                        - port
-                        type: object
-                      terminationGracePeriodSeconds:
-                        description: Optional duration in seconds the pod needs to
-                          terminate gracefully upon probe failure. The grace period
-                          is the duration in seconds after the processes running in
-                          the pod are sent a termination signal and the time when
-                          the processes are forcibly halted with a kill signal. Set
-                          this value longer than the expected cleanup time for your
-                          process. If this value is nil, the pod's terminationGracePeriodSeconds
-                          will be used. Otherwise, this value overrides the value
-                          provided by the pod spec. Value must be non-negative integer.
-                          The value zero indicates stop immediately via the kill signal
-                          (no opportunity to shut down). This is a beta field and
-                          requires enabling ProbeTerminationGracePeriod feature gate.
-                          Minimum value is 1. spec.terminationGracePeriodSeconds is
-                          used if unset.
-                        format: int64
-                        type: integer
-                      timeoutSeconds:
-                        description: 'Number of seconds after which the probe times
-                          out. Defaults to 1 second. Minimum value is 1. More info:
-                          https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                         format: int32
                         type: integer
                     type: object
@@ -2668,8 +2517,8 @@ spec:
                         format: int32
                         type: integer
                     type: object
-                  reload:
-                    description: Reload defines how to notify the replica service
+                  reconfigure:
+                    description: Reconfigure defines how to notify the replica service
                       that there is a configuration update. Cannot be updated.
                     properties:
                       container:
@@ -3065,11 +2914,10 @@ spec:
                       current leader to a new replica to minimize the impact on availability.
                       This action is typically invoked when the leader is about to
                       become unavailable due to events, such as: - switchover - stop
-                      - restart - scale-in - liveness probe Dedicated env vars for
-                      the action: - KB_SWITCHOVER_CANDIDATE_NAME: The name of the
-                      new candidate replica''s Pod. It may be empty. - KB_SWITCHOVER_CANDIDATE_FQDN:
-                      The FQDN of the new candidate replica. It may be empty. Cannot
-                      be updated.'
+                      - restart - scale-in Dedicated env vars for the action: - KB_SWITCHOVER_CANDIDATE_NAME:
+                      The name of the new candidate replica''s Pod. It may be empty.
+                      - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate
+                      replica. It may be empty. Cannot be updated.'
                     properties:
                       container:
                         description: Container defines the name of the container within
@@ -3313,7 +3161,7 @@ spec:
                 type: object
               logConfigs:
                 description: LogConfigs is detail log file config which provided by
-                  provider.
+                  provider. Cannot be updated.
                 items:
                   properties:
                     filePathPattern:
@@ -3337,6 +3185,7 @@ spec:
                 x-kubernetes-list-type: map
               monitor:
                 description: Monitor is monitoring config which provided by provider.
+                  Cannot be updated.
                 properties:
                   builtIn:
                     default: false
@@ -3441,19 +3290,19 @@ spec:
                   properties:
                     name:
                       description: Name of the role. It will apply to "apps.kubeblocks.io/role"
-                        object label value. It cannot be empty.
+                        object label value. Cannot be updated.
                       maxLength: 32
                       pattern: ^.*[^\s]+.*$
                       type: string
                     serviceable:
                       default: true
                       description: Serviceable indicates whether a replica with this
-                        role can provide services.
+                        role can provide services. Cannot be updated.
                       type: boolean
                     writable:
                       default: false
                       description: Writable indicates whether a replica with this
-                        role is allowed to write data.
+                        role is allowed to write data. Cannot be updated.
                       type: boolean
                   required:
                   - name
@@ -3462,10 +3311,10 @@ spec:
               runtime:
                 description: 'Runtime defines primarily runtime information for the
                   component, including: - Init containers - Containers - Image - Commands
-                  - Args - Envs - Mounts - Ports - Security context - Probes: readiness
-                  - Lifecycle - Volumes CPU and memory resource limits, as well as
-                  scheduling settings (affinity, toleration, priority), should not
-                  be configured within this structure.'
+                  - Args - Envs - Mounts - Ports - Security context - Probes - Lifecycle
+                  - Volumes CPU and memory resource limits, as well as scheduling
+                  settings (affinity, toleration, priority), should not be configured
+                  within this structure. Cannot be updated.'
                 properties:
                   activeDeadlineSeconds:
                     description: Optional duration in seconds the pod may be active
@@ -10520,7 +10369,7 @@ spec:
               scripts:
                 description: The scripts field provided by provider, and finally this
                   configTemplateRefs will be rendered into the user's own configuration
-                  file according to the user's cluster.
+                  file according to the user's cluster. Cannot be updated.
                 items:
                   properties:
                     defaultMode:
@@ -10573,11 +10422,12 @@ spec:
               serviceKind:
                 description: ServiceKind defines what kind of well-known service that
                   the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
+                  Cannot be updated.
                 maxLength: 32
                 type: string
               serviceRefDeclarations:
                 description: serviceRefDeclarations is used to declare the service
-                  reference of the current component.
+                  reference of the current component. Cannot be updated.
                 items:
                   properties:
                     name:
@@ -10629,12 +10479,12 @@ spec:
                 type: array
               serviceVersion:
                 description: ServiceVersion defines the version of the well-known
-                  service that the component provides.
+                  service that the component provides. Cannot be updated.
                 maxLength: 32
                 type: string
               services:
                 description: Services defines endpoints that can be used to access
-                  the component service to manage the component.
+                  the component service to manage the component. Cannot be updated.
                 items:
                   properties:
                     allocateLoadBalancerNodePorts:
@@ -10830,7 +10680,7 @@ spec:
                       type: array
                     name:
                       description: The name of the component service. Others can refer
-                        to this service by this name.
+                        to this service by its name. Cannot be updated.
                       type: string
                     ports:
                       description: 'The list of ports that are exposed by this service.
@@ -10912,6 +10762,13 @@ spec:
                         Kubernetes generated endpoints through the Endpoints or EndpointSlice
                         resources can safely assume this behavior.
                       type: boolean
+                    roleSelector:
+                      description: RoleSelector extends the ServiceSpec.Selector by
+                        allowing you to specify defined roles as selectors for the
+                        service. Cannot be updated.
+                      items:
+                        type: string
+                      type: array
                     selector:
                       additionalProperties:
                         type: string
@@ -10926,7 +10783,8 @@ spec:
                     serviceName:
                       description: ServiceName defines the name of the service object.
                         If not specified, the default service name with pattern <CLUSTER_NAME>-<COMPONENT_NAME>
-                        will be used. Only one default service name is allowed.
+                        will be used. Only one default service name is allowed. Cannot
+                        be updated.
                       type: string
                     sessionAffinity:
                       description: 'Supports "ClientIP" and "None". Used to maintain
@@ -10980,16 +10838,17 @@ spec:
                   properties:
                     bootstrap:
                       default: false
-                      description: Bootstrap specifies whether the account will be
-                        used during bootstrapping.
+                      description: IsSystemInitAccount indicates whether this is the
+                        unique system initialization account (e.g., MySQL root). Only
+                        one system init account is allowed. Cannot be updated.
                       type: boolean
                     name:
                       description: The name of the account. Others can refer to this
-                        account by the name.
+                        account by the name. Cannot be updated.
                       type: string
                     passwordGenerationPolicy:
                       description: PasswordGenerationPolicy defines the policy for
-                        generating the account's password.
+                        generating the account's password. Cannot be updated.
                       properties:
                         length:
                           default: 16
@@ -11020,7 +10879,7 @@ spec:
                       type: object
                     secretRef:
                       description: SecretRef specifies the secret from which data
-                        will be copied to create the new account.
+                        will be copied to create the new account. Cannot be updated.
                       properties:
                         name:
                           description: name refers to the name of the secret.
@@ -11034,7 +10893,7 @@ spec:
                       type: object
                     statement:
                       description: Statement specifies the statement used to create
-                        the account with required privileges.
+                        the account with required privileges. Cannot be updated.
                       type: string
                   required:
                   - name
@@ -11049,14 +10908,10 @@ spec:
                 - BestEffortParallel
                 - Parallel
                 type: string
-              version:
-                description: Version of the component.
-                maxLength: 32
-                type: string
               volumes:
                 description: Volumes defines the persistent volumes needed by the
                   component. The users are responsible for providing these volumes
-                  when creating a component instance.
+                  when creating a component instance. Cannot be updated.
                 items:
                   properties:
                     highWatermark:
@@ -11069,18 +10924,20 @@ spec:
                         as read-only. And after that, if all volumes' space usage
                         drops under the threshold later, the pre-defined "UNLOCK"
                         action will be performed to recover the service normally.
+                        Cannot be updated.
                       maximum: 100
                       minimum: 0
                       type: integer
                     name:
-                      description: 'The Name of the persistent volume. Must be a DNS_LABEL
-                        and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      description: 'The Name of the volume. Must be a DNS_LABEL and
+                        unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        Cannot be updated.'
                       type: string
-                    synchronization:
+                    needSnapshot:
                       default: false
-                      description: Synchronization indicates whether the data on this
-                        volume needs to be synchronized when making a backup or building
-                        a new replica.
+                      description: NeedSnapshot indicates whether the volume need
+                        to snapshot when making a backup for the component. Cannot
+                        be updated.
                       type: boolean
                   required:
                   - name
@@ -11088,10 +10945,9 @@ spec:
                 type: array
             required:
             - runtime
-            - version
             type: object
           status:
-            description: ComponentDefinitionStatus defines the observed state of ComponentDefinition
+            description: ComponentDefinitionStatus defines the observed state of ComponentDefinition.
             properties:
               message:
                 description: Extra message for current phase.

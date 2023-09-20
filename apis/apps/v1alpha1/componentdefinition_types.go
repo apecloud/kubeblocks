@@ -31,7 +31,6 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpd
-// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.version",description="component version"
 // +kubebuilder:printcolumn:name="SERVICE",type="string",JSONPath=".spec.serviceKind",description="service"
 // +kubebuilder:printcolumn:name="SERVICE-VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
@@ -59,30 +58,26 @@ func init() {
 	SchemeBuilder.Register(&ComponentDefinition{}, &ComponentDefinitionList{})
 }
 
-// ComponentDefinitionSpec provides a workload component specification, with attributes that strongly work with
-// stateful workloads and day-2 operations behaviors.
+// ComponentDefinitionSpec provides a workload component specification with attributes that strongly work with stateful workloads and day-2 operation behaviors.
 type ComponentDefinitionSpec struct {
-	// Version of the component.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
-	Version string `json:"version"`
-
 	// Provider is the name of the component provider.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	Provider string `json:"provider,omitempty"`
 
-	// Description is a brief description of the component definition.
-	// +kubebuilder:validation:MaxLength=512
+	// Description is a brief description of the component.
+	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	Description string `json:"description,omitempty"`
 
 	// ServiceKind defines what kind of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
+	// Cannot be updated.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceKind string `json:"serviceKind,omitempty"`
 
 	// ServiceVersion defines the version of the well-known service that the component provides.
+	// Cannot be updated.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
@@ -97,59 +92,59 @@ type ComponentDefinitionSpec struct {
 	//       - Mounts
 	//       - Ports
 	//       - Security context
-	//       - Probes: readiness
+	//       - Probes
 	//       - Lifecycle
 	//   - Volumes
-	// CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority),
-	// should not be configured within this structure.
+	// CPU and memory resource limits, as well as scheduling settings (affinity, toleration, priority), should not be configured within this structure.
+	// Cannot be updated.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
 	// Volumes defines the persistent volumes needed by the component.
 	// The users are responsible for providing these volumes when creating a component instance.
+	// Cannot be updated.
 	// +optional
-	Volumes []ComponentPersistentVolume `json:"volumes"`
+	Volumes []ComponentVolume `json:"volumes"`
 
 	// Services defines endpoints that can be used to access the component service to manage the component.
+	// Cannot be updated.
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
 	// The configs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
-	// +optional
+	// Cannot be updated.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
 	// LogConfigs is detail log file config which provided by provider.
-	// +optional
+	// Cannot be updated.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Monitor is monitoring config which provided by provider.
+	// Cannot be updated.
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// The scripts field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
-	// +optional
+	// Cannot be updated.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
 	// +optional
 	Scripts []ComponentTemplateSpec `json:"scripts,omitempty"`
-
-	// ConnectionCredentials defines the default connection credentials that can be used to access the component service.
-	// Cannot be updated.
-	// +optional
-	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
 	// PolicyRules defines the namespaced policy rules required by the component.
 	// If any rule application fails (e.g., due to lack of permissions), the provisioning of the component instance will also fail.
@@ -169,7 +164,10 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
 
-	// TODO: support other resources provisioning.
+	// ConnectionCredentials defines the default connection credentials that can be used to access the component service.
+	// Cannot be updated.
+	// +optional
+	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
@@ -198,6 +196,7 @@ type ComponentDefinitionSpec struct {
 
 	// ComponentDefRef is used to inject values from other components into the current component.
 	// values will be saved and updated in a configmap and mounted to the current component.
+	// Cannot be updated.
 	// +patchMergeKey=componentDefName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -206,11 +205,12 @@ type ComponentDefinitionSpec struct {
 	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
 
 	// serviceRefDeclarations is used to declare the service reference of the current component.
+	// Cannot be updated.
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
 }
 
-// ComponentDefinitionStatus defines the observed state of ComponentDefinition
+// ComponentDefinitionStatus defines the observed state of ComponentDefinition.
 type ComponentDefinitionStatus struct {
 	// ObservedGeneration is the most recent generation observed for this ComponentDefinition.
 	// +optional
@@ -226,23 +226,26 @@ type ComponentDefinitionStatus struct {
 	Message string `json:"message,omitempty"`
 }
 
-type ComponentPersistentVolume struct {
-	// The Name of the persistent volume.
+type ComponentVolume struct {
+	// The Name of the volume.
 	// Must be a DNS_LABEL and unique within the pod.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
-	// Synchronization indicates whether the data on this volume needs to be synchronized when making a backup or building a new replica.
+	// NeedSnapshot indicates whether the volume need to snapshot when making a backup for the component.
+	// Cannot be updated.
 	// +kubebuilder:default=false
 	// +optional
-	Synchronization bool `json:"synchronization,omitempty"`
+	NeedSnapshot bool `json:"needSnapshot,omitempty"`
 
 	// HighWatermark defines the high watermark threshold for the volume space usage.
 	// If there is any specified volumes who's space usage is over the threshold, the pre-defined "LOCK" action
 	// will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
 	// as read-only. And after that, if all volumes' space usage drops under the threshold later, the pre-defined
 	// "UNLOCK" action will be performed to recover the service normally.
+	// Cannot be updated.
 	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0
@@ -252,41 +255,84 @@ type ComponentPersistentVolume struct {
 
 type ComponentService struct {
 	// The name of the component service.
-	// Others can refer to this service by this name.
+	// Others can refer to this service by its name.
+	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
 	// ServiceName defines the name of the service object.
 	// If not specified, the default service name with pattern <CLUSTER_NAME>-<COMPONENT_NAME> will be used.
 	// Only one default service name is allowed.
+	// Cannot be updated.
 	// +optional
 	ServiceName BuiltInString `json:"serviceName,omitempty"`
 
+	// Cannot be updated.
 	corev1.ServiceSpec `json:",inline"`
+
+	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined roles as selectors for the service.
+	// Cannot be updated.
+	// +optional
+	RoleSelector []string `json:"roleSelector,omitempty"`
+}
+
+type ComponentSystemAccount struct {
+	// The name of the account.
+	// Others can refer to this account by the name.
+	// Cannot be updated.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// IsSystemInitAccount indicates whether this is the unique system initialization account (e.g., MySQL root).
+	// Only one system init account is allowed.
+	// Cannot be updated.
+	// +kubebuilder:default=false
+	// +optional
+	IsSystemInitAccount bool `json:"bootstrap,omitempty"`
+
+	// Statement specifies the statement used to create the account with required privileges.
+	// Cannot be updated.
+	// +optional
+	Statement string `json:"statement,omitempty"`
+
+	// PasswordGenerationPolicy defines the policy for generating the account's password.
+	// Cannot be updated.
+	// +optional
+	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
+
+	// SecretRef specifies the secret from which data will be copied to create the new account.
+	// Cannot be updated.
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
 type ConnectionCredential struct {
 	// The name of the ConnectionCredential.
+	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
 	// ServiceName specifies the name of component service to use for accessing the component service.
+	// Cannot be updated.
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
 	// PortName specifies the name of the port to access the component service.
 	// If the service has multiple ports, a specific port must be specified to use here.
 	// Otherwise, the unique port of the service will be used.
+	// Cannot be updated.
 	// +optional
 	PortName string `json:"portName,omitempty"`
 
 	// AccountName specifies the account used to access the component service.
 	// If specified, the account must be defined in @SystemAccounts.
+	// Cannot be updated.
 	// +optional
 	AccountName string `json:"accountName,omitempty"`
 
 	// TODO: how to use the secret?
 	// CredentialSecret specifies the secret used to access the component service.
+	// Cannot be updated.
 	// +optional
 	CredentialSecret string `json:"credentialSecret,omitempty"`
 }
@@ -304,55 +350,23 @@ const (
 // ComponentReplicaRole represents a role that can be assumed by a component instance.
 type ComponentReplicaRole struct {
 	// Name of the role. It will apply to "apps.kubeblocks.io/role" object label value.
-	// It cannot be empty.
+	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Pattern=`^.*[^\s]+.*$`
 	Name string `json:"name"`
 
 	// Serviceable indicates whether a replica with this role can provide services.
+	// Cannot be updated.
 	// +kubebuilder:default=true
 	// +optional
 	Serviceable bool `json:"serviceable,omitempty"`
 
 	// Writable indicates whether a replica with this role is allowed to write data.
+	// Cannot be updated.
 	// +kubebuilder:default=false
 	// +optional
 	Writable bool `json:"writable,omitempty"`
-
-	//// Votable indicates whether a replica with this role can participate in leader election voting.
-	//// +kubebuilder:default=true
-	//// +optional
-	// Votable bool `json:"votable,omitempty"`
-	//
-	//// Leaderable indicates whether a replica with this role can be elected as a leader.
-	//// +kubebuilder:default=true
-	//// +optional
-	// Leaderable bool `json:"leaderable,omitempty"`
-}
-
-type ComponentSystemAccount struct {
-	// The name of the account.
-	// Others can refer to this account by the name.
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Bootstrap specifies whether the account will be used during bootstrapping.
-	// +kubebuilder:default=false
-	// +optional
-	Bootstrap bool `json:"bootstrap,omitempty"`
-
-	// Statement specifies the statement used to create the account with required privileges.
-	// +optional
-	Statement string `json:"statement,omitempty"`
-
-	// PasswordGenerationPolicy defines the policy for generating the account's password.
-	// +optional
-	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
-
-	// SecretRef specifies the secret from which data will be copied to create the new account.
-	// +optional
-	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
 // TargetPodSelector defines how to select pod(s) to execute a action.
@@ -496,11 +510,6 @@ type ComponentLifecycleActions struct {
 	// +optional
 	PreStop *Action `json:"preStop,omitempty"`
 
-	// LivenessProbe defines how to probe the liveness of replicas periodically.
-	// Cannot be updated.
-	// +optional
-	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
-
 	// RoleProbe defines how to probe the role of replicas.
 	// Cannot be updated.
 	// +optional
@@ -512,7 +521,6 @@ type ComponentLifecycleActions struct {
 	// - stop
 	// - restart
 	// - scale-in
-	// - liveness probe
 	// Dedicated env vars for the action:
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the new candidate replica's Pod. It may be empty.
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate replica. It may be empty.
@@ -567,10 +575,10 @@ type ComponentLifecycleActions struct {
 	// +optional
 	DataAssemble *Action `json:"dataAssemble,omitempty"`
 
-	// Reload defines how to notify the replica service that there is a configuration update.
+	// Reconfigure defines how to notify the replica service that there is a configuration update.
 	// Cannot be updated.
 	// +optional
-	Reload *Action `json:"reload,omitempty"`
+	Reconfigure *Action `json:"reconfigure,omitempty"`
 
 	// AccountProvision defines how to provision accounts.
 	// Cannot be updated.

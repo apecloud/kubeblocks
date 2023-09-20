@@ -150,16 +150,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateVolumes,
 		r.validateServices,
 		r.validateConfigs,
-		r.validateLogConfigs,
-		r.validateMonitor,
 		r.validateScripts,
 		r.validateConnectionCredentials,
 		r.validatePolicyRules,
 		r.validateLabels,
 		r.validateSystemAccounts,
-		r.validateUpdateStrategy,
-		r.validateRoles,
-		r.validateRoleArbitrator,
 		r.validateLifecycleActions,
 		r.validateComponentDefRef,
 	} {
@@ -194,24 +189,16 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	checkedAdd := func(table *map[string]interface{}, name string) bool {
-		if _, ok := (*table)[name]; ok {
-			return false
-		}
-		(*table)[name] = true
-		return true
-	}
-	names := make(map[string]interface{}, 0)
-	svcNames := make(map[string]interface{}, 0)
+	names, svcNames := newLookupTable(), newLookupTable()
 	for _, svc := range cmpd.Spec.Services {
-		if ok := checkedAdd(&names, svc.Name); !ok {
+		if ok := names.checkedInsert(svc.Name); !ok {
 			return fmt.Errorf("there are multiple component services with the same name: %s", svc.Name)
 		}
 		svcName := defaultServiceName
 		if len(svc.ServiceName) > 0 {
 			svcName = string(svc.ServiceName)
 		}
-		if ok := checkedAdd(&svcNames, svcName); !ok {
+		if ok := svcNames.checkedInsert(svcName); !ok {
 			if svcName == defaultServiceName {
 				return fmt.Errorf("there are multiple services with default name")
 			} else {
@@ -227,16 +214,6 @@ func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx 
 	// if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, rctx, dbClusterDef); err != nil {
 	//	return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	// }
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateLogConfigs(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateMonitor(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }
 
@@ -317,6 +294,7 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd
 
 func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
+	// TODO: how to check the acquired rules can be granted?
 	return nil
 }
 
@@ -327,28 +305,22 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if len(cmpd.Spec.SystemAccounts) == 0 {
-		return nil
+	if len(cmpd.Spec.SystemAccounts) != 0 && cmpd.Spec.LifecycleActions.AccountProvision == nil {
+		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
 	}
-	if cmpd.Spec.LifecycleActions.AccountProvision != nil {
-		return nil
+
+	names, bootstraps := newLookupTable(), newLookupTable()
+	for _, account := range cmpd.Spec.SystemAccounts {
+		if len(account.Statement) == 0 && account.SecretRef == nil {
+			return fmt.Errorf("the Statement or SecretRef must be provided to create system account: %s", account.Name)
+		}
+		if ok := names.checkedInsert(account.Name); !ok {
+			return fmt.Errorf("there are multiple system accounts with the same name: %s", account.Name)
+		}
+		if ok := bootstraps.checkedInsert(account.IsSystemInitAccount); !ok {
+			return fmt.Errorf("there are multiple system init accounts")
+		}
 	}
-	// TODO: check name & bootstrap uniquely, check password config
-	return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
-}
-
-func (r *ComponentDefinitionReconciler) validateUpdateStrategy(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateRoles(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateRoleArbitrator(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }
 
@@ -360,4 +332,18 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Clie
 func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
+}
+
+type lookupTable map[interface{}]interface{}
+
+func newLookupTable() lookupTable {
+	return make(map[interface{}]interface{}, 0)
+}
+
+func (t *lookupTable) checkedInsert(key interface{}) bool {
+	if _, ok := (*t)[key]; ok {
+		return false
+	}
+	(*t)[key] = true
+	return true
 }

@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 This tutorial demonstrates how to configure parameter templates in KubeBlocks with Oracle MySQL as an example. You can find [the full PR here](https://github.com/apecloud/learn-kubeblocks-addon/tree/main/tutorial-3-config-and-reconfig/).
 
-## Prerequisites
+## Before you start
 
 1. Grasp basic concepts of Kubernetes, such as Pod and ConfigMap.
 2. Finish [Tutorial 1](./how-to-add-an-add-on.md).
@@ -21,13 +21,13 @@ This tutorial demonstrates how to configure parameter templates in KubeBlocks wi
 
 ## Introduction
 
-When creating a cluster, developers typically modify parameters according to resource availability, performance needs, environment, etc. Cloud database providers like AWS and Alibaba Cloud have therefore offered various parameter templates (such as high-performance and asynchronous templates for RDS) to facilitate a quick startup for users.
+When creating a cluster, developers typically configure parameters according to resource availability, performance needs, environment, etc. Cloud database providers like AWS and Alibaba Cloud have therefore offered various parameter templates (such as high-performance and asynchronous templates for RDS) to facilitate a quick startup for users.
 
-In this tutorial, you will learn how to configure parameters in KubeBlocks, which includes adding parameter templates, modifying parameters, and configuring parameter verification.
+In this tutorial, you will learn how to configure parameters in KubeBlocks, which includes adding parameter templates, configuring parameters, and configuring parameter validation.
 
 Although Kubernetes allows users to mount parameter files as ConfigMap on volumes of the Pod, it only manages ConfigMap updates and synchronizes them to the volume. Therefore, if the database engine (such as MySQL and Postgres) fails to support dynamic loading of configuration files, you can only log in to the database to perform update operations, which can easily lead to configuration drift.
 
-To prevent that, KubeBlocks manages all parameters through ConfigMap with the principle that `ConfigMap is the only source-of-truth`. It means that all changes to the configuration are first applied to ConfigMap, and then, depending on different ways the parameters take effect, applied to each Pod in the cluster. A comprehensive guide on how to change parameters/configurations will be provided in the next tutorial.
+To prevent that, KubeBlocks manages all parameters through ConfigMap with the principle that `ConfigMap is the only source-of-truth`. It means that all parameter configurations are first applied to ConfigMap, and then, depending on different ways the parameters take effect, applied to each Pod in the cluster. A comprehensive guide on how to configure parameters will be provided in the next tutorial.
 
 ## ConfigTemplate
 
@@ -95,26 +95,26 @@ Tailor additional parameter calculation options as you wish:
 Specify parameter templates through `configSpecs` in `ClusterDefinition` and quote the ConfigMap defined in [Add a parameter template](#add-a-parameter-template).
 
 ```yaml
-1   componentDefs:
-2     - name: mysql-compdef
-3       configSpecs:
-4         - name: mysql-config
-5           templateRef: oracle-mysql-config-template # Defines the ConfigMap name for the parameter template
-6           volumeName: configs                       # Name of the mounted volume          
-7           namespace: {{ .Release.Namespace }}       # Namespace of the ConfigMap
-8       podSpec:
-9         containers:
-10          - name: mysql-container
-11            volumeMounts:
-12              - mountPath: /var/lib/mysql
-13                name: data
-14              - mountPath: /etc/mysql/conf.d       # Path to the mounted configuration files, engine-related  
-15                name: configs                      # Corresponds to the volumeName on Line 6    
-16            ports:
-17             ...
+  componentDefs:
+    - name: mysql-compdef
+      configSpecs:
+        - name: mysql-config
+          templateRef: oracle-mysql-config-template # Defines the ConfigMap name for the parameter template
+          volumeName: configs                       # Name of the mounted volume          
+          namespace: {{ .Release.Namespace }}       # Namespace of the ConfigMap
+      podSpec:
+        containers:
+         - name: mysql-container
+           volumeMounts:
+             - mountPath: /var/lib/mysql
+               name: data
+             - mountPath: /etc/mysql/conf.d       # Path to the mounted configuration files, engine-related  
+               name: configs                      # Corresponds to the volumeName on Line 6    
+           ports:
+            ...
 ```
 
-As shown above, you need to modify `ClusterDefinition.yaml` file by adding `configSpecs` (Line 3 to 7). Remember to specify the following:
+As shown above, you need to modify `ClusterDefinition.yaml` file by adding `configSpecs`. Remember to specify the following:
 
 - templateRef: The name of the ConfigMap where the template is.
 - volumeName: The name of the volume mounted to the Pod.
@@ -126,32 +126,32 @@ When a new cluster is created, KubeBlocks renders the corresponding ConfigMap ba
 
 1. Install a Helm chart.
 
-    ```bash
-    helm install oracle-mysql path-to-your-helm-char/oracle-mysql
-    ```
+   ```bash
+   helm install oracle-mysql path-to-your-helm-char/oracle-mysql
+   ```
 
 2. Create a cluster.
 
-    ```bash
-    kbcli cluster create mycluster --cluster-definition oracle-mysql --cluster-version oracle-mysql-8.0.32
-    ```
+   ```bash
+   kbcli cluster create mycluster --cluster-definition oracle-mysql --cluster-version oracle-mysql-8.0.32
+   ```
 
 3. View configuration.
 
-    kbcli provides the subcommand `describe-config` to view the configuration of a cluster.
+   kbcli provides the subcommand `describe-config` to view the configuration of a cluster.
 
-    ```bash
-    kbcli cluster describe-config mycluster --component mysql-compdef
-    >
-    ConfigSpecs Meta:
-    CONFIG-SPEC-NAME   FILE     ENABLED   TEMPLATE                       CONSTRAINT   RENDERED                               COMPONENT       CLUSTER
-    mysql-config       my.cnf   false     oracle-mysql-config-template                mycluster-mysql-compdef-mysql-config   mysql-compdef   mycluster
+   ```bash
+   kbcli cluster describe-config mycluster --component mysql-compdef
+   >
+   ConfigSpecs Meta:
+   CONFIG-SPEC-NAME   FILE     ENABLED   TEMPLATE                       CONSTRAINT   RENDERED                               COMPONENT       CLUSTER
+   mysql-config       my.cnf   false     oracle-mysql-config-template                mycluster-mysql-compdef-mysql-config   mysql-compdef   mycluster
 
-    History modifications:
-    OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PROGRESS   CREATED-TIME   VALID-UPDATED
-    ```
+   History modifications:
+   OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PROGRESS   CREATED-TIME   VALID-UPDATED
+   ```
 
-You can check:
+You can view:
 
 - Name of the configuration template: oracle-mysql-config-template
 - Rendered ConfigMap: mycluster-mysql-compdef-mysql-config
@@ -165,7 +165,7 @@ In Kubernetes, ConfigMap changes are periodically synchronized to Pods, but most
 
 ## Appendix
 
-### How to configure multiple parameter templates?
+### A.1 How to configure multiple parameter templates?
 
 To meet various requirements, developers often need to configure multiple parameter templates in a production environment. For example, Alibaba Cloud provides many high-performance parameter templates and asynchronous templates for customized needs.
 

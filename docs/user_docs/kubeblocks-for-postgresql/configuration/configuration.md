@@ -7,7 +7,9 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
+The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
+
+From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
 
 ## View parameter information
 
@@ -63,7 +65,7 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Reconfigure parameters with --set flag
+## Reconfigure parameters with config command
 
 ### Reconfigure dynamic parameters
 
@@ -253,11 +255,11 @@ The example below reconfigures `shared_buffers`.
    (1 row)
    ```
 
-## Reconfigure parameters with edit-config
+## Reconfigure parameters with edit-config command
 
-For your convenience, kbcli offers a tool `edit-config` to help you to visually edit configurations.
+For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
-For Linux and macOS, you can edit configuration files by vi and for Windows, you can edit files on notepad.
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 
 1. Edit the configuration file.
 

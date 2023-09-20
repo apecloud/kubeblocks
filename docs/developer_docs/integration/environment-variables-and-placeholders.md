@@ -10,7 +10,7 @@ sidebar_label: Environment variables and placeholders
 
 ## Environment variables
 
-### Automatic pod container environment variables
+### Automatic pod's container environment variables
 
 The following variables are injected by KubeBlocks into each pod.
 

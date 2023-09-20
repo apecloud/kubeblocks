@@ -3,6 +3,7 @@ kind: Configuration
 metadata:
   name: {{ include "kblib.clusterName" . }}-mysql
   namespace: {{ .Release.Namespace }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
 spec:
   clusterDefRef: apecloud-mysql
   clusterRef: {{ include "kblib.clusterName" . }}
@@ -19,9 +20,9 @@ spec:
         my.cnf:
           parameters:
             {{- if .Values.smartEngineEnabled }}
-            loose_smartengine: ON
-            binlog_format: ROW
-            default_storage_engine: smartengine
+            loose_smartengine: "ON"
+            binlog_format: "ROW"
+            default_storage_engine: "SMARTENGINE"
             {{- end }}
             {{- range $key, $value := .Values.configurations }}
             {{ $key }}: "{{ $value }}"

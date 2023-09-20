@@ -43,8 +43,10 @@ proxyEnabled: false
 extra:
   podAntiAffinity: Required
 
+## enable smart engine
 smartEngineEnabled: false
 
+## customized config parameters
 configurations: { }
 
 # customized config template

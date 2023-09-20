@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	unstructured2 "github.com/apecloud/kubeblocks/internal/unstructured"
 )
 
 var (
@@ -90,9 +91,20 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 		default:
 			val, _ = fs.GetString(f.Name)
 		}
-		values[strcase.LowerCamelCase(f.Name)] = val
+		updateValues(f.Name, val, values)
 	})
 	return values
+}
+
+func updateValues(name string, val interface{}, values map[string]interface{}) {
+	if !strings.Contains(name, ".") {
+		values[strcase.LowerCamelCase(name)] = val
+		return
+	}
+	path := strings.Split(name, ".")
+	lastKey := path[len(path)-1]
+	m := unstructured2.CheckAndCreateNestedPrefixMap(values, path[:len(path)-1])
+	m[lastKey] = val
 }
 
 // resetFlagsValue reset the default value of some flags

@@ -71,6 +71,45 @@
       "description": "Enable SmartEngine or not.",
       "type": "boolean",
       "default": false
+    },
+    "configurations": {
+      "title": "mysql configuration",
+      "description": "set mysql default configuration parameters.",
+      "type": "object",
+      "properties": {
+      }
+    },
+    "userConfigTemplate": {
+      "title": "mysql configuration",
+      "description": "set mysql default configuration parameters.",
+      "type": "object",
+      "required": [
+        "templateRef",
+        "namespace",
+        "policy"
+      ],
+      "properties": {
+        "templateRef": {
+          "title": "reference config template",
+          "description": "customized config template.",
+          "type": "string"
+        },
+        "namespace": {
+          "title": "reference config template",
+          "description": "customized config template.",
+          "type": "string"
+        },
+        "policy": {
+          "title": "reference config template",
+          "description": "customized config template.",
+          "type": "string",
+          "default": "none",
+          "enum": [
+            "patch",
+            "none"
+          ]
+        }
+      }
     }
   }
 }

@@ -78,7 +78,7 @@ func BuildFlagsBySchema(cmd *cobra.Command, f cmdutil.Factory, schema *spec.Sche
 	}
 
 	for name, prop := range schema.Properties {
-		if err := buildOneFlag(cmd, f, name, &prop); err != nil {
+		if err := buildOneFlag(cmd, f, name, &prop, ""); err != nil {
 			return err
 		}
 	}
@@ -100,11 +100,19 @@ func castOrZero[T any](v any) T {
 	return cv
 }
 
-func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema) error {
-	name := strcase.KebabCase(k)
+func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema, prefix string) error {
+	name := k
 	tpe := "string"
 	if len(s.Type) > 0 {
 		tpe = s.Type[0]
+	}
+
+	switch {
+	case prefix != "":
+		name = prefix + "." + name
+	case tpe == "object":
+	default:
+		name = strcase.KebabCase(k)
 	}
 
 	switch tpe {
@@ -116,6 +124,13 @@ func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schem
 		cmd.Flags().Float64(name, castOrZero[float64](s.Default), buildFlagDescription(s))
 	case "boolean":
 		cmd.Flags().Bool(name, castOrZero[bool](s.Default), buildFlagDescription(s))
+	case "object":
+		for subfield, prop := range s.Properties {
+			if err := buildOneFlag(cmd, f, subfield, &prop, name); err != nil {
+				return err
+			}
+		}
+		return nil
 	default:
 		return fmt.Errorf("unsupported json schema type %s", s.Type)
 	}

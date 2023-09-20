@@ -58,3 +58,39 @@ raftGroup mode: max(replicas, 3)
 {{- max .Values.replicas 3 }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Define userConfigTemplate.
+*/}}
+{{- define "apecloud-mysql-cluster.userConfigTemplate" }}
+{{- if .Values.userConfigTemplate }}
+importTemplateRef:
+{{- .Values.userConfigTemplate | toYaml | nindent 2 }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Define userConfigurations.
+*/}}
+{{- define "apecloud-mysql-cluster.userConfigurations" }}
+{{- if or (gt (len .Values.configurations) 0) .Values.smartEngineEnabled }}
+configFileParams:
+  my.cnf:
+    parameters:
+      {{- include "apecloud-mysql-cluster.smartengine" . | nindent 6 }}
+      {{- range $key, $value := .Values.configurations }}
+      {{ $key }}: "{{ $value }}"
+      {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Define smartengine.
+*/}}
+{{- define "apecloud-mysql-cluster.smartengine" }}
+{{- if .Values.smartEngineEnabled }}
+loose_smartengine: "ON"
+binlog_format: "ROW"
+default_storage_engine: "SMARTENGINE"
+{{- end }}
+{{- end -}}

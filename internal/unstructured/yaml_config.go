@@ -43,7 +43,7 @@ func init() {
 func (y *yamlConfig) Update(key string, value any) error {
 	path := strings.Split(key, ".")
 	lastKey := path[len(path)-1]
-	deepestMap := checkAndCreateNestedPrefixMap(y.config, path[0:len(path)-1])
+	deepestMap := CheckAndCreateNestedPrefixMap(y.config, path[0:len(path)-1])
 	deepestMap[lastKey] = value
 	return nil
 }
@@ -97,7 +97,7 @@ func (y *yamlConfig) Unmarshal(str string) error {
 	return nil
 }
 
-func checkAndCreateNestedPrefixMap(m map[string]any, path []string) map[string]any {
+func CheckAndCreateNestedPrefixMap(m map[string]any, path []string) map[string]any {
 	for _, k := range path {
 		m2, ok := m[k]
 		// if the key is not existed, create a new map

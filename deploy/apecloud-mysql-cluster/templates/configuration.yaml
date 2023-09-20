@@ -11,20 +11,5 @@ spec:
   componentName: mysql
   configItemDetails:
     - name: mysql-consensusset-config
-      {{- if .Values.userConfigTemplate }}
-      importTemplateRef:
-        {{- .Values.userConfigTemplate | toYaml | nindent 8 }}
-      {{- end }}
-      {{- if or (gt (len .Values.configurations) 0) .Values.smartEngineEnabled }}
-      configFileParams:
-        my.cnf:
-          parameters:
-            {{- if .Values.smartEngineEnabled }}
-            loose_smartengine: "ON"
-            binlog_format: "ROW"
-            default_storage_engine: "SMARTENGINE"
-            {{- end }}
-            {{- range $key, $value := .Values.configurations }}
-            {{ $key }}: "{{ $value }}"
-            {{- end }}
-      {{- end }}
+      {{- include "apecloud-mysql-cluster.userConfigTemplate" . | indent 6 }}
+      {{- include "apecloud-mysql-cluster.userConfigurations" . | indent 6 }}

@@ -396,8 +396,7 @@ var _ = Describe("builder", func() {
 
 		It("builds PDB correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			pdb, err := BuildPDB(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
+			pdb := BuildPDB(cluster, synthesizedComponent)
 			Expect(pdb).ShouldNot(BeNil())
 		})
 

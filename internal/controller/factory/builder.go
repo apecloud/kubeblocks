@@ -865,16 +865,13 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	return connCredential
 }
 
-func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*policyv1.PodDisruptionBudget, error) {
-	const tplFile = "pdb_template.cue"
-	pdb := policyv1.PodDisruptionBudget{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   cluster,
-		"component": component,
-	}, "pdb", &pdb); err != nil {
-		return nil, err
-	}
-	return &pdb, nil
+func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {
+	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	return builder.NewPDBBuilder(cluster.Namespace, fmt.Sprintf("%s-%s", cluster.Name, component.Name)).
+		AddLabelsInMap(wellKnownLabels).
+		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddSelectorsInMap(wellKnownLabels).
+		GetObject()
 }
 
 func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string) (*appsv1.Deployment, error) {

@@ -124,10 +124,7 @@ func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {
 		// conditionally build PodDisruptionBudget
 		synthesizedComponent := b.Comp.GetSynthesizedComponent()
 		if synthesizedComponent.MinAvailable != nil {
-			pdb, err := factory.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
-			if err != nil {
-				return nil, err
-			}
+			pdb := factory.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
 			return []client.Object{pdb}, nil
 		} else {
 			panic("this shouldn't happen")

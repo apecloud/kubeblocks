@@ -132,10 +132,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
 	if component.MinAvailable != nil {
-		pdb, err := factory.BuildPDB(cluster, component)
-		if err != nil {
-			return nil, err
-		}
+		pdb := factory.BuildPDB(cluster, component)
 		resources = append(resources, pdb)
 	} else {
 		panic("this shouldn't happen")

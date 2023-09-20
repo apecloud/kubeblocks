@@ -38,7 +38,7 @@ func (builder *RoleBindingBuilder) SetRoleRef(roleRef rbacv1.RoleRef) *RoleBindi
 	return builder
 }
 
-func (builder *RoleBindingBuilder) AddSubjects(subjects ...rbacv1.Subject) *RoleBindingBuilder  {
+func (builder *RoleBindingBuilder) AddSubjects(subjects ...rbacv1.Subject) *RoleBindingBuilder {
 	builder.get().Subjects = append(builder.get().Subjects, subjects...)
 	return builder
 }

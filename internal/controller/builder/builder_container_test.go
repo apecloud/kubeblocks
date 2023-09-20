@@ -29,9 +29,9 @@ import (
 
 var _ = Describe("container builder", func() {
 	It("should work well", func() {
-		name := "foo"
+		const name = "foo"
 		commands := []string{
-			"foo",
+			name,
 			"--bar",
 		}
 		args := []string{
@@ -40,7 +40,7 @@ var _ = Describe("container builder", func() {
 		}
 		env := []corev1.EnvVar{
 			{
-				Name:  "foo",
+				Name:  name,
 				Value: "bar",
 			},
 			{
@@ -56,7 +56,7 @@ var _ = Describe("container builder", func() {
 		policy := corev1.PullAlways
 		mounts := []corev1.VolumeMount{
 			{
-				Name:      "foo",
+				Name:      name,
 				MountPath: "/data/foo",
 			},
 			{
@@ -86,7 +86,7 @@ var _ = Describe("container builder", func() {
 		}
 		ports := []corev1.ContainerPort{
 			{
-				Name:          "foo",
+				Name:          name,
 				ContainerPort: 12345,
 				Protocol:      corev1.ProtocolTCP,
 			},

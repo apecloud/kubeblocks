@@ -102,7 +102,8 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 
 	port, err := intctrlutil.GetProbeHTTPPort(pod)
 	if err != nil {
-		return nil, err
+		// not lorry in the pod, just return nil without error
+		return nil, nil
 	}
 
 	// don't use default http-client

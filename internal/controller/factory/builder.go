@@ -352,6 +352,15 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	return sts, nil
 }
 
+func buildWellKnownLabels(clusterDefName, clusterName, componentName string) map[string]string {
+	return map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppNameLabelKey:        clusterDefName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: componentName,
+	}
+}
+
 func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, envConfigName string) (*workloads.ReplicatedStateMachine, error) {
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
@@ -361,12 +370,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		}
 	}
 
-	commonLabels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppNameLabelKey:        component.ClusterDefName,
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: component.Name,
-	}
+	commonLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	addCommonLabels := func(service *corev1.Service) {
 		if service == nil {
 			return
@@ -920,60 +924,16 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
-	configConstraintName string,
-	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
-	const tplFile = "config_template.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	// prepare cue data
-	configMeta := map[string]map[string]string{
-		"clusterDefinition": {
-			"name": cluster.Spec.ClusterDefRef,
-		},
-		"cluster": {
-			"name":      cluster.GetName(),
-			"namespace": cluster.GetNamespace(),
-		},
-		"component": {
-			"name":                  component.Name,
-			"compDefName":           component.CompDefName,
-			"characterType":         component.CharacterType,
-			"configName":            cmName,
-			"templateName":          configTemplateSpec.TemplateRef,
-			"configConstraintsName": configConstraintName,
-			"configTemplateName":    configTemplateSpec.Name,
-		},
-	}
-	configBytes, err := json.Marshal(configMeta)
-	if err != nil {
-		return nil, err
-	}
-
-	// Generate config files context by rendering cue template
-	if err = cueValue.Fill("meta", configBytes); err != nil {
-		return nil, err
-	}
-
-	configStrByte, err := cueValue.Lookup("config")
-	if err != nil {
-		return nil, err
-	}
-
-	cm := corev1.ConfigMap{}
-	if err = json.Unmarshal(configStrByte, &cm); err != nil {
-		return nil, err
-	}
-
-	// Update rendered config
-	cm.Data = configs
-	return &cm, nil
+	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
+	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
+	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
+		AddLabelsInMap(wellKnownLabels).
+		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
+		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.TemplateRef).
+		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
+		SetData(configs).
+		GetObject()
 }
 
 func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {

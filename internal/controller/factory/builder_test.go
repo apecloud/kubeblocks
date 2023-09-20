@@ -438,9 +438,8 @@ var _ = Describe("builder", func() {
 				},
 				ConfigConstraintRef: "test-config-constraint",
 			}
-			configmap, err := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
-				"test-cm", tplCfg.ConfigConstraintRef, tplCfg.ComponentTemplateSpec)
-			Expect(err).Should(BeNil())
+			configmap := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
+				"test-cm", tplCfg.ComponentTemplateSpec)
 			Expect(configmap).ShouldNot(BeNil())
 		})
 

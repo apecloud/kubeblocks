@@ -22,6 +22,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"reflect"
 	"strconv"
 	"strings"
@@ -316,7 +317,7 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	}
 	updatePodsReady(podsReady)
 
-	c.roleStatus()
+	c.updateMembersStatus()
 
 	// works should continue to be done after spec updated.
 	if err := c.horizontalScale(reqCtx, cli); err != nil {
@@ -1075,38 +1076,65 @@ func (c *rsmComponent) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli clie
 	return matchedPVCs, nil
 }
 
-func (c *rsmComponent) roleStatus() {
-	status := c.getComponentStatus()
+func (c *rsmComponent) updateMembersStatus() {
+	// get component status
+	componentStatus := c.getComponentStatus()
 
-	// create the initial status
-	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
-		Leader: appsv1alpha1.ConsensusMemberStatus{
-			Name:       "",
-			Pod:        constant.ComponentStatusDefaultPodName,
-			AccessMode: appsv1alpha1.None,
-		},
+	// for compatibilities prior KB 0.7.0
+	buildConsensusSetStatus := func(membersStatus []workloads.MemberStatus) *appsv1alpha1.ConsensusSetStatus {
+		consensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
+			Leader: appsv1alpha1.ConsensusMemberStatus{
+				Name:       "",
+				Pod:        constant.ComponentStatusDefaultPodName,
+				AccessMode: appsv1alpha1.None,
+			},
+		}
+		for _, memberStatus := range membersStatus {
+			status := appsv1alpha1.ConsensusMemberStatus{
+				Name:       memberStatus.Name,
+				Pod:        memberStatus.PodName,
+				AccessMode: appsv1alpha1.AccessMode(memberStatus.AccessMode),
+			}
+			switch {
+			case memberStatus.IsLeader:
+				consensusSetStatus.Leader = status
+			case memberStatus.CanVote:
+				consensusSetStatus.Followers = append(consensusSetStatus.Followers, status)
+			default:
+				consensusSetStatus.Learner = &status
+			}
+		}
+		return consensusSetStatus
+	}
+	buildReplicationSetStatus := func(membersStatus []workloads.MemberStatus) *appsv1alpha1.ReplicationSetStatus {
+		replicationSetStatus := &appsv1alpha1.ReplicationSetStatus{
+			Primary: appsv1alpha1.ReplicationMemberStatus{
+				Pod: "Unknown",
+			},
+		}
+		for _, memberStatus := range membersStatus {
+			status := appsv1alpha1.ReplicationMemberStatus{
+				Pod:        memberStatus.PodName,
+			}
+			switch {
+			case memberStatus.IsLeader:
+				replicationSetStatus.Primary = status
+			default:
+				replicationSetStatus.Secondaries = append(replicationSetStatus.Secondaries, status)
+			}
+		}
+		return replicationSetStatus
 	}
 
-	// then, set the new status
-	setConsensusSetStatusRolesByRSM(newConsensusSetStatus, c.runningWorkload)
-	status.ConsensusSetStatus = newConsensusSetStatus
-	// TODO(free6om): set status back
-}
-
-func setConsensusSetStatusRolesByRSM(newConsensusSetStatus *appsv1alpha1.ConsensusSetStatus, rsmObj *workloads.ReplicatedStateMachine) {
-	for _, memberStatus := range rsmObj.Status.MembersStatus {
-		status := appsv1alpha1.ConsensusMemberStatus{
-			Name:       memberStatus.Name,
-			Pod:        memberStatus.PodName,
-			AccessMode: appsv1alpha1.AccessMode(memberStatus.AccessMode),
-		}
-		switch {
-		case memberStatus.IsLeader:
-			newConsensusSetStatus.Leader = status
-		case memberStatus.CanVote:
-			newConsensusSetStatus.Followers = append(newConsensusSetStatus.Followers, status)
-		default:
-			newConsensusSetStatus.Learner = &status
-		}
+	// update members status
+	switch c.Component.WorkloadType {
+	case appsv1alpha1.Consensus:
+		componentStatus.ConsensusSetStatus = buildConsensusSetStatus(c.runningWorkload.Status.MembersStatus)
+	case appsv1alpha1.Replication:
+		componentStatus.ReplicationSetStatus = buildReplicationSetStatus(c.runningWorkload.Status.MembersStatus)
 	}
+	componentStatus.MembersStatus = slices.Clone(c.runningWorkload.Status.MembersStatus)
+
+	// set component status back
+	c.Cluster.Status.Components[c.GetName()] = componentStatus
 }

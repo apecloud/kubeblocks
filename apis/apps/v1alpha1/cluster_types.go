@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -349,11 +350,17 @@ type ClusterComponentStatus struct {
 
 	// consensusSetStatus specifies the mapping of role and pod name.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 
 	// replicationSetStatus specifies the mapping of role and pod name.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
+
+	// members' status.
+	// +optional
+	MembersStatus []workloads.MemberStatus `json:"membersStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {

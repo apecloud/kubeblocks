@@ -248,10 +248,7 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 
 func BuildSvcListWithCustomAttributes(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
 	customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
-	services, err := BuildSvcList(cluster, component)
-	if err != nil {
-		return nil, err
-	}
+	services := BuildSvcList(cluster, component)
 	if customAttributeSetter != nil {
 		for _, svc := range services {
 			customAttributeSetter(svc)
@@ -260,24 +257,33 @@ func BuildSvcListWithCustomAttributes(cluster *appsv1alpha1.Cluster, component *
 	return services, nil
 }
 
-func BuildSvcList(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) ([]*corev1.Service, error) {
-	const tplFile = "service_template.cue"
+func BuildSvcList(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) []*corev1.Service {
+	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
+	selectors := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	delete(selectors, constant.AppNameLabelKey)
 	var result = make([]*corev1.Service, 0)
 	for _, item := range component.Services {
 		if len(item.Spec.Ports) == 0 {
 			continue
 		}
-		svc := corev1.Service{}
-		if err := buildFromCUE(tplFile, map[string]any{
-			"cluster":   cluster,
-			"service":   item,
-			"component": component,
-		}, "svc", &svc); err != nil {
-			return nil, err
+		name := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
+		if len(item.Name) > 0 {
+			name = fmt.Sprintf("%s-%s-%s", cluster.Name, component.Name, item.Name)
 		}
-		result = append(result, &svc)
+
+		svcBuilder := builder.NewServiceBuilder(cluster.Namespace, name).
+			AddLabelsInMap(wellKnownLabels).
+			AddAnnotationsInMap(item.Annotations).
+			AddSelectorsInMap(selectors).
+			AddPorts(item.Spec.Ports...)
+		if len(item.Spec.Type) > 0 {
+			svcBuilder.SetType(item.Spec.Type)
+		}
+		svc := svcBuilder.GetObject()
+		result = append(result, svc)
 	}
-	return result, nil
+	return result
 }
 
 func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *corev1.Service {

@@ -166,15 +166,12 @@ func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuild
 
 func (b *componentWorkloadBuilderBase) BuildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		if err != nil {
-			return nil, err
-		}
+		svcList := factory.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		objs := make([]client.Object, 0)
 		for _, svc := range svcList {
 			objs = append(objs, svc)
 		}
-		return objs, err
+		return objs, nil
 	}
 	return b.BuildWrapper(buildfn)
 }

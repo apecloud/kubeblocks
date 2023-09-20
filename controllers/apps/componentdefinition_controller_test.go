@@ -20,9 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -39,8 +43,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 	)
 
 	var (
-		componentDefObj *appsv1alpha1.ComponentDefinition
-
 		defaultAction = &appsv1alpha1.Action{}
 	)
 
@@ -60,6 +62,15 @@ var _ = Describe("ComponentDefinition Controller", func() {
 
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)
+	}
+
+	checkObjectStatus := func(obj *appsv1alpha1.ComponentDefinition, expectedPhase appsv1alpha1.Phase) {
+		By(fmt.Sprintf("checking the object as %s", strings.ToLower(string(expectedPhase))))
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
+			func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
+				g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
+				g.Expect(cmpd.Status.Phase).Should(Equal(expectedPhase))
+			})).Should(Succeed())
 	}
 
 	// assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
@@ -84,14 +95,12 @@ var _ = Describe("ComponentDefinition Controller", func() {
 	})
 
 	Context("default", func() {
-		BeforeEach(func() {
+		It("reconcile empty object", func() {
 			By("create a ComponentDefinition obj")
-			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
 				Create(&testCtx).GetObject()
-		})
 
-		It("reconcile empty object", func() {
 			By("checking the object reconciled")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
 				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
@@ -148,67 +157,206 @@ var _ = Describe("ComponentDefinition Controller", func() {
 	Context("volumes", func() {
 		It("enable volume protection w/o actions set", func() {
 			By("create a ComponentDefinition obj")
-			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				SetVolume("default", true, 85).
+				AddVolume("default", true, 85).
 				Create(&testCtx).GetObject()
 
-			By("checking the object as unavailable")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
-				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
-					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
-					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-				})).Should(Succeed())
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 
 		It("enable volume protection w/ actions set", func() {
 			By("create a ComponentDefinition obj")
-			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				SetVolume("default", true, 85).
+				AddVolume("default", true, 85).
 				SetLifecycleAction("Readonly", defaultAction).
 				SetLifecycleAction("Readwrite", defaultAction).
 				Create(&testCtx).GetObject()
 
-			By("checking the object as available")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
-				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
-					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
-					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-				})).Should(Succeed())
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+	})
+
+	Context("services", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddService("default", "", 3306, []string{"leader"}).
+				AddService("readonly", "readonly", 3306, []string{"follower"}).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+
+		It("duplicate names", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddService("default", "", 3306, []string{"leader"}).
+				AddService("default", "readonly", 3306, []string{"follower"}).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("duplicate service names", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddService("default", "default", 3306, []string{"leader"}).
+				AddService("readonly", "default", 3306, []string{"follower"}).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("multiple default service names", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddService("default", "", 3306, []string{"leader"}).
+				AddService("readonly", "", 3306, []string{"follower"}).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("duplicate service names - default & named", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddService("default", "", 3306, []string{"leader"}).
+				AddService("readonly", defaultServiceName, 3306, []string{"follower"}).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("w/o port", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddServiceExt("default", "", []string{"leader"}, corev1.ServiceSpec{}).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("undefined role selector", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddService("default", "", 3306, []string{"leader"}).
+				AddService("readonly", "readonly", 3306, []string{"follower"}).
+				AddService("undefined", "undefined", 3306, []string{"undefined"}).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 	})
 
 	Context("system accounts", func() {
 		It("provision accounts w/o actions set", func() {
 			By("create a ComponentDefinition obj")
-			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				SetSystemAccount(string(appsv1alpha1.AdminAccount), true).
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
 				Create(&testCtx).GetObject()
 
-			By("checking the object as unavailable")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
-				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
-					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
-					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-				})).Should(Succeed())
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 
-		It("provision accounts w/ actions set", func() {
+		It("w/ actions set", func() {
 			By("create a ComponentDefinition obj")
-			componentDefObj = testapps.NewComponentDefinitionFactory(componentDefName).
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				SetSystemAccount(string(appsv1alpha1.AdminAccount), true).
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
 				SetLifecycleAction("AccountProvision", defaultAction).
 				Create(&testCtx).GetObject()
 
-			By("checking the object as available")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
-				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
-					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
-					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-				})).Should(Succeed())
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+
+		It("duplicate accounts", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
+				SetLifecycleAction("AccountProvision", defaultAction).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("multiple system init accounts", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
+				AddSystemAccount(string(appsv1alpha1.ProbeAccount), true, "create user").
+				SetLifecycleAction("AccountProvision", defaultAction).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+	})
+
+	Context("connection credential", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddService("default", "", 3306, []string{}).
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
+				AddConnectionCredential("default", "default", "", string(appsv1alpha1.AdminAccount)).
+				SetLifecycleAction("AccountProvision", defaultAction).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+	})
+
+	Context("replica roles", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				AddRole("learner", false, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+
+		It("duplicate roles", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				AddRole("learner", false, false).
+				AddRole("learner", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 	})
 })

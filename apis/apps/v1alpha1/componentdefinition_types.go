@@ -288,7 +288,7 @@ type ComponentSystemAccount struct {
 	// Cannot be updated.
 	// +kubebuilder:default=false
 	// +optional
-	IsSystemInitAccount bool `json:"bootstrap,omitempty"`
+	IsSystemInitAccount bool `json:"isSystemInitAccount,omitempty"`
 
 	// Statement specifies the statement used to create the account with required privileges.
 	// Cannot be updated.

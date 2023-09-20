@@ -91,7 +91,7 @@ func (f *MockComponentDefinitionFactory) AddVolumeMounts(containerName string, v
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetVolume(name string, snapshot bool, watermark int) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, watermark int) *MockComponentDefinitionFactory {
 	vol := appsv1alpha1.ComponentVolume{
 		Name:          name,
 		NeedSnapshot:  snapshot,
@@ -100,45 +100,34 @@ func (f *MockComponentDefinitionFactory) SetVolume(name string, snapshot bool, w
 	if f.get().Spec.Volumes == nil {
 		f.get().Spec.Volumes = make([]appsv1alpha1.ComponentVolume, 0)
 	}
-	for i, it := range f.get().Spec.Volumes {
-		if it.Name == name {
-			f.get().Spec.Volumes[i] = vol
-			return f
-		}
-	}
 	f.get().Spec.Volumes = append(f.get().Spec.Volumes, vol)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetService(name, serviceName string, port int32) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, port int32, roleSelector []string) *MockComponentDefinitionFactory {
 	serviceSpec := corev1.ServiceSpec{
 		Ports: []corev1.ServicePort{{
 			Port: port,
 		}},
 	}
-	return f.SetServiceExt(name, serviceName, serviceSpec)
+	return f.AddServiceExt(name, serviceName, roleSelector, serviceSpec)
 }
 
-func (f *MockComponentDefinitionFactory) SetServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string, roleSelector []string, serviceSpec corev1.ServiceSpec) *MockComponentDefinitionFactory {
 	svc := appsv1alpha1.ComponentService{
-		Name:        name,
-		ServiceName: appsv1alpha1.BuiltInString(serviceName),
-		ServiceSpec: serviceSpec,
+		Name:         name,
+		ServiceName:  appsv1alpha1.BuiltInString(serviceName),
+		ServiceSpec:  serviceSpec,
+		RoleSelector: roleSelector,
 	}
 	if f.get().Spec.Services == nil {
 		f.get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
-	}
-	for i, it := range f.get().Spec.Services {
-		if it.Name == name {
-			f.get().Spec.Services[i] = svc
-			return f
-		}
 	}
 	f.get().Spec.Services = append(f.get().Spec.Services, svc)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetConfigTemplate(name, configTemplateRef, configConstraintRef,
+func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
 	namespace, volumeName string, asEnvFrom ...string) *MockComponentDefinitionFactory {
 	config := appsv1alpha1.ComponentConfigSpec{
 		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -153,29 +142,17 @@ func (f *MockComponentDefinitionFactory) SetConfigTemplate(name, configTemplateR
 	if f.get().Spec.Configs == nil {
 		f.get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
 	}
-	for i, it := range f.get().Spec.Configs {
-		if it.Name == name {
-			f.get().Spec.Configs[i] = config
-			return f
-		}
-	}
 	f.get().Spec.Configs = append(f.get().Spec.Configs, config)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetLogConfig(name, filePathPattern string) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern string) *MockComponentDefinitionFactory {
 	logConfig := appsv1alpha1.LogConfig{
 		FilePathPattern: filePathPattern,
 		Name:            name,
 	}
 	if f.get().Spec.LogConfigs == nil {
 		f.get().Spec.LogConfigs = make([]appsv1alpha1.LogConfig, 0)
-	}
-	for i, it := range f.get().Spec.LogConfigs {
-		if it.Name == name {
-			f.get().Spec.LogConfigs[i] = logConfig
-			return f
-		}
 	}
 	f.get().Spec.LogConfigs = append(f.get().Spec.LogConfigs, logConfig)
 	return f
@@ -192,7 +169,7 @@ func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort int
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetScriptTemplate(name, configTemplateRef, namespace, volumeName string,
+func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
 	mode *int32) *MockComponentDefinitionFactory {
 	script := appsv1alpha1.ComponentTemplateSpec{
 		Name:        name,
@@ -204,33 +181,7 @@ func (f *MockComponentDefinitionFactory) SetScriptTemplate(name, configTemplateR
 	if f.get().Spec.Scripts == nil {
 		f.get().Spec.Scripts = make([]appsv1alpha1.ComponentTemplateSpec, 0)
 	}
-	for i, it := range f.get().Spec.Scripts {
-		if it.Name == name {
-			f.get().Spec.Scripts[i] = script
-			return f
-		}
-	}
 	f.get().Spec.Scripts = append(f.get().Spec.Scripts, script)
-	return f
-}
-
-func (f *MockComponentDefinitionFactory) SetConnectionCredential(name, serviceName, portName, accountName string) *MockComponentDefinitionFactory {
-	credential := appsv1alpha1.ConnectionCredential{
-		Name:        name,
-		ServiceName: serviceName,
-		PortName:    portName,
-		AccountName: accountName,
-	}
-	if f.get().Spec.ConnectionCredentials == nil {
-		f.get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
-	}
-	for i, it := range f.get().Spec.ConnectionCredentials {
-		if it.Name == name {
-			f.get().Spec.ConnectionCredentials[i] = credential
-			return f
-		}
-	}
-	f.get().Spec.ConnectionCredentials = append(f.get().Spec.ConnectionCredentials, credential)
 	return f
 }
 
@@ -244,21 +195,30 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetSystemAccount(accountName string, isSystemInitAccount bool) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, isSystemInitAccount bool, statement string) *MockComponentDefinitionFactory {
 	account := appsv1alpha1.ComponentSystemAccount{
 		Name:                accountName,
 		IsSystemInitAccount: isSystemInitAccount,
+		Statement:           statement,
 	}
 	if f.get().Spec.SystemAccounts == nil {
 		f.get().Spec.SystemAccounts = make([]appsv1alpha1.ComponentSystemAccount, 0)
 	}
-	for i, it := range f.get().Spec.SystemAccounts {
-		if it.Name == accountName {
-			f.get().Spec.SystemAccounts[i] = account
-			return f
-		}
-	}
 	f.get().Spec.SystemAccounts = append(f.get().Spec.SystemAccounts, account)
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) AddConnectionCredential(name, serviceName, portName, accountName string) *MockComponentDefinitionFactory {
+	credential := appsv1alpha1.ConnectionCredential{
+		Name:        name,
+		ServiceName: serviceName,
+		PortName:    portName,
+		AccountName: accountName,
+	}
+	if f.get().Spec.ConnectionCredentials == nil {
+		f.get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
+	}
+	f.get().Spec.ConnectionCredentials = append(f.get().Spec.ConnectionCredentials, credential)
 	return f
 }
 
@@ -267,7 +227,7 @@ func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy appsv1alpha1
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetRole(name string, serviceable, writable bool) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writable bool) *MockComponentDefinitionFactory {
 	role := appsv1alpha1.ComponentReplicaRole{
 		Name:        name,
 		Serviceable: serviceable,
@@ -275,12 +235,6 @@ func (f *MockComponentDefinitionFactory) SetRole(name string, serviceable, writa
 	}
 	if f.get().Spec.Roles == nil {
 		f.get().Spec.Roles = make([]appsv1alpha1.ComponentReplicaRole, 0)
-	}
-	for i, it := range f.get().Spec.Roles {
-		if it.Name == name {
-			f.get().Spec.Roles[i] = role
-			return f
-		}
 	}
 	f.get().Spec.Roles = append(f.get().Spec.Roles, role)
 	return f
@@ -309,15 +263,9 @@ func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val int
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetComponentRef(ref appsv1alpha1.ComponentDefRef) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddComponentRef(ref appsv1alpha1.ComponentDefRef) *MockComponentDefinitionFactory {
 	if f.get().Spec.ComponentDefRef == nil {
 		f.get().Spec.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
-	}
-	for i, it := range f.get().Spec.ComponentDefRef {
-		if it.ComponentDefName == ref.ComponentDefName {
-			f.get().Spec.ComponentDefRef[i] = ref
-			return f
-		}
 	}
 	f.get().Spec.ComponentDefRef = append(f.get().Spec.ComponentDefRef, ref)
 	return f

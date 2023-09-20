@@ -10836,7 +10836,7 @@ spec:
                   be updated.'
                 items:
                   properties:
-                    bootstrap:
+                    isSystemInitAccount:
                       default: false
                       description: IsSystemInitAccount indicates whether this is the
                         unique system initialization account (e.g., MySQL root). Only

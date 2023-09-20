@@ -22,6 +22,9 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -151,10 +154,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateServices,
 		r.validateConfigs,
 		r.validateScripts,
-		r.validateConnectionCredentials,
 		r.validatePolicyRules,
 		r.validateLabels,
 		r.validateSystemAccounts,
+		r.validateConnectionCredentials,
+		r.validateReplicaRoles,
 		r.validateLifecycleActions,
 		r.validateComponentDefRef,
 	} {
@@ -172,6 +176,10 @@ func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
+	if !checkUniqueItem(cmpd.Spec.Volumes, "Name") {
+		return fmt.Errorf("duplicate volume names are not allowed")
+	}
+
 	hasVolumeToProtect := false
 	for _, vol := range cmpd.Spec.Volumes {
 		if vol.HighWatermark > 0 && vol.HighWatermark < 100 {
@@ -189,20 +197,33 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	names, svcNames := newLookupTable(), newLookupTable()
+	if !checkUniqueItem(cmpd.Spec.Services, "Name") {
+		return fmt.Errorf("duplicate names of component service are not allowed")
+	}
+
+	for i, svc := range cmpd.Spec.Services {
+		if len(svc.ServiceName) == 0 {
+			cmpd.Spec.Services[i].ServiceName = appsv1alpha1.BuiltInString(defaultServiceName)
+		}
+	}
+	if !checkUniqueItem(cmpd.Spec.Services, "ServiceName") {
+		return fmt.Errorf("duplicate service names are not allowed")
+	}
+
 	for _, svc := range cmpd.Spec.Services {
-		if ok := names.checkedInsert(svc.Name); !ok {
-			return fmt.Errorf("there are multiple component services with the same name: %s", svc.Name)
+		if len(svc.Ports) == 0 {
+			return fmt.Errorf("there is no port defined for service: %s", svc.Name)
 		}
-		svcName := defaultServiceName
-		if len(svc.ServiceName) > 0 {
-			svcName = string(svc.ServiceName)
-		}
-		if ok := svcNames.checkedInsert(svcName); !ok {
-			if svcName == defaultServiceName {
-				return fmt.Errorf("there are multiple services with default name")
-			} else {
-				return fmt.Errorf("there are multiple services with the same name: %s", svcName)
+	}
+
+	roleNames := make(map[string]bool, 0)
+	for _, role := range cmpd.Spec.Roles {
+		roleNames[strings.ToLower(role.Name)] = true
+	}
+	for _, svc := range cmpd.Spec.Services {
+		for _, roleName := range svc.RoleSelector {
+			if !roleNames[strings.ToLower(roleName)] {
+				return fmt.Errorf("the role that service selector used is not defined: %s", roleName)
 			}
 		}
 	}
@@ -222,8 +243,43 @@ func (r *ComponentDefinitionReconciler) validateScripts(cli client.Client, rctx 
 	return nil
 }
 
+func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	// TODO: how to check the acquired rules can be granted?
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	if len(cmpd.Spec.SystemAccounts) != 0 && cmpd.Spec.LifecycleActions.AccountProvision == nil {
+		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
+	}
+
+	if !checkUniqueItem(cmpd.Spec.SystemAccounts, "Name") {
+		return fmt.Errorf("duplicate system accounts are not allowed")
+	}
+	if !checkUniqueItem(cmpd.Spec.SystemAccounts, "IsSystemInitAccount") {
+		return fmt.Errorf("multiple system init accounts are not allowed")
+	}
+
+	for _, account := range cmpd.Spec.SystemAccounts {
+		if len(account.Statement) == 0 && account.SecretRef == nil {
+			return fmt.Errorf("the Statement or SecretRef must be provided to create system account: %s", account.Name)
+		}
+	}
+	return nil
+}
+
 func (r *ComponentDefinitionReconciler) validateConnectionCredentials(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
+	if !checkUniqueItem(cmpd.Spec.ConnectionCredentials, "Name") {
+		return fmt.Errorf("duplicate connection credential names are not allowed")
+	}
 	for _, cc := range cmpd.Spec.ConnectionCredentials {
 		if err := r.validateConnectionCredential(cli, rctx, cmpd, cc); err != nil {
 			return err
@@ -285,41 +341,17 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd
 		return fmt.Errorf("there is no account defined for connection credential: %s", cc.Name)
 	}
 	for _, account := range cmpd.Spec.SystemAccounts {
-		if string(account.Name) == cc.AccountName {
+		if account.Name == cc.AccountName {
 			return nil
 		}
 	}
 	return fmt.Errorf("there is no matched account for connection credential: %s", cc.Name)
 }
 
-func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,
+func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	// TODO: how to check the acquired rules can be granted?
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if len(cmpd.Spec.SystemAccounts) != 0 && cmpd.Spec.LifecycleActions.AccountProvision == nil {
-		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
-	}
-
-	names, bootstraps := newLookupTable(), newLookupTable()
-	for _, account := range cmpd.Spec.SystemAccounts {
-		if len(account.Statement) == 0 && account.SecretRef == nil {
-			return fmt.Errorf("the Statement or SecretRef must be provided to create system account: %s", account.Name)
-		}
-		if ok := names.checkedInsert(account.Name); !ok {
-			return fmt.Errorf("there are multiple system accounts with the same name: %s", account.Name)
-		}
-		if ok := bootstraps.checkedInsert(account.IsSystemInitAccount); !ok {
-			return fmt.Errorf("there are multiple system init accounts")
-		}
+	if !checkUniqueItem(cmpd.Spec.Roles, "Name") {
+		return fmt.Errorf("duplicate replica roles are not allowed")
 	}
 	return nil
 }
@@ -334,16 +366,34 @@ func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Clien
 	return nil
 }
 
-type lookupTable map[interface{}]interface{}
-
-func newLookupTable() lookupTable {
-	return make(map[interface{}]interface{}, 0)
-}
-
-func (t *lookupTable) checkedInsert(key interface{}) bool {
-	if _, ok := (*t)[key]; ok {
-		return false
+func checkUniqueItem(slice any, fieldName string) bool {
+	sliceValue := reflect.ValueOf(slice)
+	if sliceValue.Kind() != reflect.Slice {
+		panic("Not a slice")
 	}
-	(*t)[key] = true
+
+	lookupTable := make(map[any]bool)
+	for i := 0; i < sliceValue.Len(); i++ {
+		item := sliceValue.Index(i)
+		if item.Kind() == reflect.Ptr {
+			item = item.Elem()
+		}
+		if item.Kind() != reflect.Struct {
+			panic("Items in the slice are not structs or pointers to structs")
+		}
+
+		field := item.FieldByNameFunc(func(name string) bool {
+			return strings.ToLower(name) == strings.ToLower(fieldName)
+		})
+		if !field.IsValid() {
+			panic(fmt.Sprintf("Field '%s' not found in struct", fieldName))
+		}
+		fieldValue := field.Interface()
+
+		if lookupTable[fieldValue] {
+			return false
+		}
+		lookupTable[fieldValue] = true
+	}
 	return true
 }

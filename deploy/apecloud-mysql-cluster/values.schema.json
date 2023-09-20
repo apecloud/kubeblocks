@@ -83,11 +83,7 @@
       "title": "mysql configuration",
       "description": "set mysql default configuration parameters.",
       "type": "object",
-      "required": [
-        "templateRef",
-        "namespace",
-        "policy"
-      ],
+      "required": [],
       "properties": {
         "templateRef": {
           "title": "reference config template",

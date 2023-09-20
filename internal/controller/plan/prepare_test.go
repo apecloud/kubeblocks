@@ -217,7 +217,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service, deployment and external service objects", func() {
+		It("should construct env", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,

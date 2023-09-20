@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"fmt"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
@@ -199,14 +200,20 @@ func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.Com
 			WorkloadType: compType,
 			Name:         string(compType),
 		}
-		if compType == appsv1alpha1.Consensus {
-			params.Component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
-				Leader: appsv1alpha1.ConsensusMember{
-					Name: "leader",
-				},
-				Followers: []appsv1alpha1.ConsensusMember{
+		if compType == appsv1alpha1.Consensus || compType == appsv1alpha1.Replication {
+			params.Component.RSMSpec = &appsv1alpha1.RSMSpec{
+				Roles: []workloads.ReplicaRole{
+					{
+						Name: "leader",
+						IsLeader: true,
+						AccessMode: workloads.ReadWriteMode,
+						CanVote: true,
+					},
 					{
 						Name: "follower",
+						IsLeader: false,
+						AccessMode: workloads.ReadonlyMode,
+						CanVote: true,
 					},
 				},
 			}

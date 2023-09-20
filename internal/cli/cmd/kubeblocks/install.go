@@ -513,7 +513,7 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.Timeout,
-		Atomic:          true,
+		Atomic:          false,
 	}
 }
 

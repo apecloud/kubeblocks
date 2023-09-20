@@ -64,25 +64,30 @@ type destroyOptions struct {
 	// uninstall KubeBlocks
 	autoApprove bool
 	purge       bool
-	timeout     time.Duration
+	// timeout represents the timeout for the destruction process.
+	timeout time.Duration
+	// apiTimeout represents the timeout for interactions with the K8s API server.
+	apiTimeout time.Duration
 }
 
 func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &destroyOptions{
-		IOStreams: streams,
+		IOStreams:  streams,
+		apiTimeout: 5 * time.Second,
 	}
 	cmd := &cobra.Command{
 		Use:     "destroy",
 		Short:   "Destroy the playground KubeBlocks and kubernetes cluster.",
 		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(cmd))
 			util.CheckErr(o.validate())
 			util.CheckErr(o.destroy())
 		},
 	}
 
 	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroying kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
-	cmd.Flags().DurationVar(&o.timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 300*time.Second, "Time to wait for destroy KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before destroying the playground")
 	return cmd
 }
@@ -222,12 +227,12 @@ func (o *destroyOptions) deleteClustersAndUninstallKB() error {
 // delete all clusters created by KubeBlocks
 func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 	var err error
-	ctx := context.Background()
-
+	ctx, cancel := context.WithTimeout(context.Background(), o.apiTimeout)
+	defer cancel()
 	// get all clusters in all namespaces
 	getClusters := func() (*unstructured.UnstructuredList, error) {
 		return dynamic.Resource(types.ClusterGVR()).Namespace(metav1.NamespaceAll).
-			List(context.Background(), metav1.ListOptions{})
+			List(ctx, metav1.ListOptions{})
 	}
 
 	// get all clusters and check if satisfy the checkFn
@@ -392,5 +397,13 @@ func (o *destroyOptions) removeStateFile() error {
 		return err
 	}
 	s.Success()
+	return nil
+}
+
+func (o *destroyOptions) complete(cmd *cobra.Command) error {
+	// enable log
+	if err := util.EnableLogToFile(cmd.Flags()); err != nil {
+		return fmt.Errorf("failed to enable the log file %s", err.Error())
+	}
 	return nil
 }

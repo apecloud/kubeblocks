@@ -46,7 +46,7 @@ Prometheus in KubeBlocks has already been configured with scraping jobs, so deve
 
 First, choose an Exporter. This tutorial is based on Oracle MySQL, so a MySQL Exporter is needed.
 
-### 1. Configure Exporter version
+### Configure Exporter version
 
 Modify ClusterVersion (`clusterversion.yaml`).
 
@@ -66,7 +66,7 @@ componentVersions:
 
 Specify the image of mysql-exporter as prom/mysqld-exporter with the version 0.14.0.
 
-### 2. Add an Exporter container
+### Add an Exporter container
 
 Modify `clusterdefinition.yaml` and configure mysql-exporter in Sidecar form.
 
@@ -104,7 +104,7 @@ As mentioned, this tutorial uses mysql exporter 0.14.0. In the latest mysql expo
 
 :::
 
-### 3. Configure monitor parameters
+### Configure monitor parameters
 
 Modify `clusterdefinition.yaml` and configure `monitor` parameters.
 
@@ -123,14 +123,14 @@ KubeBlocks supports multiple monitoring solutions. To use the open-source Promet
 
 ## Configure Grafana Dashboard
 
-### 1. Obtain Grafana Dashboard configurations
+### Obtain Grafana Dashboard configurations
 
 Grafana Dashboard can help users monitor, analyze, and understand data in real-time. For popular databases, various dashboard configuration files (in JSON format) can be easily found.
 
 - [Official Website of Grafana](https://grafana.com/grafana/dashboards).
 - [KubeBlocks Dashboard](https://github.com/apecloud/kubeblocks-mixin).
 
-### 2. Add to your cluster
+### Add to your cluster
 
 Import the downloaded JSON files on the Grafana Dashboard page or configure them in your cluster template.
 
@@ -161,7 +161,7 @@ tree oracle-mysql
 
 ## Monitor cluster data
 
-### 3.1 Prepare the environment and enable Prometheus monitoring components
+### Prepare the environment and enable Prometheus monitoring components
 
 Run `kbcli addon list` to check if the following add-ons are enabled (status: Enabled):
 
@@ -194,7 +194,7 @@ kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0
 kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
 ```
 
-### 3.2 Create a database cluster
+### Create a database cluster
 
 1. Install a cluster template.
 

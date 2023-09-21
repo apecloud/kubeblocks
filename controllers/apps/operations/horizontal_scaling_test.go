@@ -84,10 +84,10 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
 
-			By(fmt.Sprintf("create opsRequest for scaling down replicas of consensus component from 3 to %d", replicas))
+			By(fmt.Sprintf("create opsRequest for horizontal scaling of consensus component from 3 to %d", replicas))
 			initClusterAnnotationAndPhaseForOps(opsRes)
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, replicas)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp)
 
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)

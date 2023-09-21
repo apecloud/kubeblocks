@@ -43,14 +43,8 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 	switch params.WorkloadType() {
 	default:
 		return makeReturnedStatus(ESNotSupport), core.MakeError("not supported component workload type:[%s]", params.WorkloadType())
-	case appsv1alpha1.Consensus:
-		funcs = GetConsensusRollingUpgradeFuncs()
-		compLists = fromStatefulSetObjects(params.ComponentUnits)
-	case appsv1alpha1.Stateful:
-		funcs = GetStatefulSetRollingUpgradeFuncs()
-		compLists = fromStatefulSetObjects(params.ComponentUnits)
-	case appsv1alpha1.Replication:
-		funcs = GetReplicationRollingUpgradeFuncs()
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication, appsv1alpha1.Stateful:
+		funcs = GetRSMRollingUpgradeFuncs()
 		compLists = fromStatefulSetObjects(params.ComponentUnits)
 	case appsv1alpha1.Stateless:
 		funcs = GetDeploymentRollingUpgradeFuncs()
@@ -81,12 +75,12 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 		param.Ctx.Recorder.Eventf(obj,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureRestartFailed,
 			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), param.Cluster.Name, newVersion)
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	pods, err := funcs.GetPodsFunc(param)
 	if err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) != 0 {
 		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)

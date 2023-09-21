@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
 var (
@@ -72,6 +74,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for upgrading KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready. It will wait for a --timeout period")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before upgrading KubeBlocks")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -114,6 +117,28 @@ func (o *InstallOptions) Upgrade() error {
 
 	if err = o.checkVersion(v); err != nil {
 		return err
+	}
+
+	// double check for KubeBlocks upgrade
+	if !o.autoApprove {
+		oldVersion, err := version.NewVersion(kbVersion)
+		if err != nil {
+			return err
+		}
+		newVersion, err := version.NewVersion(o.Version)
+		if err != nil {
+			return err
+		}
+		upgradeWarn := ""
+		if oldVersion.GreaterThan(newVersion) {
+			upgradeWarn = printer.BoldYellow(fmt.Sprintf("Warning: You're attempting to downgrade KubeBlocks version from %s to %s, this action may cause your clusters and some KubeBlocks feature unavailable.\nEnsure you proceed after reviewing detailed release notes at https://github.com/apecloud/kubeblocks/releases.", kbVersion, o.Version))
+		} else {
+			upgradeWarn = fmt.Sprintf("Upgrade KubeBlocks from %s to %s", kbVersion, o.Version)
+		}
+
+		if err = prompt.Confirm(nil, o.In, upgradeWarn, "Please type 'Yes/yes' to confirm your operation:"); err != nil {
+			return err
+		}
 	}
 
 	// add helm repo

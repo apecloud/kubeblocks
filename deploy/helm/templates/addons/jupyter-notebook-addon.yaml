@@ -14,8 +14,14 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/jupyter-notebook-0.1.0.tgz
-    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/bytebase-0.1.0/bytebase-0.1.0.tgz
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "jupyter-notebook" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
+
   installable:
     autoInstall: false
 

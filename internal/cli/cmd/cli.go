@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/backup"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backuprepo"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
@@ -211,6 +212,7 @@ A Command Line Interface for KubeBlocks`,
 		report.NewReportCmd(f, ioStreams),
 		infras.NewInfraCmd(ioStreams),
 		backuprepo.NewBackupRepoCmd(f, ioStreams),
+		backup.NewBackupCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

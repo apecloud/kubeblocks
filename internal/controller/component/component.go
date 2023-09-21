@@ -40,9 +40,10 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, clsMgr, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, clsMgr, cluster, clusterDef, clusterCompDef, clusterCompSpec, serviceReferences, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
@@ -53,6 +54,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 	hasSimplifiedAPI := func() bool {
@@ -199,6 +201,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		StatefulSpec:          clusterCompDefObj.StatefulSpec,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
 		ReplicationSpec:       clusterCompDefObj.ReplicationSpec,
+		RSMSpec:               clusterCompDefObj.RSMSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
@@ -276,18 +279,17 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	// probe container requires a service account with adequate privileges.
-	// If probes are required and the serviceAccountName is not set,
+	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
+
+	// lorry container requires a service account with adequate privileges.
+	// If lorry required and the serviceAccountName is not set,
 	// a default serviceAccountName will be assigned.
 	if component.ServiceAccountName == "" && component.Probes != nil {
 		component.ServiceAccountName = "kb-" + component.ClusterName
 	}
-
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
-
-	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
-	if err = buildProbeContainers(reqCtx, component); err != nil {
+	if err = buildLorryContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
@@ -298,6 +300,11 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.Error(err, "failed to merge componentRef")
 		return nil, err
 	}
+
+	if serviceReferences != nil {
+		component.ServiceReferences = serviceReferences
+	}
+
 	return component, nil
 }
 
@@ -440,6 +447,10 @@ func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
 }
 
+func GenerateDefaultServiceDescriptorName(clusterName string) string {
+	return fmt.Sprintf("kbsd-%s", GenerateConnCredential(clusterName))
+}
+
 // overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
 func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
 	if switchoverSpec == nil || cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
@@ -512,4 +523,14 @@ func getCloudProvider() CloudProvider {
 		return CloudProviderTencent
 	}
 	return CloudProviderUnknown
+}
+
+func GetConfigSpecByName(component *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {
+	for i := range component.ConfigTemplates {
+		template := &component.ConfigTemplates[i]
+		if template.Name == configSpec {
+			return template
+		}
+	}
+	return nil
 }

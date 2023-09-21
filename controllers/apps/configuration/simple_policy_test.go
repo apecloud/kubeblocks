@@ -72,7 +72,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 			// mock client update caller
 			updateErr := core.MakeError("update failed!")
-			k8sMockClient.MockUpdateMethod(
+			k8sMockClient.MockPatchMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -94,7 +94,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(BeEquivalentTo(updateErr))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 
 			// first upgrade, not pod is ready
 			status, err = simplePolicy.Upgrade(mockParam)
@@ -134,7 +134,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 					}}}),
 			)
 
-			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
 					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 2)),
@@ -172,7 +172,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 					}}}))
 
 			updateErr := core.MakeError("update failed!")
-			k8sMockClient.MockUpdateMethod(
+			k8sMockClient.MockPatchMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -194,7 +194,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(BeEquivalentTo(updateErr))
-			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
 
 			// first upgrade, not pod is ready
 			status, err = simplePolicy.Upgrade(mockParam)

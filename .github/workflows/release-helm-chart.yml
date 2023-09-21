@@ -37,25 +37,25 @@ jobs:
 
   release-chart:
     needs: chart-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.25
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       DEP_CHART_DIR: "deploy/helm/depend-charts"
-      APECD_REF: "v0.1.12"
+      APECD_REF: "v0.1.25"
     secrets: inherit
 
   release-charts-image:
     needs: [ chart-version, release-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:
       MAKE_OPS_PRE: "helm-package VERSION=${{ needs.chart-version.outputs.chart-version-bump }}"
       IMG: "apecloud/kubeblocks-charts"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
       GO_VERSION: "1.20.5"
-      APECD_REF: "v0.1.12"
+      APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-charts"
     secrets: inherit
 

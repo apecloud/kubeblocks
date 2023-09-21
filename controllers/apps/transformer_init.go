@@ -36,19 +36,5 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	// put the cluster object first, it will be root vertex of DAG
 	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.cluster, ObjCopy: t.originCluster, Action: ictrltypes.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
-
-	// TODO: why set cluster status phase here?
-	if t.cluster.IsUpdating() {
-		t.handleClusterPhase()
-	}
 	return nil
-}
-
-func (t *initTransformer) handleClusterPhase() {
-	clusterPhase := t.cluster.Status.Phase
-	if clusterPhase == "" {
-		t.cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
-	} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
-		t.cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
-	}
 }

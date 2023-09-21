@@ -7,6 +7,6 @@ sidebar_position: 1
 
 # KubeBlocks for Redis
 
-* [Cluster Management](./cluster-management/)
-* [Configuration](./configuration/)
-* [High Availability](./high-availability/)
+* [Cluster Management](./cluster-management/create-and-connect-a-redis-cluster.md)
+* [Configuration](./configuration/configuration.md)
+* [High Availability](./high-availability/high-availability.md)

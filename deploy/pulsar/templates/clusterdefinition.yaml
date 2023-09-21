@@ -18,12 +18,11 @@ spec:
       characterType: pulsar-broker
       statefulSpec:
         updateStrategy: BestEffortParallel
-      componentDefRef:
-      - componentDefName: zookeeper
-        componentRefEnv:
-        - name: zookeeperSVC
-          valueFrom:
-            type: ServiceRef
+      serviceRefDeclarations:
+      - name: pulsarZookeeper
+        serviceRefDeclarationSpecs:
+          - serviceKind: zookeeper
+            serviceVersion: ^3.8.\d{1,2}$
       monitor:
         builtIn: false
         exporterConfig:
@@ -98,10 +97,6 @@ spec:
               value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
             - name: webServiceUrl
               value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:80
-            - name: zookeeperServers
-              value: $(zookeeperSVC):2181
-            - name: configurationStoreServers
-              value: $(zookeeperSVC):2181
             volumeMounts:
               - name: scripts
                 mountPath: /kb-scripts
@@ -169,10 +164,6 @@ spec:
               value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
             - name: webServiceUrl
               value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc{{ .Values.clusterDomain }}:80
-            - name: zookeeperServers
-              value: $(zookeeperSVC):2181
-            - name: configurationStoreServers
-              value: $(zookeeperSVC):2181
             ports:
               - name: pulsar
                 containerPort: 6650
@@ -427,6 +418,11 @@ spec:
       characterType: bookkeeper
       statefulSpec:
         updateStrategy: BestEffortParallel
+      serviceRefDeclarations:
+      - name: pulsarZookeeper
+        serviceRefDeclarationSpecs:
+        - serviceKind: zookeeper
+          serviceVersion: ^3.8.\d{1,2}$
       monitor:
         builtIn: false
         exporterConfig:

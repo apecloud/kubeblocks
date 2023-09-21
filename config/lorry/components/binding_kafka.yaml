@@ -1,0 +1,14 @@
+name: kafka
+spec:
+  version: v1
+  metadata:
+    - name: topics
+      value: "topic1,topic2"
+    - name: brokers
+      value: "localhost:9092,localhost:9093"
+    - name: publishTopic # Optional. Used for output bindings.
+      value: "topic3"
+    - name: authRequired # Required.
+      value: "false"
+    - name: initialOffset # Optional. Used for input bindings.
+      value: "newest"

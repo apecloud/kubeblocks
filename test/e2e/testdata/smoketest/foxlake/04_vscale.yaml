@@ -1,0 +1,17 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: foxlake-cluster-vscale-
+spec:
+  clusterRef: foxlake-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: foxlake-server
+      requests:
+        cpu: "1.5"
+        memory: 2.5Gi
+    - componentName: foxlake-metadb
+      requests:
+        cpu: "1.5"
+        memory: 2.5Gi
+

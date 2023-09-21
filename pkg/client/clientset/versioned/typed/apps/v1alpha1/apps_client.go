@@ -36,6 +36,7 @@ type AppsV1alpha1Interface interface {
 	ComponentResourceConstraintsGetter
 	ConfigConstraintsGetter
 	OpsRequestsGetter
+	ServiceDescriptorsGetter
 }
 
 // AppsV1alpha1Client is used to interact with features provided by the apps.kubeblocks.io group.
@@ -73,6 +74,10 @@ func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {
 
 func (c *AppsV1alpha1Client) OpsRequests(namespace string) OpsRequestInterface {
 	return newOpsRequests(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) ServiceDescriptors(namespace string) ServiceDescriptorInterface {
+	return newServiceDescriptors(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1alpha1Client for the given config.

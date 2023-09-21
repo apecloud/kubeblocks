@@ -39,7 +39,7 @@ func TestNewCUETplFromBytes(t *testing.T) {
 }
 
 func TestNewCUETpl(t *testing.T) {
-	NewCUETpl("")
+	NewCUETpl([]byte{})
 }
 
 type testCUEInput struct {
@@ -104,7 +104,7 @@ output: {
 	}}
 
 	for _, tc := range testCases {
-		cueTpl := NewCUETpl(tc.tpl)
+		cueTpl := NewCUETpl([]byte(tc.tpl))
 		cueValue := NewCUEBuilder(*cueTpl)
 
 		if err := cueValue.FillObj("input", tc.input); err != nil {
@@ -145,7 +145,7 @@ func TestCUEFillObj(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		cueTpl := NewCUETpl(tc.tpl)
+		cueTpl := NewCUETpl([]byte(tc.tpl))
 		cueValue := NewCUEBuilder(*cueTpl)
 
 		err := cueValue.FillObj("input", tc.input)
@@ -183,7 +183,7 @@ func TestCUEFill(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		cueTpl := NewCUETpl(tc.tpl)
+		cueTpl := NewCUETpl([]byte(tc.tpl))
 		cueValue := NewCUEBuilder(*cueTpl)
 
 		err := cueValue.Fill("input", []byte(tc.input))

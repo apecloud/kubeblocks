@@ -21,6 +21,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/StudioSol/set"
 	"github.com/go-logr/logr"
@@ -139,6 +140,11 @@ func FromConfigData(data map[string]string, cmKeys *set.LinkedHashSetString) *Co
 	}
 }
 
+// GenerateComponentConfigurationName generates configuration name for component
+func GenerateComponentConfigurationName(clusterName, componentName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, componentName)
+}
+
 // GenerateTPLUniqLabelKeyWithConfig generates uniq key for configuration template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
@@ -171,4 +177,13 @@ func getInstanceCfgCMName(objName, tplName string) string {
 // GetComponentCfgName is similar to getInstanceCfgCMName, while without statefulSet object.
 func GetComponentCfgName(clusterName, componentName, tplName string) string {
 	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
+}
+
+// GenerateEnvFromName generates env configmap name
+func GenerateEnvFromName(originName string) string {
+	return strings.Join([]string{originName, "envfrom"}, "-")
+}
+
+func GenerateRevisionPhaseKey(revision string) string {
+	return strings.Join([]string{constant.LastConfigurationRevisionPhase, revision}, "-")
 }

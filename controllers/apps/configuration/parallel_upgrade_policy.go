@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -38,19 +38,15 @@ func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatu
 	var funcs RollingUpgradeFuncs
 
 	switch params.WorkloadType() {
+	case appsv1alpha1.Consensus, appsv1alpha1.Stateful, appsv1alpha1.Replication:
+		funcs = GetRSMRollingUpgradeFuncs()
 	default:
 		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", params.WorkloadType())
-	case appsv1alpha1.Consensus:
-		funcs = GetConsensusRollingUpgradeFuncs()
-	case appsv1alpha1.Stateful:
-		funcs = GetStatefulSetRollingUpgradeFuncs()
-	case appsv1alpha1.Replication:
-		funcs = GetReplicationRollingUpgradeFuncs()
 	}
 
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
-		return makeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	return p.restartPods(params, pods, funcs)
@@ -69,10 +65,10 @@ func (p *parallelUpgradePolicy) restartPods(params reconfigureParams, pods []cor
 			continue
 		}
 		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
-			return makeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}
 	return makeReturnedStatus(ESNone), nil

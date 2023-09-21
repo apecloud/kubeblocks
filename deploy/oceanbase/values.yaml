@@ -1,0 +1,16 @@
+# Default values for oceanbase.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+images:
+  registry: oceanbasedev
+  pullPolicy: IfNotPresent
+  observer:
+    repository: oceanbase-chart
+    tag: 4.2.0.0-100010032023083021
+
+zoneCount: 3
+
+nameOverride: ""
+fullnameOverride: ""
+clusterVersionOverride: "4.2.0.0-100010032023083021"

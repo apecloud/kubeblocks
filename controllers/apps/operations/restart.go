@@ -21,6 +21,7 @@ package operations
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -29,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -42,7 +44,7 @@ func init() {
 		// if cluster is Abnormal or Failed, new opsRequest may repair it.
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		ToClusterPhase:                     appsv1alpha1.UpdatingClusterPhase,
 		OpsHandler:                         restartOpsHandler{},
 		ProcessingReasonInClusterCondition: ProcessingReasonRestarting,
 	}
@@ -62,10 +64,17 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
 	componentNameMap := opsRes.OpsRequest.Spec.GetRestartComponentNameSet()
-	if err := restartDeployment(reqCtx, cli, opsRes, componentNameMap); err != nil {
-		return err
+	componentKindList := []client.ObjectList{
+		&appv1.DeploymentList{},
+		&appv1.StatefulSetList{},
+		&workloads.ReplicatedStateMachineList{},
 	}
-	return restartStatefulSet(reqCtx, cli, opsRes, componentNameMap)
+	for _, objectList := range componentKindList {
+		if err := restartComponent(reqCtx, cli, opsRes, componentNameMap, objectList); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -81,45 +90,23 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 }
 
 // restartStatefulSet restarts statefulSet workload
-func restartStatefulSet(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentNameMap map[string]struct{}) error {
-	var (
-		statefulSetList = &appv1.StatefulSetList{}
-		err             error
-	)
-	if err = cli.List(reqCtx.Ctx, statefulSetList,
+func restartComponent(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentNameMap map[string]struct{}, objList client.ObjectList) error {
+	if err := cli.List(reqCtx.Ctx, objList,
 		client.InNamespace(opsRes.Cluster.Namespace),
 		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
 	}
 
-	for _, v := range statefulSetList.Items {
-		if isRestarted(opsRes, &v, componentNameMap, &v.Spec.Template) {
+	items := reflect.ValueOf(objList).Elem().FieldByName("Items")
+	l := items.Len()
+	for i := 0; i < l; i++ {
+		// get the underlying object
+		object := items.Index(i).Addr().Interface().(client.Object)
+		template := items.Index(i).FieldByName("Spec").FieldByName("Template").Addr().Interface().(*corev1.PodTemplateSpec)
+		if isRestarted(opsRes, object, componentNameMap, template) {
 			continue
 		}
-		if err = cli.Update(reqCtx.Ctx, &v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// restartDeployment restarts deployment workload
-func restartDeployment(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentNameMap map[string]struct{}) error {
-	var (
-		deploymentList = &appv1.DeploymentList{}
-		err            error
-	)
-	if err = cli.List(reqCtx.Ctx, deploymentList,
-		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
-		return err
-	}
-
-	for _, v := range deploymentList.Items {
-		if isRestarted(opsRes, &v, componentNameMap, &v.Spec.Template) {
-			continue
-		}
-		if err = cli.Update(reqCtx.Ctx, &v); err != nil {
+		if err := cli.Update(reqCtx.Ctx, object); err != nil {
 			return err
 		}
 	}

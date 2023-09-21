@@ -44,27 +44,9 @@ type RollingUpgradeFuncs struct {
 	RestartComponent     RestartComponent
 }
 
-func GetConsensusRollingUpgradeFuncs() RollingUpgradeFuncs {
+func GetRSMRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
-		GetPodsFunc:          getConsensusPods,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartStatefulComponent,
-	}
-}
-
-func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
-	return RollingUpgradeFuncs{
-		GetPodsFunc:          getStatefulSetPods,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartStatefulComponent,
-	}
-}
-
-func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
-	return RollingUpgradeFuncs{
-		GetPodsFunc:          getReplicationSetPods,
+		GetPodsFunc:          getRSMPods,
 		RestartContainerFunc: commonStopContainerWithPod,
 		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 		RestartComponent:     restartStatefulComponent,

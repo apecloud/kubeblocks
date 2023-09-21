@@ -84,6 +84,9 @@ func (builder *BaseBuilder[T, PT, B]) AddAnnotations(keysAndValues ...string) *B
 	return builder.concreteBuilder
 }
 func (builder *BaseBuilder[T, PT, B]) AddAnnotationsInMap(annotations map[string]string) *B {
+	if len(annotations) == 0 {
+		return builder.concreteBuilder
+	}
 	a := builder.object.GetAnnotations()
 	if a == nil {
 		a = make(map[string]string, 0)

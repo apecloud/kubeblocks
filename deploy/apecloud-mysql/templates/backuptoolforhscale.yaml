@@ -13,6 +13,8 @@ spec:
       value: {{ .Values.mysqlConfigs.dataDir }}
     - name: LOG_BIN
       value: {{ .Values.mysqlConfigs.logBin }}
+    - name: DATA_MOUNT_DIR
+      value: {{ .Values.mysqlConfigs.dataMountPath }}
   physical:
     restoreCommands:
       - sh
@@ -20,14 +22,15 @@ spec:
       - |
         set -e;
         mkdir -p ${DATA_DIR}
-        mkdir -p /tmp/data/ && cd /tmp/data
+        TMP_DIR=${DATA_MOUNT_DIR}/temp
+        mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
         xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
-        xtrabackup --decompress  --target-dir=/tmp/data/
-        xtrabackup --prepare --target-dir=/tmp/data/
+        xtrabackup --decompress  --target-dir=${TMP_DIR}
+        xtrabackup --prepare --target-dir=${TMP_DIR}
         find . -name "*.qp"|xargs rm -f
-        xtrabackup --move-back --target-dir=/tmp/data/ --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
+        xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
         touch ${DATA_DIR}/.xtrabackup_restore
-        rm -rf /tmp/data/
+        rm -rf ${TMP_DIR}
         chmod -R 0777 ${DATA_DIR}
     incrementalRestoreCommands: []
   logical:

@@ -25,11 +25,23 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
+## [backup](kbcli_backup.md)
+
+Backup command.
+
+* [kbcli backup create](kbcli_backup_create.md)	 - Create a backup for the cluster.
+* [kbcli backup delete](kbcli_backup_delete.md)	 - Delete a backup.
+* [kbcli backup describe](kbcli_backup_describe.md)	 - Describe a backup
+* [kbcli backup list](kbcli_backup_list.md)	 - List backups.
+
+
 ## [backuprepo](kbcli_backuprepo.md)
 
 BackupRepo command.
 
 * [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
+* [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backuprepo.
+* [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List BackupRepo.
 
 
 ## [bench](kbcli_bench.md)
@@ -101,6 +113,7 @@ Cluster command.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
 * [kbcli cluster promote](kbcli_cluster_promote.md)	 - Promote a non-primary or non-leader instance as the new primary or leader of the cluster
+* [kbcli cluster register](kbcli_cluster_register.md)	 - Pull the cluster chart to the local cache and register the type to 'create' sub-command
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
 * [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from account

@@ -117,7 +117,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager dataprotection kbcli probe reloader ## Make all cmd binaries.
+all: manager dataprotection kbcli lorry reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -302,7 +302,7 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.postgresql-cluster \
 	build-single-kbcli-embed-chart.kafka-cluster \
 	build-single-kbcli-embed-chart.mongodb-cluster \
-	build-single-kbcli-embed-chart.neon-cluster
+#	build-single-kbcli-embed-chart.neon-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
 #	build-single-kbcli-embed-chart.milvus-cluster \
@@ -320,9 +320,9 @@ clean-kbcli: ## Clean bin/kbcli*.
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
-.PHONY: sqlctl-doc
-sqlctl-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/sqlctl/main.go ./docs/user_docs/sqlctl
+.PHONY: lorryctl-doc
+lorryctl-doc: generate test-go-generate ## generate CLI command reference manual.
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/lorryctl/main.go ./docs/user_docs/lorryctl
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
@@ -615,15 +615,62 @@ else ifeq ($(TEST_TYPE), mongodb)
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
 	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
+else ifeq ($(TEST_TYPE), nebula)
+	$(HELM) dependency build deploy/nebula-cluster --skip-refresh
+	$(HELM) upgrade --install nebula deploy/nebula
+	$(HELM) template nebula-cluster deploy/nebula-cluster > test/e2e/testdata/smoketest/nebula/00_nebulacluster.yaml
+else ifeq ($(TEST_TYPE), greptimedb)
+	$(HELM) dependency build deploy/greptimedb-cluster --skip-refresh
+	$(HELM) upgrade --install greptimedb deploy/greptimedb
+	$(HELM) template greptimedb-cluster deploy/greptimedb-cluster > test/e2e/testdata/smoketest/greptimedb/00_greptimedbcluster.yaml
+else ifeq ($(TEST_TYPE), starrocks)
+	$(HELM) dependency build deploy/starrocks-cluster --skip-refresh
+	$(HELM) upgrade --install starrocks deploy/starrocks
+	$(HELM) template starrocks-cluster deploy/starrocks-cluster > test/e2e/testdata/smoketest/starrocks/00_starrocksbcluster.yaml
+else ifeq ($(TEST_TYPE), risingwave)
+	$(HELM) dependency build deploy/risingwave-cluster --skip-refresh
+	$(HELM) upgrade --install etcd deploy/etcd
+	$(HELM) upgrade --install risingwave deploy/risingwave
+	$(HELM) template risingwave-cluster deploy/risingwave-cluster > test/e2e/testdata/smoketest/risingwave/00_risingwavecluster.yaml
+else ifeq ($(TEST_TYPE), etcd)
+	$(HELM) dependency build deploy/etcd-cluster --skip-refresh
+	$(HELM) upgrade --install etcd deploy/etcd
+	$(HELM) template etcd-cluster deploy/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
+else ifeq ($(TEST_TYPE), oracle)
+	$(HELM) dependency build deploy/oracle-mysql-cluster --skip-refresh
+	$(HELM) upgrade --install oracle deploy/oracle-mysql
+	$(HELM) template oracle-cluster deploy/oracle-mysql-cluster > test/e2e/testdata/smoketest/oracle/00_oraclecluster.yaml
 else ifeq ($(TEST_TYPE), kafka)
 	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+	$(HELM) upgrade --install kafka deploy/kafka
+	$(HELM) template kafka-cluster deploy/kafka-cluster > test/e2e/testdata/smoketest/kafka/00_kafkacluster.yaml
+else ifeq ($(TEST_TYPE), foxlake)
+	$(HELM) dependency build deploy/foxlake-cluster --skip-refresh
+	$(HELM) upgrade --install foxlake deploy/foxlake
+	$(HELM) template foxlake-cluster deploy/foxlake-cluster > test/e2e/testdata/smoketest/foxlake/00_foxlakecluster.yaml
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) dependency build deploy/oceanbase-cluster --skip-refresh
+	$(HELM) upgrade --install oceanbase deploy/oceanbase
+	$(HELM) template oceanbase-cluster deploy/oceanbase-cluster > test/e2e/testdata/smoketest/oceanbase/00_oceanbasecluster.yaml
+else ifeq ($(TEST_TYPE), official-postgresql)
+	$(HELM) dependency build deploy/official-postgresql-cluster --skip-refresh
+	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
+	$(HELM) template official-pg deploy/official-postgresql-cluster > test/e2e/testdata/smoketest/official-postgresql/00_official_pgcluster.yaml
+else ifeq ($(TEST_TYPE), openldap)
+	$(HELM) dependency build deploy/openldap-cluster --skip-refresh
+	$(HELM) upgrade --install openldap deploy/openldap
+	$(HELM) template openldap-cluster deploy/openldap-cluster > test/e2e/testdata/smoketest/openldap/00_openldapcluster.yaml
+else ifeq ($(TEST_TYPE), orioledb)
+	$(HELM) dependency build deploy/orioledb-cluster --skip-refresh
+	$(HELM) upgrade --install orioledb deploy/orioledb
+	$(HELM) template oriole-cluster deploy/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
 else
 	$(error "test type does not exist")
 endif
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV
@@ -637,6 +684,29 @@ else ifeq ($(TEST_TYPE), redis)
 	$(HELM) upgrade --install redis deploy/redis
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) upgrade --install pulsar deploy/pulsar
+else ifeq ($(TEST_TYPE), nebula)
+	$(HELM) upgrade --install nebula deploy/nebula
+else ifeq ($(TEST_TYPE), greptimedb)
+	$(HELM) upgrade --install greptimedb deploy/greptimedb
+else ifeq ($(TEST_TYPE), starrocks)
+	$(HELM) upgrade --install starrocks deploy/starrocks
+else ifeq ($(TEST_TYPE), risingwave)
+	$(HELM) upgrade --install etcd deploy/etcd
+	$(HELM) upgrade --install risingwave deploy/risingwave
+else ifeq ($(TEST_TYPE), etcd)
+	$(HELM) upgrade --install etcd deploy/etcd
+else ifeq ($(TEST_TYPE), oracle)
+	$(HELM) upgrade --install oracle-mysql deploy/oracle-mysql
+else ifeq ($(TEST_TYPE), kafka)
+	$(HELM) upgrade --install kafka deploy/kafka
+else ifeq ($(TEST_TYPE), foxlake)
+	$(HELM) upgrade --install foxlake deploy/foxlake
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) upgrade --install oceanbase deploy/oceanbase
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
+else ifeq ($(TEST_TYPE), openldap)
+	$(HELM) upgrade --install openldap deploy/openldap
 else
 	$(error "test type does not exist")
 endif

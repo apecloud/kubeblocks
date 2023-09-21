@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: official-pg-stop-
+spec:
+  clusterRef: official-pg
+  ttlSecondsAfterSucceed: 27017
+  type: Stop
+  restart:
+    - componentName: postgresql

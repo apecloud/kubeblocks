@@ -8,7 +8,7 @@ image:
 # bitnami/elasticsearch
 # docker pull bitnami/elasticsearch  
   registry: docker.io
-  repository: bitnami/elasticsearch
+  repository: apecloud/elasticsearch
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""

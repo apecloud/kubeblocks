@@ -1,0 +1,8 @@
+name: mysql
+spec:
+  version: v1
+  metadata:
+    - name: url # Required, define DB connection in DSN format
+      value: "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
+    - name: maxOpenConns
+      value: "5"

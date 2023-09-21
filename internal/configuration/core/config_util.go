@@ -21,7 +21,9 @@ package core
 
 import (
 	"context"
+	"regexp"
 
+	"github.com/spf13/cast"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -32,6 +34,18 @@ import (
 type ParamPairs struct {
 	Key           string
 	UpdatedParams map[string]interface{}
+}
+
+const pattern = `^[a-z0-9A-Z]([a-zA-Z0-9\.\-\_]*[a-zA-Z0-9])?$`
+
+var regxPattern = regexp.MustCompile(pattern)
+
+func FromValueToString(val interface{}) string {
+	str := cast.ToString(val)
+	if regxPattern.MatchString(str) {
+		return str
+	}
+	return ""
 }
 
 // MergeUpdatedConfig replaces the file content of the changed key.

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "openldap-cluster.fullname" . }}-test-connection"
+  labels:
+    {{- include "openldap-cluster.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: test-openldap-cluster
+      image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+      command:
+        - "ldapsearch"
+      args:
+        - "-x"
+        - "-H"
+        - "ldap://openldap-cluster-openldap-0.openldap-cluster-openldap-headless.default.svc.cluster.local"
+        - "-b"
+        - "dc=kubeblocks,dc=io"
+        - "-D"
+        - "cn=admin,dc=kubeblocks,dc=io"
+        - "-w"
+        - "admin"
+  restartPolicy: Never

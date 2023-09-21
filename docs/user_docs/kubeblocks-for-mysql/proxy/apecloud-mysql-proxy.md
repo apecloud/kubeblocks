@@ -26,7 +26,7 @@ import TabItem from '@theme/TabItem';
    ```
 
    Or if you already have a Kubernetes cluster, you can choose install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm) or [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-3. Prepare an ApeCloud MySQL Raft Group named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
+3. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
 
 ## Create a Proxy Cluster
 
@@ -82,7 +82,7 @@ kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none -
 
 :::note
 
-If you only have one node for deploying a Raft Group, set the `availability-policy` as `none` when creating a Raft Group.
+If you only have one node for deploying a RaftGroup, set the `availability-policy` as `none` when creating a RaftGroup.
 
 ```bash
 helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none

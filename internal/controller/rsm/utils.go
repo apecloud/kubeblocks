@@ -35,12 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
@@ -65,10 +63,10 @@ const (
 
 var podNameRegex = regexp.MustCompile(`(.*)-([0-9]+)$`)
 
-// sortPods sorts pods by their role priority
+// SortPods sorts pods by their role priority
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
-func sortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
+func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	getRoleFunc := func(i int) string {
 		return getRoleName(pods[i])
 	}
@@ -90,11 +88,12 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 	sortMembers(membersStatus, rolePriorityMap, getRoleFunc, getOrdinalFunc, true)
 }
 
-func sortMembers[T any](membersStatus []T,
+// sortMembers sorts items by role priority and pod ordinal.
+func sortMembers[T any](items []T,
 	rolePriorityMap map[string]int,
 	getRoleFunc getRole, getOrdinalFunc getOrdinal,
 	reverse bool) {
-	sort.SliceStable(membersStatus, func(i, j int) bool {
+	sort.SliceStable(items, func(i, j int) bool {
 		if reverse {
 			i, j = j, i
 		}
@@ -109,11 +108,11 @@ func sortMembers[T any](membersStatus []T,
 	})
 }
 
-// composeRolePriorityMap generates a priority map based on roles.
-func composeRolePriorityMap(rsm workloads.ReplicatedStateMachine) map[string]int {
+// ComposeRolePriorityMap generates a priority map based on roles.
+func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
-	for _, role := range rsm.Spec.Roles {
+	for _, role := range roles {
 		roleName := strings.ToLower(role.Name)
 		switch {
 		case role.IsLeader:
@@ -136,10 +135,8 @@ func composeRolePriorityMap(rsm workloads.ReplicatedStateMachine) map[string]int
 }
 
 // updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
-	rsm workloads.ReplicatedStateMachine,
-	pod *corev1.Pod, roleName string) error {
+func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
+	rsm workloads.ReplicatedStateMachine, pod *corev1.Pod, roleName string, version string) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(rsm)
 	// role not defined in CR, ignore it
@@ -156,6 +153,11 @@ func updatePodRoleLabel(cli client.Client,
 		delete(pod.Labels, roleLabelKey)
 		delete(pod.Labels, rsmAccessModeLabelKey)
 	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
 	return cli.Patch(ctx, pod, patch)
 }
 
@@ -165,10 +167,6 @@ func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.R
 		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap
-}
-
-func SetMembersStatusForTest(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
-	setMembersStatus(rsm, pods)
 }
 
 func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
@@ -191,33 +189,13 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
 
-	// members(pods) being scheduled should be kept
-	oldMemberMap := make(map[string]*workloads.MemberStatus, len(rsm.Status.MembersStatus))
-	for i, status := range rsm.Status.MembersStatus {
-		oldMemberMap[status.PodName] = &rsm.Status.MembersStatus[i]
-	}
-	newMemberMap := make(map[string]*workloads.MemberStatus, len(newMembersStatus))
-	for i, status := range newMembersStatus {
-		newMemberMap[status.PodName] = &newMembersStatus[i]
-	}
-	oldMemberSet := sets.KeySet(oldMemberMap)
-	newMemberSet := sets.KeySet(newMemberMap)
-	memberToKeepSet := oldMemberSet.Difference(newMemberSet)
-	// TODO(free6om): handle stale role in memberToKeepSet
-	for podName := range memberToKeepSet {
-		ordinal, _ := getPodOrdinal(podName)
-		// members have left because of scale-in
-		if ordinal >= int(*rsm.Spec.Replicas) {
-			continue
-		}
-		newMembersStatus = append(newMembersStatus, *oldMemberMap[podName])
-	}
-
-	rolePriorityMap := composeRolePriorityMap(*rsm)
+	// sort and set
+	rolePriorityMap := ComposeRolePriorityMap(rsm.Spec.Roles)
 	sortMembersStatus(newMembersStatus, rolePriorityMap)
 	rsm.Status.MembersStatus = newMembersStatus
 }
 
+// getRoleName gets role name of pod 'pod'
 func getRoleName(pod corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
@@ -247,9 +225,13 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 		client.MatchingLabels(selector)); err != nil {
 		return nil, err
 	}
+	isMemberOf := func(stsName string, pod *corev1.Pod) bool {
+		parent, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+		return parent == stsName
+	}
 	var pods []corev1.Pod
 	for _, pod := range podList.Items {
-		if components.IsMemberOf(stsObj, &pod) {
+		if isMemberOf(stsObj.Name, &pod) {
 			pods = append(pods, pod)
 		}
 	}
@@ -544,14 +526,16 @@ func getLabels(rsm *workloads.ReplicatedStateMachine) map[string]string {
 }
 
 func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[string]string {
-	var leader *workloads.ReplicaRole
-	for _, role := range rsm.Spec.Roles {
-		if role.IsLeader && len(role.Name) > 0 {
-			leader = &role
-			break
+	selectors := make(map[string]string, 0)
+
+	if !headless {
+		for _, role := range rsm.Spec.Roles {
+			if role.IsLeader && len(role.Name) > 0 {
+				selectors[constant.RoleLabelKey] = role.Name
+				break
+			}
 		}
 	}
-	selectors := make(map[string]string, 0)
 
 	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 		keys := []string{
@@ -564,17 +548,11 @@ func getSvcSelector(rsm *workloads.ReplicatedStateMachine, headless bool) map[st
 				selectors[key] = value
 			}
 		}
-		if leader != nil && !headless {
-			selectors[constant.RoleLabelKey] = leader.Name
-		}
 		return selectors
 	}
 
 	for k, v := range rsm.Spec.Selector.MatchLabels {
 		selectors[k] = v
-	}
-	if leader != nil && !headless {
-		selectors[rsmAccessModeLabelKey] = string(leader.AccessMode)
 	}
 	return selectors
 }
@@ -647,4 +625,102 @@ func CopyOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer s
 		}
 	}
 	return nil
+}
+
+// IsRSMReady gives rsm level 'ready' state:
+// 1. all replicas exist
+// 2. all members have role set
+func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
+	if rsm == nil {
+		return false
+	}
+	// check whether the rsm cluster has been initialized
+	if rsm.Status.ReadyInitReplicas != rsm.Status.InitReplicas {
+		return false
+	}
+	// check whether latest spec has been sent to the underlying workload(sts)
+	if rsm.Status.ObservedGeneration != rsm.Generation ||
+		rsm.Status.CurrentGeneration != rsm.Generation {
+		return false
+	}
+	// check whether the underlying workload(sts) is ready
+	if rsm.Spec.Replicas == nil {
+		return false
+	}
+	replicas := *rsm.Spec.Replicas
+	if rsm.Status.Replicas != replicas ||
+		rsm.Status.ReadyReplicas != replicas ||
+		rsm.Status.AvailableReplicas != replicas ||
+		rsm.Status.UpdatedReplicas != replicas {
+		return false
+	}
+	// check whether role probe has done
+	if rsm.Spec.Roles == nil || rsm.Spec.RoleProbe == nil {
+		return true
+	}
+	membersStatus := rsm.Status.MembersStatus
+	if len(membersStatus) != int(*rsm.Spec.Replicas) {
+		return false
+	}
+	for i := 0; i < int(*rsm.Spec.Replicas); i++ {
+		podName := getPodName(rsm.Name, i)
+		if !isMemberReady(podName, membersStatus) {
+			return false
+		}
+	}
+	hasLeader := false
+	for _, status := range membersStatus {
+		if status.IsLeader {
+			hasLeader = true
+			break
+		}
+	}
+	return hasLeader
+}
+
+func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool {
+	for _, memberStatus := range membersStatus {
+		if memberStatus.PodName == podName {
+			return true
+		}
+	}
+	return false
+}
+
+// AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.
+func AddAnnotationScope(scope AnnotationScope, annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+	scopedAnnotations := make(map[string]string, len(annotations))
+	for k, v := range annotations {
+		scopedAnnotations[fmt.Sprintf("%s%s", k, scope)] = v
+	}
+	return scopedAnnotations
+}
+
+// ParseAnnotationsOfScope parses all annotations with AnnotationScope defined by 'scope'.
+// the AnnotationScope suffix of keys in result map will be trimmed.
+func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string]string) map[string]string {
+	if scopedAnnotations == nil {
+		return nil
+	}
+
+	annotations := make(map[string]string, 0)
+	if scope == RootScope {
+		for k, v := range scopedAnnotations {
+			if strings.HasSuffix(k, scopeSuffix) {
+				continue
+			}
+			annotations[k] = v
+		}
+		return annotations
+	}
+
+	for k, v := range scopedAnnotations {
+		if strings.HasSuffix(k, string(scope)) {
+			annotations[strings.TrimSuffix(k, string(scope))] = v
+		}
+	}
+	return annotations
 }

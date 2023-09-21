@@ -33,9 +33,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
+	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -62,10 +62,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		cluster.UID = types.UID("test-uid")
 	}
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(cluster, component)
-		if err != nil {
-			return err
-		}
+		envConfig := factory.BuildEnvConfig(cluster, component)
 		resources = append(resources, envConfig)
 
 		workload, err := customSetup(envConfig)
@@ -77,12 +74,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			// workload object should be appended last
 			resources = append(resources, workload)
 		}()
-
-		svc, err := builder.BuildHeadlessSvc(cluster, component)
-		if err != nil {
-			return err
-		}
-		resources = append(resources, svc)
 
 		var podSpec *corev1.PodSpec
 		sts, ok := workload.(*appsv1.StatefulSet)
@@ -122,66 +113,41 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		return RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
+		return RenderConfigNScriptFiles(
+			&intctrlutil.ResourceCtx{
+				Context:       reqCtx.Ctx,
+				Client:        cli,
+				Namespace:     cluster.GetNamespace(),
+				ClusterName:   cluster.GetNamespace(),
+				ComponentName: component.Name,
+			},
+			clusterVer, cluster, component, workload, podSpec, nil)
 	}
 
 	// TODO: may add a PDB transform to Create/Update/Delete.
 	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
 	if component.MinAvailable != nil {
-		pdb, err := builder.BuildPDB(cluster, component)
-		if err != nil {
-			return nil, err
-		}
+		pdb := factory.BuildPDB(cluster, component)
 		resources = append(resources, pdb)
 	} else {
 		panic("this shouldn't happen")
-	}
-
-	svcList, err := builder.BuildSvcListWithCustomAttributes(cluster, component, func(svc *corev1.Service) {
-		switch component.WorkloadType {
-		case appsv1alpha1.Consensus:
-			addLeaderSelectorLabels(svc, component)
-		case appsv1alpha1.Replication:
-			svc.Spec.Selector[constant.RoleLabelKey] = "primary"
-		}
-	})
-	if err != nil {
-		return nil, err
-	}
-	for _, svc := range svcList {
-		resources = append(resources, svc)
 	}
 
 	// REVIEW/TODO:
 	// - need higher level abstraction handling
 	// - or move this module to part operator controller handling
 	switch component.WorkloadType {
-	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, cluster, component, "")
-			}); err != nil {
-			return nil, err
-		}
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildSts(reqCtx, cluster, component, envConfig.Name)
+				return factory.BuildSts(reqCtx, cluster, component, envConfig.Name)
 			}); err != nil {
 			return nil, err
 		}
 	}
 
 	return resources, nil
-}
-
-// TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
-	leader := component.ConsensusSpec.Leader
-	if len(leader.Name) > 0 {
-		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
-	}
 }
 
 var _ = Describe("Cluster Controller", func() {
@@ -242,7 +208,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service, deployment and external service objects", func() {
+		It("should construct pdb", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -254,6 +220,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -262,10 +229,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
-				"ConfigMap",
-				"Service",
-				"Deployment",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
@@ -303,6 +266,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0],
 			)
 			Expect(err).Should(Succeed())
@@ -312,9 +276,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -366,6 +328,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -374,9 +337,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -384,7 +345,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
-					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], generateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
+					Expect(configuration.CheckEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
 				}
 			}
 		})
@@ -427,6 +388,7 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
@@ -435,9 +397,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -446,7 +406,7 @@ var _ = Describe("Cluster Controller", func() {
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
 					podSpec := sts.Spec.Template.Spec
-					Expect(len(podSpec.Containers)).Should(Equal(4))
+					Expect(len(podSpec.Containers)).Should(Equal(3))
 				}
 			}
 			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec
@@ -493,15 +453,14 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
 			Expect(err).Should(Succeed())
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
 				"ConfigMap",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -537,7 +496,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service, statefuset object, besides an external service object", func() {
+		It("should construct env, statefuset object", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -549,20 +508,17 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				&cluster.Spec.ComponentSpecs[0],
+				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 
 			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
 			Expect(err).Should(Succeed())
 
-			// REVIEW: (free6om)
-			//  missing connection credential, TLS secret objs check?
-			Expect(resources).Should(HaveLen(5))
+			Expect(resources).Should(HaveLen(3))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("PodDisruptionBudget"))
-			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))
-			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("StatefulSet"))
+			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("ConfigMap"))
+			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
 		})
 	})
 

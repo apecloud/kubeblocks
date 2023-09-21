@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,7 +36,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -298,21 +296,13 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-				var sts appsv1.StatefulSet
-				if controllerutil.IsRSMEnabled() {
-					rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-					sts = *components.ConvertRSMToSTS(&rsmList.Items[0])
-				} else {
-					stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-					sts = stsList.Items[0]
-				}
+
+				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				sts := *components.ConvertRSMToSTS(&rsmList.Items[0])
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
 				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
 				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
-				Eventually(testapps.GetAndChangeObj(&testCtx, cmKey, func(cm *corev1.ConfigMap) {
-					cm.Annotations[constant.CMInsEnableRerenderTemplateKey] = "true"
-				})).Should(Succeed())
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}
 					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
@@ -334,6 +324,13 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
 				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+				conf := &appsv1alpha1.Configuration{}
+				confKey := client.ObjectKey{Namespace: sts.Namespace, Name: cfgcore.GenerateComponentConfigurationName(clusterObj.Name, clusterObj.Spec.ComponentSpecs[0].Name)}
+				Expect(k8sClient.Get(ctx, confKey, conf)).Should(Succeed())
+				patch2 := client.MergeFrom(conf.DeepCopy())
+				conf.Spec.ConfigItemDetails[0].Version = "v1"
+				Expect(k8sClient.Patch(ctx, conf, patch2)).Should(Succeed())
 				Eventually(hasTLSSettings).Should(BeTrue())
 
 				By("update tls to disabled")
@@ -341,6 +338,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = false
 				clusterObj.Spec.ComponentSpecs[0].Issuer = nil
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+				Expect(k8sClient.Get(ctx, confKey, conf)).Should(Succeed())
+				patch2 = client.MergeFrom(conf.DeepCopy())
+				conf.Spec.ConfigItemDetails[0].Version = "v2"
+				Expect(k8sClient.Patch(ctx, conf, patch2)).Should(Succeed())
+
 				Eventually(hasTLSSettings).Should(BeFalse())
 			})
 		})

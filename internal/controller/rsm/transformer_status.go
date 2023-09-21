@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	"strconv"
+
 	apps "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -48,10 +50,6 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 	case model.IsObjectUpdating(rsmOrig):
 		// use rsm's generation instead of sts's
 		rsm.Status.ObservedGeneration = rsm.Generation
-		// hack for sts initialization error: is invalid: status.replicas: Required value
-		if rsm.Status.Replicas == 0 {
-			rsm.Status.Replicas = *rsm.Spec.Replicas
-		}
 	case model.IsObjectStatusUpdating(rsmOrig):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}
@@ -62,6 +60,11 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		generation := rsm.Status.ObservedGeneration
 		rsm.Status.StatefulSetStatus = sts.Status
 		rsm.Status.ObservedGeneration = generation
+		currentGeneration, err := strconv.ParseInt(sts.Labels[rsmGenerationLabelKey], 10, 64)
+		if err != nil {
+			return err
+		}
+		rsm.Status.CurrentGeneration = currentGeneration
 		// read all pods belong to the sts, hence belong to the rsm
 		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 		if err != nil {

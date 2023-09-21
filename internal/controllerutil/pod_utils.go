@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -86,7 +87,7 @@ func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.Co
 // GetPodContainerWithVolumeMount searches for containers mounting the volume
 func GetPodContainerWithVolumeMount(podSpec *corev1.PodSpec, volumeName string) []*corev1.Container {
 	containers := podSpec.Containers
-	if len(containers) == 0 {
+	if len(containers) == 0 || volumeName == "" {
 		return nil
 	}
 	return getContainerWithVolumeMount(containers, volumeName)
@@ -112,10 +113,11 @@ func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Vo
 
 type containerNameFilter func(containerName string) bool
 
-func GetContainersByConfigmap(containers []corev1.Container, volumeName string, filters ...containerNameFilter) []string {
+func GetContainersByConfigmap(containers []corev1.Container, volumeName string, cmName string, filters ...containerNameFilter) []string {
 	containerFilter := func(c corev1.Container) bool {
 		for _, f := range filters {
-			if len(c.VolumeMounts) == 0 || f(c.Name) {
+			if (len(c.VolumeMounts) == 0 && len(c.EnvFrom) == 0) ||
+				f(c.Name) {
 				return true
 			}
 		}
@@ -130,9 +132,19 @@ func GetContainersByConfigmap(containers []corev1.Container, volumeName string, 
 		for _, vm := range c.VolumeMounts {
 			if vm.Name == volumeName {
 				tmpList = append(tmpList, c.Name)
+				goto breakHere
+			}
+		}
+		if cmName == "" {
+			continue
+		}
+		for _, source := range c.EnvFrom {
+			if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
+				tmpList = append(tmpList, c.Name)
 				break
 			}
 		}
+	breakHere:
 	}
 	return tmpList
 }
@@ -344,14 +356,30 @@ func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
 }
 
-// GetProbeContainerName gets the probe container from pod
-func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+// GuessLorryHTTPPort guesses lorry container and serving port.
+// TODO(xuriwuyun): should provide a deterministic way to find the lorry serving port.
+func GuessLorryHTTPPort(pod *corev1.Pod) (int32, error) {
+	lorryImage := viper.GetString(constant.KBToolsImage)
 	for _, container := range pod.Spec.Containers {
-		if container.Name == constant.RoleProbeContainerName {
-			return constant.RoleProbeContainerName, nil
+		if container.Image != lorryImage {
+			continue
+		}
+		if len(container.Ports) > 0 {
+			return container.Ports[0].ContainerPort, nil
 		}
 	}
-	return "", fmt.Errorf("container %s not found", constant.RoleProbeContainerName)
+	return 0, fmt.Errorf("lorry port not found")
+}
+
+// GetProbeContainerName gets the probe container from pod
+func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+	lorryImage := viper.GetString(constant.KBToolsImage)
+	for _, container := range pod.Spec.Containers {
+		if container.Image == lorryImage {
+			return container.Name, nil
+		}
+	}
+	return "", fmt.Errorf("container %s not found", lorryImage)
 
 }
 

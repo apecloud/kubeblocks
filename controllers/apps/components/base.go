@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -605,7 +605,7 @@ func ownedKinds() []client.ObjectList {
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{}, // TODO(merge): remove it?
 		&policyv1.PodDisruptionBudgetList{},
-		&dataprotectionv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupPolicyList{},
 	}
 }
 

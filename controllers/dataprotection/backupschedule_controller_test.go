@@ -66,8 +66,6 @@ var _ = Describe("Backup Schedule Controller", func() {
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 	}
 
-	//var clusterInfo *testdp.BackupClusterInfo
-
 	BeforeEach(func() {
 		cleanEnv()
 		_ = testdp.NewFakeCluster(&testCtx)

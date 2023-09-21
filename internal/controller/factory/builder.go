@@ -43,7 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -51,6 +51,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 const (
@@ -960,17 +961,17 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
-	backupType string) *dataprotectionv1alpha1.Backup {
+	backupMethod string) *dpv1alpha1.Backup {
 	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
-		AddLabels(dptypes.BackupTypeLabelKeyKey, backupType).
+		AddLabels(dptypes.DataProtectionLabelBackupMethodKey, backupMethod).
+		AddLabels(dptypes.DataProtectionLabelBackupPolicyKey, backupPolicyName).
 		AddLabels(constant.KBManagedByKey, "cluster").
-		AddLabels("backuppolicies.dataprotection.kubeblocks.io/name", backupPolicyName).
 		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 		AddLabels(constant.KBAppComponentLabelKey, component.Name).
 		SetBackupPolicyName(backupPolicyName).
-		SetBackType(dataprotectionv1alpha1.BackupType(backupType)).
+		SetBackupMethod(backupMethod).
 		GetObject()
 }
 

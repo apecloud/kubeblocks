@@ -23,19 +23,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 type MockBackupRepoFactory struct {
-	BaseFactory[dataprotectionv1alpha1.BackupRepo, *dataprotectionv1alpha1.BackupRepo, MockBackupRepoFactory]
+	BaseFactory[dpv1alpha1.BackupRepo, *dpv1alpha1.BackupRepo, MockBackupRepoFactory]
 }
 
 func NewBackupRepoFactory(namespace, name string) *MockBackupRepoFactory {
 	f := &MockBackupRepoFactory{}
 	f.Init(namespace, name,
-		&dataprotectionv1alpha1.BackupRepo{
-			Spec: dataprotectionv1alpha1.BackupRepoSpec{
+		&dpv1alpha1.BackupRepo{
+			Spec: dpv1alpha1.BackupRepoSpec{
 				VolumeCapacity:  resource.MustParse("100Gi"),
 				PVReclaimPolicy: "Retain",
 			},

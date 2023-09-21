@@ -47,7 +47,7 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/exp/slices"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -346,12 +346,12 @@ func (o *createOptions) createCredentialSecret() (*corev1.Secret, error) {
 }
 
 func (o *createOptions) buildBackupRepoObject(secret *corev1.Secret) (*unstructured.Unstructured, error) {
-	backupRepo := &dataprotectionv1alpha1.BackupRepo{
+	backupRepo := &dpv1alpha1.BackupRepo{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       "BackupRepo",
 		},
-		Spec: dataprotectionv1alpha1.BackupRepoSpec{
+		Spec: dpv1alpha1.BackupRepoSpec{
 			StorageProviderRef: o.storageProvider,
 			PVReclaimPolicy:    corev1.PersistentVolumeReclaimPolicy(o.pvReclaimPolicy),
 			VolumeCapacity:     resource.MustParse(o.volumeCapacity),

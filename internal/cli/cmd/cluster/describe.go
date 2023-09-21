@@ -237,54 +237,54 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
 			continue
 		}
-		//ttlString := printer.NoneString
-		//backupSchedule := printer.NoneString
-		//backupType := printer.NoneString
-		//scheduleEnable := "Disabled"
-		//if policy.Spec.SchedulePolicy.Snapshot != nil {
-		//	if policy.Spec.SchedulePolicy.Snapshot.Enable {
-		//		scheduleEnable = "Enabled"
-		//		backupSchedule = policy.Spec.SchedulePolicy.Snapshot.CronExpression
-		//		backupType = string(dpv1alpha1.BackupTypeSnapshot)
+		//	ttlString := printer.NoneString
+		//	backupSchedule := printer.NoneString
+		//	backupType := printer.NoneString
+		//	scheduleEnable := "Disabled"
+		//	if policy.Spec.SchedulePolicy.Snapshot != nil {
+		//		if policy.Spec.SchedulePolicy.Snapshot.Enable {
+		//			scheduleEnable = "Enabled"
+		//			backupSchedule = policy.Spec.SchedulePolicy.Snapshot.CronExpression
+		//			backupType = string(dpv1alpha1.BackupTypeSnapshot)
+		//		}
 		//	}
-		//}
-		//if policy.Spec.SchedulePolicy.Datafile != nil {
-		//	if policy.Spec.SchedulePolicy.Datafile.Enable {
-		//		scheduleEnable = "Enabled"
-		//		backupSchedule = policy.Spec.SchedulePolicy.Datafile.CronExpression
-		//		backupType = string(dpv1alpha1.BackupTypeDataFile)
+		//	if policy.Spec.SchedulePolicy.Datafile != nil {
+		//		if policy.Spec.SchedulePolicy.Datafile.Enable {
+		//			scheduleEnable = "Enabled"
+		//			backupSchedule = policy.Spec.SchedulePolicy.Datafile.CronExpression
+		//			backupType = string(dpv1alpha1.BackupTypeDataFile)
+		//		}
 		//	}
-		//}
-		//if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
-		//	ttlString = *policy.Spec.Retention.TTL
-		//}
-		//lastScheduleTime := printer.NoneString
-		//if policy.Status.LastScheduleTime != nil {
-		//	lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
-		//}
-		//tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
+		//	if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
+		//		ttlString = *policy.Spec.Retention.TTL
+		//	}
+		//	lastScheduleTime := printer.NoneString
+		//	if policy.Status.LastScheduleTime != nil {
+		//		lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
+		//	}
+		//	tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
 	}
 	tbl.Print()
 }
 
-// getBackupRecoverableTime returns the recoverable time range string
-//func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
-//recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
-//var result string
-//for _, i := range recoverabelTime {
-//	result = addTimeRange(result, i.StartTime, i.StopTime)
-//}
-//if result == "" {
-//	return printer.NoneString
-//}
-//return result
-//}
-
-//func addTimeRange(result string, start, end *metav1.Time) string {
-//	if result != "" {
-//		result += ", "
+//	 getBackupRecoverableTime returns the recoverable time range string
+//	func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
+//	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
+//	var result string
+//	for _, i := range recoverabelTime {
+//		result = addTimeRange(result, i.StartTime, i.StopTime)
 //	}
-//	result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
-//		util.TimeFormatWithDuration(end, time.Second))
+//	if result == "" {
+//		return printer.NoneString
+//	}
 //	return result
-//}
+//	}
+
+//	func addTimeRange(result string, start, end *metav1.Time) string {
+//		if result != "" {
+//			result += ", "
+//		}
+//		result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
+//			util.TimeFormatWithDuration(end, time.Second))
+//		return result
+//	}

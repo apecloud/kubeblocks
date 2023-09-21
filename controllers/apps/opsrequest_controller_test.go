@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -523,9 +523,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock backup status is ready, component phase should change to Updating when component is horizontally scaling.")
 			backupKey := client.ObjectKey{Name: fmt.Sprintf("%s-%s-scaling",
 				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
-			backup := &dataprotectionv1alpha1.Backup{}
+			backup := &dpv1alpha1.Backup{}
 			Expect(k8sClient.Get(testCtx.Ctx, backupKey, backup)).Should(Succeed())
-			backup.Status.Phase = dataprotectionv1alpha1.BackupPhaseCompleted
+			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 			Expect(k8sClient.Status().Update(testCtx.Ctx, backup)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase))

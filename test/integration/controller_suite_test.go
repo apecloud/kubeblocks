@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	dpctrl "github.com/apecloud/kubeblocks/controllers/dataprotection"
@@ -256,7 +256,7 @@ var _ = BeforeSuite(func() {
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = dataprotectionv1alpha1.AddToScheme(scheme.Scheme)
+	err = dpv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = snapshotv1.AddToScheme(scheme.Scheme)
@@ -350,19 +350,19 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	//err = (&dpctrl.RestoreJobReconciler{
+	// err = (&dpctrl.RestoreJobReconciler{
 	//	Client:   k8sManager.GetClient(),
 	//	Scheme:   k8sManager.GetScheme(),
 	//	Recorder: k8sManager.GetEventRecorderFor("restore-job-controller"),
-	//}).SetupWithManager(k8sManager)
-	//Expect(err).ToNot(HaveOccurred())
+	// }).SetupWithManager(k8sManager)
+	// Expect(err).ToNot(HaveOccurred())
 
-	err = (&dpctrl.CronJobReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cronjob-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
+	// err = (&dpctrl.CronJobReconciler{
+	// 	Client:   k8sManager.GetClient(),
+	// 	Scheme:   k8sManager.GetScheme(),
+	// 	Recorder: k8sManager.GetEventRecorderFor("cronjob-controller"),
+	// }).SetupWithManager(k8sManager)
+	// Expect(err).ToNot(HaveOccurred())
 
 	// pulling docker images is slow
 	viper.SetDefault("EventuallyTimeout", time.Second*300)

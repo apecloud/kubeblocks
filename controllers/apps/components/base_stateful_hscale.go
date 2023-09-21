@@ -627,36 +627,36 @@ func (d *backupDataClone) checkBackupStatus() (backupStatus, error) {
 
 func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object, error) {
 	objs := make([]client.Object, 0)
-	//backup := dataprotectionv1alpha1.Backup{}
-	//if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
+	// backup := dataprotectionv1alpha1.Backup{}
+	// if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
 	//	return nil, err
-	//}
-	//pvc := factory.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
-	//objs = append(objs, pvc)
-	//backupTool := &dataprotectionv1alpha1.BackupTool{}
-	//if err := d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+	// }
+	// pvc := factory.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
+	// objs = append(objs, pvc)
+	// backupTool := &dataprotectionv1alpha1.BackupTool{}
+	// if err := d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backup.Status.BackupToolName}, backupTool); err != nil {
 	//	return nil, err
-	//}
-	//restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
-	//restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, backupTool, []string{pvc.Name}, d.getBackupMatchingLabels())
-	//if err != nil {
+	// }
+	// restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
+	// restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, backupTool, []string{pvc.Name}, d.getBackupMatchingLabels())
+	// if err != nil {
 	//	return nil, err
-	//}
-	//objs = append(objs, restoreJobs...)
+	// }
+	// objs = append(objs, restoreJobs...)
 	return objs, nil
 }
 
 func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backupStatus, error) {
 	job := v1.Job{}
-	//restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
-	//jobName := restoreMgr.GetDatafileRestoreJobName(pvcKey.Name)
-	//if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: pvcKey.Namespace, Name: jobName}, &job); err != nil {
+	// restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
+	// jobName := restoreMgr.GetDatafileRestoreJobName(pvcKey.Name)
+	// if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: pvcKey.Namespace, Name: jobName}, &job); err != nil {
 	//	if errors.IsNotFound(err) {
 	//		return backupStatusNotCreated, nil
 	//	} else {
 	//		return backupStatusNotCreated, err
 	//	}
-	//}
+	// }
 	if job.Status.Succeeded == 1 {
 		return backupStatusReadyToUse, nil
 	}

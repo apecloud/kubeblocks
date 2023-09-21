@@ -22,7 +22,6 @@ package helm
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"

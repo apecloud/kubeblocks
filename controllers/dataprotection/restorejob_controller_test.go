@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 //
-//import (
+// import (
 //	. "github.com/onsi/ginkgo/v2"
 //	. "github.com/onsi/gomega"
 //
@@ -37,7 +37,7 @@ package dataprotection
 //	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 //)
 //
-//var _ = Describe("RestoreJob Controller", func() {
+// var _ = Describe("RestoreJob Controller", func() {
 //	const (
 //		clusterName = "mycluster"
 //		compName    = "cluster"
@@ -198,4 +198,4 @@ package dataprotection
 //		})
 //	})
 //
-//})
+// })

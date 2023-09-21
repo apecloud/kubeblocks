@@ -292,7 +292,7 @@ var _ = Describe("DataProtection", func() {
 		cmdRestore.Run(nil, []string{newClusterName + "-with-nil-affinity"})
 	})
 
-	//It("restore-to-time", func() {
+	// It("restore-to-time", func() {
 	//	timestamp := time.Now().Format("20060102150405")
 	//	backupName := "backup-test-" + timestamp
 	//	backupName1 := backupName + "1"
@@ -362,7 +362,7 @@ var _ = Describe("DataProtection", func() {
 	//	o.SourceCluster = clusterName
 	//	Expect(o.Complete()).Should(Succeed())
 	//	Expect(o.validateRestoreTime().Error()).Should(ContainSubstring("restore-to-time is out of time range"))
-	//})
+	// })
 
 	It("describe-backup", func() {
 		cmd := NewDescribeBackupCmd(tf, streams)

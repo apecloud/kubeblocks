@@ -38,12 +38,7 @@ func (builder *BackupBuilder) SetBackupPolicyName(policyName string) *BackupBuil
 	return builder
 }
 
-func (builder *BackupBuilder) SetBackType(backupType dataprotection.BackupType) *BackupBuilder {
-	builder.get().Spec.BackupType = backupType
-	return builder
-}
-
-func (builder *BackupBuilder) SetParentBackupName(parent string) *BackupBuilder {
-	builder.get().Spec.ParentBackupName = parent
+func (builder *BackupBuilder) SetBackupMethod(method string) *BackupBuilder {
+	builder.get().Spec.BackupMethod = method
 	return builder
 }

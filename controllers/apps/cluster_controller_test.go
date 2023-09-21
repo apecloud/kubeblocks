@@ -2319,7 +2319,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Creating cluster with backup", func() {
-			//var (
+			// var (
 			//	boolTrue  = true
 			//	boolFalse = false
 			//	int64Ptr  = func(in int64) *int64 {
@@ -2328,12 +2328,12 @@ var _ = Describe("Cluster Controller", func() {
 			//	retention = func(s string) dpv1alpha1.RetentionPeriod {
 			//		return dpv1alpha1.RetentionPeriod(s)
 			//	}
-			//)
+			// )
 			//
-			//var testCases = []struct {
+			// var testCases = []struct {
 			//	desc   string
 			//	backup *appsv1alpha1.ClusterBackup
-			//}{
+			// }{
 			//	{
 			//		desc: "backup with snapshot method",
 			//		backup: &appsv1alpha1.ClusterBackup{
@@ -2374,9 +2374,9 @@ var _ = Describe("Cluster Controller", func() {
 			//		desc:   "backup is nil",
 			//		backup: nil,
 			//	},
-			//}
+			// }
 			//
-			//for _, t := range testCases {
+			// for _, t := range testCases {
 			//	By(t.desc)
 			//	backup := t.backup
 			//	createClusterWithBackup(backup)
@@ -2421,7 +2421,7 @@ var _ = Describe("Cluster Controller", func() {
 			//				checkPolicyDisabled(g, policy)
 			//			}
 			//		})).Should(Succeed())
-			//}
+			// }
 		})
 	})
 
@@ -2581,60 +2581,60 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("test restore cluster from backup", func() {
-			//By("mock backuptool object")
-			//backupPolicyName := "test-backup-policy"
-			//backupName := "test-backup"
-			//backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+			// By("mock backuptool object")
+			// backupPolicyName := "test-backup-policy"
+			// backupName := "test-backup"
+			// backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 			//	&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 			//
-			//By("creating backup")
-			//backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+			// By("creating backup")
+			// backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			//	SetBackupPolicyName(backupPolicyName).
 			//	SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
 			//	Create(&testCtx).GetObject()
 			//
-			//By("mocking backup status completed, we don't need backup reconcile here")
-			//Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
+			// By("mocking backup status completed, we don't need backup reconcile here")
+			// Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
 			//	backup.Status.BackupToolName = backupTool.Name
 			//	backup.Status.PersistentVolumeClaimName = "backup-pvc"
 			//	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-			//})).Should(Succeed())
+			// })).Should(Succeed())
 			//
-			//By("checking backup status completed")
-			//Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
+			// By("checking backup status completed")
+			// Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
 			//	func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
 			//		g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
 			//	})).Should(Succeed())
 			//
-			//By("creating cluster with backup")
-			//restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
-			//pvcSpec := testapps.NewPVCSpec("1Gi")
-			//clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			// By("creating cluster with backup")
+			// restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
+			// pvcSpec := testapps.NewPVCSpec("1Gi")
+			// clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			//	clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			//	AddComponent(compName, compDefName).
 			//	SetReplicas(3).
 			//	AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			//	AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
-			//clusterKey = client.ObjectKeyFromObject(clusterObj)
+			// clusterKey = client.ObjectKeyFromObject(clusterObj)
 			//
-			//By("mocking restore job completed")
-			//patchK8sJobStatus := func(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
+			// By("mocking restore job completed")
+			// patchK8sJobStatus := func(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
 			//	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
 			//		jobCondition := batchv1.JobCondition{Type: jobStatus}
 			//		fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
 			//	})).Should(Succeed())
-			//}
-			//for i := 0; i < 3; i++ {
+			// }
+			// for i := 0; i < 3; i++ {
 			//	restoreJobKey := client.ObjectKey{
 			//		Name:      fmt.Sprintf("base-%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i),
 			//		Namespace: clusterKey.Namespace,
 			//	}
 			//	patchK8sJobStatus(restoreJobKey, batchv1.JobComplete)
-			//}
+			// }
 			//
-			//By("Waiting for the cluster controller to create resources completely")
-			//waitForCreatingResourceCompletely(clusterKey, compName)
-			//if intctrlutil.IsRSMEnabled() {
+			// By("Waiting for the cluster controller to create resources completely")
+			// waitForCreatingResourceCompletely(clusterKey, compName)
+			// if intctrlutil.IsRSMEnabled() {
 			//	rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 			//	rsm := rsmList.Items[0]
 			//	sts := components.ConvertRSMToSTS(&rsm)
@@ -2650,7 +2650,7 @@ var _ = Describe("Cluster Controller", func() {
 			//		g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			//	})).Should(Succeed())
 			//
-			//} else {
+			// } else {
 			//	stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			//	sts := stsList.Items[0]
 			//	By("mock pod/sts are available and wait for component enter running phase")
@@ -2664,18 +2664,18 @@ var _ = Describe("Cluster Controller", func() {
 			//	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 			//		g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
 			//	})).Should(Succeed())
-			//}
+			// }
 			//
-			//By("clean up annotations after cluster running")
-			//Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
+			// By("clean up annotations after cluster running")
+			// Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
 			//	compStatus := tmpCluster.Status.Components[compName]
 			//	compStatus.Phase = appsv1alpha1.RunningClusterCompPhase
 			//	tmpCluster.Status.Components[compName] = compStatus
-			//})()).Should(Succeed())
-			//Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			// })()).Should(Succeed())
+			// Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 			//	g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			//	g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
-			//})).Should(Succeed())
+			// })).Should(Succeed())
 		})
 	})
 

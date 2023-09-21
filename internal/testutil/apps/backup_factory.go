@@ -40,28 +40,28 @@ func NewBackupFactory(namespace, name string) *MockBackupFactory {
 	return f
 }
 
-func (factory *MockBackupFactory) SetBackupPolicyName(backupPolicyName string) *MockBackupFactory {
-	factory.Get().Spec.BackupPolicyName = backupPolicyName
-	return factory
+func (f *MockBackupFactory) SetBackupPolicyName(backupPolicyName string) *MockBackupFactory {
+	f.Get().Spec.BackupPolicyName = backupPolicyName
+	return f
 }
 
-func (factory *MockBackupFactory) SetBackupMethod(backupMethod string) *MockBackupFactory {
-	factory.Get().Spec.BackupMethod = backupMethod
-	return factory
+func (f *MockBackupFactory) SetBackupMethod(backupMethod string) *MockBackupFactory {
+	f.Get().Spec.BackupMethod = backupMethod
+	return f
 }
 
-func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBackupFactory {
-	factory.Get().SetLabels(labels)
-	return factory
+func (f *MockBackupFactory) SetLabels(labels map[string]string) *MockBackupFactory {
+	f.Get().SetLabels(labels)
+	return f
 }
 
-func (factory *MockBackupFactory) SetBackupTimeRange(startTime, stopTime time.Time) *MockBackupFactory {
-	tr := factory.Get().Status.TimeRange
+func (f *MockBackupFactory) SetBackupTimeRange(startTime, stopTime time.Time) *MockBackupFactory {
+	tr := f.Get().Status.TimeRange
 	if tr == nil {
 		tr = &dpv1alpha1.BackupTimeRange{}
 	}
 	tr.Start = &metav1.Time{Time: startTime}
 	tr.End = &metav1.Time{Time: stopTime}
-	factory.Get().Status.TimeRange = tr
-	return factory
+	f.Get().Status.TimeRange = tr
+	return f
 }

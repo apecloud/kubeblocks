@@ -64,6 +64,8 @@ type ClusterSpec struct {
 	// +listMapKey=name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:XValidation:rule="self.all(x, x in oldSelf)",message="component can not be added dynamically"
+	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, x in self)",message="component can not be removed dynamically"
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// tenancy describes how pods are distributed across node.

@@ -65,16 +65,6 @@ type ConfigurationSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ComponentName string `json:"componentName"`
 
-	// clusterDefRef referencing ClusterDefinition name. This is an immutable attribute.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// ClusterDefRef string `json:"clusterDefRef"`
-
-	// clusterVerRef referencing ClusterVersion name.
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	// ClusterVersionRef string `json:"clusterVerRef,omitempty"`
-
 	// customConfigurationItems describes user-defined config template.
 	// +optional
 	// +patchMergeKey=name

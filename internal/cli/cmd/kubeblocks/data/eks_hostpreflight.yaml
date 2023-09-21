@@ -42,6 +42,6 @@ spec:
           - us-west-2
         outcomes:
           - warn:
-              message: k8s cluster region doesn't belong to amazon china/us, you may have some unexpected behavior
+              message: be aware of the network reachability for cluster regions that located at East-Asia
           - pass:
               message: k8s cluster region belongs to amazon china/us

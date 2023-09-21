@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -164,8 +162,6 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	for _, task := range tasks {
 		task.Status.UpdateRevision = revision
 		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
-			task.Status.Phase = appsv1alpha1.CMergeFailedPhase
-			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)
 			continue
 		}
@@ -194,22 +190,19 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
 	if item.ConfigSpec == nil {
-		ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", item), "")
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
 		return nil
 	}
-	for i := range status.ConfigurationItemStatus {
-		itemStatus := &status.ConfigurationItemStatus[i]
-		switch {
-		case itemStatus.Name != item.Name:
-		case isReconcileStatus(itemStatus.Phase):
-			return itemStatus
-		default:
-			ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", itemStatus), "")
-			return nil
-		}
+	itemStatus := status.GetItemStatus(item.Name)
+	if itemStatus == nil || itemStatus.Phase == "" {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating and pass: %v", item))
+		return nil
 	}
-	ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", item), "")
-	return nil
+	if !isReconcileStatus(itemStatus.Phase) {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating or deleting and pass: %v", itemStatus))
+		return nil
+	}
+	return itemStatus
 }
 
 func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {

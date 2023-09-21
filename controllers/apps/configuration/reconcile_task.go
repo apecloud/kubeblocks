@@ -26,6 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -95,8 +96,10 @@ func syncImpl(fetcher *Task,
 		Sync().
 		Complete()
 	if err != nil {
+		status.Message = cfgutil.ToPointer(err.Error())
 		status.Phase = appsv1alpha1.CMergeFailedPhase
 	} else {
+		status.Message = nil
 		status.Phase = appsv1alpha1.CMergedPhase
 	}
 	return

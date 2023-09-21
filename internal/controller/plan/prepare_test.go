@@ -33,7 +33,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
@@ -72,9 +71,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			// workload object should be appended last
 			resources = append(resources, workload)
 		}()
-
-		svc := factory.BuildHeadlessSvc(cluster, component)
-		resources = append(resources, svc)
 
 		var podSpec *corev1.PodSpec
 		sts, ok := workload.(*appsv1.StatefulSet)
@@ -135,31 +131,10 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		panic("this shouldn't happen")
 	}
 
-	svcList, err := factory.BuildSvcListWithCustomAttributes(cluster, component, func(svc *corev1.Service) {
-		switch component.WorkloadType {
-		case appsv1alpha1.Consensus:
-			addLeaderSelectorLabels(svc, component)
-		case appsv1alpha1.Replication:
-			svc.Spec.Selector[constant.RoleLabelKey] = "primary"
-		}
-	})
-	if err != nil {
-		return nil, err
-	}
-	for _, svc := range svcList {
-		resources = append(resources, svc)
-	}
-
 	// REVIEW/TODO:
 	// - need higher level abstraction handling
 	// - or move this module to part operator controller handling
 	switch component.WorkloadType {
-	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(func() (client.Object, error) {
-			return factory.BuildDeploy(cluster, component)
-		}); err != nil {
-			return nil, err
-		}
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		if err := workloadProcessor(func() (client.Object, error) {
 			return factory.BuildSts(cluster, component)
@@ -169,14 +144,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	}
 
 	return resources, nil
-}
-
-// TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
-	leader := component.ConsensusSpec.Leader
-	if len(leader.Name) > 0 {
-		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
-	}
 }
 
 var _ = Describe("Cluster Controller", func() {
@@ -237,7 +204,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct headless service, deployment and external service objects", func() {
+		It("should construct pdb", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -258,9 +225,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
-				"Service",
-				"Deployment",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
@@ -308,8 +272,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -370,8 +332,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -431,8 +391,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -495,8 +453,6 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(err).Should(Succeed())
 			expects := []string{
 				"PodDisruptionBudget",
-				"Service",
-				"Service",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -532,7 +488,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service, statefuset object, besides an external service object", func() {
+		It("should construct env, statefulSet object", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -551,13 +507,9 @@ var _ = Describe("Cluster Controller", func() {
 			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
 			Expect(err).Should(Succeed())
 
-			// REVIEW: (free6om)
-			//  missing connection credential, TLS secret objs check?
-			Expect(resources).Should(HaveLen(4))
+			Expect(resources).Should(HaveLen(2))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("PodDisruptionBudget"))
-			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("Service"))
-			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("StatefulSet"))
+			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("StatefulSet"))
 		})
 	})
 })

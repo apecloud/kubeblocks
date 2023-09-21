@@ -28,7 +28,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/asaskevich/govalidator"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 

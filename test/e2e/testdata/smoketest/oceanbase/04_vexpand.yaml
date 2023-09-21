@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: oceanbase-cluster-vexpand-
+spec:
+  clusterRef: oceanbase-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: ob-bundle
+      volumeClaimTemplates:
+        - name: data-file
+          storage: "51Gi"
+        - name:  data-log
+          storage: "51Gi"
+        - name: log
+          storage: "51Gi"

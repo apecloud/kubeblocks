@@ -94,8 +94,8 @@ func (p *realUpdatePlan) build() {
 		return
 	}
 
-	rolePriorityMap := composeRolePriorityMap(p.rsm)
-	sortPods(p.pods, rolePriorityMap, false)
+	rolePriorityMap := ComposeRolePriorityMap(p.rsm.Spec.Roles)
+	SortPods(p.pods, rolePriorityMap, false)
 
 	// generate plan by MemberUpdateStrategy
 	switch *p.rsm.Spec.MemberUpdateStrategy {

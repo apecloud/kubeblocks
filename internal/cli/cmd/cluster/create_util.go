@@ -141,6 +141,14 @@ func buildCreateSubCmdsExamples(t cluster.ClusterType) string {
 
 	# Create a cluster with the specified cpu, memory and storage
 	kbcli cluster create {{ .ClusterType }} --cpu 1 --memory 2 --storage 10
+
+	{{ if eq .ClusterType "mysql" -}}
+	# Create a cluster with smartengine
+	kbcli cluster create {{ .ClusterType }} --smart-engine-enabled
+
+	# Create a cluster with specified user customized config template
+	kbcli cluster create {{ .ClusterType }} --userConfigTemplate.templateRef=mysql8.0-config-template --userConfigTemplate.namespace=kb-system --userConfigTemplate.policy=none
+ 	{{- end }}
 `
 
 	var builder strings.Builder

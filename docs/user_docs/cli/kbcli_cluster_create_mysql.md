@@ -16,6 +16,12 @@ kbcli cluster create mysql NAME [flags]
   
   # Create a cluster with the specified cpu, memory and storage
   kbcli cluster create mysql --cpu 1 --memory 2 --storage 10
+  
+  # Create a cluster with smartengine
+  kbcli cluster create mysql --smart-engine-enabled
+  
+  # Create a cluster with specified user customized config template
+  kbcli cluster create mysql --userConfigTemplate.templateRef=mysql8.0-config-template --userConfigTemplate.namespace=kb-system --userConfigTemplate.policy=none
 ```
 
 ### Options

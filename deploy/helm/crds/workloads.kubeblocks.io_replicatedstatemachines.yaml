@@ -41,7 +41,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: ReplicatedStateMachine is the Schema for the replicatedstatemachines
-          API
+          API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -970,6 +970,15 @@ spec:
                       - command
                       type: object
                     type: array
+                  roleUpdateMechanism:
+                    default: None
+                    description: RoleUpdateMechanism specifies the way how pod role
+                      label being updated.
+                    enum:
+                    - ReadinessProbeEventUpdate
+                    - DirectAPIServerEventUpdate
+                    - None
+                    type: string
                   successThreshold:
                     default: 1
                     description: Minimum consecutive successes for the probe to be

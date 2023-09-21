@@ -64,6 +64,12 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              persistentVolumeClaimTemplate:
+                description: 'A Go template for rendering a PersistentVolumeClaim.
+                  The template will be rendered with the following variables: - Parameters:
+                  a map of parameters defined in the ParametersSchema. - GeneratedStorageClassName:
+                  the name of the storage class generated with the StorageClassTemplate.'
+                type: string
               storageClassTemplate:
                 description: 'A Go template for rendering a storage class which will
                   be used by the CSI driver. The template will be rendered with the

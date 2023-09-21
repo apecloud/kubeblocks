@@ -51,26 +51,34 @@ const (
 	// annotation keys
 	dataProtectionSecretTemplateMD5AnnotationKey = "dataprotection.kubeblocks.io/secret-template-md5"
 	dataProtectionTemplateValuesMD5AnnotationKey = "dataprotection.kubeblocks.io/template-values-md5"
+	dataProtectionPVCTemplateMD5MD5AnnotationKey = "dataprotection.kubeblocks.io/pvc-template-md5"
 )
 
 // condition constants
 const (
 	// condition types
 	ConditionTypeStorageProviderReady  = "StorageProviderReady"
+	ConditionTypeParametersChecked     = "ParametersChecked"
 	ConditionTypeStorageClassCreated   = "StorageClassCreated"
+	ConditionTypePVCTemplateChecked    = "PVCTemplateChecked"
 	ConditionTypeDerivedObjectsDeleted = "DerivedObjectsDeleted"
 
 	// condition reasons
-	ReasonStorageProviderReady    = "StorageProviderReady"
-	ReasonStorageProviderNotReady = "StorageProviderNotReady"
-	ReasonStorageProviderNotFound = "StorageProviderNotFound"
-	ReasonBadSecretTemplate       = "BadSecretTemplate"
-	ReasonBadStorageClassTemplate = "BadStorageClassTemplate"
-	ReasonStorageClassCreated     = "StorageClassCreated"
-	ReasonHaveAssociatedBackups   = "HaveAssociatedBackups"
-	ReasonHaveResidualPVCs        = "HaveResidualPVCs"
-	ReasonDerivedObjectsDeleted   = "DerivedObjectsDeleted"
-	ReasonUnknownError            = "UnknownError"
+	ReasonStorageProviderReady     = "StorageProviderReady"
+	ReasonStorageProviderNotReady  = "StorageProviderNotReady"
+	ReasonStorageProviderNotFound  = "StorageProviderNotFound"
+	ReasonInvalidStorageProvider   = "InvalidStorageProvider"
+	ReasonParametersChecked        = "ParametersChecked"
+	ReasonCredentialSecretNotFound = "CredentialSecretNotFound"
+	ReasonBadSecretTemplate        = "BadSecretTemplate"
+	ReasonBadStorageClassTemplate  = "BadStorageClassTemplate"
+	ReasonBadPVCTemplate           = "BadPVCTemplate"
+	ReasonStorageClassCreated      = "StorageClassCreated"
+	ReasonPVCTemplateChecked       = "PVCTemplateChecked"
+	ReasonHaveAssociatedBackups    = "HaveAssociatedBackups"
+	ReasonHaveResidualPVCs         = "HaveResidualPVCs"
+	ReasonDerivedObjectsDeleted    = "DerivedObjectsDeleted"
+	ReasonUnknownError             = "UnknownError"
 )
 
 var reconcileInterval = time.Second

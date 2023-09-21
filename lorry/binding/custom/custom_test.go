@@ -21,6 +21,7 @@ package custom
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/apecloud/kubeblocks/internal/common"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
@@ -75,7 +77,7 @@ func TestInit(t *testing.T) {
 	}
 }
 
-func TestGlobalInfo(t *testing.T) {
+func TestGlobalRoleSnapshot(t *testing.T) {
 	var lines []string
 	for i := 0; i < 3; i++ {
 		podName := "pod-" + strconv.Itoa(i)
@@ -100,7 +102,7 @@ func TestGlobalInfo(t *testing.T) {
 	}{
 		"get": {
 			input:     join,
-			operation: "getGlobalInfo",
+			operation: "getRole",
 			metadata:  nil,
 			path:      "/",
 			err:       "",
@@ -110,13 +112,14 @@ func TestGlobalInfo(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			response := binding.ProbeResponse{}
-			info, err := hs.GetGlobalInfo(context.TODO(), &binding.ProbeRequest{
+			info, err := hs.GetRole(context.TODO(), &binding.ProbeRequest{
 				Operation: OperationKind(tc.operation),
 			}, &response)
 			require.NoError(t, err)
-			assert.Equal(t, OperationSuccess, info.Event)
-			assert.Equal(t, 3, len(info.PodName2Role))
-			assert.Equal(t, 1, info.Term)
+			snapshot := &common.GlobalRoleSnapshot{}
+			assert.NoError(t, json.Unmarshal([]byte(info), snapshot))
+			assert.Equal(t, 3, len(snapshot.PodRoleNamePairs))
+			assert.Equal(t, "1", snapshot.Version)
 		})
 	}
 

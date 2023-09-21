@@ -42,8 +42,8 @@ package plan
 //	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 //	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 //	"github.com/apecloud/kubeblocks/internal/constant"
-//	"github.com/apecloud/kubeblocks/internal/controller/builder"
 //	"github.com/apecloud/kubeblocks/internal/controller/component"
+//	"github.com/apecloud/kubeblocks/internal/controller/factory"
 //	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 //)
 //
@@ -97,7 +97,7 @@ package plan
 //		return err
 //	}
 //	jobs := make([]client.Object, 0)
-//	if backupObj.Spec.BackupMethod == dpv1alpha1.BackupTypeDataFile {
+//	if backupObj.Spec.BackupType == dpv1alpha1.BackupTypeDataFile {
 //		restoreJobs, err := mgr.doFullBackupRestore(component, backupObj)
 //		if err != nil {
 //			return err
@@ -141,7 +141,7 @@ package plan
 //	}
 //
 //	jobs := make([]client.Object, 0)
-//	if baseBackup.Spec.BackupMethod == dpv1alpha1.BackupTypeDataFile {
+//	if baseBackup.Spec.BackupType == dpv1alpha1.BackupTypeDataFile {
 //		restoreJobs, err := pitrMgr.doFullBackupRestore(component, baseBackup)
 //		if err != nil {
 //			return err
@@ -241,7 +241,7 @@ package plan
 //
 //	backupItems = []dpv1alpha1.Backup{}
 //	for _, b := range backups.Items {
-//		if b.Status.Phase == dpv1alpha1.BackupPhaseCompleted && b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
+//		if b.Status.Phase == dpv1alpha1.BackupCompleted && b.Status.Manifests != nil && b.Status.Manifests.BackupLog != nil {
 //			backupItems = append(backupItems, b)
 //		}
 //	}
@@ -280,7 +280,7 @@ package plan
 //	// 2. gets the latest backup object
 //	var latestBackup *dpv1alpha1.Backup
 //	for _, item := range backups {
-//		if item.Spec.BackupMethod != dpv1alpha1.BackupTypeLogFile &&
+//		if item.Spec.BackupType != dpv1alpha1.BackupTypeLogFile &&
 //			item.Status.Manifests.BackupLog.StopTime != nil && !p.restoreTime.Before(item.Status.Manifests.BackupLog.StopTime) {
 //			latestBackup = &item
 //			break
@@ -513,16 +513,13 @@ package plan
 //	}
 //
 //	snapshotName := ""
-//	if backup != nil && backup.Spec.BackupMethod == dpv1alpha1.BackupTypeSnapshot {
+//	if backup != nil && backup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
 //		snapshotName = backup.Name
 //	}
 //	for i := int32(0); i < synthesizedComponent.Replicas; i++ {
 //		pvcName := fmt.Sprintf("%s-%s-%s-%d", vct.Name, p.Cluster.Name, synthesizedComponent.Name, i)
 //		pvcKey := types.NamespacedName{Namespace: p.Cluster.Namespace, Name: pvcName}
-//		pvc, err := builder.BuildPVC(p.Cluster, synthesizedComponent, &vct, pvcKey, snapshotName)
-//		if err != nil {
-//			return err
-//		}
+//		pvc := factory.BuildPVC(p.Cluster, synthesizedComponent, &vct, pvcKey, snapshotName)
 //		// Prevents halt recovery from checking uncleaned resources
 //		if pvc.Annotations == nil {
 //			pvc.Annotations = map[string]string{}
@@ -530,7 +527,7 @@ package plan
 //		pvc.Annotations[constant.LastAppliedClusterAnnotationKey] =
 //			fmt.Sprintf(`{"metadata":{"uid":"%s","name":"%s"}}`, p.Cluster.UID, p.Cluster.Name)
 //
-//		if err = p.Client.Create(p.Ctx, pvc); err != nil && !apierrors.IsAlreadyExists(err) {
+//		if err := p.Client.Create(p.Ctx, pvc); err != nil && !apierrors.IsAlreadyExists(err) {
 //			return err
 //		}
 //	}
@@ -560,7 +557,7 @@ package plan
 //
 //func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *component.SynthesizedComponent,
 //	backup *dpv1alpha1.Backup,
-//	actionSet *dpv1alpha1.ActionSet,
+//	backupTool *dpv1alpha1.BackupTool,
 //	pvcNames []string,
 //	labels map[string]string) (objs []client.Object, err error) {
 //
@@ -611,7 +608,7 @@ package plan
 //			}
 //		}
 //		timeFormat := p.getTimeFormat(backupTool.Spec.Env)
-//		stopTime := backup.Status.GetEndTime()
+//		stopTime := backup.Status.GetStopTime()
 //		if stopTime != nil {
 //			env = append(env, corev1.EnvVar{Name: constant.DPBackupStopTime, Value: stopTime.Format(timeFormat)})
 //		}
@@ -638,7 +635,7 @@ package plan
 //			}
 //		}
 //		jobName := p.GetDatafileRestoreJobName(pvcName)
-//		job, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
+//		job, err := factory.BuildRestoreJob(p.Cluster, synthesizedComponent, jobName, backupTool.Spec.Image,
 //			backupTool.Spec.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, env, backupTool.Spec.Resources)
 //		if err != nil {
 //			return nil, err
@@ -694,7 +691,7 @@ package plan
 //				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: logfilePVC.GetName()}}},
 //		}
 //		pitrJobName := p.buildRestoreJobName(fmt.Sprintf("pitr-phy-%s", dataPVC.GetName()))
-//		pitrJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, pitrJobName, image,
+//		pitrJob, err := factory.BuildRestoreJob(p.Cluster, synthesizedComponent, pitrJobName, image,
 //			recoveryInfo.Physical.GetPhysicalRestoreCommand(), volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
 //		if err != nil {
 //			return objs, err
@@ -745,8 +742,8 @@ package plan
 //			{Name: "backup-data", VolumeSource: corev1.VolumeSource{
 //				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: backup.Status.PersistentVolumeClaimName}}},
 //		}
-//		logicJobName := p.buildRestoreJobName(fmt.Sprintf("restore-%s-logic-%s", backup.Spec.BackupMethod, pod.Name))
-//		logicJob, err := builder.BuildRestoreJob(p.Cluster, synthesizedComponent, logicJobName, image,
+//		logicJobName := p.buildRestoreJobName(fmt.Sprintf("restore-%s-logic-%s", backup.Spec.BackupType, pod.Name))
+//		logicJob, err := factory.BuildRestoreJob(p.Cluster, synthesizedComponent, logicJobName, image,
 //			backupToolSpec.Logical.GetLogicalRestoreCommand(), volumes, volumeMounts, podENV, backupToolSpec.Resources)
 //		if err != nil {
 //			return objs, err

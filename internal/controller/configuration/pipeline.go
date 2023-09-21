@@ -78,12 +78,13 @@ func NewCreatePipeline(ctx ReconcileCtx) *pipeline {
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus) *updatePipeline {
+func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus, configSpec *appsv1alpha1.ComponentConfigSpec) *updatePipeline {
 	p := &updatePipeline{
 		reconcile:  true,
 		item:       item,
 		itemStatus: itemStatus,
 		ctx:        ctx,
+		configSpec: configSpec,
 	}
 	return p.Init(ctx.ResourceCtx, p)
 }
@@ -295,23 +296,14 @@ func (p *updatePipeline) ConfigSpec() *appsv1alpha1.ComponentConfigSpec {
 
 func (p *updatePipeline) InitConfigSpec() *updatePipeline {
 	return p.Wrap(func() (err error) {
-		p.configSpec, err = p.foundConfigSpec(p.item.Name)
+		if p.configSpec == nil {
+			p.configSpec = component.GetConfigSpecByName(p.ctx.Component, p.item.Name)
+			if p.configSpec == nil {
+				return core.MakeError("not found config spec: %s", p.item.Name)
+			}
+		}
 		return
 	})
-}
-
-func (p *updatePipeline) foundConfigSpec(configSpec string) (*appsv1alpha1.ComponentConfigSpec, error) {
-	var i int
-	templates := p.ctx.Component.ConfigTemplates
-	for i = 0; i < len(templates); i++ {
-		if templates[i].Name == configSpec {
-			break
-		}
-	}
-	if i >= len(templates) {
-		return nil, core.MakeError("not found config spec: %s", configSpec)
-	}
-	return &templates[i], nil
 }
 
 func (p *updatePipeline) RerenderTemplate() *updatePipeline {

@@ -10,8 +10,12 @@ spec:
     - componentDefRef: qdrant
       versionsContext:
         initContainers:
-        - name: qdrant-tools
-          image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.tools.repository }}:{{ default .Chart.AppVersion .Values.images.tools.tag }}
+          - name: qdrant-tools
+            image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.tools.repository }}:{{ .Values.images.tools.tag | default "latest" }}
         containers:
           - name: qdrant
-            image:  {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ default .Chart.AppVersion .Values.images.tag }}
+            image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ include "qdrant.version" . | default .Values.images.tag }}
+          - name: web-ui
+            image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.web_ui.repository}}:{{ .Values.images.web_ui.tag | default "latest" }}
+
+

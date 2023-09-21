@@ -28,10 +28,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -222,7 +222,7 @@ var _ = Describe("DataProtection", func() {
 		By("test list-backup cmd with no backup")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
 		o := ListBackupOptions{ListOptions: list.NewListOptions(tf, streams, types.BackupGVR())}
-		Expect(printBackupList(o)).Should(Succeed())
+		Expect(PrintBackupList(o)).Should(Succeed())
 		Expect(o.ErrOut.(*bytes.Buffer).String()).Should(ContainSubstring("No backups found"))
 
 		By("test list-backup")
@@ -234,14 +234,14 @@ var _ = Describe("DataProtection", func() {
 		backup2 := testing.FakeBackup("test1")
 		backup2.Namespace = "backup"
 		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1, backup2)
-		Expect(printBackupList(o)).Should(Succeed())
+		Expect(PrintBackupList(o)).Should(Succeed())
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql"))
 
 		By("test list all namespace")
 		o.Out.(*bytes.Buffer).Reset()
 		o.AllNamespaces = true
-		Expect(printBackupList(o)).Should(Succeed())
+		Expect(PrintBackupList(o)).Should(Succeed())
 		Expect(len(strings.Split(strings.Trim(o.Out.(*bytes.Buffer).String(), "\n"), "\n"))).Should(Equal(3))
 	})
 
@@ -369,13 +369,13 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		By("test describe-backup cmd with no backup")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
-		o := describeBackupOptions{
-			factory:   tf,
+		o := DescribeBackupOptions{
+			Factory:   tf,
 			IOStreams: streams,
-			gvr:       types.BackupGVR(),
+			Gvr:       types.BackupGVR(),
 		}
 		args := []string{}
-		Expect(o.complete(args)).Should(HaveOccurred())
+		Expect(o.Complete(args)).Should(HaveOccurred())
 
 		By("test describe-backup")
 		backupName := "test1"
@@ -388,9 +388,9 @@ var _ = Describe("DataProtection", func() {
 		backup1.Status.Expiration = &logNow
 		backup1.Status.Duration = &metav1.Duration{Duration: logNow.Sub(logNow.Time)}
 		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
-		Expect(o.complete(args)).Should(Succeed())
+		Expect(o.Complete(args)).Should(Succeed())
 		o.client = testing.FakeClientSet()
-		Expect(o.run()).Should(Succeed())
+		Expect(o.Run()).Should(Succeed())
 	})
 })
 

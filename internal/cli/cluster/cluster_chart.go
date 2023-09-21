@@ -220,6 +220,7 @@ func ValidateValues(c *ChartInfo, values map[string]interface{}) error {
 }
 
 func loadHelmChart(ci *ChartInfo, t ClusterType) error {
+	// cf references cluster config
 	cf, ok := ClusterTypeCharts[t]
 	if !ok {
 		return fmt.Errorf("failed to find the helm chart of %s", t)

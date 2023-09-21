@@ -753,7 +753,7 @@ func (c *rsmComponentBase) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cl
 	}
 	for _, pod := range pods {
 		subs := strings.Split(pod.Name, "-")
-		if ordinal, err := strconv.Atoi(subs[len(subs)-1]); err != nil {
+		if ordinal, err := strconv.ParseInt(subs[len(subs)-1], 10, 32); err != nil {
 			return err
 		} else if int32(ordinal) < c.Component.Replicas {
 			continue
@@ -765,6 +765,12 @@ func (c *rsmComponentBase) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cl
 			}
 			continue
 		}
+
+		if lorryCli == nil {
+			// no lorry in the pod
+			continue
+		}
+
 		if err2 := lorryCli.LeaveMember(reqCtx.Ctx); err2 != nil {
 			if err == nil {
 				err = err2

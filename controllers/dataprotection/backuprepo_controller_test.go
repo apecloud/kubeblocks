@@ -219,6 +219,13 @@ parameters:
 			return testapps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.Backup)
 		}
 
+		getBackupRepo := func(g Gomega, key types.NamespacedName) *dpv1alpha1.BackupRepo {
+			repo := &dpv1alpha1.BackupRepo{}
+			err := testCtx.Cli.Get(testCtx.Ctx, key, repo)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			return repo
+		}
+
 		deleteBackup := func(g Gomega, key types.NamespacedName) {
 			backupObj := &dpv1alpha1.Backup{}
 			err := testCtx.Cli.Get(testCtx.Ctx, key, backupObj)
@@ -426,6 +433,10 @@ parameters:
 			By("checking the repo object again, it should be failed")
 			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
+				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeParametersChecked)
+				g.Expect(cond).NotTo(BeNil())
+				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+				g.Expect(cond.Reason).Should(Equal(ReasonCredentialSecretNotFound))
 			})).Should(Succeed())
 		})
 
@@ -500,7 +511,7 @@ parameters:
 		createBackupAndCheckPVC := func(namespace string) (backup *dpv1alpha1.Backup, pvcName string) {
 			By("making sure the repo is ready")
 			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
-				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
+				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady), "%+v", repo)
 				g.Expect(repo.Status.BackupPVCName).ShouldNot(BeEmpty())
 				pvcName = repo.Status.BackupPVCName
 			})).Should(Succeed())
@@ -542,6 +553,107 @@ parameters:
 
 		It("should create a PVC in Backup's namespace (in namespace2)", func() {
 			createBackupAndCheckPVC(namespace2)
+		})
+
+		Context("storage provider with PersistentVolumeClaimTemplate", func() {
+			It("should create a PVC in Backup's namespace (in default namespace)", func() {
+				By("setting the PersistentVolumeClaimTemplate")
+				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+					provider.Spec.PersistentVolumeClaimTemplate = `
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    byPVCTemplate: "true"
+spec:
+  storageClassName: {{ .GeneratedStorageClassName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    volumeMode: Filesystem
+`
+				})).Should(Succeed())
+				_, pvcName := createBackupAndCheckPVC(testCtx.DefaultNamespace)
+
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: pvcName, Namespace: testCtx.DefaultNamespace},
+					func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+						repo := getBackupRepo(g, repoKey)
+						g.Expect(pvc.Spec.StorageClassName).ShouldNot(BeNil())
+						g.Expect(*pvc.Spec.StorageClassName).Should(Equal(repo.Status.GeneratedStorageClassName))
+						g.Expect(pvc.Spec.Resources.Requests.Storage()).ShouldNot(BeNil())
+						g.Expect(pvc.Spec.Resources.Requests.Storage().String()).Should(Equal(repo.Spec.VolumeCapacity.String()))
+						g.Expect(pvc.Spec.AccessModes).Should(Equal([]corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}))
+						g.Expect(pvc.Spec.VolumeMode).ShouldNot(BeNil())
+						g.Expect(*pvc.Spec.VolumeMode).Should(BeEquivalentTo(corev1.PersistentVolumeFilesystem))
+						g.Expect(pvc.Labels["byPVCTemplate"]).Should(Equal("true"))
+					})).Should(Succeed())
+			})
+
+			It("should fail if the PVC template is invalid", func() {
+				By("setting a invalid PersistentVolumeClaimTemplate")
+				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+					provider.Spec.PersistentVolumeClaimTemplate = `bad spec`
+				})).Should(Succeed())
+
+				By("checking repo's status")
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase, dpv1alpha1.BackupRepoFailed)
+					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypePVCTemplateChecked)
+					g.Expect(cond).NotTo(BeNil())
+					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadPVCTemplate))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("storage provider contains only PersistentVolumeClaimTemplate", func() {
+			BeforeEach(func() {
+				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+					provider.Spec.CSIDriverName = ""
+					provider.Spec.CSIDriverSecretTemplate = ""
+					provider.Spec.StorageClassTemplate = ""
+					provider.Spec.PersistentVolumeClaimTemplate = `
+spec:
+  storageClassName: some.storage.class
+  accessModes:
+    - ReadWriteOnce
+`
+				})
+				createBackupRepoSpec(nil)
+			})
+			It("should create the PVC based on the PersistentVolumeClaimTemplate", func() {
+				_, pvcName := createBackupAndCheckPVC(namespace2)
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: pvcName, Namespace: namespace2},
+					func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+						g.Expect(pvc.Spec.StorageClassName).ShouldNot(BeNil())
+						g.Expect(*pvc.Spec.StorageClassName).Should(Equal("some.storage.class"))
+						g.Expect(pvc.Spec.AccessModes).Should(Equal([]corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}))
+						g.Expect(pvc.Spec.VolumeMode).ShouldNot(BeNil())
+						g.Expect(*pvc.Spec.VolumeMode).Should(BeEquivalentTo(corev1.PersistentVolumeFilesystem))
+						g.Expect(pvc.Spec.Resources.Requests.Storage()).ShouldNot(BeNil())
+						g.Expect(pvc.Spec.Resources.Requests.Storage().String()).Should(Equal(repo.Spec.VolumeCapacity.String()))
+					})).Should(Succeed())
+			})
+		})
+
+		It("should fail if both StorageClassTemplate and PersistentVolumeClaimTemplate are empty", func() {
+			By("creating a storage provider with empty PersistentVolumeClaimTemplate and StorageClassTemplate")
+			createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+				provider.Spec.CSIDriverName = ""
+				provider.Spec.CSIDriverSecretTemplate = ""
+				provider.Spec.StorageClassTemplate = ""
+				provider.Spec.PersistentVolumeClaimTemplate = ""
+			})
+			By("creating a backup repo with the storage provider")
+			createBackupRepoSpec(nil)
+			By("checking repo's status")
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupRepoFailed))
+				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
+				g.Expect(cond).NotTo(BeNil())
+				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonInvalidStorageProvider))
+			})).Should(Succeed())
 		})
 
 		It("should block the deletion of the BackupRepo if derived objects are not deleted", func() {

@@ -177,6 +177,10 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
+	if item.ConfigSpec == nil {
+		ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", item), "")
+		return nil
+	}
 	for i := range status.ConfigurationItemStatus {
 		itemStatus := &status.ConfigurationItemStatus[i]
 		switch {

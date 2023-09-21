@@ -37,9 +37,13 @@ type ConfigurationItemDetail struct {
 	// +optional
 	Version string `json:"version,omitempty"`
 
+	// configSpec is used to set the configuration template.
+	// +optional
+	ConfigSpec *ComponentConfigSpec `json:"configSpec"`
+
 	// Specify the configuration template.
 	// +optional
-	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef,omitempty"`
+	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef"`
 
 	// configFileParams is used to set the parameters to be updated.
 	// +optional
@@ -64,12 +68,12 @@ type ConfigurationSpec struct {
 	// clusterDefRef referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ClusterDefRef string `json:"clusterDefRef"`
+	// ClusterDefRef string `json:"clusterDefRef"`
 
 	// clusterVerRef referencing ClusterVersion name.
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
-	ClusterVersionRef string `json:"clusterVerRef,omitempty"`
+	// ClusterVersionRef string `json:"clusterVerRef,omitempty"`
 
 	// customConfigurationItems describes user-defined config template.
 	// +optional

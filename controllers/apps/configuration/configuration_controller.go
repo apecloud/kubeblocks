@@ -137,7 +137,7 @@ func (r *ConfigurationReconciler) runTasks(
 		nil,
 		fetcher.ClusterVerComObj)
 	if err != nil {
-		return
+		return err
 	}
 
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
@@ -163,7 +163,7 @@ func (r *ConfigurationReconciler) runTasks(
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {
-		return
+		return nil
 	}
 	return utilerrors.NewAggregate(errs)
 }

@@ -22,7 +22,7 @@ kbcli cluster register [NAME] --source [CHART-URL] [flags]
 
 ```
       --alias string    Set the cluster type alias
-      --auto-approve    Skip interactive approval when register an existed cluster type
+      --auto-approve    Skip interactive approval when registering an existed cluster type
   -h, --help            help for register
   -S, --source string   Specify the cluster type chart source, support a URL or a local file path
 ```

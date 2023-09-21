@@ -492,7 +492,7 @@ func (o *reportClusterOptions) handleManifests(ctx context.Context) error {
 			types.BackupPolicyGVR(),
 			types.BackupScheduleGVR(),
 			types.ActionSetGVR(),
-			types.RestoreJobGVR(),
+			types.RestoreGVR(),
 		}
 	)
 	var err error

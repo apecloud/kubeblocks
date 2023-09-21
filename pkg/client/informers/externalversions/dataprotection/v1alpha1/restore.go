@@ -32,59 +32,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// RestoreJobInformer provides access to a shared informer and lister for
-// RestoreJobs.
-type RestoreJobInformer interface {
+// RestoreInformer provides access to a shared informer and lister for
+// Restores.
+type RestoreInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.RestoreJobLister
+	Lister() v1alpha1.RestoreLister
 }
 
-type restoreJobInformer struct {
+type restoreInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewRestoreJobInformer constructs a new informer for RestoreJob type.
+// NewRestoreInformer constructs a new informer for Restore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewRestoreJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredRestoreJobInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewRestoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredRestoreInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredRestoreJobInformer constructs a new informer for RestoreJob type.
+// NewFilteredRestoreInformer constructs a new informer for Restore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredRestoreJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredRestoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.DataprotectionV1alpha1().RestoreJobs(namespace).List(context.TODO(), options)
+				return client.DataprotectionV1alpha1().Restores(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.DataprotectionV1alpha1().RestoreJobs(namespace).Watch(context.TODO(), options)
+				return client.DataprotectionV1alpha1().Restores(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&dataprotectionv1alpha1.RestoreJob{},
+		&dataprotectionv1alpha1.Restore{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *restoreJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredRestoreJobInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *restoreInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredRestoreInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *restoreJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&dataprotectionv1alpha1.RestoreJob{}, f.defaultInformer)
+func (f *restoreInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&dataprotectionv1alpha1.Restore{}, f.defaultInformer)
 }
 
-func (f *restoreJobInformer) Lister() v1alpha1.RestoreJobLister {
-	return v1alpha1.NewRestoreJobLister(f.Informer().GetIndexer())
+func (f *restoreInformer) Lister() v1alpha1.RestoreLister {
+	return v1alpha1.NewRestoreLister(f.Informer().GetIndexer())
 }

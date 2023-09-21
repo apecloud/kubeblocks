@@ -118,6 +118,9 @@ var _ = BeforeSuite(func() {
 	err = storagev1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = dpv1alpha1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
@@ -129,7 +132,7 @@ var _ = BeforeSuite(func() {
 		&dpv1alpha1.BackupSchedule{},
 		&dpv1alpha1.ActionSet{},
 		&dpv1alpha1.Backup{},
-		&dpv1alpha1.RestoreJob{},
+		&dpv1alpha1.Restore{},
 		&snapshotv1.VolumeSnapshot{},
 		&snapshotv1beta1.VolumeSnapshot{},
 		&batchv1.Job{},
@@ -171,21 +174,7 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	/*
-		err = (&RestoreJobReconciler{
-			Client:   k8sManager.GetClient(),
-			Scheme:   k8sManager.GetScheme(),
-			Recorder: k8sManager.GetEventRecorderFor("restore-job-controller"),
-		}).SetupWithManager(k8sManager)
-		Expect(err).ToNot(HaveOccurred())
 
-		err = (&CronJobReconciler{
-			Client:   k8sManager.GetClient(),
-			Scheme:   k8sManager.GetScheme(),
-			Recorder: k8sManager.GetEventRecorderFor("cronjob-controller"),
-		}).SetupWithManager(k8sManager)
-		Expect(err).ToNot(HaveOccurred())
-	*/
 	err = (&BackupRepoReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),

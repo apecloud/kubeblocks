@@ -21,13 +21,16 @@ spec:
       targetVolumes:
         volumeMounts:
         - name: data
-          mountPath: /data/mysql
+          mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
     - name: volume-snapshot
       snapshotVolumes: true
       actionSetName: volumesnapshot-for-apecloud-mysql
       targetVolumes:
         volumes:
         - data
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
     schedules:
     - backupMethod: xtrabackup
       enabled: false

@@ -20,14 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockClusterFactory struct {
@@ -205,18 +200,6 @@ func (factory *MockClusterFactory) AddService(serviceName string, serviceType co
 		comps[len(comps)-1] = comp
 	}
 	factory.Get().Spec.ComponentSpecs = comps
-	return factory
-}
-
-func (factory *MockClusterFactory) AddRestorePointInTime(restoreTime metav1.Time, compNames, sourceCluster string) *MockClusterFactory {
-	annotations := factory.Get().Annotations
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[constant.RestoreFromTimeAnnotationKey] = fmt.Sprintf(`{"%s":"%s"}`, compNames, restoreTime.Format(time.RFC3339))
-	annotations[constant.RestoreFromSrcClusterAnnotationKey] = sourceCluster
-
-	factory.Get().Annotations = annotations
 	return factory
 }
 

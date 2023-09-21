@@ -23,20 +23,27 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
-func BuildEnvByCredential(credential *dpv1alpha1.ConnectionCredential) []corev1.EnvVar {
+func BuildEnvByCredential(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredential) []corev1.EnvVar {
 	var envVars []corev1.EnvVar
 	if credential == nil {
 		return nil
 	}
+	var hostEnv corev1.EnvVar
+	if credential.HostKey == "" {
+		hostEnv = corev1.EnvVar{Name: dptypes.DPDBHost,
+			Value: intctrlutil.BuildPodHostDNS(pod)}
+	} else {
+		hostEnv = buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey)
+	}
 	envVars = append(envVars,
 		buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey),
 		buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey),
-		buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey),
 		buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey),
-		buildEnvBySecretKey(dptypes.DPDBEndpoint, credential.SecretName, credential.EndpointKey),
+		hostEnv,
 	)
 	return envVars
 }

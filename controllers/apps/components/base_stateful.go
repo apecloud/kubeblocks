@@ -389,8 +389,8 @@ func (c *rsmComponentBase) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli c
 	} else if status == backupStatusFailed {
 		return true, nil
 	}
-	for _, name := range d.pvcKeysToRestore() {
-		if status, err := d.checkRestoreStatus(name); err != nil {
+	for i := *c.runningWorkload.Spec.Replicas; i < c.Component.Replicas; i++ {
+		if status, err := d.checkRestoreStatus(i); err != nil {
 			return false, err
 		} else if status == backupStatusFailed {
 			return true, nil

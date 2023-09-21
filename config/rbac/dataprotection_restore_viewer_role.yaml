@@ -1,13 +1,13 @@
-# permissions for end users to view restorejobs.
+# permissions for end users to view restores.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: restorejob-viewer-role
+  name: restore-viewer-role
 rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - restorejobs
+  - restores
   verbs:
   - get
   - list
@@ -15,6 +15,6 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - restorejobs/status
+  - restores/status
   verbs:
   - get

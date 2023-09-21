@@ -425,20 +425,6 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 
-	It("set restoreTime", func() {
-		o := &CreateOptions{}
-		o.Namespace = testing.Namespace
-		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
-		o.SourceCluster = testing.ClusterName
-		components := []map[string]interface{}{
-			{
-				"name": testing.ClusterName,
-			},
-		}
-		By("test setRestoreTime")
-		Expect(setRestoreTime(o, components)).Should(Succeed())
-	})
-
 	It("test fillClusterMetadataFromBackup", func() {
 		baseBackupName := "test-backup"
 		logBackupName := "test-logfile-backup"
@@ -452,8 +438,8 @@ var _ = Describe("create", func() {
 		o.Dynamic = dynamic
 		o.Namespace = testing.Namespace
 		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
+		o.Backup = logBackupName
 		backupLogTime, _ := util.TimeParse(o.RestoreTime, time.Second)
-		o.SourceCluster = clusterName
 		buildBackupLogTime := func(d time.Duration) string {
 			return backupLogTime.Add(d).Format(time.RFC3339)
 		}

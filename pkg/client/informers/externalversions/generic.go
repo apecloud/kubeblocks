@@ -87,8 +87,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupRepos().Informer()}, nil
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backupschedules"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupSchedules().Informer()}, nil
-	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("restorejobs"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().RestoreJobs().Informer()}, nil
+	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("restores"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().Restores().Informer()}, nil
 
 		// Group=extensions.kubeblocks.io, Version=v1alpha1
 	case extensionsv1alpha1.SchemeGroupVersion.WithResource("addons"):

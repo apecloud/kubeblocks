@@ -30,6 +30,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/action"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
@@ -107,11 +108,11 @@ func getVolumeMountsByVolumeInfo(pod *corev1.Pod, info *dpv1alpha1.TargetVolumeI
 
 func getPVCsByVolumeNames(cli client.Client,
 	pod *corev1.Pod,
-	volumeNames []string) ([]corev1.PersistentVolumeClaim, error) {
+	volumeNames []string) ([]action.PersistentVolumeClaimWrapper, error) {
 	if len(volumeNames) == 0 {
 		return nil, nil
 	}
-	var all []corev1.PersistentVolumeClaim
+	var all []action.PersistentVolumeClaimWrapper
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim == nil {
 			continue
@@ -126,7 +127,8 @@ func getPVCsByVolumeNames(cli client.Client,
 			if err := cli.Get(context.Background(), pvcKey, &tmp); err != nil {
 				return nil, err
 			}
-			all = append(all, *tmp.DeepCopy())
+
+			all = append(all, action.NewPersistentVolumeClaimWrapper(*tmp.DeepCopy(), name))
 		}
 	}
 	return all, nil
@@ -221,10 +223,6 @@ func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
 	}
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
-}
-
-func GetVolumeSnapshotNamePrefix(backup *dpv1alpha1.Backup) string {
-	return fmt.Sprintf("%s-", backup.Name)
 }
 
 func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string) *dpv1alpha1.SchedulePolicy {

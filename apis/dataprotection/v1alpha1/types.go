@@ -34,39 +34,6 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
-// CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
-// +enum
-// +kubebuilder:validation:Enum={IfNotPresent,Never}
-type CreatePVCPolicy string
-
-const (
-	CreatePVCPolicyNever        CreatePVCPolicy = "Never"
-	CreatePVCPolicyIfNotPresent CreatePVCPolicy = "IfNotPresent"
-)
-
-// RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.
-// +enum
-// +kubebuilder:validation:Enum={New,InProgressPhy,InProgressLogic,Completed,Failed}
-type RestoreJobPhase string
-
-const (
-	RestoreJobNew             RestoreJobPhase = "New"
-	RestoreJobInProgressPhy   RestoreJobPhase = "InProgressPhy"
-	RestoreJobInProgressLogic RestoreJobPhase = "InProgressLogic"
-	RestoreJobCompleted       RestoreJobPhase = "Completed"
-	RestoreJobFailed          RestoreJobPhase = "Failed"
-)
-
-// PodRestoreScope defines the scope pod for restore from backup.
-// +enum
-// +kubebuilder:validation:Enum={All,ReadWrite}
-type PodRestoreScope string
-
-const (
-	PodRestoreScopeAll       = "All"
-	PodRestoreScopeReadWrite = "ReadWrite"
-)
-
 // BackupRepoPhase defines phases for BackupRepo CR.
 // +enum
 // +kubebuilder:validation:Enum={PreChecking,Failed,Ready,Deleting}
@@ -207,3 +174,45 @@ func (r RetentionPeriod) nextNumber(input string) (num int, rest string, err err
 	}
 	return num, rest, nil
 }
+
+// RestorePhase The current phase. Valid values are Running, Completed, Failed, Deleting.
+// +enum
+// +kubebuilder:validation:Enum={Running,Completed,Failed,Deleting}
+type RestorePhase string
+
+const (
+	RestorePhaseRunning   RestorePhase = "Running"
+	RestorePhaseCompleted RestorePhase = "Completed"
+	RestorePhaseFailed    RestorePhase = "Failed"
+	RestorePhaseDeleting  RestorePhase = "Deleting"
+)
+
+// RestoreActionStatus the status of restore action.
+// +enum
+// +kubebuilder:validation:Enum={Processing,Completed,Failed}
+type RestoreActionStatus string
+
+const (
+	RestoreActionProcessing RestoreActionStatus = "Processing"
+	RestoreActionCompleted  RestoreActionStatus = "Completed"
+	RestoreActionFailed     RestoreActionStatus = "Failed"
+)
+
+type RestoreStage string
+
+const (
+	PrepareData RestoreStage = "prepareData"
+	PostReady   RestoreStage = "postReady"
+)
+
+// VolumeClaimManagementPolicy defines recovery strategy for persistent volume claim. supported policies are as follows:
+// 1. Parallel: parallel recovery of persistent volume claim.
+// 2. OrderedReady: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
+// +enum
+// +kubebuilder:validation:Enum={Parallel,OrderedReady}
+type VolumeClaimManagementPolicy string
+
+const (
+	ParallelManagementPolicy     VolumeClaimManagementPolicy = "Parallel"
+	OrderedReadyManagementPolicy VolumeClaimManagementPolicy = "OrderedReady"
+)

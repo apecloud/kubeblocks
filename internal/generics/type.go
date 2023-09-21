@@ -99,9 +99,9 @@ var BackupScheduleSignature = func(_ dpv1alpha1.BackupSchedule, _ dpv1alpha1.Bac
 }
 var BackupSignature = func(_ dpv1alpha1.Backup, _ dpv1alpha1.BackupList) {
 }
-var ActionSetSignature = func(_ dpv1alpha1.ActionSet, _ dpv1alpha1.ActionSetList) {
+var RestoreSignature = func(_ dpv1alpha1.Restore, _ dpv1alpha1.RestoreList) {
 }
-var RestoreJobSignature = func(_ dpv1alpha1.RestoreJob, _ dpv1alpha1.RestoreJobList) {
+var ActionSetSignature = func(_ dpv1alpha1.ActionSet, _ dpv1alpha1.ActionSetList) {
 }
 var BackupRepoSignature = func(_ dpv1alpha1.BackupRepo, _ dpv1alpha1.BackupRepoList) {
 }

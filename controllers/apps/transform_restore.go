@@ -20,9 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type RestoreTransformer struct {
@@ -32,37 +37,36 @@ type RestoreTransformer struct {
 var _ graph.Transformer = &RestoreTransformer{}
 
 func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	//	transCtx, _ := ctx.(*ClusterTransformContext)
-	//	cluster := transCtx.Cluster
-	//	clusterDef := transCtx.ClusterDef
-	//	clusterVer := transCtx.ClusterVer
-	//	reqCtx := ictrlutil.RequestCtx{
-	//		Ctx:      transCtx.Context,
-	//		Log:      transCtx.Logger,
-	//		Recorder: transCtx.EventRecorder,
-	//	}
-	//	commitError := func(err error) error {
-	//		if ictrlutil.IsTargetError(err, ictrlutil.ErrorTypeNeedWaiting) {
-	//			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(ictrlutil.ErrorTypeNeedWaiting), err.Error())
-	//			return graph.ErrPrematureStop
-	//		}
-	//		return err
-	//	}
-	//	for _, spec := range cluster.Spec.ComponentSpecs {
-	//	comp, err := components.NewComponent(reqCtx, t.Client, clusterDef, clusterVer, cluster, spec.Name, nil)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	syncComp := comp.GetSynthesizedComponent()
-	//	if cluster.Annotations[constant.RestoreFromBackUpAnnotationKey] != "" {
-	//	if err = plan.DoRestore(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
-	//		return commitError(err)
-	//	}
-	//	} else if cluster.Annotations[constant.RestoreFromTimeAnnotationKey] != "" {
-	//	if err = plan.DoPITR(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
-	//		return commitError(err)
-	//	}
-	//	}
-	//	}
+	transCtx, _ := ctx.(*ClusterTransformContext)
+	cluster := transCtx.Cluster
+	clusterDef := transCtx.ClusterDef
+	clusterVer := transCtx.ClusterVer
+	reqCtx := ictrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
+	}
+	commitError := func(err error) error {
+		if ictrlutil.IsTargetError(err, ictrlutil.ErrorTypeNeedWaiting) {
+			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(ictrlutil.ErrorTypeNeedWaiting), err.Error())
+			return graph.ErrPrematureStop
+		}
+		return err
+	}
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if cluster.Annotations[constant.RestoreFromBackUpAnnotationKey] == "" {
+			continue
+		}
+
+		comp, err := components.NewComponent(reqCtx, t.Client, clusterDef, clusterVer, cluster, spec.Name, nil)
+		if err != nil {
+			return err
+		}
+		syncComp := comp.GetSynthesizedComponent()
+		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, syncComp.Replicas, 0)
+		if err = restoreMGR.DoRestore(syncComp); err != nil {
+			return commitError(err)
+		}
+	}
 	return nil
 }

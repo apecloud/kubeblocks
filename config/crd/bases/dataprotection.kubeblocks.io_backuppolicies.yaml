@@ -326,13 +326,7 @@ spec:
                     description: connectionCredential specifies the connection credential
                       to connect to the target database cluster.
                     properties:
-                      endpointKey:
-                        default: endpoint
-                        description: endpointKey specifies the map key of the endpoint
-                          in the connection credential secret.
-                        type: string
                       hostKey:
-                        default: host
                         description: hostKey specifies the map key of the host in
                           the connection credential secret.
                         type: string

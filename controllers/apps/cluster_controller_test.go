@@ -29,14 +29,12 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -60,6 +58,7 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
@@ -516,16 +515,20 @@ var _ = Describe("Cluster Controller", func() {
 		return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compName, i)
 	}
 
-	createPVC := func(clusterName, pvcName, compName string) {
+	createPVC := func(clusterName, pvcName, compName, storageSize string) {
+		if storageSize == "" {
+			storageSize = "1Gi"
+		}
+		clusterBytes, _ := json.Marshal(clusterObj)
 		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-			compName, "data").SetStorage("1Gi").AddLabelsInMap(map[string]string{
+			compName, testapps.DataVolumeName).SetStorage(storageSize).AddLabelsInMap(map[string]string{
 			constant.AppInstanceLabelKey:    clusterName,
 			constant.KBAppComponentLabelKey: compName,
 			constant.AppManagedByLabelKey:   constant.AppName,
-		}).CheckedCreate(&testCtx)
+		}).AddAnnotations(constant.LastAppliedClusterAnnotationKey, string(clusterBytes)).CheckedCreate(&testCtx)
 	}
 
-	mockComponentPVCsBound := func(comp *appsv1alpha1.ClusterComponentSpec, replicas int, create bool) {
+	mockComponentPVCsAndBound := func(comp *appsv1alpha1.ClusterComponentSpec, replicas int, create bool) {
 		for i := 0; i < replicas; i++ {
 			for _, vct := range comp.VolumeClaimTemplates {
 				pvcKey := types.NamespacedName{
@@ -533,7 +536,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      getPVCName(vct.Name, comp.Name, i),
 				}
 				if create {
-					createPVC(clusterKey.Name, pvcKey.Name, comp.Name)
+					createPVC(clusterKey.Name, pvcKey.Name, comp.Name, vct.Spec.Resources.Requests.Storage().String())
 				}
 				Eventually(testapps.CheckObjExists(&testCtx, pvcKey,
 					&corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
@@ -584,7 +587,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec, policy *appsv1alpha1.HorizontalScalePolicy) {
 		By("Mocking component PVCs to bound")
-		mockComponentPVCsBound(comp, int(comp.Replicas), true)
+		mockComponentPVCsAndBound(comp, int(comp.Replicas), true)
 
 		if intctrlutil.IsRSMEnabled() {
 			By("Checking rsm replicas right")
@@ -647,6 +650,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dpv1alpha1.Backup) {
 					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = "backup-data"
+					testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
 				})()).Should(Succeed())
 
 				if viper.GetBool("VOLUMESNAPSHOT") {
@@ -675,59 +679,26 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 
-			By("Checking pvc created")
-			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature,
-				client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: comp.Name,
-				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(updatedReplicas * len(comp.VolumeClaimTemplates)))
-
 			if policy != nil {
-				if !viper.GetBool("VOLUMESNAPSHOT") && len(viper.GetString(constant.CfgKeyBackupPVCName)) > 0 {
-					By("Checking restore job created")
-					Eventually(testapps.List(&testCtx, generics.JobSignature,
-						client.MatchingLabels{
-							constant.AppInstanceLabelKey:    clusterKey.Name,
-							constant.KBAppComponentLabelKey: comp.Name,
-							constant.KBManagedByKey:         "cluster",
-						}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(updatedReplicas - int(comp.Replicas)))
-
-					By("Mocking job status to succeeded")
-					ml := client.MatchingLabels{
-						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: comp.Name,
-						constant.KBManagedByKey:         "cluster",
-					}
-					jobList := batchv1.JobList{}
-					Expect(testCtx.Cli.List(testCtx.Ctx, &jobList, ml)).Should(Succeed())
-					for _, job := range jobList.Items {
-						key := client.ObjectKeyFromObject(&job)
-						Expect(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
-							job.Status.Succeeded = 1
-						})()).Should(Succeed())
-					}
-				}
+				checkRestoreAndSetCompleted(clusterKey, comp.Name, updatedReplicas-int(comp.Replicas))
 			}
 
-			By("Mock PVCs status to bound")
-			mockComponentPVCsBound(comp, updatedReplicas, false)
+			By("Mock PVCs and set status to bound")
+			mockComponentPVCsAndBound(comp, updatedReplicas, true)
 
 			if policy != nil {
-				By("Checking backup job cleanup")
+				By("Checking Backup and Restore cleanup")
 				Eventually(testapps.List(&testCtx, generics.BackupSignature,
 					client.MatchingLabels{
 						constant.AppInstanceLabelKey:    clusterKey.Name,
 						constant.KBAppComponentLabelKey: comp.Name,
 					}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
 
-				if !viper.GetBool("VOLUMESNAPSHOT") && len(viper.GetString(constant.CfgKeyBackupPVCName)) > 0 {
-					By("Checking restore job cleanup")
-					Eventually(testapps.List(&testCtx, generics.JobSignature,
-						client.MatchingLabels{
-							constant.AppInstanceLabelKey:    clusterKey.Name,
-							constant.KBAppComponentLabelKey: comp.Name,
-						}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
-				}
+				Eventually(testapps.List(&testCtx, generics.RestoreSignature,
+					client.MatchingLabels{
+						constant.AppInstanceLabelKey:    clusterKey.Name,
+						constant.KBAppComponentLabelKey: comp.Name,
+					}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
 			}
 
 			checkUpdatedStsReplicas()
@@ -932,8 +903,8 @@ var _ = Describe("Cluster Controller", func() {
 		setHorizontalScalePolicy(policyType, componentDefsWithHScalePolicy...)
 
 		By("Mocking all components' PVCs to bound")
-		for _, comp := range clusterObj.Spec.ComponentSpecs {
-			mockComponentPVCsBound(&comp, int(comp.Replicas), true)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			mockComponentPVCsAndBound(&comp, int(comp.Replicas), true)
 		}
 
 		hscalePolicy := func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.HorizontalScalePolicy {
@@ -947,16 +918,16 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
-		for i, comp := range clusterObj.Spec.ComponentSpecs {
+		for i, comp := range cluster.Spec.ComponentSpecs {
 			lorry.SetMockClient(&mockLorryClient{replicas: updatedReplicas, clusterKey: clusterKey, compName: comp.Name}, nil)
 
 			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
-			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], hscalePolicy(comp))
+			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], hscalePolicy(comp))
 		}
 
 		By("Checking cluster status and the number of replicas changed")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).
-			Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))
+			Should(BeEquivalentTo(initialGeneration + len(cluster.Spec.ComponentSpecs)))
 	}
 
 	testHorizontalScale := func(compName, compDefName string, initialReplicas, updatedReplicas int32,
@@ -1765,14 +1736,9 @@ var _ = Describe("Cluster Controller", func() {
 			var err error
 			for _, cond := range cluster.Status.Conditions {
 				if strings.Contains(cond.Message, "backup for horizontalScaling failed") {
-					g.Expect(cond.Message).Should(ContainSubstring("backup for horizontalScaling failed"))
 					err = errors.New("has backup error")
 					break
 				}
-			}
-			if err == nil {
-				// this expectation is intended to print all cluster.Status.Conditions
-				g.Expect(cluster.Status.Conditions).Should(BeEmpty())
 			}
 			g.Expect(err).Should(HaveOccurred())
 		})).Should(Succeed())
@@ -2175,7 +2141,7 @@ var _ = Describe("Cluster Controller", func() {
 						Namespace: clusterKey.Namespace,
 						Name:      getPVCName(testapps.DataVolumeName, compName, i),
 					}
-					createPVC(clusterKey.Name, pvcKey.Name, compName)
+					createPVC(clusterKey.Name, pvcKey.Name, compName, "")
 					Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
 					Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 						pvc.Status.Phase = corev1.ClaimBound
@@ -2319,7 +2285,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Creating cluster with backup", func() {
-			// var (
+			//var (
 			//	boolTrue  = true
 			//	boolFalse = false
 			//	int64Ptr  = func(in int64) *int64 {
@@ -2328,12 +2294,12 @@ var _ = Describe("Cluster Controller", func() {
 			//	retention = func(s string) dpv1alpha1.RetentionPeriod {
 			//		return dpv1alpha1.RetentionPeriod(s)
 			//	}
-			// )
+			//)
 			//
-			// var testCases = []struct {
+			//var testCases = []struct {
 			//	desc   string
 			//	backup *appsv1alpha1.ClusterBackup
-			// }{
+			//}{
 			//	{
 			//		desc: "backup with snapshot method",
 			//		backup: &appsv1alpha1.ClusterBackup{
@@ -2374,9 +2340,9 @@ var _ = Describe("Cluster Controller", func() {
 			//		desc:   "backup is nil",
 			//		backup: nil,
 			//	},
-			// }
+			//}
 			//
-			// for _, t := range testCases {
+			//for _, t := range testCases {
 			//	By(t.desc)
 			//	backup := t.backup
 			//	createClusterWithBackup(backup)
@@ -2421,7 +2387,7 @@ var _ = Describe("Cluster Controller", func() {
 			//				checkPolicyDisabled(g, policy)
 			//			}
 			//		})).Should(Succeed())
-			// }
+			//}
 		})
 	})
 
@@ -2581,101 +2547,91 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("test restore cluster from backup", func() {
-			// By("mock backuptool object")
-			// backupPolicyName := "test-backup-policy"
-			// backupName := "test-backup"
-			// backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-			//	&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
-			//
-			// By("creating backup")
-			// backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-			//	SetBackupPolicyName(backupPolicyName).
-			//	SetBackupMethod(dpv1alpha1.BackupTypeDataFile).
-			//	Create(&testCtx).GetObject()
-			//
-			// By("mocking backup status completed, we don't need backup reconcile here")
-			// Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
-			//	backup.Status.BackupToolName = backupTool.Name
-			//	backup.Status.PersistentVolumeClaimName = "backup-pvc"
-			//	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-			// })).Should(Succeed())
-			//
-			// By("checking backup status completed")
-			// Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
-			//	func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-			//		g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
-			//	})).Should(Succeed())
-			//
-			// By("creating cluster with backup")
-			// restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
-			// pvcSpec := testapps.NewPVCSpec("1Gi")
-			// clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			//	clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			//	AddComponent(compName, compDefName).
-			//	SetReplicas(3).
-			//	AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			//	AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
-			// clusterKey = client.ObjectKeyFromObject(clusterObj)
-			//
-			// By("mocking restore job completed")
-			// patchK8sJobStatus := func(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
-			//	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
-			//		jobCondition := batchv1.JobCondition{Type: jobStatus}
-			//		fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
-			//	})).Should(Succeed())
-			// }
-			// for i := 0; i < 3; i++ {
-			//	restoreJobKey := client.ObjectKey{
-			//		Name:      fmt.Sprintf("base-%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i),
-			//		Namespace: clusterKey.Namespace,
-			//	}
-			//	patchK8sJobStatus(restoreJobKey, batchv1.JobComplete)
-			// }
-			//
-			// By("Waiting for the cluster controller to create resources completely")
-			// waitForCreatingResourceCompletely(clusterKey, compName)
-			// if intctrlutil.IsRSMEnabled() {
-			//	rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-			//	rsm := rsmList.Items[0]
-			//	sts := components.ConvertRSMToSTS(&rsm)
-			//	By("mock pod/sts are available and wait for component enter running phase")
-			//	testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
-			//	Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-			//		testk8s.MockRSMReady(&rsm)
-			//	})).ShouldNot(HaveOccurred())
-			//	Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-			//
-			//	By("the restore container has been removed from init containers")
-			//	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
-			//		g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-			//	})).Should(Succeed())
-			//
-			// } else {
-			//	stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			//	sts := stsList.Items[0]
-			//	By("mock pod/sts are available and wait for component enter running phase")
-			//	testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
-			//	Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
-			//		testk8s.MockStatefulSetReady(&sts)
-			//	})).ShouldNot(HaveOccurred())
-			//	Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-			//
-			//	By("the restore container has been removed from init containers")
-			//	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-			//		g.Expect(tmpSts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-			//	})).Should(Succeed())
-			// }
-			//
-			// By("clean up annotations after cluster running")
-			// Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(tmpCluster *appsv1alpha1.Cluster) {
-			//	compStatus := tmpCluster.Status.Components[compName]
-			//	compStatus.Phase = appsv1alpha1.RunningClusterCompPhase
-			//	tmpCluster.Status.Components[compName] = compStatus
-			// })()).Should(Succeed())
-			// Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-			//	g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
-			//	g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
-			// })).Should(Succeed())
+			By("mock backuptool object")
+			backupPolicyName := "test-backup-policy"
+			backupName := "test-backup"
+			_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+				&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
+
+			By("creating backup")
+			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				SetBackupPolicyName(backupPolicyName).
+				SetBackupMethod(testdp.BackupMethodName).
+				Create(&testCtx).GetObject()
+
+			By("mocking backup status completed, we don't need backup reconcile here")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
+				backup.Status.PersistentVolumeClaimName = "backup-pvc"
+				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+				testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
+			})).Should(Succeed())
+
+			By("creating cluster with backup")
+			restoreFromBackup := fmt.Sprintf(`{"%s":{"name":"%s"}}`, compName, backupName)
+			pvcSpec := testapps.NewPVCSpec("1Gi")
+			replicas := 3
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(compName, compDefName).
+				SetReplicas(int32(replicas)).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			// mock pvcs have restored
+			mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(compName), replicas, true)
+			By("wait for restore created")
+			ml := client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: compName,
+			}
+			Eventually(testapps.List(&testCtx, generics.RestoreSignature,
+				ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
+
+			By("Mocking restore phase to Completed")
+			// mock prepareData restore completed
+			mockRestoreCompleted(ml)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey, compName)
+			if intctrlutil.IsRSMEnabled() {
+				rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+				rsm := rsmList.Items[0]
+				sts := components.ConvertRSMToSTS(&rsm)
+
+				By("mock pod/sts are available and wait for component enter running phase")
+				// mock sts ready
+				sts = testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
+					AddAppNameLabel(clusterDefName).
+					SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
+				Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+					testk8s.MockStatefulSetReady(sts)
+				})).ShouldNot(HaveOccurred())
+				// mock pods
+				pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
+				// mock rsm ready
+				Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
+					testk8s.MockRSMReady(&rsm, pods...)
+				})).ShouldNot(HaveOccurred())
+				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			} else {
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+				sts := stsList.Items[0]
+				By("mock pod/sts are available and wait for component enter running phase")
+				testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)
+				Expect(testapps.ChangeObjStatus(&testCtx, &sts, func() {
+					testk8s.MockStatefulSetReady(&sts)
+				})).ShouldNot(HaveOccurred())
+				Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			}
+
+			By("clean up annotations after cluster running")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+				// mock postReady restore completed
+				mockRestoreCompleted(ml)
+				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
+			})).Should(Succeed())
 		})
 	})
 
@@ -2955,4 +2911,29 @@ func outOfOrderEqualFunc[E1, E2 any](s1 []E1, s2 []E2, eq func(E1, E2) bool) boo
 		}
 	}
 	return true
+}
+
+func mockRestoreCompleted(ml client.MatchingLabels) {
+	restoreList := dpv1alpha1.RestoreList{}
+	Expect(testCtx.Cli.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
+	for _, rs := range restoreList.Items {
+		err := testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(&rs), func(res *dpv1alpha1.Restore) {
+			res.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+		})()
+		Expect(client.IgnoreNotFound(err)).ShouldNot(HaveOccurred())
+	}
+}
+
+func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName string, scaleOutReplicas int) {
+	By("Checking restore CR created")
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    clusterKey.Name,
+		constant.KBAppComponentLabelKey: compName,
+		constant.KBManagedByKey:         "cluster",
+	}
+	Eventually(testapps.List(&testCtx, generics.RestoreSignature,
+		ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(scaleOutReplicas))
+
+	By("Mocking restore phase to succeeded")
+	mockRestoreCompleted(ml)
 }

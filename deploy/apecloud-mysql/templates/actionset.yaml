@@ -7,10 +7,16 @@ metadata:
 spec:
   backupType: Full
   env:
-  - name: DATA_DIR
-    value: /data/mysql/data
-  - name: LOG_BIN
-    value: /data/mysql/binlog/mysql-bin
+    - name: DATA_DIR
+      value: {{ .Values.mysqlConfigs.dataDir }}
+    - name: LOG_BIN
+      value: {{ .Values.mysqlConfigs.logBin }}
+    - name: DP_DB_PORT
+      value: "3306"
+    - name: DATA_MOUNT_DIR
+      value: {{ .Values.mysqlConfigs.dataMountPath }}
+    - name: SIGNAL_FILE
+      value: .xtrabackup_restore_new_cluster
   backup:
     preBackup: []
     postBackup: []
@@ -45,13 +51,13 @@ spec:
       - |
         set -e;
         mkdir -p ${DATA_DIR}
-        TMP_DIR=/data/mysql/temp
+        TMP_DIR=${DATA_MOUNT_DIR}/temp
         mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
         xbstream -x < ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
         xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
         xtrabackup --prepare --target-dir=${TMP_DIR}
         xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/ --log-bin=${LOG_BIN}
-        touch ${DATA_DIR}/.xtrabackup_restore_new_cluster
+        touch ${DATA_DIR}/${SIGNAL_FILE}
         rm -rf ${TMP_DIR}
         chmod -R 0777 ${DATA_DIR}
     postReady: []
@@ -67,10 +73,14 @@ spec:
   env:
   - name: DATA_DIR
     value: /data/mysql/data
+  - name: SIGNAL_FILE
+    value: .restore_new_cluster
   backup: {}
   restore:
     prepareData:
       image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
       command:
-      - touch {{ .Values.mysqlConfigs.dataDir }}/.restore_new_cluster; sync
+      - sh
+      - -c
+      - touch {{ .Values.mysqlConfigs.dataDir }}/${SIGNAL_FILE}; sync
     postReady: []

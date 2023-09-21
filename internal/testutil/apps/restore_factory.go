@@ -22,16 +22,16 @@ package apps
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
-type MockRestoreJobFactory struct {
-	BaseFactory[dataprotectionv1alpha1.RestoreJob, *dataprotectionv1alpha1.RestoreJob, MockRestoreJobFactory]
+type MockRestoreFactory struct {
+	BaseFactory[dpv1alpha1.Restore, *dpv1alpha1.Restore, MockRestoreFactory]
 }
 
-func NewRestoreJobFactory(namespace, name string) *MockRestoreJobFactory {
-	f := &MockRestoreJobFactory{}
-	// f.Init(namespace, name,
+func NewRestoreJobFactory(namespace, name string) *MockRestoreFactory {
+	f := &MockRestoreFactory{}
+	// f.init(namespace, name,
 	//	&dataprotectionv1alpha1.RestoreJob{
 	//		Spec: dataprotectionv1alpha1.RestoreJobSpec{
 	//			Target: dataprotectionv1alpha1.TargetCluster{
@@ -44,29 +44,29 @@ func NewRestoreJobFactory(namespace, name string) *MockRestoreJobFactory {
 	return f
 }
 
-func (factory *MockRestoreJobFactory) SetBackupJobName(backupJobName string) *MockRestoreJobFactory {
-	factory.Get().Spec.BackupJobName = backupJobName
+func (factory *MockRestoreFactory) SetBackupName(backupName string) *MockRestoreFactory {
+	// factory.get().Spec.Backup.Name = backupName
 	return factory
 }
 
-func (factory *MockRestoreJobFactory) AddTargetMatchLabels(keyAndValues ...string) *MockRestoreJobFactory {
+func (factory *MockRestoreFactory) AddTargetMatchLabels(keyAndValues ...string) *MockRestoreFactory {
 	// for k, v := range WithMap(keyAndValues...) {
-	//	factory.Get().Spec.Target.LabelsSelector.MatchLabels[k] = v
+	//	factory.get().Spec.Target.LabelsSelector.MatchLabels[k] = v
 	// }
 	return factory
 }
 
-func (factory *MockRestoreJobFactory) SetTargetSecretName(name string) *MockRestoreJobFactory {
-	// factory.Get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
+func (factory *MockRestoreFactory) SetTargetSecretName(name string) *MockRestoreFactory {
+	// factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
 	return factory
 }
 
-func (factory *MockRestoreJobFactory) AddTargetVolume(volume corev1.Volume) *MockRestoreJobFactory {
-	factory.Get().Spec.TargetVolumes = append(factory.Get().Spec.TargetVolumes, volume)
+func (factory *MockRestoreFactory) AddTargetVolume(volume corev1.Volume) *MockRestoreFactory {
+	// factory.get().Spec.TargetVolumes = append(factory.get().Spec.TargetVolumes, volume)
 	return factory
 }
 
-func (factory *MockRestoreJobFactory) AddTargetVolumePVC(volumeName, pvcName string) *MockRestoreJobFactory {
+func (factory *MockRestoreFactory) AddTargetVolumePVC(volumeName, pvcName string) *MockRestoreFactory {
 	volume := corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -79,7 +79,7 @@ func (factory *MockRestoreJobFactory) AddTargetVolumePVC(volumeName, pvcName str
 	return factory
 }
 
-func (factory *MockRestoreJobFactory) AddTargetVolumeMount(volumeMount corev1.VolumeMount) *MockRestoreJobFactory {
-	factory.Get().Spec.TargetVolumeMounts = append(factory.Get().Spec.TargetVolumeMounts, volumeMount)
+func (factory *MockRestoreFactory) AddTargetVolumeMount(volumeMount corev1.VolumeMount) *MockRestoreFactory {
+	// factory.get().Spec.TargetVolumeMounts = append(factory.get().Spec.TargetVolumeMounts, volumeMount)
 	return factory
 }

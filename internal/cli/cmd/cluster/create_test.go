@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -232,21 +233,20 @@ var _ = Describe("create", func() {
 		Expect(err).Should(HaveOccurred())
 	})
 
-	It("build component and set values map", func() {
-		mockCD := func(compDefNames []string) *appsv1alpha1.ClusterDefinition {
-			cd := &appsv1alpha1.ClusterDefinition{}
-			var comps []appsv1alpha1.ClusterComponentDefinition
-			for _, n := range compDefNames {
-				comp := appsv1alpha1.ClusterComponentDefinition{
-					Name:         n,
-					WorkloadType: appsv1alpha1.Replication,
-				}
-				comps = append(comps, comp)
+	mockCD := func(compDefNames []string) *appsv1alpha1.ClusterDefinition {
+		cd := &appsv1alpha1.ClusterDefinition{}
+		var comps []appsv1alpha1.ClusterComponentDefinition
+		for _, n := range compDefNames {
+			comp := appsv1alpha1.ClusterComponentDefinition{
+				Name:         n,
+				WorkloadType: appsv1alpha1.Replication,
 			}
-			cd.Spec.ComponentDefs = comps
-			return cd
+			comps = append(comps, comp)
 		}
-
+		cd.Spec.ComponentDefs = comps
+		return cd
+	}
+	It("build component and set values map", func() {
 		testCases := []struct {
 			values       []string
 			compDefNames []string
@@ -507,4 +507,240 @@ var _ = Describe("create", func() {
 		Expect(o.buildBackupConfig(cluster)).To(Succeed())
 		Expect(o.BackupConfig.CronExpression).Should(Equal("0 0 * * *"))
 	})
+
+	It("build multiple pvc in one cluster component", func() {
+		testCases := []struct {
+			pvcs         []string
+			compDefNames []string
+			expected     map[string][]map[storageKey]string
+			success      bool
+		}{
+			{
+				nil,
+				nil,
+				map[string][]map[storageKey]string{},
+				true,
+			},
+			// --pvc all key
+			{
+				[]string{"type=comp1,name=data,size=10Gi,storageClass=localPath,mode=ReadWriteOnce"},
+				[]string{"comp1", "comp2"},
+				map[string][]map[storageKey]string{
+					"comp1": {
+						map[storageKey]string{
+							storageKeyType:         "comp1",
+							storageKeyName:         "data",
+							storageKeySize:         "10Gi",
+							storageKeyStorageClass: "localPath",
+							storageAccessMode:      "ReadWriteOnce",
+						},
+					},
+				}, true,
+			},
+			// multiple components and don't specify the type,
+			// the default type will be the first component.
+			{
+				[]string{"name=data,size=10Gi,storageClass=localPath,mode=ReadWriteOnce"},
+				[]string{"comp1", "comp2"},
+				map[string][]map[storageKey]string{
+					"comp1": {
+						map[storageKey]string{
+							storageKeyName:         "data",
+							storageKeySize:         "10Gi",
+							storageKeyStorageClass: "localPath",
+							storageAccessMode:      "ReadWriteOnce",
+						},
+					},
+				}, true,
+			},
+			// wrong key
+			{
+				[]string{"cpu=1,memory=2Gi"},
+				[]string{"comp1"},
+				nil,
+				false,
+			},
+			// wrong component
+			{
+
+				[]string{"type=comp3,name=data,size=10Gi,storageClass=localPath,mode=ReadWriteOnce"},
+				[]string{"comp1", "comp2"},
+				nil,
+				false,
+			},
+			// one component with multiple pvc
+			{
+				[]string{"type=comp1,name=data,size=10Gi,storageClass=localPath,mode=ReadWriteOnce", "type=comp1,name=log,size=5Gi,storageClass=localPath,mode=ReadWriteMany"},
+				[]string{"comp1"},
+				map[string][]map[storageKey]string{
+					"comp1": {
+						map[storageKey]string{
+							storageKeyType:         "comp1",
+							storageKeyName:         "data",
+							storageKeySize:         "10Gi",
+							storageKeyStorageClass: "localPath",
+							storageAccessMode:      "ReadWriteOnce",
+						},
+						map[storageKey]string{
+							storageKeyType:         "comp1",
+							storageKeyName:         "log",
+							storageKeySize:         "5Gi",
+							storageKeyStorageClass: "localPath",
+							storageAccessMode:      "ReadWriteMany",
+						},
+					},
+				}, true,
+			},
+			// multiple components with one pvc
+			// it has the same effect as "--set type=comp1,storage=10Gi --set type=comp2,storage=5Gi"
+			{
+				[]string{"type=comp1,name=data,size=10Gi", "type=comp2,name=data,size=5Gi"},
+				[]string{"comp1", "comp2", "comp3"},
+				map[string][]map[storageKey]string{
+					"comp1": {
+						map[storageKey]string{
+							storageKeyType: "comp1",
+							storageKeyName: "data",
+							storageKeySize: "10Gi",
+						},
+					},
+					"comp2": {
+						map[storageKey]string{
+							storageKeyType: "comp2",
+							storageKeyName: "data",
+							storageKeySize: "5Gi",
+						},
+					},
+				}, true,
+			},
+			// multiple components, and some component with multiple pvcs
+			{
+				[]string{"type=comp1,name=data,size=10Gi", "type=comp1,name=log,size=5Gi", "type=comp2,name=data,size=5Gi"},
+				[]string{"comp1", "comp2", "comp3"}, map[string][]map[storageKey]string{
+					"comp1": {
+						map[storageKey]string{
+							storageKeyType: "comp1",
+							storageKeyName: "data",
+							storageKeySize: "10Gi",
+						},
+						map[storageKey]string{
+							storageKeyType: "comp1",
+							storageKeyName: "log",
+							storageKeySize: "5Gi",
+						},
+					},
+					"comp2": {
+						map[storageKey]string{
+							storageKeyType: "comp2",
+							storageKeyName: "data",
+							storageKeySize: "5Gi",
+						},
+					},
+				}, true,
+			},
+		}
+
+		for _, t := range testCases {
+			By(strings.Join(t.pvcs, " "))
+			res, err := buildCompStorages(t.pvcs, mockCD(t.compDefNames))
+			if t.success {
+				Expect(err).Should(Succeed())
+				Expect(reflect.DeepEqual(res, t.expected)).Should(BeTrue())
+			} else {
+				Expect(err).Should(HaveOccurred())
+			}
+		}
+	})
+
+	It("rebuild clusterComponentSpec VolumeClaimTemplates by --pvc", func() {
+		comps, err := buildClusterComp(mockCD([]string{"comp1", "comp2"}), nil, clsMgr)
+
+		Expect(err).Should(Succeed())
+		Expect(comps).ShouldNot(BeNil())
+		testCases := []struct {
+			describe             string
+			pvcMaps              map[string][]map[storageKey]string
+			clusterComponentSpec []*appsv1alpha1.ClusterComponentSpec
+			expected             map[string][]appsv1alpha1.ClusterComponentVolumeClaimTemplate
+		}{
+			{"rebuild multiple pvc in one component",
+				map[string][]map[storageKey]string{
+					"comp1": {
+						map[storageKey]string{
+							storageKeyType: "comp1",
+							storageKeyName: "data",
+							storageKeySize: "10Gi",
+						},
+						map[storageKey]string{
+							storageKeyType: "comp1",
+							storageKeyName: "log",
+							storageKeySize: "5Gi",
+						},
+					},
+					"comp2": {
+						map[storageKey]string{
+							storageKeyType: "comp2",
+							storageKeyName: "data",
+							storageKeySize: "5Gi",
+						},
+					}},
+				comps,
+				map[string][]appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+					"comp1": {
+						{
+							Name: "data",
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{
+									corev1.ReadWriteOnce,
+								},
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceStorage: resource.MustParse("10Gi"),
+									},
+								},
+							},
+						},
+						{
+							Name: "log",
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{
+									corev1.ReadWriteOnce,
+								},
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceStorage: resource.MustParse("5Gi"),
+									},
+								},
+							},
+						},
+					},
+					"comp2": {
+						{
+							Name: "data",
+							Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{
+									corev1.ReadWriteOnce,
+								},
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceStorage: resource.MustParse("5Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		for _, t := range testCases {
+			By(t.describe)
+			res := rebuildCompStorage(t.pvcMaps, t.clusterComponentSpec)
+			for _, spec := range res {
+				Expect(reflect.DeepEqual(spec.VolumeClaimTemplates, t.expected[spec.Name])).Should(BeTrue())
+			}
+		}
+
+	})
+
 })

@@ -20,14 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"compress/gzip"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
+	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/klog"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -74,6 +75,15 @@ func (c *clusterConfig) WriteConfigs(configPath string) error {
 // AddConfig add a new cluster type instance into current config
 func (c *clusterConfig) AddConfig(add *TypeInstance) {
 	*c = append(*c, add)
+}
+
+// UpdateConfig will update the existed TypeInstance in c
+func (c *clusterConfig) UpdateConfig(update *TypeInstance) {
+	for i, instance := range *c {
+		if instance.Name == update.Name {
+			(*c)[i] = update
+		}
+	}
 }
 
 // RemoveConfig remove a ClusterType from current config
@@ -148,6 +158,35 @@ type TypeInstance struct {
 	Name  ClusterType `yaml:"name"`
 	URL   string      `yaml:"helmChartUrl"`
 	Alias string      `yaml:"alias"`
+	// chartName is the filename cached locally
+	ChartName string `yaml:"chartName"`
+}
+
+// PreCheck is used by `cluster register` command
+func (h *TypeInstance) PreCheck() error {
+	chartInfo := &ChartInfo{}
+	// load helm chart from embed tgz file
+	{
+		file, err := h.loadChart()
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		c, err := loader.LoadArchive(file)
+		if err != nil {
+			if err == gzip.ErrHeader {
+				return fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", h.getChartFileName(), err)
+			}
+		}
+		if c == nil {
+			return fmt.Errorf("failed to load cluster helm chart %s", h.getChartFileName())
+		}
+		chartInfo.Chart = c
+	}
+	if err := chartInfo.buildClusterSchema(); err != nil {
+		return err
+	}
+	return chartInfo.buildClusterDef()
 }
 
 func (h *TypeInstance) loadChart() (io.ReadCloser, error) {
@@ -155,7 +194,7 @@ func (h *TypeInstance) loadChart() (io.ReadCloser, error) {
 }
 
 func (h *TypeInstance) getChartFileName() string {
-	return path.Base(h.URL)
+	return h.ChartName
 }
 
 func (h *TypeInstance) getAlias() string {

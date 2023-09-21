@@ -401,7 +401,6 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 	if probeDaemonPort == 0 {
 		probeDaemonPort = defaultRoleProbeDaemonPort
 	}
-	roleProbeURI := fmt.Sprintf(roleProbeURIFormat, strconv.Itoa(probeDaemonPort))
 	env := credentialEnv
 	env = append(env,
 		corev1.EnvVar{
@@ -437,13 +436,56 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 			})
 	}
 
+	// inject role update mechanism env
+	env = append(env,
+		corev1.EnvVar{
+			Name:  RoleUpdateMechanismVarName,
+			Value: string(roleProbe.RoleUpdateMechanism),
+		})
+
+	// lorry related envs
+	env = append(env,
+		corev1.EnvVar{
+			Name: constant.KBEnvPodName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvNamespace,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvPodUID,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.uid",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvNodeName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "spec.nodeName",
+				},
+			},
+		},
+	)
+
 	// build container
 	container := corev1.Container{
 		Name:            roleProbeName,
 		Image:           image,
 		ImagePullPolicy: "IfNotPresent",
 		Command: []string{
-			"role-agent",
+			"lorry",
 			"--port", strconv.Itoa(probeDaemonPort),
 		},
 		Ports: []corev1.ContainerPort{{
@@ -453,11 +495,9 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		}},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/grpc_health_probe",
-						roleProbeURI,
-					},
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: roleProbeURI,
+					Port: intstr.FromInt(probeDaemonPort),
 				},
 			},
 			InitialDelaySeconds: roleProbe.InitialDelaySeconds,

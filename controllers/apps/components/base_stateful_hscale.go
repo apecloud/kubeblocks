@@ -275,10 +275,7 @@ func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate)
 			} else if exist {
 				continue
 			}
-			pvc, err := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, "")
-			if err != nil {
-				return nil, err
-			}
+			pvc := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, "")
 			objs = append(objs, pvc)
 		}
 	}
@@ -373,10 +370,7 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 	if backupPolicy == nil {
 		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
-	backup, err := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "snapshot")
-	if err != nil {
-		return nil, err
-	}
+	backup := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "snapshot")
 	objs = append(objs, backup)
 	d.reqCtx.Recorder.Eventf(d.cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", d.key.Name)
 	return objs, nil
@@ -482,10 +476,7 @@ func (d *snapshotDataClone) createPVCFromSnapshot(
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	snapshotName string) (client.Object, error) {
-	pvc, err := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, snapshotName)
-	if err != nil {
-		return nil, err
-	}
+	pvc := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, snapshotName)
 	return pvc, nil
 }
 
@@ -598,10 +589,7 @@ func (d *backupDataClone) backup() ([]client.Object, error) {
 	if backupPolicy == nil {
 		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
-	backup, err := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "datafile")
-	if err != nil {
-		return nil, err
-	}
+	backup := factory.BuildBackup(d.cluster, d.component, backupPolicy.Name, d.key, "datafile")
 	objs = append(objs, backup)
 	return objs, nil
 }
@@ -630,13 +618,10 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 	if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
 		return nil, err
 	}
-	pvc, err := factory.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
-	if err != nil {
-		return nil, err
-	}
+	pvc := factory.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
 	objs = append(objs, pvc)
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	if err = d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+	if err := d.cli.Get(d.reqCtx.Ctx, client.ObjectKey{Name: backup.Status.BackupToolName}, backupTool); err != nil {
 		return nil, err
 	}
 	restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)

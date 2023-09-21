@@ -80,8 +80,6 @@ const (
 	ReasonUnknownError             = "UnknownError"
 )
 
-const manifestsUpdaterContainerName = "manifests-updater"
-
 var reconcileInterval = time.Second
 
 func init() {

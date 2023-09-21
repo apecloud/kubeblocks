@@ -57,7 +57,7 @@ func SetRestoreValidationCondition(restore *dpv1alpha1.Restore, reason, message 
 	SetRestoreCondition(restore, status, ConditionTypeRestoreValidationPassed, reason, message)
 }
 
-// setRestoreStageCondition sets restore stage condition.
+// SetRestoreStageCondition sets restore stage condition.
 func SetRestoreStageCondition(restore *dpv1alpha1.Restore, stage dpv1alpha1.RestoreStage, reason, message string) {
 	status := metav1.ConditionFalse
 	if reason == ReasonSucceed {
@@ -70,9 +70,9 @@ func SetRestoreStageCondition(restore *dpv1alpha1.Restore, stage dpv1alpha1.Rest
 	SetRestoreCondition(restore, status, conditionType, reason, message)
 }
 
-func FindRestoreStatusAction(actions []dpv1alpha1.RestoreStatusAction, ObjectKey string) *dpv1alpha1.RestoreStatusAction {
+func FindRestoreStatusAction(actions []dpv1alpha1.RestoreStatusAction, key string) *dpv1alpha1.RestoreStatusAction {
 	for i := range actions {
-		if actions[i].ObjectKey == ObjectKey {
+		if actions[i].ObjectKey == key {
 			return &actions[i]
 		}
 	}

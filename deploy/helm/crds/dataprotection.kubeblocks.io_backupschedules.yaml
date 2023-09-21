@@ -59,13 +59,6 @@ spec:
                       description: backupMethod specifies the backup method name that
                         is defined in backupPolicy.
                       type: string
-                    backupsHistoryLimit:
-                      default: 0
-                      description: the number of automatic backups to retain. Value
-                        must be non-negative integer. 0 means NO limit on the number
-                        of backups.
-                      format: int32
-                      type: integer
                     cronExpression:
                       description: the cron expression for schedule, the timezone
                         is in UTC. see https://en.wikipedia.org/wiki/Cron.

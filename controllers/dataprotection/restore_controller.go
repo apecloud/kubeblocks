@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -50,9 +51,9 @@ type RestoreReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -207,17 +208,16 @@ func (r *RestoreReconciler) validateAndBuildMGR(reqCtx intctrlutil.RequestCtx, r
 
 	// get backupActionSet based on the specified backup name.
 	backupName := restoreMgr.Restore.Spec.Backup.Name
-	backupSet := &dprestore.BackupActionSet{}
-	backupSet, err = restoreMgr.GetBackupActionSetByNamespaced(reqCtx, r.Client, backupName, restoreMgr.Restore.Spec.Backup.Namespace)
-	if err != nil || backupSet == nil {
-		return
+	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, r.Client, backupName, restoreMgr.Restore.Spec.Backup.Namespace)
+	if err != nil {
+		return err
 	}
 
 	// check if the backup is completed exclude continuous backup.
 	backupType := backupSet.ActionSet.Spec.BackupType
 	if backupType != dpv1alpha1.BackupTypeContinuous && backupSet.Backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		err = intctrlutil.NewFatalError(fmt.Sprintf(`phase of backup "%s" is not completed`, backupName))
-		return
+		return err
 	}
 
 	// build backupActionSets of prepareData and postReady stage based on the specified backup's type.
@@ -233,7 +233,7 @@ func (r *RestoreReconciler) validateAndBuildMGR(reqCtx intctrlutil.RequestCtx, r
 	default:
 		err = intctrlutil.NewFatalError(fmt.Sprintf("backup type of %s is empty", backupName))
 	}
-	return
+	return err
 }
 
 // prepareData handles the prepareData stage of the backups.
@@ -290,6 +290,7 @@ func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr 
 	}()
 	if readyConfig.ReadinessProbe != nil && !meta.IsStatusConditionTrue(restoreMgr.Restore.Status.Conditions, dprestore.ConditionTypeReadinessProbe) {
 		// TODO: check readiness probe, use a job or exec?
+		_ = klog.TODO()
 	}
 	for _, v := range restoreMgr.PostReadyBackupSets {
 		// handle postReady actions

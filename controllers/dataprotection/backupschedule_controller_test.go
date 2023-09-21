@@ -216,9 +216,9 @@ var _ = Describe("Backup Schedule Controller", func() {
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
 				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupOutLimit2), backupStatus)
 
-				By("patch backup schedule to delete the expired backup")
+				By("patch backup schedule to trigger the controller to delete expired backup")
 				Eventually(testapps.GetAndChangeObj(&testCtx, backupScheduleKey, func(fetched *dpv1alpha1.BackupSchedule) {
-					fetched.Spec.Schedules[0].BackupsHistoryLimit = 10
+					fetched.Spec.Schedules[0].RetentionPeriod = "1d"
 				})).Should(Succeed())
 
 				By("retain the latest backup")

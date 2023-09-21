@@ -68,7 +68,7 @@ var ConfigMapSignature = func(_ corev1.ConfigMap, _ corev1.ConfigMapList) {}
 var EndpointsSignature = func(_ corev1.Endpoints, _ corev1.EndpointsList) {}
 
 var RSMSignature = func(_ workloads.ReplicatedStateMachine, _ workloads.ReplicatedStateMachineList) {}
-var StatefulSetSignature = func(_ appsv1.StatefulSet, _ appsv1.StatefulSetList) {}
+var StatefulSetSignature = func(A appsv1.StatefulSet, B appsv1.StatefulSetList) {}
 var DeploymentSignature = func(_ appsv1.Deployment, _ appsv1.DeploymentList) {}
 var ReplicaSetSignature = func(_ appsv1.ReplicaSet, _ appsv1.ReplicaSetList) {}
 

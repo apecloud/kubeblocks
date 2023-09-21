@@ -34,9 +34,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 

@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -354,11 +355,17 @@ type ClusterComponentStatus struct {
 
 	// consensusSetStatus specifies the mapping of role and pod name.
 	// +optional
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 
 	// replicationSetStatus specifies the mapping of role and pod name.
 	// +optional
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
+
+	// members' status.
+	// +optional
+	MembersStatus []workloads.MemberStatus `json:"membersStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {

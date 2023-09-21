@@ -246,7 +246,7 @@ var _ = Describe("PITR Functions", func() {
 
 			By("wait for postReady restore created and mock it to Completed")
 			restoreMGR.Cluster = cluster
-			err = restoreMGR.DoRestore(synthesizedComponent)
+			_ = restoreMGR.DoRestore(synthesizedComponent)
 
 			// check if restore CR of postReady stage is created.
 			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady)
@@ -259,7 +259,7 @@ var _ = Describe("PITR Functions", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			By("clean up annotations after cluster running")
-			err = restoreMGR.DoRestore(synthesizedComponent)
+			_ = restoreMGR.DoRestore(synthesizedComponent)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())

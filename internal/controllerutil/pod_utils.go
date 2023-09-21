@@ -356,6 +356,21 @@ func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
 }
 
+// GuessLorryHTTPPort guesses lorry container and serving port.
+// TODO(xuriwuyun): should provide a deterministic way to find the lorry serving port.
+func GuessLorryHTTPPort(pod *corev1.Pod) (int32, error) {
+	lorryImage := viper.GetString(constant.KBToolsImage)
+	for _, container := range pod.Spec.Containers {
+		if container.Image != lorryImage {
+			continue
+		}
+		if len(container.Ports) > 0 {
+			return container.Ports[0].ContainerPort, nil
+		}
+	}
+	return 0, fmt.Errorf("lorry port not found")
+}
+
 // GetProbeContainerName gets the probe container from pod
 func GetProbeContainerName(pod *corev1.Pod) (string, error) {
 	lorryImage := viper.GetString(constant.KBToolsImage)

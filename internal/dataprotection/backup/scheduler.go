@@ -93,11 +93,7 @@ func (s *Scheduler) handleSchedulePolicy(index int) error {
 	}
 
 	// create/delete/patch cronjob workload
-	if err := s.reconcileCronJob(schedulePolicy); err != nil {
-		return err
-	}
-
-	return s.removeOldestBackups(schedulePolicy)
+	return s.reconcileCronJob(schedulePolicy)
 }
 
 type backupReconfigureRef struct {
@@ -204,45 +200,6 @@ func (s *Scheduler) reconcileReconfigure() error {
 			return intctrlutil.NewErrorf(dperrors.ErrorTypeReconfigureFailed, "ops failed %s", latestOps.Name)
 		} else if latestOps.Status.Phase != appsv1alpha1.OpsSucceedPhase {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "waiting for ops %s finished.", latestOps.Name)
-		}
-	}
-	return nil
-}
-
-// removeOldestBackups removes old backups according to backupsHistoryLimit policy.
-func (s *Scheduler) removeOldestBackups(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
-	historyLimit := schedulePolicy.BackupsHistoryLimit
-	if historyLimit == 0 {
-		return nil
-	}
-	matchLabels := map[string]string{
-		dptypes.DataProtectionLabelBackupScheduleKey: s.BackupSchedule.Name,
-		dptypes.DataProtectionLabelBackupMethodKey:   schedulePolicy.BackupMethod,
-		dptypes.DataProtectionLabelAutoBackupKey:     "true",
-	}
-	backups := dpv1alpha1.BackupList{}
-	if err := s.Client.List(s.Ctx, &backups,
-		client.InNamespace(s.Req.Namespace),
-		client.MatchingLabels(matchLabels)); err != nil {
-		return err
-	}
-	// filter final state backups only
-	var backupItems []dpv1alpha1.Backup
-	for _, item := range backups.Items {
-		if item.Status.Phase == dpv1alpha1.BackupPhaseCompleted ||
-			item.Status.Phase == dpv1alpha1.BackupPhaseFailed {
-			backupItems = append(backupItems, item)
-		}
-	}
-	numToDelete := int32(len(backupItems)) - historyLimit
-	if numToDelete <= 0 {
-		return nil
-	}
-	sort.Sort(ByBackupStartTime(backupItems))
-	for i := int32(0); i < numToDelete; i++ {
-		if err := intctrlutil.BackgroundDeleteObject(s.Client, s.Ctx, &backupItems[i]); err != nil {
-			// failed delete backups, return error info.
-			return err
 		}
 	}
 	return nil

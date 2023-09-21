@@ -54,12 +54,6 @@ type SchedulePolicy struct {
 	// +kubebuilder:validation:Required
 	CronExpression string `json:"cronExpression"`
 
-	// the number of automatic backups to retain. Value must be non-negative integer.
-	// 0 means NO limit on the number of backups.
-	// +kubebuilder:default=0
-	// +optional
-	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
-
 	// retentionPeriod determines a duration up to which the backup should be kept.
 	// controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.

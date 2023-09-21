@@ -54,7 +54,6 @@ type RestoreManager struct {
 	namespace              string
 	restoreTime            string
 	volumeManagementPolicy dpv1alpha1.VolumeClaimManagementPolicy
-	sourceCluster          string
 	startingIndex          int32
 	replicas               int32
 	restoreLabels          map[string]string
@@ -121,7 +120,7 @@ func (r *RestoreManager) BuildePrepareDataRestore(comp *component.SynthesizedCom
 	if targetVolumes == nil {
 		return nil, nil
 	}
-	getClusterJson := func() string {
+	getClusterJSON := func() string {
 		clusterSpec := r.Cluster.DeepCopy()
 		clusterSpec.ObjectMeta = metav1.ObjectMeta{
 			Name: clusterSpec.GetName(),
@@ -144,7 +143,7 @@ func (r *RestoreManager) BuildePrepareDataRestore(comp *component.SynthesizedCom
 				Labels: pvcLabels,
 				Annotations: map[string]string{
 					// satisfy the detection of transformer_halt_recovering.
-					constant.LastAppliedClusterAnnotationKey: getClusterJson(),
+					constant.LastAppliedClusterAnnotationKey: getClusterJSON(),
 				},
 			},
 		}
@@ -304,7 +303,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 // createRestoreAndWait create the restore CR and wait for completion.
 func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error {
 	if r.Scheme != nil {
-		controllerutil.SetControllerReference(r.Cluster, restore, r.Scheme)
+		_ = controllerutil.SetControllerReference(r.Cluster, restore, r.Scheme)
 	}
 	if err := r.Client.Get(r.Ctx, client.ObjectKeyFromObject(restore), restore); err != nil {
 		if !apierrors.IsNotFound(err) {

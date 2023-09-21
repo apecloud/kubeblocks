@@ -37,9 +37,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// TODO(free6om): dedup copied funcs from event_controllers.go
-// TODO(free6om): refactor event_controller.go as it should NOT import controllers/apps/component/*
-
 type PodRoleEventHandler struct{}
 
 // probeEventType defines the type of probe event.

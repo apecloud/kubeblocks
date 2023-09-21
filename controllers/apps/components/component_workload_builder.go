@@ -35,8 +35,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// TODO(impl): define a custom workload to encapsulate all the resources.
-
 type componentWorkloadBuilder interface {
 	//	runtime, config, script, env, volume, service, monitor, probe
 	BuildEnv() componentWorkloadBuilder
@@ -50,61 +48,77 @@ type componentWorkloadBuilder interface {
 	Complete() error
 }
 
-type componentWorkloadBuilderBase struct {
-	ReqCtx          intctrlutil.RequestCtx
-	Client          client.Client
-	Comp            Component
-	DefaultAction   *ictrltypes.LifecycleAction
-	ConcreteBuilder componentWorkloadBuilder
-	Error           error
-	EnvConfig       *corev1.ConfigMap
-	Workload        client.Object
-	LocalObjs       []client.Object // cache the objects needed for configuration, should remove this after refactoring the configuration
+type rsmComponentWorkloadBuilder struct {
+	reqCtx        intctrlutil.RequestCtx
+	client        client.Client
+	comp          *rsmComponent
+	defaultAction *ictrltypes.LifecycleAction
+	error         error
+	envConfig     *corev1.ConfigMap
+	workload      client.Object
+	localObjs     []client.Object // cache the objects needed for configuration, should remove this after refactoring the configuration
 }
 
-func (b *componentWorkloadBuilderBase) BuildEnv() componentWorkloadBuilder {
+var _ componentWorkloadBuilder = &rsmComponentWorkloadBuilder{}
+
+func (b *rsmComponentWorkloadBuilder) BuildEnv() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		envCfg := factory.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
-		b.EnvConfig = envCfg
-		b.LocalObjs = append(b.LocalObjs, envCfg)
+		envCfg := factory.BuildEnvConfig(b.comp.GetCluster(), b.comp.GetSynthesizedComponent())
+		b.envConfig = envCfg
+		b.localObjs = append(b.localObjs, envCfg)
 		return []client.Object{envCfg}, nil
 	}
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) BuildConfig() componentWorkloadBuilder {
+func (b *rsmComponentWorkloadBuilder) BuildConfig() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		if b.Workload == nil {
+		if b.workload == nil {
 			return nil, fmt.Errorf("build config but workload is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
+				b.comp.GetClusterName(), b.comp.GetName())
 		}
 
 		err := plan.RenderConfigNScriptFiles(
 			&intctrlutil.ResourceCtx{
-				Context:       b.ReqCtx.Ctx,
-				Client:        b.Client,
-				Namespace:     b.Comp.GetNamespace(),
-				ClusterName:   b.Comp.GetClusterName(),
-				ComponentName: b.Comp.GetName(),
+				Context:       b.reqCtx.Ctx,
+				Client:        b.client,
+				Namespace:     b.comp.GetNamespace(),
+				ClusterName:   b.comp.GetClusterName(),
+				ComponentName: b.comp.GetName(),
 			},
-			b.Comp.GetClusterVersion(),
-			b.Comp.GetCluster(),
-			b.Comp.GetSynthesizedComponent(),
-			b.Workload,
+			b.comp.GetClusterVersion(),
+			b.comp.GetCluster(),
+			b.comp.GetSynthesizedComponent(),
+			b.workload,
 			b.getRuntime(),
-			b.LocalObjs)
+			b.localObjs)
 		return nil, err
 	}
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {
+func (b *rsmComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
+	buildfn := func() ([]client.Object, error) {
+		component := b.comp.GetSynthesizedComponent()
+		obj, err := factory.BuildRSM(b.reqCtx, b.comp.GetCluster(), component, b.envConfig.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		b.workload = obj
+
+		return nil, nil // don't return sts here
+	}
+	return b.BuildWrapper(buildfn)
+}
+
+func (b *rsmComponentWorkloadBuilder) BuildPDB() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		// if without this handler, the cluster controller will occur error during reconciling.
 		// conditionally build PodDisruptionBudget
-		synthesizedComponent := b.Comp.GetSynthesizedComponent()
+		synthesizedComponent := b.comp.GetSynthesizedComponent()
 		if synthesizedComponent.MinAvailable != nil {
-			pdb := factory.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
+			pdb := factory.BuildPDB(b.comp.GetCluster(), synthesizedComponent)
 			return []client.Object{pdb}, nil
 		} else {
 			panic("this shouldn't happen")
@@ -113,11 +127,11 @@ func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuilder {
+func (b *rsmComponentWorkloadBuilder) BuildVolumeMount() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		if b.Workload == nil {
+		if b.workload == nil {
 			return nil, fmt.Errorf("build volume mount but workload is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
+				b.comp.GetClusterName(), b.comp.GetName())
 		}
 
 		podSpec := b.getRuntime()
@@ -144,10 +158,10 @@ func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuild
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) BuildTLSCert() componentWorkloadBuilder {
+func (b *rsmComponentWorkloadBuilder) BuildTLSCert() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		cluster := b.Comp.GetCluster()
-		component := b.Comp.GetSynthesizedComponent()
+		cluster := b.comp.GetCluster()
+		component := b.comp.GetSynthesizedComponent()
 		if !component.TLS {
 			return nil, nil
 		}
@@ -158,7 +172,7 @@ func (b *componentWorkloadBuilderBase) BuildTLSCert() componentWorkloadBuilder {
 		objs := make([]client.Object, 0)
 		switch component.Issuer.Name {
 		case appsv1alpha1.IssuerUserProvided:
-			if err := plan.CheckTLSSecretRef(b.ReqCtx.Ctx, b.Client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
+			if err := plan.CheckTLSSecretRef(b.reqCtx.Ctx, b.client, cluster.Namespace, component.Issuer.SecretRef); err != nil {
 				return nil, err
 			}
 		case appsv1alpha1.IssuerKubeBlocks:
@@ -167,59 +181,59 @@ func (b *componentWorkloadBuilderBase) BuildTLSCert() componentWorkloadBuilder {
 				return nil, err
 			}
 			objs = append(objs, secret)
-			b.LocalObjs = append(b.LocalObjs, secret)
+			b.localObjs = append(b.localObjs, secret)
 		}
 		return objs, nil
 	}
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) BuildTLSVolume() componentWorkloadBuilder {
+func (b *rsmComponentWorkloadBuilder) BuildTLSVolume() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		if b.Workload == nil {
+		if b.workload == nil {
 			return nil, fmt.Errorf("build TLS volumes but workload is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
+				b.comp.GetClusterName(), b.comp.GetName())
 		}
 		// build secret volume and volume mount
-		return nil, updateTLSVolumeAndVolumeMount(b.getRuntime(), b.Comp.GetClusterName(), *b.Comp.GetSynthesizedComponent())
+		return nil, updateTLSVolumeAndVolumeMount(b.getRuntime(), b.comp.GetClusterName(), *b.comp.GetSynthesizedComponent())
 	}
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *componentWorkloadBuilderBase) Complete() error {
-	if b.Error != nil {
-		return b.Error
+func (b *rsmComponentWorkloadBuilder) Complete() error {
+	if b.error != nil {
+		return b.error
 	}
-	if b.Workload == nil {
+	if b.workload == nil {
 		return fmt.Errorf("fail to create component workloads, cluster: %s, component: %s",
-			b.Comp.GetClusterName(), b.Comp.GetName())
+			b.comp.GetClusterName(), b.comp.GetName())
 	}
-	b.Comp.SetWorkload(b.Workload, b.DefaultAction, nil)
+	b.comp.setWorkload(b.workload, b.defaultAction, nil)
 	return nil
 }
 
-func (b *componentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Object, error)) componentWorkloadBuilder {
-	if b.Error != nil || buildfn == nil {
-		return b.ConcreteBuilder
+func (b *rsmComponentWorkloadBuilder) BuildWrapper(buildfn func() ([]client.Object, error)) componentWorkloadBuilder {
+	if b.error != nil || buildfn == nil {
+		return b
 	}
 	objs, err := buildfn()
 	if err != nil {
-		b.Error = err
+		b.error = err
 	} else {
-		cluster := b.Comp.GetCluster()
-		component := b.Comp.GetSynthesizedComponent()
+		cluster := b.comp.GetCluster()
+		component := b.comp.GetSynthesizedComponent()
 		if err = updateCustomLabelToObjs(cluster.Name, string(cluster.UID), component.Name, component.CustomLabelSpecs, objs); err != nil {
-			b.Error = err
+			b.error = err
 		}
 		for _, obj := range objs {
-			b.Comp.AddResource(obj, b.DefaultAction, nil)
+			b.comp.addResource(obj, b.defaultAction, nil)
 		}
 	}
-	return b.ConcreteBuilder
+	return b
 }
 
-func (b *componentWorkloadBuilderBase) getRuntime() *corev1.PodSpec {
-	switch w := b.Workload.(type) {
+func (b *rsmComponentWorkloadBuilder) getRuntime() *corev1.PodSpec {
+	switch w := b.workload.(type) {
 	case *appsv1.StatefulSet:
 		return &w.Spec.Template.Spec
 	case *appsv1.Deployment:

@@ -42,8 +42,12 @@ spec:
       {{- end }}
       
     {{- else }}
-    - name: coordinating # user-defined
-      componentDefRef: coordinating # ref clusterdefinition componentDefs.name
+    
+    {{- range .Values.roles }}
+    {{- $rangeItem := . -}}
+    {{- with $ }}
+    - name: {{ $rangeItem.name }} # user-defined
+      componentDefRef: {{ $rangeItem.name }}  # ref clusterdefinition componentDefs.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 3 }}
       {{- with  .Values.resources }}
@@ -66,81 +70,8 @@ spec:
               requests:
                 storage: {{ .Values.persistence.data.size }}
       {{- end }}
-
-    - name: data # user-defined
-      componentDefRef: data # ref clusterdefinition componentDefs.name
-      monitor: {{ .Values.monitor.enabled | default false }}
-      replicas: {{ .Values.replicaCount | default 3 }}
-      {{- with  .Values.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- if .Values.persistence.enabled }}
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            storageClassName: {{ .Values.persistence.data.storageClassName }}
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.persistence.data.size }}
-      {{- end }}
-
-    - name: ingest # user-defined
-      componentDefRef: ingest # ref clusterdefinition componentDefs.name
-      monitor: {{ .Values.monitor.enabled | default false }}
-      replicas: {{ .Values.replicaCount | default 3 }}
-      {{- with  .Values.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- if .Values.persistence.enabled }}
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            storageClassName: {{ .Values.persistence.data.storageClassName }}
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.persistence.data.size }}
-      {{- end }}
-
-    - name: master # user-defined
-      componentDefRef: master # ref clusterdefinition componentDefs.name
-      monitor: {{ .Values.monitor.enabled | default false }}
-      replicas: {{ .Values.replicaCount | default 3 }}
-      {{- with  .Values.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- if .Values.persistence.enabled }}
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            storageClassName: {{ .Values.persistence.data.storageClassName }}
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.persistence.data.size }}
-      {{- end }}
+    {{- end }}
+    {{- end }}
 
     - name: metrics # user-defined
       componentDefRef: metrics # ref clusterdefinition componentDefs.name

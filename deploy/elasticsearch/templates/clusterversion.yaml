@@ -24,7 +24,10 @@ spec:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.metrics.repository }}:{{ default .Chart.AppVersion .Values.image.metrics.tag }}
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
 
-  - componentDefRef: coordinating
+{{- range .Values.roles }}
+{{- $rangeItem := . -}}
+{{- with $ }}
+  - componentDefRef: {{ $rangeItem.name }}
     versionsContext:
       initContainers:
       - name: sysctl
@@ -37,48 +40,8 @@ spec:
       - name: elasticsearch-master-graceful-termination-handler
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-
-  - componentDefRef: data
-    versionsContext:
-      initContainers:
-      - name: sysctl
-        image: {{ .Values.image.registry | default "docker.io" }}/busybox:latest
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-      containers:
-      - name: elasticsearch
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-      - name: elasticsearch-master-graceful-termination-handler
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-
-  - componentDefRef: ingest
-    versionsContext:
-      initContainers:
-      - name: sysctl
-        image: {{ .Values.image.registry | default "docker.io" }}/busybox:latest
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-      containers:
-      - name: elasticsearch
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-      - name: elasticsearch-master-graceful-termination-handler
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-
-  - componentDefRef: master
-    versionsContext:
-      initContainers:
-      - name: sysctl
-        image: {{ .Values.image.registry | default "docker.io" }}/busybox:latest
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-      containers:
-      - name: elasticsearch
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-      - name: elasticsearch-master-graceful-termination-handler
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+{{- end }}
+{{- end }}
 
   - componentDefRef: metrics
     versionsContext:

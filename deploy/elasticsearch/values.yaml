@@ -67,3 +67,20 @@ ingress:
 service:
   type: ClusterIP
  
+roles:  # template for different roles so we use a range loop
+  - name: coordinating
+    heapSize: 128m
+    role: ""
+
+  - name: ingest
+    heapSize: 128m
+    role: "ingest"
+  
+  - name: data
+    heapSize: 1024m
+    role: "data"
+
+  - name: master
+    heapSize: 128m
+    role: "master"
+  

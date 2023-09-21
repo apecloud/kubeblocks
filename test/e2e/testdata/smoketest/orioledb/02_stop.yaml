@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: oriole-cluster-stop-
+spec:
+  clusterRef: oriole-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Stop
+  restart:
+    - componentName: orioledb

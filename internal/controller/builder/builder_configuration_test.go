@@ -23,33 +23,36 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 )
 
 var _ = Describe("configuration builder", func() {
 	It("should work well", func() {
 		const (
-			clusterName    = "test"
-			componentName  = "mysql"
-			clusterDefName = "mysql-cd"
-			clusterVerName = "mysql-cv"
-			ns             = "default"
+			clusterName   = "test"
+			componentName = "mysql"
+			ns            = "default"
 		)
 		name := core.GenerateComponentConfigurationName(clusterName, componentName)
 		config := NewConfigurationBuilder(ns, name).
 			ClusterRef(clusterName).
 			Component(componentName).
-			ClusterDefRef(clusterDefName).
-			ClusterVerRef(clusterVerName).
-			AddConfigurationItem("mysql-config").
-			AddConfigurationItem("mysql-oteld-config").
+			AddConfigurationItem(v1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+					Name: "mysql-config",
+				},
+			}).
+			AddConfigurationItem(v1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+					Name: "mysql-oteld-config",
+				},
+			}).
 			GetObject()
 
 		Expect(config.Name).Should(BeEquivalentTo(name))
 		Expect(config.Spec.ClusterRef).Should(BeEquivalentTo(clusterName))
 		Expect(config.Spec.ComponentName).Should(BeEquivalentTo(componentName))
-		Expect(config.Spec.ClusterVersionRef).Should(BeEquivalentTo(clusterVerName))
-		Expect(config.Spec.ClusterDefRef).Should(BeEquivalentTo(clusterDefName))
 		Expect(len(config.Spec.ConfigItemDetails)).Should(Equal(2))
 	})
 })

@@ -81,9 +81,15 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, statefulCompName)).
 		ClusterRef(clusterName).
 		Component(statefulCompName).
-		ClusterDefRef(clusterDefName).
-		ClusterVerRef(clusterVersionName).
-		AddConfigurationItem(configSpecName).
+		AddConfigurationItem(appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        configSpecName,
+				TemplateRef: configmap.Name,
+				Namespace:   configmap.Namespace,
+				VolumeName:  configVolumeName,
+			},
+			ConfigConstraintRef: constraint.Name,
+		}).
 		GetObject()
 	Expect(testCtx.CreateObj(testCtx.Ctx, configuration)).Should(Succeed())
 

@@ -44,7 +44,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 		Name:   item.Name,
 		Status: status,
 		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, revision string) error {
-			configSpec := component.GetConfigSpecByName(synComponent, item.Name)
+			configSpec := item.ConfigSpec
 			if configSpec == nil {
 				return core.MakeError("not found config spec: %s", item.Name)
 			}

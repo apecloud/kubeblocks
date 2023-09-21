@@ -85,6 +85,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// try to remove expired or oldest backups, triggered by cronjob controller
+	// TODO(ldm): another garbage collection controller to remove expired backups
 	if err = r.removeExpiredBackups(reqCtx); err != nil {
 		return r.patchStatusFailed(reqCtx, backupSchedule, "RemoveExpiredBackupsFailed", err)
 	}
@@ -161,11 +162,11 @@ func (r *BackupScheduleReconciler) patchStatusAvailable(reqCtx intctrlutil.Reque
 		}
 	}
 	// update status phase
-	if backupSchedule.Status.Phase != dpv1alpha1.BackupScheduleAvailable ||
+	if backupSchedule.Status.Phase != dpv1alpha1.BackupSchedulePhaseAvailable ||
 		backupSchedule.Status.ObservedGeneration != backupSchedule.Generation {
 		patch := client.MergeFrom(backupSchedule.DeepCopy())
 		backupSchedule.Status.ObservedGeneration = backupSchedule.Generation
-		backupSchedule.Status.Phase = dpv1alpha1.BackupScheduleAvailable
+		backupSchedule.Status.Phase = dpv1alpha1.BackupSchedulePhaseAvailable
 		backupSchedule.Status.FailureReason = ""
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backupSchedule, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -183,7 +184,7 @@ func (r *BackupScheduleReconciler) patchStatusFailed(reqCtx intctrlutil.RequestC
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 	}
 	backupScheduleDeepCopy := backupSchedule.DeepCopy()
-	backupSchedule.Status.Phase = dpv1alpha1.BackupScheduleFailed
+	backupSchedule.Status.Phase = dpv1alpha1.BackupSchedulePhaseFailed
 	backupSchedule.Status.FailureReason = err.Error()
 	if !reflect.DeepEqual(backupSchedule.Status, backupScheduleDeepCopy.Status) {
 		if patchErr := r.Client.Status().Patch(reqCtx.Ctx, backupSchedule, client.MergeFrom(backupScheduleDeepCopy)); patchErr != nil {
@@ -200,17 +201,23 @@ func (r *BackupScheduleReconciler) removeExpiredBackups(reqCtx intctrlutil.Reque
 		client.InNamespace(reqCtx.Req.Namespace)); err != nil {
 		return err
 	}
+
 	now := metav1.Now()
 	for _, item := range backups.Items {
 		// ignore retained backup.
 		if strings.EqualFold(item.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
 			continue
 		}
-		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {
-			if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &item); err != nil {
-				// failed delete backups, return error info.
-				return err
-			}
+
+		// ignore backup which is not expired.
+		if item.Status.Expiration == nil || !item.Status.Expiration.Before(&now) {
+			continue
+		}
+
+		// delete expired backup.
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &item); err != nil {
+			// failed delete backups, return error info.
+			return err
 		}
 	}
 	return nil

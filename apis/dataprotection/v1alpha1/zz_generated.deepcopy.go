@@ -621,7 +621,7 @@ func (in *BackupScheduleList) DeepCopyInto(out *BackupScheduleList) {
 	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]BackupPolicy, len(*in))
+		*out = make([]BackupSchedule, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

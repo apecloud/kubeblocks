@@ -88,6 +88,7 @@ spec:
                   - backupMethod
                   - cronExpression
                   type: object
+                minItems: 1
                 type: array
               startingDeadlineMinutes:
                 description: startingDeadlineMinutes defines the deadline in minutes
@@ -102,7 +103,7 @@ spec:
             - schedules
             type: object
           status:
-            description: BackupScheduleStatus defines the observed state of BackupPolicy
+            description: BackupScheduleStatus defines the observed state of BackupSchedule.
             properties:
               failureReason:
                 description: failureReason is an error that caused the backup to fail.

@@ -226,3 +226,12 @@ func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 func GetVolumeSnapshotNamePrefix(backup *dpv1alpha1.Backup) string {
 	return fmt.Sprintf("%s-", backup.Name)
 }
+
+func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string) *dpv1alpha1.SchedulePolicy {
+	for _, s := range backupSchedule.Spec.Schedules {
+		if s.BackupMethod == method {
+			return &s
+		}
+	}
+	return nil
+}

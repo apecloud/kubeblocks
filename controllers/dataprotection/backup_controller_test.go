@@ -116,7 +116,7 @@ var _ = Describe("Backup Controller test", func() {
 				backup    *dpv1alpha1.Backup
 			)
 
-			jobKey := func() client.ObjectKey {
+			getJobKey := func() client.ObjectKey {
 				return client.ObjectKey{
 					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
 					Namespace: backup.Namespace,
@@ -138,14 +138,14 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 
 				By("Check backup job's nodeName equals pod's nodeName")
-				Eventually(testapps.CheckObj(&testCtx, jobKey(), func(g Gomega, fetched *batchv1.Job) {
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(targetPod.Spec.NodeName))
 				})).Should(Succeed())
 
-				patchK8sJobStatus(jobKey(), batchv1.JobComplete)
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
 
 				By("Check backup job completed")
-				Eventually(testapps.CheckObj(&testCtx, jobKey(), func(g Gomega, fetched *batchv1.Job) {
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					_, finishedType := dputils.IsJobFinished(fetched)
 					g.Expect(finishedType).To(Equal(batchv1.JobComplete))
 				})).Should(Succeed())
@@ -160,14 +160,14 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 
 				By("Check backup job is deleted after backup completed")
-				Eventually(testapps.CheckObjExists(&testCtx, jobKey(), &batchv1.Job{}, false)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, false)).Should(Succeed())
 			})
 
 			It("should fail after job fails", func() {
-				patchK8sJobStatus(jobKey(), batchv1.JobFailed)
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobFailed)
 
 				By("check backup job failed")
-				Eventually(testapps.CheckObj(&testCtx, jobKey(), func(g Gomega, fetched *batchv1.Job) {
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					_, finishedType := dputils.IsJobFinished(fetched)
 					g.Expect(finishedType).To(Equal(batchv1.JobFailed))
 				})).Should(Succeed())
@@ -235,12 +235,12 @@ var _ = Describe("Backup Controller test", func() {
 					&dpv1alpha1.Backup{}, true)).Should(Succeed())
 
 				By("mock job for deletion to failed, backup should not be deleted")
-				replaceK8sJobStatus(jobKey, batchv1.JobFailed)
+				testdp.ReplaceK8sJobStatus(&testCtx, jobKey, batchv1.JobFailed)
 				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
 					&dpv1alpha1.Backup{}, true)).Should(Succeed())
 
 				By("mock job for deletion to completed, backup should be deleted")
-				replaceK8sJobStatus(jobKey, batchv1.JobComplete)
+				testdp.ReplaceK8sJobStatus(&testCtx, jobKey, batchv1.JobComplete)
 
 				By("check deletion backup file job completed")
 				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, fetched *batchv1.Job) {
@@ -282,7 +282,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			It("should success after all volume snapshot ready", func() {
 				By("patching volumesnapshot status to ready")
-				patchVolumeSnapshotStatus(vsKey, true)
+				testdp.PatchVolumeSnapshotStatus(&testCtx, vsKey, true)
 
 				By("checking volume snapshot source is equal to pvc")
 				Eventually(testapps.CheckObj(&testCtx, vsKey, func(g Gomega, fetched *vsv1.VolumeSnapshot) {
@@ -517,24 +517,3 @@ var _ = Describe("Backup Controller test", func() {
 		})
 	})
 })
-
-func patchK8sJobStatus(key client.ObjectKey, jobStatus batchv1.JobConditionType) {
-	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
-		jobCondition := batchv1.JobCondition{Type: jobStatus, Status: corev1.ConditionTrue}
-		fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
-	})).Should(Succeed())
-}
-
-func replaceK8sJobStatus(key client.ObjectKey, jobStatus batchv1.JobConditionType) {
-	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
-		jobCondition := batchv1.JobCondition{Type: jobStatus, Status: corev1.ConditionTrue}
-		fetched.Status.Conditions = []batchv1.JobCondition{jobCondition}
-	})).Should(Succeed())
-}
-
-func patchVolumeSnapshotStatus(key client.ObjectKey, readyToUse bool) {
-	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *vsv1.VolumeSnapshot) {
-		snapStatus := vsv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
-		fetched.Status = &snapStatus
-	})).Should(Succeed())
-}

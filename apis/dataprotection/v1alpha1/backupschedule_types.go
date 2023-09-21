@@ -36,6 +36,7 @@ type BackupScheduleSpec struct {
 
 	// schedules defines the list of backup schedules.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
 	Schedules []SchedulePolicy `json:"schedules"`
 }
 
@@ -74,7 +75,7 @@ type SchedulePolicy struct {
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 }
 
-// BackupScheduleStatus defines the observed state of BackupPolicy
+// BackupScheduleStatus defines the observed state of BackupSchedule.
 type BackupScheduleStatus struct {
 	// phase describes the phase of the BackupSchedule.
 	// +optional
@@ -99,11 +100,11 @@ type BackupScheduleStatus struct {
 type BackupSchedulePhase string
 
 const (
-	// BackupScheduleAvailable means the backup schedule is available.
-	BackupScheduleAvailable BackupSchedulePhase = "Available"
+	// BackupSchedulePhaseAvailable means the backup schedule is available.
+	BackupSchedulePhaseAvailable BackupSchedulePhase = "Available"
 
-	// BackupScheduleFailed means the backup schedule is failed.
-	BackupScheduleFailed BackupSchedulePhase = "Failed"
+	// BackupSchedulePhaseFailed means the backup schedule is failed.
+	BackupSchedulePhaseFailed BackupSchedulePhase = "Failed"
 )
 
 // ScheduleStatus defines the status of each schedule.
@@ -156,7 +157,7 @@ type BackupSchedule struct {
 type BackupScheduleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []BackupPolicy `json:"items"`
+	Items           []BackupSchedule `json:"items"`
 }
 
 func init() {

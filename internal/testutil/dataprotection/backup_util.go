@@ -29,6 +29,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -165,4 +166,39 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 		TargetPod: pod,
 		TargetPVC: pvc.Name,
 	}
+}
+
+func NewFakeBackupSchedule(testCtx *testutil.TestContext,
+	change func(schedule *dpv1alpha1.BackupSchedule)) *dpv1alpha1.BackupSchedule {
+	schedule := NewBackupScheduleFactory(testCtx.DefaultNamespace, BackupScheduleName).
+		SetBackupPolicyName(BackupPolicyName).
+		SetStartingDeadlineMinutes(StartingDeadlineMinutes).
+		AddSchedulePolicy(dpv1alpha1.SchedulePolicy{
+			Enabled:         boolptr.False(),
+			BackupMethod:    BackupMethodName,
+			CronExpression:  BackupScheduleCron,
+			RetentionPeriod: BackupRetention,
+		}).
+		AddSchedulePolicy(dpv1alpha1.SchedulePolicy{
+			Enabled:         boolptr.False(),
+			BackupMethod:    VSBackupMethodName,
+			CronExpression:  BackupScheduleCron,
+			RetentionPeriod: BackupRetention,
+		}).
+		Apply(change).
+		Create(testCtx).GetObject()
+	return schedule
+}
+
+// EnableBackupSchedule enables the backup schedule that matches the given method.
+func EnableBackupSchedule(testCtx *testutil.TestContext,
+	backupSchedule *dpv1alpha1.BackupSchedule, method string) {
+	Eventually(testapps.ChangeObj(testCtx, backupSchedule, func(schedule *dpv1alpha1.BackupSchedule) {
+		for i := range schedule.Spec.Schedules {
+			if schedule.Spec.Schedules[i].BackupMethod == method {
+				schedule.Spec.Schedules[i].Enabled = boolptr.True()
+				break
+			}
+		}
+	})).Should(Succeed())
 }

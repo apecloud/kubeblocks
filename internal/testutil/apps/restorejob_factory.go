@@ -31,7 +31,7 @@ type MockRestoreJobFactory struct {
 
 func NewRestoreJobFactory(namespace, name string) *MockRestoreJobFactory {
 	f := &MockRestoreJobFactory{}
-	// f.init(namespace, name,
+	// f.Init(namespace, name,
 	//	&dataprotectionv1alpha1.RestoreJob{
 	//		Spec: dataprotectionv1alpha1.RestoreJobSpec{
 	//			Target: dataprotectionv1alpha1.TargetCluster{
@@ -45,24 +45,24 @@ func NewRestoreJobFactory(namespace, name string) *MockRestoreJobFactory {
 }
 
 func (factory *MockRestoreJobFactory) SetBackupJobName(backupJobName string) *MockRestoreJobFactory {
-	factory.get().Spec.BackupJobName = backupJobName
+	factory.Get().Spec.BackupJobName = backupJobName
 	return factory
 }
 
 func (factory *MockRestoreJobFactory) AddTargetMatchLabels(keyAndValues ...string) *MockRestoreJobFactory {
 	// for k, v := range WithMap(keyAndValues...) {
-	//	factory.get().Spec.Target.LabelsSelector.MatchLabels[k] = v
+	//	factory.Get().Spec.Target.LabelsSelector.MatchLabels[k] = v
 	// }
 	return factory
 }
 
 func (factory *MockRestoreJobFactory) SetTargetSecretName(name string) *MockRestoreJobFactory {
-	// factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
+	// factory.Get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{Name: name}
 	return factory
 }
 
 func (factory *MockRestoreJobFactory) AddTargetVolume(volume corev1.Volume) *MockRestoreJobFactory {
-	factory.get().Spec.TargetVolumes = append(factory.get().Spec.TargetVolumes, volume)
+	factory.Get().Spec.TargetVolumes = append(factory.Get().Spec.TargetVolumes, volume)
 	return factory
 }
 
@@ -80,6 +80,6 @@ func (factory *MockRestoreJobFactory) AddTargetVolumePVC(volumeName, pvcName str
 }
 
 func (factory *MockRestoreJobFactory) AddTargetVolumeMount(volumeMount corev1.VolumeMount) *MockRestoreJobFactory {
-	factory.get().Spec.TargetVolumeMounts = append(factory.get().Spec.TargetVolumeMounts, volumeMount)
+	factory.Get().Spec.TargetVolumeMounts = append(factory.Get().Spec.TargetVolumeMounts, volumeMount)
 	return factory
 }

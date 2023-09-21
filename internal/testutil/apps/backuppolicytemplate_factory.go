@@ -32,23 +32,23 @@ type MockBackupPolicyTemplateFactory struct {
 
 func NewBackupPolicyTemplateFactory(name string) *MockBackupPolicyTemplateFactory {
 	f := &MockBackupPolicyTemplateFactory{}
-	f.init("", name,
+	f.Init("", name,
 		&appsv1alpha1.BackupPolicyTemplate{},
 		f)
 	return f
 }
 
 func (f *MockBackupPolicyTemplateFactory) SetClusterDefRef(clusterDefRef string) *MockBackupPolicyTemplateFactory {
-	f.get().Spec.ClusterDefRef = clusterDefRef
+	f.Get().Spec.ClusterDefRef = clusterDefRef
 	return f
 }
 
 func (f *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *appsv1alpha1.BackupPolicy {
-	l := len(f.get().Spec.BackupPolicies)
+	l := len(f.Get().Spec.BackupPolicies)
 	if l == 0 {
 		return nil
 	}
-	backupPolicies := f.get().Spec.BackupPolicies
+	backupPolicies := f.Get().Spec.BackupPolicies
 	return &backupPolicies[l-1]
 }
 
@@ -63,7 +63,7 @@ func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.Back
 }
 
 func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(componentDef string) *MockBackupPolicyTemplateFactory {
-	f.get().Spec.BackupPolicies = append(f.get().Spec.BackupPolicies, appsv1alpha1.BackupPolicy{
+	f.Get().Spec.BackupPolicies = append(f.Get().Spec.BackupPolicies, appsv1alpha1.BackupPolicy{
 		ComponentDefRef: componentDef,
 	})
 	return f
@@ -134,6 +134,6 @@ func (f *MockBackupPolicyTemplateFactory) SetTargetRole(role string) *MockBackup
 }
 
 func (f *MockBackupPolicyTemplateFactory) SetLabels(labels map[string]string) *MockBackupPolicyTemplateFactory {
-	f.get().SetLabels(labels)
+	f.Get().SetLabels(labels)
 	return f
 }

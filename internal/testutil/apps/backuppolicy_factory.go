@@ -32,32 +32,32 @@ type MockBackupPolicyFactory struct {
 
 func NewBackupPolicyFactory(namespace, name string) *MockBackupPolicyFactory {
 	f := &MockBackupPolicyFactory{}
-	f.init(namespace, name, &dpv1alpha1.BackupPolicy{}, f)
+	f.Init(namespace, name, &dpv1alpha1.BackupPolicy{}, f)
 	return f
 }
 
 func (f *MockBackupPolicyFactory) SetBackupRepoName(backupRepoName string) *MockBackupPolicyFactory {
 	if backupRepoName == "" {
-		f.get().Spec.BackupRepoName = nil
+		f.Get().Spec.BackupRepoName = nil
 	} else {
-		f.get().Spec.BackupRepoName = &backupRepoName
+		f.Get().Spec.BackupRepoName = &backupRepoName
 	}
 	return f
 }
 
 func (f *MockBackupPolicyFactory) SetPathPrefix(pathPrefix string) *MockBackupPolicyFactory {
-	f.get().Spec.PathPrefix = pathPrefix
+	f.Get().Spec.PathPrefix = pathPrefix
 	return f
 }
 
 func (f *MockBackupPolicyFactory) SetBackoffLimit(backoffLimit int32) *MockBackupPolicyFactory {
-	f.get().Spec.BackoffLimit = &backoffLimit
+	f.Get().Spec.BackoffLimit = &backoffLimit
 	return f
 }
 
 func (f *MockBackupPolicyFactory) AddBackupMethod(name string,
 	snapshotVolumes bool, actionSetName string) *MockBackupPolicyFactory {
-	f.get().Spec.BackupMethods = append(f.get().Spec.BackupMethods,
+	f.Get().Spec.BackupMethods = append(f.Get().Spec.BackupMethods,
 		dpv1alpha1.BackupMethod{
 			Name:            name,
 			SnapshotVolumes: &snapshotVolumes,
@@ -68,7 +68,7 @@ func (f *MockBackupPolicyFactory) AddBackupMethod(name string,
 }
 
 func (f *MockBackupPolicyFactory) SetBackupMethodVolumes(names []string) *MockBackupPolicyFactory {
-	f.get().Spec.BackupMethods[len(f.get().Spec.BackupMethods)-1].TargetVolumes.Volumes = names
+	f.Get().Spec.BackupMethods[len(f.Get().Spec.BackupMethods)-1].TargetVolumes.Volumes = names
 	return f
 }
 
@@ -80,12 +80,12 @@ func (f *MockBackupPolicyFactory) SetBackupMethodVolumeMounts(keyAndValues ...st
 			MountPath: v,
 		})
 	}
-	f.get().Spec.BackupMethods[len(f.get().Spec.BackupMethods)-1].TargetVolumes.VolumeMounts = volumeMounts
+	f.Get().Spec.BackupMethods[len(f.Get().Spec.BackupMethods)-1].TargetVolumes.VolumeMounts = volumeMounts
 	return f
 }
 
 func (f *MockBackupPolicyFactory) SetTarget(keyAndValues ...string) *MockBackupPolicyFactory {
-	f.get().Spec.Target = &dpv1alpha1.BackupTarget{
+	f.Get().Spec.Target = &dpv1alpha1.BackupTarget{
 		PodSelector: &dpv1alpha1.PodSelector{
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: WithMap(keyAndValues...),
@@ -96,7 +96,7 @@ func (f *MockBackupPolicyFactory) SetTarget(keyAndValues ...string) *MockBackupP
 }
 
 func (f *MockBackupPolicyFactory) SetTargetConnectionCredential(secretName string) *MockBackupPolicyFactory {
-	f.get().Spec.Target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
+	f.Get().Spec.Target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
 		SecretName:  secretName,
 		UsernameKey: "username",
 		PasswordKey: "password",

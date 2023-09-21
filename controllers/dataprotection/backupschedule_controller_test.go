@@ -19,547 +19,260 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package dataprotection
 
-//
-//import (
-//	"fmt"
-//	"time"
-//
-//	. "github.com/onsi/ginkgo/v2"
-//	. "github.com/onsi/gomega"
-//
-//	appsv1 "k8s.io/api/apps/v1"
-//	batchv1 "k8s.io/api/batch/v1"
-//	corev1 "k8s.io/api/core/v1"
-//	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-//	"k8s.io/apimachinery/pkg/types"
-//	"sigs.k8s.io/controller-runtime/pkg/client"
-//
-//	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-//	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-//	"github.com/apecloud/kubeblocks/internal/constant"
-//	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-//	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-//	viper "github.com/apecloud/kubeblocks/internal/viperx"
-//)
-//
-//var _ = Describe("Backup Schedule Controller", func() {
-//	const (
-//		clusterName         = "wesql-cluster"
-//		componentName       = "replicasets-primary"
-//		containerName       = "mysql"
-//		defaultPVCSize      = "1Gi"
-//		backupPolicyName    = "test-backup-policy"
-//		backupRemotePVCName = "backup-remote-pvc"
-//		defaultSchedule     = "0 3 * * *"
-//		defaultTTL          = "7d"
-//		backupNamePrefix    = "test-backup-job-"
-//	)
-//
-//	cleanEnv := func() {
-//		// must wait till resources deleted and no longer existed before the testcases start,
-//		// otherwise if later it needs to create some new resource objects with the same name,
-//		// in race conditions, it will find the existence of old objects, resulting failure to
-//		// create the new objects.
-//		By("clean resources")
-//		// delete rest mocked objects
-//		inNS := client.InNamespace(testCtx.DefaultNamespace)
-//		ml := client.HasLabels{testCtx.TestObjLabelKey}
-//		// namespaced
-//		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
-//		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-//		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-//		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-//		testapps.ClearResources(&testCtx, intctrlutil.BackupScheduleSignature, inNS, ml)
-//		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
-//		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS)
-//		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
-//		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
-//		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
-//		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
-//
-//		// non-namespaced
-//		testapps.ClearResources(&testCtx, intctrlutil.ActionSetSignature, ml)
-//	}
-//
-//	BeforeEach(func() {
-//		cleanEnv()
-//
-//		By("By mocking a statefulset")
-//		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
-//			AddAppInstanceLabel(clusterName).
-//			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-//			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-//				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
-//				Spec:       testapps.NewPVC(defaultPVCSize),
-//			}).Create(&testCtx).GetObject()
-//
-//		By("By mocking a pod belonging to the statefulset")
-//		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
-//			AddAppInstanceLabel(clusterName).
-//			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
-//			Create(&testCtx).GetObject()
-//
-//		By("By mocking a pvc belonging to the pod")
-//		_ = testapps.NewPersistentVolumeClaimFactory(
-//			testCtx.DefaultNamespace, "data-"+pod.Name, clusterName, componentName, "data").
-//			SetStorage("1Gi").
-//			Create(&testCtx)
-//	})
-//
-//	AfterEach(cleanEnv)
-//
-//	When("creating backup policy with default settings", func() {
-//		var actionSetName string
-//		getCronjobKey := func(backupType dpv1alpha1.BackupMethod) types.NamespacedName {
-//			return types.NamespacedName{
-//				Name:      fmt.Sprintf("%s-%s-%s", backupPolicyName, testCtx.DefaultNamespace, backupType),
-//				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
-//			}
-//		}
-//
-//		BeforeEach(func() {
-//			viper.Set(constant.CfgKeyCtrlrMgrAffinity,
-//				"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
-//			viper.Set(constant.CfgKeyCtrlrMgrTolerations,
-//				"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
-//			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
-//
-//			By("By creating a backupTool")
-//			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
-//				&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
-//			actionSetName = actionSet.Name
-//		})
-//
-//		AfterEach(func() {
-//			viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
-//			viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
-//			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
-//		})
-//
-//		Context("creates a backup policy", func() {
-//			var backupPolicyKey types.NamespacedName
-//			var backupPolicy *dpv1alpha1.BackupPolicy
-//			var startingDeadlineMinutes int64 = 60
-//			BeforeEach(func() {
-//				By("By creating a backupPolicy from actionSet: " + actionSetName)
-//				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-//					AddDataFilePolicy().
-//					SetBackupToolName(backupToolName).
-//					SetBackupsHistoryLimit(1).
-//					SetSchedule(defaultSchedule, true).
-//					SetScheduleStartingDeadlineMinutes(&startingDeadlineMinutes).
-//					SetRetentionPeriod(defaultTTL).
-//					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//					SetTargetSecretName(clusterName).
-//					AddHookPreCommand("touch /data/mysql/.restore;sync").
-//					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-//					SetPVC(backupRemotePVCName).
-//					Create(&testCtx).GetObject()
-//				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
-//			})
-//			It("should success", func() {
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
-//				})).Should(Succeed())
-//				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(dpv1alpha1.BackupTypeDataFile), func(g Gomega, fetched *batchv1.CronJob) {
-//					g.Expect(fetched.Spec.Schedule).To(Equal(defaultSchedule))
-//					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
-//					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
-//					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
-//					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
-//					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())
-//					g.Expect(*fetched.Spec.StartingDeadlineSeconds).Should(Equal(startingDeadlineMinutes * 60))
-//				})).Should(Succeed())
-//			})
-//			It("limit backups to 1", func() {
-//				now := metav1.Now()
-//				backupStatus := dpv1alpha1.BackupStatus{
-//					Phase:               dpv1alpha1.BackupPhaseCompleted,
-//					Expiration:          &now,
-//					StartTimestamp:      &now,
-//					CompletionTimestamp: &now,
-//				}
-//
-//				autoBackupLabel := map[string]string{
-//					dataProtectionLabelAutoBackupKey:   "true",
-//					dataProtectionLabelBackupPolicyKey: backupPolicyName,
-//					dataProtectionLabelBackupTypeKey:   string(dpv1alpha1.BackupTypeDataFile),
-//				}
-//
-//				By("create a expired backup")
-//				backupExpired := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
-//					WithRandomName().AddLabelsInMap(autoBackupLabel).
-//					SetBackupPolicyName(backupPolicyName).
-//					AddBackupMethod(dpv1alpha1.BackupTypeDataFile).
-//					Create(&testCtx).GetObject()
-//				By("create 1st limit backup")
-//				backupOutLimit1 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
-//					WithRandomName().AddLabelsInMap(autoBackupLabel).
-//					SetBackupPolicyName(backupPolicyName).
-//					AddBackupMethod(dpv1alpha1.BackupTypeDataFile).
-//					Create(&testCtx).GetObject()
-//				By("create 2nd limit backup")
-//				backupOutLimit2 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
-//					WithRandomName().AddLabelsInMap(autoBackupLabel).
-//					SetBackupPolicyName(backupPolicyName).
-//					AddBackupMethod(dpv1alpha1.BackupTypeDataFile).
-//					Create(&testCtx).GetObject()
-//
-//				By("waiting expired backup completed")
-//				backupExpiredKey := client.ObjectKeyFromObject(backupExpired)
-//				patchK8sJobStatus(backupExpiredKey, batchv1.JobComplete)
-//				Eventually(testapps.CheckObj(&testCtx, backupExpiredKey,
-//					func(g Gomega, fetched *dpv1alpha1.Backup) {
-//						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-//					})).Should(Succeed())
-//				By("mock update expired backup status to expire")
-//				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
-//				backupStatus.StartTimestamp = backupStatus.Expiration
-//				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
-//
-//				By("waiting 1st limit backup completed")
-//				backupOutLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
-//				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
-//				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
-//					func(g Gomega, fetched *dpv1alpha1.Backup) {
-//						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-//					})).Should(Succeed())
-//				By("mock update 1st limit backup NOT to expire")
-//				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
-//				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
-//				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
-//
-//				By("waiting 2nd limit backup completed")
-//				backupOutLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
-//				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
-//				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
-//					func(g Gomega, fetched *dpv1alpha1.Backup) {
-//						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-//					})).Should(Succeed())
-//				By("mock update 2nd limit backup NOT to expire")
-//				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
-//				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
-//				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))
-//
-//				// trigger the backup policy controller through update cronjob
-//				patchCronJobStatus(getCronjobKey(dpv1alpha1.BackupTypeDataFile))
-//
-//				By("retain the latest backup")
-//				Eventually(testapps.List(&testCtx, intctrlutil.BackupSignature,
-//					client.MatchingLabels(backupPolicy.Spec.Datafile.Target.LabelsSelector.MatchLabels),
-//					client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(1))
-//			})
-//		})
-//
-//		Context("creates a backup policy with empty schedule", func() {
-//			var backupPolicyKey types.NamespacedName
-//			var backupPolicy *dpv1alpha1.BackupPolicy
-//			BeforeEach(func() {
-//				By("By creating a backupPolicy from backupTool: " + backupToolName)
-//				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-//					SetBackupToolName(backupToolName).
-//					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//					SetTargetSecretName(clusterName).
-//					AddHookPreCommand("touch /data/mysql/.restore;sync").
-//					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-//					SetPVC(backupRemotePVCName).
-//					Create(&testCtx).GetObject()
-//				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
-//			})
-//			It("should success", func() {
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
-//				})).Should(Succeed())
-//			})
-//		})
-//
-//		Context("creates a backup policy with invalid schedule", func() {
-//			var backupPolicyKey types.NamespacedName
-//			var backupPolicy *dpv1alpha1.BackupPolicy
-//			BeforeEach(func() {
-//				By("By creating a backupPolicy from backupTool: " + backupToolName)
-//				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-//					AddSnapshotPolicy().
-//					SetBackupToolName(backupToolName).
-//					SetSchedule("invalid schedule", true).
-//					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//					SetTargetSecretName(clusterName).
-//					AddHookPreCommand("touch /data/mysql/.restore;sync").
-//					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-//					SetPVC(backupRemotePVCName).
-//					Create(&testCtx).GetObject()
-//				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
-//			})
-//			It("should failed", func() {
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.BackupPolicyAvailable))
-//				})).Should(Succeed())
-//			})
-//		})
-//
-//		Context("creating a backupPolicy with secret", func() {
-//			It("creating a backupPolicy with secret", func() {
-//				By("By creating a backupPolicy with empty secret")
-//				randomSecretName := testCtx.GetRandomStr()
-//				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-//					AddDataFilePolicy().
-//					SetBackupToolName(backupToolName).
-//					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//					SetTargetSecretName(randomSecretName).
-//					AddHookPreCommand("touch /data/mysql/.restore;sync").
-//					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-//					SetPVC(backupRemotePVCName).
-//					Create(&testCtx).GetObject()
-//				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
-//					g.Expect(fetched.Spec.Datafile.Target.Secret.Name).To(Equal(randomSecretName))
-//				})).Should(Succeed())
-//			})
-//		})
-//
-//		Context("creating a backupPolicy with global backup config", func() {
-//			It("creating a backupPolicy with global backup config", func() {
-//				By("By creating a backupPolicy with empty secret")
-//				pvcName := "backup-data"
-//				pvcInitCapacity := "10Gi"
-//				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
-//				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
-//				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-//					AddDataFilePolicy().
-//					SetBackupToolName(backupToolName).
-//					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//					AddHookPreCommand("touch /data/mysql/.restore;sync").
-//					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-//					Create(&testCtx).GetObject()
-//				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
-//					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).ToNot(BeNil())
-//					g.Expect(*fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
-//					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
-//				})).Should(Succeed())
-//			})
-//		})
-//		Context("reconcile a logfile backupPolicy", func() {
-//			It("with reconfigure config and job deployKind", func() {
-//				By("creating a backupPolicy")
-//				pvcName := "backup-data"
-//				pvcInitCapacity := "10Gi"
-//				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
-//				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
-//				reconfigureRef := `{
-//					"name": "postgresql-configuration",
-//					"key": "postgresql.conf",
-//					"enable": {
-//					  "logfile": [{"key":"archive_command","value":"''"}]
-//					},
-//					"disable": {
-//					  "logfile": [{"key": "archive_command","value":"'/bin/true'"}]
-//					}
-//				  }`
-//				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-//					AddAnnotations(constant.ReconfigureRefAnnotationKey, reconfigureRef).
-//					AddLogfilePolicy().
-//					SetBackupToolName(backupToolName).
-//					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//					AddSnapshotPolicy().
-//					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//					Create(&testCtx).GetObject()
-//				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
-//				})).Should(Succeed())
-//				By("enable schedule for reconfigure")
-//				Eventually(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
-//					fetched.Spec.Schedule.Logfile = &dpv1alpha1.SchedulePolicy{Enable: true, CronExpression: "* * * * *"}
-//				})).Should(Succeed())
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotationKey]).To(Equal(`[{"key":"archive_command","value":"''"}]`))
-//				})).Should(Succeed())
-//
-//				By("disable schedule for reconfigure")
-//				Eventually(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
-//					fetched.Spec.Schedule.Logfile.Enable = false
-//				})).Should(Succeed())
-//				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-//					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotationKey]).To(Equal(`[{"key":"archive_command","value":"'/bin/true'"}]`))
-//				})).Should(Succeed())
-//			})
-//
-//			It("test logfile backup with a statefulSet deployKind", func() {
-//
-//				// mock a backupTool
-//				backupTool := createStatefulKindBackupTool()
-//
-//				testLogfileBackupWithStatefulSet := func() {
-//					By("init test resources")
-//					// mock a cluster
-//					cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-//						"test-cd", "test-cv").Create(&testCtx).GetObject()
-//					// mock a backupPolicy
-//					backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-//						SetOwnerReferences("apps.kubeblocks.io/v1alpha1", "Cluster", cluster).
-//						AddLogfilePolicy().
-//						SetRetentionPeriod("7d").
-//						SetSchedule("*/1 * * * *", false).
-//						SetBackupToolName(backupTool.Name).
-//						SetPVC(backupRemotePVCName).
-//						AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
-//						Create(&testCtx).GetObject()
-//
-//					By("enable logfile schedule, expect for backup and statefulSet creation")
-//					Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
-//						backupPolicy.Spec.Schedule.Logfile.Enable = true
-//					})).Should(Succeed())
-//					backup := &dpv1alpha1.Backup{}
-//					sts := &appsv1.StatefulSet{}
-//					backupName := generateCRNameByBackupSchedule(backupPolicy, dpv1alpha1.BackupTypeLogFile)
-//					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-//						backup = tmpBackup
-//						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-//					})).Should(Succeed())
-//					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, sts, true)).Should(Succeed())
-//
-//					By("check the container envs which is injected successfully.")
-//					expectedEnv := map[string]string{
-//						constant.DPArchiveInterval:  "60s",
-//						constant.DPTTL:              "7d",
-//						constant.DPLogfileTTL:       "192h",
-//						constant.DPLogfileTTLSecond: "691200",
-//					}
-//					checkGenerateENV := func(sts *appsv1.StatefulSet) {
-//						mainContainer := sts.Spec.Template.Spec.Containers[0]
-//						for k, v := range expectedEnv {
-//							for _, env := range mainContainer.Env {
-//								if env.Name != k {
-//									continue
-//								}
-//								Expect(env.Value).Should(Equal(v))
-//								break
-//							}
-//						}
-//					}
-//					checkGenerateENV(sts)
-//
-//					By("update cronExpression, expect for noticing backup to reconcile")
-//					Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
-//						backupPolicy.Spec.Schedule.Logfile.CronExpression = "*/2 * * * *"
-//						ttl := "2h"
-//						backupPolicy.Spec.Retention.TTL = &ttl
-//					})).Should(Succeed())
-//					// waiting for sts has changed and expect sts env to change to the corresponding value
-//					expectedEnv = map[string]string{
-//						constant.DPArchiveInterval:  "120s",
-//						constant.DPTTL:              "2h",
-//						constant.DPLogfileTTL:       "26h",
-//						constant.DPLogfileTTLSecond: "93600",
-//					}
-//					oldStsGeneration := sts.Generation
-//					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, func(g Gomega, tmpSts *appsv1.StatefulSet) {
-//						g.Expect(tmpSts.Generation).Should(Equal(oldStsGeneration + 1))
-//						checkGenerateENV(tmpSts)
-//					})).Should(Succeed())
-//
-//					By("expect to recreate the backup after delete the backup during enable logfile")
-//					Expect(testapps.ChangeObj(&testCtx, backup, func(policy *dpv1alpha1.Backup) {
-//						backup.Finalizers = []string{}
-//					})).Should(Succeed())
-//					testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(backup), backup)
-//					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-//						g.Expect(tmpBackup.Generation).Should(Equal(int64(1)))
-//						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-//					})).Should(Succeed())
-//
-//					By("disable logfile, expect the backup phase to Completed and sts is deleted")
-//					Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
-//						backupPolicy.Spec.Schedule.Logfile.Enable = false
-//					})).Should(Succeed())
-//					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-//						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
-//					})).Should(Succeed())
-//					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, sts, false)).Should(Succeed())
-//
-//					By("enable logfile schedule, expect to re-create backup ")
-//					Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
-//						backupPolicy.Spec.Schedule.Logfile.Enable = true
-//					})).Should(Succeed())
-//					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-//						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-//					})).Should(Succeed())
-//
-//					By("delete cluster, expect the backup phase to Completed")
-//					testapps.DeleteObject(&testCtx, types.NamespacedName{
-//						Name:      clusterName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, &appsv1alpha1.Cluster{})
-//					Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
-//						Name:      backupName,
-//						Namespace: testCtx.DefaultNamespace,
-//					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-//						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseCompleted))
-//					})).Should(Succeed())
-//
-//					// disabled logfile
-//					Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
-//						backupPolicy.Spec.Schedule.Logfile.Enable = false
-//					})).Should(Succeed())
-//				}
-//
-//				testLogfileBackupWithStatefulSet()
-//
-//				// clear backupPolicy
-//				testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, client.InNamespace(testCtx.DefaultNamespace),
-//					client.HasLabels{testCtx.TestObjLabelKey})
-//
-//				// test again for create a cluster with same name
-//				testLogfileBackupWithStatefulSet()
-//
-//			})
-//		})
-//	})
-//})
-//
-//func patchBackupStatus(status dpv1alpha1.BackupStatus, key types.NamespacedName) {
-//	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *dpv1alpha1.Backup) {
-//		fetched.Status = status
-//	})).Should(Succeed())
-//}
-//
-//func patchCronJobStatus(key types.NamespacedName) {
-//	now := metav1.Now()
-//	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.CronJob) {
-//		fetched.Status = batchv1.CronJobStatus{LastSuccessfulTime: &now, LastScheduleTime: &now}
-//	})).Should(Succeed())
-//}
-//
-//func createStatefulKindBackupTool() *dpv1alpha1.BackupTool {
-//	By("By creating a backupTool")
-//	backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
-//		&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
-//	Expect(testapps.ChangeObj(&testCtx, backupTool, func(bt *dpv1alpha1.BackupTool) {
-//		bt.Spec.DeployKind = dpv1alpha1.DeployKindStatefulSet
-//	})).Should(Succeed())
-//	return backupTool
-//}
+import (
+	"fmt"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
+	"github.com/apecloud/kubeblocks/internal/generics"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
+)
+
+var _ = Describe("Backup Schedule Controller", func() {
+	cleanEnv := func() {
+		// must wait till resources deleted and no longer existed before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+
+		// namespaced
+		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupScheduleSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.CronJobSignature, true, inNS)
+
+		// non-namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
+		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
+	}
+
+	//var clusterInfo *testdp.BackupClusterInfo
+
+	BeforeEach(func() {
+		cleanEnv()
+		_ = testdp.NewFakeCluster(&testCtx)
+	})
+
+	AfterEach(cleanEnv)
+
+	When("creating backup schedule with default settings", func() {
+		var (
+			backupPolicy *dpv1alpha1.BackupPolicy
+		)
+
+		getCronjobKey := func(backupSchedule *dpv1alpha1.BackupSchedule,
+			method string) client.ObjectKey {
+			return client.ObjectKey{
+				Name:      dpbackup.GenerateCRNameByBackupSchedule(backupSchedule, method),
+				Namespace: backupPolicy.Namespace,
+			}
+		}
+
+		getJobKey := func(backup *dpv1alpha1.Backup) client.ObjectKey {
+			return client.ObjectKey{
+				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+				Namespace: backup.Namespace,
+			}
+		}
+
+		BeforeEach(func() {
+			By("creating an actionSet")
+			actionSet := testdp.NewFakeActionSet(&testCtx)
+
+			By("creating storage provider")
+			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
+
+			By("creating backup repo")
+			_, _ = testdp.NewFakeBackupRepo(&testCtx, nil)
+
+			By("By creating a backupPolicy from actionSet " + actionSet.Name)
+			backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
+		})
+
+		AfterEach(func() {
+		})
+
+		Context("creates a backup schedule", func() {
+			var (
+				backupNamePrefix  = "schedule-test-backup-"
+				backupSchedule    *dpv1alpha1.BackupSchedule
+				backupScheduleKey client.ObjectKey
+			)
+			BeforeEach(func() {
+				By("creating a backupSchedule")
+				backupSchedule = testdp.NewFakeBackupSchedule(&testCtx, nil)
+				backupScheduleKey = client.ObjectKeyFromObject(backupSchedule)
+			})
+
+			It("should success", func() {
+				By("checking backupSchedule status, should be available")
+				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, func(g Gomega, fetched *dpv1alpha1.BackupSchedule) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupSchedulePhaseAvailable))
+				})).Should(Succeed())
+
+				By("checking cronjob, should not exist because all schedule policies of methods are disabled")
+				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName),
+					&batchv1.CronJob{}, false)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.VSBackupMethodName),
+					&batchv1.CronJob{}, false)).Should(Succeed())
+
+				By(fmt.Sprintf("enabling %s method schedule", testdp.BackupMethodName))
+				testdp.EnableBackupSchedule(&testCtx, backupSchedule, testdp.BackupMethodName)
+
+				By("checking cronjob, should exist one cronjob to create backup")
+				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName), func(g Gomega, fetched *batchv1.CronJob) {
+					schedulePolicy := dpbackup.GetSchedulePolicyByMethod(backupSchedule, testdp.BackupMethodName)
+					g.Expect(boolptr.IsSetToTrue(schedulePolicy.Enabled)).To(BeTrue())
+					g.Expect(fetched.Spec.Schedule).To(Equal(schedulePolicy.CronExpression))
+					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())
+					g.Expect(*fetched.Spec.StartingDeadlineSeconds).To(Equal(getStartingDeadlineSeconds(backupSchedule)))
+				})).Should(Succeed())
+			})
+
+			It("limit backups to 1", func() {
+				now := metav1.Now()
+				backupStatus := dpv1alpha1.BackupStatus{
+					Phase:               dpv1alpha1.BackupPhaseCompleted,
+					Expiration:          &now,
+					StartTimestamp:      &now,
+					CompletionTimestamp: &now,
+				}
+
+				autoBackupLabel := map[string]string{
+					dataProtectionLabelAutoBackupKey:   "true",
+					dataProtectionLabelBackupPolicyKey: testdp.BackupPolicyName,
+					dataProtectionLabelBackupMethodKey: testdp.BackupMethodName,
+				}
+
+				createBackup := func() *dpv1alpha1.Backup {
+					return testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
+						WithRandomName().AddLabelsInMap(autoBackupLabel).
+						SetBackupPolicyName(testdp.BackupPolicyName).
+						SetBackupMethod(testdp.BackupMethodName).
+						Create(&testCtx).GetObject()
+				}
+
+				checkBackupCompleted := func(key client.ObjectKey) {
+					Eventually(testapps.CheckObj(&testCtx, key,
+						func(g Gomega, fetched *dpv1alpha1.Backup) {
+							g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+						})).Should(Succeed())
+				}
+
+				By("create an expired backup")
+				backupExpired := createBackup()
+
+				By("create 1st limit backup")
+				backupOutLimit1 := createBackup()
+
+				By("create 2nd limit backup")
+				backupOutLimit2 := createBackup()
+
+				By("waiting expired backup completed")
+				expiredKey := client.ObjectKeyFromObject(backupExpired)
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupExpired), batchv1.JobComplete)
+				checkBackupCompleted(expiredKey)
+
+				By("mock update expired backup status to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
+				backupStatus.StartTimestamp = backupStatus.Expiration
+				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupExpired), backupStatus)
+
+				By("waiting 1st limit backup completed")
+				outLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupOutLimit1), batchv1.JobComplete)
+				checkBackupCompleted(outLimit1Key)
+
+				By("mock update 1st limit backup NOT to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
+				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
+				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupOutLimit1), backupStatus)
+
+				By("waiting 2nd limit backup completed")
+				outLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupOutLimit2), batchv1.JobComplete)
+				checkBackupCompleted(outLimit2Key)
+
+				By("mock update 2nd limit backup NOT to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
+				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
+				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupOutLimit2), backupStatus)
+
+				By("patch backup schedule to delete the expired backup")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupScheduleKey, func(fetched *dpv1alpha1.BackupSchedule) {
+					fetched.Spec.Schedules[0].BackupsHistoryLimit = 10
+				})).Should(Succeed())
+
+				By("retain the latest backup")
+				Eventually(testapps.List(&testCtx, generics.BackupSignature,
+					client.MatchingLabels(autoBackupLabel),
+					client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(2))
+			})
+		})
+
+		Context("creates a backup schedule with empty schedule", func() {
+			It("should fail when create a backupSchedule without nil schedule policy", func() {
+				backupScheduleObj := testdp.NewBackupScheduleFactory(testCtx.DefaultNamespace, testdp.BackupScheduleName).
+					SetBackupPolicyName(testdp.BackupPolicyName).
+					SetSchedules(nil).
+					GetObject()
+				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, backupScheduleObj)).Should(HaveOccurred())
+			})
+
+			It("should fail when create a backupSchedule without empty schedule policy", func() {
+				backupScheduleObj := testdp.NewBackupScheduleFactory(testCtx.DefaultNamespace, testdp.BackupScheduleName).
+					SetBackupPolicyName(testdp.BackupPolicyName).
+					GetObject()
+				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, backupScheduleObj)).Should(HaveOccurred())
+			})
+		})
+
+		Context("creates a backup policy with invalid schedule", func() {
+			var (
+				backupScheduleKey client.ObjectKey
+				backupSchedule    *dpv1alpha1.BackupSchedule
+			)
+
+			BeforeEach(func() {
+				By("creating a backupSchedule")
+				backupSchedule = testdp.NewFakeBackupSchedule(&testCtx, func(schedule *dpv1alpha1.BackupSchedule) {
+					schedule.Spec.Schedules[0].CronExpression = "invalid"
+				})
+				backupScheduleKey = client.ObjectKeyFromObject(backupSchedule)
+			})
+
+			It("should fail", func() {
+				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, func(g Gomega, fetched *dpv1alpha1.BackupSchedule) {
+					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.BackupSchedulePhaseAvailable))
+				})).Should(Succeed())
+			})
+		})
+	})
+})
+
+func getStartingDeadlineSeconds(backupSchedule *dpv1alpha1.BackupSchedule) int64 {
+	if backupSchedule.Spec.StartingDeadlineMinutes == nil {
+		return 0
+	}
+	return *backupSchedule.Spec.StartingDeadlineMinutes * 60
+}

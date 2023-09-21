@@ -33,7 +33,7 @@ type MockBackupRepoFactory struct {
 
 func NewBackupRepoFactory(namespace, name string) *MockBackupRepoFactory {
 	f := &MockBackupRepoFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&dataprotectionv1alpha1.BackupRepo{
 			Spec: dataprotectionv1alpha1.BackupRepoSpec{
 				VolumeCapacity:  resource.MustParse("100Gi"),
@@ -44,39 +44,39 @@ func NewBackupRepoFactory(namespace, name string) *MockBackupRepoFactory {
 }
 
 func (factory *MockBackupRepoFactory) SetStorageProviderRef(providerName string) *MockBackupRepoFactory {
-	factory.get().Spec.StorageProviderRef = providerName
+	factory.Get().Spec.StorageProviderRef = providerName
 	return factory
 }
 
 func (factory *MockBackupRepoFactory) SetVolumeCapacity(amount string) *MockBackupRepoFactory {
-	factory.get().Spec.VolumeCapacity = resource.MustParse(amount)
+	factory.Get().Spec.VolumeCapacity = resource.MustParse(amount)
 	return factory
 }
 
 func (factory *MockBackupRepoFactory) SetPVReclaimPolicy(policy string) *MockBackupRepoFactory {
-	factory.get().Spec.PVReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(policy)
+	factory.Get().Spec.PVReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(policy)
 	return factory
 }
 
 func (factory *MockBackupRepoFactory) SetConfig(config map[string]string) *MockBackupRepoFactory {
-	factory.get().Spec.Config = config
+	factory.Get().Spec.Config = config
 	return factory
 }
 
 func (factory *MockBackupRepoFactory) SetCredential(ref *corev1.SecretReference) *MockBackupRepoFactory {
-	factory.get().Spec.Credential = ref
+	factory.Get().Spec.Credential = ref
 	return factory
 }
 
 func (factory *MockBackupRepoFactory) SetAsDefaultRepo(v bool) *MockBackupRepoFactory {
 	if v {
-		obj := factory.get()
+		obj := factory.Get()
 		if obj.Annotations == nil {
 			obj.Annotations = map[string]string{}
 		}
 		obj.Annotations[dptypes.DefaultBackupRepoAnnotationKey] = "true"
 	} else {
-		delete(factory.get().Annotations, dptypes.DefaultBackupRepoAnnotationKey)
+		delete(factory.Get().Annotations, dptypes.DefaultBackupRepoAnnotationKey)
 	}
 	return factory
 }

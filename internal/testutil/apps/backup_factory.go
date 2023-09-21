@@ -33,7 +33,7 @@ type MockBackupFactory struct {
 
 func NewBackupFactory(namespace, name string) *MockBackupFactory {
 	f := &MockBackupFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&dpv1alpha1.Backup{
 			Spec: dpv1alpha1.BackupSpec{},
 		}, f)
@@ -41,27 +41,27 @@ func NewBackupFactory(namespace, name string) *MockBackupFactory {
 }
 
 func (factory *MockBackupFactory) SetBackupPolicyName(backupPolicyName string) *MockBackupFactory {
-	factory.get().Spec.BackupPolicyName = backupPolicyName
+	factory.Get().Spec.BackupPolicyName = backupPolicyName
 	return factory
 }
 
 func (factory *MockBackupFactory) SetBackupMethod(backupMethod string) *MockBackupFactory {
-	factory.get().Spec.BackupMethod = backupMethod
+	factory.Get().Spec.BackupMethod = backupMethod
 	return factory
 }
 
 func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBackupFactory {
-	factory.get().SetLabels(labels)
+	factory.Get().SetLabels(labels)
 	return factory
 }
 
 func (factory *MockBackupFactory) SetBackupTimeRange(startTime, stopTime time.Time) *MockBackupFactory {
-	tr := factory.get().Status.TimeRange
+	tr := factory.Get().Status.TimeRange
 	if tr == nil {
 		tr = &dpv1alpha1.BackupTimeRange{}
 	}
 	tr.Start = &metav1.Time{Time: startTime}
 	tr.End = &metav1.Time{Time: stopTime}
-	factory.get().Status.TimeRange = tr
+	factory.Get().Status.TimeRange = tr
 	return factory
 }

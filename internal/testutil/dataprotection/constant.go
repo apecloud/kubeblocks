@@ -40,4 +40,9 @@ const (
 
 	StorageProviderName = "test-sp"
 	StorageClassName    = "test-sc"
+
+	BackupScheduleName      = "test-backup-schedule"
+	BackupScheduleCron      = "0 3 * * *"
+	BackupRetention         = "7d"
+	StartingDeadlineMinutes = 10
 )

@@ -95,7 +95,7 @@ type MockComponentResourceConstraintFactory struct {
 
 func NewComponentResourceConstraintFactory(name string) *MockComponentResourceConstraintFactory {
 	f := &MockComponentResourceConstraintFactory{}
-	f.init("", name, &appsv1alpha1.ComponentResourceConstraint{
+	f.Init("", name, &appsv1alpha1.ComponentResourceConstraint{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -110,7 +110,7 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 	var (
 		tpl            string
 		newConstraints []appsv1alpha1.ResourceConstraintRule
-		constraints    = factory.get().Spec.Rules
+		constraints    = factory.Get().Spec.Rules
 	)
 	switch constraintTplType {
 	case GeneralResourceConstraint:
@@ -124,11 +124,11 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 		panic(err)
 	}
 	constraints = append(constraints, newConstraints...)
-	factory.get().Spec.Rules = constraints
+	factory.Get().Spec.Rules = constraints
 	return factory
 }
 
 func (factory *MockComponentResourceConstraintFactory) AddSelector(selector appsv1alpha1.ClusterResourceConstraintSelector) *MockComponentResourceConstraintFactory {
-	factory.get().Spec.Selector = append(factory.get().Spec.Selector, selector)
+	factory.Get().Spec.Selector = append(factory.Get().Spec.Selector, selector)
 	return factory
 }

@@ -187,15 +187,37 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 				Phase: v1alpha1.CInitPhase,
 			},
 		},
+		want: v1alpha1.CCreatingPhase,
+	}, {
+		name: "test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+				ConfigSpec: &v1alpha1.ComponentConfigSpec{
+					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+						Name: "test",
+					},
+				},
+			},
+			status: &v1alpha1.ConfigurationItemDetailStatus{
+				Phase: v1alpha1.CInitPhase,
+			},
+		},
 		want: v1alpha1.CPendingPhase,
 	}, {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `{"name":"test"}`).
+				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `{"name":"test","configSpec":{"name":"test"}}`).
 				GetObject(),
 			item: v1alpha1.ConfigurationItemDetail{
 				Name: "test",
+				ConfigSpec: &v1alpha1.ComponentConfigSpec{
+					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+						Name: "test",
+					},
+				},
 			},
 			status: &v1alpha1.ConfigurationItemDetailStatus{
 				Phase: v1alpha1.CUpgradingPhase,

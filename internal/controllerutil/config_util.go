@@ -158,7 +158,7 @@ func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDeta
 func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
 	item v1alpha1.ConfigurationItemDetail,
 	status *v1alpha1.ConfigurationItemDetailStatus) v1alpha1.ConfigurationPhase {
-	if status == nil || status.Phase == "" {
+	if status == nil || status.Phase == "" || item.ConfigSpec == nil {
 		return v1alpha1.CCreatingPhase
 	}
 	if !IsApplyConfigChanged(configMap, item) {

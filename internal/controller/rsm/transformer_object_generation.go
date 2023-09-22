@@ -22,12 +22,12 @@ package rsm
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"

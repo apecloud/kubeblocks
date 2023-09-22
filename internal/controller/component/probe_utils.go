@@ -99,9 +99,9 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 	// as all the above features share the lorry service, only one lorry need to be injected.
 	// if none of the above feature enabled, WeSyncer still need to be injected for the HA feature functions well.
 	if len(lorryContainers) == 0 {
-		dbPilotContainer := container.DeepCopy()
-		buildWeSyncerContainer(dbPilotContainer, int(lorrySvcHTTPPort))
-		lorryContainers = append(lorryContainers, *dbPilotContainer)
+		weSyncerContainer := container.DeepCopy()
+		buildWeSyncerContainer(weSyncerContainer, int(lorrySvcHTTPPort))
+		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
 
 	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
@@ -208,9 +208,9 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 	}
 }
 
-func buildWeSyncerContainer(dbPilotContainer *corev1.Container, probeSvcHTTPPort int) {
-	dbPilotContainer.Name = constant.WeSyncerContainerName
-	dbPilotContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPort int) {
+	weSyncerContainer.Name = constant.WeSyncerContainerName
+	weSyncerContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,

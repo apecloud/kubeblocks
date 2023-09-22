@@ -514,7 +514,7 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 	if container, existed := isRoleProbeContainerExisting(); existed {
 		// presume the first port is the http port.
 		// this is an easily broken contract between rsm controller and cluster controller.
-		// TODO(free6om): design a better way to do this after Lorry-DBPilot separation done
+		// TODO(free6om): design a better way to do this after Lorry-WeSyncer separation done
 		readinessProbe.HTTPGet.Port = intstr.FromInt(int(container.Ports[0].ContainerPort))
 		container.ReadinessProbe = readinessProbe
 		for _, e := range env {

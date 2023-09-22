@@ -7,6 +7,8 @@ sidebar_position: 4
 
 # Configure cluster parameters
 
+From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
+
 There are 3 types of parameters:
 
 1. Environment parameters, such as GC-related parameters, `PULSAR_MEM`, and `PULSAR_GC`, changes will apply to all components;
@@ -195,6 +197,43 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
      Progress:           1/2
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
+
+## Reconfigure parameters with edit-config
+
+For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+
+1. Edit the configuration file.
+
+   ```bash
+   kbcli cluster edit-config pulsar
+   ```
+
+:::note
+
+If there are multiple components in a cluster, use `--component` to specify a component.
+
+:::
+
+2. View the status of the parameter reconfiguration.
+
+   ```bash
+   kbcli cluster describe-ops xxx -n default
+   ```
+
+3. Connect to the database to verify whether the parameters are modified
+
+   ```bash
+   kbcli cluster connect pulsar
+   ```
+
+:::note
+
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported in later version.
+
+:::
 
 ## Reconfigure with kubectl
 

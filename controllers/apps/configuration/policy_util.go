@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -58,7 +59,13 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := common.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		pods, err := common.GetPodListByStatefulSetWithSelector(params.Ctx.Ctx,
+			params.Client,
+			&params.ComponentUnits[i],
+			client.MatchingLabels{
+				constant.KBAppComponentLabelKey: params.ClusterComponent.Name,
+				constant.AppInstanceLabelKey:    params.Cluster.Name,
+			})
 		if err != nil {
 			return nil, err
 		}
@@ -83,17 +90,39 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 	return readyPods
 }
 
-func getRSMPods(params reconfigureParams) ([]corev1.Pod, error) {
+func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
+	if len(params.ComponentUnits) != 1 {
+		return nil, core.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
+	}
+
+	pods, err := GetComponentPods(params)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.SliceStable(pods, func(i, j int) bool {
+		_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+		_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+		return ordinal1 < ordinal2
+	})
+	return pods, nil
+}
+
+func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) > 1 {
-		return nil, core.MakeError("rsm component require only one statefulset, actual %d components", len(params.ComponentUnits))
+		return nil, core.MakeError("consensus component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	if len(params.ComponentUnits) == 0 {
 		return nil, nil
 	}
 
-	stsObj := &params.ComponentUnits[0]
-	pods, err := common.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := GetComponentPods(params)
+	// stsObj := &params.ComponentUnits[0]
+	// pods, err := components.GetPodListByStatefulSetWithSelector(params.Ctx.Ctx, params.Client, stsObj, client.MatchingLabels{
+	//	constant.KBAppComponentLabelKey: params.ClusterComponent.Name,
+	//	constant.AppInstanceLabelKey:    params.Cluster.Name,
+	// })
 	if err != nil {
 		return nil, err
 	}

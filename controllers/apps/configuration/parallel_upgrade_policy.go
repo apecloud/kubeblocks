@@ -25,6 +25,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -39,10 +40,14 @@ func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatu
 	var funcs RollingUpgradeFuncs
 
 	switch params.WorkloadType() {
-	case appsv1alpha1.Consensus, appsv1alpha1.Stateful, appsv1alpha1.Replication:
-		funcs = GetRSMRollingUpgradeFuncs()
 	default:
 		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", params.WorkloadType())
+	case appsv1alpha1.Consensus:
+		funcs = GetConsensusRollingUpgradeFuncs()
+	case appsv1alpha1.Stateful:
+		funcs = GetStatefulSetRollingUpgradeFuncs()
+	case appsv1alpha1.Replication:
+		funcs = GetReplicationRollingUpgradeFuncs()
 	}
 
 	pods, err := funcs.GetPodsFunc(params)

@@ -283,6 +283,14 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 */}}
 {{- define "kubeblocks.cloudProvider" }}
 {{- $kubeVersion := .Capabilities.KubeVersion.GitVersion }}
+{{- $validProviders := .Values.validProviders}}
+{{- $provider := .Values.provider }}
+{{- $valid := false }}
+{{- range $validProviders }}
+    {{- if eq . $provider }}
+        {{- $valid = true }}
+    {{- end }}
+{{- end }}
 {{- if contains "-eks" $kubeVersion }}
 {{- "aws" -}}
 {{- else if contains "-gke" $kubeVersion }}
@@ -293,10 +301,15 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 {{- "tencentCloud" -}}
 {{- else if contains "-aks" $kubeVersion }}
 {{- "azure" -}}
-{{- else }}
-{{- "" -}}
+{{- else if $valid }}
+{{- $provider }}
+{{- else}}
+{{- $invalidProvider := join ", " .Values.validProviders }}
+{{- $errorMessage := printf "Warning: Your provider is invalid. Please use one of the following: %s" $invalidProvider | trimSuffix ", " }}
+{{- fail $errorMessage}}
 {{- end }}
 {{- end }}
+
 
 {{/*
 Define default storage class name, if cloud provider is known, specify a default storage class name.

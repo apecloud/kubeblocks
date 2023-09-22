@@ -29,8 +29,6 @@ spec:
               - mountPath: /etc/ldap/slapd.d
                 name: openldap
                 subPath: ldap-config
-              - mountPath: /container/service/slapd/assets/config/bootstrap/ldif/custom
-                name: openldap-bootstrap
             ports:
               - containerPort: 389
                 name: ldap

@@ -255,6 +255,13 @@ mathAvg = [8-9][0-9]\.?\d*`
 			Expect("GetUserName").Should(BeEquivalentTo(r))
 		})
 
+		It("Default syntax", func() {
+			engine := NewTplEngine(&TplValues{}, nil, "for_test", nil, ctx, WithCustomizedWithType(DefaultDSL))
+			r, err := engine.Render(TemplateBeginDelim + ` camelcase "get_user_name" ` + TemplateEndDelim)
+			Expect(err).Should(Succeed())
+			Expect("GetUserName").Should(BeEquivalentTo(r))
+		})
+
 		It("customized syntax", func() {
 			engine := NewTplEngine(&TplValues{}, nil, "for_test", nil, ctx, WithCustomizedSyntax("-------", "======"))
 			r, err := engine.Render(`------- camelcase "get_user_name" ======`)

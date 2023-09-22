@@ -43,9 +43,12 @@ kbcli cluster describe-config pulsar
   kbcli cluster explain-config pulsar |head -n 20
   ```
 
-## Reconfigure environment parameters
+## Configure parameters with configure command
+
+### Configure environment parameters
 
 ***Steps***
+
 1. You need to specify the component name to configure parameters. Get the pulsar cluster component name.
 
   ```bash
@@ -87,9 +90,9 @@ kbcli cluster describe-config pulsar
    kubectl get pod -l app.kubernetes.io/name=pulsar
    ```
 
-## Reconfigure dynamic parameters
+### Configure dynamic parameters
 
-The following steps take the reconfiguration of dynamic parameter `brokerShutdownTimeoutMs` as an example.
+The following steps take the configuration of dynamic parameter `brokerShutdownTimeoutMs` as an example.
 
 ***Steps***
 
@@ -105,7 +108,7 @@ The following steps take the reconfiguration of dynamic parameter `brokerShutdow
    broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
    ```
 
-2. Reconfigure parameters.
+2. Configure parameters.
 
    ```bash
    kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
@@ -138,9 +141,9 @@ The following steps take the reconfiguration of dynamic parameter `brokerShutdow
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
 
-## Reconfigure static parameters
+### Configure static parameters
 
-Static parameter reconfiguring requires restarting the pod. The following example reconfigures `lostBookieRecoveryDelay`.
+Static parameter configuring requires restarting the pod. The following example configures `lostBookieRecoveryDelay`.
 
 1. Get the current configuration.
 
@@ -179,7 +182,7 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
            kbcli cluster describe-ops pulsar-reconfiguring-gmz7w -n default
    ```
 
-3. View the status of the parameter reconfiguration.
+3. View the status of the parameter configuration.
 
    ```bash
    kbcli cluster describe-ops pulsar-reconfiguring-gmz7w -n default
@@ -198,7 +201,7 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
 
-## Reconfigure parameters with edit-config
+## Configure parameters with edit-config command
 
 For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
@@ -216,13 +219,13 @@ If there are multiple components in a cluster, use `--component` to specify a co
 
 :::
 
-2. View the status of the parameter reconfiguration.
+2. View the status of the parameter configuration.
 
    ```bash
    kbcli cluster describe-ops xxx -n default
    ```
 
-3. Connect to the database to verify whether the parameters are modified
+3. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
    kbcli cluster connect pulsar
@@ -231,13 +234,13 @@ If there are multiple components in a cluster, use `--component` to specify a co
 :::note
 
 1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-2. Deleting a parameter will be supported in later version.
+2. Deleting a parameter will be supported later.
 
 :::
 
-## Reconfigure with kubectl
+## Configure with kubectl
 
-Using kubectl to reconfigure pulsar cluster requires modifying the configuration file.
+Using kubectl to configure pulsar cluster requires modifying the configuration file.
 
 ***Steps***
 

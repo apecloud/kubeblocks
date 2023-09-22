@@ -197,7 +197,7 @@ var _ = Describe("PITR Functions", func() {
 				constant.AppInstanceLabelKey:    sourceCluster,
 				constant.KBAppComponentLabelKey: mysqlCompName,
 			}
-			backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+			backup = testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
 				SetBackupPolicyName("test-fake").
 				SetBackupMethod(testdp.VSBackupMethodName).

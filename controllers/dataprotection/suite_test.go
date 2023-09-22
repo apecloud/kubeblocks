@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 	"fmt"
-	"go/build"
 	"path/filepath"
 	"testing"
 	"time"
@@ -87,10 +86,6 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
-			// use dependent external CRDs.
-			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.2.0", "config", "crd"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}
@@ -136,6 +131,7 @@ var _ = BeforeSuite(func() {
 		&snapshotv1.VolumeSnapshot{},
 		&snapshotv1beta1.VolumeSnapshot{},
 		&batchv1.Job{},
+		&batchv1.CronJob{},
 	}
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
@@ -150,7 +146,6 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("backup-controller"),
 	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupScheduleReconciler{

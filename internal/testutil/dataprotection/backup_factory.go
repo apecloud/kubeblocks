@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package dataprotection
 
 import (
 	"time"
@@ -25,10 +25,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 type MockBackupFactory struct {
-	BaseFactory[dpv1alpha1.Backup, *dpv1alpha1.Backup, MockBackupFactory]
+	testapps.BaseFactory[dpv1alpha1.Backup, *dpv1alpha1.Backup, MockBackupFactory]
 }
 
 func NewBackupFactory(namespace, name string) *MockBackupFactory {

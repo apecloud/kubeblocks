@@ -384,7 +384,7 @@ var _ = Describe("Cluster Controller", func() {
 		backupPolicyName := "test-backup-policy"
 		backupName := "test-backup"
 		backupMethod := "test-backup-method"
-		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
 			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
@@ -2325,7 +2325,7 @@ var _ = Describe("Cluster Controller", func() {
 				&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
 
 			By("creating backup")
-			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupMethod(testdp.BackupMethodName).
 				Create(&testCtx).GetObject()

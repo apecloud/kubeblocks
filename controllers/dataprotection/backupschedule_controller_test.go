@@ -147,7 +147,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 				})).Should(Succeed())
 			})
 
-			It("limit backups to 1", func() {
+			It("delete expired backups", func() {
 				now := metav1.Now()
 				backupStatus := dpv1alpha1.BackupStatus{
 					Phase:               dpv1alpha1.BackupPhaseCompleted,
@@ -163,7 +163,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 				}
 
 				createBackup := func() *dpv1alpha1.Backup {
-					return testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
+					return testdp.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 						WithRandomName().AddLabelsInMap(autoBackupLabel).
 						SetBackupPolicyName(testdp.BackupPolicyName).
 						SetBackupMethod(testdp.BackupMethodName).

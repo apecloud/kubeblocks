@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package dataprotection
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -25,10 +25,11 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 type MockBackupRepoFactory struct {
-	BaseFactory[dpv1alpha1.BackupRepo, *dpv1alpha1.BackupRepo, MockBackupRepoFactory]
+	testapps.BaseFactory[dpv1alpha1.BackupRepo, *dpv1alpha1.BackupRepo, MockBackupRepoFactory]
 }
 
 func NewBackupRepoFactory(namespace, name string) *MockBackupRepoFactory {

@@ -17,17 +17,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package dataprotection
 
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 type MockBackupPolicyFactory struct {
-	BaseFactory[dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy, MockBackupPolicyFactory]
+	testapps.BaseFactory[dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy, MockBackupPolicyFactory]
 }
 
 func NewBackupPolicyFactory(namespace, name string) *MockBackupPolicyFactory {
@@ -74,7 +75,7 @@ func (f *MockBackupPolicyFactory) SetBackupMethodVolumes(names []string) *MockBa
 
 func (f *MockBackupPolicyFactory) SetBackupMethodVolumeMounts(keyAndValues ...string) *MockBackupPolicyFactory {
 	var volumeMounts []corev1.VolumeMount
-	for k, v := range WithMap(keyAndValues...) {
+	for k, v := range testapps.WithMap(keyAndValues...) {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      k,
 			MountPath: v,
@@ -88,7 +89,7 @@ func (f *MockBackupPolicyFactory) SetTarget(keyAndValues ...string) *MockBackupP
 	f.Get().Spec.Target = &dpv1alpha1.BackupTarget{
 		PodSelector: &dpv1alpha1.PodSelector{
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: WithMap(keyAndValues...),
+				MatchLabels: testapps.WithMap(keyAndValues...),
 			},
 		},
 	}

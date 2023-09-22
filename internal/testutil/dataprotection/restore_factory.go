@@ -17,24 +17,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package dataprotection
 
 import (
 	corev1 "k8s.io/api/core/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 type MockRestoreFactory struct {
-	BaseFactory[dpv1alpha1.Restore, *dpv1alpha1.Restore, MockRestoreFactory]
+	testapps.BaseFactory[dpv1alpha1.Restore, *dpv1alpha1.Restore, MockRestoreFactory]
 }
 
 func NewRestoreJobFactory(namespace, name string) *MockRestoreFactory {
 	f := &MockRestoreFactory{}
 	// f.init(namespace, name,
-	//	&dataprotectionv1alpha1.RestoreJob{
-	//		Spec: dataprotectionv1alpha1.RestoreJobSpec{
-	//			Target: dataprotectionv1alpha1.TargetCluster{
+	//	&dpv1alpha1.RestoreJob{
+	//		Spec: dpv1alpha1.RestoreJobSpec{
+	//			Target: dpv1alpha1.TargetCluster{
 	//				LabelsSelector: &metav1.LabelSelector{
 	//					MatchLabels: map[string]string{},
 	//				},

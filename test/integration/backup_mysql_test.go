@@ -123,7 +123,7 @@ var _ = Describe("MySQL data protection function", func() {
 			&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
 
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
-		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+		backupPolicyObj := testdp.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
 			SetTarget(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetConnectionCredential(component.GenerateConnCredential(clusterKey.Name)).
@@ -145,7 +145,7 @@ var _ = Describe("MySQL data protection function", func() {
 		})).Should(Succeed())
 
 		By("By creating a backup from backupPolicy: " + backupPolicyKey.Name)
-		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
 			SetBackupPolicyName(backupPolicyKey.Name).
 			SetBackupMethod(testdp.BackupMethodName).

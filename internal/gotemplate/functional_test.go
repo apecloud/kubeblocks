@@ -85,6 +85,7 @@ func Test_fromYAML(t *testing.T) {
 		args: args{
 			str: `efg`,
 		},
+		want:    map[string]interface{}{},
 		wantErr: true,
 	}, {
 		name: "test",

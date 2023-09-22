@@ -413,6 +413,12 @@ func (ha *Ha) IsPodReady() (bool, error) {
 	pinger.Interval = 500 * time.Millisecond
 	err = pinger.Run()
 	if err != nil {
+		// For container runtimes like Containerd, unprivileged users can't send icmp echo packets.
+		// As a temporary workaround, special handling is being implemented to bypass this limitation.
+		if strings.Contains(err.Error(), "socket: permission denied") {
+			ha.logger.Info("ping failed, socket: permission denied, but temporarily return true")
+			return true, nil
+		}
 		ha.logger.Error(err, fmt.Sprintf("ping domain:%s failed", domain))
 		return false, err
 	}

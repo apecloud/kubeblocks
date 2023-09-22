@@ -68,10 +68,12 @@ var (
 	redisChart embed.FS
 	//go:embed charts/mongodb-cluster.tgz
 	mongodbChart embed.FS
+	//go:embed charts/foxlake-cluster.tgz
+	foxlakeChart embed.FS
 )
 
 func IsbuiltinCharts(chart string) bool {
-	return chart == "mysql" || chart == "postgresql" || chart == "kafka" || chart == "redis" || chart == "mongodb"
+	return chart == "mysql" || chart == "postgresql" || chart == "kafka" || chart == "redis" || chart == "mongodb" || chart == "foxlake"
 }
 
 // internal_chart registers embed chart
@@ -120,6 +122,15 @@ func init() {
 		alias:   "",
 	}
 	if err := mongodb.register("mongodb"); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	foxlake := &embedConfig{
+		chartFS: foxlakeChart,
+		name:    "foxlake-cluster.tgz",
+		alias:   "",
+	}
+	if err := foxlake.register("foxlake"); err != nil {
 		fmt.Println(err.Error())
 	}
 

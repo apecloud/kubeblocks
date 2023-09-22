@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "version": {
+      "title": "Version",
+      "description": "Cluster version.",
+      "type": "string",
+      "default": "foxlake-0.2.0"
+    },
+    "cpu": {
+      "title": "CPU",
+      "description": "CPU cores.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 1,
+      "minimum": 1,
+      "maximum": 64,
+      "multipleOf": 0.5
+    },
+    "memory": {
+      "title": "Memory(Gi)",
+      "description": "Memory, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 2,
+      "minimum": 2,
+      "maximum": 1000
+    },
+    "storage": {
+      "title": "Storage(Gi)",
+      "description": "Storage size, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 20,
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "storageCreate": {
+      "title": "Storage Create",
+      "description": "Specify whether a default storage will be created in FoxLake during initialization.",
+      "type": "boolean",
+      "default": false
+    },
+    "storageAccessKey": {
+      "title": "Storage Access Key",
+      "description": "Access key for the object storage service.",
+      "type": "string"
+    },
+    "storageSecretKey": {
+      "title": "Storage Secret Key",
+      "description": "Secret key for the object storage service.",
+      "type:": "string"
+    },
+    "storageEndpoint": {
+      "title": "Storage Endpoint",
+      "description": "Endpoint for the object storage service.",
+      "type": "string"
+    },
+    "storageUri": {
+      "title": "Storage URI",
+      "description": "Object Storage URI Format.",
+      "type": "string"
+    }
+  }
+}

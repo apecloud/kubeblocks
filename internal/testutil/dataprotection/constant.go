@@ -45,4 +45,6 @@ const (
 	BackupScheduleCron      = "0 3 * * *"
 	BackupRetention         = "7d"
 	StartingDeadlineMinutes = 10
+
+	KBToolImage = "apecloud/kubeblocks-tool:latest"
 )

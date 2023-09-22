@@ -17,31 +17,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package builder
+package action
 
 import (
-	"testing"
+	"reflect"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "Data Protection Builder Suite")
+func setControllerReference(owner, controlled metav1.Object, scheme *runtime.Scheme) error {
+	if owner == nil || reflect.ValueOf(owner).IsNil() {
+		return nil
+	}
+	return ctrlutil.SetControllerReference(owner, controlled, scheme)
 }
-
-var _ = BeforeSuite(func() {
-	// +kubebuilder:scaffold:scheme
-
-	go func() {
-		defer GinkgoRecover()
-	}()
-})
-
-var _ = AfterSuite(func() {
-})

@@ -308,7 +308,7 @@ func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
 }
 
-// GetStartTime gets the backup start time. Default return status.startTime,
+// GetStartTime gets the backup start time. Default return status.startTimestamp,
 // unless status.timeRange.startTime is not nil.
 func (r *BackupStatus) GetStartTime() *metav1.Time {
 	if r.TimeRange != nil && r.TimeRange.Start != nil {

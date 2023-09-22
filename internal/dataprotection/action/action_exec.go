@@ -63,10 +63,10 @@ func (e *ExecAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 
 func (e *ExecAction) validate() error {
 	if e.PodName == "" {
-		return errors.New("pod Name is required")
+		return errors.New("pod name is required")
 	}
 	if e.Namespace == "" {
-		return errors.New("Namespace is required")
+		return errors.New("namespace is required")
 	}
 	if len(e.Command) == 0 {
 		return errors.New("command is required")

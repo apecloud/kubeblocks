@@ -102,7 +102,7 @@ var _ = Describe("Backup Controller test", func() {
 			By("creating backup repo")
 			_, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
 
-			By("By creating a backupPolicy from actionSet: " + actionSet.Name)
+			By("creating a backupPolicy from actionSet: " + actionSet.Name)
 			backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
 
 			cluster = clusterInfo.Cluster
@@ -124,33 +124,33 @@ var _ = Describe("Backup Controller test", func() {
 			}
 
 			BeforeEach(func() {
-				By("By creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup = testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
 			It("should succeed after job completes", func() {
-				By("Check backup status")
+				By("check backup status")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 				})).Should(Succeed())
 
-				By("Check backup job's nodeName equals pod's nodeName")
+				By("check backup job's nodeName equals pod's nodeName")
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(targetPod.Spec.NodeName))
 				})).Should(Succeed())
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
 
-				By("Check backup job completed")
+				By("backup job should have completed")
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					_, finishedType := dputils.IsJobFinished(fetched)
 					g.Expect(finishedType).To(Equal(batchv1.JobComplete))
 				})).Should(Succeed())
 
-				By("Check backup completed")
+				By("backup should have completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Labels[dptypes.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
@@ -159,7 +159,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
-				By("Check backup job is deleted after backup completed")
+				By("backup job should be deleted after backup completed")
 				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, false)).Should(Succeed())
 			})
 
@@ -354,7 +354,7 @@ var _ = Describe("Backup Controller test", func() {
 		Context("creates a backup with non-existent backup policy", func() {
 			var backupKey types.NamespacedName
 			BeforeEach(func() {
-				By("By creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup := testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 			})

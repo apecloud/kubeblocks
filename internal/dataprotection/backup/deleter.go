@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -212,13 +212,13 @@ func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 		Ctx:    d.Ctx,
 	}
 
-	snaps := &snapshotv1.VolumeSnapshotList{}
+	snaps := &vsv1.VolumeSnapshotList{}
 	if err := vsCli.List(snaps, client.InNamespace(backup.Namespace),
 		client.MatchingLabels(BuildBackupWorkloadLabels(backup))); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
-	deleteVolumeSnapshot := func(vs *snapshotv1.VolumeSnapshot) error {
+	deleteVolumeSnapshot := func(vs *vsv1.VolumeSnapshot) error {
 		if controllerutil.ContainsFinalizer(vs, dptypes.DataProtectionFinalizerName) {
 			patch := vs.DeepCopy()
 			controllerutil.RemoveFinalizer(vs, dptypes.DataProtectionFinalizerName)

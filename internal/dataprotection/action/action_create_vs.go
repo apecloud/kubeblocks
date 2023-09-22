@@ -98,7 +98,10 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 		snap *vsv1.VolumeSnapshot
 	)
 	for _, w := range c.PersistentVolumeClaimWrappers {
-		key := client.ObjectKey{Namespace: w.PersistentVolumeClaim.Namespace, Name: dputils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName)}
+		key := client.ObjectKey{
+			Namespace: w.PersistentVolumeClaim.Namespace,
+			Name:      dputils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName),
+		}
 		// create volume snapshot
 		if err = c.createVolumeSnapshotIfNotExist(ctx, vsCli, &w.PersistentVolumeClaim, key); err != nil {
 			return handleErr(err)
@@ -115,7 +118,7 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 	}
 
 	// volume snapshot is ready and status is not error
-	// TODO: now only support one volume to take snapshot, set its time, size to status
+	// TODO(ldm): now only support one volume to take snapshot, set its time, size to status
 	return sb.phase(dpv1alpha1.ActionPhaseCompleted).
 		phase(dpv1alpha1.ActionPhaseCompleted).
 		totalSize(snap.Status.RestoreSize.String()).
@@ -180,7 +183,7 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	}
 
 	controllerutil.AddFinalizer(snap, dptypes.DataProtectionFinalizerName)
-	if err = controllerutil.SetControllerReference(c.Owner, snap, ctx.Scheme); err != nil {
+	if err = setControllerReference(c.Owner, snap, ctx.Scheme); err != nil {
 		return err
 	}
 

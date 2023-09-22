@@ -494,7 +494,7 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		FailureThreshold:    roleProbe.FailureThreshold,
 	}
 
-	isRoleProbeContainerExisting := func() (*corev1.Container, bool) {
+	tryToGetRoleProbeContainer := func() *corev1.Container {
 		for i, container := range template.Spec.Containers {
 			if container.Image != image {
 				continue
@@ -506,12 +506,12 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 				continue
 			}
 			// if all the above conditions satisfied, container that can do the role probe job found
-			return &template.Spec.Containers[i], true
+			return &template.Spec.Containers[i]
 		}
-		return nil, false
+		return nil
 	}
 	// if role probe container exists, update the readiness probe, env and serving container port
-	if container, existed := isRoleProbeContainerExisting(); existed {
+	if container := tryToGetRoleProbeContainer(); container != nil {
 		// presume the first port is the http port.
 		// this is an easily broken contract between rsm controller and cluster controller.
 		// TODO(free6om): design a better way to do this after Lorry-WeSyncer separation done

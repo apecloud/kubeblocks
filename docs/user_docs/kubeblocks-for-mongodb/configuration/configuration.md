@@ -13,22 +13,22 @@ From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster ed
 
 ## View parameter information
 
-View the current configuration file of a cluster.
+* View the current configuration file of a cluster.
 
-```bash
-kbcli cluster describe-config mongodb-cluster
->
-ConfigSpecs Meta:
-CONFIG-SPEC-NAME         FILE                  ENABLED   TEMPLATE                     CONSTRAINT                   RENDERED                                            COMPONENT    CLUSTER           
-mongodb-config           keyfile               false     mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
-mongodb-config           mongodb.conf          true      mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
-mongodb-metrics-config   metrics-config.yaml   false     mongodb-metrics-config                                    mongodb-cluster-replicaset-mongodb-metrics-config   replicaset   mongodb-cluster   
+   ```bash
+   kbcli cluster describe-config mongodb-cluster
+   >
+   ConfigSpecs Meta:
+   CONFIG-SPEC-NAME         FILE                  ENABLED   TEMPLATE                     CONSTRAINT                   RENDERED                                            COMPONENT    CLUSTER           
+   mongodb-config           keyfile               false     mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
+   mongodb-config           mongodb.conf          true      mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
+   mongodb-metrics-config   metrics-config.yaml   false     mongodb-metrics-config                                    mongodb-cluster-replicaset-mongodb-metrics-config   replicaset   mongodb-cluster   
 
-History modifications:
-OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PROGRESS   CREATED-TIME   VALID-UPDATED 
-```
+   History modifications:
+   OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PROGRESS   CREATED-TIME   VALID-UPDATED 
+   ```
 
-From the meta information, the cluster `mongodb-cluster` has a configuration file named `mongodb.conf`.
+   From the meta information, the cluster `mongodb-cluster` has a configuration file named `mongodb.conf`.
 
 You can also view the details of this configuration file and parameters.
 
@@ -38,7 +38,9 @@ You can also view the details of this configuration file and parameters.
    kbcli cluster describe-config mongodb-cluster --show-detail
    ```
 
-## Configure parameters with configure command
+## Configure parameters
+
+### Configure parameters with configure command
 
 The example below configures velocity to 1.
 
@@ -79,9 +81,9 @@ The example below configures velocity to 1.
     verbosity: "1"
    ```
 
-## Configure parameters with edit-config command
+### Configure parameters with edit-config command
 
-For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 

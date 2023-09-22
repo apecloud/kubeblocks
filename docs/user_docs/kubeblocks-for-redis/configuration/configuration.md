@@ -65,9 +65,9 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make configuration effective. Follow the instructions in [Configure static parameters](#configure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Configure parameters with configure command
+## Configure parameters
 
-### Configure dynamic parameters
+### Configure parameters with configure command
 
 The example below configures `acllog-max-len`.
 
@@ -159,106 +159,9 @@ The example below configures `acllog-max-len`.
    2) "256"
    ```
 
-### Configure static parameters
+### Configure parameters with edit-config command
 
-The example below configures `maxclients` and `databases`.
-
-1. View the current values of `maxclients` and `databases`.
-
-   ```bash
-   kbcli cluster connect redis-cluster
-   ```
-
-   ```bash
-   127.0.0.1:6379> config get parameter maxclients databases
-   1) "databases"
-   2) "16"
-   3) "maxclients"
-   4) "10000"
-   ```
-
-2. Adjust the values of `maxclients` and `databases`.
-
-   ```bash
-   kbcli cluster configure redis-cluster --component=redis --set=maxclients=20000,databases=32
-   ```
-
-   :::note
-
-   Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
-
-   ```bash
-   kbcli cluster configure redis-cluster  --component=redis --set=maxclients=65001
-   >
-   error: failed to validate updated config: [failed to cue template render configure: [configuration.maxclients: 2 errors in empty disjunction:
-   configuration.maxclients: conflicting values 65000 and 65001:
-       100:37
-       155:16
-   configuration.maxclients: invalid value 65001 (out of bound <=65000):
-       100:26
-   ]
-   ]
-   ```
-
-   :::
-
-3. View the status of the parameter configuration.
-
-   `Status.Progress` and `Status.Status` shows the overall status of the parameter configuration and `Conditions` show the details.
-
-   When the `Status.Status` shows `Succeed`, the configuration is completed.
-
-   ```bash
-   kbcli cluster describe-ops redis-cluster-reconfiguring-zrkq7 -n default
-   ```
-
-   <details>
-   <summary>Output</summary>
-
-   ```bash
-   Spec:
-     Name: redis-cluster-reconfiguring-zrkq7	NameSpace: default	Cluster: redis-cluster	Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure redis-cluster --components=redis --config-spec=redis-replication-config --config-file=redis.conf --set databases=32 --set maxclients=20000 --namespace=default
-
-   Status:
-     Start Time:         Apr 17,2023 17:28 UTC+0800
-     Duration:           2s
-     Status:             Running
-     Progress:           0/1
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-
-   Conditions:
-   LAST-TRANSITION-TIME         TYPE                 REASON                         STATUS   MESSAGE
-   Apr 17,2023 17:28 UTC+0800   Progressing          OpsRequestProgressingStarted   True     Start to process the OpsRequest: redis-cluster-reconfiguring-zrkq7 in Cluster: redis-cluster
-   Apr 17,2023 17:28 UTC+0800   Validated            ValidateOpsRequestPassed       True     OpsRequest: redis-cluster-reconfiguring-zrkq7 is validated
-   Apr 17,2023 17:28 UTC+0800   Reconfigure          ReconfigureStarted             True     Start to reconfigure in Cluster: redis-cluster, Component: redis
-   Apr 17,2023 17:28 UTC+0800   ReconfigureMerged    ReconfigureMerged              True     Reconfiguring in Cluster: redis-cluster, Component: redis, ConfigSpec: redis-replication-config, info: updated: map[redis.conf:{"databases":"32","maxclients":"20000"}], added: map[], deleted:map[]
-   Apr 17,2023 17:28 UTC+0800   ReconfigureRunning   ReconfigureRunning             True     Reconfiguring in Cluster: redis-cluster, Component: redis, ConfigSpec: redis-replication-config
-   ```
-
-   </details>
-
-4. Connect to the database to verify whether the parameters are configured as expected.
-
-   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
-
-   ```bash
-   kbcli cluster connect redis-cluster
-   ```
-
-   ```bash
-   127.0.0.1:6379> config get parameter maxclients databases
-   1) "databases"
-   2) "32"
-   3) "maxclients"
-   4) "20000"
-   ```
-
-## Configure parameters with edit-config command
-
-For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 

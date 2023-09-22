@@ -40,12 +40,14 @@ kbcli cluster describe-config pulsar
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config pulsar |head -n 20
+  kbcli cluster explain-config pulsar | head -n 20
   ```
 
-## Configure parameters with configure command
+## Configure parameters
 
-### Configure environment parameters
+### Configure parameters with configure command
+
+#### Configure environment parameters
 
 ***Steps***
 
@@ -90,7 +92,7 @@ kbcli cluster describe-config pulsar
    kubectl get pod -l app.kubernetes.io/name=pulsar
    ```
 
-### Configure dynamic parameters
+#### Configure other parameters
 
 The following steps take the configuration of dynamic parameter `brokerShutdownTimeoutMs` as an example.
 
@@ -141,69 +143,9 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
 
-### Configure static parameters
+### Configure parameters with edit-config command
 
-Static parameter configuring requires restarting the pod. The following example configures `lostBookieRecoveryDelay`.
-
-1. Get the current configuration.
-
-    ```bash
-    kbcli cluster explain-config pulsar --component=broker
-    >
-    ConfigSpecs Meta:
-    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
-    agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
-    broker-env               conf                   true      pulsar-broker-env-tpl      pulsar-env-constraints       pulsar-broker-broker-env               broker      pulsar
-    broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
-    ```
-
-2. Adjust the value of `lostBookieRecoveryDelay`.
-
-   ```bash
-   kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set lostBookieRecoveryDelay=1000
-   ```
-
-   :::note
-
-   The change of parameters may cause the restart of the cluster. Enter `yes` to confirm it. 
-
-   :::
-
-   ***Example***
-
-   ```bash
-   kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set lostBookieRecoveryDelay=1000
-   >
-   Warning: The parameter change incurs a cluster restart, which brings the cluster down for a while. Enter to continue...
-   Please type "yes" to confirm: yes
-   Will updated configure file meta:
-     ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
-   OpsRequest pulsar-reconfiguring-gmz7w created successfully, you can view the progress:
-           kbcli cluster describe-ops pulsar-reconfiguring-gmz7w -n default
-   ```
-
-3. View the status of the parameter configuration.
-
-   ```bash
-   kbcli cluster describe-ops pulsar-reconfiguring-gmz7w -n default
-   >
-   Spec:
-     Name: pulsar-reconfiguring-gmz7w        NameSpace: default        Cluster: pulsar        Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure pulsar --components=broker --config-spec=broker-config --config-file=broker.conf --set lostBookieRecoveryDelay=1000 --namespace=default
-
-   Status:
-     Start Time:         Jul 20,2023 09:57 UTC+0800
-     Duration:           57s
-     Status:             Running
-     Progress:           1/2
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-   ```
-
-## Configure parameters with edit-config command
-
-For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 
@@ -238,7 +180,7 @@ If there are multiple components in a cluster, use `--component` to specify a co
 
 :::
 
-## Configure with kubectl
+### Configure parameters with kubectl
 
 Using kubectl to configure pulsar cluster requires modifying the configuration file.
 

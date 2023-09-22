@@ -61,15 +61,15 @@ You can also view the details of this configuration file and parameters.
 
   * Allowed Values: It defines the valid value range of this parameter.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make configuration effective. Follow the instructions in [Configure static parameters](#configure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Configure parameters with config command
+## Configure parameters
 
-### Configure dynamic parameters
+### Configure parameters with configure command
 
-The example below configures `max_connections`.
+The example below takes configuring `max_connections` as an example.
 
 1. View the current values of `max_connections`.
 
@@ -162,102 +162,9 @@ The example below configures `max_connections`.
    (1 row)
    ```
 
-### Configure static parameters
+### Configure parameters with edit-config command
 
-The example below configures `shared_buffers`.
-
-1. View the current values of `shared_buffers`.
-
-   ```bash
-   kbcli cluster connect pg-cluster
-   ```
-
-   ```bash
-   postgres=# show shared_buffers;
-    shared_buffers
-   ----------------
-    256MB
-   (1 row)
-   ```
-
-2. Adjust the values of `shared_buffers`.
-
-   ```bash
-   kbcli cluster configure pg-cluster --set=shared_buffers=512M
-   ```
-
-   :::note
-
-   Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
-
-   ```bash
-   kbcli cluster configure pg-cluster  --set=shared_buffers=5M
-   error: failed to validate updated config: [failed to cue template render configure: [pg.maxclients: invalid value 5 (out of bound 16-107374182):
-    343:34
-   ]
-   ]
-   ```
-
-   :::
-
-3. View the status of the parameter configuration.
-
-   `Status.Progress` and `Status.Status` shows the overall status of the parameter configuration and `Conditions` show the details.
-
-   When the `Status.Status` shows `Succeed`, the configuration is completed.
-
-   ```bash
-   kbcli cluster describe-ops pg-cluster-reconfiguring-rcnzb -n default
-   ```
-
-   <details>
-
-   <summary>Output</summary>
-
-   ```bash
-   Spec:
-     Name: pg-cluster-reconfiguring-rcnzb NameSpace: default Cluster: pg-cluster Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure pg-cluster --components=postgresql --config-spec=postgresql-configuration --config-file=postgresql.conf --set shared_buffers=512M --namespace=default
-
-   Status:
-     Start Time:         Mar 17,2023 19:31 UTC+0800
-     Duration:           2s
-     Status:             Running
-     Progress:           0/1
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-
-   Conditions:
-   LAST-TRANSITION-TIME         TYPE                 REASON                         STATUS   MESSAGE
-   Mar 17,2023 19:31 UTC+0800   Progressing          OpsRequestProgressingStarted   True     Start to process the OpsRequest: pg-cluster-reconfiguring-rcnzb in Cluster: pg-cluster
-   Mar 17,2023 19:31 UTC+0800   Validated            ValidateOpsRequestPassed       True     OpsRequest: pg-cluster-reconfiguring-rcnzb is validated
-   Mar 17,2023 19:31 UTC+0800   Reconfigure          ReconfigureStarted             True     Start to reconfigure in Cluster: pg-cluster, Component: postgresql
-   Mar 17,2023 19:31 UTC+0800   ReconfigureMerged    ReconfigureMerged              True     Reconfiguring in Cluster: pg-cluster, Component: postgresql, ConfigSpec: postgresql-configuration, info: updated: map[postgresql.conf:{"shared_buffers":"512M"}], added: map[], deleted:map[]
-   Mar 17,2023 19:31 UTC+0800   ReconfigureRunning   ReconfigureRunning             True     Reconfiguring in Cluster: pg-cluster, Component: postgresql, ConfigSpec: postgresql-configuration
-   ```
-
-   </details>
-
-4. Connect to the database to verify whether the parameter is configured as expected.
-
-   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
-
-   ```bash
-   kbcli cluster connect pg-cluster
-   ```
-
-   ```bash
-   postgres=# show shared_buffers;
-    shared_buffers
-   ----------------
-    512MB
-   (1 row)
-   ```
-
-## Configure parameters with edit-config command
-
-For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 

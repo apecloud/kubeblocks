@@ -62,15 +62,15 @@ You can also view the details of this configuration file and parameters.
 
   * Allowed Values: It defines the valid value range of this parameter.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make configuration effective. Follow the instructions in [Configure static parameters](#configure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Configure parameters with configure command
+## Configure parameters
 
-### Configure dynamic parameters
+### Configure parameters with configure command
 
-The example below configures `max_connection` and `innodb_buffer_pool_size`.
+The example below takes configuring `max_connection` and `innodb_buffer_pool_size` as an example.
 
 1. View the current values of `max_connection` and `innodb_buffer_pool_size`.
 
@@ -188,110 +188,9 @@ The example below configures `max_connection` and `innodb_buffer_pool_size`.
    1 row in set (0.00 sec)
    ```
 
-### Configure static parameters
+### Configure parameters with edit-config command
 
-Static parameter configuring requires restarting the pod. The following example configures `ngram_token_size`.
-
-1. Search the current value of `ngram_token_size` and the default value is 2.
-
-    ```bash
-    kbcli cluster connect mysql-cluster
-    ```
-
-    ```bash
-    mysql> show variables like '%ngram_token_size%';
-    >
-    +------------------+-------+
-    | Variable_name    | Value |
-    +------------------+-------+
-    | ngram_token_size | 2     |
-    +------------------+-------+
-    1 row in set (0.01 sec)
-    ```
-
-2. Adjust the value of `ngram_token_size`.
-
-   ```bash
-   kbcli cluster configure mysql-cluster  --set=ngram_token_size=6
-   ```
-
-   :::note
-
-   Make sure the value you set is within the Allowed Values of this parameter. Otherwise, the configuration may fail.
-
-   :::
-
-3. View the status of the parameter configuration.
-
-   `Status.Progress` and `Status.Status` shows the overall status of the parameter configuration and Conditions show the details.
-
-   When the `Status.Status` shows `Succeed`, the configuration is completed.
-
-   <details>
-
-   <summary>Output</summary>
-
-   ```bash
-   # In progress
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf -n default
-   >
-   Spec:
-     Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set ngram_token_size=6
-
-   Status:
-     Start Time:         Mar 13,2023 03:37 UTC+0800
-     Duration:           22s
-     Status:             Running
-     Progress:           0/1
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-   ```
-
-   ```bash
-   # Parameter reconfiguration is completed
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf -n default
-   >
-   Spec:
-     Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set ngram_token_size=6
-
-   Status:
-     Start Time:         Mar 13,2023 03:37 UTC+0800
-     Completion Time:    Mar 13,2023 03:37 UTC+0800
-     Duration:           26s
-     Status:             Succeed
-     Progress:           1/1
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-   ```
-
-   </details>
-
-4. Connect to the database to verify whether the parameter is configured as expected.
-
-   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
-
-   ```bash
-   kbcli cluster connect mysql-cluster
-   ```
-
-   ```bash
-   mysql> show variables like '%ngram_token_size%';
-   >
-   +------------------+-------+
-   | Variable_name    | Value |
-   +------------------+-------+
-   | ngram_token_size | 6     |
-   +------------------+-------+
-   1 row in set (0.09 sec)
-   ```
-
-## Configure parameters with edit-config command
-
-For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 

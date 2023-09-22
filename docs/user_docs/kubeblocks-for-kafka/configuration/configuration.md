@@ -61,14 +61,12 @@ You can also view the details of this configuration file and parameters.
   </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. Currerntly, Kafka only supports static strategy, i.e. `Dynamic` is `false`. Restarting is required to make configuration effective since using kbcli to configure parameters triggers broker restarting.
+  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. Currerntly, Kafka only supports static strategy, i.e. `Dynamic` is `false`. Restarting is required to make configuration effective.
   * Description: It describes the parameter definition.
 
-## Configure parameters with configure command
+## Configure parameters
 
-### Configure static parameters
-
-Static parameter configuring requires restarting the pod.
+### Configure parameters with configure command
 
 1. View the current value of `log.cleanup.policy`.
 
@@ -150,9 +148,9 @@ Static parameter configuring requires restarting the pod.
    mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        Sep 14,2023 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
    ```
 
-## Configure parameters with edit-config command
+### Configure parameters with edit-config command
 
-For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 

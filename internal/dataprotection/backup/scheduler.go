@@ -106,12 +106,12 @@ type backupReconfigureRef struct {
 type parameterPairs map[string][]appsv1alpha1.ParameterPair
 
 func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
-	reconfigRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
-	if reconfigRef == "" {
+	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
+	if reCfgRef == "" {
 		return nil
 	}
 	configRef := backupReconfigureRef{}
-	if err := json.Unmarshal([]byte(reconfigRef), &configRef); err != nil {
+	if err := json.Unmarshal([]byte(reCfgRef), &configRef); err != nil {
 		return err
 	}
 

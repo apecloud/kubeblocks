@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,7 +48,6 @@ var _ = Describe("CreateVolumeSnapshotAction Test", func() {
 		By("clean resources")
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 	}
@@ -73,12 +71,6 @@ var _ = Describe("CreateVolumeSnapshotAction Test", func() {
 		})
 
 		It("should success to execute action", func() {
-			createPVC := func() *corev1.PersistentVolumeClaim {
-				return testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, "", "", "").
-					SetStorage("1Gi").
-					Create(&testCtx).GetObject()
-			}
-
 			act := &action.CreateVolumeSnapshotAction{
 				Name:  actionName,
 				Owner: testdp.NewFakeBackup(&testCtx, nil),
@@ -88,7 +80,7 @@ var _ = Describe("CreateVolumeSnapshotAction Test", func() {
 				},
 				PersistentVolumeClaimWrappers: []action.PersistentVolumeClaimWrapper{
 					{
-						PersistentVolumeClaim: *createPVC(),
+						PersistentVolumeClaim: *testdp.NewFakePVC(&testCtx, pvcName),
 						VolumeName:            volumeName,
 					},
 				},

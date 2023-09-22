@@ -265,7 +265,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			BeforeEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
-				By("By creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				By("create a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup = testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.BackupMethod = testdp.VSBackupMethodName
 				})

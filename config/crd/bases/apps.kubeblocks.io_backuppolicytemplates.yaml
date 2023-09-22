@@ -54,14 +54,6 @@ spec:
                   the specified componentDefinition.
                 items:
                   properties:
-                    backoffLimit:
-                      default: 0
-                      description: Specifies the number of retries before marking
-                        the backup failed.
-                      format: int32
-                      maximum: 10
-                      minimum: 0
-                      type: integer
                     backupMethods:
                       description: backupMethods defines the backup methods.
                       items:

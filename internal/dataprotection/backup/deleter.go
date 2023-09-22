@@ -35,7 +35,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	ctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
@@ -56,7 +56,7 @@ const (
 )
 
 type Deleter struct {
-	intctrlutil.RequestCtx
+	ctrlutil.RequestCtx
 	Client client.Client
 	Scheme *runtime.Scheme
 }
@@ -64,7 +64,7 @@ type Deleter struct {
 func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, error) {
 	jobKey := BuildDeleteBackupFilesJobKey(backup)
 	job := &batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
+	exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
 	if err != nil {
 		return DeletionStatusUnknown, err
 	}
@@ -117,7 +117,6 @@ func (d *Deleter) createDeleteBackupFileJob(
 	backup *dpv1alpha1.Backup,
 	backupPVCName string,
 	backupFilePath string) error {
-
 	// make sure the path has a leading slash
 	if !strings.HasPrefix(backupFilePath, "/") {
 		backupFilePath = "/" + backupFilePath
@@ -166,7 +165,7 @@ func (d *Deleter) createDeleteBackupFileJob(
 			buildBackupRepoVolumeMount(backupPVCName),
 		},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	// build pod
 	podSpec := corev1.PodSpec{
@@ -207,7 +206,7 @@ func (d *Deleter) createDeleteBackupFileJob(
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 	// initialize volume snapshot client that is compatible with both v1beta1 and v1
-	vsCli := &intctrlutil.VolumeSnapshotCompatClient{
+	vsCli := &ctrlutil.VolumeSnapshotCompatClient{
 		Client: d.Client,
 		Ctx:    d.Ctx,
 	}

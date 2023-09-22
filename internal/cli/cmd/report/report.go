@@ -497,6 +497,9 @@ func (o *reportClusterOptions) handleManifests(ctx context.Context) error {
 			types.RestoreGVR(),
 			types.PVCGVR(),
 		}
+		globalGvrs = []schema.GroupVersionResource{
+			types.PVGVR(),
+		}
 	)
 
 	var err error

@@ -330,6 +330,12 @@ func (r *BackupPolicyTplTransformer) buildBackupTarget(comp *appsv1alpha1.Cluste
 		if ccKey.UsernameKey != nil {
 			cc.UsernameKey = *ccKey.UsernameKey
 		}
+		if ccKey.PortKey != nil {
+			cc.PortKey = *ccKey.PortKey
+		}
+		if ccKey.HostKey != nil {
+			cc.HostKey = *ccKey.HostKey
+		}
 	}
 
 	target := &dpv1alpha1.BackupTarget{

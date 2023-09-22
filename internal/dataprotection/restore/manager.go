@@ -235,7 +235,7 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 	if prepareDataConfig == nil {
 		return nil, nil
 	}
-	if backupSet.ActionSet.Spec.Restore == nil || backupSet.ActionSet.Spec.Restore.PrepareData == nil {
+	if !backupSet.ActionSet.HasPrepareDataStage() {
 		return nil, nil
 	}
 	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, dpv1alpha1.PrepareData).
@@ -320,7 +320,9 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	if readyConfig == nil {
 		return nil, nil
 	}
-
+	if !backupSet.ActionSet.HasPostReadyStage() {
+		return nil, nil
+	}
 	getTargetPodList := func(labelSelector metav1.LabelSelector, msgKey string) ([]corev1.Pod, error) {
 		targetPodList, err := utils.GetPodListByLabelSelector(reqCtx, cli, labelSelector)
 		if err != nil {

@@ -51,7 +51,6 @@ spec:
             description: BackupPolicySpec defines the desired state of BackupPolicy
             properties:
               backoffLimit:
-                default: 0
                 description: Specifies the number of retries before marking the backup
                   failed.
                 format: int32

@@ -22,8 +22,6 @@ package configuration
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"

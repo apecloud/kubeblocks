@@ -214,7 +214,12 @@ func (r *RestoreReconciler) validateAndBuildMGR(reqCtx intctrlutil.RequestCtx, r
 	}
 
 	// check if the backup is completed exclude continuous backup.
-	backupType := backupSet.ActionSet.Spec.BackupType
+	var backupType dpv1alpha1.BackupType
+	if backupSet.ActionSet != nil {
+		backupType = backupSet.ActionSet.Spec.BackupType
+	} else if backupSet.UseVolumeSnapshot {
+		backupType = dpv1alpha1.BackupTypeFull
+	}
 	if backupType != dpv1alpha1.BackupTypeContinuous && backupSet.Backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		err = intctrlutil.NewFatalError(fmt.Sprintf(`phase of backup "%s" is not completed`, backupName))
 		return err

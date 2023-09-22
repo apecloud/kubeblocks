@@ -17,6 +17,7 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 clusterVersionOverride: ""
+dataMountPath: /data
 
 logConfigs:
   running: /data/running.log

@@ -64,7 +64,7 @@ spec:
                 containerPort: 6379
             volumeMounts:
               - name: data
-                mountPath: /data
+                mountPath: {{ .Values.dataMountPath }}
               - name: redis-config
                 mountPath: /etc/conf
               - name: scripts
@@ -231,7 +231,7 @@ spec:
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: data
-              mountPath: /data
+              mountPath: {{ .Values.dataMountPath }}
             - name: redis-config
               mountPath: /etc/conf
             - name: sentinel-conf
@@ -278,7 +278,7 @@ spec:
               name: redis-sentinel
           volumeMounts:
             - name: data
-              mountPath: /data
+              mountPath: {{ .Values.dataMountPath }}
             - name: redis-config
               mountPath: /etc/conf
             - name: sentinel-conf

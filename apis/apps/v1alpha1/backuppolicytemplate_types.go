@@ -132,6 +132,13 @@ type ConnectionCredentialKey struct {
 	// if not set, the default key is "username".
 	// +optional
 	UsernameKey *string `json:"usernameKey,omitempty"`
+
+	// hostKey specifies the map key of the host in the connection credential secret.
+	HostKey *string `json:"hostKey,omitempty"`
+
+	// portKey specifies the map key of the port in the connection credential secret.
+	// +kubebuilder:default=port
+	PortKey *string `json:"portKey,omitempty"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate

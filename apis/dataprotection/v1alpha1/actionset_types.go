@@ -242,3 +242,10 @@ func (r *ActionSet) HasPrepareDataStage() bool {
 	}
 	return r.Spec.Restore.PrepareData != nil
 }
+
+func (r *ActionSet) HasPostReadyStage() bool {
+	if r == nil || r.Spec.Restore == nil {
+		return false
+	}
+	return len(r.Spec.Restore.PostReady) > 0
+}

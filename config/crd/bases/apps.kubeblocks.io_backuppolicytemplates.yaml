@@ -54,6 +54,14 @@ spec:
                   the specified componentDefinition.
                 items:
                   properties:
+                    backoffLimit:
+                      default: 0
+                      description: Specifies the number of retries before marking
+                        the backup failed.
+                      format: int32
+                      maximum: 10
+                      minimum: 0
+                      type: integer
                     backupMethods:
                       description: backupMethods defines the backup methods.
                       items:
@@ -367,9 +375,18 @@ spec:
                             of the ClusterDefinition. it will be ignored when "account"
                             is set.
                           properties:
+                            hostKey:
+                              description: hostKey specifies the map key of the host
+                                in the connection credential secret.
+                              type: string
                             passwordKey:
                               description: the key of password in the ConnectionCredential
                                 secret. if not set, the default key is "password".
+                              type: string
+                            portKey:
+                              default: port
+                              description: portKey specifies the map key of the port
+                                in the connection credential secret.
                               type: string
                             usernameKey:
                               description: the key of username in the ConnectionCredential

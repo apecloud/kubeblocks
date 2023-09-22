@@ -39,7 +39,6 @@ type BackupPolicySpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=10
-	// +kubebuilder:default=0
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 
 	// target specifies the target information to back up.

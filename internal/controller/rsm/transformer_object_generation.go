@@ -22,6 +22,7 @@ package rsm
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"reflect"
 	"strconv"
 	"strings"
@@ -479,38 +480,74 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		},
 	)
 
-	// build container
-	container := corev1.Container{
-		Name:            roleProbeName,
-		Image:           image,
-		ImagePullPolicy: "IfNotPresent",
-		Command: []string{
-			"lorry",
-			"--port", strconv.Itoa(probeDaemonPort),
-		},
-		Ports: []corev1.ContainerPort{{
-			ContainerPort: int32(probeDaemonPort),
-			Name:          roleProbeName,
-			Protocol:      "TCP",
-		}},
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: roleProbeURI,
-					Port: intstr.FromInt(probeDaemonPort),
-				},
+	readinessProbe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: roleProbeURI,
+				Port: intstr.FromInt(probeDaemonPort),
 			},
-			InitialDelaySeconds: roleProbe.InitialDelaySeconds,
-			TimeoutSeconds:      roleProbe.TimeoutSeconds,
-			PeriodSeconds:       roleProbe.PeriodSeconds,
-			SuccessThreshold:    roleProbe.SuccessThreshold,
-			FailureThreshold:    roleProbe.FailureThreshold,
 		},
-		Env: env,
+		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
+		TimeoutSeconds:      roleProbe.TimeoutSeconds,
+		PeriodSeconds:       roleProbe.PeriodSeconds,
+		SuccessThreshold:    roleProbe.SuccessThreshold,
+		FailureThreshold:    roleProbe.FailureThreshold,
 	}
 
+	isRoleProbeContainerExisting := func() (*corev1.Container, bool) {
+		for i, container := range template.Spec.Containers {
+			if container.Image != image {
+				continue
+			}
+			if len(container.Command) == 0 || container.Command[0] != roleProbeBinaryName {
+				continue
+			}
+			if container.ReadinessProbe != nil {
+				continue
+			}
+			// if all the above conditions satisfied, container that can do the role probe job found
+			return &template.Spec.Containers[i], true
+		}
+		return nil, false
+	}
+	// if role probe container exists, update the readiness probe, env and serving container port
+	if container, existed := isRoleProbeContainerExisting(); existed {
+		// presume the first port is the http port.
+		// this is an easily broken contract between rsm controller and cluster controller.
+		// TODO(free6om): design a better way to do this after Lorry-DBPilot separation done
+		readinessProbe.HTTPGet.Port = intstr.FromInt(int(container.Ports[0].ContainerPort))
+		container.ReadinessProbe = readinessProbe
+		for _, e := range env {
+			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
+				return v.Name == e.Name
+			}) >= 0 {
+				continue
+			}
+			container.Env = append(container.Env, e)
+		}
+		return
+	}
+
+	// if role probe container doesn't exist, create a new one
+	// build container
+	container := builder.NewContainerBuilder(roleProbeContainerName).
+		SetImage(image).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddCommands([]string{
+			roleProbeBinaryName,
+			"--port", strconv.Itoa(probeDaemonPort),
+		}...).
+		AddEnv(env...).
+		AddPorts(corev1.ContainerPort{
+			ContainerPort: int32(probeDaemonPort),
+			Name:          roleProbeContainerName,
+			Protocol:      "TCP",
+		}).
+		SetReadinessProbe(*readinessProbe).
+		GetObject()
+
 	// inject role probe container
-	template.Spec.Containers = append(template.Spec.Containers, container)
+	template.Spec.Containers = append(template.Spec.Containers, *container)
 }
 
 func injectProbeActionContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {

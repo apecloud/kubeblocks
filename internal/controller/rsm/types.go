@@ -69,7 +69,8 @@ const (
 	jobScenarioMembership       = "membership-reconfiguration"
 	jobScenarioUpdate           = "pod-update"
 
-	roleProbeName                 = "kb-role-probe"
+	roleProbeContainerName        = "kb-role-probe"
+	roleProbeBinaryName           = "lorry"
 	roleAgentVolumeName           = "role-agent"
 	roleAgentInstallerName        = "role-agent-installer"
 	roleAgentVolumeMountPath      = "/role-probe"
@@ -89,7 +90,7 @@ const (
 	targetHostVarName             = "KB_RSM_TARGET_HOST"
 	RoleUpdateMechanismVarName    = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	directAPIServerEventFieldPath = "spec.containers{sqlchannel}"
-	readinessProbeEventFieldPath  = "spec.containers{" + roleProbeName + "}"
+	readinessProbeEventFieldPath  = "spec.containers{" + roleProbeContainerName + "}"
 	legacyEventFieldPath          = "spec.containers{kb-checkrole}"
 	checkRoleEventReason          = "checkRole"
 

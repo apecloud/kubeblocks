@@ -216,7 +216,7 @@ func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPor
 func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = constant.StatusProbeContainerName
-	probe := statusProbeContainer.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(checkStatusURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
@@ -224,13 +224,14 @@ func buildStatusProbeContainer(characterType string, statusProbeContainer *corev
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
+	statusProbeContainer.ReadinessProbe = probe
 	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildRunningProbeContainer(characterType string, runningProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = constant.RunningProbeContainerName
-	probe := runningProbeContainer.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(checkRunningURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
@@ -238,6 +239,7 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
+	runningProbeContainer.ReadinessProbe = probe
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
@@ -247,7 +249,7 @@ func volumeProtectionEnabled(component *SynthesizedComponent) bool {
 
 func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {
 	c.Name = constant.VolumeProtectionProbeContainerName
-	probe := c.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(volumeProtectionURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
@@ -255,6 +257,7 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
 	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
+	c.ReadinessProbe = probe
 	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 

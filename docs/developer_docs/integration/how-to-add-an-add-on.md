@@ -16,7 +16,7 @@ There are altogether 3 steps to integrate an add-on:
 2. Prepare cluster templates.
 3. Add an `addon.yaml` file.
 
-## Step 1. Design a blueprint for cluster.
+## Step 1. Design a blueprint for cluster
 
 Before getting started, make sure to design your cluster blueprint. Think about what you want your cluster to look like. For example:
 
@@ -37,9 +37,9 @@ Cluster Format: Deploying a MySQL 8.0 Standalone.
 | ClusterVersion    | Image: docker.io/mysql:8.0.34                                                                                |
 | Cluster.yaml      | Specified by the user during creation                                                                        |
 
-## Step 2. Prepare cluster templates.
+## Step 2. Prepare cluster templates
 
-### 2.1 Create a Helm chart.
+### 2.1 Create a Helm chart
 
 Opt 1.`helm create oracle-mysql`
 
@@ -226,7 +226,7 @@ Now you've finished with ClusterDefinition and ClusterVersion, try to do a quick
 
 :::
 
-### 2.2 Install Helm chart.
+### 2.2 Install Helm chart
 
 Install Helm.
 
@@ -245,7 +245,7 @@ REVISION: 1
 TEST SUITE: None
 ```
 
-### 2.3 Create a cluster.
+### 2.3 Create a cluster
 
 Create a MySQL cluster with `kbcli cluster create`.
 
@@ -313,7 +313,7 @@ After the creating, you can:
    kbcli cluster stop mycluster
    ```
 
-## Step 3. Add an addon.yaml file.
+## Step 3. Add an addon.yaml file
 
 This is the last step to integrate an add-on to KubeBlocks. After creating this addon.yaml file, this add-on is in the KubeBlocks add-on family. Please refer to `tutorial-1-create-an-addon/oracle-mysql-addon.yaml`.
 

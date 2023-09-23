@@ -32,6 +32,9 @@ spec:
         - name: mysql-container
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+        - name: mysql-exporter
+          image: prom/mysqld-exporter:v0.14.0
+          imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     # name needs to consistent with the name of the configmap defined in clusterDefinition
     configSpecs:
       - name: mysql-config

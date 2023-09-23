@@ -208,14 +208,11 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
 	builder := builder.NewConfigurationBuilder(p.Namespace,
 		core.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
 	)
-
 	for _, template := range p.ctx.Component.ConfigTemplates {
-		builder.AddConfigurationItem(template.Name)
+		builder.AddConfigurationItem(template)
 	}
 	return builder.Component(p.ComponentName).
 		ClusterRef(p.ClusterName).
-		ClusterDefRef(p.ctx.Cluster.Spec.ClusterDefRef).
-		ClusterVerRef(p.ctx.Cluster.Spec.ClusterVersionRef).
 		GetObject()
 }
 

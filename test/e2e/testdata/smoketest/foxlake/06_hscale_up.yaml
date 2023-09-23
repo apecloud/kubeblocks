@@ -7,6 +7,6 @@ spec:
   type: HorizontalScaling
   horizontalScaling:
     - componentName: foxlake-server
-      replicas: 3
+      replicas: 2
     - componentName: foxlake-metadb
-      replicas: 3
+      replicas: 2

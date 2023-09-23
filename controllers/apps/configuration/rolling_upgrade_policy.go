@@ -53,18 +53,17 @@ func init() {
 }
 
 func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	var (
-		funcs RollingUpgradeFuncs
-		cType = params.WorkloadType()
-	)
+	var funcs RollingUpgradeFuncs
 
-	switch cType {
+	switch params.WorkloadType() {
 	case appsv1alpha1.Consensus:
 		funcs = GetConsensusRollingUpgradeFuncs()
+	case appsv1alpha1.Replication:
+		funcs = GetReplicationRollingUpgradeFuncs()
 	case appsv1alpha1.Stateful:
 		funcs = GetStatefulSetRollingUpgradeFuncs()
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", cType)
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", params.WorkloadType())
 	}
 	return performRollingUpgrade(params, funcs)
 }

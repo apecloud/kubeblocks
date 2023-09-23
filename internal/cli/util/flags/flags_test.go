@@ -203,8 +203,8 @@ var _ = Describe("flag", func() {
 	var cmd *cobra.Command
 	var schema *spec.Schema
 	testCast := []struct {
-		describtion   string
-		rawSchemaJson string
+		description   string
+		rawSchemaJSON string
 		flags         []string
 		success       bool
 	}{
@@ -238,8 +238,8 @@ var _ = Describe("flag", func() {
 			schema = &spec.Schema{}
 		})
 		for i := range testCast {
-			It(testCast[i].describtion, func() {
-				Expect(schema.UnmarshalJSON([]byte(testCast[i].rawSchemaJson))).Should(Succeed())
+			It(testCast[i].description, func() {
+				Expect(schema.UnmarshalJSON([]byte(testCast[i].rawSchemaJSON))).Should(Succeed())
 				if testCast[i].success {
 					Expect(BuildFlagsBySchema(cmd, schema)).Should(Succeed())
 					for _, flag := range testCast[i].flags {

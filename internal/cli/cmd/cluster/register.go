@@ -83,7 +83,7 @@ func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			o.clusterType = cluster.ClusterType(args[0])
 			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.run())
-			fmt.Fprintf(streams.Out, buildRegisterSuccessExamples(o.clusterType))
+			fmt.Fprint(streams.Out, buildRegisterSuccessExamples(o.clusterType))
 		},
 	}
 	cmd.Flags().StringVarP(&o.source, "source", "S", "", "Specify the cluster type chart source, support a URL or a local file path")

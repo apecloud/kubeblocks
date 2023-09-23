@@ -46,7 +46,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
@@ -141,7 +140,7 @@ func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
-		flags.AddComponentsFlag(f, cmd, true, &o.ComponentNames, "Component names to this operations")
+		cluster.AddComponentsFlag(f, cmd, true, &o.ComponentNames, "Component names to this operations")
 	}
 }
 

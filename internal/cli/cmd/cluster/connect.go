@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/lorry/engine"
 )
@@ -113,7 +112,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	flags.AddComponentsFlag(f, cmd, false, &o.componentName, "The component to connect. If not specified, pick up the first one.")
+	cluster.AddComponentsFlag(f, cmd, false, &o.componentName, "The component to connect. If not specified, pick up the first one.")
 	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster/instance from different clients.")
 	cmd.Flags().BoolVar(&o.showPassword, "show-password", false, "Show password in example.")
 

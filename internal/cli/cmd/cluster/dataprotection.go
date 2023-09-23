@@ -115,6 +115,10 @@ var (
 		# describe a backup
 		kbcli cluster describe-backup backup-default-mycluster-20230616190023
 	`)
+	describeBackupPolicyExample = templates.Examples(`
+		# describe a backup policy
+		kbcli cluster describe-backup-policy mycluster-mysql-backup-policy
+	`)
 )
 
 const annotationTrueValue = "true"
@@ -851,6 +855,100 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 	}
 	fmt.Fprintln(o.Out, "updated")
 	return nil
+}
+
+type describeBackupPolicyOptions struct {
+	namespace string
+	names     []string
+	dynamic   dynamic.Interface
+	Factory   cmdutil.Factory
+	client    clientset.Interface
+
+	genericclioptions.IOStreams
+}
+
+func (o *describeBackupPolicyOptions) Complete(args []string) error {
+	var err error
+
+	if len(args) == 0 {
+		return fmt.Errorf("backupPolicy name should be specified")
+	}
+
+	o.names = args
+
+	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *describeBackupPolicyOptions) Run() error {
+	for _, name := range o.names {
+		backupPolicyObj := &dpv1alpha1.BackupPolicy{}
+		if err := cluster.GetK8SClientObject(o.dynamic, backupPolicyObj, types.BackupPolicyGVR(), o.namespace, name); err != nil {
+			return err
+		}
+		if err := o.printBackupPolicyObj(backupPolicyObj); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.BackupPolicy) error {
+	printer.PrintLine("Summary:")
+	realPrintPairStringToLine("Name", obj.Name)
+	realPrintPairStringToLine("Cluster", obj.Labels[constant.AppInstanceLabelKey])
+	realPrintPairStringToLine("Namespace", obj.Namespace)
+	realPrintPairStringToLine("Default", obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey])
+
+	printer.PrintLine("\nDatafile:")
+	realPrintPairStringToLine("Backup Tool Name", obj.Spec.Datafile.BackupToolName)
+	realPrintPairStringToLine("History Limit", fmt.Sprintf("%d", obj.Spec.Datafile.BackupsHistoryLimit))
+	realPrintPairStringToLine("Cron Expression", obj.Spec.Schedule.Datafile.CronExpression)
+	realPrintPairStringToLine("Enable", fmt.Sprintf("%t", obj.Spec.Schedule.Datafile.Enable))
+
+	printer.PrintLine("\nLogfile:")
+	realPrintPairStringToLine("Backup Tool Name", obj.Spec.Logfile.BackupToolName)
+	realPrintPairStringToLine("History Limit", fmt.Sprintf("%d", obj.Spec.Logfile.BackupsHistoryLimit))
+	realPrintPairStringToLine("Cron Expression", obj.Spec.Schedule.Logfile.CronExpression)
+	realPrintPairStringToLine("Enable", fmt.Sprintf("%t", obj.Spec.Schedule.Logfile.Enable))
+
+	printer.PrintLine("\nSnapshot:")
+	realPrintPairStringToLine("History Limit", fmt.Sprintf("%d", obj.Spec.Snapshot.BackupsHistoryLimit))
+	realPrintPairStringToLine("Cron Expression", obj.Spec.Schedule.Snapshot.CronExpression)
+	realPrintPairStringToLine("Enable", fmt.Sprintf("%t", obj.Spec.Schedule.Snapshot.Enable))
+
+	return nil
+}
+
+func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &describeBackupPolicyOptions{
+		Factory:   f,
+		IOStreams: streams,
+	}
+	cmd := &cobra.Command{
+		Use:                   "describe-backup-policy",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"describe-bp"},
+		Short:                 "Describe backup policy",
+		Example:               describeBackupPolicyExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.BackupPolicyGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			util.CheckErr(o.Complete(args))
+			util.CheckErr(o.Run())
+		},
+	}
+	return cmd
 }
 
 func (o *DescribeBackupOptions) Complete(args []string) error {

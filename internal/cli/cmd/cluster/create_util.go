@@ -54,12 +54,12 @@ func addCreateFlags(cmd *cobra.Command, f cmdutil.Factory, c *cluster.ChartInfo)
 	}
 
 	// add the flags for the cluster schema
-	if err := flags.BuildFlagsBySchema(cmd, f, c.Schema); err != nil {
+	if err := flags.BuildFlagsBySchema(cmd, c.Schema); err != nil {
 		return err
 	}
 
 	// add the flags for sub helm chart
-	if err := flags.BuildFlagsBySchema(cmd, f, c.SubSchema); err != nil {
+	if err := flags.BuildFlagsBySchema(cmd, c.SubSchema); err != nil {
 		return err
 	}
 

@@ -1,0 +1,694 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: polardbx
+  labels:
+    {{- include "polardbx.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: "polardbx_root"
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_polardbx)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_polardbx)"
+    metaDbPasswd: "$(RANDOM_PASSWD)"
+  componentDefs:
+    - name: gms
+      scriptSpecs:
+        - name: polardbx-scripts
+          templateRef: polardbx-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0555
+      workloadType: Consensus
+      characterType: polardbx
+      consensusSpec:
+        leader:
+          name: "leader"
+          accessMode: ReadWrite
+        followers:
+          - name: "follower"
+            accessMode: Readonly
+        updateStrategy: Parallel
+      probes:
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: 3306
+          - name: metrics
+            port: 9104
+            targetPort: 9104
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9104
+          scrapePath: "/metrics"
+      podSpec:
+        volumes: &xstoreVolumes
+          - hostPath:
+              path: /data/cache/tools/xstore
+              type: Directory
+            name: xstore-tools
+          - downwardAPI:
+              defaultMode: 420
+              items:
+                - fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.labels
+                  path: labels
+                - fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.annotations
+                  path: annotations
+                - fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.annotations['runmode']
+                  path: runmode
+                - fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+                  path: name
+                - fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+                  path: namespace
+            name: podinfo
+        initContainers: &xsotreInitContainers
+          - name: tools-updater
+            command: ["/bin/ash"]
+            args: ["-c", "./hack/update.sh /target"]
+            env:
+              - name: NODE_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: spec.nodeName
+            volumeMounts:
+              - name: xstore-tools
+                mountPath: /target
+        containers:
+          - name: engine
+            command: ["/scripts/xstore-setup.sh"]
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /scripts/xstore-post-start.sh
+                    - GMS
+            env: &xstoreEngineEnv
+              - name: LANG
+                value: en_US.utf8
+              - name: LC_ALL
+                value: en_US.utf8
+              - name: ENGINE
+                value: galaxy
+              - name: ENGINE_HOME
+                value: /opt/galaxy_engine
+              - name: NODE_ROLE
+                value: candidate
+              - name: NODE_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.hostIP
+              - name: NODE_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: spec.nodeName
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: LIMITS_CPU
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.cpu
+                    divisor: "1m"
+              - name: LIMITS_MEM
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.memory
+              - name: PORT_MYSQL
+                value: "3306"
+              - name: PORT_PAXOS
+                value: "11306"
+              - name: PORT_POLARX
+                value: "31600"
+              - name: KB_SERVICE_USER
+                value: "polardbx_root"
+              - name: KB_SERVICE_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: RSM_COMPATIBILITY_MODE
+                value: "true"
+            ports: &xstoreEnginePorts
+              - name: mysql
+                containerPort: 3306
+              - name: paxos
+                containerPort: 11306
+              - name: polarx
+                containerPort: 31600
+            startupProbe:
+              failureThreshold: 60
+              tcpSocket:
+                port: mysql
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 30
+            volumeMounts: &xstoreEngineVolumeMounts
+              - name: data
+                mountPath: /data/mysql
+              - name: data-log
+                mountPath: /data-log/mysql
+              - name: xstore-tools
+                mountPath: /tools/xstore
+              - name: scripts
+                mountPath: /scripts/xstore-post-start.sh
+                subPath: xstore-post-start.sh
+              - name: scripts
+                mountPath: /scripts/xstore-setup.sh
+                subPath: xstore-setup.sh
+              - name: podinfo
+                mountPath: /etc/podinfo
+          - name: exporter
+            imagePullPolicy: IfNotPresent
+            ports:
+              - name: metrics
+                containerPort: 9104
+                protocol: TCP
+            env:
+              - name: "MYSQL_MONITOR_USER"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: "MYSQL_MONITOR_PASSWORD"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: "DATA_SOURCE_NAME"
+                value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"
+    - name: dn
+      scriptSpecs:
+        - name: polardbx-scripts
+          templateRef: polardbx-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0555
+      workloadType: Consensus
+      characterType: polardbx
+      componentDefRef:
+        - &gmsRef
+          componentDefName: gms
+          componentRefEnv:
+            - name: GMS_SVC_PORT
+              valueFrom:
+                type: FieldRef
+                fieldPath: $.componentDef.service.ports[?(@.name == "mysql")].port
+            - name: GMS_SVC_NAME
+              valueFrom:
+                type: ServiceRef
+      consensusSpec:
+        leader:
+          name: "leader"
+          accessMode: ReadWrite
+        followers:
+          - name: "follower"
+            accessMode: Readonly
+        updateStrategy: Parallel
+      probes:
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: 3306
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9104
+          scrapePath: "/metrics"
+      podSpec:
+        volumes: *xstoreVolumes
+        initContainers: *xsotreInitContainers
+        containers:
+          - name: engine
+            command: [ "/scripts/xstore-setup.sh" ]
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /scripts/xstore-post-start.sh
+                    - DN
+            env: *xstoreEngineEnv
+            ports: *xstoreEnginePorts
+            startupProbe:
+              failureThreshold: 60
+              tcpSocket:
+                port: mysql
+              initialDelaySeconds: 20
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 30
+            volumeMounts: *xstoreEngineVolumeMounts
+          - name: exporter
+            imagePullPolicy: IfNotPresent
+            ports:
+              - name: metrics
+                containerPort: 9104
+                protocol: TCP
+            env:
+              - name: "MYSQL_MONITOR_USER"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: "MYSQL_MONITOR_PASSWORD"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: "DATA_SOURCE_NAME"
+                value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"
+    - name: cn
+      scriptSpecs:
+        - name: polardbx-scripts
+          templateRef: polardbx-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0555
+      workloadType: Stateless
+      characterType: mysql
+      componentDefRef:
+        - *gmsRef
+        - componentDefName: dn
+          componentRefEnv:
+            - name: DN_SVC_PORT
+              valueFrom:
+                type: FieldRef
+                fieldPath: $.componentDef.service.ports[?(@.name == "mysql")].port
+            - name: DN_HEADLESS_SVC_NAME
+              valueFrom:
+                type: HeadlessServiceRef
+                format: $(POD_FQDN){{ .Values.clusterDomain }}
+                joinWith: ","
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: 3306
+          - name: metrics
+            port: 9104
+            targetPort: 9104
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9104
+          scrapePath: "/metrics"
+      podSpec:
+        shareProcessNamespace: true  # For jmx collector
+        volumes:
+          - name: shared
+            emptyDir: {}
+        initContainers:
+          - name: metadb-init
+            command: ["/scripts/metadb-setup.sh"]
+            env:
+            - name: metaDbAddr
+              value: "$(GMS_SVC_NAME):$(GMS_SVC_PORT)"
+            - name: metaDbName
+              value: "polardbx_meta_db"
+            - name: metaDbUser
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+                  optional: false
+            - name: metaDbNonEncPasswd
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: dnPasswordKey
+              value: "$(metaDbNonEncPasswd)$(metaDbNonEncPasswd)"
+            - name: switchCloud
+              value: aliyun
+            - name: metaDbConn
+              value: "mysql -h$(GMS_SVC_NAME) -P3306 -u$(metaDbUser) -p$(metaDbNonEncPasswd) -D$(metaDbName)"
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/metadb-setup.sh
+                subPath: metadb-setup.sh
+              - name: scripts
+                mountPath: /scripts/gms-init.sql
+                subPath: gms-init.sql
+              - name: scripts
+                mountPath: /scripts/gms-metadata.tpl
+                subPath: gms-metadata.tpl
+              - name: shared
+                mountPath: /shared
+          - name: init
+            command: [ "sh" ]
+            args: [ "-c", 'source /shared/env.sh && /polardbx-init' ]
+            env: &cnEngineEnv
+              - name: POD_ID
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: HOST_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.hostIP
+              - name: NODE_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: spec.nodeName
+              - name: metaDbAddr
+                value: "$(GMS_SVC_NAME):$(GMS_SVC_PORT)"
+              - name: metaDbName
+                value: "polardbx_meta_db"
+              - name: metaDbUser
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: metaDbNonEncPasswd
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: switchCloud
+                value: aliyun
+              - name: metaDbConn
+                value: "mysql -h$(GMS_SVC_NAME) -P3306 -u$(metaDbUser) -p$(metaDbPasswd) -D$(metaDbName)"
+              - name: dnPasswordKey
+                value: "$(metaDbNonEncPasswd)$(metaDbNonEncPasswd)"
+              - name: metaDbXprotoPort
+                value: "0"
+              - name: storageDbXprotoPort
+                value: "0"
+              - name: instanceId
+                value: "$(KB_CLUSTER_NAME)"
+              - name: instanceType
+                value: "0"
+              - name: serverPort
+                value: "3306"
+              - name: mgrPort
+                value: "3406"
+              - name: mppPort
+                value: "3506"
+              - name: htapPort
+                value: "3606"
+              - name: logPort
+                value: "8507"
+              - name: ins_id
+                value: dummy
+              - name: polarx_dummy_log_port
+                value: "$(logPort)"
+              - name: polarx_dummy_ssh_port
+                value: "-1"
+              - name: cpuCore
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.cpu
+              - name: memSize
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.memory
+              - name: cpu_cores
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.cpu
+              - name: memory
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.memory
+              - name: galaxyXProtocol
+                value: "1"
+              - name: processorHandler
+                value: "1"
+              - name: processors
+                value: "1"
+              - name: serverExecutor
+                value: "1024"
+              - name: TDDL_OPTS
+                value: -Dpod.id=$(POD_ID) -XX:+UnlockExperimentalVMOptions -XX:+UseWisp2 -Dio.grpc.netty.shaded.io.netty.transport.noNative=true
+                  -Dio.netty.transport.noNative=true -DinstanceVersion=8.0.3
+            volumeMounts:
+              - name: shared
+                mountPath: /shared
+        containers:
+          - name: engine
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - "source /shared/env.sh && /home/admin/entrypoint.sh 20"
+            env: *cnEngineEnv
+            ports:
+              - containerPort: 3306
+                name: mysql
+                protocol: TCP
+              - containerPort: 3406
+                name: mgr
+                protocol: TCP
+              - containerPort: 3506
+                name: mpp
+                protocol: TCP
+              - containerPort: 3606
+                name: htap
+                protocol: TCP
+              - containerPort: 8507
+                name: log
+                protocol: TCP
+            startupProbe:
+              failureThreshold: 60
+              tcpSocket:
+                port: mysql
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 30
+            livenessProbe:
+              failureThreshold: 60
+              tcpSocket:
+                port: mysql
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 30
+            readinessProbe:
+              failureThreshold: 60
+              tcpSocket:
+                port: mysql
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 30
+            volumeMounts:
+              - name: tmp
+                mountPath: /tmp
+              - name: polardbx-log
+                mountPath: /home/admin/drds-server/logs
+              - name: polardbx-spill
+                mountPath: /home/admin/drds-server/spill
+              - name: shared
+                mountPath: /shared
+          - name: exporter
+            args:
+             - -collectors.process
+             - -collectors.jvm
+             - -target.type=CN
+             - -target.port=3406
+             - -web.listen-addr=:9104
+             - -web.metrics-path=/metrics
+            env:
+              - name: GOMAXPROCS
+                value: "1"
+            ports:
+              - containerPort: 9104
+                name: metrics
+                protocol: TCP
+            volumeMounts:
+              - name: tmp
+                mountPath: /tmp
+    - name: cdc
+      scriptSpecs:
+        - name: polardbx-scripts
+          templateRef: polardbx-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0555
+      workloadType: Stateless
+      characterType: mysql
+      componentDefRef:
+        - *gmsRef
+        - componentDefName: cn
+          componentRefEnv:
+            - name: CN_SVC_PORT
+              valueFrom:
+                type: FieldRef
+                fieldPath: $.componentDef.service.ports[?(@.name == "mysql")].port
+            - name: CN_SVC_NAME
+              valueFrom:
+                type: ServiceRef
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: 3306
+          - name: metrics
+            port: 9104
+            targetPort: 9104
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9104
+          scrapePath: "/metrics"
+      podSpec:
+        initContainers:
+          - name: wait-cn-ready
+            command:
+              - bin/sh
+              - -c
+              - |
+                until mysql -h$CN_SVC_NAME -P$CN_SVC_PORT -u$polarx_username -p$polarx_password -e 'select 1'; do
+                  sleep 1;
+                  echo "cn is not ready"
+                done
+            env:
+              - name: polarx_username
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: polarx_password
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+        containers:
+          - name: engine
+            env:
+              - name: switchCloud
+                value: aliyun
+              - name: cluster_id
+                value: "$(KB_CLUSTER_NAME)"
+              - name: ins_id
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              - name: daemonPort
+                value: "3300"
+              - name: common_ports
+                value: '{"cdc1_port":"3009","cdc3_port":"3011","cdc2_port":"3010","cdc6_port":"3014","cdc5_port":"3013","cdc4_port":"3012"}'
+              - name: metaDb_url
+                value: "jdbc:mysql://$(GMS_SVC_NAME):$(GMS_SVC_PORT)/polardbx_meta_db?useSSL=false"
+              - name: polarx_url
+                value: "jdbc:mysql://$(CN_SVC_NAME):$(CN_SVC_PORT)/__cdc__?useSSL=false"
+              - name: metaDb_username
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: metaDb_password
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: polarx_username
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: polarx_password
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: metaDbNonEncPasswd
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: dnPasswordKey
+                value: "$(metaDbNonEncPasswd)$(metaDbNonEncPasswd)"
+              - name: cpu_cores
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.cpu
+              - name: mem_size
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: engine
+                    resource: limits.memory
+                    divisor: "1M"
+              - name: disk_size
+                value: "10240"
+              - name: disk_quota
+                value: "10240"
+            volumeMounts:
+              - name: binlog
+                mountPath: /home/admin/binlog
+              - name: log
+                mountPath: /home/admin/logs
+          - name: exporter
+            args:
+              - -web.listen-addr=:9104
+              - -web.metrics-path=/metrics
+              - -target.port=3007
+              - -target.type=CDC
+            env:
+              - name: GOMAXPROCS
+                value: "1"
+            ports:
+              - containerPort: 9104
+                name: metrics
+                protocol: TCP
+

@@ -1,0 +1,19 @@
+apiVersion: v2
+name: polardbx-cluster
+description: PolarDB-X Cluster Helm Chart for KubeBlocks.
+
+type: application
+version: 0.1.0
+appVersion: v1.4.1
+
+keywords:
+  - polardbx
+  - database
+  - distributed
+  - cloud-native
+
+home: https://polardbx.com/home
+
+maintainers:
+  - name: Vettal Wu
+    email: vettal.wd@alibaba-inc.com

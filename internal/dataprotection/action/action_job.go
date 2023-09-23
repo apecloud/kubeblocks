@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	ctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 )
@@ -76,14 +76,14 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 		Name:      j.ObjectMeta.Name,
 	}
 	original := batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(ctx.Ctx, ctx.Client, key, &original)
+	exists, err := ctrlutil.CheckResourceExists(ctx.Ctx, ctx.Client, key, &original)
 	if err != nil {
 		return handleErr(err)
 	} else if exists {
 		// job exists, check job status and set action status accordingly
 		objRef, _ := ref.GetReference(ctx.Scheme, &original)
 		sb = sb.startTimestamp(&original.CreationTimestamp).objectRef(objRef)
-		_, finishedType := utils.IsJobFinished(&original)
+		_, finishedType, msg := utils.IsJobFinished(&original)
 		switch finishedType {
 		case batchv1.JobComplete:
 			return sb.phase(dpv1alpha1.ActionPhaseCompleted).
@@ -91,10 +91,9 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 				reason("JobCompleted").
 				build(), nil
 		case batchv1.JobFailed:
-			// TODO: get failed reason from job
 			return sb.phase(dpv1alpha1.ActionPhaseFailed).
 				completionTimestamp(nil).
-				reason("JobFailed").
+				reason(msg).
 				build(), nil
 		}
 		// job is running

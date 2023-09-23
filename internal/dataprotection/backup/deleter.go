@@ -71,13 +71,13 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 
 	// if deletion job exists, check its status
 	if exists {
-		_, finishedType := utils.IsJobFinished(job)
+		_, finishedType, msg := utils.IsJobFinished(job)
 		switch finishedType {
 		case batchv1.JobComplete:
 			return DeletionStatusSucceeded, nil
 		case batchv1.JobFailed:
 			return DeletionStatusFailed,
-				fmt.Errorf("deletion backup files job \"%s\" failed, you can delete it to re-delete the backup files", job.Name)
+				fmt.Errorf("deletion backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
 		}
 		return DeletionStatusDeleting, nil
 	}

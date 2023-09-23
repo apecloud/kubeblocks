@@ -146,7 +146,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("backup job should have completed")
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
-					_, finishedType := dputils.IsJobFinished(fetched)
+					_, finishedType, _ := dputils.IsJobFinished(fetched)
 					g.Expect(finishedType).To(Equal(batchv1.JobComplete))
 				})).Should(Succeed())
 
@@ -168,7 +168,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
-					_, finishedType := dputils.IsJobFinished(fetched)
+					_, finishedType, _ := dputils.IsJobFinished(fetched)
 					g.Expect(finishedType).To(Equal(batchv1.JobFailed))
 				})).Should(Succeed())
 
@@ -244,7 +244,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("check deletion backup file job completed")
 				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, fetched *batchv1.Job) {
-					_, finishedType := dputils.IsJobFinished(fetched)
+					_, finishedType, _ := dputils.IsJobFinished(fetched)
 					g.Expect(finishedType).To(Equal(batchv1.JobComplete))
 				})).Should(Succeed())
 

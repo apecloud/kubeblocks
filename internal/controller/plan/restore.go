@@ -104,14 +104,14 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent) error {
 }
 
 func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) error {
-	restore, err := r.BuildePrepareDataRestore(comp, backupObj)
+	restore, err := r.BuildPrepareDataRestore(comp, backupObj)
 	if err != nil {
 		return err
 	}
 	return r.createRestoreAndWait(restore)
 }
 
-func (r *RestoreManager) BuildePrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) (*dpv1alpha1.Restore, error) {
+func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) (*dpv1alpha1.Restore, error) {
 	backupMethod := backupObj.Status.BackupMethod
 	if backupMethod == nil {
 		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `status.backupMethod of backup "%s" can not be empty`, backupObj.Name)

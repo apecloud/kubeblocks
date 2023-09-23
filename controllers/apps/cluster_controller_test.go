@@ -29,9 +29,10 @@ import (
 	"strings"
 	"time"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -179,8 +180,8 @@ var _ = Describe("Cluster Controller", func() {
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
@@ -2055,110 +2056,99 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Creating cluster with backup", func() {
-			// TODO(ldm): fix test case
-			// var (
-			//	boolTrue  = true
-			//	boolFalse = false
-			//	int64Ptr  = func(in int64) *int64 {
-			//		return &in
-			//	}
-			//	retention = func(s string) dpv1alpha1.RetentionPeriod {
-			//		return dpv1alpha1.RetentionPeriod(s)
-			//	}
-			// )
-			//
-			// var testCases = []struct {
-			//	desc   string
-			//	backup *appsv1alpha1.ClusterBackup
-			// }{
-			//	{
-			//		desc: "backup with snapshot method",
-			//		backup: &appsv1alpha1.ClusterBackup{
-			//			Enabled:                 &boolTrue,
-			//			RetentionPeriod:         retention("1d"),
-			//			Method:                  vsBackupMethodName,
-			//			CronExpression:          "*/1 * * * *",
-			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
-			//			PITREnabled:             &boolTrue,
-			//			RepoName:                backupRepoName,
-			//		},
-			//	},
-			//	{
-			//		desc: "disable backup",
-			//		backup: &appsv1alpha1.ClusterBackup{
-			//			Enabled:                 &boolFalse,
-			//			RetentionPeriod:         retention("1d"),
-			//			Method:                  vsBackupMethodName,
-			//			CronExpression:          "*/1 * * * *",
-			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
-			//			PITREnabled:             &boolTrue,
-			//			RepoName:                backupRepoName,
-			//		},
-			//	},
-			//	{
-			//		desc: "backup with backup tool method",
-			//		backup: &appsv1alpha1.ClusterBackup{
-			//			Enabled:                 &boolTrue,
-			//			RetentionPeriod:         retention("2d"),
-			//			Method:                  backupMethodName,
-			//			CronExpression:          "*/1 * * * *",
-			//			StartingDeadlineMinutes: int64Ptr(int64(10)),
-			//			RepoName:                backupRepoName,
-			//			PITREnabled:             &boolFalse,
-			//		},
-			//	},
-			//	{
-			//		desc:   "backup is nil",
-			//		backup: nil,
-			//	},
-			// }
-			//
-			// for _, t := range testCases {
-			//	By(t.desc)
-			//	backup := t.backup
-			//	createClusterWithBackup(backup)
-			//	checkSchedulePolicy := func(g Gomega, sp *dpv1alpha1.SchedulePolicy) {
-			//		g.Expect(sp).ShouldNot(BeNil())
-			//		g.Expect(sp.Enable).Should(BeEquivalentTo(*backup.Enabled))
-			//		g.Expect(sp.CronExpression).Should(Equal(backup.CronExpression))
-			//	}
-			//	checkPolicy := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
-			//		schedule := p.Spec.SchedulePolicy
-			//		switch backup.Method {
-			//		case dpv1alpha1.BackupMethodSnapshot:
-			//			checkSchedulePolicy(g, schedule.Snapshot)
-			//		case dpv1alpha1.BackupMethodBackupTool:
-			//			checkSchedulePolicy(g, schedule.Datafile)
-			//		}
-			//		g.Expect(schedule.Logfile.Enable).Should(BeEquivalentTo(*backup.PITREnabled))
-			//		g.Expect(*p.Spec.Logfile.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
-			//		g.Expect(schedule.StartingDeadlineMinutes).Should(Equal(backup.StartingDeadlineMinutes))
-			//	}
-			//	checkPolicyDisabled := func(g Gomega, p *dpv1alpha1.BackupPolicy) {
-			//		schedule := p.Spec.SchedulePolicy
-			//		switch backup.Method {
-			//		case dpv1alpha1.BackupMethodSnapshot:
-			//			g.Expect(schedule.Snapshot.Enable).Should(BeFalse())
-			//		case dpv1alpha1.BackupMethodBackupTool:
-			//			g.Expect(schedule.Datafile.Enable).Should(BeFalse())
-			//		}
-			//	}
-			//	policyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
-			//	Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
-			//		func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
-			//			if backup == nil {
-			//				// if cluster.Spec.Backup is nil, will use the default backup policy
-			//				g.Expect(policy).ShouldNot(BeNil())
-			//				g.Expect(policy.Spec.SchedulePolicy).ShouldNot(BeNil())
-			//				g.Expect(policy.Spec.SchedulePolicy.Snapshot).ShouldNot(BeNil())
-			//				g.Expect(policy.Spec.SchedulePolicy.Snapshot.Enable).Should(BeFalse())
-			//			} else if boolValue(backup.Enabled) {
-			//				checkPolicy(g, policy)
-			//			} else {
-			//				checkPolicyDisabled(g, policy)
-			//			}
-			//		})).Should(Succeed())
-			// }
+			var (
+				boolTrue  = true
+				boolFalse = false
+				int64Ptr  = func(in int64) *int64 {
+					return &in
+				}
+				retention = func(s string) dpv1alpha1.RetentionPeriod {
+					return dpv1alpha1.RetentionPeriod(s)
+				}
+			)
+
+			var testCases = []struct {
+				desc   string
+				backup *appsv1alpha1.ClusterBackup
+			}{
+				{
+					desc: "backup with snapshot method",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         retention("1d"),
+						Method:                  vsBackupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
+					},
+				},
+				{
+					desc: "disable backup",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled:                 &boolFalse,
+						RetentionPeriod:         retention("1d"),
+						Method:                  vsBackupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
+					},
+				},
+				{
+					desc: "backup with backup tool",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         retention("2d"),
+						Method:                  backupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						RepoName:                backupRepoName,
+						PITREnabled:             &boolFalse,
+					},
+				},
+				{
+					desc:   "backup is nil",
+					backup: nil,
+				},
+			}
+
+			for _, t := range testCases {
+				By(t.desc)
+				backup := t.backup
+				createClusterWithBackup(backup)
+
+				checkSchedule := func(g Gomega, schedule *dpv1alpha1.BackupSchedule) {
+					var policy *dpv1alpha1.SchedulePolicy
+					for i, s := range schedule.Spec.Schedules {
+						if s.BackupMethod == backup.Method {
+							Expect(*s.Enabled).Should(BeEquivalentTo(*backup.Enabled))
+							policy = &schedule.Spec.Schedules[i]
+						}
+					}
+					if backup.Enabled != nil && *backup.Enabled {
+						Expect(policy).ShouldNot(BeNil())
+						Expect(policy.RetentionPeriod).Should(BeEquivalentTo(backup.RetentionPeriod))
+						Expect(policy.CronExpression).Should(BeEquivalentTo(backup.CronExpression))
+					}
+				}
+
+				By("checking backup policy exists")
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
+				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
+				backupPolicy := &dpv1alpha1.BackupPolicy{}
+				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
+
+				By("checking backup schedule")
+				backupScheduleName := generateBackupScheduleName(clusterKey.Name, compDefName, "")
+				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
+				if backup == nil {
+					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
+						&dpv1alpha1.BackupSchedule{}, false)).Should(Succeed())
+					continue
+				}
+				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, checkSchedule)).Should(Succeed())
+			}
 		})
 	})
 
@@ -2604,7 +2594,9 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 			AddBackupMethod(backupMethodName, false, actionSetName).
 			SetBackupMethodVolumeMounts("data", "/data").
 			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
-			SetBackupMethodVolumes([]string{"data"})
+			SetBackupMethodVolumes([]string{"data"}).
+			AddSchedule(backupMethodName, "0 0 * * *", true).
+			AddSchedule(vsBackupMethodName, "0 0 * * *", true)
 		switch v.WorkloadType {
 		case appsv1alpha1.Consensus:
 			bpt.SetTargetRole("leader")

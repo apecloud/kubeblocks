@@ -390,7 +390,7 @@ func (d *backupDataClone) restore(startingIndex int32) ([]client.Object, error) 
 		return nil, err
 	}
 	restoreMGR := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil, d.getBRLabels(), int32(1), startingIndex)
-	restore, err := restoreMGR.BuildePrepareDataRestore(d.component, backup)
+	restore, err := restoreMGR.BuildPrepareDataRestore(d.component, backup)
 	if err != nil || restore == nil {
 		return nil, err
 	}

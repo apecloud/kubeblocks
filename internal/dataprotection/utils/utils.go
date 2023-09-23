@@ -56,13 +56,16 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 	return nil
 }
 
-func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType) {
+func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 	for _, c := range job.Status.Conditions {
-		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == corev1.ConditionTrue {
-			return true, c.Type
+		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
+			return true, c.Type, ""
+		}
+		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+			return true, c.Type, c.Reason + "/" + c.Message
 		}
 	}
-	return false, ""
+	return false, "", ""
 }
 
 func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj client.Object) error {

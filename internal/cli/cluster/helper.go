@@ -24,11 +24,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	k8sutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -430,4 +432,30 @@ func GetConfigConstraintByName(dynamic dynamic.Interface, name string) (*appsv1a
 		return nil, err
 	}
 	return ccObj, nil
+}
+
+func AddComponentsFlag(f k8sutil.Factory, cmd *cobra.Command, isPlural bool, p any, usage string) {
+	autoComplete := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var components []string
+		if len(args) == 0 {
+			return components, cobra.ShellCompDirectiveNoFileComp
+		}
+		namespace, _, _ := f.ToRawKubeConfigLoader().Namespace()
+		dynamic, _ := f.DynamicClient()
+		cluster, _ := GetClusterByName(dynamic, args[0], namespace)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if strings.HasPrefix(comp.Name, toComplete) {
+				components = append(components, comp.Name)
+			}
+		}
+		return components, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if isPlural {
+		cmd.Flags().StringSliceVar(p.(*[]string), "components", nil, usage)
+		util.CheckErr(cmd.RegisterFlagCompletionFunc("components", autoComplete))
+	} else {
+		cmd.Flags().StringVar(p.(*string), "component", "", usage)
+		util.CheckErr(cmd.RegisterFlagCompletionFunc("component", autoComplete))
+	}
 }

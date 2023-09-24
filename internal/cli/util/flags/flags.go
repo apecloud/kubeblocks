@@ -38,6 +38,15 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
+const (
+	typeString  = "string"
+	typeNumber  = "number"
+	typeInteger = "integer"
+	typeBoolean = "boolean"
+	typeObject  = "object"
+	typeArray   = "array"
+)
+
 // AddClusterDefinitionFlag adds a flag "cluster-definition" for the cmd and stores the value of the flag
 // in string p
 func AddClusterDefinitionFlag(f cmdutil.Factory, cmd *cobra.Command, p *string) {
@@ -56,13 +65,17 @@ func BuildFlagsBySchema(cmd *cobra.Command, schema *spec.Schema) error {
 	}
 
 	for name, prop := range schema.Properties {
-		if err := buildOneFlag(cmd, name, &prop); err != nil {
+		if err := buildOneFlag(cmd, name, &prop, false); err != nil {
 			return err
 		}
 	}
 
 	for _, name := range schema.Required {
 		flagName := strcase.KebabCase(name)
+		// fixme: array/object type flag will be "--servers.name", but in schema.Required will check the "--servers" flag, do not mark the array type as required in schema.json
+		if schema.Properties[name].Type[0] == typeObject || schema.Properties[name].Type[0] == typeArray {
+			continue
+		}
 		if err := cmd.MarkFlagRequired(flagName); err != nil {
 			return err
 		}
@@ -78,33 +91,64 @@ func castOrZero[T any](v any) T {
 	return cv
 }
 
-func buildOneFlag(cmd *cobra.Command, k string, s *spec.Schema) error {
+func buildOneFlag(cmd *cobra.Command, k string, s *spec.Schema, isArray bool) error {
 	name := strcase.KebabCase(k)
-	tpe := "string"
+	tpe := typeString
 	if len(s.Type) > 0 {
 		tpe = s.Type[0]
 	}
-	// flag not support array type
-	switch tpe {
-	case "string":
-		cmd.Flags().String(name, castOrZero[string](s.Default), buildFlagDescription(s))
-	case "integer":
-		cmd.Flags().Int(name, int(castOrZero[float64](s.Default)), buildFlagDescription(s))
-	case "number":
-		cmd.Flags().Float64(name, castOrZero[float64](s.Default), buildFlagDescription(s))
-	case "boolean":
-		cmd.Flags().Bool(name, castOrZero[bool](s.Default), buildFlagDescription(s))
-	case "object":
-		for subName, prop := range s.Properties {
-			if err := buildOneFlag(cmd, fmt.Sprintf("%s.%s", name, subName), &prop); err != nil {
+
+	if isArray {
+		switch tpe {
+		case typeString:
+			cmd.Flags().StringArray(name, []string{castOrZero[string](s.Default)}, buildFlagDescription(s))
+		case typeInteger:
+			cmd.Flags().IntSlice(name, []int{castOrZero[int](s.Default)}, buildFlagDescription(s))
+		case typeNumber:
+			cmd.Flags().Float64Slice(name, []float64{castOrZero[float64](s.Default)}, buildFlagDescription(s))
+		case typeBoolean:
+			cmd.Flags().BoolSlice(name, []bool{castOrZero[bool](s.Default)}, buildFlagDescription(s))
+		case typeObject:
+			for subName, prop := range s.Properties {
+				if err := buildOneFlag(cmd, fmt.Sprintf("%s.%s", name, subName), &prop, true); err != nil {
+					return err
+				}
+			}
+		case typeArray:
+			return fmt.Errorf("unsupport build flags for object with array nested within an array")
+		default:
+			return fmt.Errorf("unsupported json schema type %s", s.Type)
+		}
+
+		registerFlagCompFunc(cmd, name, s)
+	} else {
+		switch tpe {
+		case typeString:
+			cmd.Flags().String(name, castOrZero[string](s.Default), buildFlagDescription(s))
+		case typeInteger:
+			cmd.Flags().Int(name, int(castOrZero[float64](s.Default)), buildFlagDescription(s))
+		case typeNumber:
+			cmd.Flags().Float64(name, castOrZero[float64](s.Default), buildFlagDescription(s))
+		case typeBoolean:
+			cmd.Flags().Bool(name, castOrZero[bool](s.Default), buildFlagDescription(s))
+		case typeObject:
+			for subName, prop := range s.Properties {
+				if err := buildOneFlag(cmd, fmt.Sprintf("%s.%s", name, subName), &prop, false); err != nil {
+					return err
+				}
+			}
+		case typeArray:
+			if err := buildOneFlag(cmd, name, s.Items.Schema, true); err != nil {
 				return err
 			}
+		default:
+			return fmt.Errorf("unsupported json schema type %s", s.Type)
 		}
-	default:
-		return fmt.Errorf("unsupported json schema type %s", s.Type)
-	}
 
-	registerFlagCompFunc(cmd, name, s)
+		registerFlagCompFunc(cmd, name, s)
+	}
+	// flag not support array type
+
 	return nil
 }
 

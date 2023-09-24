@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package flags
 
 import (
@@ -80,7 +99,8 @@ const singleFlags = `{
 }
 `
 
-const complexFlags = `
+// objectFlags is the schema.json of risingwave-cluster
+const objectFlags = `
 {
     "$schema": "http://json-schema.org/schema#",
     "type": "object",
@@ -151,8 +171,9 @@ const complexFlags = `
 }
 `
 
-// The helm chart values.yaml corresponding to 'wrongFlags' with an array type configuration
 /*
+	objectArrayFlags yaml example:
+
 apiVersion: 1
 name: myapp
 servers:
@@ -163,7 +184,7 @@ servers:
     address: 192.168.1.20
     port: 8081
 */
-const wrongFlags = `{
+const objectArrayFlags = `{
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
   "properties": {
@@ -195,10 +216,84 @@ const wrongFlags = `{
       }
     }
   },
-  "required": ["apiVersion", "name", "servers"]
+  "required": ["apiVersion", "name"]
 }
-
 `
+
+/*
+	simpleArrayFlags yaml example:
+
+name:
+- alal
+- jack
+*/
+const simpleArrayFlags = `
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
+`
+
+/*
+	arrayWithArray yaml example:
+
+data:
+  - name: John
+    age: 30
+    hobbies:
+  - Reading
+  - Swimming
+  - name: Alice
+    age: 28
+    hobbies:
+  - Painting
+  - Hiking
+  - name: Bob
+    age: 35
+    hobbies:
+  - Cycling
+*/
+const arrayWithArray = `{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "title": "Root Schema",
+    "type": "object",
+    "properties": {
+        "data": {
+            "title": "The data Schema",
+            "type": "array",
+            "items": {
+                "title": "A Schema",
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "title": "The name Schema",
+                        "type": "string"
+                    },
+                    "age": {
+                        "title": "The age Schema",
+                        "type": "number"
+                    },
+                    "hobbies": {
+                        "title": "The hobbies Schema",
+                        "type": "array",
+                        "items": {
+                            "title": "A Schema",
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}`
 
 var _ = Describe("flag", func() {
 	var cmd *cobra.Command
@@ -217,7 +312,7 @@ var _ = Describe("flag", func() {
 			true,
 		}, {
 			"test complex flags",
-			complexFlags,
+			objectFlags,
 			[]string{"risingwave.meta-store.etcd.endpoints",
 				"risingwave.state-store.s3.authentication.access-key",
 				"risingwave.state-store.s3.authentication.secret-access-key",
@@ -227,19 +322,27 @@ var _ = Describe("flag", func() {
 			},
 			true,
 		}, {
-			"test wrong flags",
-			wrongFlags,
+			"test object array flags",
+			objectArrayFlags,
+			[]string{"api-version", "name", "servers.name", "servers.address", "servers.port"},
+			true,
+		}, {
+			"test simple array flags",
+			simpleArrayFlags,
+			[]string{"name"},
+			true,
+		}, {
+			"test array with array object",
+			arrayWithArray,
 			nil,
 			false,
 		},
 	}
-	Context("test BuildFlagsBySchema", func() {
-		BeforeEach(func() {
+	It("test BuildFlagsBySchema", func() {
+		for i := range testCast {
 			cmd = &cobra.Command{}
 			schema = &spec.Schema{}
-		})
-		for i := range testCast {
-			It(testCast[i].description, func() {
+			By(testCast[i].description, func() {
 				Expect(schema.UnmarshalJSON([]byte(testCast[i].rawSchemaJSON))).Should(Succeed())
 				if testCast[i].success {
 					Expect(BuildFlagsBySchema(cmd, schema)).Should(Succeed())

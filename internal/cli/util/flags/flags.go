@@ -192,7 +192,7 @@ func AddComponentsFlag(f cmdutil.Factory, cmd *cobra.Command, p *[]string, usage
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("components", autoComplete))
 }
 
-// getClusterByNames is a hacky way to eliminate circular import, combining functions from the cluster.GetK8SClientObject and cluster.GetClusterByName
+// getClusterByNames is a hack way to eliminate circular import, combining functions from the cluster.GetK8SClientObject and cluster.GetClusterByName
 func getClusterByName(dynamic dynamic.Interface, name string, namespace string) (*appsv1alpha1.Cluster, error) {
 	cluster := &appsv1alpha1.Cluster{}
 

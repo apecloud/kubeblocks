@@ -20,15 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package flags
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/stoewer/go-strcase"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -141,4 +146,62 @@ func registerFlagCompFunc(cmd *cobra.Command, name string, s *spec.Schema) {
 			})
 		return
 	}
+}
+
+// AddComponentFlag add flag "component" for cobra.Command and support auto complete for it
+func AddComponentFlag(f cmdutil.Factory, cmd *cobra.Command, p *string, usage string) {
+	autoComplete := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var components []string
+		if len(args) == 0 {
+			return components, cobra.ShellCompDirectiveNoFileComp
+		}
+		namespace, _, _ := f.ToRawKubeConfigLoader().Namespace()
+		dynamic, _ := f.DynamicClient()
+		cluster, _ := getClusterByName(dynamic, args[0], namespace)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if strings.HasPrefix(comp.Name, toComplete) {
+				components = append(components, comp.Name)
+			}
+		}
+		return components, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	cmd.Flags().StringVar(p, "component", "", usage)
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("component", autoComplete))
+}
+
+// AddComponentsFlag add flag "components" for cobra.Command and support auto complete for it
+func AddComponentsFlag(f cmdutil.Factory, cmd *cobra.Command, p *[]string, usage string) {
+	autoComplete := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var components []string
+		if len(args) == 0 {
+			return components, cobra.ShellCompDirectiveNoFileComp
+		}
+		namespace, _, _ := f.ToRawKubeConfigLoader().Namespace()
+		dynamic, _ := f.DynamicClient()
+		cluster, _ := getClusterByName(dynamic, args[0], namespace)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if strings.HasPrefix(comp.Name, toComplete) {
+				components = append(components, comp.Name)
+			}
+		}
+		return components, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	cmd.Flags().StringSliceVar(p, "components", nil, usage)
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("components", autoComplete))
+}
+
+// getClusterByNames is a hacky way to eliminate circular import, combining functions from the cluster.GetK8SClientObject and cluster.GetClusterByName
+func getClusterByName(dynamic dynamic.Interface, name string, namespace string) (*appsv1alpha1.Cluster, error) {
+	cluster := &appsv1alpha1.Cluster{}
+
+	unstructuredObj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.UnstructuredContent(), cluster); err != nil {
+		return nil, err
+	}
+	return cluster, nil
 }

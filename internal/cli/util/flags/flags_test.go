@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/cobra"
@@ -252,4 +253,12 @@ var _ = Describe("flag", func() {
 		}
 	})
 
+	Context("test getClusterByName ", func() {
+		It("get cluster cluster", func() {
+			dynamic := testing.FakeDynamicClient(testing.FakeCluster("test", "test"))
+			c, err := getClusterByName(dynamic, "test", "test")
+			Expect(err).Should(Succeed())
+			Expect(c).ShouldNot(BeNil())
+		})
+	})
 })

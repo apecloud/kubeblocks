@@ -45,6 +45,8 @@ const (
 	ErrorTypeBackupScheduleDisabled intctrlutil.ErrorType = "BackupScheduleDisabled"
 	// ErrorTypeLogfileScheduleDisabled logfile schedule disabled
 	ErrorTypeLogfileScheduleDisabled intctrlutil.ErrorType = "LogfileScheduleDisabled"
+	// ErrorTypeWaitForExternalHandler wait for external handler to handle the Backup or Restore
+	ErrorTypeWaitForExternalHandler intctrlutil.ErrorType = "WaitForExternalHandler"
 )
 
 // NewBackupNotSupported returns a new Error with ErrorTypeBackupNotSupported.

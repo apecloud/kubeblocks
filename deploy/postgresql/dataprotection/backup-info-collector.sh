@@ -12,5 +12,5 @@ function stat_and_save_backup_info() {
   START_TIME=$(date -d "${START_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
   STOP_TIME=$(date -d "${STOP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
   TOTAL_SIZE=$(du -shx ${DP_BACKUP_DIR}|awk '{print $1}')
-  echo "{\"totalSize\":\"$TOTAL_SIZE\",\"timeRange\":{\"start\":\"${START_TIME}\",\"end\":\"${STOP_TIME}\"}}" >${DP_BACKUP_DIR}/backup.info
+  echo "{\"totalSize\":\"$TOTAL_SIZE\",\"timeRange\":{\"start\":\"${START_TIME}\",\"end\":\"${STOP_TIME}\"}}" > ${DP_BACKUP_DIR}/backup.info
 }

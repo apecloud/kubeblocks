@@ -5,18 +5,6 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4}}
-  annotations:
-    dataprotection.kubeblocks.io/reconfigure-ref: |
-      {
-        "name": "postgresql-configuration",
-        "key": "postgresql.conf",
-        "enable": {
-          "logfile": [{"key": "archive_command","value": "''"}]
-        },
-        "disable": {
-          "logfile": [{ "key": "archive_command","value": "'/bin/true'"}]
-        }
-      }
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:
@@ -29,19 +17,14 @@ spec:
       snapshotVolumes: false
       actionSetName: postgres-basebackup
       targetVolumes:
-        volumes:
-        - data
         volumeMounts:
         - name: data
-          mountPath: /home/postgres/pgdata/pgroot/data
+          mountPath: {{ .Values.dataMountPath }}
     - name: volume-snapshot
       snapshotVolumes: true
       targetVolumes:
         volumes:
         - data
-        volumeMounts:
-        - name: data
-          mountPath: /home/postgres/pgdata/pgroot/data
     schedules:
     - backupMethod: pg-basebackup
       enabled: false

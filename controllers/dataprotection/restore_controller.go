@@ -40,6 +40,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dperrors "github.com/apecloud/kubeblocks/internal/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/internal/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
@@ -234,7 +235,8 @@ func (r *RestoreReconciler) validateAndBuildMGR(reqCtx intctrlutil.RequestCtx, r
 	case dpv1alpha1.BackupTypeDifferential:
 		err = restoreMgr.BuildDifferentialBackupActionSets(reqCtx, r.Client, *backupSet)
 	case dpv1alpha1.BackupTypeContinuous:
-		err = intctrlutil.NewFatalError("Point-In-Time-Recover is not supported in the community version.")
+		err = intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler, "wait for external handler to do handle the Point-In-Time recovery.")
+		r.Recorder.Event(restoreMgr.Restore, corev1.EventTypeWarning, string(dperrors.ErrorTypeWaitForExternalHandler), err.Error())
 	default:
 		err = intctrlutil.NewFatalError(fmt.Sprintf("backup type of %s is empty", backupName))
 	}

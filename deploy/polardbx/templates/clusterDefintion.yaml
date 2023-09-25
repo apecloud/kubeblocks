@@ -22,19 +22,30 @@ spec:
           defaultMode: 0555
       workloadType: Consensus
       characterType: polardbx
-      consensusSpec:
-        leader:
-          name: "leader"
-          accessMode: ReadWrite
-        followers:
+      rsmSpec:
+        roles:
+          - name: "leader"
+            accessMode: ReadWrite
+            isLeader: true
+            canVote: true
           - name: "follower"
             accessMode: Readonly
-        updateStrategy: Parallel
-      probes:
+            canVote: true
         roleProbe:
-          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
-          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+          roleUpdateMechanism: DirectAPIServerEventUpdate
+          probeActions:
+            - image: "arey/mysql-client:latest"
+              command:
+                - mysql
+                - "-h127.0.0.1"
+                - "-P3306"
+                - "-uroot"
+                - "-N"
+                - "-B"
+                - "-e"
+                - "\"select role from information_schema.alisql_cluster_local\""
+                - "|"
+                - "xargs echo -n"
       service:
         ports:
           - name: mysql
@@ -50,9 +61,7 @@ spec:
           scrapePath: "/metrics"
       podSpec:
         volumes: &xstoreVolumes
-          - hostPath:
-              path: /data/cache/tools/xstore
-              type: Directory
+          - emptyDir: {}
             name: xstore-tools
           - downwardAPI:
               defaultMode: 420
@@ -227,19 +236,30 @@ spec:
             - name: GMS_SVC_NAME
               valueFrom:
                 type: ServiceRef
-      consensusSpec:
-        leader:
-          name: "leader"
-          accessMode: ReadWrite
-        followers:
+      rsmSpec:
+        roles:
+          - name: "leader"
+            accessMode: ReadWrite
+            isLeader: true
+            canVote: true
           - name: "follower"
             accessMode: Readonly
-        updateStrategy: Parallel
-      probes:
+            canVote: true
         roleProbe:
-          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
-          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+          roleUpdateMechanism: DirectAPIServerEventUpdate
+          probeActions:
+            - image: "arey/mysql-client:latest"
+              command:
+                - mysql
+                - "-h127.0.0.1"
+                - "-P3306"
+                - "-uroot"
+                - "-N"
+                - "-B"
+                - "-e"
+                - "\"select role from information_schema.alisql_cluster_local\""
+                - "|"
+                - "xargs echo -n"
       service:
         ports:
           - name: mysql

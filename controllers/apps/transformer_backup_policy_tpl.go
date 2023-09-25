@@ -25,7 +25,6 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -121,6 +120,11 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 					return
 				}
 
+				// only create backup schedule for the default backup policy template
+				if r.isDefaultTemplate != trueVal {
+					return
+				}
+
 				// build the data protection backup schedule from the template.
 				dpBackupSchedule, action := r.transformBackupSchedule(backupPolicy)
 
@@ -132,6 +136,15 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 				} else if action == nil {
 					action = ictrltypes.ActionUpdatePtr()
 				}
+
+				// for a cluster, the default backup schedule is created by backup
+				// policy template, user can also configure cluster backup in the
+				// cluster custom object, such as enable cluster backup, set backup
+				// schedule, etc.
+				// We always prioritize the cluster backup configuration in the
+				// cluster object, so we need to merge the cluster backup configuration
+				// into the default backup schedule created by backup policy template
+				// if it exists.
 				dpBackupSchedule = r.mergeClusterBackup(backupPolicy, dpBackupSchedule)
 				if dpBackupSchedule == nil {
 					return
@@ -154,7 +167,8 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 				backupScheduleNames[dpBackupSchedule.Name] = struct{}{}
 			}
 
-			// transform template to data protection backupPolicy and backupSchedule
+			// transform backup policy template to data protection backupPolicy
+			// and backupSchedule
 			policy, policyVertex := transformBackupPolicy()
 			transformBackupSchedule(policy, policyVertex)
 		}
@@ -175,7 +189,7 @@ func (r *BackupPolicyTplTransformer) transformBackupPolicy() (*dpv1alpha1.Backup
 	}
 
 	if len(backupPolicy.Name) == 0 {
-		// build a new backup policy from the backup policy template.
+		// build a new backup policy by the backup policy template.
 		return r.buildBackupPolicy(backupPolicyName), ictrltypes.ActionCreatePtr()
 	}
 
@@ -280,13 +294,13 @@ func (r *BackupPolicyTplTransformer) getCompReplicas() int32 {
 	rsm := &workloads.ReplicatedStateMachine{}
 	compSpec := r.getClusterComponentSpec()
 	rsmName := fmt.Sprintf("%s-%s", r.Cluster.Name, compSpec.Name)
-	if err := r.Client.Get(r.Context, types.NamespacedName{Name: rsmName, Namespace: r.Cluster.Namespace}, rsm); err != nil {
+	if err := r.Client.Get(r.Context, client.ObjectKey{Name: rsmName, Namespace: r.Cluster.Namespace}, rsm); err != nil {
 		return compSpec.Replicas
 	}
 	return *rsm.Spec.Replicas
 }
 
-// buildBackupPolicy builds a new backup policy from the backup policy template.
+// buildBackupPolicy builds a new backup policy by the backup policy template.
 func (r *BackupPolicyTplTransformer) buildBackupPolicy(backupPolicyName string) *dpv1alpha1.BackupPolicy {
 	comp := r.getClusterComponentSpec()
 	if comp == nil {
@@ -311,9 +325,17 @@ func (r *BackupPolicyTplTransformer) buildBackupPolicy(backupPolicyName string) 
 	return backupPolicy
 }
 
-func (r *BackupPolicyTplTransformer) buildBackupTarget(comp *appsv1alpha1.ClusterComponentSpec) *dpv1alpha1.BackupTarget {
+func (r *BackupPolicyTplTransformer) buildBackupTarget(
+	comp *appsv1alpha1.ClusterComponentSpec) *dpv1alpha1.BackupTarget {
 	targetTpl := r.backupPolicy.Target
 	clusterName := r.OrigCluster.Name
+
+	getSAName := func() string {
+		if comp.ServiceAccountName != "" {
+			return comp.ServiceAccountName
+		}
+		return "kb-" + r.Cluster.Name
+	}
 
 	// build the target connection credential
 	cc := dpv1alpha1.ConnectionCredential{}
@@ -346,12 +368,11 @@ func (r *BackupPolicyTplTransformer) buildBackupTarget(comp *appsv1alpha1.Cluste
 			},
 		},
 		ConnectionCredential: &cc,
-		ServiceAccountName:   comp.ServiceAccountName,
+		ServiceAccountName:   getSAName(),
 	}
 	return target
 }
 
-// mergeClusterBackup merges the cluster backup configuration into the backup policy.
 func (r *BackupPolicyTplTransformer) mergeClusterBackup(
 	backupPolicy *dpv1alpha1.BackupPolicy,
 	backupSchedule *dpv1alpha1.BackupSchedule) *dpv1alpha1.BackupSchedule {
@@ -395,12 +416,14 @@ func (r *BackupPolicyTplTransformer) mergeClusterBackup(
 		BackupMethod:    backup.Method,
 		CronExpression:  backup.CronExpression,
 	}
-	// merge backup schedule policy into backup schedule, if the backup schedule
-	// with backup method already exists, we need to update it. Otherwise, we
-	// need to append it to the backup schedule.
+
+	// merge cluster backup schedule policy into backup schedule, if the backup
+	// schedule with specified method already exists, we need to update it
+	// using the cluster backup schedule policy. Otherwise, we need to append
+	// it to the backup schedule.
 	for i, s := range backupSchedule.Spec.Schedules {
 		if s.BackupMethod == backup.Method {
-			backupSchedule.Spec.Schedules[i] = *sp
+			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
 			return backupSchedule
 		}
 	}
@@ -484,4 +507,19 @@ func buildBackupPathPrefix(cluster *appsv1alpha1.Cluster, compName string) strin
 
 func workloadHasRoleLabel(workloadType appsv1alpha1.WorkloadType) bool {
 	return slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Replication, appsv1alpha1.Consensus}, workloadType)
+}
+
+func mergeSchedulePolicy(src *dpv1alpha1.SchedulePolicy, dst *dpv1alpha1.SchedulePolicy) {
+	if src.Enabled != nil {
+		dst.Enabled = src.Enabled
+	}
+	if src.RetentionPeriod.String() != "" {
+		dst.RetentionPeriod = src.RetentionPeriod
+	}
+	if src.BackupMethod != "" {
+		dst.BackupMethod = src.BackupMethod
+	}
+	if src.CronExpression != "" {
+		dst.CronExpression = src.CronExpression
+	}
 }

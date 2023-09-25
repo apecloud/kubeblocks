@@ -1,8 +1,0 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: Backup
-metadata:
-  name: my-backup-1
-spec:
-  backupPolicyName: apecloud-mysql-backup-policy
-  backupMethod: xtrabackup
-  retentionPeriod: 7d

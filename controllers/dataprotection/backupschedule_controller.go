@@ -101,6 +101,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupSchedule{}).
+		Owns(&batchv1.CronJob{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
 		}).
@@ -131,6 +132,7 @@ func (r *BackupScheduleReconciler) deleteExternalResources(
 		}
 	}
 	// notice running backup to completed
+	// TODO(ldm): is it necessary to notice running backup to completed?
 	backup := &dpv1alpha1.Backup{}
 	for _, s := range backupSchedule.Spec.Schedules {
 		backupKey := client.ObjectKey{

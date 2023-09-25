@@ -74,6 +74,40 @@ type TplEngine struct {
 	ctx context.Context
 }
 
+type TplEngineOptions func(*TplEngine)
+
+type DSLType string
+
+const (
+	DefaultDSL DSLType = "gotemplate"
+	KBDSL      DSLType = "kbdsl"
+	KBDSL2     DSLType = "kbdsl2"
+
+	TemplateBeginDelim = "{{"
+	TemplateEndDelim   = "}}"
+	KBDSLBeginDelim    = "{%"
+	KBDSLEndDelim      = "%}"
+	KBDSL2BeginDelim   = "<%"
+	KBDSL2EndDelim     = "%>"
+)
+
+func WithCustomizedSyntax(begin, end string) TplEngineOptions {
+	return func(t *TplEngine) {
+		t.tpl.Delims(begin, end)
+	}
+}
+
+func WithCustomizedWithType(dsl DSLType) TplEngineOptions {
+	switch dsl {
+	case KBDSL:
+		return WithCustomizedSyntax(KBDSLBeginDelim, KBDSLEndDelim)
+	case KBDSL2:
+		return WithCustomizedSyntax(KBDSL2BeginDelim, KBDSL2EndDelim)
+	default:
+		return WithCustomizedSyntax(TemplateBeginDelim, TemplateEndDelim)
+	}
+}
+
 func (t *TplEngine) GetTplEngine() *template.Template {
 	return t.tpl
 }
@@ -180,7 +214,7 @@ func (t *TplEngine) importSelfModuleFuncs(funcs map[string]functional, fn func(t
 }
 
 // NewTplEngine creates go template helper
-func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli types2.ReadonlyClient, ctx context.Context) *TplEngine {
+func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli types2.ReadonlyClient, ctx context.Context, options ...TplEngineOptions) *TplEngine {
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 
 	// custom funcs
@@ -200,5 +234,8 @@ func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, 
 	}
 
 	engine.initSystemFunMap(coreBuiltinFuncs)
+	if len(options) > 0 {
+		options[0](&engine)
+	}
 	return &engine
 }

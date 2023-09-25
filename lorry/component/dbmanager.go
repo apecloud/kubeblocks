@@ -306,7 +306,7 @@ func (*FakeManager) IsFirstMember() bool {
 }
 
 func (*FakeManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
-	return fmt.Errorf("NotSupported")
+	return nil
 }
 
 func (*FakeManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {

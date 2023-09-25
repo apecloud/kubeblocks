@@ -24,16 +24,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
 
-	dapr "github.com/dapr/go-sdk/client"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+)
+
+const (
+	urlTemplate = "http://localhost:%d/v1.0/bindings/%s"
 )
 
 type Client interface {
@@ -66,8 +72,10 @@ func NewClient(characterType string, pod corev1.Pod) (Client, error) {
 }
 
 type OperationClient struct {
-	dapr.Client
+	Client           *http.Client
+	Port             int32
 	CharacterType    string
+	URL              string
 	cache            map[string]*OperationResult
 	CacheTTL         time.Duration
 	ReconcileTimeout time.Duration
@@ -77,7 +85,7 @@ type OperationClient struct {
 var _ Client = &OperationClient{}
 
 type OperationResult struct {
-	response *dapr.BindingEvent
+	response *http.Response
 	err      error
 	respTime time.Time
 }
@@ -92,19 +100,30 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 
-	port, err := intctrlutil.GetProbeGRPCPort(pod)
+	port, err := intctrlutil.GuessLorryHTTPPort(pod)
 	if err != nil {
-		return nil, err
+		// not lorry in the pod, just return nil without error
+		return nil, nil
 	}
 
-	client, err := dapr.NewClientWithAddress(fmt.Sprintf("%s:%d", ip, port))
-	if err != nil {
-		return nil, err
+	// don't use default http-client
+	dialer := &net.Dialer{
+		Timeout: 5 * time.Second,
+	}
+	netTransport := &http.Transport{
+		Dial:                dialer.Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+	client := &http.Client{
+		Timeout:   time.Second * 30,
+		Transport: netTransport,
 	}
 
 	operationClient := &OperationClient{
 		Client:           client,
+		Port:             port,
 		CharacterType:    characterType,
+		URL:              fmt.Sprintf(urlTemplate, port, characterType),
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
@@ -117,20 +136,18 @@ func (cli *OperationClient) GetRole() (string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
 	defer cancel()
 
-	// Request sql channel via Dapr SDK
-	req := &dapr.InvokeBindingRequest{
-		Name:      cli.CharacterType,
-		Operation: string(GetRoleOperation),
-		Data:      []byte(""),
-		Metadata:  map[string]string{},
-	}
+	// Http request
+	url := fmt.Sprintf("%s?operation=%s", cli.URL, GetRoleOperation)
 
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodGet, nil)
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 	result := map[string]string{}
-	err = json.Unmarshal(resp.Data, &result)
+
+	buf, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(buf, &result)
 	if err != nil {
 		return "", err
 	}
@@ -142,21 +159,19 @@ func (cli *OperationClient) GetRole() (string, error) {
 func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
 	defer cancel()
-
-	// Request sql channel via Dapr SDK
-	req := &dapr.InvokeBindingRequest{
-		Name:      cli.CharacterType,
-		Operation: string(ListSystemAccountsOp),
-	}
-
-	var resp *dapr.BindingEvent
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	url := fmt.Sprintf("%s?operation=%s", cli.URL, ListSystemAccountsOp)
+	var resp *http.Response
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	sqlResponse := SQLChannelResponse{}
-	if err = json.Unmarshal(resp.Data, &sqlResponse); err != nil {
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(buf, &sqlResponse); err != nil {
 		return nil, err
 	}
 	if sqlResponse.Event == RespEveFail {
@@ -185,20 +200,19 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 
-	// Request sql channel via Dapr SDK
-	req := &dapr.InvokeBindingRequest{
-		Name:      cli.CharacterType,
-		Operation: operation,
-		Data:      []byte(""),
-		Metadata:  map[string]string{},
-	}
+	// Request sql channel via http request
+	url := fmt.Sprintf("%s?operation=%s", cli.URL, operation)
 
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodPost, nil)
 	if err != nil {
 		return nil, err
 	}
 	result := map[string]any{}
-	err = json.Unmarshal(resp.Data, &result)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -206,10 +220,10 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	return result, nil
 }
 
-func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
+func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
 	ch := make(chan *OperationResult, 1)
-	go cli.InvokeComponent(ctxWithReconcileTimeout, req, ch)
-	var resp *dapr.BindingEvent
+	go cli.InvokeComponent(ctxWithReconcileTimeout, url, method, body, ch)
+	var resp *http.Response
 	var err error
 	select {
 	case <-ctxWithReconcileTimeout.Done():
@@ -221,9 +235,20 @@ func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout con
 	return resp, err
 }
 
-func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest, ch chan *OperationResult) {
+func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader, ch chan *OperationResult) {
 	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
 	defer cancel()
+	req, err := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)
+	if err != nil || req == nil {
+		operationRes := &OperationResult{
+			response: nil,
+			err:      err,
+			respTime: time.Now(),
+		}
+		ch <- operationRes
+		return
+	}
+
 	mapKey := GetMapKeyFromRequest(req)
 	operationRes, ok := cli.cache[mapKey]
 	if ok {
@@ -234,7 +259,7 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 		}
 	}
 
-	resp, err := cli.InvokeBinding(ctxWithRequestTimeout, req)
+	resp, err := cli.Client.Do(req)
 	operationRes = &OperationResult{
 		response: resp,
 		err:      err,
@@ -248,19 +273,26 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 	}
 }
 
-func GetMapKeyFromRequest(req *dapr.InvokeBindingRequest) string {
+func GetMapKeyFromRequest(req *http.Request) string {
 	var buf bytes.Buffer
-	buf.WriteString(req.Name)
-	buf.WriteString(req.Operation)
-	buf.Write(req.Data)
-	keys := make([]string, 0, len(req.Metadata))
-	for k := range req.Metadata {
+	buf.WriteString(req.URL.String())
+
+	if req.Body != nil {
+		all, err := io.ReadAll(req.Body)
+		if err != nil {
+			return ""
+		}
+		buf.Write(all)
+	}
+	keys := make([]string, 0, len(req.Header))
+	for k := range req.Header {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Metadata[k]))
+		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Header[k]))
 	}
+
 	return buf.String()
 }
 

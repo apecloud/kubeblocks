@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: nebula-cluster-start-
+  generateName: nebula-cluster-restart-
 spec:
   clusterRef: nebula-cluster
   ttlSecondsAfterSucceed: 27017

@@ -21,6 +21,8 @@ package binding
 
 import (
 	"fmt"
+
+	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 const (
@@ -47,13 +49,8 @@ const (
 	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleDetectionThreshold     = 300
-)
 
-const (
-	// types for probe
-	CheckRunningType int = iota
-	CheckStatusType
-	CheckRoleChangedType
+	rsmRoleUpdateMechanismVarName = "KB_RSM_ROLE_UPDATE_MECHANISM"
 )
 
 const (
@@ -87,4 +84,15 @@ var (
 
 type SlaveStatus struct {
 	SecondsBehindMaster int64 `json:"Seconds_Behind_Master"`
+}
+
+type ProbeRequest struct {
+	Data      []byte            `json:"data"`
+	Metadata  map[string]string `json:"metadata"`
+	Operation OperationKind     `json:"operation"`
+}
+
+type ProbeResponse struct {
+	Data     []byte            `json:"data"`
+	Metadata map[string]string `json:"metadata"`
 }

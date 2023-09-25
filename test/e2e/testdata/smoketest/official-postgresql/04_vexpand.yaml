@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: official-pg-vexpand-
+spec:
+  clusterRef: official-pg
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: postgresql
+      volumeClaimTemplates:
+        - name: data
+          storage: "21Gi"

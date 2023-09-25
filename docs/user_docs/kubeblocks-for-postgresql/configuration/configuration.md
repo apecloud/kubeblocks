@@ -7,12 +7,9 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
+The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
 
-## Before you start
-
-1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster) and wait until the cluster status is Running.
+From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
 
 ## View parameter information
 
@@ -35,7 +32,7 @@ You can also view the details of this configuration file and parameters.
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config pg-cluster |head -n 20
+  kbcli cluster explain-config pg-cluster | head -n 20
   ```
 
 * View the user guide of a specified parameter.
@@ -68,7 +65,9 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Reconfigure dynamic parameters
+## Reconfigure parameters with config command
+
+### Reconfigure dynamic parameters
 
 The example below reconfigures `max_connections`.
 
@@ -163,7 +162,7 @@ The example below reconfigures `max_connections`.
    (1 row)
    ```
 
-## Reconfigure static parameters
+### Reconfigure static parameters
 
 The example below reconfigures `shared_buffers`.
 
@@ -255,6 +254,43 @@ The example below reconfigures `shared_buffers`.
     512MB
    (1 row)
    ```
+
+## Reconfigure parameters with edit-config command
+
+For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+
+1. Edit the configuration file.
+
+   ```bash
+   kbcli cluster edit-config pg-cluster
+   ```
+
+:::note
+
+If there are multiple components in a cluster, use `--component` to specify a component.
+
+:::
+
+2. View the status of the parameter reconfiguration.
+
+   ```bash
+   kbcli cluster describe-ops xxx -n default
+   ```
+
+3. Connect to the database to verify whether the parameters are modified
+
+   ```bash
+   kbcli cluster connect pg-cluster
+   ```
+
+:::note
+
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported in later version.
+
+:::
 
 ## View history and compare differences
 

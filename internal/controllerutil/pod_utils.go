@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -355,14 +356,30 @@ func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
 }
 
-// GetProbeContainerName gets the probe container from pod
-func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+// GuessLorryHTTPPort guesses lorry container and serving port.
+// TODO(xuriwuyun): should provide a deterministic way to find the lorry serving port.
+func GuessLorryHTTPPort(pod *corev1.Pod) (int32, error) {
+	lorryImage := viper.GetString(constant.KBToolsImage)
 	for _, container := range pod.Spec.Containers {
-		if container.Name == constant.RoleProbeContainerName {
-			return constant.RoleProbeContainerName, nil
+		if container.Image != lorryImage {
+			continue
+		}
+		if len(container.Ports) > 0 {
+			return container.Ports[0].ContainerPort, nil
 		}
 	}
-	return "", fmt.Errorf("container %s not found", constant.RoleProbeContainerName)
+	return 0, fmt.Errorf("lorry port not found")
+}
+
+// GetProbeContainerName gets the probe container from pod
+func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+	lorryImage := viper.GetString(constant.KBToolsImage)
+	for _, container := range pod.Spec.Containers {
+		if container.Image == lorryImage {
+			return container.Name, nil
+		}
+	}
+	return "", fmt.Errorf("container %s not found", lorryImage)
 
 }
 

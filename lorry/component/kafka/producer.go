@@ -16,6 +16,7 @@ package kafka
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/Shopify/sarama"
 )
@@ -44,7 +45,7 @@ func (k *Kafka) Publish(_ context.Context, topic string, data []byte, metadata m
 		return errors.New("component is closed")
 	}
 	// k.logger.Debugf("Publishing topic %v with data: %v", topic, string(data))
-	k.logger.Debugf("Publishing on topic %v", topic)
+	k.logger.Info(fmt.Sprintf("Publishing on topic %v", topic))
 
 	msg := &sarama.ProducerMessage{
 		Topic: topic,
@@ -67,7 +68,7 @@ func (k *Kafka) Publish(_ context.Context, topic string, data []byte, metadata m
 
 	partition, offset, err := k.Producer.SendMessage(msg)
 
-	k.logger.Debugf("Partition: %v, offset: %v", partition, offset)
+	k.logger.Info(fmt.Sprintf("Partition: %v, offset: %v", partition, offset))
 
 	if err != nil {
 		return err

@@ -1,9 +1,5 @@
-apiVersion: dapr.io/v1alpha1
-kind: Component
-metadata:
-  name: kafka
+name: kafka
 spec:
-  type: bindings.kafka
   version: v1
   metadata:
     - name: topics

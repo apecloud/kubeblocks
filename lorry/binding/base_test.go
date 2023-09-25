@@ -27,10 +27,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -45,7 +47,7 @@ var (
 
 func TestInit(t *testing.T) {
 	p := mockFakeOperations()
-	p.Init(bindings.Metadata{})
+	p.Init()
 	if p.OriRole != "" {
 		t.Errorf("p.oriRole init failed: %s", p.OriRole)
 	}
@@ -71,7 +73,7 @@ func TestInit(t *testing.T) {
 
 func TestOperations(t *testing.T) {
 	p := mockFakeOperations()
-	p.Init(bindings.Metadata{})
+	p.Init()
 	ops := p.Operations()
 
 	if len(ops) <= 4 {
@@ -83,12 +85,12 @@ func TestOperations(t *testing.T) {
 func TestInvoke(t *testing.T) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	p := mockFakeOperations()
-	p.Init(bindings.Metadata{})
+	p.Init()
 
 	t.Run("CheckRunning", func(t *testing.T) {
 		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
-		req := &bindings.InvokeRequest{
+		req := &ProbeRequest{
 			Data:      nil,
 			Metadata:  metadata,
 			Operation: CheckRunningOperation,
@@ -125,7 +127,7 @@ func TestInvoke(t *testing.T) {
 	t.Run("CheckRole", func(t *testing.T) {
 		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
-		req := &bindings.InvokeRequest{
+		req := &ProbeRequest{
 			Data:      nil,
 			Metadata:  metadata,
 			Operation: CheckRoleOperation,
@@ -200,7 +202,7 @@ func TestInvoke(t *testing.T) {
 	t.Run("GetRole", func(t *testing.T) {
 		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
-		req := &bindings.InvokeRequest{
+		req := &ProbeRequest{
 			Data:      nil,
 			Metadata:  metadata,
 			Operation: GetRoleOperation,
@@ -260,15 +262,17 @@ func stopFooServer(server net.Listener) {
 }
 
 func mockFakeOperations() *fakeOperations {
-	log := logger.NewLogger("base_test")
+	log := logr.Logger{}
 	p := BaseOperations{Logger: log}
 	return &fakeOperations{BaseOperations: p}
 }
 
 // Init initializes the fake binding.
-func (fakeOps *fakeOperations) Init(metadata bindings.Metadata) {
-	fakeOps.BaseOperations.Init(metadata)
-	fakeOps.Logger.Debug("Initializing MySQL binding")
+func (fakeOps *fakeOperations) Init() {
+	development, _ := zap.NewDevelopment()
+	fakeOps.Logger = zapr.NewLogger(development)
+	fakeOps.BaseOperations.Init(component.Properties{})
+	fakeOps.Logger.Info("Initializing MySQL binding")
 	fakeOps.DBType = "mysql"
 	fakeOps.InitIfNeed = fakeOps.initIfNeed
 	fakeOps.BaseOperations.GetRole = fakeOps.GetRole
@@ -284,15 +288,15 @@ func (fakeOps *fakeOperations) GetRunningPort() int {
 	return testDBPort
 }
 
-func (fakeOps *fakeOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (fakeOps *fakeOperations) CheckStatusOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	return OpsResult{}, nil
 }
 
-func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	return testRole, nil
 }
 
-func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	return testRole, fmt.Errorf("mock error")
 }
 

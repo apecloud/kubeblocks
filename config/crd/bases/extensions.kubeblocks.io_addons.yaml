@@ -172,12 +172,15 @@ spec:
                         properties:
                           key:
                             description: The selector key. Valid values are KubeVersion,
-                              KubeGitVersion. "KubeVersion" the semver expression
-                              of Kubernetes versions, i.e., v1.24. "KubeGitVersion"
-                              may contain distro. info., i.e., v1.24.4+eks.
+                              KubeGitVersion and KubeProvider. "KubeVersion" the semver
+                              expression of Kubernetes versions, i.e., v1.24. "KubeGitVersion"
+                              may contain distro. info., i.e., v1.24.4+eks. "KubeProvider"
+                              the Kubernetes provider, i.e., aws,gcp,azure,huaweiCloud,tencentCloud
+                              etc.
                             enum:
                             - KubeGitVersion
                             - KubeVersion
+                            - KubeProvider
                             type: string
                           operator:
                             description: "Represents a key's relationship to a set
@@ -562,12 +565,15 @@ spec:
                       properties:
                         key:
                           description: The selector key. Valid values are KubeVersion,
-                            KubeGitVersion. "KubeVersion" the semver expression of
-                            Kubernetes versions, i.e., v1.24. "KubeGitVersion" may
-                            contain distro. info., i.e., v1.24.4+eks.
+                            KubeGitVersion and KubeProvider. "KubeVersion" the semver
+                            expression of Kubernetes versions, i.e., v1.24. "KubeGitVersion"
+                            may contain distro. info., i.e., v1.24.4+eks. "KubeProvider"
+                            the Kubernetes provider, i.e., aws,gcp,azure,huaweiCloud,tencentCloud
+                            etc.
                           enum:
                           - KubeGitVersion
                           - KubeVersion
+                          - KubeProvider
                           type: string
                         operator:
                           description: "Represents a key's relationship to a set of

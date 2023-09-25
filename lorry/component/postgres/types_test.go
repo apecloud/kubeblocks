@@ -170,6 +170,15 @@ func TestParsePGLsn(t *testing.T) {
 	})
 }
 
+func TestFormatPgLsn(t *testing.T) {
+	t.Run("format lsn", func(t *testing.T) {
+		lsn := int64(16777376)
+
+		lsnStr := FormatPgLsn(lsn)
+		assert.Equal(t, "0/010000A0", lsnStr)
+	})
+}
+
 func TestParsePrimaryConnInfo(t *testing.T) {
 	t.Run("legal primary conn info str", func(t *testing.T) {
 		primaryConnInfoStr := "host=pg-pg-replication-0.pg-pg-replication-headless port=5432 user=postgres application_name=my-application"
@@ -188,5 +197,43 @@ func TestParsePrimaryConnInfo(t *testing.T) {
 		result := ParsePrimaryConnInfo(primaryConnInfoStr)
 		assert.NotNil(t, result)
 		assert.Equal(t, map[string]string{}, result)
+	})
+}
+
+func TestParseHistory(t *testing.T) {
+	t.Run("parse history success", func(t *testing.T) {
+		historyStr :=
+			`     filename     |                       content
+------------------+------------------------------------------------------
+ 00000003.history | 1       0/50000A0       no recovery target specified+
+                  |                                                     +
+                  | 2       0/60000A0       no recovery target specified+
+                  |`
+
+		history := ParseHistory(historyStr)
+		assert.NotNil(t, history)
+		assert.Len(t, history.History, 2)
+		assert.Equal(t, int64(1), history.History[0].ParentTimeline)
+		assert.Equal(t, int64(2), history.History[1].ParentTimeline)
+		assert.Equal(t, ParsePgLsn("0/50000A0 "), history.History[0].SwitchPoint)
+		assert.Equal(t, ParsePgLsn("0/60000A0 "), history.History[1].SwitchPoint)
+	})
+}
+
+func TestParsePgWalDumpError(t *testing.T) {
+	t.Run("parse success", func(t *testing.T) {
+		errorInfo := "pg_waldump: fatal: error in WAL record at 0/182E220: invalid record length at 0/182E298: wanted 24, got 0"
+
+		resp := ParsePgWalDumpError(errorInfo, "0/182E220")
+
+		assert.Equal(t, "0/182E298", resp)
+	})
+
+	t.Run("parse failed", func(t *testing.T) {
+		errorInfo := "pg_waldump: fatal: error in WAL record at 0/182E220: invalid record length at 0/182E298"
+
+		resp := ParsePgWalDumpError(errorInfo, "0/182E220")
+
+		assert.Equal(t, "", resp)
 	})
 }

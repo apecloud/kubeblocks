@@ -21,6 +21,7 @@ package rsm
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,10 +44,10 @@ var _ = Describe("utils test", func() {
 			SetService(&corev1.Service{}).
 			SetRoles(roles).
 			GetObject()
-		priorityMap = composeRolePriorityMap(*rsm)
+		priorityMap = ComposeRolePriorityMap(rsm.Spec.Roles)
 	})
 
-	Context("composeRolePriorityMap function", func() {
+	Context("ComposeRolePriorityMap function", func() {
 		It("should work well", func() {
 			priorityList := []int{
 				leaderPriority,
@@ -62,7 +63,7 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("sortPods function", func() {
+	Context("SortPods function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
 				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
@@ -75,7 +76,7 @@ var _ = Describe("utils test", func() {
 			}
 			expectedOrder := []string{"pod-4", "pod-2", "pod-3", "pod-6", "pod-1", "pod-0", "pod-5"}
 
-			sortPods(pods, priorityMap, false)
+			SortPods(pods, priorityMap, false)
 			for i, pod := range pods {
 				Expect(pod.Name).Should(Equal(expectedOrder[i]))
 			}
@@ -148,13 +149,11 @@ var _ = Describe("utils test", func() {
 			rsm.Status.MembersStatus = oldMembersStatus
 			setMembersStatus(rsm, pods)
 
-			Expect(rsm.Status.MembersStatus).Should(HaveLen(len(oldMembersStatus)))
+			Expect(rsm.Status.MembersStatus).Should(HaveLen(2))
 			Expect(rsm.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
 			Expect(rsm.Status.MembersStatus[0].Name).Should(Equal("leader"))
-			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-2"))
+			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-0"))
 			Expect(rsm.Status.MembersStatus[1].Name).Should(Equal("follower"))
-			Expect(rsm.Status.MembersStatus[2].PodName).Should(Equal("pod-0"))
-			Expect(rsm.Status.MembersStatus[2].Name).Should(Equal("follower"))
 		})
 	})
 
@@ -323,6 +322,69 @@ var _ = Describe("utils test", func() {
 			Expect(getActionCommand(reconfiguration, jobTypeMemberLeaveNotifying)).Should(Equal(reconfiguration.MemberLeaveAction.Command))
 			Expect(getActionCommand(reconfiguration, jobTypeLogSync)).Should(Equal(reconfiguration.LogSyncAction.Command))
 			Expect(getActionCommand(reconfiguration, jobTypePromote)).Should(Equal(reconfiguration.PromoteAction.Command))
+		})
+	})
+
+	Context("AddAnnotationScope function", func() {
+		It("should work well", func() {
+			By("call with a nil map")
+			var annotations map[string]string
+			Expect(AddAnnotationScope(HeadlessServiceScope, annotations)).Should(BeNil())
+
+			By("call with an empty map")
+			annotations = make(map[string]string, 0)
+			scopedAnnotations := AddAnnotationScope(HeadlessServiceScope, annotations)
+			Expect(scopedAnnotations).ShouldNot(BeNil())
+			Expect(scopedAnnotations).Should(HaveLen(0))
+
+			By("call with none empty map")
+			annotations["foo"] = "bar"
+			annotations["foo/bar"] = "foo.bar"
+			annotations["foo.bar/bar"] = "foo.bar.bar"
+			scopedAnnotations = AddAnnotationScope(HeadlessServiceScope, annotations)
+			Expect(scopedAnnotations).ShouldNot(BeNil())
+			Expect(scopedAnnotations).Should(HaveLen(len(annotations)))
+			for k, v := range annotations {
+				nk := fmt.Sprintf("%s%s", k, HeadlessServiceScope)
+				nv, ok := scopedAnnotations[nk]
+				Expect(ok).Should(BeTrue())
+				Expect(nv).Should(Equal(v))
+			}
+		})
+	})
+
+	Context("ParseAnnotationsOfScope function", func() {
+		It("should work well", func() {
+			By("call with a nil map")
+			var scopedAnnotations map[string]string
+			Expect(ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)).Should(BeNil())
+
+			By("call with an empty map")
+			scopedAnnotations = make(map[string]string, 0)
+			annotations := ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)
+			Expect(annotations).ShouldNot(BeNil())
+			Expect(annotations).Should(HaveLen(0))
+
+			By("call with RootScope")
+			scopedAnnotations["foo"] = "bar"
+			scopedAnnotations["foo.bar"] = "foo.bar"
+			headlessK := "foo.headless.rsm"
+			scopedAnnotations[headlessK] = headlessK
+			annotations = ParseAnnotationsOfScope(RootScope, scopedAnnotations)
+			Expect(annotations).ShouldNot(BeNil())
+			Expect(annotations).Should(HaveLen(2))
+			delete(scopedAnnotations, headlessK)
+			for k, v := range scopedAnnotations {
+				nv, ok := annotations[k]
+				Expect(ok).Should(BeTrue())
+				Expect(nv).Should(Equal(v))
+			}
+
+			By("call with none RootScope")
+			scopedAnnotations[headlessK] = headlessK
+			annotations = ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)
+			Expect(annotations).Should(HaveLen(1))
+			Expect(annotations["foo"]).Should(Equal(headlessK))
 		})
 	})
 })

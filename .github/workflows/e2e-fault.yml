@@ -8,7 +8,7 @@ on:
         required: true
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g. mysql|postgres|smarte)'
+        description: 'test type (e.g. mysql|postgres|smarte|redis|mongodb)'
         required: false
         default: ''
       CLOUD_PROVIDER:

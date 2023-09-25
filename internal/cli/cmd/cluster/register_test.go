@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"os"
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -29,10 +33,16 @@ import (
 var _ = Describe("cluster register", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
-
+	var tempLocalPath string
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tempLocalPath = filepath.Join(os.TempDir(), "fake.tgz")
+		Expect(os.WriteFile(tempLocalPath, []byte("fake-data"), 0666)).Should(Succeed())
+	})
+
+	AfterEach(func() {
+		os.Remove(tempLocalPath)
 	})
 
 	It("register command", func() {
@@ -48,14 +58,40 @@ var _ = Describe("cluster register", func() {
 			Factory:     tf,
 			IOStreams:   streams,
 			clusterType: "not-allow-name",
+			source:      tempLocalPath,
 		}
 		Expect(o.validate()).Should(HaveOccurred())
 
 		o.clusterType = "mysql"
-		// already exist
+		// builtin chart
 		Expect(o.validate()).Should(HaveOccurred())
 
 		o.clusterType = "oracle"
 		Expect(o.validate()).Should(Succeed())
+
+	})
+
+	It("test validateSource", func() {
+		o := &registerOption{
+			Factory:     tf,
+			IOStreams:   streams,
+			clusterType: "newCLuster",
+			source:      tempLocalPath,
+		}
+		Expect(o.validate()).Should(Succeed())
+		o.source = "https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz"
+		Expect(o.validate()).Should(Succeed())
+		o.source = "This is a bad url or a local file path do not existed"
+		Expect(o.validate()).Should(HaveOccurred())
+
+	})
+
+	It("test copy file", func() {
+		Expect(copyFile(tempLocalPath, tempLocalPath)).Should(Succeed())
+		Expect(copyFile("bad local path", tempLocalPath)).Should(HaveOccurred())
+		Expect(copyFile(tempLocalPath, filepath.Join(os.TempDir(), "fake-other.tgz"))).Should(Succeed())
+		file, _ := os.ReadFile(filepath.Join(os.TempDir(), "fake-other.tgz"))
+		Expect(string(file)).Should(Equal("fake-data"))
+		os.Remove(filepath.Join(os.TempDir(), "fake-other.tgz"))
 	})
 })

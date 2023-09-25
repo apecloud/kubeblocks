@@ -38,7 +38,7 @@ import (
 
 const (
 	NodesPath      = "cluster-resources/nodes.json"
-	NodesErrorPath = "cluster-resources/nodes-error.json"
+	NodesErrorPath = "cluster-resources/nodes-errors.json"
 	Tolerations    = "tolerations"
 	KubeBlocks     = "kubeblocks"
 )
@@ -77,7 +77,12 @@ func (a *AnalyzeTaintClassByKb) analyzeTaint(getFile GetCollectedFileContents, f
 
 	nodesErrorData, err := getFile(NodesErrorPath)
 	if err != nil && nodesErrorData != nil && len(nodesErrorData) > 0 && len(nodesData) == 0 {
-		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get nodes list from k8s failed, err:%v", err)), err
+		var values []string
+		err = json.Unmarshal(nodesErrorData, &values)
+		if err != nil || len(values) == 0 {
+			return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get nodes from k8s failed, err:%v", nodesErrorData)), err
+		}
+		return newFailedResultWithMessage(a.Title(), fmt.Sprintf("get nodes from k8s failed, err:%v", values[0])), nil
 	}
 
 	var nodes v1.NodeList

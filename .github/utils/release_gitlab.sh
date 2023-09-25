@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
 set -o nounset
-set -o pipefail
 
 DEFAULT_PACKAGE_NAME=kubeblocks
 DEFAULT_CHANNEL=stable
@@ -180,14 +178,21 @@ create_release() {
 
 upload_asset() {
     request_url=$API_URL/$PROJECT_ID/packages/generic/$PACKAGE_NAME/$TAG_NAME/
+    upload_flag=0
     for i in {1..10}; do
         ret_msg=$(gitlab_api_curl $request_url --upload-file $ASSET_PATH)
         echo "return message:$ret_msg"
         if [[ "$ret_msg" == *"201 Created"* ]]; then
+            echo "$(tput -T xterm setaf 2)$ret_msg$(tput -T xterm sgr0)"
+            upload_flag=1
             break
         fi
         sleep 1
     done
+    if [[ $upload_flag -eq 0 ]]; then
+        echo "$(tput -T xterm setaf 1)upload asset $ASSET_PATH error$(tput -T xterm sgr0)"
+        exit 1
+    fi
 }
 
 download_asset() {

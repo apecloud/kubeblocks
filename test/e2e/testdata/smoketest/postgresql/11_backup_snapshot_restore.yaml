@@ -85,6 +85,7 @@ subjects:
     name: kb-mycluster-pgcluster
     namespace: default
 ---
+# Source: postgresql-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:

@@ -39,7 +39,7 @@ func init() {
 		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
+		ToClusterPhase:                     appsv1alpha1.UpdatingClusterPhase,
 		OpsHandler:                         vsHandler,
 		ProcessingReasonInClusterCondition: ProcessingReasonVerticalScaling,
 		CancelFunc:                         vsHandler.Cancel,

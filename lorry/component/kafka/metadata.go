@@ -70,7 +70,7 @@ func (k *Kafka) upgradeMetadata(metadata map[string]string) (map[string]string, 
 
 	// If authType is not set, derive it from authRequired.
 	if (!authTypePres || authTypeVal == "") && authReqPres && authReqVal != "" {
-		k.logger.Warn("AuthRequired is deprecated, use AuthType instead.")
+		k.logger.Info("AuthRequired is deprecated, use AuthType instead.")
 		validAuthRequired, err := strconv.ParseBool(authReqVal)
 		if err == nil {
 			if validAuthRequired {
@@ -106,22 +106,22 @@ func (k *Kafka) getKafkaMetadata(metadata map[string]string) (*kafkaMetadata, er
 	// use the runtimeConfig.ID as the consumer group so that each dapr runtime creates its own consumergroup
 	if val, ok := metadata["consumerID"]; ok && val != "" {
 		meta.ConsumerGroup = val
-		k.logger.Debugf("Using %s as ConsumerGroup", meta.ConsumerGroup)
+		k.logger.Info(fmt.Sprintf("Using %s as ConsumerGroup", meta.ConsumerGroup))
 	}
 
 	if val, ok := metadata["consumerGroup"]; ok && val != "" {
 		meta.ConsumerGroup = val
-		k.logger.Debugf("Using %s as ConsumerGroup", meta.ConsumerGroup)
+		k.logger.Info(fmt.Sprintf("Using %s as ConsumerGroup", meta.ConsumerGroup))
 	}
 
 	if val, ok := metadata["clientID"]; ok && val != "" {
 		meta.ClientID = val
-		k.logger.Debugf("Using %s as ClientID", meta.ClientID)
+		k.logger.Info(fmt.Sprintf("Using %s as ClientID", meta.ClientID))
 	}
 
 	if val, ok := metadata["saslMechanism"]; ok && val != "" {
 		meta.SaslMechanism = val
-		k.logger.Debugf("Using %s as saslMechanism", meta.SaslMechanism)
+		k.logger.Info(fmt.Sprintf("Using %s as saslMechanism", meta.SaslMechanism))
 	}
 
 	initialOffset, err := parseInitialOffset(metadata["initialOffset"])
@@ -136,7 +136,7 @@ func (k *Kafka) getKafkaMetadata(metadata map[string]string) (*kafkaMetadata, er
 		return nil, errors.New("kafka error: missing 'brokers' attribute")
 	}
 
-	k.logger.Debugf("Found brokers: %v", meta.Brokers)
+	k.logger.Info("Found brokers", "brokers", meta.Brokers)
 
 	val, ok := metadata["authType"]
 	if !ok {
@@ -160,7 +160,7 @@ func (k *Kafka) getKafkaMetadata(metadata map[string]string) (*kafkaMetadata, er
 		} else {
 			return nil, errors.New("kafka error: missing SASL Password for authType 'password'")
 		}
-		k.logger.Debug("Configuring SASL password authentication.")
+		k.logger.Info("Configuring SASL password authentication.")
 	case oidcAuthType:
 		meta.AuthType = val
 		if val, ok = metadata["oidcTokenEndpoint"]; ok && val != "" {
@@ -181,10 +181,10 @@ func (k *Kafka) getKafkaMetadata(metadata map[string]string) (*kafkaMetadata, er
 		if val, ok = metadata["oidcScopes"]; ok && val != "" {
 			meta.OidcScopes = strings.Split(val, ",")
 		} else {
-			k.logger.Warn("Warning: no OIDC scopes specified, using default 'openid' scope only. This is a security risk for token reuse.")
+			k.logger.Info("Warning: no OIDC scopes specified, using default 'openid' scope only. This is a security risk for token reuse.")
 			meta.OidcScopes = []string{"openid"}
 		}
-		k.logger.Debug("Configuring SASL token authentication via OIDC.")
+		k.logger.Info("Configuring SASL token authentication via OIDC.")
 	case mtlsAuthType:
 		meta.AuthType = val
 		if val, ok = metadata[clientCert]; ok && val != "" {
@@ -203,10 +203,10 @@ func (k *Kafka) getKafkaMetadata(metadata map[string]string) (*kafkaMetadata, er
 		if (meta.TLSClientKey == "") != (meta.TLSClientCert == "") {
 			return nil, errors.New("kafka error: clientKey or clientCert is missing")
 		}
-		k.logger.Debug("Configuring mTLS authentication.")
+		k.logger.Info("Configuring mTLS authentication.")
 	case noAuthType:
 		meta.AuthType = val
-		k.logger.Debug("No authentication configured.")
+		k.logger.Info("No authentication configured.")
 	default:
 		return nil, errors.New("kafka error: invalid value for 'authType' attribute")
 	}
@@ -245,7 +245,7 @@ func (k *Kafka) getKafkaMetadata(metadata map[string]string) (*kafkaMetadata, er
 		}
 		meta.TLSSkipVerify = boolVal
 		if boolVal {
-			k.logger.Infof("kafka: you are using 'skipVerify' to skip server config verify which is unsafe!")
+			k.logger.Info("kafka: you are using 'skipVerify' to skip server config verify which is unsafe!")
 		}
 	}
 

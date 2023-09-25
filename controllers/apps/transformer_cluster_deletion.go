@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -39,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
@@ -53,6 +51,9 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if !cluster.IsDeleting() {
 		return nil
 	}
+
+	transCtx.Cluster.Status.Phase = appsv1alpha1.DeletingClusterPhase
+
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
@@ -175,7 +176,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if len(delObjs) == 0 {
 		root.Action = ictrltypes.ActionDeletePtr()
 	} else {
-		root.Action = ictrltypes.ActionNoopPtr()
+		root.Action = ictrltypes.ActionStatusPtr()
 		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")
 	}
@@ -198,11 +199,8 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
 	}
-	if intctrlutil.IsRSMEnabled() {
-		namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
-	} else {
-		namespacedKindsPlus = append(namespacedKindsPlus, &corev1.ServiceList{}, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})
-	}
+	namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
+
 	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
 }
 

@@ -21,16 +21,14 @@ package officalpostgres
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/dapr/kit/logger"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/cast"
@@ -53,7 +51,7 @@ var Mgr *Manager
 
 var fs = afero.NewOsFs()
 
-func NewManager(logger logger.Logger) (*Manager, error) {
+func NewManager(logger logr.Logger) (*Manager, error) {
 	Mgr = &Manager{}
 
 	baseManager, err := postgres.NewManager(logger)
@@ -103,14 +101,14 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 
 	isLeader, err := mgr.IsLeader(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("check is leader failed, err:%v", err)
+		mgr.Logger.Error(err, "check is leader failed")
 		return nil
 	}
 	mgr.SetIsLeader(isLeader)
 
 	replicationMode, err := mgr.getReplicationMode(ctx)
 	if err != nil {
-		mgr.Logger.Errorf("get replication mode failed, err:%v", err)
+		mgr.Logger.Error(err, "get replication mode failed")
 		return nil
 	}
 	mgr.DBState.Extra[postgres.ReplicationMode] = replicationMode
@@ -125,19 +123,14 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 
 	walPosition, err := mgr.getWalPositionWithHost(ctx, "")
 	if err != nil {
-		mgr.Logger.Errorf("get wal position failed, err:%v", err)
+		mgr.Logger.Error(err, "get wal position failed")
 		return nil
 	}
 	mgr.DBState.OpTimestamp = walPosition
 
-	var timeLine int64
-	if isLeader {
-		timeLine = mgr.getCurrentTimeLine(ctx)
-	} else {
-		timeLine = mgr.getReceivedTimeLine(ctx)
-	}
+	timeLine := mgr.getTimeLineWithHost(ctx, "")
 	if timeLine == 0 {
-		mgr.Logger.Errorf("get received timeLine failed, err:%v", err)
+		mgr.Logger.Error(err, "get received timeLine failed")
 		return nil
 	}
 	mgr.DBState.Extra[postgres.TimeLine] = strconv.FormatInt(timeLine, 10)
@@ -145,7 +138,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	if !isLeader {
 		recoveryParams, err := mgr.readRecoveryParams(ctx)
 		if err != nil {
-			mgr.Logger.Errorf("get recoveryParams failed, err:%v", err)
+			mgr.Logger.Error(nil, "get recoveryParams failed", "err", err)
 			return nil
 		}
 		mgr.recoveryParams = recoveryParams
@@ -169,6 +162,7 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
 	}
 
+	mgr.Logger.Info(fmt.Sprintf("get member:%s role:%s", host, role))
 	return role == binding.PRIMARY, nil
 }
 
@@ -184,7 +178,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	}
 
 	mgr.DBStartupReady = true
-	mgr.Logger.Infof("DB startup ready")
+	mgr.Logger.Info("DB startup ready")
 	return true
 }
 
@@ -193,13 +187,13 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 
 	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil {
-		mgr.Logger.Errorf("get member role failed, err: %v", err)
+		mgr.Logger.Error(err, "get member role failed")
 		return "", err
 	}
 
 	result, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse member role failed, err:%v", err)
+		mgr.Logger.Error(err, "parse member role failed")
 		return "", err
 	}
 
@@ -224,18 +218,6 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 		host = cluster.GetMemberAddr(*member)
 	}
 
-	replicationMode, err := mgr.getReplicationMode(ctx)
-	if err != nil {
-		mgr.Logger.Errorf("get db replication mode failed, err:%v", err)
-		return false
-	}
-
-	if replicationMode == postgres.Synchronous {
-		if !mgr.checkStandbySynchronizedToLeader(true, cluster) {
-			return false
-		}
-	}
-
 	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
 		if !mgr.WriteCheck(ctx, host) {
 			return false
@@ -250,21 +232,43 @@ func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, m
 
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
-		mgr.Logger.Warnf("No leader DBState info")
+		mgr.Logger.Info("No leader DBState info")
 		return false, 0
 	}
+	maxLag := cluster.HaConfig.GetMaxLagOnSwitchover()
 
 	var host string
 	if member.Name != mgr.CurrentMemberName {
 		host = cluster.GetMemberAddr(*member)
 	}
-	walPosition, err := mgr.getWalPositionWithHost(ctx, host)
+
+	replicationMode, err := mgr.getReplicationMode(ctx)
 	if err != nil {
-		mgr.Logger.Errorf("check member lagging failed, err:%v", err)
-		return true, cluster.HaConfig.GetMaxLagOnSwitchover() + 1
+		mgr.Logger.Error(err, "get db replication mode failed")
+		return true, maxLag + 1
 	}
 
-	// TODO: check timeLine
+	if replicationMode == postgres.Synchronous {
+		if !mgr.checkStandbySynchronizedToLeader(true, cluster) {
+			return true, maxLag + 1
+		}
+	}
+
+	timeLine := mgr.getTimeLineWithHost(ctx, host)
+	if timeLine == 0 {
+		mgr.Logger.Error(err, "get timeline with host:%s failed")
+		return true, maxLag + 1
+	}
+	clusterTimeLine := cast.ToInt64(cluster.Leader.DBState.Extra[postgres.TimeLine])
+	if clusterTimeLine != 0 && clusterTimeLine != timeLine {
+		return true, maxLag + 1
+	}
+
+	walPosition, err := mgr.getWalPositionWithHost(ctx, host)
+	if err != nil {
+		mgr.Logger.Error(err, "check member lagging failed")
+		return true, maxLag + 1
+	}
 
 	return cluster.Leader.DBState.OpTimestamp-walPosition > cluster.HaConfig.GetMaxLagOnSwitchover(), cluster.Leader.DBState.OpTimestamp - walPosition
 }
@@ -303,7 +307,7 @@ func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
 }
 
 func (mgr *Manager) getWalPositionWithHost(ctx context.Context, host string) (int64, error) {
-	if mgr.DBState != nil && mgr.DBState.OpTimestamp != 0 {
+	if mgr.DBState != nil && mgr.DBState.OpTimestamp != 0 && host == "" {
 		return mgr.DBState.OpTimestamp, nil
 	}
 
@@ -318,7 +322,11 @@ func (mgr *Manager) getWalPositionWithHost(ctx context.Context, host string) (in
 	} else {
 		isLeader, err = mgr.IsLeaderWithHost(ctx, host)
 	}
-	if isLeader && err == nil {
+	if err != nil {
+		return 0, err
+	}
+
+	if isLeader {
 		lsn, err = mgr.getLsnWithHost(ctx, "current", host)
 		if err != nil {
 			return 0, err
@@ -348,7 +356,7 @@ func (mgr *Manager) getLsnWithHost(ctx context.Context, types string, host strin
 
 	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil {
-		mgr.Logger.Errorf("get wal position failed, err:%v", err)
+		mgr.Logger.Error(err, "get wal position failed")
 		return 0, err
 	}
 
@@ -369,19 +377,19 @@ func (mgr *Manager) getSyncStandbys(ctx context.Context) *postgres.PGStandby {
 	sql := "select pg_catalog.current_setting('synchronous_standby_names');"
 	resp, err := mgr.Query(ctx, sql)
 	if err != nil {
-		mgr.Logger.Errorf("query sql:%s failed, err:%v", sql, err)
+		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
 		return nil
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
 		return nil
 	}
 
 	syncStandbys, err := postgres.ParsePGSyncStandby(cast.ToString(resMap[0]["current_setting"]))
 	if err != nil {
-		mgr.Logger.Errorf("parse pg sync standby failed, err:%v", err)
+		mgr.Logger.Error(err, "parse pg sync standby failed")
 		return nil
 	}
 	return syncStandbys
@@ -412,7 +420,7 @@ func (mgr *Manager) executeRewind() error {
 
 func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluster) bool {
 	var needRewind bool
-	var historys []*postgres.History
+	var history *postgres.HistoryFile
 
 	isRecovery, localTimeLine, localLsn := mgr.getLocalTimeLineAndLsn(ctx)
 	if localTimeLine == 0 || localLsn == 0 {
@@ -421,13 +429,13 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 
 	isLeader, err := mgr.IsLeaderWithHost(ctx, cluster.GetMemberAddr(*cluster.GetLeaderMember()))
 	if err != nil || !isLeader {
-		mgr.Logger.Warnf("Leader is still in recovery and can't rewind")
+		mgr.Logger.Error(nil, "Leader is still in recovery and can't rewind")
 		return false
 	}
 
 	primaryTimeLine, err := mgr.getPrimaryTimeLine(cluster.GetMemberAddr(*cluster.GetLeaderMember()))
 	if err != nil {
-		mgr.Logger.Errorf("get primary timeLine failed, err:%v", err)
+		mgr.Logger.Error(err, "get primary timeLine failed")
 		return false
 	}
 
@@ -436,12 +444,17 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 		needRewind = true
 	case localTimeLine == primaryTimeLine:
 		needRewind = false
-	case primaryTimeLine > 1:
-		historys = mgr.getHistory()
+	case localTimeLine < primaryTimeLine:
+		history = mgr.getHistory(cluster.GetMemberAddr(*cluster.GetLeaderMember()), primaryTimeLine)
 	}
 
-	if len(historys) != 0 {
-		for _, h := range historys {
+	if len(history.History) != 0 {
+		// use a boolean value to check if the loop should exit early
+		exitFlag := false
+		for _, h := range history.History {
+			// Don't need to rewind just when:
+			// for replica: replayed location is not ahead of switchpoint
+			// for the former primary: end of checkpoint record is the same as switchpoint
 			if h.ParentTimeline == localTimeLine {
 				switch {
 				case isRecovery:
@@ -449,32 +462,46 @@ func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluste
 				case localLsn >= h.SwitchPoint:
 					needRewind = true
 				default:
-					// TODO:get checkpoint end
+					checkPointEnd := mgr.getCheckPointEnd(localTimeLine, localLsn)
+					needRewind = h.SwitchPoint != checkPointEnd
 				}
+				exitFlag = true
 				break
 			} else if h.ParentTimeline > localTimeLine {
 				needRewind = true
+				exitFlag = true
 				break
 			}
+		}
+		if !exitFlag {
+			needRewind = true
 		}
 	}
 
 	return needRewind
 }
 
-func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("psql", "-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+func (mgr *Manager) getCheckPointEnd(timeLine, lsn int64) int64 {
+	lsnStr := postgres.FormatPgLsn(lsn)
 
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get primary time line failed, err:%v, stderr%s", err, stderr.String())
+	resp, err := postgres.PgWalDump("-t", strconv.FormatInt(timeLine, 10), "-s", lsnStr, "-n", "2")
+	if err == nil || resp == "" {
+		return 0
+	}
+
+	checkPointEndStr := postgres.ParsePgWalDumpError(err.Error(), lsnStr)
+
+	return postgres.ParsePgLsn(checkPointEndStr)
+}
+
+func (mgr *Manager) getPrimaryTimeLine(host string) (int64, error) {
+	resp, err := postgres.Psql("-h", host, "replication=database", "-c", "IDENTIFY_SYSTEM")
+	if err != nil {
+		mgr.Logger.Error(err, "get primary time line failed")
 		return 0, err
 	}
 
-	stdoutList := strings.Split(stdout.String(), "\n")
+	stdoutList := strings.Split(resp, "\n")
 	value := stdoutList[2]
 	values := strings.Split(value, "|")
 
@@ -491,7 +518,7 @@ func (mgr *Manager) getLocalTimeLineAndLsn(ctx context.Context) (bool, int64, in
 	}
 
 	inRecovery = true
-	timeLine := mgr.getReceivedTimeLine(ctx)
+	timeLine := mgr.getReceivedTimeLine(ctx, "")
 	lsn, _ := mgr.getLsnWithHost(ctx, "replay", "")
 
 	return inRecovery, timeLine, lsn
@@ -523,43 +550,59 @@ func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64)
 	return inRecovery, timeLine, lsn
 }
 
-func (mgr *Manager) getCurrentTimeLine(ctx context.Context) int64 {
-	if mgr.DBState != nil && mgr.DBState.Extra[postgres.TimeLine] != "" {
+func (mgr *Manager) getTimeLineWithHost(ctx context.Context, host string) int64 {
+	if mgr.DBState != nil && mgr.DBState.Extra[postgres.TimeLine] != "" && host == "" {
 		return cast.ToInt64(mgr.DBState.Extra[postgres.TimeLine])
 	}
 
+	var isLeader bool
+	var err error
+	if host == "" {
+		isLeader, err = mgr.IsLeader(ctx, nil)
+	} else {
+		isLeader, err = mgr.IsLeaderWithHost(ctx, host)
+	}
+	if err != nil {
+		mgr.Logger.Error(err, "get timeLine check leader failed")
+		return 0
+	}
+
+	if isLeader {
+		return mgr.getCurrentTimeLine(ctx, host)
+	} else {
+		return mgr.getReceivedTimeLine(ctx, host)
+	}
+}
+
+func (mgr *Manager) getCurrentTimeLine(ctx context.Context, host string) int64 {
 	sql := "SELECT timeline_id FROM pg_control_checkpoint();"
-	resp, err := mgr.Query(ctx, sql)
+	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil || resp == nil {
-		mgr.Logger.Errorf("get current timeline failed, err%v", err)
+		mgr.Logger.Error(err, "get current timeline failed")
 		return 0
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		mgr.Logger.Error(err, "parse query response failed", "response", string(resp))
 		return 0
 	}
 
 	return cast.ToInt64(resMap[0]["timeline_id"])
 }
 
-func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
-	if mgr.DBState != nil && mgr.DBState.Extra[postgres.TimeLine] != "" {
-		return cast.ToInt64(mgr.DBState.Extra[postgres.TimeLine])
-	}
-
+func (mgr *Manager) getReceivedTimeLine(ctx context.Context, host string) int64 {
 	sql := "select case when latest_end_lsn is null then null " +
 		"else received_tli end as received_tli from pg_catalog.pg_stat_get_wal_receiver();"
-	resp, err := mgr.Query(ctx, sql)
+	resp, err := mgr.QueryWithHost(ctx, sql, host)
 	if err != nil || resp == nil {
-		mgr.Logger.Errorf("get received timeline failed, err%v", err)
+		mgr.Logger.Error(err, "get received timeline failed")
 		return 0
 	}
 
 	resMap, err := postgres.ParseQuery(string(resp))
 	if err != nil {
-		mgr.Logger.Errorf("parse query response:%s failed, err:%v", string(resp), err)
+		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
 		return 0
 	}
 
@@ -569,18 +612,13 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
 func (mgr *Manager) getPgControlData() *map[string]string {
 	result := map[string]string{}
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("pg_controldata")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("get pg control data failed, err:%v, stderr: %s", err, stderr.String())
+	resp, err := postgres.ExecCommand("pg_controldata")
+	if err != nil {
+		mgr.Logger.Error(err, "get pg control data failed")
 		return &result
 	}
 
-	stdoutList := strings.Split(stdout.String(), "\n")
+	stdoutList := strings.Split(resp, "\n")
 	for _, s := range stdoutList {
 		out := strings.Split(s, ":")
 		if len(out) == 2 {
@@ -598,7 +636,7 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 			return true, true
 		}
 	} else {
-		mgr.Logger.Infof("check recovery conf")
+		mgr.Logger.Info("check recovery conf")
 		// TODO: support check recovery.conf
 	}
 
@@ -609,10 +647,10 @@ func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (b
 
 	if !strings.HasPrefix(recoveryParams[postgres.PrimaryConnInfo]["host"], leaderName) {
 		if recoveryParams[postgres.PrimaryConnInfo]["context"] == "postmaster" {
-			mgr.Logger.Warnf("host not match, need to restart")
+			mgr.Logger.Info("host not match, need to restart")
 			return true, true
 		} else {
-			mgr.Logger.Warnf("host not match, need to reload")
+			mgr.Logger.Info("host not match, need to reload")
 			return true, false
 		}
 	}
@@ -644,14 +682,19 @@ func (mgr *Manager) readRecoveryParams(ctx context.Context) (map[string]map[stri
 	}, nil
 }
 
-// TODO: Parse history file
-func (mgr *Manager) getHistory() []*postgres.History {
-	return nil
+func (mgr *Manager) getHistory(host string, timeline int64) *postgres.HistoryFile {
+	resp, err := postgres.Psql("-h", host, "replication=database", "-c", fmt.Sprintf("TIMELINE_HISTORY %d", timeline))
+	if err != nil {
+		mgr.Logger.Error(err, "get history failed")
+		return nil
+	}
+
+	return postgres.ParseHistory(resp)
 }
 
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
-		mgr.Logger.Infof("i am already the leader, don't need to promote")
+		mgr.Logger.Info("i am already the leader, don't need to promote")
 		return nil
 	}
 
@@ -660,22 +703,18 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return err
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("su", "-c", "pg_ctl promote", "postgres")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err = cmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("promote failed, err:%v, stderr:%s", err, stderr.String())
+	resp, err := postgres.PgCtl("promote")
+	if err != nil {
+		mgr.Logger.Error(err, "promote failed")
 		return err
 	}
-	mgr.Logger.Infof("promote success, response:%s", stdout.String())
 
 	err = mgr.postPromote()
 	if err != nil {
 		return err
 	}
+
+	mgr.Logger.Info("promote success", "response", resp)
 	return nil
 }
 
@@ -688,9 +727,9 @@ func (mgr *Manager) postPromote() error {
 }
 
 func (mgr *Manager) Demote(ctx context.Context) error {
-	mgr.Logger.Infof("current member demoting: %s", mgr.CurrentMemberName)
+	mgr.Logger.Info(fmt.Sprintf("current member demoting: %s", mgr.CurrentMemberName))
 	if isLeader, err := mgr.IsLeader(ctx, nil); !isLeader && err == nil {
-		mgr.Logger.Infof("i am not the leader, don't need to demote")
+		mgr.Logger.Info("i am not the leader, don't need to demote")
 		return nil
 	}
 
@@ -703,14 +742,9 @@ func (mgr *Manager) Stop() error {
 		return err
 	}
 
-	var stdout, stderr bytes.Buffer
-	stopCmd := exec.Command("su", "-c", "pg_ctl stop -m fast", "postgres")
-	stopCmd.Stdout = &stdout
-	stopCmd.Stderr = &stderr
-
-	err = stopCmd.Run()
-	if err != nil || stderr.String() != "" {
-		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
+	_, err = postgres.PgCtl("stop -m fast")
+	if err != nil {
+		mgr.Logger.Error(err, "pg_ctl stop failed")
 		return err
 	}
 
@@ -720,13 +754,13 @@ func (mgr *Manager) Stop() error {
 func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	// only when db is not running, leader probably be nil
 	if cluster.Leader == nil {
-		mgr.Logger.Infof("cluster has no leader now, starts db firstly without following")
+		mgr.Logger.Info("cluster has no leader now, starts db firstly without following")
 		return nil
 	}
 
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("handle rewind failed, err:%v", err)
+		mgr.Logger.Error(err, "handle rewind failed")
 	}
 
 	needChange, needRestart := mgr.checkRecoveryConf(ctx, cluster.Leader.Name)
@@ -734,14 +768,14 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 		return mgr.follow(ctx, needRestart, cluster)
 	}
 
-	mgr.Logger.Infof("no action coz i still follow the leader:%s", cluster.Leader.Name)
+	mgr.Logger.Info(fmt.Sprintf("no action coz i still follow the leader:%s", cluster.Leader.Name))
 	return nil
 }
 
 func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		mgr.Logger.Infof("cluster has no leader now, just start if need")
+		mgr.Logger.Info("cluster has no leader now, just start if need")
 		if needRestart {
 			return mgr.DBManagerBase.Start(ctx, cluster)
 		}
@@ -749,7 +783,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 	}
 
 	if mgr.CurrentMemberName == leaderMember.Name {
-		mgr.Logger.Infof("i get the leader key, don't need to follow")
+		mgr.Logger.Info("i get the leader key, don't need to follow")
 		return nil
 	}
 
@@ -758,7 +792,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 
 	pgConf, err := fs.OpenFile("/kubeblocks/conf/postgresql.conf", os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
-		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
+		mgr.Logger.Error(err, "open postgresql.conf failed")
 		return err
 	}
 	defer func() {
@@ -768,19 +802,19 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 	writer := bufio.NewWriter(pgConf)
 	_, err = writer.WriteString(primaryInfo)
 	if err != nil {
-		mgr.Logger.Errorf("write into postgresql.conf failed, err:%v", err)
+		mgr.Logger.Error(err, "write into postgresql.conf failed")
 		return err
 	}
 
 	err = writer.Flush()
 	if err != nil {
-		mgr.Logger.Errorf("writer flush failed, err:%v", err)
+		mgr.Logger.Error(err, "writer flush failed")
 		return err
 	}
 
 	if !needRestart {
 		if err = mgr.PgReload(ctx); err != nil {
-			mgr.Logger.Errorf("reload conf failed, err:%v", err)
+			mgr.Logger.Error(err, "reload conf failed")
 			return err
 		}
 		return nil
@@ -794,7 +828,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, cluster *dcs.C
 func (mgr *Manager) Start(ctx context.Context, cluster *dcs.Cluster) error {
 	err := mgr.follow(ctx, true, cluster)
 	if err != nil {
-		mgr.Logger.Errorf("start failed, err:%v", err)
+		mgr.Logger.Error(err, "start failed")
 		return err
 	}
 	return nil

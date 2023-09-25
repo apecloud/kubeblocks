@@ -27,13 +27,16 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/internal/common"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -44,8 +47,11 @@ type HTTPCustom struct {
 	BaseOperations
 }
 
+var perNodeRegx = regexp.MustCompile("[a-zA-Z0-9]+")
+
 // NewHTTPCustom returns a new HTTPCustom.
-func NewHTTPCustom(logger logger.Logger) bindings.OutputBinding {
+func NewHTTPCustom() *HTTPCustom {
+	logger := ctrl.Log.WithName("Custom")
 	return &HTTPCustom{
 		actionSvcPorts: &[]int{},
 		BaseOperations: BaseOperations{Logger: logger},
@@ -53,8 +59,8 @@ func NewHTTPCustom(logger logger.Logger) bindings.OutputBinding {
 }
 
 // Init performs metadata parsing.
-func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
-	actionSvcList := viper.GetString("KB_CONSENSUS_SET_ACTION_SVC_LIST")
+func (h *HTTPCustom) Init(metadata component.Properties) error {
+	actionSvcList := viper.GetString("KB_RSM_ACTION_SVC_LIST")
 	if len(actionSvcList) > 0 {
 		err := json.Unmarshal([]byte(actionSvcList), h.actionSvcPorts)
 		if err != nil {
@@ -83,28 +89,53 @@ func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-func (h *HTTPCustom) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (h *HTTPCustom) GetRole(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (string, error) {
 	if h.actionSvcPorts == nil {
 		return "", nil
 	}
 
 	var (
-		lastOutput string
+		lastOutput []byte
 		err        error
 	)
 
 	for _, port := range *h.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_RSM_LAST_STDOUT=%s", port, url.QueryEscape(string(lastOutput)))
 		lastOutput, err = h.callAction(ctx, u)
 		if err != nil {
 			return "", err
 		}
+		h.Logger.Info("action succeed", "url", u, "output", string(lastOutput))
+	}
+	finalOutput := strings.TrimSpace(string(lastOutput))
+
+	if perNodeRegx.MatchString(finalOutput) {
+		return finalOutput, nil
 	}
 
-	return lastOutput, nil
+	// csv format: term,podName,role
+	parseCSV := func(input string) (string, error) {
+		res := common.GlobalRoleSnapshot{}
+		lines := strings.Split(input, "\n")
+		for _, line := range lines {
+			fields := strings.Split(strings.TrimSpace(line), ",")
+			if len(fields) != 3 {
+				return "", err
+			}
+			res.Version = strings.TrimSpace(fields[0])
+			pair := common.PodRoleNamePair{
+				PodName:  strings.TrimSpace(fields[1]),
+				RoleName: strings.ToLower(strings.TrimSpace(fields[2])),
+			}
+			res.PodRoleNamePairs = append(res.PodRoleNamePairs, pair)
+		}
+		resByte, err := json.Marshal(res)
+		return string(resByte), err
+	}
+	return parseCSV(finalOutput)
 }
 
-func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	role, err := h.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
@@ -115,28 +146,28 @@ func (h *HTTPCustom) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest
 }
 
 // callAction performs an HTTP request to local HTTP endpoint specified by actionSvcPort
-func (h *HTTPCustom) callAction(ctx context.Context, url string) (string, error) {
+func (h *HTTPCustom) callAction(ctx context.Context, url string) ([]byte, error) {
 	// compose http request
-	request, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	request, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// send http request
 	resp, err := h.client.Do(request)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	// parse http response
 	if resp.StatusCode/100 != 2 {
-		return "", fmt.Errorf("received status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("received status code %d", resp.StatusCode)
 	}
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(b), err
+	return b, err
 }

@@ -22,15 +22,4 @@ package k8score
 const (
 	// roleChangedAnnotKey is used to mark the role change event has been handled.
 	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
-
-	// TrueStr values
-	trueStr = "true"
-)
-
-const (
-	ProbeEventOperationNotImpl ProbeEventType = "OperationNotImplemented"
-	ProbeEventCheckRoleFailed  ProbeEventType = "checkRoleFailed"
-	ProbeEventRoleInvalid      ProbeEventType = "roleInvalid"
-	ProbeEventRoleChanged      ProbeEventType = "roleChanged"
-	ProbeEventRoleUnChanged    ProbeEventType = "roleUnChanged"
 )

@@ -21,55 +21,57 @@ package probe
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 
-	"github.com/dapr/components-contrib/metadata"
-	"github.com/dapr/components-contrib/middleware"
-	"github.com/dapr/kit/logger"
+	json "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
-	"github.com/valyala/fasthttp"
 )
 
-const checkFailedHTTPCode = "451"
+func TestGetRequestBody(t *testing.T) {
+	mock := make(map[string][]string)
+	mock["sql"] = []string{"dd"}
+	operation := "exec"
+	body := GetRequestBody(operation, mock)
 
-// mockedRequestHandler acts like an upstream service, returns success status code 200 and a fixed response body.
-func mockedRequestHandler(ctx *fasthttp.RequestCtx) {
-	ctx.Response.Header.SetStatusCode(http.StatusOK)
-	ctx.Response.SetBodyString("mock response")
+	meta := RequestMeta{
+		Operation: operation,
+		Metadata:  map[string]string{},
+	}
+	meta.Metadata["sql"] = "dd"
+	marshal, err := json.Marshal(meta)
+	assert.Nil(t, err)
+	assert.Equal(t, marshal, body)
 }
 
-func TestRequestHandlerWithIllegalRouterRule(t *testing.T) {
-	meta := middleware.Metadata{
-		Base: metadata.Base{
-			Properties: map[string]string{},
-		},
-	}
-	log := logger.NewLogger("probemiddleware.test")
-	middleware := NewProbeMiddleware(log)
-	handler, err := middleware.GetHandler(meta)
-	assert.Nil(t, err)
+func TestSetMiddleware(t *testing.T) {
+	t.Run("Rewrite Get", func(t *testing.T) {
+		mockHandler := func(writer http.ResponseWriter, request *http.Request) {
+			assert.Equal(t, request.Method, http.MethodPost)
+		}
 
-	t.Run("hit: status check request", func(t *testing.T) {
-		var ctx fasthttp.RequestCtx
-		ctx.Request.SetHost("localhost:3501")
-		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statusCheck")
-		ctx.Request.Header.SetHost("localhost:3501")
-		ctx.Request.Header.SetMethod("GET")
+		request := httptest.NewRequest("GET", "/v1.0/bindings", nil)
+		recorder := httptest.NewRecorder()
 
-		handler(mockedRequestHandler)(&ctx)
-		assert.Equal(t, http.StatusOK, ctx.Response.Header.StatusCode())
-		assert.Equal(t, http.MethodPost, string(ctx.Request.Header.Method()))
+		middleware := SetMiddleware(mockHandler)
+		middleware(recorder, request)
 	})
 
-	t.Run("hit: status code handler", func(t *testing.T) {
-		var ctx fasthttp.RequestCtx
-		ctx.Request.SetHost("localhost:3501")
-		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statusCheck")
-		ctx.Request.Header.SetHost("localhost:3501")
-		ctx.Request.Header.SetMethod("GET")
-		ctx.Response.Header.Add(statusCodeHeader, checkFailedHTTPCode)
-		handler(mockedRequestHandler)(&ctx)
-		assert.Equal(t, 451, ctx.Response.Header.StatusCode())
-		assert.Equal(t, http.MethodPost, string(ctx.Request.Header.Method()))
+	t.Run("Rewrite StatusCode", func(t *testing.T) {
+
+		mockHandler := func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Add(statusCodeHeader, strconv.Itoa(http.StatusNotFound))
+		}
+
+		request := httptest.NewRequest("Post", "/v1.0/bindings", nil)
+		recorder := httptest.NewRecorder()
+
+		middleware := SetMiddleware(mockHandler)
+		middleware(recorder, request)
+
+		code := recorder.Code
+		assert.Equal(t, http.StatusNotFound, code)
 	})
+
 }

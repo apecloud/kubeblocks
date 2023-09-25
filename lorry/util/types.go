@@ -22,9 +22,9 @@ package util
 import (
 	"strings"
 	"time"
-
-	"github.com/dapr/components-contrib/bindings"
 )
+
+type OperationKind string
 
 const (
 	RespTypEve  = "event"
@@ -33,31 +33,36 @@ const (
 	RespEveSucc = "Success"
 	RespEveFail = "Failed"
 
-	CheckRunningOperation bindings.OperationKind = "checkRunning"
-	CheckStatusOperation  bindings.OperationKind = "checkStatus"
-	CheckRoleOperation    bindings.OperationKind = "checkRole"
-	GetRoleOperation      bindings.OperationKind = "getRole"
-	GetLagOperation       bindings.OperationKind = "getLag"
-	SwitchoverOperation   bindings.OperationKind = "switchover"
-	ExecOperation         bindings.OperationKind = "exec"
-	QueryOperation        bindings.OperationKind = "query"
-	CloseOperation        bindings.OperationKind = "close"
+	GetOperation    OperationKind = "get"
+	CreateOperation OperationKind = "create"
+	DeleteOperation OperationKind = "delete"
+	ListOperation   OperationKind = "list"
 
-	LockOperation    bindings.OperationKind = "lockInstance"
-	UnlockOperation  bindings.OperationKind = "unlockInstance"
-	VolumeProtection bindings.OperationKind = "volumeProtection"
+	CheckRunningOperation OperationKind = "checkRunning"
+	CheckStatusOperation  OperationKind = "checkStatus"
+	CheckRoleOperation    OperationKind = "checkRole"
+	GetRoleOperation      OperationKind = "getRole"
+	GetLagOperation       OperationKind = "getLag"
+	SwitchoverOperation   OperationKind = "switchover"
+	ExecOperation         OperationKind = "exec"
+	QueryOperation        OperationKind = "query"
+	CloseOperation        OperationKind = "close"
+
+	LockOperation    OperationKind = "lockInstance"
+	UnlockOperation  OperationKind = "unlockInstance"
+	VolumeProtection OperationKind = "volumeProtection"
 
 	// actions for cluster accounts management
-	ListUsersOp          bindings.OperationKind = "listUsers"
-	CreateUserOp         bindings.OperationKind = "createUser"
-	DeleteUserOp         bindings.OperationKind = "deleteUser"
-	DescribeUserOp       bindings.OperationKind = "describeUser"
-	GrantUserRoleOp      bindings.OperationKind = "grantUserRole"
-	RevokeUserRoleOp     bindings.OperationKind = "revokeUserRole"
-	ListSystemAccountsOp bindings.OperationKind = "listSystemAccounts"
+	ListUsersOp          OperationKind = "listUsers"
+	CreateUserOp         OperationKind = "createUser"
+	DeleteUserOp         OperationKind = "deleteUser"
+	DescribeUserOp       OperationKind = "describeUser"
+	GrantUserRoleOp      OperationKind = "grantUserRole"
+	RevokeUserRoleOp     OperationKind = "revokeUserRole"
+	ListSystemAccountsOp OperationKind = "listSystemAccounts"
 
-	JoinMemberOperation  bindings.OperationKind = "joinMember"
-	LeaveMemberOperation bindings.OperationKind = "leaveMember"
+	JoinMemberOperation  OperationKind = "joinMember"
+	LeaveMemberOperation OperationKind = "leaveMember"
 
 	OperationNotImplemented = "NotImplemented"
 	OperationInvalid        = "Invalid"

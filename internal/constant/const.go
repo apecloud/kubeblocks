@@ -34,6 +34,7 @@ const (
 	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap containing the persistentVolume template.
 	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace containing the persistentVolume template.
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
+	CfgKeyProvider                      = "KUBE_PROVIDER"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -106,13 +107,16 @@ const (
 	CMTemplateNameLabelKey                   = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey              = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey           = "config.kubeblocks.io/config-hash"
+	CMInsCurrentConfigurationHashLabelKey    = "config.kubeblocks.io/update-config-hash"
 	CMConfigurationConstraintsNameLabelKey   = "config.kubeblocks.io/config-constraints-name"
+	CMConfigurationTemplateVersion           = "config.kubeblocks.io/config-template-version"
 	ConsensusSetAccessModeLabelKey           = "cs.apps.kubeblocks.io/access-mode"
 	BackupTypeLabelKeyKey                    = "dataprotection.kubeblocks.io/backup-type"
 	DataProtectionLabelBackupNameKey         = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                        = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                   = "ops.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
+	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -144,13 +148,15 @@ const (
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
+	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
-	LastRoleChangedEventTimestampAnnotationKey  = "apps.kubeblocks.io/last-role-changed-event-timestamp"
+	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -159,11 +165,20 @@ const (
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
+	// ConfigurationRevision defines the current revision
+	// TODO support multi version
+	ConfigurationRevision          = "config.kubeblocks.io/configuration-revision"
+	LastConfigurationRevisionPhase = "config.kubeblocks.io/revision-reconcile-phase"
+
+	// Deprecated: only compatible with version 0.6, will be removed in 0.8
 	// CMInsEnableRerenderTemplateKey is used to enable rerender template
 	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
 	// IgnoreResourceConstraint is used to specify whether to ignore the resource constraint
 	IgnoreResourceConstraint = "resource.kubeblocks.io/ignore-constraint"
+
+	RBACRoleName        = "kubeblocks-cluster-pod-role"
+	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
 )
 
 const (
@@ -214,13 +229,12 @@ const (
 	ProbeHTTPPortName                  = "probe-http-port"
 	ProbeGRPCPortName                  = "probe-grpc-port"
 	ProbeInitContainerName             = "kb-initprobe"
-	RoleProbeContainerName             = "kb-checkrole"
+	WeSyncerContainerName              = "kb-we-syncer"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
-	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
 )
@@ -310,4 +324,11 @@ const (
 const (
 	KubernetesClusterDomainEnv = "KUBERNETES_CLUSTER_DOMAIN"
 	DefaultDNSDomain           = "cluster.local"
+)
+
+const (
+	ServiceDescriptorUsernameKey = "username"
+	ServiceDescriptorPasswordKey = "password"
+	ServiceDescriptorEndpointKey = "endpoint"
+	ServiceDescriptorPortKey     = "port"
 )

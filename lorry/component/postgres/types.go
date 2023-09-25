@@ -22,6 +22,7 @@ package postgres
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -279,9 +280,37 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 	return -1
 }
 
+type HistoryFile struct {
+	History []History
+}
+
 type History struct {
 	ParentTimeline int64
 	SwitchPoint    int64
+}
+
+func ParseHistory(str string) *HistoryFile {
+	result := &HistoryFile{
+		History: []History{},
+	}
+
+	lines := strings.Split(str, "\n")
+	for _, line := range lines {
+		values := strings.Split(line, "|")
+		if len(values) <= 1 {
+			continue
+		}
+		content := strings.TrimSpace(values[1])
+		history := strings.Split(content, " ")
+		if len(history) > 2 {
+			result.History = append(result.History, History{
+				ParentTimeline: cast.ToInt64(history[0]),
+				SwitchPoint:    ParsePgLsn(history[1]),
+			})
+		}
+	}
+
+	return result
 }
 
 func ParsePgLsn(str string) int64 {
@@ -293,6 +322,10 @@ func ParsePgLsn(str string) int64 {
 	prefix, _ := strconv.ParseInt(list[0], 16, 64)
 	suffix, _ := strconv.ParseInt(list[1], 16, 64)
 	return prefix*0x100000000 + suffix
+}
+
+func FormatPgLsn(lsn int64) string {
+	return fmt.Sprintf("%X/%08X", lsn>>32, lsn&0xFFFFFFFF)
 }
 
 func ParsePrimaryConnInfo(str string) map[string]string {
@@ -307,4 +340,18 @@ func ParsePrimaryConnInfo(str string) map[string]string {
 	}
 
 	return result
+}
+
+func ParsePgWalDumpError(errorInfo string, lsnStr string) string {
+	prefixPattern := fmt.Sprintf("error in WAL record at %s: invalid record length at ", lsnStr)
+	suffixPattern := ": wanted "
+
+	startIndex := strings.Index(errorInfo, prefixPattern) + len(prefixPattern)
+	endIndex := strings.Index(errorInfo, suffixPattern)
+
+	if startIndex == -1 || endIndex == -1 {
+		return ""
+	}
+
+	return errorInfo[startIndex:endIndex]
 }

@@ -310,7 +310,7 @@ func (*FakeManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) er
 }
 
 func (*FakeManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
-	return fmt.Errorf("NotSuppported")
+	return nil
 }
 
 func (*FakeManager) Promote(context.Context, *dcs.Cluster) error {

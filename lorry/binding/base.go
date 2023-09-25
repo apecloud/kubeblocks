@@ -462,10 +462,11 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest,
 func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
-	if err != nil {
-		opsRes["event"] = OperationFailed
+	if manager == nil {
+		// manager for the DB is not supported, just return
+		opsRes["event"] = OperationSuccess
 		opsRes["message"] = err.Error()
-		return opsRes, err
+		return opsRes, nil
 	}
 
 	dcsStore := dcs.GetStore()

@@ -34,7 +34,7 @@ spec:
     env_auth = false
     access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
     secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
-    endpoint = {{ `{{ index .Parameters "region" }}` }}
+    endpoint = {{ `{{ index .Parameters "endpoint" }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
 
   parametersSchema:

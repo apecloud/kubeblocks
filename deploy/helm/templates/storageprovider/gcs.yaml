@@ -6,12 +6,12 @@ metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
-  {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
-  {{ `{{- if not $endpoint }}` }}
-    {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
-  {{ `{{- end }}` }}
   csiDriverName: ru.yandex.s3.csi
   csiDriverSecretTemplate: |
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
+    {{ `{{- end }}` }}
     accessKeyID: {{ `{{ index .Parameters "accessKeyId" }}` }}
     secretAccessKey: {{ `{{ index .Parameters "secretAccessKey" }}` }}
     endpoint: {{ `{{ $endpoint }}` }}
@@ -39,6 +39,10 @@ spec:
     env_auth = false
     access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
     secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
+    {{ `{{- end }}` }}
     endpoint = {{ `{{ $endpoint }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
 

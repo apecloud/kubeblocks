@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"context"
 	"fmt"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type dataClone interface {
@@ -88,7 +89,11 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 		}, nil
 	}
 	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
-		if viper.GetBool("VOLUMESNAPSHOT") {
+		volumeSnapshotEnabled, err := isVolumeSnapshotEnabled(reqCtx.Ctx, cli, stsObj, backupVCT(component))
+		if err != nil {
+			return nil, err
+		}
+		if volumeSnapshotEnabled {
 			return &snapshotDataClone{
 				baseDataClone{
 					reqCtx:    reqCtx,
@@ -224,17 +229,7 @@ func (d *baseDataClone) allVCTs() []*corev1.PersistentVolumeClaimTemplate {
 }
 
 func (d *baseDataClone) backupVCT() *corev1.PersistentVolumeClaimTemplate {
-	// TODO: is it possible that component.VolumeClaimTemplates may be empty?
-	vct := d.component.VolumeClaimTemplates[0]
-	for _, tmpVct := range d.component.VolumeClaimTemplates {
-		for _, volumeType := range d.component.VolumeTypes {
-			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
-				vct = tmpVct
-				break
-			}
-		}
-	}
-	return &vct
+	return backupVCT(d.component)
 }
 
 func (d *baseDataClone) excludeBackupVCTs() []*corev1.PersistentVolumeClaimTemplate {
@@ -456,7 +451,7 @@ func (d *snapshotDataClone) checkedCreatePVCFromSnapshot(pvcKey types.Namespaced
 			return nil, err
 		}
 		if len(vsList.Items) == 0 {
-			return nil, fmt.Errorf("volumesnapshot not found in cluster %s component %s", d.cluster.Name, d.component.Name)
+			return nil, fmt.Errorf("volumesnapshot not found for cluster %s component %s", d.cluster.Name, d.component.Name)
 		}
 		// exclude volumes that are deleting
 		vsName := ""
@@ -670,4 +665,54 @@ func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return nil, nil
+}
+
+func backupVCT(component *component.SynthesizedComponent) *corev1.PersistentVolumeClaimTemplate {
+	if len(component.VolumeClaimTemplates) == 0 {
+		return nil
+	}
+	vct := component.VolumeClaimTemplates[0]
+	for _, tmpVct := range component.VolumeClaimTemplates {
+		for _, volumeType := range component.VolumeTypes {
+			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
+				vct = tmpVct
+				break
+			}
+		}
+	}
+	return &vct
+}
+
+func isVolumeSnapshotEnabled(ctx context.Context, cli client.Client,
+	sts *appsv1.StatefulSet, vct *corev1.PersistentVolumeClaimTemplate) (bool, error) {
+	if sts == nil || vct == nil {
+		return false, nil
+	}
+	pvcKey := types.NamespacedName{
+		Namespace: sts.Namespace,
+		Name:      fmt.Sprintf("%s-%s-%d", vct.Name, sts.Name, 0),
+	}
+	pvc := corev1.PersistentVolumeClaim{}
+	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+	if pvc.Spec.StorageClassName == nil {
+		return false, nil
+	}
+
+	storageClass := storagev1.StorageClass{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: *pvc.Spec.StorageClassName}, &storageClass); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	vscList := snapshotv1.VolumeSnapshotClassList{}
+	if err := cli.List(ctx, &vscList); err != nil {
+		return false, err
+	}
+	for _, vsc := range vscList.Items {
+		if vsc.Driver == storageClass.Provisioner {
+			return true, nil
+		}
+	}
+	return false, nil
 }

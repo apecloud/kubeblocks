@@ -451,7 +451,7 @@ func (d *snapshotDataClone) checkedCreatePVCFromSnapshot(pvcKey types.Namespaced
 			return nil, err
 		}
 		if len(vsList.Items) == 0 {
-			return nil, fmt.Errorf("volumesnapshot not found in cluster %s component %s", d.cluster.Name, d.component.Name)
+			return nil, fmt.Errorf("volumesnapshot not found for cluster %s component %s", d.cluster.Name, d.component.Name)
 		}
 		// exclude volumes that are deleting
 		vsName := ""
@@ -668,7 +668,9 @@ func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
 }
 
 func backupVCT(component *component.SynthesizedComponent) *corev1.PersistentVolumeClaimTemplate {
-	// TODO: is it possible that component.VolumeClaimTemplates may be empty?
+	if len(component.VolumeClaimTemplates) == 0 {
+		return nil
+	}
 	vct := component.VolumeClaimTemplates[0]
 	for _, tmpVct := range component.VolumeClaimTemplates {
 		for _, volumeType := range component.VolumeTypes {

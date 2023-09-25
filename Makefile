@@ -664,6 +664,10 @@ else ifeq ($(TEST_TYPE), orioledb)
 	$(HELM) dependency build deploy/orioledb-cluster --skip-refresh
 	$(HELM) upgrade --install orioledb deploy/orioledb
 	$(HELM) template oriole-cluster deploy/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) dependency build deploy/weaviate-cluster --skip-refresh
+	$(HELM) upgrade --install weaviate deploy/weaviate
+	$(HELM) template weaviate-cluster deploy/weaviate-cluster > test/e2e/testdata/smoketest/weaviate/00_weaviatecluster.yaml
 else
 	$(error "test type does not exist")
 endif
@@ -707,6 +711,8 @@ else ifeq ($(TEST_TYPE), oceanbase)
 	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
 else ifeq ($(TEST_TYPE), openldap)
 	$(HELM) upgrade --install openldap deploy/openldap
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) upgrade --install weaviate deploy/weaviate
 else
 	$(error "test type does not exist")
 endif

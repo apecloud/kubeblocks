@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: weaviate-cluster-start-
+spec:
+  clusterRef: weaviate-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Start
+  restart:
+    - componentName: weaviate

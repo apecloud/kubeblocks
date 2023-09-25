@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: nebula-cluster-hscale-out-
+spec:
+  clusterRef: nebula-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: nebula-console
+      replicas: 3
+    - componentName: nebula-graphd
+      replicas: 3

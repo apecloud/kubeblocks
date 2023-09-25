@@ -46,7 +46,7 @@ type ConfigurationReconciler struct {
 	Recorder record.EventRecorder
 }
 
-const reconcileInterval = time.Millisecond * 10
+const reconcileInterval = time.Second * 2
 
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations/status,verbs=get;update;patch

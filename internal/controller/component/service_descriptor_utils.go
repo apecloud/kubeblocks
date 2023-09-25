@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package component
 
 import (
 	"fmt"
@@ -32,27 +32,26 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	compDef *appsv1alpha1.ComponentDefinition,
+	comp *appsv1alpha1.Component,
 ) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
-	if cluster == nil || clusterCompDef == nil || clusterCompSpec == nil {
+	if cluster == nil || compDef == nil || comp == nil {
 		return nil, nil
 	}
 
-	if len(clusterCompDef.ServiceRefDeclarations) == 0 {
+	if len(compDef.Spec.ServiceRefDeclarations) == 0 {
 		return nil, nil
 	}
 
-	serviceReferences := make(map[string]*appsv1alpha1.ServiceDescriptor, len(clusterCompDef.ServiceRefDeclarations))
-	for _, serviceRefDecl := range clusterCompDef.ServiceRefDeclarations {
-		for _, serviceRef := range clusterCompSpec.ServiceRefs {
+	serviceReferences := make(map[string]*appsv1alpha1.ServiceDescriptor, len(compDef.Spec.ServiceRefDeclarations))
+	for _, serviceRefDecl := range compDef.Spec.ServiceRefDeclarations {
+		for _, serviceRef := range comp.Spec.ServiceRefs {
 			if serviceRef.Name != serviceRefDecl.Name {
 				continue
 			}
@@ -104,7 +103,7 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 
 	// get the connection credential secret of the referenced cluster
 	secretRef := &corev1.Secret{}
-	secretRefName := component.GenerateConnCredential(referencedCluster.Name)
+	secretRefName := GenerateConnCredential(referencedCluster.Name)
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: secretRefName}, secretRef); err != nil {
 		return err
 	}
@@ -123,7 +122,7 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// TODO: Second-stage optimization: Cluster-type references no longer perform conversion on the connection credential field. Instead, the configMap or secret is directly passed through to the serviceDescriptor.
-	sdBuilder := builder.NewServiceDescriptorBuilder(namespace, component.GenerateDefaultServiceDescriptorName(cluster.Name))
+	sdBuilder := builder.NewServiceDescriptorBuilder(namespace, generateDefaultServiceDescriptorName(cluster.Name))
 	sdBuilder.SetServiceKind("")
 	sdBuilder.SetServiceVersion("")
 	handleSecretKey(secretRef, sdBuilder, constant.ServiceDescriptorEndpointKey, sdBuilder.SetEndpoint)
@@ -217,4 +216,8 @@ func getWellKnownServiceKindAliasMapping(serviceKind string) string {
 	default:
 		return lowerServiceKind
 	}
+}
+
+func generateDefaultServiceDescriptorName(clusterName string) string {
+	return fmt.Sprintf("kbsd-%s", GenerateConnCredential(clusterName))
 }

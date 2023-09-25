@@ -321,7 +321,7 @@ var _ = Describe("builder", func() {
 					constant.AppNameLabelKey:        replComponent.ClusterDefName,
 					constant.AppInstanceLabelKey:    cluster.Name,
 					constant.KBAppComponentLabelKey: replComponent.Name,
-					constant.AppComponentLabelKey:   replComponent.CompDefName,
+					constant.AppComponentLabelKey:   replComponent.ClusterCompDefName,
 				}
 				Expect(labels).ShouldNot(BeNil())
 				for k, ev := range expectedLabels {

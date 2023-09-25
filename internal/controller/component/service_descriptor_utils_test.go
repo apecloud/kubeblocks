@@ -17,11 +17,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package component
 
 import (
 	"context"
-
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -48,17 +48,17 @@ var _ = Describe("generate service descriptor", func() {
 		// create the new objects.
 		By("clean resources")
 
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		inNS := client.InNamespace(plan.testCtx.DefaultNamespace)
+		ml := client.HasLabels{plan.testCtx.TestObjLabelKey}
 
 		// resources should be released in following order
 		// non-namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&plan.testCtx, generics.ClusterVersionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&plan.testCtx, generics.ClusterDefinitionSignature, true, ml)
+		testapps.ClearResources(&plan.testCtx, generics.ConfigConstraintSignature, ml)
 
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&plan.testCtx, generics.ConfigMapSignature, true, inNS, ml)
 	}
 
 	var (
@@ -125,12 +125,12 @@ var _ = Describe("generate service descriptor", func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				AddServiceRefDeclarations(serviceRefDeclarations).
-				Create(&testCtx).GetObject()
+				Create(&plan.testCtx).GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponentVersion(nginxCompDefName).
 				AddInitContainerShort("nginx-init", testapps.NginxImage).
 				AddContainerShort("nginx", testapps.NginxImage).
-				Create(&testCtx).GetObject()
+				Create(&plan.testCtx).GetObject()
 		})
 
 		It("serviceRefDeclaration serviceVersion regex validation test", func() {
@@ -200,10 +200,10 @@ var _ = Describe("generate service descriptor", func() {
 
 		It("generate service descriptor test", func() {
 			By("Create cluster and beReferencedCluster object")
-			beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName,
+			beReferencedCluster = testapps.NewClusterFactory(plan.testCtx.DefaultNamespace, beReferencedClusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompDefName).
-				Create(&testCtx).GetObject()
+				Create(&plan.testCtx).GetObject()
 
 			serviceRefs := []appsv1alpha1.ServiceRef{
 				{
@@ -215,23 +215,23 @@ var _ = Describe("generate service descriptor", func() {
 					Cluster: beReferencedCluster.Name,
 				},
 			}
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			cluster = testapps.NewClusterFactory(plan.testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(nginxCompName, nginxCompDefName).
 				SetServiceRefs(serviceRefs).
-				Create(&testCtx).GetObject()
+				Create(&plan.testCtx).GetObject()
 
 			clusterKey := client.ObjectKeyFromObject(cluster)
 			req := ctrl.Request{
 				NamespacedName: clusterKey,
 			}
 			reqCtx := intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
+				Ctx: plan.testCtx.Ctx,
 				Req: req,
-				Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
+				Log: log.FromContext(plan.ctx).WithValues("cluster", req.NamespacedName),
 			}
 			By("GenServiceReferences failed because external service descriptor not found")
-			serviceReferences, err := GenServiceReferences(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err := GenServiceReferences(reqCtx, plan.testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			Expect(serviceReferences).Should(BeNil())
@@ -251,31 +251,31 @@ var _ = Describe("generate service descriptor", func() {
 					Value: "mock-password",
 				},
 			}
-			externalServiceDescriptor := testapps.NewServiceDescriptorFactory(testCtx.DefaultNamespace, externalServiceDescriptorName).
+			externalServiceDescriptor := testapps.NewServiceDescriptorFactory(plan.testCtx.DefaultNamespace, externalServiceDescriptorName).
 				SetEndpoint(endpoint).
 				SetPort(port).
 				SetAuth(auth).
-				Create(&testCtx).GetObject()
+				Create(&plan.testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor status is not available")
-			serviceReferences, err = GenServiceReferences(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = GenServiceReferences(reqCtx, plan.testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status is not available"))
 			Expect(serviceReferences).Should(BeNil())
 
 			By("update external service descriptor status to available")
-			Expect(testapps.ChangeObjStatus(&testCtx, externalServiceDescriptor, func() {
+			Expect(testapps.ChangeObjStatus(&plan.testCtx, externalServiceDescriptor, func() {
 				externalServiceDescriptor.Status.Phase = appsv1alpha1.AvailablePhase
 			})).Should(Succeed())
 
 			By("GenServiceReferences failed because external service descriptor kind and version not match")
-			serviceReferences, err = GenServiceReferences(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = GenServiceReferences(reqCtx, plan.testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("kind or version is not match with"))
 			Expect(serviceReferences).Should(BeNil())
 
 			By("update external service descriptor kind and version")
-			Expect(testapps.ChangeObj(&testCtx, externalServiceDescriptor, func(externalServiceDescriptor *appsv1alpha1.ServiceDescriptor) {
+			Expect(testapps.ChangeObj(&plan.testCtx, externalServiceDescriptor, func(externalServiceDescriptor *appsv1alpha1.ServiceDescriptor) {
 				externalServiceDescriptor.Spec.ServiceKind = externalServiceDescriptorKind
 				externalServiceDescriptor.Spec.ServiceVersion = externalServiceDescriptorVersion
 			})).Should(Succeed())
@@ -293,10 +293,10 @@ var _ = Describe("generate service descriptor", func() {
 					constant.ServiceDescriptorPortKey:     []byte("3306"),
 				},
 			}
-			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
+			Expect(plan.testCtx.CheckedCreateObj(plan.ctx, secret)).Should(Succeed())
+			Expect(plan.k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
 				Namespace: secret.Namespace}, secret)).Should(Succeed())
-			serviceReferences, err = GenServiceReferences(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = GenServiceReferences(reqCtx, plan.testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(serviceReferences).ShouldNot(BeNil())
 			Expect(len(serviceReferences)).Should(Equal(2))

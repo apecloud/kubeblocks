@@ -26,26 +26,26 @@ import (
 )
 
 func buildMonitorConfig(
-	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	component *SynthesizedComponent) {
+	compDef *appsv1alpha1.ComponentDefinition,
+	comp *appsv1alpha1.Component,
+	synthesizeComp *SynthesizedComponent) {
 	monitorEnable := false
-	if clusterCompSpec != nil {
-		monitorEnable = clusterCompSpec.Monitor
+	if comp != nil {
+		monitorEnable = comp.Spec.Monitor
 	}
 
-	monitorConfig := clusterCompDef.Monitor
+	monitorConfig := compDef.Spec.Monitor
 	if !monitorEnable || monitorConfig == nil {
-		disableMonitor(component)
+		disableMonitor(synthesizeComp)
 		return
 	}
 
 	if !monitorConfig.BuiltIn {
 		if monitorConfig.Exporter == nil {
-			disableMonitor(component)
+			disableMonitor(synthesizeComp)
 			return
 		}
-		component.Monitor = &MonitorConfig{
+		synthesizeComp.Monitor = &MonitorConfig{
 			Enable:     true,
 			BuiltIn:    false,
 			ScrapePath: monitorConfig.Exporter.ScrapePath,
@@ -54,10 +54,10 @@ func buildMonitorConfig(
 
 		if monitorConfig.Exporter.ScrapePort.Type == intstr.String {
 			portName := monitorConfig.Exporter.ScrapePort.StrVal
-			for _, c := range clusterCompDef.PodSpec.Containers {
+			for _, c := range compDef.Spec.Runtime.Containers {
 				for _, p := range c.Ports {
 					if p.Name == portName {
-						component.Monitor.ScrapePort = p.ContainerPort
+						synthesizeComp.Monitor.ScrapePort = p.ContainerPort
 						break
 					}
 				}
@@ -66,7 +66,7 @@ func buildMonitorConfig(
 		return
 	}
 
-	component.Monitor = &MonitorConfig{
+	synthesizeComp.Monitor = &MonitorConfig{
 		Enable:  true,
 		BuiltIn: true,
 	}

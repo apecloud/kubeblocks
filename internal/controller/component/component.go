@@ -194,7 +194,6 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ClusterName:           cluster.Name,
 		ClusterUID:            string(cluster.UID),
 		Name:                  clusterCompSpec.Name,
-		CompDefName:           clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
 		StatelessSpec:         clusterCompDefObj.StatelessSpec,
@@ -218,7 +217,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		EnabledLogs:           clusterCompSpec.EnabledLogs,
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
-		ComponentDef:          clusterCompSpec.ComponentDefRef,
+		ClusterCompDefName:    clusterCompSpec.ComponentDefRef,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 	}
 
@@ -239,13 +238,13 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 
 	// handle component.PodSpec extra settings
 	// set affinity and tolerations
-	affinity := BuildAffinity(cluster, clusterCompSpec)
+	affinity := BuildAffinity(cluster, clusterCompSpec.Affinity)
 	if component.PodSpec.Affinity, err = BuildPodAffinity(cluster, affinity, component); err != nil {
 		reqCtx.Log.Error(err, "build pod affinity failed.")
 		return nil, err
 	}
 	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
-	if component.PodSpec.Tolerations, err = BuildTolerations(cluster, clusterCompSpec); err != nil {
+	if component.PodSpec.Tolerations, err = BuildTolerations(cluster, clusterCompSpec.Tolerations); err != nil {
 		reqCtx.Log.Error(err, "build pod tolerations failed.")
 		return nil, err
 	}
@@ -279,7 +278,8 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
+	// TODO(xingran): buildComponent will be replaced by buildSynthesizedComponent and will delete it later, so set compDef and comp to nil.
+	buildMonitorConfig(nil, nil, component)
 
 	// lorry container requires a service account with adequate privileges.
 	// If lorry required and the serviceAccountName is not set,
@@ -296,7 +296,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
 
-	if err = buildComponentRef(clusterDef, cluster, clusterCompDefObj, clusterCompSpec, component); err != nil {
+	if err = buildComponentRef(clusterDef, cluster, clusterCompDefObj, component); err != nil {
 		reqCtx.Log.Error(err, "failed to merge componentRef")
 		return nil, err
 	}
@@ -445,10 +445,6 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 
 func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
-}
-
-func GenerateDefaultServiceDescriptorName(clusterName string) string {
-	return fmt.Sprintf("kbsd-%s", GenerateConnCredential(clusterName))
 }
 
 // overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.

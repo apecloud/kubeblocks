@@ -22,7 +22,6 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ComponentSpec defines the desired state of Component
@@ -30,17 +29,17 @@ type ComponentSpec struct {
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`
 
-	//// classDefRef references the class defined in ComponentClassDefinition.
-	//// +optional
-	// ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+	// classDefRef references the class defined in ComponentClassDefinition.
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
-	//// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
-	//// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
-	//// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
-	//// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
-	//// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
-	//// +optional
-	// ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
+	// serviceRefs define service references for the current component. Based on the referenced services, they can be categorized into two types:
+	// Service provided by external sources: These services are provided by external sources and are not managed by KubeBlocks. They can be Kubernetes-based or non-Kubernetes services. For external services, you need to provide an additional ServiceDescriptor object to establish the service binding.
+	// Service provided by other KubeBlocks clusters: These services are provided by other KubeBlocks clusters. You can bind to these services by specifying the name of the hosting cluster.
+	// Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
+	// It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.
+	// +optional
+	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
 	// Resources requests and limits of workload.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -66,8 +65,13 @@ type ComponentSpec struct {
 	//// +optional
 	// Services []ClusterComponentService `json:"services,omitempty"`
 
+	// monitor is a switch to enable monitoring and is set as false by default.
+	// KubeBlocks provides an extension mechanism to support component level monitoring,
+	// which will scrape metrics auto or manually from servers in component and export
+	// metrics to Time Series Database.
+	// +kubebuilder:default=false
 	// +optional
-	Monitor *intstr.IntOrString `json:"monitor,omitempty"`
+	Monitor bool `json:"monitor,omitempty"`
 
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
@@ -85,26 +89,12 @@ type ComponentSpec struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Component termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
-	// DoNotTerminate will block delete operation.
-	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
-	// Delete is based on Halt and deletes PVCs.
-	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
-	// +kubebuilder:validation:Required
-	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
-
 	// +kubebuilder:default=false
 	// +optional
 	TLS bool `json:"tls,omitempty"`
 
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
-
-	//// noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget
-	//// for this component is not needed. It defaults to false.
-	//// +kubebuilder:default=false
-	//// +optional
-	// NoCreatePDB bool `json:"noCreatePDB,omitempty"`
 }
 
 // ComponentStatus defines the observed state of Component
@@ -159,4 +149,16 @@ type ComponentList struct {
 
 func init() {
 	SchemeBuilder.Register(&Component{}, &ComponentList{})
+}
+
+// ToVolumeClaimTemplates convert r.VolumeClaimTemplates to []corev1.PersistentVolumeClaimTemplate.
+func (r *ComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimTemplate {
+	if r == nil {
+		return nil
+	}
+	var ts []corev1.PersistentVolumeClaimTemplate
+	for _, t := range r.VolumeClaimTemplates {
+		ts = append(ts, t.toVolumeClaimTemplate())
+	}
+	return ts
 }

@@ -64,7 +64,7 @@ func buildPodTopologySpreadConstraints(
 	return topologySpreadConstraints
 }
 
-func BuildAffinity(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.Affinity {
+func BuildAffinity(cluster *appsv1alpha1.Cluster, componentAffinity *appsv1alpha1.Affinity) *appsv1alpha1.Affinity {
 	affinityTopoKey := func(policyType appsv1alpha1.AvailabilityPolicyType) string {
 		switch policyType {
 		case appsv1alpha1.AvailabilityPolicyZone:
@@ -85,8 +85,8 @@ func BuildAffinity(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.
 	if cluster.Spec.Affinity != nil {
 		affinity = cluster.Spec.Affinity
 	}
-	if clusterCompSpec.Affinity != nil {
-		affinity = clusterCompSpec.Affinity
+	if componentAffinity != nil {
+		affinity = componentAffinity
 	}
 	return affinity
 }
@@ -254,10 +254,10 @@ func mergeAffinity(dest, src *corev1.Affinity) (*corev1.Affinity, error) {
 }
 
 // BuildTolerations builds tolerations from config
-func BuildTolerations(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) ([]corev1.Toleration, error) {
+func BuildTolerations(cluster *appsv1alpha1.Cluster, componentTolerations []corev1.Toleration) ([]corev1.Toleration, error) {
 	tolerations := cluster.Spec.Tolerations
-	if clusterCompSpec != nil && len(clusterCompSpec.Tolerations) != 0 {
-		tolerations = clusterCompSpec.Tolerations
+	if len(componentTolerations) != 0 {
+		tolerations = componentTolerations
 	}
 
 	// build data plane tolerations from config

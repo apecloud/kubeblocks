@@ -363,7 +363,7 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 	}
 
 	// if there is backuppolicytemplate created by provider
-	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.ComponentDef, backupPolicyTplName)
+	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.ClusterCompDefName, backupPolicyTplName)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +582,7 @@ func (d *backupDataClone) clearTmpResources() ([]client.Object, error) {
 func (d *backupDataClone) backup() ([]client.Object, error) {
 	objs := make([]client.Object, 0)
 	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
-	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.ComponentDef, backupPolicyTplName)
+	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.ClusterCompDefName, backupPolicyTplName)
 	if err != nil {
 		return nil, err
 	}

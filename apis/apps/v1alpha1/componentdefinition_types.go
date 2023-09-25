@@ -173,7 +173,7 @@ type ComponentDefinitionSpec struct {
 	// Cannot be updated.
 	// +kubebuilder:default=Serial
 	// +optional
-	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Roles defines all the roles that the component can assume.
 	// Cannot be updated.
@@ -184,13 +184,13 @@ type ComponentDefinitionSpec struct {
 	// Cannot be updated.
 	// +kubebuilder:default=External
 	// +optional
-	RoleArbitrator ComponentRoleArbitrator `json:"roleArbitrator,omitempty"`
+	RoleArbitrator *ComponentRoleArbitrator `json:"roleArbitrator,omitempty"`
 
 	// LifecycleActions defines the operational actions that needed to interoperate with the component
 	// service and processes for lifecycle management.
 	// Cannot be updated.
 	// +optional
-	LifecycleActions ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	LifecycleActions *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// TODO: introduce the event-based interoperability mechanism.
 
@@ -202,7 +202,7 @@ type ComponentDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=componentDefName
 	// +optional
-	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
+	// ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
 
 	// serviceRefDeclarations is used to declare the service reference of the current component.
 	// Cannot be updated.

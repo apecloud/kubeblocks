@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type MockComponentFactory struct {
@@ -77,7 +75,7 @@ func (factory *MockComponentFactory) SetEnabledLogs(logName ...string) *MockComp
 	return factory
 }
 
-func (factory *MockComponentFactory) SetMonitor(monitor *intstr.IntOrString) *MockComponentFactory {
+func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
 	factory.get().Spec.Monitor = monitor
 	return factory
 }

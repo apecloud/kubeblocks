@@ -143,7 +143,7 @@ var _ = Describe("affinity utils", func() {
 		})
 
 		It("should have correct tolerations", func() {
-			tolerations, err := BuildTolerations(clusterObj, &clusterObj.Spec.ComponentSpecs[0])
+			tolerations, err := BuildTolerations(clusterObj, (&clusterObj.Spec.ComponentSpecs[0]).Tolerations)
 			Expect(err).Should(Succeed())
 			Expect(tolerations).ShouldNot(BeEmpty())
 			Expect(tolerations[0].Key).Should(Equal(clusterTolerationKey))
@@ -153,7 +153,7 @@ var _ = Describe("affinity utils", func() {
 			const dpTolerationKey = "dataPlaneTolerationKey"
 			viper.Set(constant.CfgKeyDataPlaneTolerations, fmt.Sprintf("[{\"key\":\"%s\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]", dpTolerationKey))
 			defer viper.Set(constant.CfgKeyDataPlaneTolerations, "")
-			tolerations, err := BuildTolerations(clusterObj, &clusterObj.Spec.ComponentSpecs[0])
+			tolerations, err := BuildTolerations(clusterObj, (&clusterObj.Spec.ComponentSpecs[0]).Tolerations)
 			Expect(err).Should(Succeed())
 			Expect(tolerations).Should(HaveLen(2))
 			Expect(tolerations[0].Key).Should(Equal(clusterTolerationKey))

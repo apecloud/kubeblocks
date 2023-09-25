@@ -641,7 +641,7 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 		}
 		// if the workload uses local pv, the job's affinity should consistent with workload.
 		// so datafile job should contain cluster affinity constraints.
-		affinity := component.BuildAffinity(p.Cluster, p.Cluster.Spec.GetComponentByName(synthesizedComponent.Name))
+		affinity := component.BuildAffinity(p.Cluster, p.Cluster.Spec.GetComponentByName(synthesizedComponent.Name).Affinity)
 		if job.Spec.Template.Spec.Affinity, err = component.BuildPodAffinity(p.Cluster, affinity, synthesizedComponent); err != nil {
 			return nil, err
 		}

@@ -59,7 +59,8 @@ const (
 )
 
 const (
-	KBPrefix = "KB"
+	KBPrefix      = "KB"
+	KBLowerPrefix = "kb"
 )
 
 const (

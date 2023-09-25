@@ -26,8 +26,8 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	jsonpath "k8s.io/client-go/util/jsonpath"
-	klog "k8s.io/klog/v2"
+	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -35,7 +35,6 @@ import (
 func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterComp *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) error {
 
 	compRefs := clusterCompDef.ComponentDefRef

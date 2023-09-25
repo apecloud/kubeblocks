@@ -207,7 +207,7 @@ func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	}
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
@@ -218,7 +218,7 @@ func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	}
 	stsBuilder := builder.NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
 		AddMatchLabelsInMap(commonLabels).
 		SetServiceName(cluster.Name + "-" + component.Name + "-headless").
 		SetReplicas(component.Replicas).
@@ -280,13 +280,13 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 		for k, v := range commonLabels {
 			labels[k] = v
 		}
-		labels[constant.AppComponentLabelKey] = component.CompDefName
+		labels[constant.AppComponentLabelKey] = component.ClusterCompDefName
 		service.Labels = labels
 	}
 
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
 		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
@@ -321,7 +321,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotationsInMap(monitorAnnotations).
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
 		AddMatchLabelsInMap(commonLabels).
 		SetServiceName(rsmName + "-headless").
 		SetReplicas(component.Replicas).
@@ -740,7 +740,7 @@ func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	return builder.NewPDBBuilder(cluster.Namespace, fmt.Sprintf("%s-%s", cluster.Name, component.Name)).
 		AddLabelsInMap(wellKnownLabels).
-		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
+		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
 		AddSelectorsInMap(wellKnownLabels).
 		GetObject()
 }
@@ -796,7 +796,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	cmName string,
 	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
 	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
+	wellKnownLabels[constant.AppComponentLabelKey] = component.ClusterCompDefName
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
 		AddLabelsInMap(wellKnownLabels).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
@@ -926,7 +926,7 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 		}
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&containers[0])
 	}
-	tolerations, err := component.BuildTolerations(cluster, cluster.Spec.GetComponentByName(synthesizedComponent.Name))
+	tolerations, err := component.BuildTolerations(cluster, cluster.Spec.GetComponentByName(synthesizedComponent.Name).Tolerations)
 	if err != nil {
 		return nil, err
 	}

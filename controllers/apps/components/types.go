@@ -31,7 +31,6 @@ import (
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -84,7 +83,9 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	serviceReferences, err := plan.GenServiceReferences(reqCtx, cli, cluster, compDef, compSpec)
+
+	// TODO(xingran): this file will be deleted, so set serviceReferences to nil first to avoid panic
+	serviceReferences, err := component.GenServiceReferences(reqCtx, cli, cluster, nil, nil)
 	if err != nil {
 		return nil, err
 	}

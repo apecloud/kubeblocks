@@ -228,9 +228,10 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&dpv1alpha1.BackupPolicy{}).
+		Owns(&dpv1alpha1.BackupSchedule{}).
 		Owns(&dpv1alpha1.Backup{}).
-		Owns(&batchv1.Job{}).
 		Owns(&dpv1alpha1.Restore{}).
+		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {

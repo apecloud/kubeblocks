@@ -211,6 +211,7 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
 		&dpv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupScheduleList{},
 		&batchv1.JobList{},
 		&dpv1alpha1.RestoreList{},
 	}

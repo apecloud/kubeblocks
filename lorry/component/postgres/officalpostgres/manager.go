@@ -411,7 +411,21 @@ func (mgr *Manager) handleRewind(ctx context.Context, cluster *dcs.Cluster) erro
 		return nil
 	}
 
+	if !mgr.canRewind() {
+		return nil
+	}
+
 	return mgr.executeRewind()
+}
+
+func (mgr *Manager) canRewind() bool {
+	_, err := postgres.PgRewind("--help")
+	if err != nil {
+		mgr.Logger.Error(err, "unable to execute pg_rewind")
+		return false
+	}
+
+	return true
 }
 
 func (mgr *Manager) executeRewind() error {

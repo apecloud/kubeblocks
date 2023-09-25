@@ -42,6 +42,10 @@ func PgWalDump(args ...string) (string, error) {
 	return ExecCommand("pg_waldump", args...)
 }
 
+func PgRewind(args ...string) (string, error) {
+	return ExecCommand("pg_rewind", args...)
+}
+
 func ExecCommand(name string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(name, args...)

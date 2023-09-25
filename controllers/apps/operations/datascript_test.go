@@ -236,7 +236,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job, missing service, should fail")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			_, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			_, err := buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(HaveOccurred())
 
 			By("mock a service, should pass")
@@ -249,7 +249,7 @@ var _ = Describe("DataScriptOps", func() {
 			Expect(err).Should(Succeed())
 
 			By("mock a job one more time, fail with missing secret")
-			_, err = buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			_, err = buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("conn-credential"))
 
@@ -263,7 +263,7 @@ var _ = Describe("DataScriptOps", func() {
 			}
 			Expect(k8sClient.Patch(testCtx.Ctx, ops, patch)).Should(Succeed())
 
-			_, err = buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			_, err = buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(secretName))
 
@@ -281,8 +281,9 @@ var _ = Describe("DataScriptOps", func() {
 
 			By("create job, should pass")
 			viper.Set(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-clients:latest")
-			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			jobs, err := buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
+			job := jobs[0]
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
 
 			By("reconcile the opsRequest phase")
@@ -358,8 +359,9 @@ var _ = Describe("DataScriptOps", func() {
 
 			By("create job, should pass")
 			viper.Set(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-clients:latest")
-			job, err := buildDataScriptJob(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
+			jobs, err := buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(Succeed())
+			job := jobs[0]
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
 
 			By("reconcile the opsRequest phase")

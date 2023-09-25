@@ -111,6 +111,18 @@ var _ = Describe("BackupRepo controller", func() {
 		}).Should(Succeed())
 	}
 
+	// barrier := func(repoKey types.NamespacedName) {
+	// 	repo := &dpv1alpha1.BackupRepo{}
+	// 	var gen
+	// 	Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(obj *dpv1alpha1.BackupRepo) {
+	// 		repo = obj
+	// 		obj.Generation
+	// 	}))
+	//
+	// 	err := testCtx.Cli.Get(testCtx.Ctx, repoKey, repo)
+	//
+	// }
+
 	BeforeEach(func() {
 		viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		cleanEnv()
@@ -163,7 +175,7 @@ var _ = Describe("BackupRepo controller", func() {
 			repoKey = client.ObjectKeyFromObject(repo)
 		}
 
-		createStorageProviderSpec := func(mutateFunc func(repo *storagev1alpha1.StorageProvider)) {
+		createStorageProviderSpec := func(mutateFunc func(provider *storagev1alpha1.StorageProvider)) {
 			obj := &storagev1alpha1.StorageProvider{}
 			obj.GenerateName = "storageprovider-"
 			obj.Spec.CSIDriverName = defaultCSIDriverName
@@ -207,8 +219,8 @@ parameters:
 			obj.GenerateName = "backup-"
 			obj.Namespace = testCtx.DefaultNamespace
 			obj.Labels = map[string]string{
-				dataProtectionBackupRepoKey:  repoKey.Name,
-				dataProtectionNeedRepoPVCKey: "true",
+				dataProtectionBackupRepoKey:          repoKey.Name,
+				dataProtectionWaitRepoPreparationKey: "true",
 			}
 			obj.Spec.BackupType = dpv1alpha1.BackupTypeSnapshot
 			obj.Spec.BackupPolicyName = "default"
@@ -450,7 +462,7 @@ parameters:
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
-				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadSecretTemplate))
+				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPrepareCSISecretFailed))
 				g.Expect(cond.Message).Should(ContainSubstring(`function "bad" not defined`))
 			})).Should(Succeed())
 		})
@@ -466,7 +478,7 @@ parameters:
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
-				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadSecretTemplate))
+				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPrepareCSISecretFailed))
 				g.Expect(cond.Message).Should(ContainSubstring(`cannot unmarshal string into Go value of type map[string]string`))
 			})).Should(Succeed())
 		})
@@ -484,7 +496,7 @@ parameters:
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
-				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadStorageClassTemplate))
+				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPrepareStorageClassFailed))
 				g.Expect(cond.Message).Should(ContainSubstring(`function "bad" not defined`))
 			})).Should(Succeed())
 		})
@@ -502,7 +514,7 @@ parameters:
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageClassCreated)
 				g.Expect(cond).NotTo(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
-				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadStorageClassTemplate))
+				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPrepareStorageClassFailed))
 				g.Expect(cond.Message).Should(ContainSubstring(`cannot unmarshal string into Go value of type v1.StorageClass`))
 			})).Should(Succeed())
 		})
@@ -557,7 +569,7 @@ parameters:
 		Context("storage provider with PersistentVolumeClaimTemplate", func() {
 			It("should create a PVC in Backup's namespace (in default namespace)", func() {
 				By("setting the PersistentVolumeClaimTemplate")
-				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
 					provider.Spec.PersistentVolumeClaimTemplate = `
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -571,7 +583,8 @@ spec:
   resources:
     volumeMode: Filesystem
 `
-				})).Should(Succeed())
+				})
+				createBackupRepoSpec(nil)
 				_, pvcName := createBackupAndCheckPVC(testCtx.DefaultNamespace)
 
 				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: pvcName, Namespace: testCtx.DefaultNamespace},
@@ -653,6 +666,145 @@ spec:
 				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
 				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonInvalidStorageProvider))
 			})).Should(Succeed())
+		})
+
+		Context("with AccessMethodDirect", func() {
+			var repo *dpv1alpha1.BackupRepo
+			var backup *dpv1alpha1.Backup
+			var dptConfigSecretKey types.NamespacedName
+
+			BeforeEach(func() {
+				By("preparing")
+				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+					provider.Spec.DPTConfigTemplate = `
+[storage]
+type=local
+key1={{ index .Parameters "key1" }}
+key2={{ index .Parameters "key2" }}
+cred-key1={{ index .Parameters "cred-key1" }}
+cred-key2={{ index .Parameters "cred-key2" }}
+`
+				})
+				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDirect
+				})
+
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, obj *dpv1alpha1.BackupRepo) {
+					g.Expect(obj.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
+					repo = obj
+				})).Should(Succeed())
+
+				backup = createBackupSpec(func(backup *dpv1alpha1.Backup) {
+					backup.Namespace = testCtx.DefaultNamespace
+				})
+				dptConfigSecretKey = types.NamespacedName{
+					Name:      repo.Status.DPTConfigSecretName,
+					Namespace: testCtx.DefaultNamespace,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, dptConfigSecretKey, &corev1.Secret{}, true)).Should(Succeed())
+			})
+
+			It("should check that the storage provider has a non-empty dptConfigTemplate", func() {
+				By("preparing")
+				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+					provider.Spec.DPTConfigTemplate = ""
+				})
+				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDirect
+				})
+				By("checking")
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
+					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
+					g.Expect(cond).NotTo(BeNil())
+					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonInvalidStorageProvider))
+					g.Expect(cond.Message).Should(ContainSubstring("DPTConfigTemplate is empty"))
+				})).Should(Succeed())
+			})
+
+			It("should fail if the dptConfigTemplate is invalid", func() {
+				By("preparing")
+				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+					provider.Spec.DPTConfigTemplate = "bad template {{"
+				})
+				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDirect
+				})
+				By("checking")
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
+					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeDPTConfigChecked)
+					g.Expect(cond).NotTo(BeNil())
+					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadDPTConfigTemplate))
+				})).Should(Succeed())
+			})
+
+			It("should create the secret containing the dpt config", func() {
+				Eventually(testapps.CheckObj(&testCtx, dptConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
+					g.Expect(secret.Data).Should(HaveKeyWithValue("dpt.conf", []byte(`
+[storage]
+type=local
+key1=val1
+key2=val2
+cred-key1=cred-val1
+cred-key2=cred-val2
+`)))
+				})).Should(Succeed())
+
+				By("creating a backup in namespace2")
+				createBackupSpec(func(backup *dpv1alpha1.Backup) {
+					backup.Namespace = namespace2
+				})
+				secretKey := types.NamespacedName{
+					Name:      repo.Status.DPTConfigSecretName,
+					Namespace: namespace2,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, secretKey, &corev1.Secret{}, true)).Should(Succeed())
+			})
+
+			It("should update the content of the secret when the template or the value changes", func() {
+				By("changing the template")
+				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
+					provider.Spec.DPTConfigTemplate += "new-item=new-value\n"
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, dptConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
+					g.Expect(secret.Data).Should(HaveKeyWithValue("dpt.conf", []byte(`
+[storage]
+type=local
+key1=val1
+key2=val2
+cred-key1=cred-val1
+cred-key2=cred-val2
+new-item=new-value
+`)))
+				})).Should(Succeed())
+
+				By("changing the value")
+				Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+					repo.Spec.Config["key1"] = "changed-val1"
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, dptConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
+					g.Expect(secret.Data).Should(HaveKeyWithValue("dpt.conf", []byte(`
+[storage]
+type=local
+key1=changed-val1
+key2=val2
+cred-key1=cred-val1
+cred-key2=cred-val2
+new-item=new-value
+`)))
+				})).Should(Succeed())
+			})
+
+			It("should delete the secret when the repo is deleted", func() {
+				By("deleting the Backup and BackupRepo")
+				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(backup), &dpv1alpha1.Backup{})
+				testapps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
+				By("checking the secret is deleted")
+				Eventually(testapps.CheckObjExists(&testCtx, dptConfigSecretKey, &corev1.Secret{}, false)).Should(Succeed())
+			})
 		})
 
 		It("should block the deletion of the BackupRepo if derived objects are not deleted", func() {

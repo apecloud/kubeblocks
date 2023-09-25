@@ -30,7 +30,7 @@ import (
 	"strings"
 	"text/template"
 
-	sprig "github.com/go-task/slim-sprig"
+	"github.com/Masterminds/sprig/v3"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -52,6 +52,7 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -155,11 +156,20 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			"failed to create storage class and secret")
 	}
 
+	// check PVC template
 	err = r.checkPVCTemplate(reqCtx, renderCtx, repo, provider)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			"failed to check PVC template")
+	}
+
+	// check DPT config
+	err = r.checkAndUpdateDPTConfig(reqCtx, renderCtx, repo, provider)
+	if err != nil {
+		_ = r.updateStatus(reqCtx, repo)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			"failed to check DPT config")
 	}
 
 	// TODO: implement pre-check logic
@@ -175,7 +185,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// check associated backups, to create PVC in their namespaces
 	if repo.Status.Phase == dpv1alpha1.BackupRepoReady {
-		if err = r.createPVCForAssociatedBackups(reqCtx, renderCtx, repo, provider); err != nil {
+		if err = r.prepareForAssociatedBackups(reqCtx, renderCtx, repo, provider); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 				"check associated backups failed")
 		}
@@ -192,12 +202,24 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 		if meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageProviderReady) &&
 			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeParametersChecked) &&
 			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageClassCreated) &&
-			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypePVCTemplateChecked) {
+			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypePVCTemplateChecked) &&
+			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeDPTConfigChecked) {
 			phase = dpv1alpha1.BackupRepoReady
 		}
 		repo.Status.Phase = phase
 	}
 	repo.Status.IsDefault = repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal
+
+	// update other fields
+	if repo.Status.BackupPVCName == "" {
+		repo.Status.BackupPVCName = randomNameForDerivedObject(repo, "pvc")
+	}
+	if repo.Status.DPTConfigSecretName == "" {
+		repo.Status.DPTConfigSecretName = randomNameForDerivedObject(repo, "dpt-config")
+	}
+	if repo.Status.ObservedGeneration != repo.Generation {
+		repo.Status.ObservedGeneration = repo.Generation
+	}
 
 	if !reflect.DeepEqual(old.Status, repo.Status) {
 		if err := r.Client.Status().Patch(reqCtx.Ctx, repo, client.MergeFrom(old)); err != nil {
@@ -238,14 +260,24 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 	}
 
 	// check its spec
-	if provider.Spec.StorageClassTemplate == "" &&
-		provider.Spec.PersistentVolumeClaimTemplate == "" {
-		// both StorageClassTemplate and PersistentVolumeClaimTemplate are empty.
-		// in this case, we are unable to create a backup PVC.
-		status = metav1.ConditionFalse
-		reason = ReasonInvalidStorageProvider
-		message = "both StorageClassTemplate and PersistentVolumeClaimTemplate are empty"
-		return provider, nil
+	switch {
+	case repo.IsMountAccess():
+		if provider.Spec.StorageClassTemplate == "" &&
+			provider.Spec.PersistentVolumeClaimTemplate == "" {
+			// both StorageClassTemplate and PersistentVolumeClaimTemplate are empty.
+			// in this case, we are unable to create a backup PVC.
+			status = metav1.ConditionFalse
+			reason = ReasonInvalidStorageProvider
+			message = "both StorageClassTemplate and PersistentVolumeClaimTemplate are empty"
+			return provider, nil
+		}
+	case repo.IsDirectAccess():
+		if provider.Spec.DPTConfigTemplate == "" {
+			status = metav1.ConditionFalse
+			reason = ReasonInvalidStorageProvider
+			message = "DPTConfigTemplate is empty"
+			return provider, nil
+		}
 	}
 
 	// check its status
@@ -300,6 +332,26 @@ func (r *BackupRepoReconciler) checkParameters(reqCtx intctrlutil.RequestCtx,
 func (r *BackupRepoReconciler) createStorageClassAndSecret(reqCtx intctrlutil.RequestCtx,
 	renderCtx renderContext, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) error {
 
+	var err error
+	reason := ReasonUnknownError
+
+	defer func() {
+		condType := ConditionTypeStorageClassCreated
+		status := metav1.ConditionFalse
+		var message string
+		if err == nil {
+			status = metav1.ConditionTrue
+			reason = ReasonStorageClassCreated
+		} else {
+			message = err.Error()
+		}
+		updateErr := updateCondition(reqCtx.Ctx, r.Client, repo,
+			condType, status, reason, message)
+		if updateErr != nil {
+			err = updateErr
+		}
+	}()
+
 	oldRepo := repo.DeepCopy()
 
 	// create secret for the CSI driver if it's not exist,
@@ -312,8 +364,9 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(reqCtx intctrlutil.Re
 			}
 		}
 		renderCtx.CSIDriverSecretRef = *repo.Status.GeneratedCSIDriverSecret
-		// create secret if it's not exist
-		if _, err := r.createSecretForCSIDriver(reqCtx, renderCtx, repo, provider); err != nil {
+		// create or update the secret for CSI
+		if _, err = r.createOrUpdateSecretForCSIDriver(reqCtx, renderCtx, repo, provider); err != nil {
+			reason = ReasonPrepareCSISecretFailed
 			return err
 		}
 	}
@@ -323,18 +376,12 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(reqCtx intctrlutil.Re
 		if repo.Status.GeneratedStorageClassName == "" {
 			repo.Status.GeneratedStorageClassName = randomNameForDerivedObject(repo, "sc")
 		}
-		if _, err := r.createStorageClass(reqCtx, renderCtx, repo, provider); err != nil {
+		if _, err = r.createStorageClass(reqCtx, renderCtx, repo, provider); err != nil {
+			reason = ReasonPrepareStorageClassFailed
 			return err
 		}
 	}
 
-	// update other fields
-	if repo.Status.BackupPVCName == "" {
-		repo.Status.BackupPVCName = randomNameForDerivedObject(repo, "pvc")
-	}
-	if repo.Status.ObservedGeneration != repo.Generation {
-		repo.Status.ObservedGeneration = repo.Generation
-	}
 	if !meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageClassCreated) {
 		setCondition(repo, ConditionTypeStorageClassCreated,
 			metav1.ConditionTrue, ReasonStorageClassCreated, "")
@@ -349,25 +396,30 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(reqCtx intctrlutil.Re
 	return nil
 }
 
-func (r *BackupRepoReconciler) createSecretForCSIDriver(
+func (r *BackupRepoReconciler) createOrUpdateSecretForCSIDriver(
 	reqCtx intctrlutil.RequestCtx, renderCtx renderContext,
 	repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) (created bool, err error) {
 
-	secretTemplateMD5 := md5Digest(provider.Spec.CSIDriverSecretTemplate)
-	templateValuesMD5 := md5Digest(stableSerializeMap(renderCtx.Parameters))
-	condType := ConditionTypeStorageClassCreated
-	setSecretContent := func(secret *corev1.Secret) error {
+	secret := &corev1.Secret{}
+	secret.Name = repo.Status.GeneratedCSIDriverSecret.Name
+	secret.Namespace = repo.Status.GeneratedCSIDriverSecret.Namespace
+
+	templateMd5 := md5Digest(provider.Spec.CSIDriverSecretTemplate)
+	parametersMd5 := renderCtx.Md5OfParameters()
+	shouldUpdateFunc := func() bool {
+		tmplMd5InSecret := secret.Annotations[dataProtectionSecretTemplateMD5AnnotationKey]
+		paramMd5InSecret := secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
+		return templateMd5 != tmplMd5InSecret || parametersMd5 != paramMd5InSecret
+	}
+
+	return createOrUpdateObject(reqCtx.Ctx, r.Client, secret, func() error {
 		// render secret template
 		content, err := renderTemplate("secret", provider.Spec.CSIDriverSecretTemplate, renderCtx)
 		if err != nil {
-			_ = updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-				metav1.ConditionFalse, ReasonBadSecretTemplate, err.Error())
 			return fmt.Errorf("failed to render secret template: %w", err)
 		}
 		secretStringData := map[string]string{}
 		if err = yaml.Unmarshal([]byte(content), &secretStringData); err != nil {
-			_ = updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-				metav1.ConditionFalse, ReasonBadSecretTemplate, err.Error())
 			return fmt.Errorf("failed to unmarshal secret content: %w", err)
 		}
 		secretData := make(map[string][]byte, len(secretStringData))
@@ -375,63 +427,24 @@ func (r *BackupRepoReconciler) createSecretForCSIDriver(
 			secretData[k] = []byte(v)
 		}
 		secret.Data = secretData
-		return nil
-	}
 
-	secret := &corev1.Secret{}
-	secret.Name = repo.Status.GeneratedCSIDriverSecret.Name
-	secret.Namespace = repo.Status.GeneratedCSIDriverSecret.Namespace
-
-	// create the secret object if not exist.
-	// this function will retrieve the whole secret object
-	// when the object is existing.
-	created, err = createObjectIfNotExist(reqCtx.Ctx, r.Client, secret,
-		func() error {
-			secret.Labels = map[string]string{
-				dataProtectionBackupRepoKey: repo.Name,
-			}
-			secret.Annotations = map[string]string{
-				dataProtectionSecretTemplateMD5AnnotationKey: secretTemplateMD5,
-				dataProtectionTemplateValuesMD5AnnotationKey: templateValuesMD5,
-			}
-			if err := setSecretContent(secret); err != nil {
-				return err
-			}
-			if err := controllerutil.SetControllerReference(repo, secret, r.Scheme); err != nil {
-				_ = updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-					metav1.ConditionUnknown, ReasonUnknownError, err.Error())
-				return fmt.Errorf("failed to set controller reference: %w", err)
-			}
-			return nil
-		})
-	if err != nil {
-		return false, fmt.Errorf("createObjectIfNotExist for secret %s failed: %w",
-			client.ObjectKeyFromObject(secret), err)
-	}
-	if created {
-		return true, nil
-	}
-
-	// check if the template or config changed, then update the secret
-	currSecretTemplateMD5 := secret.Annotations[dataProtectionSecretTemplateMD5AnnotationKey]
-	currTemplateValuesMD5 := secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
-	if currSecretTemplateMD5 != secretTemplateMD5 || currTemplateValuesMD5 != templateValuesMD5 {
-		patch := client.MergeFrom(secret.DeepCopy())
-		if err := setSecretContent(secret); err != nil {
-			return false, err
+		// set labels and annotations
+		if secret.Labels == nil {
+			secret.Labels = make(map[string]string)
 		}
+		secret.Labels[dataProtectionBackupRepoKey] = repo.Name
+
 		if secret.Annotations == nil {
 			secret.Annotations = make(map[string]string)
 		}
-		secret.Annotations[dataProtectionSecretTemplateMD5AnnotationKey] = secretTemplateMD5
-		secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey] = templateValuesMD5
-		err := r.Client.Patch(reqCtx.Ctx, secret, patch)
-		if err != nil {
-			return false, fmt.Errorf("failed to patch secret object %s: %w",
-				client.ObjectKeyFromObject(secret), err)
+		secret.Annotations[dataProtectionSecretTemplateMD5AnnotationKey] = templateMd5
+		secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey] = parametersMd5
+
+		if err := controllerutil.SetControllerReference(repo, secret, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set controller reference: %w", err)
 		}
-	}
-	return false, nil
+		return nil
+	}, shouldUpdateFunc)
 }
 
 func (r *BackupRepoReconciler) createStorageClass(
@@ -442,18 +455,12 @@ func (r *BackupRepoReconciler) createStorageClass(
 	storageClass.Name = repo.Status.GeneratedStorageClassName
 	return createObjectIfNotExist(reqCtx.Ctx, r.Client, storageClass,
 		func() error {
-			condType := ConditionTypeStorageClassCreated
-
 			// render storage class template
 			content, err := renderTemplate("sc", provider.Spec.StorageClassTemplate, renderCtx)
 			if err != nil {
-				_ = updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-					metav1.ConditionFalse, ReasonBadStorageClassTemplate, err.Error())
 				return fmt.Errorf("failed to render storage class template: %w", err)
 			}
 			if err = yaml.Unmarshal([]byte(content), storageClass); err != nil {
-				_ = updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-					metav1.ConditionFalse, ReasonBadStorageClassTemplate, err.Error())
 				return fmt.Errorf("failed to unmarshal storage class: %w", err)
 			}
 
@@ -467,8 +474,6 @@ func (r *BackupRepoReconciler) createStorageClass(
 				storageClass.ReclaimPolicy = &repo.Spec.PVReclaimPolicy
 			}
 			if err := controllerutil.SetControllerReference(repo, storageClass, r.Scheme); err != nil {
-				_ = updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-					metav1.ConditionUnknown, ReasonUnknownError, err.Error())
 				return fmt.Errorf("failed to set owner reference: %w", err)
 			}
 			return nil
@@ -476,26 +481,115 @@ func (r *BackupRepoReconciler) createStorageClass(
 }
 
 func (r *BackupRepoReconciler) checkPVCTemplate(reqCtx intctrlutil.RequestCtx,
-	renderCtx renderContext, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) error {
+	renderCtx renderContext, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) (err error) {
 
-	condType := ConditionTypePVCTemplateChecked
+	reason := ReasonUnknownError
+	defer func() {
+		condType := ConditionTypePVCTemplateChecked
+		status := metav1.ConditionFalse
+		var message string
+		if err == nil {
+			status = metav1.ConditionTrue
+			reason = ReasonPVCTemplateChecked
+		} else {
+			message = err.Error()
+		}
+		updateErr := updateCondition(reqCtx.Ctx, r.Client, repo,
+			condType, status, reason, message)
+		if err == nil {
+			err = updateErr
+		}
+	}()
+
+	if !repo.IsMountAccess() || provider.Spec.PersistentVolumeClaimTemplate == "" {
+		return nil
+	}
 	checkedTemplateMd5 := repo.Annotations[dataProtectionPVCTemplateMD5MD5AnnotationKey]
+	checkedParametersMd5 := repo.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
 	currentTemplateMd5 := md5Digest(provider.Spec.PersistentVolumeClaimTemplate)
-	if provider.Spec.PersistentVolumeClaimTemplate != "" && checkedTemplateMd5 != currentTemplateMd5 {
+	currentParametersMd5 := renderCtx.Md5OfParameters()
+	if checkedTemplateMd5 != currentTemplateMd5 || checkedParametersMd5 != currentParametersMd5 {
 		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.constructPVCByTemplate(renderCtx, pvc, repo, provider.Spec.PersistentVolumeClaimTemplate)
 		if err != nil {
-			_ = updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-				metav1.ConditionFalse, ReasonBadPVCTemplate, err.Error())
+			reason = ReasonBadPVCTemplate
 			return err
 		}
 	}
-	if err := updateCondition(reqCtx.Ctx, r.Client, repo, condType,
-		metav1.ConditionTrue, ReasonPVCTemplateChecked, ""); err != nil {
-		return err
-	}
 	return updateAnnotations(reqCtx.Ctx, r.Client, repo, map[string]string{
 		dataProtectionPVCTemplateMD5MD5AnnotationKey: currentTemplateMd5,
+		dataProtectionTemplateValuesMD5AnnotationKey: currentParametersMd5,
+	})
+}
+
+func (r *BackupRepoReconciler) checkAndUpdateDPTConfig(reqCtx intctrlutil.RequestCtx,
+	renderCtx renderContext, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) (err error) {
+
+	reason := ReasonUnknownError
+	defer func() {
+		condType := ConditionTypeDPTConfigChecked
+		status := metav1.ConditionFalse
+		var message string
+		if err == nil {
+			status = metav1.ConditionTrue
+			reason = ReasonDPTConfigChecked
+		} else {
+			message = err.Error()
+		}
+		updateErr := updateCondition(reqCtx.Ctx, r.Client, repo,
+			condType, status, reason, message)
+		if err == nil {
+			err = updateErr
+		}
+	}()
+
+	if !repo.IsDirectAccess() {
+		return nil
+	}
+	checkedTemplateMd5 := repo.Annotations[dataProtectionDPTConfigTemplateMD5MD5AnnotationKey]
+	checkedParametersMd5 := repo.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
+	currentTemplateMd5 := md5Digest(provider.Spec.DPTConfigTemplate)
+	currentParametersMd5 := renderCtx.Md5OfParameters()
+	if !(checkedTemplateMd5 != currentTemplateMd5 || checkedParametersMd5 != currentParametersMd5) {
+		return nil
+	}
+	// check dpt config template
+	content, err := renderTemplate("dpt-config", provider.Spec.DPTConfigTemplate, renderCtx)
+	if err != nil {
+		reason = ReasonBadDPTConfigTemplate
+		return err
+	}
+	// update existing dpt config secrets
+	secretList := &corev1.SecretList{}
+	err = r.Client.List(reqCtx.Ctx, secretList, client.MatchingLabels{
+		dataProtectionBackupRepoKey:  repo.Name,
+		dataProtectionIsDPTConfigKey: trueVal,
+	})
+	if err != nil {
+		return err
+	}
+	for idx := range secretList.Items {
+		secret := &secretList.Items[idx]
+		tmplMd5InSecret := secret.Annotations[dataProtectionDPTConfigTemplateMD5MD5AnnotationKey]
+		paramMd5InSecret := secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
+		if tmplMd5InSecret == currentTemplateMd5 && paramMd5InSecret == currentParametersMd5 {
+			continue
+		}
+		patch := client.MergeFrom(secret.DeepCopy())
+		constructDPTConfigSecret(secret, content)
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+		secret.Annotations[dataProtectionDPTConfigTemplateMD5MD5AnnotationKey] = currentTemplateMd5
+		secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey] = currentParametersMd5
+		if err = r.Client.Patch(reqCtx.Ctx, secret, patch); err != nil {
+			return err
+		}
+	}
+
+	return updateAnnotations(reqCtx.Ctx, r.Client, repo, map[string]string{
+		dataProtectionDPTConfigTemplateMD5MD5AnnotationKey: currentTemplateMd5,
+		dataProtectionTemplateValuesMD5AnnotationKey:       currentParametersMd5,
 	})
 }
 
@@ -537,12 +631,12 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 	return filtered, err
 }
 
-func (r *BackupRepoReconciler) createPVCForAssociatedBackups(
+func (r *BackupRepoReconciler) prepareForAssociatedBackups(
 	reqCtx intctrlutil.RequestCtx, renderCtx renderContext,
 	repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) error {
 
 	backups, err := r.listAssociatedBackups(reqCtx, repo, map[string]string{
-		dataProtectionNeedRepoPVCKey: trueVal,
+		dataProtectionWaitRepoPreparationKey: trueVal,
 	})
 	if err != nil {
 		return err
@@ -550,14 +644,26 @@ func (r *BackupRepoReconciler) createPVCForAssociatedBackups(
 	// return any error to reconcile the repo
 	var retErr error
 	for _, backup := range backups {
-		if err := r.checkOrCreatePVC(reqCtx, renderCtx, repo, provider, backup.Namespace); err != nil {
-			reqCtx.Log.Error(err, "failed to check or create PVC", "namespace", backup.Namespace)
-			retErr = err
-			continue
+		switch {
+		case repo.IsMountAccess():
+			if err := r.checkOrCreatePVC(reqCtx, renderCtx, repo, provider, backup.Namespace); err != nil {
+				reqCtx.Log.Error(err, "failed to check or create PVC", "namespace", backup.Namespace)
+				retErr = err
+				continue
+			}
+		case repo.IsDirectAccess():
+			if err := r.checkOrCreateDPTConfigSecret(reqCtx, renderCtx, repo, provider, backup.Namespace); err != nil {
+				reqCtx.Log.Error(err, "failed to check or create dpt config secret", "namespace", backup.Namespace)
+				retErr = err
+				continue
+			}
+		default:
+			retErr = fmt.Errorf("unknown access method: %s", repo.Spec.AccessMethod)
 		}
-		if backup.Labels[dataProtectionNeedRepoPVCKey] != "" {
+
+		if backup.Labels[dataProtectionWaitRepoPreparationKey] != "" {
 			patch := client.MergeFrom(backup.DeepCopy())
-			delete(backup.Labels, dataProtectionNeedRepoPVCKey)
+			delete(backup.Labels, dataProtectionWaitRepoPreparationKey)
 			if err = r.Client.Patch(reqCtx.Ctx, backup, patch); err != nil {
 				reqCtx.Log.Error(err, "failed to patch backup",
 					"backup", client.ObjectKeyFromObject(backup))
@@ -574,6 +680,8 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 	repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider, namespace string) error {
 
 	pvc := &corev1.PersistentVolumeClaim{}
+	pvc.Name = repo.Status.BackupPVCName
+	pvc.Namespace = namespace
 	_, err := createObjectIfNotExist(reqCtx.Ctx, r.Client, pvc,
 		func() error {
 			if provider.Spec.PersistentVolumeClaimTemplate != "" {
@@ -582,6 +690,9 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 				if err != nil {
 					return err
 				}
+				// overwrite PVC name and namespace
+				pvc.Name = repo.Status.BackupPVCName
+				pvc.Namespace = namespace
 			} else {
 				// set storage class name to PVC, other fields will be set with default value later
 				storageClassName := repo.Status.GeneratedStorageClassName
@@ -589,9 +700,6 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 					StorageClassName: &storageClassName,
 				}
 			}
-			// overwrite PVC name and namespace
-			pvc.Name = repo.Status.BackupPVCName
-			pvc.Namespace = namespace
 			// add a referencing label
 			if pvc.Labels == nil {
 				pvc.Labels = make(map[string]string)
@@ -613,6 +721,45 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = repo.Spec.VolumeCapacity
 			}
 			if err := controllerutil.SetControllerReference(repo, pvc, r.Scheme); err != nil {
+				return fmt.Errorf("failed to set owner reference: %w", err)
+			}
+			return nil
+		})
+
+	return err
+}
+
+func constructDPTConfigSecret(secret *corev1.Secret, content string) {
+	secret.Data = map[string][]byte{
+		"dpt.conf": []byte(content),
+	}
+}
+
+func (r *BackupRepoReconciler) checkOrCreateDPTConfigSecret(
+	reqCtx intctrlutil.RequestCtx, renderCtx renderContext,
+	repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider, namespace string) error {
+
+	secret := &corev1.Secret{}
+	secret.Name = repo.Status.DPTConfigSecretName
+	secret.Namespace = namespace
+	_, err := createObjectIfNotExist(reqCtx.Ctx, r.Client, secret,
+		func() error {
+			content, err := renderTemplate("dpt-config", provider.Spec.DPTConfigTemplate, renderCtx)
+			if err != nil {
+				return fmt.Errorf("failed to render dpt config template: %w", err)
+			}
+			constructDPTConfigSecret(secret, content)
+
+			// add a referencing label
+			secret.Labels = map[string]string{
+				dataProtectionBackupRepoKey:  repo.Name,
+				dataProtectionIsDPTConfigKey: trueVal,
+			}
+			secret.Annotations = map[string]string{
+				dataProtectionTemplateValuesMD5AnnotationKey:       renderCtx.Md5OfParameters(),
+				dataProtectionDPTConfigTemplateMD5MD5AnnotationKey: md5Digest(provider.Spec.DPTConfigTemplate),
+			}
+			if err := controllerutil.SetControllerReference(repo, secret, r.Scheme); err != nil {
 				return fmt.Errorf("failed to set owner reference: %w", err)
 			}
 			return nil
@@ -682,7 +829,7 @@ func (r *BackupRepoReconciler) deleteExternalResources(
 		return err
 	}
 
-	// delete derived secrets
+	// delete derived secrets (secret for CSI and DPT configs)
 	if err := r.deleteSecrets(reqCtx, repo); err != nil {
 		return err
 	}
@@ -787,9 +934,9 @@ func (r *BackupRepoReconciler) mapBackupToRepo(obj client.Object) []ctrl.Request
 		return nil
 	}
 	// we should reconcile the BackupRepo when:
-	//   1. the Backup needs a PVC which is not present and should be created by the BackupRepo.
+	//   1. the Backup needs to use the BackupRepo, but it's not ready for the namespace.
 	//   2. the Backup is being deleted, because it may block the deletion of the BackupRepo.
-	shouldReconcileRepo := backup.Labels[dataProtectionNeedRepoPVCKey] == trueVal ||
+	shouldReconcileRepo := backup.Labels[dataProtectionWaitRepoPreparationKey] == trueVal ||
 		!backup.DeletionTimestamp.IsZero()
 	if shouldReconcileRepo {
 		return []ctrl.Request{{
@@ -845,6 +992,15 @@ type renderContext struct {
 	Parameters                map[string]string
 	CSIDriverSecretRef        corev1.SecretReference
 	GeneratedStorageClassName string
+
+	md5OfParameters string
+}
+
+func (r *renderContext) Md5OfParameters() string {
+	if r.md5OfParameters == "" {
+		r.md5OfParameters = md5Digest(stableSerializeMap(r.Parameters))
+	}
+	return r.md5OfParameters
 }
 
 func renderTemplate(name, tpl string, rCtx renderContext) (string, error) {
@@ -858,19 +1014,24 @@ func renderTemplate(name, tpl string, rCtx renderContext) (string, error) {
 	return b.String(), err
 }
 
-func createObjectIfNotExist(
+func createOrUpdateObject[T any, PT generics.PObject[T]](
 	ctx context.Context,
 	c client.Client,
-	obj client.Object,
-	mutateFunc func() error) (created bool, err error) {
+	obj PT,
+	mutateFunc func() error,
+	shouldUpdate func() bool) (created bool, err error) {
 	key := client.ObjectKeyFromObject(obj)
 	err = c.Get(ctx, key, obj)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return false, fmt.Errorf("failed to check existence of object: %w", err)
+		return false, fmt.Errorf("failed to check existence of object %s: %w", key, err)
 	}
+	var patch client.Patch
 	if err == nil {
-		// already exists
-		return false, nil
+		// object already exists, check if it needs to be updated
+		if !shouldUpdate() {
+			return false, nil
+		}
+		patch = client.MergeFrom(PT(obj.DeepCopy()))
 	}
 	if mutateFunc != nil {
 		err := mutateFunc()
@@ -878,12 +1039,28 @@ func createObjectIfNotExist(
 			return false, err
 		}
 	}
-	err = c.Create(ctx, obj)
-	if err != nil {
-		return false, fmt.Errorf("failed to create object %s: %w",
-			client.ObjectKeyFromObject(obj), err)
+	if patch != nil {
+		err = c.Patch(ctx, obj, patch)
+		if err != nil {
+			err = fmt.Errorf("failed to patch object %s: %w", key, err)
+		}
+		return false, err
+	} else {
+		err = c.Create(ctx, obj)
+		if err != nil {
+			return false, fmt.Errorf("failed to create object %s: %w", key, err)
+		}
+		return true, nil
 	}
-	return true, nil
+}
+
+func createObjectIfNotExist[T any, PT generics.PObject[T]](
+	ctx context.Context,
+	c client.Client,
+	obj PT,
+	mutateFunc func() error) (created bool, err error) {
+	noUpdate := func() bool { return false }
+	return createOrUpdateObject(ctx, c, obj, mutateFunc, noUpdate)
 }
 
 func setCondition(

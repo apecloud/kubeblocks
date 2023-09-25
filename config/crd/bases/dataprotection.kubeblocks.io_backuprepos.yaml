@@ -51,6 +51,13 @@ spec:
           spec:
             description: BackupRepoSpec defines the desired state of BackupRepo
             properties:
+              accessMethod:
+                default: Mount
+                description: Specifies the access method of the backup repo.
+                enum:
+                - Mount
+                - Direct
+                type: string
               config:
                 additionalProperties:
                   type: string
@@ -170,6 +177,10 @@ spec:
                   - type
                   type: object
                 type: array
+              dptConfigSecretName:
+                description: dptConfigSecretName is the name of the secret which contains
+                  the config for the dpt command.
+                type: string
               generatedCSIDriverSecret:
                 description: generatedCSIDriverSecret references the generated secret
                   used by the CSI driver.

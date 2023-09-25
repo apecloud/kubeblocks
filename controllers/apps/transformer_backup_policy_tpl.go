@@ -63,7 +63,7 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 	r.ClusterTransformContext = ctx.(*ClusterTransformContext)
 	clusterDefName := r.ClusterDef.Name
 	backupPolicyTpls := &appsv1alpha1.BackupPolicyTemplateList{}
-	if err := r.Client.List(r.Context, backupPolicyTpls,
+	if err = r.Client.List(r.Context, backupPolicyTpls,
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
 		return err
 	}
@@ -121,7 +121,8 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 				}
 
 				// only create backup schedule for the default backup policy template
-				if r.isDefaultTemplate != trueVal {
+				// if there are multiple backup policy templates.
+				if r.isDefaultTemplate != trueVal && r.tplCount > 1 {
 					return
 				}
 

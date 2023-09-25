@@ -5,8 +5,6 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{ - include "postgresql.labels" . | nindent 4 }}
-  annotations:
-    dataprotection.kubeblocks.io/is-default-policy-template: "true"
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:

@@ -24,7 +24,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/cobra"
+	clientfake "k8s.io/client-go/rest/fake"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 const singleFlags = `{
@@ -356,12 +358,27 @@ var _ = Describe("flag", func() {
 		}
 	})
 
-	Context("test getClusterByName ", func() {
-		It("get cluster cluster", func() {
-			dynamic := testing.FakeDynamicClient(testing.FakeCluster("test", "test"))
-			c, err := getClusterByName(dynamic, "test", "test")
-			Expect(err).Should(Succeed())
-			Expect(c).ShouldNot(BeNil())
+	Context("test autoCompleteClusterComponent ", func() {
+		var tf *cmdtesting.TestFactory
+		var flag string
+		BeforeEach(func() {
+			tf = cmdtesting.NewTestFactory()
+			fakeCluster := testing.FakeCluster("fake-cluster", "")
+			tf.FakeDynamicClient = testing.FakeDynamicClient(fakeCluster)
+			tf.Client = &clientfake.RESTClient{}
+			cmd = &cobra.Command{
+				Use:   "test",
+				Short: "test for autoComplete",
+			}
+			cmd.Flags().StringVar(&flag, "component", "", "test")
+		})
+
+		AfterEach(func() {
+			tf.Cleanup()
+		})
+
+		It("test build autoCompleteClusterComponent", func() {
+			Expect(autoCompleteClusterComponent(cmd, tf, "component")).Should(Succeed())
 		})
 	})
 })

@@ -35,6 +35,6 @@ storage: 20
 
 ## @param patroni etcd cluster name, if not set will use the cluster name "etcd"
 ## and the cluster must exist,
-etcdName: "etcd"
-
-etcdNamespace: ""
+etcd:
+  host: etcd-etcd
+  port: 2379

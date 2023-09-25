@@ -10,7 +10,7 @@ spec:
   backup:
     backupData:
       image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
-      scheduleToTargetPodNode: true
+      runOnTargetPodNode: true
       command:
       - sh
       - -c

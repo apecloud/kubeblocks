@@ -88,7 +88,7 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 		case batchv1.JobComplete:
 			return sb.phase(dpv1alpha1.ActionPhaseCompleted).
 				completionTimestamp(nil).
-				reason("JobCompleted").
+				reason("").
 				build(), nil
 		case batchv1.JobFailed:
 			return sb.phase(dpv1alpha1.ActionPhaseFailed).

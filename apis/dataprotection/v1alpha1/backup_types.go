@@ -56,8 +56,10 @@ type BackupSpec struct {
 	// +optional
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 
+	// parentBackupName determines the parent backup name for incremental or
+	// differential backup.
 	// +optional
-	ParentBackupName string `json:"formatVersion,omitempty"`
+	ParentBackupName string `json:"parentBackupName,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup.

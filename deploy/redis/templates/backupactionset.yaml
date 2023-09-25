@@ -17,7 +17,7 @@ spec:
     postBackup: []
     backupData:
       image: {{ include "redis.image" . }}
-      scheduleToTargetPodNode: true
+      runOnTargetPodNode: true
       syncProgress:
         enabled: true
         intervalSeconds: 5

@@ -174,12 +174,12 @@ type JobActionSpec struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// scheduleToTargetPodNode specifies whether to schedule the job workload
-	// to the target pod node. If backup container should mount the target pod's
+	// runOnTargetPodNode specifies whether to run the job workload on the
+	// target pod node. If backup container should mount the target pod's
 	// volume, this field should be set to true.
 	// +optional
 	// +kubebuilder:default=false
-	ScheduleToTargetPodNode *bool `json:"scheduleToTargetPodNode,omitempty"`
+	RunOnTargetPodNode *bool `json:"runOnTargetPodNode,omitempty"`
 
 	// command specifies the commands to back up the volume data.
 	// +kubebuilder:validation:Required

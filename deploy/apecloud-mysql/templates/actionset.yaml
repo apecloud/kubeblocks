@@ -22,7 +22,7 @@ spec:
     postBackup: []
     backupData:
       image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
-      scheduleToTargetPodNode: true
+      runOnTargetPodNode: true
       command:
       - sh
       - -c

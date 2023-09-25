@@ -341,7 +341,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 		},
 	}
 
-	if boolptr.IsSetToTrue(job.ScheduleToTargetPodNode) {
+	if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
 		podSpec.NodeSelector = map[string]string{
 			corev1.LabelHostname: targetPod.Spec.NodeName,
 		}

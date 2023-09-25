@@ -66,7 +66,7 @@ type BackupTarget struct {
 	Resources *KubeResources `json:"resources,omitempty"`
 
 	// serviceAccountName specifies the service account to run the backup workload.
-	// +optional
+	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 

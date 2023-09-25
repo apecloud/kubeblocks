@@ -356,7 +356,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				jobBuilder.addToSpecificVolumesAndMounts(&volume, &volumeMount)
 			}
 		}
-		if boolptr.IsSetToTrue(actionSpec.Job.ScheduleToTargetPodNode) {
+		if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 			jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
 		}
 		job := jobBuilder.setImage(actionSpec.Job.Image).

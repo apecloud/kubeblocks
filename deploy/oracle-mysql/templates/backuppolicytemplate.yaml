@@ -9,14 +9,24 @@ spec:
   clusterDefinitionRef: oracle-mysql
   backupPolicies:
   - componentDefRef: mysql-compdef
-    schedule:
-      snapshot:
-        enable: true
-        cronExpression: "0 18 * * *"
-      datafile:
-        enable: false
-        cronExpression: "0 18 * * *"
-    snapshot:
-      backupsHistoryLimit: 5
-    datafile:
-      backupToolName: oracle-mysql-xtrabackup
+    retentionPeriod: 7d
+    backupMethods:
+    - name: xtrabackup
+      snapshotVolumes: false
+      actionSetName: oracle-mysql-xtrabackup
+      targetVolumes:
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.dataMountPath }}
+    - name: volume-snapshot
+      snapshotVolumes: true
+      targetVolumes:
+        volumes:
+        - data
+    schedules:
+    - backupMethod: datafile
+      enabled: false
+      cronExpression: "0 18 * * 0"
+    - backupMethod: volume-snapshot
+      enabled: false
+      cronExpression: "0 18 * * 0"

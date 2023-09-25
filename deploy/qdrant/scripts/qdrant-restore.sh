@@ -9,7 +9,7 @@ if [ ! -z "${res}" ]; then
 fi
 
 # start qdrant restore process
-qdrant --storage-snapshot ${BACKUP_DIR}/${BACKUP_NAME}  --config-path /qdrant/config/config.yaml  --force-snapshot --uri http://localhost:6333 &
+qdrant --storage-snapshot ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}  --config-path /qdrant/config/config.yaml  --force-snapshot --uri http://localhost:6333 &
 
 # wait until restore finished
 until curl http://localhost:6333/cluster; do sleep 1; done

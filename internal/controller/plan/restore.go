@@ -198,6 +198,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent, backu
 		rsmAccessModeLabelKey := "rsm.workloads.kubeblocks.io/access-mode"
 		jobActionLabels[rsmAccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
 	}
+	// TODO: get connect credential from backupPolicyTemplate
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PostReady),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -302,6 +303,9 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 
 // createRestoreAndWait create the restore CR and wait for completion.
 func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error {
+	if restore == nil {
+		return nil
+	}
 	if r.Scheme != nil {
 		_ = controllerutil.SetControllerReference(r.Cluster, restore, r.Scheme)
 	}

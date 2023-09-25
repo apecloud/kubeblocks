@@ -631,7 +631,7 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 			{
 				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/mongo:5.0.14",
 				Command: []string{
-					"Status=$(export CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`; $CLIENT -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --quiet --eval \"JSON.stringify(rs.status())\") &&",
+					"Status=$(export CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`; $CLIENT -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --authenticationDatabase admin --quiet --eval \"JSON.stringify(rs.status())\") &&",
 					"MyState=$(echo $Status | jq '.myState') &&",
 					"echo $Status | jq \".members[] | select(.state == ($MyState | tonumber)) | .stateStr\" |tr '[:upper:]' '[:lower:]' | xargs echo -n",
 				},

@@ -199,7 +199,7 @@ func (r *restoreJobBuilder) addCommonEnv() *restoreJobBuilder {
 }
 
 func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod, connectCredential *dpv1alpha1.ConnectCredential) *restoreJobBuilder {
-	if pod != nil {
+	if pod == nil {
 		return r
 	}
 	var env []corev1.EnvVar
@@ -207,28 +207,26 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod, connec
 	if len(pod.Spec.Containers) != 0 {
 		env = pod.Spec.Containers[0].Env
 	}
-	if connectCredential == nil {
-		return r
-	}
-	appendEnvFromSecret := func(envName, keyName string) {
-		if keyName != "" {
-			env = append(env, corev1.EnvVar{Name: envName, ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: connectCredential.SecretName,
+	env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
+	if connectCredential != nil {
+		appendEnvFromSecret := func(envName, keyName string) {
+			if keyName != "" {
+				env = append(env, corev1.EnvVar{Name: envName, ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: connectCredential.SecretName,
+						},
+						Key: keyName,
 					},
-					Key: keyName,
-				},
-			}})
+				}})
+			}
 		}
-	}
-	appendEnvFromSecret(dptypes.DPDBUser, connectCredential.UsernameKey)
-	appendEnvFromSecret(dptypes.DPDBPassword, connectCredential.PasswordKey)
-	appendEnvFromSecret(dptypes.DPDBPort, connectCredential.PortKey)
-	if connectCredential.HostKey == "" {
-		env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-	} else {
-		appendEnvFromSecret(dptypes.DPDBHost, connectCredential.HostKey)
+		appendEnvFromSecret(dptypes.DPDBUser, connectCredential.UsernameKey)
+		appendEnvFromSecret(dptypes.DPDBPassword, connectCredential.PasswordKey)
+		appendEnvFromSecret(dptypes.DPDBPort, connectCredential.PortKey)
+		if connectCredential.HostKey != "" {
+			appendEnvFromSecret(dptypes.DPDBHost, connectCredential.HostKey)
+		}
 	}
 	r.env = utils.MergeEnv(r.env, env)
 	return r

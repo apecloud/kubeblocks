@@ -31,6 +31,7 @@ then
   $CLIENT --quiet --port $PORT_FOR_RESTORE admin --eval 'db.dropUser("root", {w: "majority", wtimeout: 4000})' || true
   kill $PID
   wait $PID
+  echo "INFO: restore set-up configuration successfully."
   rm $BACKUPFILE
 fi
 

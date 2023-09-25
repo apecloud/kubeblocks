@@ -194,7 +194,13 @@ func (ha *Ha) Start() {
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
 		if ok, _ := ha.dbManager.IsLeader(context.Background(), cluster); ok {
-			_ = ha.dcs.Initialize()
+			err := ha.dcs.Initialize()
+			if err != nil {
+				ha.logger.Warnf("DCS initialize failed: %v", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
 			break
 		}
 		ha.logger.Infof("Waiting for the database Leader to be ready.")

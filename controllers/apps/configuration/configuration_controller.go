@@ -137,7 +137,7 @@ func (r *ConfigurationReconciler) runTasks(
 		nil,
 		fetcher.ClusterVerComObj)
 	if err != nil {
-		return
+		return err
 	}
 
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
@@ -163,7 +163,7 @@ func (r *ConfigurationReconciler) runTasks(
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {
-		return
+		return nil
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -177,6 +177,10 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
+	if item.ConfigSpec == nil {
+		ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", item), "")
+		return nil
+	}
 	for i := range status.ConfigurationItemStatus {
 		itemStatus := &status.ConfigurationItemStatus[i]
 		switch {

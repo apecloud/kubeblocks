@@ -9,6 +9,8 @@ sidebar_position: 1
 
 The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
 
+From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
+
 ## View parameter information
 
 View the current configuration file of a cluster.
@@ -62,7 +64,9 @@ You can also view the details of this configuration file and parameters.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. Currerntly, Kafka only supports static strategy, i.e. `Dynamic` is `false`. Restarting is required to make reconfiguration effective since using kbcli to configure parameters triggers broker restarting.
   * Description: It describes the parameter definition.
 
-## Reconfigure static parameters
+## Reconfigure parameters with configure command
+
+### Reconfigure static parameters
 
 Static parameter reconfiguring requires restarting the pod.
 
@@ -145,6 +149,43 @@ Static parameter reconfiguring requires restarting the pod.
    log.cleanup.policy = compact
    mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        Sep 14,2023 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
    ```
+
+## Reconfigure parameters with edit-config command
+
+For your convenience, kbcli offers a tool `edit-config` to help you to configure parameter in a visulized way.
+
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+
+1. Edit the configuration file.
+
+   ```bash
+   kbcli cluster edit-config mykafka
+   ```
+
+:::note
+
+If there are multiple components in a cluster, use `--component` to specify a component.
+
+:::
+
+2. View the status of the parameter reconfiguration.
+
+   ```bash
+   kbcli cluster describe-ops xxx -n default
+   ```
+
+3. Connect to the database to verify whether the parameters are modified
+
+   ```bash
+   kbcli cluster connect mykafka
+   ```
+
+:::note
+
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported in later version.
+
+:::
 
 ## View history and compare differences
 

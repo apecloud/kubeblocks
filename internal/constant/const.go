@@ -34,6 +34,7 @@ const (
 	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap containing the persistentVolume template.
 	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace containing the persistentVolume template.
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
+	CfgKeyProvider                      = "KUBE_PROVIDER"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -63,7 +64,6 @@ const (
 
 const (
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
-	KBProbeImage             = "KUBEBLOCKS_PROBE_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
@@ -229,7 +229,7 @@ const (
 	ProbeHTTPPortName                  = "probe-http-port"
 	ProbeGRPCPortName                  = "probe-grpc-port"
 	ProbeInitContainerName             = "kb-initprobe"
-	LorryContainerName                 = "kb-lorry"
+	WeSyncerContainerName              = "kb-we-syncer"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"

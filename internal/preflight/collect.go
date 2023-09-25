@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -328,7 +327,7 @@ func handleStorageClassError(ctx context.Context, _ preflight.CollectOpts, clien
 		return
 	}
 	var errorStrs []string
-	if err := json.Unmarshal(storageClassError, &errorStrs); err != nil || len(errorStrs) == 0 || !isMetricsUnavailableError(errorStrs[0]) {
+	if err := json.Unmarshal(storageClassError, &errorStrs); err != nil || len(errorStrs) == 0 {
 		return
 	}
 	storageClasses, err := client.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
@@ -352,10 +351,6 @@ func handleStorageClassError(ctx context.Context, _ preflight.CollectOpts, clien
 		return
 	}
 	data[StorageClassPath] = scBytes
-}
-
-func isMetricsUnavailableError(str string) bool {
-	return strings.Contains(str, "the server is currently unable to handle the request")
 }
 
 func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.HostPreflight, f cmdutil.Factory, progressCh chan interface{}) (*preflight.CollectResult, error) {

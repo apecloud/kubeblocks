@@ -873,6 +873,48 @@ spec:
                       required:
                       - leader
                       type: object
+                    membersStatus:
+                      description: members' status.
+                      items:
+                        properties:
+                          podName:
+                            default: Unknown
+                            description: PodName pod name.
+                            type: string
+                          role:
+                            properties:
+                              accessMode:
+                                default: ReadWrite
+                                description: AccessMode, what service this member
+                                  capable.
+                                enum:
+                                - None
+                                - Readonly
+                                - ReadWrite
+                                type: string
+                              canVote:
+                                default: true
+                                description: CanVote, whether this member has voting
+                                  rights
+                                type: boolean
+                              isLeader:
+                                default: false
+                                description: IsLeader, whether this member is the
+                                  leader
+                                type: boolean
+                              name:
+                                default: leader
+                                description: Name, role name.
+                                type: string
+                            required:
+                            - accessMode
+                            - name
+                            type: object
+                        required:
+                        - podName
+                        - role
+                        type: object
+                      type: array
                     message:
                       additionalProperties:
                         type: string

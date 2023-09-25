@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package factory
 
 import (
-	"embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -32,14 +31,12 @@ import (
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -60,53 +57,6 @@ const (
 	KeyName    = "tls.key"
 	MountPath  = "/etc/pki/tls"
 )
-
-var (
-	//go:embed cue/*
-	cueTemplates embed.FS
-	cacheCtx     = map[string]interface{}{}
-)
-
-func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, error)) (*intctrlutil.CUETpl, error) {
-	vIf, ok := cacheCtx[key]
-	if ok {
-		return vIf.(*intctrlutil.CUETpl), nil
-	}
-	v, err := valueCreator()
-	if err != nil {
-		return nil, err
-	}
-	cacheCtx[key] = v
-	return v, err
-}
-
-func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, target any) error {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := getCacheCUETplValue(tplName, func() (*intctrlutil.CUETpl, error) {
-		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))
-	})
-	if err != nil {
-		return err
-	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	for k, v := range fillMap {
-		if err := cueValue.FillObj(k, v); err != nil {
-			return err
-		}
-	}
-
-	b, err := cueValue.Lookup(lookupKey)
-	if err != nil {
-		return err
-	}
-
-	if err = json.Unmarshal(b, target); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
@@ -244,94 +194,6 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 			}
 		}
 	}
-}
-
-func BuildSvcListWithCustomAttributes(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
-	customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
-	services := BuildSvcList(cluster, component)
-	if customAttributeSetter != nil {
-		for _, svc := range services {
-			customAttributeSetter(svc)
-		}
-	}
-	return services, nil
-}
-
-func BuildSvcList(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) []*corev1.Service {
-	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
-	selectors := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	delete(selectors, constant.AppNameLabelKey)
-	var result = make([]*corev1.Service, 0)
-	for _, item := range component.Services {
-		if len(item.Spec.Ports) == 0 {
-			continue
-		}
-		name := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
-		if len(item.Name) > 0 {
-			name = fmt.Sprintf("%s-%s-%s", cluster.Name, component.Name, item.Name)
-		}
-
-		svcBuilder := builder.NewServiceBuilder(cluster.Namespace, name).
-			AddLabelsInMap(wellKnownLabels).
-			AddAnnotationsInMap(item.Annotations).
-			AddSelectorsInMap(selectors).
-			AddPorts(item.Spec.Ports...)
-		if len(item.Spec.Type) > 0 {
-			svcBuilder.SetType(item.Spec.Type)
-		}
-		svc := svcBuilder.GetObject()
-		result = append(result, svc)
-	}
-	return result
-}
-
-func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *corev1.Service {
-	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
-	monitorAnnotations := func() map[string]string {
-		annotations := make(map[string]string, 0)
-		falseStr := "false"
-		trueStr := "true"
-		switch {
-		case !component.Monitor.Enable:
-			annotations["monitor.kubeblocks.io/scrape"] = falseStr
-			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
-		case component.Monitor.BuiltIn:
-			annotations["monitor.kubeblocks.io/scrape"] = falseStr
-			annotations["monitor.kubeblocks.io/agamotto"] = trueStr
-		default:
-			annotations["monitor.kubeblocks.io/scrape"] = trueStr
-			annotations["monitor.kubeblocks.io/path"] = component.Monitor.ScrapePath
-			annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(component.Monitor.ScrapePort))
-			annotations["monitor.kubeblocks.io/scheme"] = "http"
-			annotations["monitor.kubeblocks.io/agamotto"] = falseStr
-		}
-		return annotations
-	}()
-	servicePorts := func() []corev1.ServicePort {
-		var servicePorts []corev1.ServicePort
-		for _, container := range component.PodSpec.Containers {
-			for _, port := range container.Ports {
-				servicePort := corev1.ServicePort{
-					Name:       port.Name,
-					Protocol:   port.Protocol,
-					Port:       port.ContainerPort,
-					TargetPort: intstr.FromString(port.Name),
-				}
-				servicePorts = append(servicePorts, servicePort)
-			}
-		}
-		return servicePorts
-	}()
-	return builder.NewHeadlessServiceBuilder(cluster.Namespace, fmt.Sprintf("%s-%s-headless", cluster.Name, component.Name)).
-		AddLabelsInMap(wellKnownLabels).
-		AddAnnotationsInMap(monitorAnnotations).
-		AddSelector(constant.AppInstanceLabelKey, cluster.Name).
-		AddSelector(constant.AppManagedByLabelKey, constant.AppName).
-		AddSelector(constant.KBAppComponentLabelKey, component.Name).
-		AddPorts(servicePorts...).
-		GetObject()
 }
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
@@ -888,25 +750,6 @@ func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddSelectorsInMap(wellKnownLabels).
 		GetObject()
-}
-
-func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string) (*appsv1.Deployment, error) {
-	const tplFile = "deployment_template.cue"
-	deploy := appsv1.Deployment{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   cluster,
-		"component": component,
-	}, "deployment", &deploy); err != nil {
-		return nil, err
-	}
-
-	if component.StatelessSpec != nil {
-		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
-	}
-	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &deploy.Spec.Template.Spec); err != nil {
-		return nil, err
-	}
-	return &deploy, nil
 }
 
 func BuildPVC(cluster *appsv1alpha1.Cluster,

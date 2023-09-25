@@ -26,6 +26,39 @@ import (
 	"github.com/pkg/errors"
 )
 
+type execCommand struct {
+	*exec.Cmd
+}
+
+func (cmd *execCommand) BindStdout(stdout *bytes.Buffer) {
+	cmd.Stdout = stdout
+}
+
+func (cmd *execCommand) BindStdErr(stderr *bytes.Buffer) {
+	cmd.Stderr = stderr
+}
+
+func newExecCommander(name string, args ...string) LocalCommand {
+	execCmd := exec.Command(name, args...)
+	return &execCommand{Cmd: execCmd}
+}
+
+var localCommander = newExecCommander
+
+func ExecCommand(name string, args ...string) (string, error) {
+	var stdout, stderr bytes.Buffer
+	cmd := localCommander(name, args...)
+	cmd.BindStdout(&stdout)
+	cmd.BindStdErr(&stderr)
+
+	err := cmd.Run()
+	if err != nil || stderr.String() != "" {
+		return "", errors.Errorf("exec command %s failed, err:%v, stderr:%s", name, err, stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
 func Psql(args ...string) (string, error) {
 	return ExecCommand("psql", args...)
 }
@@ -44,18 +77,4 @@ func PgWalDump(args ...string) (string, error) {
 
 func PgRewind(args ...string) (string, error) {
 	return ExecCommand("pg_rewind", args...)
-}
-
-func ExecCommand(name string, args ...string) (string, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command(name, args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		return "", errors.Errorf("exec command %s failed, err:%v, stderr:%s", name, err, stderr.String())
-	}
-
-	return stdout.String(), nil
 }

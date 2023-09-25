@@ -876,6 +876,25 @@ func TestGetDBState(t *testing.T) {
 		assert.Nil(t, dbState)
 	})
 
+	t.Run("get pg control data failed", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectQuery("pg_last_wal_replay_lsn()").
+			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(23454272))
+		mock.ExpectQuery("pg_catalog.pg_last_wal_receive_lsn()").
+			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(23454273))
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"received_tli"}).AddRow(1))
+		mock.ExpectQuery("pg_catalog.pg_settings").
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application", "postmaster"))
+
+		dbState := manager.GetDBState(ctx, cluster)
+		assert.Nil(t, dbState)
+	})
+
 	t.Run("get db state success", func(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
@@ -901,6 +920,7 @@ func TestGetDBState(t *testing.T) {
 		assert.Equal(t, "1", dbState.Extra[postgres.TimeLine])
 		assert.Equal(t, "maple72-postgresql-0.maple72-postgresql-headless", manager.recoveryParams[postgres.PrimaryConnInfo]["host"])
 		assert.Equal(t, "postmaster", manager.recoveryParams[postgres.PrimaryConnInfo]["context"])
+		assert.Equal(t, "shut down", manager.pgControlData["Database cluster state"])
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {

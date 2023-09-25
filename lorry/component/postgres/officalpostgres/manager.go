@@ -45,6 +45,7 @@ type Manager struct {
 	postgres.Manager
 	syncStandbys   *postgres.PGStandby
 	recoveryParams map[string]map[string]string
+	pgControlData  map[string]string
 }
 
 var Mgr *Manager
@@ -91,6 +92,7 @@ func (mgr *Manager) cleanDBState() {
 	mgr.UnsetIsLeader()
 	mgr.recoveryParams = nil
 	mgr.syncStandbys = nil
+	mgr.pgControlData = nil
 	mgr.DBState = &dcs.DBState{
 		Extra: map[string]string{},
 	}
@@ -143,6 +145,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		}
 		mgr.recoveryParams = recoveryParams
 	}
+
+	pgControlData := mgr.getPgControlData()
+	if pgControlData == nil {
+		mgr.Logger.Error(err, "get pg controlData failed")
+		return nil
+	}
+	mgr.pgControlData = pgControlData
 
 	return mgr.DBState
 }
@@ -425,7 +434,8 @@ func (mgr *Manager) canRewind() bool {
 		return false
 	}
 
-	return true
+	pgControlData := mgr.getPgControlData()
+	return pgControlData["wal_log_hints setting"] == "on" || pgControlData["Data page checksum version"] != "0"
 }
 
 func (mgr *Manager) executeRewind() error {
@@ -544,14 +554,14 @@ func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64)
 	var timeLine, lsn int64
 
 	pgControlData := mgr.getPgControlData()
-	if slices.Contains([]string{"shut down in recovery", "in archive recovery"}, (*pgControlData)["Database cluster state"]) {
+	if slices.Contains([]string{"shut down in recovery", "in archive recovery"}, (pgControlData)["Database cluster state"]) {
 		inRecovery = true
-		lsnStr = (*pgControlData)["Minimum recovery ending location"]
-		timeLineStr = (*pgControlData)["Min recovery ending loc's timeline"]
-	} else if (*pgControlData)["Database cluster state"] == "shut down" {
+		lsnStr = (pgControlData)["Minimum recovery ending location"]
+		timeLineStr = (pgControlData)["Min recovery ending loc's timeline"]
+	} else if (pgControlData)["Database cluster state"] == "shut down" {
 		inRecovery = false
-		lsnStr = (*pgControlData)["Latest checkpoint location"]
-		timeLineStr = (*pgControlData)["Latest checkpoint's TimeLineID"]
+		lsnStr = (pgControlData)["Latest checkpoint location"]
+		timeLineStr = (pgControlData)["Latest checkpoint's TimeLineID"]
 	}
 
 	if lsnStr != "" {
@@ -623,24 +633,27 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context, host string) int64 
 	return cast.ToInt64(resMap[0]["received_tli"])
 }
 
-func (mgr *Manager) getPgControlData() *map[string]string {
+func (mgr *Manager) getPgControlData() map[string]string {
+	if mgr.pgControlData != nil {
+		return mgr.pgControlData
+	}
+
 	result := map[string]string{}
 
 	resp, err := postgres.ExecCommand("pg_controldata")
 	if err != nil {
 		mgr.Logger.Error(err, "get pg control data failed")
-		return &result
+		return nil
 	}
 
-	stdoutList := strings.Split(resp, "\n")
-	for _, s := range stdoutList {
+	controlDataList := strings.Split(resp, "\n")
+	for _, s := range controlDataList {
 		out := strings.Split(s, ":")
 		if len(out) == 2 {
 			result[out[0]] = strings.TrimSpace(out[1])
 		}
 	}
-
-	return &result
+	return result
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {

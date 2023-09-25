@@ -220,7 +220,7 @@ parameters:
 			obj.Namespace = testCtx.DefaultNamespace
 			obj.Labels = map[string]string{
 				dataProtectionBackupRepoKey:          repoKey.Name,
-				dataProtectionWaitRepoPreparationKey: "true",
+				dataProtectionWaitRepoPreparationKey: trueVal,
 			}
 			obj.Spec.BackupType = dpv1alpha1.BackupTypeSnapshot
 			obj.Spec.BackupPolicyName = "default"
@@ -694,12 +694,10 @@ cred-key2={{ index .Parameters "cred-key2" }}
 					repo = obj
 				})).Should(Succeed())
 
-				backup = createBackupSpec(func(backup *dpv1alpha1.Backup) {
-					backup.Namespace = testCtx.DefaultNamespace
-				})
+				backup = createBackupSpec(nil)
 				dptConfigSecretKey = types.NamespacedName{
 					Name:      repo.Status.DPTConfigSecretName,
-					Namespace: testCtx.DefaultNamespace,
+					Namespace: backup.Namespace,
 				}
 				Eventually(testapps.CheckObjExists(&testCtx, dptConfigSecretKey, &corev1.Secret{}, true)).Should(Succeed())
 			})

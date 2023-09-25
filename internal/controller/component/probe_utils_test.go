@@ -44,7 +44,7 @@ var _ = Describe("probe_utils", func() {
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			container = buildLorryContainer()
+			container = buildBasicContainer()
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}

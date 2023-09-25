@@ -53,8 +53,8 @@ var (
 )
 
 func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
-	container := buildLorryContainer()
-	lorryContainers := []corev1.Container{}
+	container := buildBasicContainer()
+	var lorryContainers []corev1.Container
 	componentLorry := component.Probes
 	if componentLorry == nil {
 		return nil
@@ -95,17 +95,23 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		lorryContainers = append(lorryContainers, *c)
 	}
 
-	if len(lorryContainers) >= 1 {
-		container := &lorryContainers[0]
-		buildLorryServiceContainer(component, container, int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
+	// inject WeSyncer(currently part of Lorry) in cluster controller.
+	// as all the above features share the lorry service, only one lorry need to be injected.
+	// if none of the above feature enabled, WeSyncer still need to be injected for the HA feature functions well.
+	if len(lorryContainers) == 0 {
+		weSyncerContainer := container.DeepCopy()
+		buildWeSyncerContainer(weSyncerContainer, int(lorrySvcHTTPPort))
+		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
+
+	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, lorryContainers...)
 	return nil
 }
 
-func buildLorryContainer() *corev1.Container {
+func buildBasicContainer() *corev1.Container {
 	return builder.NewContainerBuilder("string").
 		SetImage("registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
@@ -127,10 +133,6 @@ func buildLorryContainer() *corev1.Container {
 					},
 				},
 			}).
-		SetReadinessProbe(corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{Command: []string{}},
-			}}).
 		SetStartupProbe(corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3501)},
@@ -206,33 +208,38 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 	}
 }
 
+func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPort int) {
+	weSyncerContainer.Name = constant.WeSyncerContainerName
+	weSyncerContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+}
+
 func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = constant.StatusProbeContainerName
-	probe := statusProbeContainer.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(checkStatusURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
+	statusProbeContainer.ReadinessProbe = probe
 	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildRunningProbeContainer(characterType string, runningProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = constant.RunningProbeContainerName
-	probe := runningProbeContainer.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(checkRunningURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
+	runningProbeContainer.ReadinessProbe = probe
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
@@ -242,15 +249,15 @@ func volumeProtectionEnabled(component *SynthesizedComponent) bool {
 
 func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {
 	c.Name = constant.VolumeProtectionProbeContainerName
-	probe := c.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(volumeProtectionURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
 	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
+	c.ReadinessProbe = probe
 	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 

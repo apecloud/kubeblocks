@@ -35,7 +35,7 @@ spec:
       {{- end }}
       {{- if .Values.persistence.enabled }}
       volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+        - name: openldap # ref clusterdefinition components.containers.volumeMounts.name
           spec:
             storageClassName: {{ .Values.persistence.data.storageClassName }}
             accessModes:

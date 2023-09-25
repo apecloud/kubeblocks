@@ -492,20 +492,24 @@ var _ = Describe("Cluster Controller", func() {
 		return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compName, i)
 	}
 
-	createPVC := func(clusterName, pvcName, compName, storageSize string) {
+	createPVC := func(clusterName, pvcName, compName, storageSize, storageClassName string) {
 		if storageSize == "" {
 			storageSize = "1Gi"
 		}
 		clusterBytes, _ := json.Marshal(clusterObj)
 		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-			compName, testapps.DataVolumeName).SetStorage(storageSize).AddLabelsInMap(map[string]string{
-			constant.AppInstanceLabelKey:    clusterName,
-			constant.KBAppComponentLabelKey: compName,
-			constant.AppManagedByLabelKey:   constant.AppName,
-		}).AddAnnotations(constant.LastAppliedClusterAnnotationKey, string(clusterBytes)).CheckedCreate(&testCtx)
+			compName, testapps.DataVolumeName).
+			AddLabelsInMap(map[string]string{
+				constant.AppInstanceLabelKey:    clusterName,
+				constant.KBAppComponentLabelKey: compName,
+				constant.AppManagedByLabelKey:   constant.AppName,
+			}).AddAnnotations(constant.LastAppliedClusterAnnotationKey, string(clusterBytes)).
+			SetStorage(storageSize).
+			SetStorageClass(storageClassName).
+			CheckedCreate(&testCtx)
 	}
 
-	mockComponentPVCsAndBound := func(comp *appsv1alpha1.ClusterComponentSpec, replicas int, create bool) {
+	mockComponentPVCsAndBound := func(comp *appsv1alpha1.ClusterComponentSpec, replicas int, create bool, storageClassName string) {
 		for i := 0; i < replicas; i++ {
 			for _, vct := range comp.VolumeClaimTemplates {
 				pvcKey := types.NamespacedName{
@@ -513,7 +517,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      getPVCName(vct.Name, comp.Name, i),
 				}
 				if create {
-					createPVC(clusterKey.Name, pvcKey.Name, comp.Name, vct.Spec.Resources.Requests.Storage().String())
+					createPVC(clusterKey.Name, pvcKey.Name, comp.Name, vct.Spec.Resources.Requests.Storage().String(), storageClassName)
 				}
 				Eventually(testapps.CheckObjExists(&testCtx, pvcKey,
 					&corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
@@ -562,9 +566,10 @@ var _ = Describe("Cluster Controller", func() {
 		return pods
 	}
 
-	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec, policy *appsv1alpha1.HorizontalScalePolicy) {
+	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec,
+		storageClassName string, policy *appsv1alpha1.HorizontalScalePolicy) {
 		By("Mocking component PVCs to bound")
-		mockComponentPVCsAndBound(comp, int(comp.Replicas), true)
+		mockComponentPVCsAndBound(comp, int(comp.Replicas), true, storageClassName)
 
 		By("Checking rsm replicas right")
 		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, clusterKey, comp.Name)
@@ -620,7 +625,7 @@ var _ = Describe("Cluster Controller", func() {
 					testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
 				})()).Should(Succeed())
 
-				if viper.GetBool("VOLUMESNAPSHOT") {
+				if testk8s.IsMockVolumeSnapshotEnabled(&testCtx, storageClassName) {
 					By("Mocking VolumeSnapshot and set it as ReadyToUse")
 					pvcName := getPVCName(testapps.DataVolumeName, comp.Name, 0)
 					volumeSnapshot := &snapshotv1.VolumeSnapshot{
@@ -651,7 +656,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 			By("Mock PVCs and set status to bound")
-			mockComponentPVCsAndBound(comp, updatedReplicas, true)
+			mockComponentPVCsAndBound(comp, updatedReplicas, true, storageClassName)
 
 			if policy != nil {
 				By("Checking Backup and Restore cleanup")
@@ -828,7 +833,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
 	// the matching names. If not provided, will set 1st ClusterDefinition.spec.componentDefs[0].horizontalScalePolicy.
-	horizontalScale := func(updatedReplicas int, policyType appsv1alpha1.HScaleDataClonePolicyType, componentDefsWithHScalePolicy ...string) {
+	horizontalScale := func(updatedReplicas int, storageClassName string,
+		policyType appsv1alpha1.HScaleDataClonePolicyType, componentDefsWithHScalePolicy ...string) {
 		defer lorry.UnsetMockClient()
 
 		cluster := &appsv1alpha1.Cluster{}
@@ -839,7 +845,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Mocking all components' PVCs to bound")
 		for _, comp := range cluster.Spec.ComponentSpecs {
-			mockComponentPVCsAndBound(&comp, int(comp.Replicas), true)
+			mockComponentPVCsAndBound(&comp, int(comp.Replicas), true, storageClassName)
 		}
 
 		hscalePolicy := func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.HorizontalScalePolicy {
@@ -857,7 +863,7 @@ var _ = Describe("Cluster Controller", func() {
 			lorry.SetMockClient(&mockLorryClient{replicas: updatedReplicas, clusterKey: clusterKey, compName: comp.Name}, nil)
 
 			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
-			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], hscalePolicy(comp))
+			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], storageClassName, hscalePolicy(comp))
 		}
 
 		By("Checking cluster status and the number of replicas changed")
@@ -882,15 +888,14 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		// REVIEW: this test flow, wait for running phase?
-		viper.Set("VOLUMESNAPSHOT", true)
+		testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 		viper.Set(constant.CfgKeyBackupPVCName, "")
 
-		horizontalScale(int(updatedReplicas), dataClonePolicy, compDefName)
+		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, dataClonePolicy, compDefName)
 	}
 
-	testVolumeExpansion := func(compName, compDefName string) {
+	testVolumeExpansion := func(compName, compDefName string, storageClass *storagev1.StorageClass) {
 		var (
-			storageClassName  = "sc-mock"
 			replicas          = 3
 			volumeSize        = "1Gi"
 			newVolumeSize     = "2Gi"
@@ -899,15 +904,7 @@ var _ = Describe("Cluster Controller", func() {
 		)
 
 		By("Mock a StorageClass which allows resize")
-		allowVolumeExpansion := true
-		storageClass := &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: storageClassName,
-			},
-			Provisioner:          "kubernetes.io/no-provisioner",
-			AllowVolumeExpansion: &allowVolumeExpansion,
-		}
-		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
+		Expect(*storageClass.AllowVolumeExpansion).Should(BeTrue())
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec(volumeSize)
@@ -1577,7 +1574,7 @@ var _ = Describe("Cluster Controller", func() {
 	testBackupError := func(compName, compDefName string) {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
-		viper.Set("VOLUMESNAPSHOT", true)
+		testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 
 		By("Set HorizontalScalePolicy")
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -1606,6 +1603,11 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
+		By("Create and Mock PVCs status to bound")
+		for _, comp := range clusterObj.Spec.ComponentSpecs {
+			mockComponentPVCsAndBound(&comp, int(comp.Replicas), true, testk8s.DefaultStorageClassName)
+		}
+
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
@@ -1631,7 +1633,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking cluster status failed with backup error")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(viper.GetBool("VOLUMESNAPSHOT")).Should(BeTrue())
+			g.Expect(testk8s.IsMockVolumeSnapshotEnabled(&testCtx, testk8s.DefaultStorageClassName)).Should(BeTrue())
 			g.Expect(cluster.Status.Conditions).ShouldNot(BeEmpty())
 			var err error
 			for _, cond := range cluster.Status.Conditions {
@@ -1900,7 +1902,7 @@ var _ = Describe("Cluster Controller", func() {
 			// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
 			// REVIEW:
 			//  1. this test flow, wait for running phase?
-			horizontalScale(int(updatedReplicas), policyType, consensusCompDefName, replicationCompDefName)
+			horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, policyType, consensusCompDefName, replicationCompDefName)
 		}
 
 		It("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
@@ -1927,7 +1929,7 @@ var _ = Describe("Cluster Controller", func() {
 						Namespace: clusterKey.Namespace,
 						Name:      getPVCName(testapps.DataVolumeName, compName, i),
 					}
-					createPVC(clusterKey.Name, pvcKey.Name, compName, "")
+					createPVC(clusterKey.Name, pvcKey.Name, compName, "", "")
 					Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
 					Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 						pvc.Status.Phase = corev1.ClaimBound
@@ -1935,7 +1937,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 
-			By("delete the cluster and should preserved PVC,Secret,CM resources")
+			By("delete the cluster and should be preserved PVC,Secret,CM resources")
 			deleteCluster := func(termPolicy appsv1alpha1.TerminationPolicyType) {
 				// TODO: would be better that cluster is created with terminationPolicy=Halt instead of
 				// reassign the value after created
@@ -2003,19 +2005,19 @@ var _ = Describe("Cluster Controller", func() {
 				return i.UID == j.UID
 			})).Should(BeTrue())
 
-			By("delete the cluster and should preserved PVC,Secret,CM resources but result updated the new last applied cluster UID")
+			By("delete the cluster and should be preserved PVC,Secret,CM resources but result updated the new last applied cluster UID")
 			deleteCluster(appsv1alpha1.Halt)
 			checkPreservedObjects(clusterObj.UID)
 		})
 
 		It("should successfully h-scale with multiple components", func() {
-			viper.Set("VOLUMESNAPSHOT", true)
+			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			viper.Set(constant.CfgKeyBackupPVCName, "")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
 		It("should successfully h-scale with multiple components by backup tool", func() {
-			viper.Set("VOLUMESNAPSHOT", false)
+			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
@@ -2228,6 +2230,10 @@ var _ = Describe("Cluster Controller", func() {
 	})
 
 	When("creating cluster with stateful workloadTypes (being Stateful|Consensus|Replication) component", func() {
+		var (
+			mockStorageClass *storagev1.StorageClass
+		)
+
 		compNameNDef := map[string]string{
 			statefulCompName:    statefulCompDefName,
 			consensusCompName:   consensusCompDefName,
@@ -2237,12 +2243,13 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)
+			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
 		for compName, compDefName := range compNameNDef {
 			Context(fmt.Sprintf("[comp: %s] volume expansion", compName), func() {
 				It("should update PVC request storage size accordingly", func() {
-					testVolumeExpansion(compName, compDefName)
+					testVolumeExpansion(compName, compDefName, mockStorageClass)
 				})
 
 				It("should be able to recover if volume expansion fails", func() {
@@ -2278,15 +2285,15 @@ var _ = Describe("Cluster Controller", func() {
 
 			Context(fmt.Sprintf("[comp: %s] scale-out after volume expansion", compName), func() {
 				It("scale-out with data clone policy", func() {
-					testVolumeExpansion(compName, compDefName)
-					viper.Set("VOLUMESNAPSHOT", true)
+					testVolumeExpansion(compName, compDefName, mockStorageClass)
+					testk8s.MockEnableVolumeSnapshot(&testCtx, mockStorageClass.Name)
 					viper.Set(constant.CfgKeyBackupPVCName, "")
-					horizontalScale(5, appsv1alpha1.HScaleDataClonePolicyCloneVolume, compDefName)
+					horizontalScale(5, mockStorageClass.Name, appsv1alpha1.HScaleDataClonePolicyCloneVolume, compDefName)
 				})
 
 				It("scale-out without data clone policy", func() {
-					testVolumeExpansion(compName, compDefName)
-					horizontalScale(5, "", compDefName)
+					testVolumeExpansion(compName, compDefName, mockStorageClass)
+					horizontalScale(5, mockStorageClass.Name, "", compDefName)
 				})
 			})
 		}
@@ -2340,7 +2347,7 @@ var _ = Describe("Cluster Controller", func() {
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			// mock pvcs have restored
-			mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(compName), replicas, true)
+			mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(compName), replicas, true, testk8s.DefaultStorageClassName)
 			By("wait for restore created")
 			ml := client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
@@ -2457,13 +2464,13 @@ var _ = Describe("Cluster Controller", func() {
 			// })).Should(Succeed())
 
 			By("test when clusterVersion not Available")
-			_ = testapps.CreateConsensusMysqlClusterDef(&testCtx, clusterDefNameRand, consensusCompDefName)
 			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(&testCtx, clusterDefNameRand, clusterVersionNameRand, consensusCompDefName)
 			clusterVersionKey := client.ObjectKeyFromObject(clusterVersion)
 			// mock clusterVersion unavailable
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterVersionKey, func(clusterVersion *appsv1alpha1.ClusterVersion) {
 				clusterVersion.Spec.ComponentVersions[0].ComponentDefRef = "test-n"
 			})()).ShouldNot(HaveOccurred())
+			_ = testapps.CreateConsensusMysqlClusterDef(&testCtx, clusterDefNameRand, consensusCompDefName)
 
 			Eventually(testapps.CheckObj(&testCtx, clusterVersionKey, func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
 				g.Expect(clusterVersion.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))

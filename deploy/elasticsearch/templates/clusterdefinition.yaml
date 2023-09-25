@@ -268,7 +268,19 @@ spec:
             securityContext:
               runAsNonRoot: true
               runAsUser: 1001
-
+            readinessProbe:
+              tcpSocket:
+                port: 9300
+              periodSeconds: 10
+              timeoutSeconds: 10
+              failureThreshold: 5
+            startupProbe:
+              tcpSocket:
+                port: 9300
+              initialDelaySeconds: 20
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 30
             ports:
             - name: rest-api
               containerPort: 9200

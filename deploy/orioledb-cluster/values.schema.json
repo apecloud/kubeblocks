@@ -53,25 +53,20 @@
       "default": 20,
       "minimum": 1,
       "maximum": 10000
-    }
-  },
-  "etcd": {
-    "type": "object",
-    "title": "The etcd Schema",
-    "required": [
-      "host",
-      "port"
-    ],
-    "properties": {
-      "host": {
-        "type": "string",
-        "default": "etcd-etcd",
-        "description": "The patroni dependency etcd host"
-      },
-      "port": {
-        "type": "integer",
-        "default": 2379,
-        "title": "The patroni dependency etcd port"
+    },  "etcd": {
+      "type": "object",
+      "title": "The patroni dependency etcd Schema",
+      "properties": {
+        "cluster": {
+          "type": "string",
+          "default": "etcd",
+          "description": "The patroni dependency etcd cluster name"
+        },
+        "namespace": {
+          "type": "string",
+          "default": "default",
+          "description": "The patroni dependency etcd cluster namespace"
+        }
       }
     }
   }

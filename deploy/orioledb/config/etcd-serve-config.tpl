@@ -15,4 +15,4 @@
      {{- $etcd_server = printf "%s:%s" $orioledb_etcd_from_service_ref.spec.endpoint.value $orioledb_etcd_from_service_ref.spec.port.value }}
   {{- end }}
 {{- end }}
-export PATRONI_ETCD3_HOST={{ $etcd_server}}
+export PATRONI_ETCD3_HOST={{ $etcd_server }}

@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package monitor
 
 import (
+	"fmt"
 	"time"
-
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 )
 
 type SimpleReceiver struct {
@@ -63,6 +63,7 @@ func NewConfigGenerator(config *types.Config) *OteldConfigGenerater {
 
 func (cg *OteldConfigGenerater) GenerateOteldConfiguration(datasourceList *v1alpha1.CollectorDataSourceList, metricsExporterList *v1alpha1.MetricsExporterSinkList, logsExporterList *v1alpha1.LogsExporterSinkList) yaml.MapSlice {
 	cfg := yaml.MapSlice{}
+	cfg = cg.appendExtentions(cfg)
 	cfg = cg.appendReceiver(cfg, datasourceList)
 	cfg = cg.appendProcessor(cfg)
 	cfg = cg.appendExporter(cfg, metricsExporterList, logsExporterList)
@@ -72,26 +73,30 @@ func (cg *OteldConfigGenerater) GenerateOteldConfiguration(datasourceList *v1alp
 }
 
 func (cg *OteldConfigGenerater) appendReceiver(cfg yaml.MapSlice, datasourceList *v1alpha1.CollectorDataSourceList) yaml.MapSlice {
-	receiverItems := yaml.MapSlice{}
-	for _, datasource := range datasourceList.Items {
-		switch datasource.Spec.Type {
-		case v1alpha1.MetricsDatasourceType:
-			// TODO: add metrics receiver
-		case v1alpha1.LogsDataSourceType:
-			// TODO: add logs receiver
-		default:
+	receiverSlice := yaml.MapSlice{}
+	receiverSlice = append(receiverSlice, newReceiverCreator(v1alpha1.MetricsDatasourceType, datasourceList.Items))
+	receiverSlice = append(receiverSlice, newReceiverCreator(v1alpha1.LogsDataSourceType, datasourceList.Items))
+	return append(cfg, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+}
+
+func newReceiverCreator(datasourceType v1alpha1.DataSourceType, dataSources []v1alpha1.CollectorDataSource) yaml.MapItem {
+	if len(dataSources) == 0 {
+		return yaml.MapItem{}
+	}
+	creator := yaml.MapSlice{}
+	creator = append(creator, yaml.MapItem{Key: "watch_observers", Value: []string{"apecloud_engine_observer"}})
+	receiverSlice := yaml.MapSlice{}
+	for _, dataSource := range dataSources {
+		if dataSource.Spec.Type != datasourceType {
 			continue
 		}
+		for _, data := range dataSource.Spec.DataSourceList {
+			tplName := fmt.Sprintf("receiver/%s/%s.cue", datasourceType, data.Name)
+			receiverSlice = append(receiverSlice, buildSliceFromCUE(tplName)...)
+		}
 	}
-
-	if cg.config.Datasource.MetricsDatasource != nil {
-		receiverItems = append(receiverItems, cg.buildMetricsDatasourceSlice(cg.config.Datasource.MetricsDatasource)...)
-	}
-
-	if cg.config.Datasource.LogDatasource != nil {
-		receiverItems = append(receiverItems, cg.buildLogsDatasourceSlice(receiverItems, cg.config.Datasource.LogDatasource)...)
-	}
-	return append(cfg, yaml.MapItem{Key: "receivers", Value: receiverItems})
+	creator = append(creator, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+	return yaml.MapItem{Key: fmt.Sprintf("receiver_creator/%s", datasourceType), Value: creator}
 }
 
 func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporters *v1alpha1.MetricsExporterSinkList, logsExporter *v1alpha1.LogsExporterSinkList) yaml.MapSlice {
@@ -116,28 +121,7 @@ func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporte
 		}
 		exporterItems = append(exporterItems, yaml.MapItem{Key: exporter.Spec.Type, Value: metricsExporterConfig})
 	}
-
-	// for _, exporter := range logsExporter.Items {
-	// 	 var logsExporterConfig yaml.MapSlice
-	//	 switch exporter.Spec.Type {
-	//	 case v1alpha1.LokiSinkType:
-	//		exporterConfig := exporter.Spec.LokiConfig
-	//		logsExporterConfig = append(logsExporterConfig,
-	//			yaml.MapItem{Key: "timeout", Value: (20 * time.Second).String()},
-	//		)
-	//		if exporterConfig.RetryPolicyOnFailure != nil {
-	//			retryConfig := yaml.MapSlice{}
-	//			retryConfig = append(retryConfig, yaml.MapItem{Key: "enabled", Value: true})
-	//			retryConfig = append(retryConfig, yaml.MapItem{Key: "enabled"})
-	//	 		logsExporterConfig = append(logsExporterConfig,
-	//	 			yaml.MapItem{Key: "retry_on_failure", Value: (20 * time.Second).String()},
-	// 			)
-	//	 	}
-	//	 default:
-	// 		continue
-	//	 }
-	//	 exporterItems = append(exporterItems, yaml.MapItem{Key: exporter.Name, Value: logsExporterConfig})
-	// }
+	// TODO: add logs exporter
 	return append(cfg, yaml.MapItem{Key: "exporters", Value: exporterItems})
 }
 
@@ -155,50 +139,9 @@ func (cg *OteldConfigGenerater) appendServices(cfg yaml.MapSlice,
 	serviceSlice := yaml.MapSlice{}
 	piplneItem := cg.buildPiplineItem()
 	serviceSlice = append(serviceSlice, piplneItem)
+	extensionItem := yaml.MapItem{Key: "extensions", Value: []string{"runtime_container", "apecloud_engine_observer"}}
+	serviceSlice = append(serviceSlice, extensionItem)
 	return append(cfg, yaml.MapItem{Key: "service", Value: serviceSlice})
-}
-
-func (cg *OteldConfigGenerater) buildMetricsDatasourceSlice(datasources *types.MetricsDatasource) yaml.MapSlice {
-	collectionInterval := cg.config.CollectionInterval
-	if cg.config.Datasource.MetricsDatasource.CollectionInterval != nil {
-		collectionInterval = *cg.config.Datasource.MetricsDatasource.CollectionInterval
-	}
-
-	receiverConfigs := yaml.MapSlice{}
-	if datasources.K8sNodeConfig != nil && datasources.K8sNodeConfig.Enabled {
-		k8sNodeItem := yaml.MapItem{
-			Key: "apecloudnode",
-			Value: yaml.MapSlice{
-				yaml.MapItem{Key: "collection_interval", Value: collectionInterval},
-			},
-		}
-		receiverConfigs = append(receiverConfigs, k8sNodeItem)
-	}
-	if datasources.K8sClusterConfig != nil && datasources.K8sClusterConfig.Enabled {
-		k8sClusterItem := yaml.MapItem{
-			Key: "k8s_cluster",
-			Value: yaml.MapSlice{
-				yaml.MapItem{Key: "collection_interval", Value: collectionInterval},
-			},
-		}
-		receiverConfigs = append(receiverConfigs, k8sClusterItem)
-	}
-	if datasources.KubeletStateConfig != nil && datasources.KubeletStateConfig.Enabled {
-		k8sStateSlice := yaml.MapSlice{}
-		if datasources.KubeletStateConfig.MetricGroups != nil {
-			k8sStateSlice = append(k8sStateSlice, yaml.MapItem{Key: "metric_groups", Value: datasources.KubeletStateConfig.MetricGroups})
-		}
-		k8sStateSlice = append(k8sStateSlice, yaml.MapItem{Key: "auth_type", Value: cg.config.AuthType})
-		k8sStateSlice = append(k8sStateSlice, yaml.MapItem{Key: "collection_interval", Value: collectionInterval})
-		k8sStateSlice = append(k8sStateSlice, yaml.MapItem{Key: "endpoint", Value: "${env:NODE_NAME}:10250"})
-		k8sStateItem := yaml.MapItem{
-			Key:   "apecloudkubeletstats",
-			Value: k8sStateSlice,
-		}
-		receiverConfigs = append(receiverConfigs, k8sStateItem)
-
-	}
-	return receiverConfigs
 }
 
 func (cg *OteldConfigGenerater) buildLogsDatasourceSlice(receiverItems yaml.MapSlice, datasources *types.LogsDatasource) yaml.MapSlice {
@@ -241,30 +184,17 @@ func (cg *OteldConfigGenerater) buildPiplineItem() yaml.MapItem {
 
 func (cg *OteldConfigGenerater) buildPipline(datasourceList *v1alpha1.CollectorDataSourceList, metricsExporterList *v1alpha1.MetricsExporterSinkList, logsExporterList *v1alpha1.LogsExporterSinkList) {
 	for _, mExporter := range metricsExporterList.Items {
-		cg.metricsPipline.ExporterMap[mExporter.Name] = true
+		cg.metricsPipline.ExporterMap[string(mExporter.Spec.Type)] = true
 	}
 	for _, lExporter := range logsExporterList.Items {
-		cg.logsPipline.ExporterMap[lExporter.Name] = true
+		cg.logsPipline.ExporterMap[string(lExporter.Spec.Type)] = true
 	}
 	for _, datasource := range datasourceList.Items {
 		switch datasource.Spec.Type {
 		case v1alpha1.MetricsDatasourceType:
-			cg.addMetricsPiplineReceiver(datasource.Name, datasource.Spec.ExporterNames)
+			cg.addMetricsPiplineFromDataSource(datasource)
 		case v1alpha1.LogsDataSourceType:
-			cg.addLogsPiplineReceiver(datasource.Name, datasource.Spec.ExporterNames)
-		}
-	}
-
-	datasource := cg.config.Datasource.MetricsDatasource
-	if datasource != nil {
-		if datasource.KubeletStateConfig != nil && datasource.KubeletStateConfig.Enabled {
-			cg.addMetricsPiplineReceiver("apecloudkubeletstats", datasource.ExporterNames)
-		}
-		// if datasource.K8sClusterConfig != nil && datasource.K8sClusterConfig.Enabled {
-		//	cg.addMetricsPiplineReceiver("k8s_cluster", datasource.ExporterNames)
-		// }
-		if datasource.K8sNodeConfig != nil && datasource.K8sNodeConfig.Enabled {
-			cg.addMetricsPiplineReceiver("apecloudk8snode", datasource.ExporterNames)
+			cg.addLogsPiplineFromDataSource(datasource)
 		}
 	}
 
@@ -281,4 +211,36 @@ func (cg *OteldConfigGenerater) addMetricsPiplineReceiver(name string, exporterR
 func (cg *OteldConfigGenerater) addLogsPiplineReceiver(name string, exporterRef []string) {
 	receiver := SimpleReceiver{Name: name, ExporterRef: v1alpha1.ExporterRef{ExporterNames: exporterRef}}
 	cg.logsPipline.ReceiverList = append(cg.logsPipline.ReceiverList, receiver)
+}
+
+func (cg *OteldConfigGenerater) addMetricsPiplineFromDataSource(datasource v1alpha1.CollectorDataSource) {
+	cg.addMetricsPiplineReceiver(fmt.Sprintf("receiver_creator/%s", datasource.Spec.Type), datasource.Spec.ExporterNames)
+}
+
+func (cg *OteldConfigGenerater) addLogsPiplineFromDataSource(datasource v1alpha1.CollectorDataSource) {
+	cg.addLogsPiplineReceiver(fmt.Sprintf("receiver_creator/%s", datasource.Spec.Type), datasource.Spec.ExporterNames)
+}
+
+func (cg *OteldConfigGenerater) appendExtentions(cfg yaml.MapSlice) yaml.MapSlice {
+	extensionSlice := yaml.MapSlice{}
+	extensionSlice = append(extensionSlice, buildSliceFromCUE(newExtensionTplPath("apecloud_engine_observer"))...)
+	extensionSlice = append(extensionSlice, buildSliceFromCUE(newExtensionTplPath("runtime_container"))...)
+	return append(cfg, yaml.MapItem{Key: "extensions", Value: extensionSlice})
+}
+
+func newExtensionTplPath(name string) string {
+	return fmt.Sprintf("extension/%s.cue", name)
+}
+
+func buildSliceFromCUE(tplName string) yaml.MapSlice {
+	bytes, err := buildFromCUEForOTel(tplName, map[string]any{}, "output")
+	if err != nil {
+		return nil
+	}
+	extensionSlice := yaml.MapSlice{}
+	err = yaml.Unmarshal(bytes, &extensionSlice)
+	if err != nil {
+		return nil
+	}
+	return extensionSlice
 }

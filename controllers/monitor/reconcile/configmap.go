@@ -33,10 +33,6 @@ import (
 const OteldConfigMapName = "oteld-configmap"
 
 func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	if !reqCtx.Config.UseConfigMap {
-		return nil
-	}
-
 	k8sClient := params.Client
 	configData, err := reqCtx.GetOteldConfigYaml()
 	if err != nil {

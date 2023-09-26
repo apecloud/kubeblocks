@@ -20,11 +20,8 @@ package fake
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
@@ -128,49 +125,6 @@ func (c *FakeStorageProviders) DeleteCollection(ctx context.Context, opts v1.Del
 func (c *FakeStorageProviders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.StorageProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(storageprovidersResource, name, pt, data, subresources...), &v1alpha1.StorageProvider{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.StorageProvider), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied storageProvider.
-func (c *FakeStorageProviders) Apply(ctx context.Context, storageProvider *storagev1alpha1.StorageProviderApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageProvider, err error) {
-	if storageProvider == nil {
-		return nil, fmt.Errorf("storageProvider provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(storageProvider)
-	if err != nil {
-		return nil, err
-	}
-	name := storageProvider.Name
-	if name == nil {
-		return nil, fmt.Errorf("storageProvider.Name must be provided to Apply")
-	}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageprovidersResource, *name, types.ApplyPatchType, data), &v1alpha1.StorageProvider{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.StorageProvider), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeStorageProviders) ApplyStatus(ctx context.Context, storageProvider *storagev1alpha1.StorageProviderApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageProvider, err error) {
-	if storageProvider == nil {
-		return nil, fmt.Errorf("storageProvider provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(storageProvider)
-	if err != nil {
-		return nil, err
-	}
-	name := storageProvider.Name
-	if name == nil {
-		return nil, fmt.Errorf("storageProvider.Name must be provided to Apply")
-	}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageprovidersResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.StorageProvider{})
 	if obj == nil {
 		return nil, err
 	}

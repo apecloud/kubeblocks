@@ -20,12 +20,9 @@ package v1alpha1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
 	"time"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	scheme "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -50,8 +47,6 @@ type ComponentClassDefinitionInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ComponentClassDefinitionList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ComponentClassDefinition, err error)
-	Apply(ctx context.Context, componentClassDefinition *appsv1alpha1.ComponentClassDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ComponentClassDefinition, err error)
-	ApplyStatus(ctx context.Context, componentClassDefinition *appsv1alpha1.ComponentClassDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ComponentClassDefinition, err error)
 	ComponentClassDefinitionExpansion
 }
 
@@ -182,60 +177,6 @@ func (c *componentClassDefinitions) Patch(ctx context.Context, name string, pt t
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied componentClassDefinition.
-func (c *componentClassDefinitions) Apply(ctx context.Context, componentClassDefinition *appsv1alpha1.ComponentClassDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ComponentClassDefinition, err error) {
-	if componentClassDefinition == nil {
-		return nil, fmt.Errorf("componentClassDefinition provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(componentClassDefinition)
-	if err != nil {
-		return nil, err
-	}
-	name := componentClassDefinition.Name
-	if name == nil {
-		return nil, fmt.Errorf("componentClassDefinition.Name must be provided to Apply")
-	}
-	result = &v1alpha1.ComponentClassDefinition{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("componentclassdefinitions").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *componentClassDefinitions) ApplyStatus(ctx context.Context, componentClassDefinition *appsv1alpha1.ComponentClassDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ComponentClassDefinition, err error) {
-	if componentClassDefinition == nil {
-		return nil, fmt.Errorf("componentClassDefinition provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(componentClassDefinition)
-	if err != nil {
-		return nil, err
-	}
-
-	name := componentClassDefinition.Name
-	if name == nil {
-		return nil, fmt.Errorf("componentClassDefinition.Name must be provided to Apply")
-	}
-
-	result = &v1alpha1.ComponentClassDefinition{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("componentclassdefinitions").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

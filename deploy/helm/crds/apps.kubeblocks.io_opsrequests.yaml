@@ -468,6 +468,7 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-map-type: atomic
                     x-kubernetes-validations:
                     - message: forbidden to update spec.scriptSpec.script.selector
                       rule: self == oldSelf

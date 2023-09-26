@@ -20,11 +20,8 @@ package fake
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
@@ -117,27 +114,6 @@ func (c *FakeComponentResourceConstraints) DeleteCollection(ctx context.Context,
 func (c *FakeComponentResourceConstraints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ComponentResourceConstraint, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(componentresourceconstraintsResource, name, pt, data, subresources...), &v1alpha1.ComponentResourceConstraint{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ComponentResourceConstraint), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied componentResourceConstraint.
-func (c *FakeComponentResourceConstraints) Apply(ctx context.Context, componentResourceConstraint *appsv1alpha1.ComponentResourceConstraintApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ComponentResourceConstraint, err error) {
-	if componentResourceConstraint == nil {
-		return nil, fmt.Errorf("componentResourceConstraint provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(componentResourceConstraint)
-	if err != nil {
-		return nil, err
-	}
-	name := componentResourceConstraint.Name
-	if name == nil {
-		return nil, fmt.Errorf("componentResourceConstraint.Name must be provided to Apply")
-	}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(componentresourceconstraintsResource, *name, types.ApplyPatchType, data), &v1alpha1.ComponentResourceConstraint{})
 	if obj == nil {
 		return nil, err
 	}

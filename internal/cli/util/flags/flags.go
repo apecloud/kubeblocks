@@ -126,7 +126,7 @@ func buildOneFlag(cmd *cobra.Command, k string, s *spec.Schema, isArray bool) er
 				}
 			}
 		case typeArray:
-			return fmt.Errorf("unsupport build flags for object with array nested within an array")
+			return fmt.Errorf("unsupported build flags for object with array nested within an array")
 		default:
 			return fmt.Errorf("unsupported json schema type %s", s.Type)
 		}

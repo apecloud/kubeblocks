@@ -9557,11 +9557,6 @@ spec:
                       forbidden otherwise
                     rule: 'has(self.workloadType) && self.workloadType == ''Consensus''
                       ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)'
-                  - message: componentDefs.replicationSpec(deprecated) or componentDefs.rsmSpec(recommended)
-                      is required when componentDefs.workloadType is Replication,
-                      and forbidden otherwise
-                    rule: 'has(self.workloadType) && self.workloadType == ''Replication''
-                      ? (has(self.replicationSpec) || has(self.rsmSpec)) : !has(self.replicationSpec)'
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:

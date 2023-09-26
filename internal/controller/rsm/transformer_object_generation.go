@@ -444,6 +444,13 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 			Value: string(roleProbe.RoleUpdateMechanism),
 		})
 
+	// inject role probe timeout env
+	env = append(env,
+		corev1.EnvVar{
+			Name:  roleProbeTimeoutVarName,
+			Value: strconv.Itoa(int(roleProbe.TimeoutSeconds)),
+		})
+
 	// lorry related envs
 	env = append(env,
 		corev1.EnvVar{

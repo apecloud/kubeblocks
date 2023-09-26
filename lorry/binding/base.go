@@ -217,8 +217,12 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 		return opsRes, nil
 	}
 
-	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
-	ctx1, cancel := context.WithTimeout(ctx, 999*time.Millisecond)
+	timeoutSeconds := defaultRoleProbeTimeoutSeconds
+	if viper.IsSet(roleProbeTimeoutVarName) {
+		timeoutSeconds = viper.GetInt(roleProbeTimeoutVarName)
+	}
+	timeout := time.Duration(timeoutSeconds) * (800 * time.Millisecond)
+	ctx1, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {

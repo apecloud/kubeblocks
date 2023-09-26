@@ -159,12 +159,12 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			"failed to check PVC template")
 	}
 
-	// check DPT config
-	err = r.checkAndUpdateDPTConfig(reqCtx, renderCtx, repo, provider)
+	// check tool config
+	err = r.checkAndUpdateToolConfig(reqCtx, renderCtx, repo, provider)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
 		return checkedRequeueWithError(err, reqCtx.Log,
-			"failed to check DPT config")
+			"failed to check tool config")
 	}
 
 	// TODO: implement pre-check logic
@@ -198,7 +198,7 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeParametersChecked) &&
 			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageClassCreated) &&
 			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypePVCTemplateChecked) &&
-			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeDPTConfigChecked) {
+			meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeToolConfigChecked) {
 			phase = dpv1alpha1.BackupRepoReady
 		}
 		repo.Status.Phase = phase
@@ -209,8 +209,8 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 	if repo.Status.BackupPVCName == "" {
 		repo.Status.BackupPVCName = randomNameForDerivedObject(repo, "pvc")
 	}
-	if repo.Status.DPTConfigSecretName == "" {
-		repo.Status.DPTConfigSecretName = randomNameForDerivedObject(repo, "dpt-config")
+	if repo.Status.ToolConfigSecretName == "" {
+		repo.Status.ToolConfigSecretName = randomNameForDerivedObject(repo, "tool-config")
 	}
 	if repo.Status.ObservedGeneration != repo.Generation {
 		repo.Status.ObservedGeneration = repo.Generation
@@ -258,7 +258,7 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 
 	// check its spec
 	switch {
-	case repo.IsMountAccess():
+	case repo.AccessByMount():
 		if provider.Spec.StorageClassTemplate == "" &&
 			provider.Spec.PersistentVolumeClaimTemplate == "" {
 			// both StorageClassTemplate and PersistentVolumeClaimTemplate are empty.
@@ -266,7 +266,7 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 			reason = ReasonInvalidStorageProvider
 			return provider, newDependencyError("both StorageClassTemplate and PersistentVolumeClaimTemplate are empty")
 		}
-	case repo.IsDPTAccess():
+	case repo.AccessByTool():
 		if provider.Spec.DPTConfigTemplate == "" {
 			reason = ReasonInvalidStorageProvider
 			return provider, newDependencyError("DPTConfigTemplate is empty")
@@ -450,7 +450,7 @@ func (r *BackupRepoReconciler) checkPVCTemplate(reqCtx intctrlutil.RequestCtx,
 		r.updateConditionInDefer(reqCtx, repo, ConditionTypePVCTemplateChecked, reason, &err)
 	}()
 
-	if !repo.IsMountAccess() || provider.Spec.PersistentVolumeClaimTemplate == "" {
+	if !repo.AccessByMount() || provider.Spec.PersistentVolumeClaimTemplate == "" {
 		return nil
 	}
 	checkedTemplateMd5 := repo.Annotations[dataProtectionPVCTemplateMD5MD5AnnotationKey]
@@ -475,52 +475,52 @@ func (r *BackupRepoReconciler) checkPVCTemplate(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func (r *BackupRepoReconciler) checkAndUpdateDPTConfig(reqCtx intctrlutil.RequestCtx,
+func (r *BackupRepoReconciler) checkAndUpdateToolConfig(reqCtx intctrlutil.RequestCtx,
 	renderCtx renderContext, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) (err error) {
 
 	reason := ReasonUnknownError
 	defer func() {
-		r.updateConditionInDefer(reqCtx, repo, ConditionTypeDPTConfigChecked, reason, &err)
+		r.updateConditionInDefer(reqCtx, repo, ConditionTypeToolConfigChecked, reason, &err)
 	}()
 
-	if !repo.IsDPTAccess() {
+	if !repo.AccessByTool() {
 		return nil
 	}
-	checkedTemplateMd5 := repo.Annotations[dataProtectionDPTConfigTemplateMD5MD5AnnotationKey]
+	checkedTemplateMd5 := repo.Annotations[dataProtectionToolConfigTemplateMD5MD5AnnotationKey]
 	checkedParametersMd5 := repo.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
 	currentTemplateMd5 := md5Digest(provider.Spec.DPTConfigTemplate)
 	currentParametersMd5 := renderCtx.Md5OfParameters()
 	if !(checkedTemplateMd5 != currentTemplateMd5 || checkedParametersMd5 != currentParametersMd5) {
 		return nil
 	}
-	// check dpt config template
-	content, err := renderTemplate("dpt-config", provider.Spec.DPTConfigTemplate, renderCtx)
+	// check tool config template
+	content, err := renderTemplate("tool-config", provider.Spec.DPTConfigTemplate, renderCtx)
 	if err != nil {
-		reason = ReasonBadDPTConfigTemplate
+		reason = ReasonBadToolConfigTemplate
 		return err
 	}
-	// update existing dpt config secrets
+	// update existing tool config secrets
 	secretList := &corev1.SecretList{}
 	err = r.Client.List(reqCtx.Ctx, secretList, client.MatchingLabels{
-		dataProtectionBackupRepoKey:  repo.Name,
-		dataProtectionIsDPTConfigKey: trueVal,
+		dataProtectionBackupRepoKey:   repo.Name,
+		dataProtectionIsToolConfigKey: trueVal,
 	})
 	if err != nil {
 		return err
 	}
 	for idx := range secretList.Items {
 		secret := &secretList.Items[idx]
-		tmplMd5InSecret := secret.Annotations[dataProtectionDPTConfigTemplateMD5MD5AnnotationKey]
+		tmplMd5InSecret := secret.Annotations[dataProtectionToolConfigTemplateMD5MD5AnnotationKey]
 		paramMd5InSecret := secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
 		if tmplMd5InSecret == currentTemplateMd5 && paramMd5InSecret == currentParametersMd5 {
 			continue
 		}
 		patch := client.MergeFrom(secret.DeepCopy())
-		constructDPTConfigSecret(secret, content)
+		constructToolConfigSecret(secret, content)
 		if secret.Annotations == nil {
 			secret.Annotations = make(map[string]string)
 		}
-		secret.Annotations[dataProtectionDPTConfigTemplateMD5MD5AnnotationKey] = currentTemplateMd5
+		secret.Annotations[dataProtectionToolConfigTemplateMD5MD5AnnotationKey] = currentTemplateMd5
 		secret.Annotations[dataProtectionTemplateValuesMD5AnnotationKey] = currentParametersMd5
 		if err = r.Client.Patch(reqCtx.Ctx, secret, patch); err != nil {
 			return err
@@ -528,12 +528,12 @@ func (r *BackupRepoReconciler) checkAndUpdateDPTConfig(reqCtx intctrlutil.Reques
 	}
 
 	if err = updateAnnotations(reqCtx.Ctx, r.Client, repo, map[string]string{
-		dataProtectionDPTConfigTemplateMD5MD5AnnotationKey: currentTemplateMd5,
-		dataProtectionTemplateValuesMD5AnnotationKey:       currentParametersMd5,
+		dataProtectionToolConfigTemplateMD5MD5AnnotationKey: currentTemplateMd5,
+		dataProtectionTemplateValuesMD5AnnotationKey:        currentParametersMd5,
 	}); err != nil {
 		return err
 	}
-	reason = ReasonDPTConfigChecked
+	reason = ReasonToolConfigChecked
 	return nil
 }
 
@@ -589,15 +589,15 @@ func (r *BackupRepoReconciler) prepareForAssociatedBackups(
 	var retErr error
 	for _, backup := range backups {
 		switch {
-		case repo.IsMountAccess():
+		case repo.AccessByMount():
 			if err := r.checkOrCreatePVC(reqCtx, renderCtx, repo, provider, backup.Namespace); err != nil {
 				reqCtx.Log.Error(err, "failed to check or create PVC", "namespace", backup.Namespace)
 				retErr = err
 				continue
 			}
-		case repo.IsDPTAccess():
-			if err := r.checkOrCreateDPTConfigSecret(reqCtx, renderCtx, repo, provider, backup.Namespace); err != nil {
-				reqCtx.Log.Error(err, "failed to check or create dpt config secret", "namespace", backup.Namespace)
+		case repo.AccessByTool():
+			if err := r.checkOrCreateToolConfigSecret(reqCtx, renderCtx, repo, provider, backup.Namespace); err != nil {
+				reqCtx.Log.Error(err, "failed to check or create tool config secret", "namespace", backup.Namespace)
 				retErr = err
 				continue
 			}
@@ -673,35 +673,35 @@ func (r *BackupRepoReconciler) checkOrCreatePVC(
 	return err
 }
 
-func constructDPTConfigSecret(secret *corev1.Secret, content string) {
+func constructToolConfigSecret(secret *corev1.Secret, content string) {
 	secret.Data = map[string][]byte{
-		"dpt.conf": []byte(content),
+		"datasafed.conf": []byte(content),
 	}
 }
 
-func (r *BackupRepoReconciler) checkOrCreateDPTConfigSecret(
+func (r *BackupRepoReconciler) checkOrCreateToolConfigSecret(
 	reqCtx intctrlutil.RequestCtx, renderCtx renderContext,
 	repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider, namespace string) error {
 
 	secret := &corev1.Secret{}
-	secret.Name = repo.Status.DPTConfigSecretName
+	secret.Name = repo.Status.ToolConfigSecretName
 	secret.Namespace = namespace
 	_, err := createObjectIfNotExist(reqCtx.Ctx, r.Client, secret,
 		func() error {
-			content, err := renderTemplate("dpt-config", provider.Spec.DPTConfigTemplate, renderCtx)
+			content, err := renderTemplate("tool-config", provider.Spec.DPTConfigTemplate, renderCtx)
 			if err != nil {
-				return fmt.Errorf("failed to render dpt config template: %w", err)
+				return fmt.Errorf("failed to render tool config template: %w", err)
 			}
-			constructDPTConfigSecret(secret, content)
+			constructToolConfigSecret(secret, content)
 
 			// add a referencing label
 			secret.Labels = map[string]string{
-				dataProtectionBackupRepoKey:  repo.Name,
-				dataProtectionIsDPTConfigKey: trueVal,
+				dataProtectionBackupRepoKey:   repo.Name,
+				dataProtectionIsToolConfigKey: trueVal,
 			}
 			secret.Annotations = map[string]string{
-				dataProtectionTemplateValuesMD5AnnotationKey:       renderCtx.Md5OfParameters(),
-				dataProtectionDPTConfigTemplateMD5MD5AnnotationKey: md5Digest(provider.Spec.DPTConfigTemplate),
+				dataProtectionTemplateValuesMD5AnnotationKey:        renderCtx.Md5OfParameters(),
+				dataProtectionToolConfigTemplateMD5MD5AnnotationKey: md5Digest(provider.Spec.DPTConfigTemplate),
 			}
 			if err := controllerutil.SetControllerReference(repo, secret, r.Scheme); err != nil {
 				return fmt.Errorf("failed to set owner reference: %w", err)
@@ -773,7 +773,7 @@ func (r *BackupRepoReconciler) deleteExternalResources(
 		return err
 	}
 
-	// delete derived secrets (secret for CSI and DPT configs)
+	// delete derived secrets (secret for CSI and tool configs)
 	if err := r.deleteSecrets(reqCtx, repo); err != nil {
 		return err
 	}

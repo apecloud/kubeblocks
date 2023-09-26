@@ -51,13 +51,13 @@ const (
 
 	dataProtectionBackupRepoKey          = "dataprotection.kubeblocks.io/backup-repo-name"
 	dataProtectionWaitRepoPreparationKey = "dataprotection.kubeblocks.io/wait-repo-preparation"
-	dataProtectionIsDPTConfigKey         = "dataprotection.kubeblocks.io/is-dpt-config"
+	dataProtectionIsToolConfigKey        = "dataprotection.kubeblocks.io/is-tool-config"
 
 	// annotation keys
-	dataProtectionSecretTemplateMD5AnnotationKey       = "dataprotection.kubeblocks.io/secret-template-md5"
-	dataProtectionTemplateValuesMD5AnnotationKey       = "dataprotection.kubeblocks.io/template-values-md5"
-	dataProtectionPVCTemplateMD5MD5AnnotationKey       = "dataprotection.kubeblocks.io/pvc-template-md5"
-	dataProtectionDPTConfigTemplateMD5MD5AnnotationKey = "dataprotection.kubeblocks.io/dpt-config-template-md5"
+	dataProtectionSecretTemplateMD5AnnotationKey        = "dataprotection.kubeblocks.io/secret-template-md5"
+	dataProtectionTemplateValuesMD5AnnotationKey        = "dataprotection.kubeblocks.io/template-values-md5"
+	dataProtectionPVCTemplateMD5MD5AnnotationKey        = "dataprotection.kubeblocks.io/pvc-template-md5"
+	dataProtectionToolConfigTemplateMD5MD5AnnotationKey = "dataprotection.kubeblocks.io/tool-config-template-md5"
 
 	// the key of persistentVolumeTemplate in the configmap.
 	persistentVolumeTemplateKey = "persistentVolume"
@@ -72,7 +72,7 @@ const (
 	ConditionTypeParametersChecked     = "ParametersChecked"
 	ConditionTypeStorageClassCreated   = "StorageClassCreated"
 	ConditionTypePVCTemplateChecked    = "PVCTemplateChecked"
-	ConditionTypeDPTConfigChecked      = "DPTConfigSecretChecked"
+	ConditionTypeToolConfigChecked     = "ToolConfigSecretChecked"
 	ConditionTypeDerivedObjectsDeleted = "DerivedObjectsDeleted"
 
 	// condition reasons
@@ -85,10 +85,10 @@ const (
 	ReasonPrepareCSISecretFailed    = "PrepareCSISecretFailed"
 	ReasonPrepareStorageClassFailed = "PrepareStorageClassFailed"
 	ReasonBadPVCTemplate            = "BadPVCTemplate"
-	ReasonBadDPTConfigTemplate      = "BadDPTConfigTemplate"
+	ReasonBadToolConfigTemplate     = "BadToolConfigTemplate"
 	ReasonStorageClassCreated       = "StorageClassCreated"
 	ReasonPVCTemplateChecked        = "PVCTemplateChecked"
-	ReasonDPTConfigChecked          = "DPTConfigChecked"
+	ReasonToolConfigChecked         = "ToolConfigChecked"
 	ReasonHaveAssociatedBackups     = "HaveAssociatedBackups"
 	ReasonHaveResidualPVCs          = "HaveResidualPVCs"
 	ReasonDerivedObjectsDeleted     = "DerivedObjectsDeleted"

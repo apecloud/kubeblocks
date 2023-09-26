@@ -658,10 +658,10 @@ spec:
 			})).Should(Succeed())
 		})
 
-		Context("with AccessMethodDPT", func() {
+		Context("with AccessMethodTool", func() {
 			var repo *dpv1alpha1.BackupRepo
 			var backup *dpv1alpha1.Backup
-			var dptConfigSecretKey types.NamespacedName
+			var toolConfigSecretKey types.NamespacedName
 
 			BeforeEach(func() {
 				By("preparing")
@@ -676,7 +676,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 `
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
-					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDPT
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
 				})
 
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, obj *dpv1alpha1.BackupRepo) {
@@ -685,11 +685,11 @@ cred-key2={{ index .Parameters "cred-key2" }}
 				})).Should(Succeed())
 
 				backup = createBackupSpec(nil)
-				dptConfigSecretKey = types.NamespacedName{
-					Name:      repo.Status.DPTConfigSecretName,
+				toolConfigSecretKey = types.NamespacedName{
+					Name:      repo.Status.ToolConfigSecretName,
 					Namespace: backup.Namespace,
 				}
-				Eventually(testapps.CheckObjExists(&testCtx, dptConfigSecretKey, &corev1.Secret{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, toolConfigSecretKey, &corev1.Secret{}, true)).Should(Succeed())
 			})
 
 			It("should check that the storage provider has a non-empty dptConfigTemplate", func() {
@@ -698,7 +698,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 					provider.Spec.DPTConfigTemplate = ""
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
-					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDPT
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
 				})
 				By("checking")
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
@@ -717,21 +717,21 @@ cred-key2={{ index .Parameters "cred-key2" }}
 					provider.Spec.DPTConfigTemplate = "bad template {{"
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
-					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDPT
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
 				})
 				By("checking")
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
-					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeDPTConfigChecked)
+					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeToolConfigChecked)
 					g.Expect(cond).NotTo(BeNil())
 					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
-					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadDPTConfigTemplate))
+					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadToolConfigTemplate))
 				})).Should(Succeed())
 			})
 
-			It("should create the secret containing the dpt config", func() {
-				Eventually(testapps.CheckObj(&testCtx, dptConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
-					g.Expect(secret.Data).Should(HaveKeyWithValue("dpt.conf", []byte(`
+			It("should create the secret containing the tool config", func() {
+				Eventually(testapps.CheckObj(&testCtx, toolConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
+					g.Expect(secret.Data).Should(HaveKeyWithValue("datasafed.conf", []byte(`
 [storage]
 type=local
 key1=val1
@@ -746,7 +746,7 @@ cred-key2=cred-val2
 					backup.Namespace = namespace2
 				})
 				secretKey := types.NamespacedName{
-					Name:      repo.Status.DPTConfigSecretName,
+					Name:      repo.Status.ToolConfigSecretName,
 					Namespace: namespace2,
 				}
 				Eventually(testapps.CheckObjExists(&testCtx, secretKey, &corev1.Secret{}, true)).Should(Succeed())
@@ -757,8 +757,8 @@ cred-key2=cred-val2
 				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 					provider.Spec.DPTConfigTemplate += "new-item=new-value\n"
 				})).Should(Succeed())
-				Eventually(testapps.CheckObj(&testCtx, dptConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
-					g.Expect(secret.Data).Should(HaveKeyWithValue("dpt.conf", []byte(`
+				Eventually(testapps.CheckObj(&testCtx, toolConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
+					g.Expect(secret.Data).Should(HaveKeyWithValue("datasafed.conf", []byte(`
 [storage]
 type=local
 key1=val1
@@ -773,8 +773,8 @@ new-item=new-value
 				Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.Config["key1"] = "changed-val1"
 				})).Should(Succeed())
-				Eventually(testapps.CheckObj(&testCtx, dptConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
-					g.Expect(secret.Data).Should(HaveKeyWithValue("dpt.conf", []byte(`
+				Eventually(testapps.CheckObj(&testCtx, toolConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
+					g.Expect(secret.Data).Should(HaveKeyWithValue("datasafed.conf", []byte(`
 [storage]
 type=local
 key1=changed-val1
@@ -791,7 +791,7 @@ new-item=new-value
 				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(backup), &dpv1alpha1.Backup{})
 				testapps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
 				By("checking the secret is deleted")
-				Eventually(testapps.CheckObjExists(&testCtx, dptConfigSecretKey, &corev1.Secret{}, false)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, toolConfigSecretKey, &corev1.Secret{}, false)).Should(Succeed())
 			})
 		})
 

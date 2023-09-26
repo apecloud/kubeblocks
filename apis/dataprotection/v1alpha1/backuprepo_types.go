@@ -29,9 +29,9 @@ const (
 	// AccessMethodMount means that the storage is mounted locally,
 	// so that remote files can be accessed just like a local file.
 	AccessMethodMount AccessMethod = "Mount"
-	// AccessMethodDPT means to access the storage with the dpt command
-	// that helps to transfer files between storage and local.
-	AccessMethodDPT AccessMethod = "DPT"
+	// AccessMethodTool means to access the storage with a command-line tool,
+	// which helps to transfer files between the storage and local.
+	AccessMethodTool AccessMethod = "Tool"
 )
 
 // BackupRepoSpec defines the desired state of BackupRepo
@@ -42,7 +42,7 @@ type BackupRepoSpec struct {
 	StorageProviderRef string `json:"storageProviderRef"`
 
 	// Specifies the access method of the backup repo.
-	// +kubebuilder:validation:Enum={Mount,DPT}
+	// +kubebuilder:validation:Enum={Mount,Tool}
 	// +kubebuilder:default=Mount
 	// +optional
 	AccessMethod AccessMethod `json:"accessMethod,omitempty"`
@@ -92,9 +92,9 @@ type BackupRepoStatus struct {
 	// +optional
 	BackupPVCName string `json:"backupPVCName,omitempty"`
 
-	// dptConfigSecretName is the name of the secret which contains the config for the dpt command.
+	// toolConfigSecretName is the name of the secret containing the configuration for the access tool.
 	// +optional
-	DPTConfigSecretName string `json:"dptConfigSecretName,omitempty"`
+	ToolConfigSecretName string `json:"toolConfigSecretName,omitempty"`
 
 	// isDefault indicates whether this backup repo is the default one.
 	// +optional
@@ -134,10 +134,10 @@ func init() {
 	SchemeBuilder.Register(&BackupRepo{}, &BackupRepoList{})
 }
 
-func (repo *BackupRepo) IsMountAccess() bool {
+func (repo *BackupRepo) AccessByMount() bool {
 	return repo.Spec.AccessMethod == "" || repo.Spec.AccessMethod == AccessMethodMount
 }
 
-func (repo *BackupRepo) IsDPTAccess() bool {
-	return repo.Spec.AccessMethod == AccessMethodDPT
+func (repo *BackupRepo) AccessByTool() bool {
+	return repo.Spec.AccessMethod == AccessMethodTool
 }

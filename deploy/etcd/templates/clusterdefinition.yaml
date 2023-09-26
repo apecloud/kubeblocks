@@ -10,18 +10,47 @@ spec:
     - name: etcd
       characterType: etcd
       workloadType: Consensus
-      consensusSpec:
-        leader:
-          name: "leader"
-          accessMode: ReadWrite
-        followers:
+      rsmSpec:
+        roles:
+          - name: "leader"
+            accessMode: ReadWrite
+            isLeader: true
+            canVote: true
           - name: "follower"
             accessMode: ReadWrite
-        updateStrategy: BestEffortParallel
-      probes:
+            isLeader: false
+            canVote: true
         roleProbe:
-          periodSeconds: 1
-          failureThreshold: 3
+          probeActions:
+            - image: "quay.io/coreos/etcd:v3.5.6"
+              command:
+                - "Status=$(etcdctl --endpoints=127.0.0.1:2379 endpoint status -w simple --command-timeout=300ms --dial-timeout=100m) &&"
+                - "IsLeader=$(echo $Status | awk -F ', ' '{print $5}') &&"
+                - "IsLearner=$(echo $Status | awk -F ', ' '{print $6}') &&"
+                - "if [ \"true\" = \"$IsLeader\" ]; then echo -n \"leader\"; elif [ \"true\" = \"$IsLearner\" ]; then echo -n \"learner\"; else echo -n \"follower\"; fi"
+          roleUpdateMechanism: DirectAPIServerEventUpdate
+        memberUpdateStrategy: BestEffortParallel
+        membershipReconfiguration:
+          switchoverAction:
+            image: "quay.io/coreos/etcd:v3.5.6"
+            command:
+              - "current_leader=$(etcdctl endpoint status --write-out=json | jq -r '.[] | select(.is_leader == true) | .clientURLs[0]') &&"
+              - "[[ -z $current_leader ]] && echo \"No current leader found. Exiting...\" && exit 1 &&"
+              - "echo \"Current Leader: $current_leader\" &&"
+              - "follower_id=$(etcdctl member list | awk '/isLeader=False/{print $1}') &&"
+              - "[[ -z $follower_id ]] && echo \"No follower found. Exiting...\" && exit 1 &&"
+              - "echo \"Promoting Follower: $follower_id\" &&"
+              - "etcdctl member promote $follower_id &&"
+              - "new_leader=$(etcdctl endpoint status --write-out=json | jq -r '.[] | select(.is_leader == true) | .clientURLs[0]') &&"
+              - "[[ $new_leader == $current_leader ]] && echo \"Switchover failed. New leader is the same as the previous leader.\" && exit 1 &&"
+              - "echo \"New Leader: $new_leader\" &&"
+              - "echo \"Etcd Switchover completed successfully.\""
+          memberJoinAction:
+            command:
+              - "etcdctl member add --peer-urls=http://$KB_RSM_TARGET_HOST:KB_RSM_SERVICE_PORT"
+          memberLeaveAction:
+            command:
+              - "etcdctl member remove --peer-urls=http://$KB_RSM_TARGET_HOST:KB_RSM_SERVICE_PORT"
       service:
         ports:
           - name: client

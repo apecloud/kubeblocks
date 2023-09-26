@@ -168,8 +168,8 @@ var _ = Describe("Backup Schedule Controller", func() {
 					dataProtectionLabelBackupMethodKey: testdp.BackupMethodName,
 				}
 
-				createBackup := func() *dpv1alpha1.Backup {
-					return testdp.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
+				createBackup := func(name string) *dpv1alpha1.Backup {
+					return testdp.NewBackupFactory(testCtx.DefaultNamespace, name).
 						WithRandomName().AddLabelsInMap(autoBackupLabel).
 						SetBackupPolicyName(testdp.BackupPolicyName).
 						SetBackupMethod(testdp.BackupMethodName).
@@ -184,13 +184,13 @@ var _ = Describe("Backup Schedule Controller", func() {
 				}
 
 				By("create an expired backup")
-				backupExpired := createBackup()
+				backupExpired := createBackup(backupNamePrefix + "expired")
 
-				By("create 1st limit backup")
-				backupOutLimit1 := createBackup()
+				By("create 1st backup")
+				backupOutLimit1 := createBackup(backupNamePrefix + "1")
 
-				By("create 2nd limit backup")
-				backupOutLimit2 := createBackup()
+				By("create 2nd backup")
+				backupOutLimit2 := createBackup(backupNamePrefix + "2")
 
 				By("waiting expired backup completed")
 				expiredKey := client.ObjectKeyFromObject(backupExpired)
@@ -202,22 +202,22 @@ var _ = Describe("Backup Schedule Controller", func() {
 				backupStatus.StartTimestamp = backupStatus.Expiration
 				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupExpired), backupStatus)
 
-				By("waiting 1st limit backup completed")
+				By("waiting 1st backup completed")
 				outLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupOutLimit1), batchv1.JobComplete)
 				checkBackupCompleted(outLimit1Key)
 
-				By("mock update 1st limit backup NOT to expire")
+				By("mock 1st backup not to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
 				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupOutLimit1), backupStatus)
 
-				By("waiting 2nd limit backup completed")
+				By("waiting 2nd backup completed")
 				outLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupOutLimit2), batchv1.JobComplete)
 				checkBackupCompleted(outLimit2Key)
 
-				By("mock update 2nd limit backup NOT to expire")
+				By("mock 2nd backup not to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
 				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupOutLimit2), backupStatus)
@@ -251,7 +251,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 			})
 		})
 
-		Context("creates a backup policy with invalid schedule", func() {
+		Context("creates a backup schedule with invalid field", func() {
 			var (
 				backupScheduleKey client.ObjectKey
 				backupSchedule    *dpv1alpha1.BackupSchedule

@@ -155,7 +155,7 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 		AddVolume(volume).
 		Create(testCtx).GetObject()
 
-	By("mocking a pod 1 belonging to the statefulset")
+	By("mocking pod 1 belonging to the statefulset")
 	volume2 := corev1.Volume{Name: DataVolumeName, VolumeSource: corev1.VolumeSource{
 		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc1.Name}}}
 	_ = podFactory(podName + "-1").

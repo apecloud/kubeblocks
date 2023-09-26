@@ -26,6 +26,9 @@ fi
 
 CODE_GENERATOR_PATH=$(go list -f '{{.Dir}}' -m k8s.io/code-generator)
 
+# HACK: add exec permission to code generator scripts
+chmod u+x ${CODE_GENERATOR_PATH}/*.sh
+
 GENERATORS="deepcopy,defaulter,client,lister,informer"
 OUTPUT_PACKAGE="github.com/apecloud/kubeblocks/pkg/client"
 APIS_PACKAGE="github.com/apecloud/kubeblocks/apis"

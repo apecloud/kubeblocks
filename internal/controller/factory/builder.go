@@ -198,19 +198,13 @@ func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 			Spec:       vct.Spec,
 		}
 	}
-
-	commonLabels := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppNameLabelKey:        component.ClusterDefName,
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: component.Name,
-	}
+	commonLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
-		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
+		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
+		AddLabelsInMap(constant.GetWorkloadTypeLabel(string(component.WorkloadType)))
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
+		podBuilder.AddLabelsInMap(constant.GetClusterVersionLabel(cluster.Spec.ClusterVersionRef))
 	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
@@ -218,7 +212,7 @@ func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	}
 	stsBuilder := builder.NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
+		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
 		AddMatchLabelsInMap(commonLabels).
 		SetServiceName(cluster.Name + "-" + component.Name + "-headless").
 		SetReplicas(component.Replicas).
@@ -251,15 +245,6 @@ func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	return sts, nil
 }
 
-func buildWellKnownLabels(clusterDefName, clusterName, componentName string) map[string]string {
-	return map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppNameLabelKey:        clusterDefName,
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
-	}
-}
-
 func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
@@ -268,7 +253,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 		}
 	}
 
-	commonLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	commonLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	addCommonLabels := func(service *corev1.Service) {
 		if service == nil {
 			return
@@ -286,10 +271,10 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
-		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
+		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
+		AddLabelsInMap(constant.GetWorkloadTypeLabel(string(component.WorkloadType)))
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
+		podBuilder.AddLabelsInMap(constant.GetClusterVersionLabel(cluster.Spec.ClusterVersionRef))
 	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
@@ -321,7 +306,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotationsInMap(monitorAnnotations).
 		AddLabelsInMap(commonLabels).
-		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
+		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
 		AddMatchLabelsInMap(commonLabels).
 		SetServiceName(rsmName + "-headless").
 		SetReplicas(component.Replicas).
@@ -656,13 +641,13 @@ func randomString(length int) string {
 
 func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) *corev1.Secret {
-	wellKnownLabels := buildWellKnownLabels(clusterDefinition.Name, cluster.Name, "")
+	wellKnownLabels := constant.GetKBWellKnownLabels(clusterDefinition.Name, cluster.Name, "")
 	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
-	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, fmt.Sprintf("%s-conn-credential", cluster.Name)).
+	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, constant.GenerateDefaultConnCredential(cluster.Name)).
 		AddLabelsInMap(wellKnownLabels).
 		SetStringData(clusterDefinition.Spec.ConnectionCredential)
 	if len(clusterDefinition.Spec.Type) > 0 {
-		credentialBuilder.AddLabels("apps.kubeblocks.io/cluster-type", clusterDefinition.Spec.Type)
+		credentialBuilder.AddLabelsInMap(constant.GetClusterDefTypeLabel(clusterDefinition.Spec.Type))
 	}
 	connCredential := credentialBuilder.GetObject()
 
@@ -716,9 +701,9 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_B64)":             uuidB64,
 		"$(UUID_STR_B64)":         uuidStrB64,
 		"$(UUID_HEX)":             uuidHex,
-		"$(SVC_FQDN)":             fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
-		"$(KB_CLUSTER_COMP_NAME)": cluster.Name + "-" + component.Name,
-		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(SVC_FQDN)":             constant.GenerateComponentServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
+		"$(KB_CLUSTER_COMP_NAME)": constant.GenerateClusterComponentPattern(cluster.Name, component.Name),
+		"$(HEADLESS_SVC_FQDN)":    constant.GenerateComponentHeadlessServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
 	}
 	if len(component.Services) > 0 {
 		for _, p := range component.Services[0].Spec.Ports {
@@ -737,10 +722,10 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 }
 
 func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {
-	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	return builder.NewPDBBuilder(cluster.Namespace, fmt.Sprintf("%s-%s", cluster.Name, component.Name)).
+	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	return builder.NewPDBBuilder(cluster.Namespace, constant.GenerateClusterComponentPattern(cluster.Name, component.Name)).
 		AddLabelsInMap(wellKnownLabels).
-		AddLabels(constant.AppComponentLabelKey, component.ClusterCompDefName).
+		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
 		AddSelectorsInMap(wellKnownLabels).
 		GetObject()
 }
@@ -750,7 +735,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	snapshotName string) *corev1.PersistentVolumeClaim {
-	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
 		AddLabelsInMap(wellKnownLabels).
 		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
@@ -795,7 +780,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	configs map[string]string,
 	cmName string,
 	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
-	wellKnownLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	wellKnownLabels[constant.AppComponentLabelKey] = component.ClusterCompDefName
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
 		AddLabelsInMap(wellKnownLabels).
@@ -975,7 +960,7 @@ func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnap
 }
 
 func BuildServiceAccount(cluster *appsv1alpha1.Cluster) *corev1.ServiceAccount {
-	wellKnownLabels := buildWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
+	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
 	return builder.NewServiceAccountBuilder(cluster.Namespace, fmt.Sprintf("kb-%s", cluster.Name)).
 		AddLabelsInMap(wellKnownLabels).
@@ -983,7 +968,7 @@ func BuildServiceAccount(cluster *appsv1alpha1.Cluster) *corev1.ServiceAccount {
 }
 
 func BuildRoleBinding(cluster *appsv1alpha1.Cluster) *rbacv1.RoleBinding {
-	wellKnownLabels := buildWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
+	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
 	return builder.NewRoleBindingBuilder(cluster.Namespace, fmt.Sprintf("kb-%s", cluster.Name)).
 		AddLabelsInMap(wellKnownLabels).
@@ -1001,7 +986,7 @@ func BuildRoleBinding(cluster *appsv1alpha1.Cluster) *rbacv1.RoleBinding {
 }
 
 func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster) *rbacv1.ClusterRoleBinding {
-	wellKnownLabels := buildWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
+	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
 	return builder.NewClusterRoleBindingBuilder(cluster.Namespace, fmt.Sprintf("kb-%s", cluster.Name)).
 		AddLabelsInMap(wellKnownLabels).

@@ -384,7 +384,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
-		constant.KBConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
+		constant.KBConnCredentialPlaceHolder: constant.GenerateDefaultConnCredential(clusterName),
 	}
 }
 
@@ -441,10 +441,6 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 		newEnvs = append(newEnvs, e)
 	}
 	return newEnvs
-}
-
-func GenerateConnCredential(clusterName string) string {
-	return fmt.Sprintf("%s-conn-credential", clusterName)
 }
 
 // overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.

@@ -189,13 +189,13 @@ var _ = Describe("builder", func() {
 			)
 			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(BeEmpty())
+			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(BeEmpty())
 			By("setting type")
 			characterType := "test-character-type"
 			clusterDef.Spec.Type = characterType
 			credential = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(Equal(characterType))
+			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(Equal(characterType))
 			// "username":      "root",
 			// "SVC_FQDN":      "$(SVC_FQDN)",
 			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
@@ -498,7 +498,7 @@ var _ = Describe("builder", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:               constant.ConfigSidecarName,
-				SecreteName:               component.GenerateConnCredential(cluster.Name),
+				SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
 				Image:                     viper.GetString(constant.KBToolsImage),
 				Cluster:                   cluster,
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),

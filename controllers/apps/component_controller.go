@@ -76,16 +76,14 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentDeletionTransformer{},
 			// update finalizer and component definition labels
 			&ComponentAssureMetaTransformer{},
-			// validate ref objects existence and availability
+			// validate referenced componentDefinition objects existence and availability, and build synthesized component
 			&ComponentLoadResourcesTransformer{},
-			// validate config
-			&ValidateEnableLogsTransformer{},
-			// create cluster connection credential secret object
-			// TODO: delete it
-			&ClusterCredentialTransformer{},
-			// create all components objects
-			// TODO: refactor it
-			&ComponentTransformer{Client: r.Client},
+			// validate enabled logs
+			&ComponentEnableLogsValidationTransformer{},
+			// handle component connection credential secret object
+			&ComponentCredentialTransformer{},
+			// handle rsm(ReplicatedStateMachine) workload generation
+			&ComponentWorkloadTransformer{},
 			// add our finalizer to all objects
 			&OwnershipTransformer{},
 			// make all workload objects depending on credential secret

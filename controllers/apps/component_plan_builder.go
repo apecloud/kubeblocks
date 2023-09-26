@@ -34,6 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -45,9 +46,11 @@ type ComponentTransformContext struct {
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	CompDef       *appsv1alpha1.ComponentDefinition
-	Component     *appsv1alpha1.Component
-	ComponentOrig *appsv1alpha1.Component
+	Cluster             *appsv1alpha1.Cluster
+	CompDef             *appsv1alpha1.ComponentDefinition
+	Component           *appsv1alpha1.Component
+	ComponentOrig       *appsv1alpha1.Component
+	SynthesizeComponent *component.SynthesizedComponent
 }
 
 func (c *ComponentTransformContext) GetContext() context.Context {
@@ -89,13 +92,13 @@ var _ graph.Plan = &componentPlan{}
 // PlanBuilder implementation
 
 func (c *componentPlanBuilder) Init() error {
-	component := &appsv1alpha1.Component{}
-	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, component); err != nil {
+	comp := &appsv1alpha1.Component{}
+	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, comp); err != nil {
 		return err
 	}
 
-	c.transCtx.Component = component
-	c.transCtx.ComponentOrig = component.DeepCopy()
+	c.transCtx.Component = comp
+	c.transCtx.ComponentOrig = comp.DeepCopy()
 	c.transformers = append(c.transformers, &InitComponentTransformer{
 		Component:     c.transCtx.Component,
 		ComponentOrig: c.transCtx.ComponentOrig,

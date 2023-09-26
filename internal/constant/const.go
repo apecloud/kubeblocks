@@ -76,9 +76,9 @@ const (
 	AppName = "kubeblocks"
 
 	// K8s recommonded well-known labels and annotation keys
-	AppInstanceLabelKey  = "app.kubernetes.io/instance"
-	AppNameLabelKey      = "app.kubernetes.io/name"
-	AppComponentLabelKey = "app.kubernetes.io/component"
+	AppInstanceLabelKey  = "app.kubernetes.io/instance"  //
+	AppNameLabelKey      = "app.kubernetes.io/name"      // refer clusterDefinition.Name
+	AppComponentLabelKey = "app.kubernetes.io/component" // refer clusterDefinition.Spec.ComponentDefs[*].Name
 	AppVersionLabelKey   = "app.kubernetes.io/version"
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
 	RegionLabelKey       = "topology.kubernetes.io/region"
@@ -94,6 +94,7 @@ const (
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
 	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref"
+	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type" // refer clusterDefinition.Spec.Type (deprecated)
 	AppConfigTypeLabelKey                    = "apps.kubeblocks.io/config-type"
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"

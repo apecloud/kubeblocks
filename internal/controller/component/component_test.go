@@ -320,7 +320,7 @@ var _ = Describe("component module", func() {
 			for _, env := range mockEnvs {
 				Expect(env.ValueFrom).ShouldNot(BeNil())
 				Expect(env.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(GenerateConnCredential(cluster.Name)))
+				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(constant.GenerateDefaultConnCredential(cluster.Name)))
 			}
 		})
 

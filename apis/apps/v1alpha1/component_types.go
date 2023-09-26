@@ -20,12 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"fmt"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
+	// cluster is the name of the Cluster to which the component belongs.
+	// +kubebuilder:validation:Required
+	Cluster string `json:"cluster"`
+
+	// compDef is the name of the referenced componentDefinition.
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`
 
@@ -73,6 +80,10 @@ type ComponentSpec struct {
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 
+	// enabledLogs indicates which log file takes effect in the database cluster.
+	// element is the log type which is defined in ComponentDefinition logConfig.name,
+	// and will set relative variables about this log type in database kernel.
+	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
@@ -161,4 +172,13 @@ func (r *ComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimT
 		ts = append(ts, t.toVolumeClaimTemplate())
 	}
 	return ts
+}
+
+// ValidateEnabledLogs validates enabledLogs config in component.Spec, and returns metav1.Condition when detecting invalid values.
+func (r *Component) ValidateEnabledLogs(compDef *ComponentDefinition) error {
+	invalidLogNames := compDef.ValidateEnabledLogConfigs(r.Spec.EnabledLogs)
+	if len(invalidLogNames) > 0 {
+		return errors.New(fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the ComponentDefinition", invalidLogNames, r.Name))
+	}
+	return nil
 }

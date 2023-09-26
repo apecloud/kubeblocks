@@ -20,13 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ComponentLoadResourcesTransformer handles referenced resources validation and load them into context
@@ -36,6 +37,11 @@ var _ graph.Transformer = &ComponentLoadResourcesTransformer{}
 
 func (t *ComponentLoadResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ComponentTransformContext)
+	reqCtx := ictrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
+	}
 	comp := transCtx.Component
 
 	var err error
@@ -43,6 +49,7 @@ func (t *ComponentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
+	// get and init component definition context
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: comp.Spec.CompDef}, compDef)
 	if err != nil {
@@ -51,10 +58,25 @@ func (t *ComponentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 
 	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
 		message := fmt.Sprintf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
-		err = errors.New(message)
 		return newRequeueError(requeueDuration, message)
 	}
 
+	// get and init cluster context
+	// TODO(xingran): In order to backward compatibility in KubeBlocks version 0.7.0, the cluster field is still required. However, if in the future the Component objects can be used independently, the Cluster field should be removed from the component.Spec
+	cluster := &appsv1alpha1.Cluster{}
+	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: comp.Spec.Cluster, Namespace: comp.Namespace}, cluster)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+
 	transCtx.CompDef = compDef
+	transCtx.Cluster = cluster
+
+	synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, cluster, compDef, comp)
+	if err != nil {
+		message := fmt.Sprintf("Component %s BuildSynthesizedComponent failed: %s", comp.Name, err.Error())
+		return newRequeueError(requeueDuration, message)
+	}
+	transCtx.SynthesizeComponent = synthesizeComp
 	return nil
 }

@@ -238,7 +238,7 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
-	builtInEnvMap[constant.KBConnCredentialPlaceHolder] = component.GenerateConnCredential(clusterName)
+	builtInEnvMap[constant.KBConnCredentialPlaceHolder] = constant.GenerateDefaultConnCredential(clusterName)
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
 	}

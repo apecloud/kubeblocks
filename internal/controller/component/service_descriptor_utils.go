@@ -32,11 +32,12 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component,
@@ -87,7 +88,7 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 
 // handleClusterTypeServiceRef handles the service reference is another KubeBlocks Cluster.
 func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli roclient.ReadonlyClient,
 	namespace string,
 	cluster *appsv1alpha1.Cluster,
 	serviceRef appsv1alpha1.ServiceRef,
@@ -103,7 +104,7 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 
 	// get the connection credential secret of the referenced cluster
 	secretRef := &corev1.Secret{}
-	secretRefName := GenerateConnCredential(referencedCluster.Name)
+	secretRefName := constant.GenerateDefaultConnCredential(referencedCluster.Name)
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: secretRefName}, secretRef); err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 
 // handleServiceDescriptorTypeServiceRef handles the service reference is provided by external ServiceDescriptor object.
 func handleServiceDescriptorTypeServiceRef(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli roclient.ReadonlyClient,
 	namespace string,
 	serviceRef appsv1alpha1.ServiceRef,
 	serviceRefDecl appsv1alpha1.ServiceRefDeclaration,
@@ -219,5 +220,5 @@ func getWellKnownServiceKindAliasMapping(serviceKind string) string {
 }
 
 func generateDefaultServiceDescriptorName(clusterName string) string {
-	return fmt.Sprintf("kbsd-%s", GenerateConnCredential(clusterName))
+	return fmt.Sprintf("kbsd-%s", constant.GenerateDefaultConnCredential(clusterName))
 }

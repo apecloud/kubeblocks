@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,12 +31,13 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from input Cluster, ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component,
@@ -45,7 +47,7 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 
 // buildSynthesizeComponent builds a new Component object, which is a mixture of component-related configs from input Cluster, ComponentDefinition and Component.
 func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component,
@@ -142,7 +144,7 @@ func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
 }
 
 // buildServiceReferences builds serviceReferences for component.
-func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
+func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
 	serviceReferences, err := GenServiceReferences(reqCtx, cli, cluster, compDef, comp)
 	if err != nil {
 		return err
@@ -175,7 +177,7 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 
 // buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0
 // TODO(xingran): it will be removed in the future
-func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent) error {
+func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent) error {
 	if cluster.Spec.ClusterDefRef == "" || cluster.Spec.ClusterVersionRef == "" {
 		return nil // no need to build backward compatible fields
 	}
@@ -192,12 +194,9 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	if err := validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
 		return err
 	}
-	var cv *appsv1alpha1.ClusterVersion
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		cv = &appsv1alpha1.ClusterVersion{}
-		if err := validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
-			return err
-		}
+	cv := &appsv1alpha1.ClusterVersion{}
+	if err := validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
+		return err
 	}
 
 	var clusterCompDef *appsv1alpha1.ClusterComponentDefinition
@@ -224,7 +223,11 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		synthesizeComp.ConsensusSpec = clusterCompDef.ConsensusSpec
 		synthesizeComp.ReplicationSpec = clusterCompDef.ReplicationSpec
 		synthesizeComp.RSMSpec = clusterCompDef.RSMSpec
+		synthesizeComp.StatefulSetWorkload = clusterCompDef.GetStatefulSetWorkload()
 		synthesizeComp.Probes = clusterCompDef.Probes
+		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
+		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
+		synthesizeComp.CustomLabelSpecs = clusterCompDef.CustomLabelSpecs
 	}
 
 	// Services is a backward compatible field, which will be replaced with ComponentServices in the future.

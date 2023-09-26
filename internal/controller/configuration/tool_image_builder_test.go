@@ -63,7 +63,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ManagerName:   constant.ConfigSidecarName,
 				CharacterType: clusterComponent.CharacterType,
 				ComponentName: clusterComponent.Name,
-				SecreteName:   component.GenerateConnCredential(clusterObj.Name),
+				SecreteName:   constant.GenerateDefaultConnCredential(clusterObj.Name),
 				Image:         viper.GetString(constant.KBToolsImage),
 				Volumes:       make([]corev1.VolumeMount, 0),
 				Cluster:       clusterObj,

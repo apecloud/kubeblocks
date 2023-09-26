@@ -90,7 +90,12 @@ spec:
                 required:
                 - class
                 type: object
+              cluster:
+                description: cluster is the name of the Cluster to which the component
+                  belongs.
+                type: string
               compDef:
+                description: compDef is the name of the referenced componentDefinition.
                 type: string
               configs:
                 items:
@@ -190,9 +195,14 @@ spec:
                   type: object
                 type: array
               enabledLogs:
+                description: enabledLogs indicates which log file takes effect in
+                  the database cluster. element is the log type which is defined in
+                  ComponentDefinition logConfig.name, and will set relative variables
+                  about this log type in database kernel.
                 items:
                   type: string
                 type: array
+                x-kubernetes-list-type: set
               issuer:
                 description: Issuer defines Tls certs issuer
                 properties:
@@ -491,6 +501,7 @@ spec:
                   type: object
                 type: array
             required:
+            - cluster
             - compDef
             - replicas
             type: object

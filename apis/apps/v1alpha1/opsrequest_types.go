@@ -354,6 +354,13 @@ type ScriptSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
 	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
+	// KubeBlocks, by default, will execute the script on the primary pod, with role=leader.
+	// There are some exceptions, such as Redis, which does not synchronize accounts info between primary and secondary.
+	// In this case, we need to execute the script on all pods, matching the selector.
+	// selector indicates the components on which the script is executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script.selector"
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 type BackupSpec struct {

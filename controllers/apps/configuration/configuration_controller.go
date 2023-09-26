@@ -46,7 +46,7 @@ type ConfigurationReconciler struct {
 	Recorder record.EventRecorder
 }
 
-const reconcileInterval = time.Second
+const reconcileInterval = time.Second * 2
 
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations/status,verbs=get;update;patch
@@ -149,6 +149,8 @@ func (r *ConfigurationReconciler) runTasks(
 			errs = append(errs, err)
 			continue
 		}
+		task.Status.UpdateRevision = revision
+		task.Status.Phase = appsv1alpha1.CMergedPhase
 		if err := task.SyncStatus(fetcher, task.Status); err != nil {
 			task.Status.Phase = appsv1alpha1.CFailedPhase
 			task.Status.Message = cfgutil.ToPointer(err.Error())

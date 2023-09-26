@@ -1,5 +1,5 @@
 apiVersion: v2
-name: polardbx-cluster
+name: polardbx
 description: PolarDB-X Cluster Helm Chart for KubeBlocks.
 
 type: application

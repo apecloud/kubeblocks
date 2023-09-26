@@ -28,35 +28,42 @@ import (
 
 type execCommand struct {
 	*exec.Cmd
+	Stdout *bytes.Buffer
+	Stderr *bytes.Buffer
 }
 
-func (cmd *execCommand) BindStdout(stdout *bytes.Buffer) {
-	cmd.Stdout = stdout
-}
-
-func (cmd *execCommand) BindStdErr(stderr *bytes.Buffer) {
-	cmd.Stderr = stderr
-}
-
-func newExecCommander(name string, args ...string) LocalCommand {
+func NewExecCommander(name string, args ...string) LocalCommand {
 	execCmd := exec.Command(name, args...)
-	return &execCommand{Cmd: execCmd}
+
+	var stdout, stderr bytes.Buffer
+	execCmd.Stdout = &stdout
+	execCmd.Stderr = &stderr
+	return &execCommand{
+		Cmd:    execCmd,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
 }
 
-var localCommander = newExecCommander
+func (cmd *execCommand) GetStdout() *bytes.Buffer {
+	return cmd.Stdout
+}
+
+func (cmd *execCommand) GetStderr() *bytes.Buffer {
+	return cmd.Stderr
+}
+
+var LocalCommander = NewExecCommander
 
 func ExecCommand(name string, args ...string) (string, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := localCommander(name, args...)
-	cmd.BindStdout(&stdout)
-	cmd.BindStdErr(&stderr)
+	cmd := LocalCommander(name, args...)
 
 	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		return "", errors.Errorf("exec command %s failed, err:%v, stderr:%s", name, err, stderr.String())
+	if err != nil || cmd.GetStderr().String() != "<nil>" {
+		return "", errors.Errorf("exec command %s failed, err:%v, stderr:%s", name, err, cmd.GetStderr().String())
 	}
 
-	return stdout.String(), nil
+	return cmd.GetStdout().String(), nil
 }
 
 func Psql(args ...string) (string, error) {
@@ -77,4 +84,32 @@ func PgWalDump(args ...string) (string, error) {
 
 func PgRewind(args ...string) (string, error) {
 	return ExecCommand("pg_rewind", args...)
+}
+
+type FakeCommand struct {
+	Stdout     *bytes.Buffer
+	Stderr     *bytes.Buffer
+	RunnerFunc func() error
+}
+
+func NewFakeCommander(f func() error, stdout, stderr *bytes.Buffer) func(name string, args ...string) LocalCommand {
+	return func(name string, args ...string) LocalCommand {
+		return &FakeCommand{
+			RunnerFunc: f,
+			Stdout:     stdout,
+			Stderr:     stderr,
+		}
+	}
+}
+
+func (cmd *FakeCommand) Run() error {
+	return cmd.RunnerFunc()
+}
+
+func (cmd *FakeCommand) GetStdout() *bytes.Buffer {
+	return cmd.Stdout
+}
+
+func (cmd *FakeCommand) GetStderr() *bytes.Buffer {
+	return cmd.Stderr
 }

@@ -107,8 +107,8 @@ type PgxPoolIFace interface {
 
 type LocalCommand interface {
 	Run() error
-	BindStdout(stdout *bytes.Buffer)
-	BindStdErr(stdout *bytes.Buffer)
+	GetStdout() *bytes.Buffer
+	GetStderr() *bytes.Buffer
 }
 
 type ConsensusMemberHealthStatus struct {

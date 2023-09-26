@@ -372,7 +372,7 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 			annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(false)
 		}
 		p.newCM.Annotations = annotations
-		p.itemStatus.UpdateRevision = revision
+		// p.itemStatus.UpdateRevision = revision
 		return nil
 	})
 }

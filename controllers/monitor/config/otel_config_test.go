@@ -71,8 +71,22 @@ func fakeCollectorDataSourceList() v1alpha1.CollectorDataSourceList {
 	return v1alpha1.CollectorDataSourceList{
 		Items: []v1alpha1.CollectorDataSource{
 			{
-				Spec: v1alpha1.CollectorDataSourceSpec{Type: v1alpha1.MetricsDatasourceType,
-					ExporterRef: v1alpha1.ExporterRef{ExporterNames: []string{"prometheus"}}},
+				Spec: v1alpha1.CollectorDataSourceSpec{
+					Type:        v1alpha1.MetricsDatasourceType,
+					ExporterRef: v1alpha1.ExporterRef{ExporterNames: []string{"prometheus"}},
+					DataSourceList: []v1alpha1.DataSource{
+						{Name: "apecloudmysql"},
+					},
+				},
+			},
+			{
+				Spec: v1alpha1.CollectorDataSourceSpec{
+					Type:        v1alpha1.LogsDataSourceType,
+					ExporterRef: v1alpha1.ExporterRef{ExporterNames: []string{"loki"}},
+					DataSourceList: []v1alpha1.DataSource{
+						{Name: "mysql"},
+					},
+				},
 			},
 		},
 	}

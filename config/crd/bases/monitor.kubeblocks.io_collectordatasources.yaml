@@ -37,15 +37,37 @@ spec:
           spec:
             description: CollectorDataSourceSpec defines the desired state of CollectorDataSource
             properties:
+              collectionInterval:
+                description: CollectionInterval is the interval of the data source
+                type: string
+              dataSourceList:
+                description: DataSourceList is the list of the data source
+                items:
+                  properties:
+                    name:
+                      description: Name is the name of the data source
+                      type: string
+                    parameter:
+                      description: Parameter is the parameter of the data source
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               exporterRef:
                 items:
                   type: string
                 type: array
+              name:
+                description: Name is the name of the data source
+                type: string
               type:
                 description: Type is the type of the data source
                 type: string
             required:
+            - dataSourceList
             - exporterRef
+            - name
             - type
             type: object
           status:

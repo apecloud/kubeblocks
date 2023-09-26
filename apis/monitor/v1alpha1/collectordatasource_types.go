@@ -37,16 +37,38 @@ const (
 	LogsDataSourceType    DataSourceType = "logs"
 )
 
+type DataSource struct {
+	// Name is the name of the data source
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Parameter is the parameter of the data source
+	Parameter *string `json:"parameter,omitempty"`
+}
+
 // CollectorDataSourceSpec defines the desired state of CollectorDataSource
 type CollectorDataSourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// Name is the name of the data source
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
 	// ExporterRef is the exporters to export data source
+	// +kubebuilder:validation:Required
 	ExporterRef `json:",inline"`
 
 	// Type is the type of the data source
+	// +kubebuilder:validation:Required
 	Type DataSourceType `json:"type"`
+
+	// CollectionInterval is the interval of the data source
+	CollectionInterval string `json:"collectionInterval,omitempty"`
+
+	// DataSourceList is the list of the data source
+	// +kubebuilder:validation:Required
+	DataSourceList []DataSource `json:"dataSourceList"`
 }
 
 // CollectorDataSourceStatus defines the observed state of CollectorDataSource

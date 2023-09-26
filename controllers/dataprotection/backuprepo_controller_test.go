@@ -111,18 +111,6 @@ var _ = Describe("BackupRepo controller", func() {
 		}).Should(Succeed())
 	}
 
-	// barrier := func(repoKey types.NamespacedName) {
-	// 	repo := &dpv1alpha1.BackupRepo{}
-	// 	var gen
-	// 	Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(obj *dpv1alpha1.BackupRepo) {
-	// 		repo = obj
-	// 		obj.Generation
-	// 	}))
-	//
-	// 	err := testCtx.Cli.Get(testCtx.Ctx, repoKey, repo)
-	//
-	// }
-
 	BeforeEach(func() {
 		viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		cleanEnv()

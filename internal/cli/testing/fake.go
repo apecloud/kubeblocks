@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	chaosmeshv1alpha1 "github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
@@ -916,31 +917,30 @@ func FakeResourceNotFound(versionResource schema.GroupVersionResource, name stri
 	}
 }
 
-// TODO(chaos-mesh)
-// func FakePodChaos(name, namespace string) *chaosmeshv1alpha1.PodChaos {
-//	return &chaosmeshv1alpha1.PodChaos{
-//		TypeMeta: metav1.TypeMeta{
-//			Kind:       "PodChaos",
-//			APIVersion: "chaos-mesh.org/v1alpha1",
-//		},
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      name,
-//			Namespace: namespace,
-//		},
-//		Spec: chaosmeshv1alpha1.PodChaosSpec{
-//			ContainerSelector: chaosmeshv1alpha1.ContainerSelector{
-//				PodSelector: chaosmeshv1alpha1.PodSelector{
-//					Selector: chaosmeshv1alpha1.PodSelectorSpec{
-//						GenericSelectorSpec: chaosmeshv1alpha1.GenericSelectorSpec{
-//							Namespaces: []string{namespace},
-//						},
-//					},
-//				},
-//			},
-//			Action: chaosmeshv1alpha1.PodKillAction,
-//		},
-//	}
-// }
+func FakePodChaos(name, namespace string) *chaosmeshv1alpha1.PodChaos {
+	return &chaosmeshv1alpha1.PodChaos{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PodChaos",
+			APIVersion: "chaos-mesh.org/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: chaosmeshv1alpha1.PodChaosSpec{
+			ContainerSelector: chaosmeshv1alpha1.ContainerSelector{
+				PodSelector: chaosmeshv1alpha1.PodSelector{
+					Selector: chaosmeshv1alpha1.PodSelectorSpec{
+						GenericSelectorSpec: chaosmeshv1alpha1.GenericSelectorSpec{
+							Namespaces: []string{namespace},
+						},
+					},
+				},
+			},
+			Action: chaosmeshv1alpha1.PodKillAction,
+		},
+	}
+}
 
 func FakeEventForObject(name string, namespace string, object string) *corev1.Event {
 	return &corev1.Event{

@@ -128,6 +128,7 @@ var _ = BeforeSuite(func() {
 		&dpv1alpha1.ActionSet{},
 		&dpv1alpha1.BackupPolicy{},
 		&dpv1alpha1.BackupSchedule{},
+		&dpv1alpha1.BackupRepo{},
 		&dpv1alpha1.Backup{},
 		&dpv1alpha1.Restore{},
 		&vsv1.VolumeSnapshot{},

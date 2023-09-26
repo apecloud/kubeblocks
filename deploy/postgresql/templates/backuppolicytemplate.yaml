@@ -4,7 +4,7 @@ metadata:
   name: postgresql-backup-policy-template
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
-    {{ - include "postgresql.labels" . | nindent 4 }}
+    {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:

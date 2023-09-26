@@ -60,8 +60,14 @@ var _ = Describe("Backup Controller test", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
+
+		// wait all backup to be deleted, otherwise the controller maybe create
+		// job to delete the backup between the ClearResources function delete
+		// the job and get the job list, resulting the ClearResources panic.
+		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
+
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 
@@ -419,7 +425,9 @@ var _ = Describe("Backup Controller test", func() {
 		Context("default backup repo", func() {
 			It("should use the default backup repo if it's not specified", func() {
 				By("creating backup policy and backup")
-				_ = testdp.NewFakeBackupPolicy(&testCtx, nil)
+				_ = testdp.NewFakeBackupPolicy(&testCtx, func(backupPolicy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupRepoName = nil
+				})
 				backup := testdp.NewFakeBackup(&testCtx, nil)
 				By("checking backup, it should use the PVC from the backup repo")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {
@@ -429,7 +437,9 @@ var _ = Describe("Backup Controller test", func() {
 
 			It("should associate the default backup repo with the backup object", func() {
 				By("creating backup policy and backup")
-				_ = testdp.NewFakeBackupPolicy(&testCtx, nil)
+				_ = testdp.NewFakeBackupPolicy(&testCtx, func(backupPolicy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupRepoName = nil
+				})
 				backup := testdp.NewFakeBackup(&testCtx, nil)
 				By("checking backup labels")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, backup *dpv1alpha1.Backup) {

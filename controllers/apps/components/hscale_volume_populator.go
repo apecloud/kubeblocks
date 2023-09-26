@@ -397,11 +397,7 @@ func (d *backupDataClone) checkRestoreStatus(startingIndex int32) (backupStatus,
 	restoreMeta := restoreMGR.GetRestoreObjectMeta(d.component, dpv1alpha1.PrepareData)
 	restore := &dpv1alpha1.Restore{}
 	if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: d.cluster.Namespace, Name: restoreMeta.Name}, restore); err != nil {
-		if errors.IsNotFound(err) {
-			return backupStatusNotCreated, nil
-		} else {
-			return backupStatusNotCreated, err
-		}
+		return backupStatusNotCreated, client.IgnoreNotFound(err)
 	}
 	if restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted {
 		return backupStatusReadyToUse, nil

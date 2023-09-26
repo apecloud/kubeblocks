@@ -39,6 +39,17 @@ import (
 )
 
 const (
+	CobraInt          = "int"
+	CobraSting        = "string"
+	CobraBool         = "bool"
+	CobraFloat64      = "float64"
+	CobraStringArray  = "stringArray"
+	CobraIntSlice     = "intSlice"
+	CobraFloat64Slice = "float64Slice"
+	CobraBoolSlice    = "boolSlice"
+)
+
+const (
 	typeString  = "string"
 	typeNumber  = "number"
 	typeInteger = "integer"

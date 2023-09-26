@@ -607,13 +607,15 @@ var _ = Describe("Cluster Controller", func() {
 				return
 			}
 
+			ml := client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
+				constant.KBManagedByKey:         "cluster",
+			}
 			if policy != nil {
 				By(fmt.Sprintf("Checking backup of component %s created", comp.Name))
 				Eventually(testapps.List(&testCtx, generics.BackupSignature,
-					client.MatchingLabels{
-						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: comp.Name,
-					}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
+					ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
 				backupKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 					clusterKey.Name, comp.Name),
@@ -651,26 +653,17 @@ var _ = Describe("Cluster Controller", func() {
 				}
 			}
 
-			if policy != nil {
-				checkRestoreAndSetCompleted(clusterKey, comp.Name, updatedReplicas-int(comp.Replicas))
-			}
-
 			By("Mock PVCs and set status to bound")
 			mockComponentPVCsAndBound(comp, updatedReplicas, true, storageClassName)
 
 			if policy != nil {
-				By("Checking Backup and Restore cleanup")
-				Eventually(testapps.List(&testCtx, generics.BackupSignature,
-					client.MatchingLabels{
-						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: comp.Name,
-					}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+				checkRestoreAndSetCompleted(clusterKey, comp.Name, updatedReplicas-int(comp.Replicas))
+			}
 
-				Eventually(testapps.List(&testCtx, generics.RestoreSignature,
-					client.MatchingLabels{
-						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: comp.Name,
-					}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+			if policy != nil {
+				By("Checking Backup and Restore cleanup")
+				Eventually(testapps.List(&testCtx, generics.BackupSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+				Eventually(testapps.List(&testCtx, generics.RestoreSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
 			}
 
 			checkUpdatedStsReplicas()

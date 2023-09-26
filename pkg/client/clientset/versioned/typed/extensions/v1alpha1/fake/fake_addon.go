@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/extensions/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +37,9 @@ type FakeAddons struct {
 	Fake *FakeExtensionsV1alpha1
 }
 
-var addonsResource = schema.GroupVersionResource{Group: "extensions.kubeblocks.io", Version: "v1alpha1", Resource: "addons"}
+var addonsResource = v1alpha1.SchemeGroupVersion.WithResource("addons")
 
-var addonsKind = schema.GroupVersionKind{Group: "extensions.kubeblocks.io", Version: "v1alpha1", Kind: "Addon"}
+var addonsKind = v1alpha1.SchemeGroupVersion.WithKind("Addon")
 
 // Get takes name of the addon, and returns the corresponding addon object, and an error if there is any.
 func (c *FakeAddons) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Addon, err error) {
@@ -126,6 +128,49 @@ func (c *FakeAddons) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 func (c *FakeAddons) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Addon, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(addonsResource, name, pt, data, subresources...), &v1alpha1.Addon{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Addon), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied addon.
+func (c *FakeAddons) Apply(ctx context.Context, addon *extensionsv1alpha1.AddonApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Addon, err error) {
+	if addon == nil {
+		return nil, fmt.Errorf("addon provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(addon)
+	if err != nil {
+		return nil, err
+	}
+	name := addon.Name
+	if name == nil {
+		return nil, fmt.Errorf("addon.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(addonsResource, *name, types.ApplyPatchType, data), &v1alpha1.Addon{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Addon), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeAddons) ApplyStatus(ctx context.Context, addon *extensionsv1alpha1.AddonApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Addon, err error) {
+	if addon == nil {
+		return nil, fmt.Errorf("addon provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(addon)
+	if err != nil {
+		return nil, err
+	}
+	name := addon.Name
+	if name == nil {
+		return nil, fmt.Errorf("addon.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(addonsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.Addon{})
 	if obj == nil {
 		return nil, err
 	}

@@ -116,11 +116,12 @@ func (o *Options) complete(cmd *cobra.Command) error {
 	o.args = append([]string{util.GVRToString(o.GVR)}, o.Names...)
 	o.builder = o.Factory.NewBuilder()
 	o.unstructuredClientForMapping = o.Factory.UnstructuredClientForMapping
-	dynamicClient, err := o.Factory.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, o.Factory.OpenAPIGetter(), resource.QueryParamDryRun)
+	// TODO(controller-runtime-v0.15)
+	// dynamicClient, err := o.Factory.DynamicClient()
+	// if err != nil {
+	//	return err
+	// }
+	// o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, o.Factory, resource.QueryParamDryRun)
 	return nil
 }
 

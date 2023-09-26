@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/workloads/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +38,9 @@ type FakeReplicatedStateMachines struct {
 	ns   string
 }
 
-var replicatedstatemachinesResource = schema.GroupVersionResource{Group: "workloads", Version: "v1alpha1", Resource: "replicatedstatemachines"}
+var replicatedstatemachinesResource = v1alpha1.SchemeGroupVersion.WithResource("replicatedstatemachines")
 
-var replicatedstatemachinesKind = schema.GroupVersionKind{Group: "workloads", Version: "v1alpha1", Kind: "ReplicatedStateMachine"}
+var replicatedstatemachinesKind = v1alpha1.SchemeGroupVersion.WithKind("ReplicatedStateMachine")
 
 // Get takes name of the replicatedStateMachine, and returns the corresponding replicatedStateMachine object, and an error if there is any.
 func (c *FakeReplicatedStateMachines) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
@@ -134,6 +136,51 @@ func (c *FakeReplicatedStateMachines) DeleteCollection(ctx context.Context, opts
 func (c *FakeReplicatedStateMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ReplicatedStateMachine, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(replicatedstatemachinesResource, c.ns, name, pt, data, subresources...), &v1alpha1.ReplicatedStateMachine{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ReplicatedStateMachine), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied replicatedStateMachine.
+func (c *FakeReplicatedStateMachines) Apply(ctx context.Context, replicatedStateMachine *workloadsv1alpha1.ReplicatedStateMachineApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
+	if replicatedStateMachine == nil {
+		return nil, fmt.Errorf("replicatedStateMachine provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(replicatedStateMachine)
+	if err != nil {
+		return nil, err
+	}
+	name := replicatedStateMachine.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicatedStateMachine.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(replicatedstatemachinesResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha1.ReplicatedStateMachine{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ReplicatedStateMachine), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeReplicatedStateMachines) ApplyStatus(ctx context.Context, replicatedStateMachine *workloadsv1alpha1.ReplicatedStateMachineApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {
+	if replicatedStateMachine == nil {
+		return nil, fmt.Errorf("replicatedStateMachine provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(replicatedStateMachine)
+	if err != nil {
+		return nil, err
+	}
+	name := replicatedStateMachine.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicatedStateMachine.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(replicatedstatemachinesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ReplicatedStateMachine{})
 
 	if obj == nil {
 		return nil, err

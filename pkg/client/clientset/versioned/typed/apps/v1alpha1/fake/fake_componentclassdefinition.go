@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +37,9 @@ type FakeComponentClassDefinitions struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var componentclassdefinitionsResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "componentclassdefinitions"}
+var componentclassdefinitionsResource = v1alpha1.SchemeGroupVersion.WithResource("componentclassdefinitions")
 
-var componentclassdefinitionsKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "ComponentClassDefinition"}
+var componentclassdefinitionsKind = v1alpha1.SchemeGroupVersion.WithKind("ComponentClassDefinition")
 
 // Get takes name of the componentClassDefinition, and returns the corresponding componentClassDefinition object, and an error if there is any.
 func (c *FakeComponentClassDefinitions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ComponentClassDefinition, err error) {
@@ -126,6 +128,49 @@ func (c *FakeComponentClassDefinitions) DeleteCollection(ctx context.Context, op
 func (c *FakeComponentClassDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ComponentClassDefinition, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(componentclassdefinitionsResource, name, pt, data, subresources...), &v1alpha1.ComponentClassDefinition{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ComponentClassDefinition), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied componentClassDefinition.
+func (c *FakeComponentClassDefinitions) Apply(ctx context.Context, componentClassDefinition *appsv1alpha1.ComponentClassDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ComponentClassDefinition, err error) {
+	if componentClassDefinition == nil {
+		return nil, fmt.Errorf("componentClassDefinition provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(componentClassDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := componentClassDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("componentClassDefinition.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(componentclassdefinitionsResource, *name, types.ApplyPatchType, data), &v1alpha1.ComponentClassDefinition{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ComponentClassDefinition), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeComponentClassDefinitions) ApplyStatus(ctx context.Context, componentClassDefinition *appsv1alpha1.ComponentClassDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ComponentClassDefinition, err error) {
+	if componentClassDefinition == nil {
+		return nil, fmt.Errorf("componentClassDefinition provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(componentClassDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := componentClassDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("componentClassDefinition.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(componentclassdefinitionsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ComponentClassDefinition{})
 	if obj == nil {
 		return nil, err
 	}

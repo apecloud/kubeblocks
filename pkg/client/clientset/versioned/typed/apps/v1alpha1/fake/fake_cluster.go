@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +38,9 @@ type FakeClusters struct {
 	ns   string
 }
 
-var clustersResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "clusters"}
+var clustersResource = v1alpha1.SchemeGroupVersion.WithResource("clusters")
 
-var clustersKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "Cluster"}
+var clustersKind = v1alpha1.SchemeGroupVersion.WithKind("Cluster")
 
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
 func (c *FakeClusters) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Cluster, err error) {
@@ -134,6 +136,51 @@ func (c *FakeClusters) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeClusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Cluster, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(clustersResource, c.ns, name, pt, data, subresources...), &v1alpha1.Cluster{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Cluster), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied cluster.
+func (c *FakeClusters) Apply(ctx context.Context, cluster *appsv1alpha1.ClusterApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Cluster, err error) {
+	if cluster == nil {
+		return nil, fmt.Errorf("cluster provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(cluster)
+	if err != nil {
+		return nil, err
+	}
+	name := cluster.Name
+	if name == nil {
+		return nil, fmt.Errorf("cluster.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clustersResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha1.Cluster{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Cluster), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusters) ApplyStatus(ctx context.Context, cluster *appsv1alpha1.ClusterApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Cluster, err error) {
+	if cluster == nil {
+		return nil, fmt.Errorf("cluster provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(cluster)
+	if err != nil {
+		return nil, err
+	}
+	name := cluster.Name
+	if name == nil {
+		return nil, fmt.Errorf("cluster.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clustersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1alpha1.Cluster{})
 
 	if obj == nil {
 		return nil, err

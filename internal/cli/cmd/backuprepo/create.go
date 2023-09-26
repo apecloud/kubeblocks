@@ -452,7 +452,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		providerFlagName,
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.StorageProviderGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, util.GVRToString(types.StorageProviderGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"pv-reclaim-policy",

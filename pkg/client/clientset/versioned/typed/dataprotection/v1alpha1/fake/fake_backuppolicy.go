@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/dataprotection/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +38,9 @@ type FakeBackupPolicies struct {
 	ns   string
 }
 
-var backuppoliciesResource = schema.GroupVersionResource{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Resource: "backuppolicies"}
+var backuppoliciesResource = v1alpha1.SchemeGroupVersion.WithResource("backuppolicies")
 
-var backuppoliciesKind = schema.GroupVersionKind{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Kind: "BackupPolicy"}
+var backuppoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("BackupPolicy")
 
 // Get takes name of the backupPolicy, and returns the corresponding backupPolicy object, and an error if there is any.
 func (c *FakeBackupPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.BackupPolicy, err error) {
@@ -134,6 +136,51 @@ func (c *FakeBackupPolicies) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeBackupPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.BackupPolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(backuppoliciesResource, c.ns, name, pt, data, subresources...), &v1alpha1.BackupPolicy{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.BackupPolicy), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied backupPolicy.
+func (c *FakeBackupPolicies) Apply(ctx context.Context, backupPolicy *dataprotectionv1alpha1.BackupPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.BackupPolicy, err error) {
+	if backupPolicy == nil {
+		return nil, fmt.Errorf("backupPolicy provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(backupPolicy)
+	if err != nil {
+		return nil, err
+	}
+	name := backupPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("backupPolicy.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(backuppoliciesResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha1.BackupPolicy{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.BackupPolicy), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeBackupPolicies) ApplyStatus(ctx context.Context, backupPolicy *dataprotectionv1alpha1.BackupPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.BackupPolicy, err error) {
+	if backupPolicy == nil {
+		return nil, fmt.Errorf("backupPolicy provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(backupPolicy)
+	if err != nil {
+		return nil, err
+	}
+	name := backupPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("backupPolicy.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(backuppoliciesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1alpha1.BackupPolicy{})
 
 	if obj == nil {
 		return nil, err

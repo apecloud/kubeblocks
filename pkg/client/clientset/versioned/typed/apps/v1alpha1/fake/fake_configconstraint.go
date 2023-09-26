@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +37,9 @@ type FakeConfigConstraints struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var configconstraintsResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "configconstraints"}
+var configconstraintsResource = v1alpha1.SchemeGroupVersion.WithResource("configconstraints")
 
-var configconstraintsKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "ConfigConstraint"}
+var configconstraintsKind = v1alpha1.SchemeGroupVersion.WithKind("ConfigConstraint")
 
 // Get takes name of the configConstraint, and returns the corresponding configConstraint object, and an error if there is any.
 func (c *FakeConfigConstraints) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ConfigConstraint, err error) {
@@ -126,6 +128,49 @@ func (c *FakeConfigConstraints) DeleteCollection(ctx context.Context, opts v1.De
 func (c *FakeConfigConstraints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ConfigConstraint, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(configconstraintsResource, name, pt, data, subresources...), &v1alpha1.ConfigConstraint{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ConfigConstraint), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied configConstraint.
+func (c *FakeConfigConstraints) Apply(ctx context.Context, configConstraint *appsv1alpha1.ConfigConstraintApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ConfigConstraint, err error) {
+	if configConstraint == nil {
+		return nil, fmt.Errorf("configConstraint provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(configConstraint)
+	if err != nil {
+		return nil, err
+	}
+	name := configConstraint.Name
+	if name == nil {
+		return nil, fmt.Errorf("configConstraint.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(configconstraintsResource, *name, types.ApplyPatchType, data), &v1alpha1.ConfigConstraint{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ConfigConstraint), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeConfigConstraints) ApplyStatus(ctx context.Context, configConstraint *appsv1alpha1.ConfigConstraintApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ConfigConstraint, err error) {
+	if configConstraint == nil {
+		return nil, fmt.Errorf("configConstraint provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(configConstraint)
+	if err != nil {
+		return nil, err
+	}
+	name := configConstraint.Name
+	if name == nil {
+		return nil, fmt.Errorf("configConstraint.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(configconstraintsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ConfigConstraint{})
 	if obj == nil {
 		return nil, err
 	}

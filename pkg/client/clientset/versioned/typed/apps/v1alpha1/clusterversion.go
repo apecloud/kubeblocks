@@ -20,9 +20,12 @@ package v1alpha1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	scheme "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,6 +50,8 @@ type ClusterVersionInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterVersionList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterVersion, err error)
+	Apply(ctx context.Context, clusterVersion *appsv1alpha1.ClusterVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterVersion, err error)
+	ApplyStatus(ctx context.Context, clusterVersion *appsv1alpha1.ClusterVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterVersion, err error)
 	ClusterVersionExpansion
 }
 
@@ -177,6 +182,60 @@ func (c *clusterVersions) Patch(ctx context.Context, name string, pt types.Patch
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterVersion.
+func (c *clusterVersions) Apply(ctx context.Context, clusterVersion *appsv1alpha1.ClusterVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterVersion, err error) {
+	if clusterVersion == nil {
+		return nil, fmt.Errorf("clusterVersion provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterVersion)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterVersion.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterVersion.Name must be provided to Apply")
+	}
+	result = &v1alpha1.ClusterVersion{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusterversions").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *clusterVersions) ApplyStatus(ctx context.Context, clusterVersion *appsv1alpha1.ClusterVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterVersion, err error) {
+	if clusterVersion == nil {
+		return nil, fmt.Errorf("clusterVersion provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	name := clusterVersion.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterVersion.Name must be provided to Apply")
+	}
+
+	result = &v1alpha1.ClusterVersion{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusterversions").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

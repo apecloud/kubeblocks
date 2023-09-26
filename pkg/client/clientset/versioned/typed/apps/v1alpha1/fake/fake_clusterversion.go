@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +37,9 @@ type FakeClusterVersions struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var clusterversionsResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "clusterversions"}
+var clusterversionsResource = v1alpha1.SchemeGroupVersion.WithResource("clusterversions")
 
-var clusterversionsKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "ClusterVersion"}
+var clusterversionsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterVersion")
 
 // Get takes name of the clusterVersion, and returns the corresponding clusterVersion object, and an error if there is any.
 func (c *FakeClusterVersions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterVersion, err error) {
@@ -126,6 +128,49 @@ func (c *FakeClusterVersions) DeleteCollection(ctx context.Context, opts v1.Dele
 func (c *FakeClusterVersions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterVersion, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clusterversionsResource, name, pt, data, subresources...), &v1alpha1.ClusterVersion{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ClusterVersion), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterVersion.
+func (c *FakeClusterVersions) Apply(ctx context.Context, clusterVersion *appsv1alpha1.ClusterVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterVersion, err error) {
+	if clusterVersion == nil {
+		return nil, fmt.Errorf("clusterVersion provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterVersion)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterVersion.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterVersion.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterversionsResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterVersion{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ClusterVersion), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterVersions) ApplyStatus(ctx context.Context, clusterVersion *appsv1alpha1.ClusterVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterVersion, err error) {
+	if clusterVersion == nil {
+		return nil, fmt.Errorf("clusterVersion provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterVersion)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterVersion.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterVersion.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterversionsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ClusterVersion{})
 	if obj == nil {
 		return nil, err
 	}

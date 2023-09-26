@@ -20,9 +20,12 @@ package v1alpha1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/applyconfiguration/apps/v1alpha1"
 	scheme "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,6 +50,8 @@ type ClusterDefinitionInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterDefinitionList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterDefinition, err error)
+	Apply(ctx context.Context, clusterDefinition *appsv1alpha1.ClusterDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterDefinition, err error)
+	ApplyStatus(ctx context.Context, clusterDefinition *appsv1alpha1.ClusterDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterDefinition, err error)
 	ClusterDefinitionExpansion
 }
 
@@ -177,6 +182,60 @@ func (c *clusterDefinitions) Patch(ctx context.Context, name string, pt types.Pa
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterDefinition.
+func (c *clusterDefinitions) Apply(ctx context.Context, clusterDefinition *appsv1alpha1.ClusterDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterDefinition, err error) {
+	if clusterDefinition == nil {
+		return nil, fmt.Errorf("clusterDefinition provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterDefinition.Name must be provided to Apply")
+	}
+	result = &v1alpha1.ClusterDefinition{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusterdefinitions").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *clusterDefinitions) ApplyStatus(ctx context.Context, clusterDefinition *appsv1alpha1.ClusterDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterDefinition, err error) {
+	if clusterDefinition == nil {
+		return nil, fmt.Errorf("clusterDefinition provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterDefinition)
+	if err != nil {
+		return nil, err
+	}
+
+	name := clusterDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterDefinition.Name must be provided to Apply")
+	}
+
+	result = &v1alpha1.ClusterDefinition{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusterdefinitions").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

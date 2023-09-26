@@ -227,7 +227,26 @@ parameters:
 			if mutateFunc != nil {
 				mutateFunc(obj)
 			}
-			return testapps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.Backup)
+			backup := testapps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.Backup)
+			// updating the status of the Backup to COMPLETED, backup repo controller only
+			// handles for non-failed backups.
+			Eventually(func(g Gomega) {
+				obj := &dpv1alpha1.Backup{}
+				err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), obj)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				if obj.Status.Phase == dpv1alpha1.BackupFailed {
+					// the controller will set the status to failed because
+					// essential objects (e.g. backup policy) are missed.
+					// we set the status to completed after that, to avoid conflict.
+					obj.Status.Phase = dpv1alpha1.BackupCompleted
+					err = testCtx.Cli.Status().Update(testCtx.Ctx, obj)
+					g.Expect(err).ShouldNot(HaveOccurred())
+				} else {
+					// check again
+					g.Expect(false).Should(BeTrue())
+				}
+			}).Should(Succeed())
+			return backup
 		}
 
 		getBackupRepo := func(g Gomega, key types.NamespacedName) *dpv1alpha1.BackupRepo {
@@ -530,23 +549,6 @@ parameters:
 			backup = createBackupSpec(func(backup *dpv1alpha1.Backup) {
 				backup.Namespace = namespace
 			})
-			By("updating the status of the Backup to completed")
-			Eventually(func(g Gomega) {
-				obj := &dpv1alpha1.Backup{}
-				err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), obj)
-				g.Expect(err).ShouldNot(HaveOccurred())
-				if obj.Status.Phase == dpv1alpha1.BackupFailed {
-					// the controller will set the status to failed because
-					// essential objects (e.g. backup policy) are missed.
-					// we set the status to completed after that, to avoid conflict.
-					obj.Status.Phase = dpv1alpha1.BackupCompleted
-					err = testCtx.Cli.Status().Update(testCtx.Ctx, obj)
-					g.Expect(err).ShouldNot(HaveOccurred())
-				} else {
-					// check again
-					g.Expect(false).Should(BeTrue())
-				}
-			}).Should(Succeed())
 			By("checking the PVC has been created in the namespace")
 			pvcKey := types.NamespacedName{
 				Name:      pvcName,

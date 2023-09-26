@@ -221,6 +221,8 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	if viper.IsSet(roleProbeTimeoutVarName) {
 		timeoutSeconds = viper.GetInt(roleProbeTimeoutVarName)
 	}
+	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
+	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	timeout := time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	ctx1, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

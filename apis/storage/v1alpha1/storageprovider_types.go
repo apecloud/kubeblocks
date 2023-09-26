@@ -47,11 +47,11 @@ type StorageProviderSpec struct {
 	// +optional
 	PersistentVolumeClaimTemplate string `json:"persistentVolumeClaimTemplate,omitempty"`
 
-	// A Go template for rendering a config used by the dpt command.
+	// A Go template for rendering a config used by the datasafed command.
 	// The template will be rendered with the following variables:
 	// - Parameters: a map of parameters defined in the ParametersSchema.
 	// +optional
-	DPTConfigTemplate string `json:"dptConfigTemplate,omitempty"`
+	DatasafedConfigTemplate string `json:"datasafedConfigTemplate,omitempty"`
 
 	// The schema describes the parameters required by this StorageProvider,
 	// when rendering the templates.

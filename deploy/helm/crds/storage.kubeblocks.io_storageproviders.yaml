@@ -58,8 +58,8 @@ spec:
                   by the CSI driver. The template will be rendered with the following
                   variables: - Parameters: a map of parameters defined in the ParametersSchema.'
                 type: string
-              dptConfigTemplate:
-                description: 'A Go template for rendering a config used by the dpt
+              datasafedConfigTemplate:
+                description: 'A Go template for rendering a config used by the datasafed
                   command. The template will be rendered with the following variables:
                   - Parameters: a map of parameters defined in the ParametersSchema.'
                 type: string

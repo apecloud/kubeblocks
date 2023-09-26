@@ -666,7 +666,7 @@ spec:
 			BeforeEach(func() {
 				By("preparing")
 				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
-					provider.Spec.DPTConfigTemplate = `
+					provider.Spec.DatasafedConfigTemplate = `
 [storage]
 type=local
 key1={{ index .Parameters "key1" }}
@@ -692,10 +692,10 @@ cred-key2={{ index .Parameters "cred-key2" }}
 				Eventually(testapps.CheckObjExists(&testCtx, toolConfigSecretKey, &corev1.Secret{}, true)).Should(Succeed())
 			})
 
-			It("should check that the storage provider has a non-empty dptConfigTemplate", func() {
+			It("should check that the storage provider has a non-empty datasafedConfigTemplate", func() {
 				By("preparing")
 				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
-					provider.Spec.DPTConfigTemplate = ""
+					provider.Spec.DatasafedConfigTemplate = ""
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
@@ -707,14 +707,14 @@ cred-key2={{ index .Parameters "cred-key2" }}
 					g.Expect(cond).NotTo(BeNil())
 					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
 					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonInvalidStorageProvider))
-					g.Expect(cond.Message).Should(ContainSubstring("DPTConfigTemplate is empty"))
+					g.Expect(cond.Message).Should(ContainSubstring("DatasafedConfigTemplate is empty"))
 				})).Should(Succeed())
 			})
 
-			It("should fail if the dptConfigTemplate is invalid", func() {
+			It("should fail if the datasafedConfigTemplate is invalid", func() {
 				By("preparing")
 				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
-					provider.Spec.DPTConfigTemplate = "bad template {{"
+					provider.Spec.DatasafedConfigTemplate = "bad template {{"
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
@@ -755,7 +755,7 @@ cred-key2=cred-val2
 			It("should update the content of the secret when the template or the value changes", func() {
 				By("changing the template")
 				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
-					provider.Spec.DPTConfigTemplate += "new-item=new-value\n"
+					provider.Spec.DatasafedConfigTemplate += "new-item=new-value\n"
 				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, toolConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
 					g.Expect(secret.Data).Should(HaveKeyWithValue("datasafed.conf", []byte(`

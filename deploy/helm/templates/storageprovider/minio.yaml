@@ -27,7 +27,7 @@ spec:
       csi.storage.k8s.io/node-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
       csi.storage.k8s.io/node-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
 
-  dptConfigTemplate: |
+  datasafedConfigTemplate: |
     [storage]
     type = s3
     provider = Minio

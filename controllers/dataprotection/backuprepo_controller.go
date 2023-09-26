@@ -267,9 +267,9 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 			return provider, newDependencyError("both StorageClassTemplate and PersistentVolumeClaimTemplate are empty")
 		}
 	case repo.AccessByTool():
-		if provider.Spec.DPTConfigTemplate == "" {
+		if provider.Spec.DatasafedConfigTemplate == "" {
 			reason = ReasonInvalidStorageProvider
-			return provider, newDependencyError("DPTConfigTemplate is empty")
+			return provider, newDependencyError("DatasafedConfigTemplate is empty")
 		}
 	}
 
@@ -488,13 +488,13 @@ func (r *BackupRepoReconciler) checkAndUpdateToolConfig(reqCtx intctrlutil.Reque
 	}
 	checkedTemplateMd5 := repo.Annotations[dataProtectionToolConfigTemplateMD5MD5AnnotationKey]
 	checkedParametersMd5 := repo.Annotations[dataProtectionTemplateValuesMD5AnnotationKey]
-	currentTemplateMd5 := md5Digest(provider.Spec.DPTConfigTemplate)
+	currentTemplateMd5 := md5Digest(provider.Spec.DatasafedConfigTemplate)
 	currentParametersMd5 := renderCtx.Md5OfParameters()
 	if !(checkedTemplateMd5 != currentTemplateMd5 || checkedParametersMd5 != currentParametersMd5) {
 		return nil
 	}
 	// check tool config template
-	content, err := renderTemplate("tool-config", provider.Spec.DPTConfigTemplate, renderCtx)
+	content, err := renderTemplate("tool-config", provider.Spec.DatasafedConfigTemplate, renderCtx)
 	if err != nil {
 		reason = ReasonBadToolConfigTemplate
 		return err
@@ -688,7 +688,7 @@ func (r *BackupRepoReconciler) checkOrCreateToolConfigSecret(
 	secret.Namespace = namespace
 	_, err := createObjectIfNotExist(reqCtx.Ctx, r.Client, secret,
 		func() error {
-			content, err := renderTemplate("tool-config", provider.Spec.DPTConfigTemplate, renderCtx)
+			content, err := renderTemplate("tool-config", provider.Spec.DatasafedConfigTemplate, renderCtx)
 			if err != nil {
 				return fmt.Errorf("failed to render tool config template: %w", err)
 			}
@@ -701,7 +701,7 @@ func (r *BackupRepoReconciler) checkOrCreateToolConfigSecret(
 			}
 			secret.Annotations = map[string]string{
 				dataProtectionTemplateValuesMD5AnnotationKey:        renderCtx.Md5OfParameters(),
-				dataProtectionToolConfigTemplateMD5MD5AnnotationKey: md5Digest(provider.Spec.DPTConfigTemplate),
+				dataProtectionToolConfigTemplateMD5MD5AnnotationKey: md5Digest(provider.Spec.DatasafedConfigTemplate),
 			}
 			if err := controllerutil.SetControllerReference(repo, secret, r.Scheme); err != nil {
 				return fmt.Errorf("failed to set owner reference: %w", err)

@@ -658,7 +658,7 @@ spec:
 			})).Should(Succeed())
 		})
 
-		Context("with AccessMethodDirect", func() {
+		Context("with AccessMethodDPT", func() {
 			var repo *dpv1alpha1.BackupRepo
 			var backup *dpv1alpha1.Backup
 			var dptConfigSecretKey types.NamespacedName
@@ -676,7 +676,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 `
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
-					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDirect
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDPT
 				})
 
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, obj *dpv1alpha1.BackupRepo) {
@@ -698,7 +698,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 					provider.Spec.DPTConfigTemplate = ""
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
-					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDirect
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDPT
 				})
 				By("checking")
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
@@ -717,7 +717,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 					provider.Spec.DPTConfigTemplate = "bad template {{"
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
-					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDirect
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodDPT
 				})
 				By("checking")
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {

@@ -29,10 +29,9 @@ const (
 	// AccessMethodMount means that the storage is mounted locally,
 	// so that remote files can be accessed just like a local file.
 	AccessMethodMount AccessMethod = "Mount"
-	// AccessMethodDirect means to access the storage directly,
-	// typically using a tool that helps to transfer files between
-	// storage and local.
-	AccessMethodDirect AccessMethod = "Direct"
+	// AccessMethodDPT means to access the storage with the dpt command
+	// that helps to transfer files between storage and local.
+	AccessMethodDPT AccessMethod = "DPT"
 )
 
 // BackupRepoSpec defines the desired state of BackupRepo
@@ -43,7 +42,7 @@ type BackupRepoSpec struct {
 	StorageProviderRef string `json:"storageProviderRef"`
 
 	// Specifies the access method of the backup repo.
-	// +kubebuilder:validation:Enum={Mount,Direct}
+	// +kubebuilder:validation:Enum={Mount,DPT}
 	// +kubebuilder:default=Mount
 	// +optional
 	AccessMethod AccessMethod `json:"accessMethod,omitempty"`
@@ -139,6 +138,6 @@ func (repo *BackupRepo) IsMountAccess() bool {
 	return repo.Spec.AccessMethod == "" || repo.Spec.AccessMethod == AccessMethodMount
 }
 
-func (repo *BackupRepo) IsDirectAccess() bool {
-	return repo.Spec.AccessMethod == AccessMethodDirect
+func (repo *BackupRepo) IsDPTAccess() bool {
+	return repo.Spec.AccessMethod == AccessMethodDPT
 }

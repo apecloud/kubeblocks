@@ -271,7 +271,7 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 			message = "both StorageClassTemplate and PersistentVolumeClaimTemplate are empty"
 			return provider, nil
 		}
-	case repo.IsDirectAccess():
+	case repo.IsDPTAccess():
 		if provider.Spec.DPTConfigTemplate == "" {
 			status = metav1.ConditionFalse
 			reason = ReasonInvalidStorageProvider
@@ -543,7 +543,7 @@ func (r *BackupRepoReconciler) checkAndUpdateDPTConfig(reqCtx intctrlutil.Reques
 		}
 	}()
 
-	if !repo.IsDirectAccess() {
+	if !repo.IsDPTAccess() {
 		return nil
 	}
 	checkedTemplateMd5 := repo.Annotations[dataProtectionDPTConfigTemplateMD5MD5AnnotationKey]
@@ -651,7 +651,7 @@ func (r *BackupRepoReconciler) prepareForAssociatedBackups(
 				retErr = err
 				continue
 			}
-		case repo.IsDirectAccess():
+		case repo.IsDPTAccess():
 			if err := r.checkOrCreateDPTConfigSecret(reqCtx, renderCtx, repo, provider, backup.Namespace); err != nil {
 				reqCtx.Log.Error(err, "failed to check or create dpt config secret", "namespace", backup.Namespace)
 				retErr = err

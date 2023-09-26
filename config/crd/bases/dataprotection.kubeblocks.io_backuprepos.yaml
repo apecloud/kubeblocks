@@ -56,7 +56,7 @@ spec:
                 description: Specifies the access method of the backup repo.
                 enum:
                 - Mount
-                - Direct
+                - DPT
                 type: string
               config:
                 additionalProperties:

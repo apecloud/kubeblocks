@@ -34,7 +34,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -43,10 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -124,9 +120,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
 		}).
-		Owns(&batchv1.Job{}).
-		Owns(&appsv1.StatefulSet{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
+		Owns(&batchv1.Job{})
 
 	if intctrlutil.InVolumeSnapshotV1Beta1() {
 		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
@@ -212,35 +206,6 @@ func (r *BackupReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, backup 
 	return nil, nil
 }
 
-func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Request {
-	labels := obj.GetLabels()
-	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
-		return []reconcile.Request{}
-	}
-	backupName, ok := labels[dptypes.DataProtectionLabelBackupNameKey]
-	if !ok {
-		return []reconcile.Request{}
-	}
-	var isCreateByStatefulSet bool
-	for _, v := range obj.GetOwnerReferences() {
-		if v.Kind == constant.StatefulSetKind && v.Name == backupName {
-			isCreateByStatefulSet = true
-			break
-		}
-	}
-	if !isCreateByStatefulSet {
-		return []reconcile.Request{}
-	}
-	return []reconcile.Request{
-		{
-			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      backupName,
-			},
-		},
-	}
-}
-
 func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
@@ -265,7 +230,7 @@ func (r *BackupReconciler) handleNewPhase(
 }
 
 // prepareBackupRequest prepares a request for a backup, with all references to
-// other objects, validate them.
+// other kubernetes objects, and validate them.
 func (r *BackupReconciler) prepareBackupRequest(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (*dpbackup.Request, error) {

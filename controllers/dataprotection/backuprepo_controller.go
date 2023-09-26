@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -31,6 +32,7 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -102,7 +105,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// get repo object
 	repo := &dpv1alpha1.BackupRepo{}
 	if err := r.Get(ctx, req.NamespacedName, repo); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get BackupRepo")
+		return checkedRequeueWithError(err, reqCtx.Log, "failed to get BackupRepo")
 	}
 
 	// handle finalizer
@@ -126,22 +129,14 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	provider, err := r.checkStorageProvider(reqCtx, repo)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "check storage provider status failed")
-	}
-	if !meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageProviderReady) {
-		// update status phase to failed
-		if err := r.updateStatus(reqCtx, repo); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "update status phase failed")
-		}
-		// will reconcile again after the storage provider becomes ready
-		return intctrlutil.Reconciled()
+		return checkedRequeueWithError(err, reqCtx.Log, "check storage provider status failed")
 	}
 
 	// check parameters for rendering templates
 	parameters, err := r.checkParameters(reqCtx, repo)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "check parameters failed")
+		return checkedRequeueWithError(err, reqCtx.Log, "check parameters failed")
 	}
 
 	renderCtx := renderContext{
@@ -152,7 +147,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	err = r.createStorageClassAndSecret(reqCtx, renderCtx, repo, provider)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+		return checkedRequeueWithError(err, reqCtx.Log,
 			"failed to create storage class and secret")
 	}
 
@@ -160,7 +155,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	err = r.checkPVCTemplate(reqCtx, renderCtx, repo, provider)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+		return checkedRequeueWithError(err, reqCtx.Log,
 			"failed to check PVC template")
 	}
 
@@ -168,7 +163,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	err = r.checkAndUpdateDPTConfig(reqCtx, renderCtx, repo, provider)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+		return checkedRequeueWithError(err, reqCtx.Log,
 			"failed to check DPT config")
 	}
 
@@ -179,14 +174,14 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// update status phase to ready if all conditions are met
 	if err = r.updateStatus(reqCtx, repo); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+		return checkedRequeueWithError(err, reqCtx.Log,
 			"failed to update BackupRepo status")
 	}
 
 	// check associated backups, to create PVC in their namespaces
 	if repo.Status.Phase == dpv1alpha1.BackupRepoReady {
 		if err = r.prepareForAssociatedBackups(reqCtx, renderCtx, repo, provider); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			return checkedRequeueWithError(err, reqCtx.Log,
 				"check associated backups failed")
 		}
 	}
@@ -229,18 +224,25 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 	return nil
 }
 
+func (r *BackupRepoReconciler) updateConditionInDefer(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo,
+	condType string, reason string, err *error) {
+	status := metav1.ConditionTrue
+	message := ""
+	if *err != nil {
+		status = metav1.ConditionFalse
+		message = (*err).Error()
+	}
+	updateErr := updateCondition(reqCtx.Ctx, r.Client, repo, condType, status, reason, message)
+	if *err == nil {
+		*err = updateErr
+	}
+}
+
 func (r *BackupRepoReconciler) checkStorageProvider(
 	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (provider *storagev1alpha1.StorageProvider, err error) {
-	var condType = ConditionTypeStorageProviderReady
-	var status metav1.ConditionStatus
-	var reason string
-	var message string
-
-	// call updateCondition() when exiting the function.
+	reason := ReasonUnknownError
 	defer func() {
-		if status != "" {
-			err = updateCondition(reqCtx.Ctx, r.Client, repo, condType, status, reason, message)
-		}
+		r.updateConditionInDefer(reqCtx, repo, ConditionTypeStorageProviderReady, reason, &err)
 	}()
 
 	// get storage provider object
@@ -249,12 +251,7 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 	err = r.Client.Get(reqCtx.Ctx, providerKey, provider)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			status = metav1.ConditionFalse
 			reason = ReasonStorageProviderNotFound
-		} else {
-			status = metav1.ConditionUnknown
-			reason = ReasonUnknownError
-			message = err.Error()
 		}
 		return nil, err
 	}
@@ -266,90 +263,54 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 			provider.Spec.PersistentVolumeClaimTemplate == "" {
 			// both StorageClassTemplate and PersistentVolumeClaimTemplate are empty.
 			// in this case, we are unable to create a backup PVC.
-			status = metav1.ConditionFalse
 			reason = ReasonInvalidStorageProvider
-			message = "both StorageClassTemplate and PersistentVolumeClaimTemplate are empty"
-			return provider, nil
+			return provider, newDependencyError("both StorageClassTemplate and PersistentVolumeClaimTemplate are empty")
 		}
 	case repo.IsDPTAccess():
 		if provider.Spec.DPTConfigTemplate == "" {
-			status = metav1.ConditionFalse
 			reason = ReasonInvalidStorageProvider
-			message = "DPTConfigTemplate is empty"
-			return provider, nil
+			return provider, newDependencyError("DPTConfigTemplate is empty")
 		}
 	}
 
 	// check its status
 	if provider.Status.Phase == storagev1alpha1.StorageProviderReady {
-		status = metav1.ConditionTrue
 		reason = ReasonStorageProviderReady
+		return provider, nil
 	} else {
-		status = metav1.ConditionFalse
 		reason = ReasonStorageProviderNotReady
-		message = fmt.Sprintf("storage provider %s is not ready, status: %s",
-			provider.Name, provider.Status.Phase)
+		err = newDependencyError(fmt.Sprintf("storage provider %s is not ready, status: %s",
+			provider.Name, provider.Status.Phase))
+		return provider, err
 	}
-	return provider, nil
 }
 
 func (r *BackupRepoReconciler) checkParameters(reqCtx intctrlutil.RequestCtx,
 	repo *dpv1alpha1.BackupRepo) (parameters map[string]string, err error) {
-	condType := ConditionTypeParametersChecked
-	var status metav1.ConditionStatus
-	var reason string
-	var message string
-
+	reason := ReasonUnknownError
 	defer func() {
-		updateErr := updateCondition(reqCtx.Ctx, r.Client, repo,
-			condType, status, reason, message)
-		if err == nil {
-			err = updateErr
-		}
+		r.updateConditionInDefer(reqCtx, repo, ConditionTypeParametersChecked, reason, &err)
 	}()
 
 	// collect parameters for rendering templates
 	parameters, err = r.collectParameters(reqCtx, repo)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			status = metav1.ConditionFalse
 			reason = ReasonCredentialSecretNotFound
-			message = err.Error()
-			return nil, err
-		} else {
-			status = metav1.ConditionUnknown
-			reason = ReasonUnknownError
-			message = err.Error()
 		}
 		return nil, err
 	}
 	// TODO: verify parameters
-	status = metav1.ConditionTrue
 	reason = ReasonParametersChecked
 	return parameters, nil
 }
 
 func (r *BackupRepoReconciler) createStorageClassAndSecret(reqCtx intctrlutil.RequestCtx,
-	renderCtx renderContext, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) error {
+	renderCtx renderContext, repo *dpv1alpha1.BackupRepo, provider *storagev1alpha1.StorageProvider) (err error) {
 
-	var err error
 	reason := ReasonUnknownError
-
 	defer func() {
-		condType := ConditionTypeStorageClassCreated
-		status := metav1.ConditionFalse
-		var message string
-		if err == nil {
-			status = metav1.ConditionTrue
-			reason = ReasonStorageClassCreated
-		} else {
-			message = err.Error()
-		}
-		updateErr := updateCondition(reqCtx.Ctx, r.Client, repo,
-			condType, status, reason, message)
-		if updateErr != nil {
-			err = updateErr
-		}
+		r.updateConditionInDefer(reqCtx, repo, ConditionTypeStorageClassCreated, reason, &err)
 	}()
 
 	oldRepo := repo.DeepCopy()
@@ -393,6 +354,7 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(reqCtx intctrlutil.Re
 			return fmt.Errorf("failed to patch backup repo: %w", err)
 		}
 	}
+	reason = ReasonStorageClassCreated
 	return nil
 }
 
@@ -485,20 +447,7 @@ func (r *BackupRepoReconciler) checkPVCTemplate(reqCtx intctrlutil.RequestCtx,
 
 	reason := ReasonUnknownError
 	defer func() {
-		condType := ConditionTypePVCTemplateChecked
-		status := metav1.ConditionFalse
-		var message string
-		if err == nil {
-			status = metav1.ConditionTrue
-			reason = ReasonPVCTemplateChecked
-		} else {
-			message = err.Error()
-		}
-		updateErr := updateCondition(reqCtx.Ctx, r.Client, repo,
-			condType, status, reason, message)
-		if err == nil {
-			err = updateErr
-		}
+		r.updateConditionInDefer(reqCtx, repo, ConditionTypePVCTemplateChecked, reason, &err)
 	}()
 
 	if !repo.IsMountAccess() || provider.Spec.PersistentVolumeClaimTemplate == "" {
@@ -516,10 +465,14 @@ func (r *BackupRepoReconciler) checkPVCTemplate(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 	}
-	return updateAnnotations(reqCtx.Ctx, r.Client, repo, map[string]string{
+	if err = updateAnnotations(reqCtx.Ctx, r.Client, repo, map[string]string{
 		dataProtectionPVCTemplateMD5MD5AnnotationKey: currentTemplateMd5,
 		dataProtectionTemplateValuesMD5AnnotationKey: currentParametersMd5,
-	})
+	}); err != nil {
+		return err
+	}
+	reason = ReasonPVCTemplateChecked
+	return nil
 }
 
 func (r *BackupRepoReconciler) checkAndUpdateDPTConfig(reqCtx intctrlutil.RequestCtx,
@@ -527,20 +480,7 @@ func (r *BackupRepoReconciler) checkAndUpdateDPTConfig(reqCtx intctrlutil.Reques
 
 	reason := ReasonUnknownError
 	defer func() {
-		condType := ConditionTypeDPTConfigChecked
-		status := metav1.ConditionFalse
-		var message string
-		if err == nil {
-			status = metav1.ConditionTrue
-			reason = ReasonDPTConfigChecked
-		} else {
-			message = err.Error()
-		}
-		updateErr := updateCondition(reqCtx.Ctx, r.Client, repo,
-			condType, status, reason, message)
-		if err == nil {
-			err = updateErr
-		}
+		r.updateConditionInDefer(reqCtx, repo, ConditionTypeDPTConfigChecked, reason, &err)
 	}()
 
 	if !repo.IsDPTAccess() {
@@ -587,10 +527,14 @@ func (r *BackupRepoReconciler) checkAndUpdateDPTConfig(reqCtx intctrlutil.Reques
 		}
 	}
 
-	return updateAnnotations(reqCtx.Ctx, r.Client, repo, map[string]string{
+	if err = updateAnnotations(reqCtx.Ctx, r.Client, repo, map[string]string{
 		dataProtectionDPTConfigTemplateMD5MD5AnnotationKey: currentTemplateMd5,
 		dataProtectionTemplateValuesMD5AnnotationKey:       currentParametersMd5,
-	})
+	}); err != nil {
+		return err
+	}
+	reason = ReasonDPTConfigChecked
+	return nil
 }
 
 func (r *BackupRepoReconciler) constructPVCByTemplate(
@@ -987,6 +931,32 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // ============================================================================
 // helper functions
 // ============================================================================
+
+// dependencyError indicates that the error itself cannot be resolved
+// unless the dependent object is updated.
+type dependencyError struct {
+	msg string
+}
+
+func (e *dependencyError) Error() string {
+	return e.msg
+}
+
+func newDependencyError(msg string) error {
+	return &dependencyError{msg: msg}
+}
+
+func isDependencyError(err error) bool {
+	de, ok := err.(*dependencyError)
+	return ok || errors.As(err, &de)
+}
+
+func checkedRequeueWithError(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
+	if apierrors.IsNotFound(err) || isDependencyError(err) {
+		return intctrlutil.Reconciled()
+	}
+	return intctrlutil.RequeueWithError(err, logger, msg, keysAndValues...)
+}
 
 type renderContext struct {
 	Parameters                map[string]string

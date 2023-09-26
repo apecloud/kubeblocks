@@ -379,7 +379,7 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
-		if p.ConfigConstraintObj != nil {
+		if p.ConfigConstraintObj != nil && !p.isDone() {
 			if err := SyncEnvConfigmap(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context); err != nil {
 				return err
 			}

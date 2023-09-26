@@ -55,6 +55,12 @@ var _ = Describe("Backup Schedule Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupScheduleSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
+
+		// wait all backup to be deleted, otherwise the controller maybe create
+		// job to delete the backup between the ClearResources function delete
+		// the job and get the job list, resulting the ClearResources panic.
+		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
+
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.CronJobSignature, true, inNS)

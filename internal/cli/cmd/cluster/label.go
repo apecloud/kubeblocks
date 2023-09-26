@@ -76,10 +76,9 @@ type LabelOptions struct {
 	newLabels    map[string]string
 	removeLabels []string
 
-	namespace        string
-	enforceNamespace bool
-	dryRunStrategy   cmdutil.DryRunStrategy
-	// dryRunVerifier               *resource.QueryParamVerifier
+	namespace                    string
+	enforceNamespace             bool
+	dryRunStrategy               cmdutil.DryRunStrategy
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
@@ -142,12 +141,6 @@ func (o *LabelOptions) complete(cmd *cobra.Command, args []string) error {
 	}
 	o.builder = o.Factory.NewBuilder()
 	o.unstructuredClientForMapping = o.Factory.UnstructuredClientForMapping
-	// TODO(controller-runtime-v0.15)
-	// dynamicClient, err := o.Factory.DynamicClient()
-	// if err != nil {
-	//	return err
-	// }
-	// o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, o.Factory.OpenAPIGetter(), resource.QueryParamDryRun)
 	return nil
 }
 

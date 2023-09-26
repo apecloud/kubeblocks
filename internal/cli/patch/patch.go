@@ -65,7 +65,6 @@ type Options struct {
 	namespace                    string
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
-	dryRunVerifier               *resource.QueryParamVerifier
 	args                         []string
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -116,12 +115,6 @@ func (o *Options) complete(cmd *cobra.Command) error {
 	o.args = append([]string{util.GVRToString(o.GVR)}, o.Names...)
 	o.builder = o.Factory.NewBuilder()
 	o.unstructuredClientForMapping = o.Factory.UnstructuredClientForMapping
-	// TODO(controller-runtime-v0.15)
-	// dynamicClient, err := o.Factory.DynamicClient()
-	// if err != nil {
-	//	return err
-	// }
-	// o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, o.Factory, resource.QueryParamDryRun)
 	return nil
 }
 
@@ -162,11 +155,6 @@ func (o *Options) Run(cmd *cobra.Command) error {
 		name, namespace := info.Name, info.Namespace
 		if o.dryRunStrategy != cmdutil.DryRunClient {
 			mapping := info.ResourceMapping()
-			if o.dryRunStrategy == cmdutil.DryRunServer {
-				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-					return err
-				}
-			}
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err

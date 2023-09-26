@@ -87,14 +87,7 @@ func (o *CustomEditOptions) Run(originalObj runtime.Object) error {
 		edited = original
 	}
 
-	// TODO(controller-runtime-v0.15)
-	// dynamicClient, err := o.Factory.DynamicClient()
-	// if err != nil {
-	//	return fmt.Errorf("failed to get dynamic client: %v", err)
-	// }
 	// apply validation
-	// fieldValidationVerifier := resource.NewQueryParamVerifier(dynamicClient, o.Factory.OpenAPIGetter(), resource.QueryParamFieldValidation)
-	// schemaValidator, err := o.Factory.Validator(metav1.FieldValidationStrict, fieldValidationVerifier)
 	schemaValidator, err := o.Factory.Validator(metav1.FieldValidationStrict)
 	if err != nil {
 		return fmt.Errorf("failed to get validator: %v", err)

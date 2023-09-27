@@ -28,7 +28,7 @@ builds:
       - amd64
       - arm64
     env:
-      - ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.20
+      - ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.21
       - CGO_ENABLED=0
     tags:
       - containers_image_openpgp

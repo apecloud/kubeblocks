@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
   name: actionsets.dataprotection.kubeblocks.io
@@ -251,15 +250,22 @@ spec:
                 allOf:
                 - enum:
                   - Full
+                  - Incremental
+                  - Differential
                   - Continuous
                 - enum:
                   - Full
+                  - Incremental
+                  - Differential
                   - Continuous
                 default: Full
                 description: 'backupType specifies the backup type, supported values:
-                  Full, Continuous. Full means full backup. Continuous will back up
-                  the transaction log continuously, the PITR (Point in Time Recovery)
-                  can be performed based on the continuous backup and full backup.'
+                  Full, Continuous. Full means full backup. Incremental means back
+                  up data that have changed since the last backup (full or incremental).
+                  Differential means back up data that have changed since the last
+                  full backup. Continuous will back up the transaction log continuously,
+                  the PITR (Point in Time Recovery). can be performed based on the
+                  continuous backup and full backup.'
                 type: string
               env:
                 description: List of environment variables to set in the container.
@@ -302,6 +308,7 @@ spec:
                           required:
                           - key
                           type: object
+                          x-kubernetes-map-type: atomic
                         fieldRef:
                           description: 'Selects a field of the pod: supports metadata.name,
                             metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
@@ -319,6 +326,7 @@ spec:
                           required:
                           - fieldPath
                           type: object
+                          x-kubernetes-map-type: atomic
                         resourceFieldRef:
                           description: 'Selects a resource of the container: only
                             resources limits and requests (limits.cpu, limits.memory,
@@ -343,6 +351,7 @@ spec:
                           required:
                           - resource
                           type: object
+                          x-kubernetes-map-type: atomic
                         secretKeyRef:
                           description: Selects a key of a secret in the pod's namespace
                           properties:
@@ -361,6 +370,7 @@ spec:
                           required:
                           - key
                           type: object
+                          x-kubernetes-map-type: atomic
                       type: object
                   required:
                   - name
@@ -388,6 +398,7 @@ spec:
                           description: Specify whether the ConfigMap must be defined
                           type: boolean
                       type: object
+                      x-kubernetes-map-type: atomic
                     prefix:
                       description: An optional identifier to prepend to each key in
                         the ConfigMap. Must be a C_IDENTIFIER.
@@ -403,6 +414,7 @@ spec:
                           description: Specify whether the Secret must be defined
                           type: boolean
                       type: object
+                      x-kubernetes-map-type: atomic
                   type: object
                 type: array
                 x-kubernetes-preserve-unknown-fields: true

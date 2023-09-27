@@ -31,35 +31,6 @@ spec:
                   if [ "true" = "$IsLeader" ]; then echo -n "leader"; elif [ "true" = "$IsLearner" ]; then echo -n "learner"; else echo -n "follower"; fi
           roleUpdateMechanism: DirectAPIServerEventUpdate
         memberUpdateStrategy: BestEffortParallel
-        membershipReconfiguration:
-          switchoverAction:
-            image: quay.io/coreos/etcd:v3.5.6
-            command:
-              - /bin/bash
-              - -c
-              - |
-                echo "Prepare to promote $KB_RSM_TARGET_HOST" &&
-                follower_id=$(etcdctl --endpoints="http://$KB_RSM_LEADER_HOST:$KB_RSM_SERVICE_PORT" member list | grep "$KB_RSM_TARGET_HOST" | awk -F',' '{print $1}') &&
-                [[ -z $follower_id ]] && echo "No follower found. Exiting..." && exit 1 &&
-                echo "Promoting Follower: $follower_id" &&
-                etcdctl --endpoints=http://$KB_RSM_LEADER_HOST:$KB_RSM_SERVICE_PORT member promote $follower_id &&
-                new_leader=$(etcdctl --endpoints=http://$KB_RSM_TARGET_HOST:$KB_RSM_SERVICE_PORT endpoint status --cluster | awk '{print $2,$6}' | grep 'true' | awk -F',' '{print $1}') &&
-                [[ $new_leader != $follower_id ]] && echo "Switchover failed. New leader is not the same as expected." && exit 1 &&
-                echo "New Leader: $new_leader" &&
-                echo "Etcd Switchover completed successfully."
-          memberJoinAction:
-            command:
-              - /bin/bash
-              - -c
-              - |
-                etcdctl --endpoints=http://$KB_RSM_LEADER_HOST:$KB_RSM_SERVICE_PORT member add $KB_RSM_TARGET_HOST --peer-urls="http://$KB_RSM_TARGET_HOST:$KB_RSM_SERVICE_PORT"
-          memberLeaveAction:
-            command:
-              - /bin/bash
-              - -c
-              - |
-                member_id=$(etcdctl --endpoints=http://$KB_RSM_TARGET_HOST:$KB_RSM_SERVICE_PORT member list | grep "$KB_RSM_TARGET_HOST" | awk -F',' '{print $1}') &&
-                etcdctl member remove $member_id
       service:
         ports:
           - name: client

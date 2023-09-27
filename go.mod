@@ -38,7 +38,6 @@ require (
 	github.com/go-logr/zapr v1.2.4
 	github.com/go-redis/redismock/v9 v9.0.3
 	github.com/go-sql-driver/mysql v1.7.1
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
@@ -210,6 +209,7 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-openapi/validate v0.22.1 // indirect
 	github.com/go-redis/redis/v7 v7.4.1 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect

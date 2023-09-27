@@ -96,9 +96,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	reqCtx.Log.V(1).Info("reconcile", "backup", req.NamespacedName, "phase", backup.Status.Phase)
 
-	res, err := r.handleDeletion(reqCtx, backup)
-	if res != nil {
-		return *res, err
+	// if backup is being deleted, set backup phase to Deleting. The backup
+	// reference workloads, data and volume snapshots will be deleted by controller
+	// later when the backup status.phase is deleting.
+	if !backup.GetDeletionTimestamp().IsZero() && backup.Status.Phase != dpv1alpha1.BackupPhaseDeleting {
+		patch := client.MergeFrom(backup.DeepCopy())
+		backup.Status.Phase = dpv1alpha1.BackupPhaseDeleting
+		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
 	}
 
 	switch backup.Status.Phase {
@@ -108,6 +114,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.handleRunningPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseCompleted:
 		return r.handleCompletedPhase(reqCtx, backup)
+	case dpv1alpha1.BackupPhaseDeleting:
+		return r.handleDeletingPhase(reqCtx, backup)
 	default:
 		return intctrlutil.Reconciled()
 	}
@@ -166,44 +174,28 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	return err
 }
 
-// handleDeletion handles the deletion of backup. It will delete the backup CR
+// handleDeletingPhase handles the deletion of backup. It will delete the backup CR
 // and the backup workload(job/statefulset).
-func (r *BackupReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (*ctrl.Result, error) {
+func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	// if backup phase is Deleting, delete the backup reference workloads,
 	// backup data stored in backup repository and volume snapshots.
 	// TODO(ldm): if backup is being used by restore, do not delete it.
-	if backup.Status.Phase == dpv1alpha1.BackupPhaseDeleting {
-		if err := r.deleteExternalResources(reqCtx, backup); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
-		}
-
-		if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
-			return intctrlutil.ResultToP(intctrlutil.Reconciled())
-		}
-
-		if err := r.deleteVolumeSnapshots(reqCtx, backup); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
-		}
-
-		if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
-		}
-		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	if err := r.deleteExternalResources(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// if backup CR is being deleted, set backup phase to deleting. The backup
-	// reference workloads, data and volume snapshots will be deleted by controller
-	// later when the backup CR status.phase is deleting.
-	if !backup.GetDeletionTimestamp().IsZero() {
-		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.Phase = dpv1alpha1.BackupPhaseDeleting
-		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
-		}
-		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+		return intctrlutil.Reconciled()
 	}
 
-	return nil, nil
+	if err := r.deleteVolumeSnapshots(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
+	if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
 }
 
 func (r *BackupReconciler) handleNewPhase(
@@ -561,12 +553,8 @@ func (r *BackupReconciler) deleteExternalJobs(reqCtx intctrlutil.RequestCtx, bac
 	}
 
 	deleteJob := func(job *batchv1.Job) error {
-		if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
-			patch := client.MergeFrom(job.DeepCopy())
-			controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
-			if err := r.Patch(reqCtx.Ctx, job, patch); err != nil {
-				return err
-			}
+		if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, r.Client, job); err != nil {
+			return err
 		}
 		if !job.DeletionTimestamp.IsZero() {
 			return nil

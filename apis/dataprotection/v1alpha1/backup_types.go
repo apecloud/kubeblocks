@@ -312,18 +312,20 @@ func init() {
 
 // GetStartTime gets the backup start time. Default return status.startTimestamp,
 // unless status.timeRange.startTime is not nil.
-func (r *BackupStatus) GetStartTime() *metav1.Time {
-	if r.TimeRange != nil && r.TimeRange.Start != nil {
-		return r.TimeRange.Start
+func (r *Backup) GetStartTime() *metav1.Time {
+	s := r.Status
+	if s.TimeRange != nil && s.TimeRange.Start != nil {
+		return s.TimeRange.Start
 	}
-	return r.StartTimestamp
+	return s.StartTimestamp
 }
 
 // GetEndTime gets the backup end time. Default return status.completionTimestamp,
 // unless status.timeRange.endTime is not nil.
-func (r *BackupStatus) GetEndTime() *metav1.Time {
-	if r.TimeRange != nil && r.TimeRange.End != nil {
-		return r.TimeRange.End
+func (r *Backup) GetEndTime() *metav1.Time {
+	s := r.Status
+	if s.TimeRange != nil && s.TimeRange.End != nil {
+		return s.TimeRange.End
 	}
-	return r.CompletionTimestamp
+	return s.CompletionTimestamp
 }

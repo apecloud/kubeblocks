@@ -161,8 +161,8 @@ func checkJobDone(job *batchv1.Job) (bool, error) {
 }
 
 func compareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
-	endTimeI := backupI.Status.GetEndTime()
-	endTimeJ := backupJ.Status.GetEndTime()
+	endTimeI := backupI.GetEndTime()
+	endTimeJ := backupJ.GetEndTime()
 	if endTimeI.IsZero() {
 		return false
 	}

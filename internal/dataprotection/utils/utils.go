@@ -69,6 +69,9 @@ func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 }
 
 func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj client.Object) error {
+	if !controllerutil.ContainsFinalizer(obj, dptypes.DataProtectionFinalizerName) {
+		return nil
+	}
 	patch := client.MergeFrom(obj.DeepCopyObject().(client.Object))
 	controllerutil.RemoveFinalizer(obj, dptypes.DataProtectionFinalizerName)
 	return cli.Patch(ctx, obj, patch)

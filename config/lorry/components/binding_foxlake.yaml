@@ -1,0 +1,8 @@
+name: foxlake
+spec:
+  version: v1
+  metadata:
+    - name: url
+      value: "foxlake_root:@tcp(127.0.0.1:11288)/?multiStatements=true"
+    - name: maxOpenConns
+      value: "5"

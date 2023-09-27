@@ -32,6 +32,7 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
+	"github.com/apecloud/kubeblocks/lorry/binding/foxlake"
 	"github.com/apecloud/kubeblocks/lorry/binding/mongodb"
 	"github.com/apecloud/kubeblocks/lorry/binding/mysql"
 	"github.com/apecloud/kubeblocks/lorry/binding/postgres"
@@ -84,6 +85,14 @@ func RegisterBuiltin() error {
 	err = mongoOp.Init(properties)
 	if err != nil {
 		return errors.Errorf(initErrFmt, "mongodb", err)
+	}
+
+	foxlakeOp := foxlake.NewFoxLake()
+	builtinMap["foxlake"] = foxlakeOp
+	properties = component.GetProperties("foxlake")
+	err = foxlakeOp.Init(properties)
+	if err != nil {
+		return errors.Errorf(initErrFmt, "foxlake", err)
 	}
 
 	customOp = custom.NewHTTPCustom()

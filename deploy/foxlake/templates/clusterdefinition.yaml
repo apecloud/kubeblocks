@@ -16,6 +16,9 @@ spec:
     - name: foxlake-server
       workloadType: Stateless
       characterType: foxlake
+      probes:
+        runningProbe:
+          periodSeconds: 10
       service:
         ports:
           - name: foxlake

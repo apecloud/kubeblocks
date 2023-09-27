@@ -202,6 +202,7 @@ func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 	return phase == appsv1alpha1.CRunningPhase ||
 		phase == appsv1alpha1.CInitPhase ||
 		phase == appsv1alpha1.CPendingPhase ||
+		phase == appsv1alpha1.CFailedPhase ||
 		phase == appsv1alpha1.CMergedPhase ||
 		phase == appsv1alpha1.CMergeFailedPhase ||
 		phase == appsv1alpha1.CUpgradingPhase ||

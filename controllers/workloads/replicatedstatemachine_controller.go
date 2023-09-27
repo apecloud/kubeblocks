@@ -30,7 +30,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -151,9 +150,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
-			Watches(&source.Kind{Type: &appsv1.StatefulSet{}}, stsHandler).
-			Watches(&source.Kind{Type: &batchv1.Job{}}, jobHandler).
-			Watches(&source.Kind{Type: &corev1.Pod{}}, podHandler).
+			Watches(&appsv1.StatefulSet{}, stsHandler).
+			Watches(&batchv1.Job{}, jobHandler).
+			Watches(&corev1.Pod{}, podHandler).
 			Complete(r)
 	}
 
@@ -164,6 +163,6 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		For(&workloads.ReplicatedStateMachine{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, podHandler).
+		Watches(&corev1.Pod{}, podHandler).
 		Complete(r)
 }

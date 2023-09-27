@@ -59,7 +59,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
-	"github.com/apecloud/kubeblocks/internal/webhook"
 )
 
 // added lease.coordination.k8s.io for leader election
@@ -482,11 +481,6 @@ func main() {
 
 		if err = (&appsv1alpha1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
-			os.Exit(1)
-		}
-
-		if err = webhook.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to setup webhook")
 			os.Exit(1)
 		}
 	}

@@ -35,7 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-func retrieveRelatedComponentsByConfigmap[T generics.Object, L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, configSpecName string, _ func(T, L), cfg client.ObjectKey, opts ...client.ListOption) ([]T, []string, error) {
+func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, configSpecName string, _ func(T, PT, L, PL), cfg client.ObjectKey, opts ...client.ListOption) ([]T, []string, error) {
 	var objList L
 	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
 		return nil, nil, err

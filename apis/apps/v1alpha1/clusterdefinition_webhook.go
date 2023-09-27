@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -82,21 +83,21 @@ func (r *ClusterDefinition) Default() {
 var _ webhook.Validator = &ClusterDefinition{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterDefinition) ValidateCreate() error {
+func (r *ClusterDefinition) ValidateCreate() (admission.Warnings, error) {
 	clusterdefinitionlog.Info("validate create", "name", r.Name)
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterDefinition) ValidateUpdate(old runtime.Object) error {
+func (r *ClusterDefinition) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	clusterdefinitionlog.Info("validate update", "name", r.Name)
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterDefinition) ValidateDelete() error {
+func (r *ClusterDefinition) ValidateDelete() (admission.Warnings, error) {
 	clusterdefinitionlog.Info("validate delete", "name", r.Name)
-	return nil
+	return nil, nil
 }
 
 // Validate ClusterDefinition.spec is legal

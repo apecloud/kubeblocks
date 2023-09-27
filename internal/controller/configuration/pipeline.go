@@ -145,16 +145,17 @@ func (p *pipeline) UpdateConfigurationStatus() *pipeline {
 		}
 
 		existing := p.ConfigurationObj
+		reversion := fromConfiguration(existing)
 		patch := client.MergeFrom(existing)
 		updated := existing.DeepCopy()
 		for _, item := range existing.Spec.ConfigItemDetails {
-			checkAndUpdateItemStatus(updated, item)
+			checkAndUpdateItemStatus(updated, item, reversion)
 		}
 		return p.ResourceFetcher.Client.Status().Patch(p.Context, updated, patch)
 	})
 }
 
-func checkAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1alpha1.ConfigurationItemDetail) {
+func checkAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1alpha1.ConfigurationItemDetail, reversion string) {
 	foundStatus := func(name string) *appsv1alpha1.ConfigurationItemDetailStatus {
 		for i := range updated.Status.ConfigurationItemStatus {
 			status := &updated.Status.ConfigurationItemStatus[i]
@@ -172,8 +173,9 @@ func checkAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1al
 	if status == nil {
 		updated.Status.ConfigurationItemStatus = append(updated.Status.ConfigurationItemStatus,
 			appsv1alpha1.ConfigurationItemDetailStatus{
-				Name:  item.Name,
-				Phase: appsv1alpha1.CInitPhase,
+				Name:           item.Name,
+				Phase:          appsv1alpha1.CInitPhase,
+				UpdateRevision: reversion,
 			})
 	}
 }
@@ -356,32 +358,28 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 		if p.isDone() {
 			return nil
 		}
+
+		if err := updateConfigMetaForCM(p.newCM, &p.item, revision); err != nil {
+			return err
+		}
 		annotations := p.newCM.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
-		b, err := json.Marshal(p.item)
-		if err != nil {
-			return err
-		}
-		annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
-		hash, _ := cfgutil.ComputeHash(p.newCM.Data)
-		annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
-		annotations[constant.ConfigurationRevision] = revision
-		annotations[constant.CMConfigurationTemplateVersion] = p.item.Version
+
 		// delete disable reconcile annotation
 		if _, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]; ok {
 			annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(false)
 		}
 		p.newCM.Annotations = annotations
-		p.itemStatus.UpdateRevision = revision
+		// p.itemStatus.UpdateRevision = revision
 		return nil
 	})
 }
 
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
-		if p.ConfigConstraintObj != nil {
+		if p.ConfigConstraintObj != nil && !p.isDone() {
 			if err := SyncEnvConfigmap(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context); err != nil {
 				return err
 			}

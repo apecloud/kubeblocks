@@ -31,7 +31,6 @@ import (
 	"strings"
 	"time"
 
-	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/factory"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
@@ -55,11 +54,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -154,7 +153,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&batchv1.Job{}).
 		Owns(&appsv1.StatefulSet{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
@@ -249,7 +248,7 @@ func (r *BackupReconciler) handleBackupDeletion(reqCtx intctrlutil.RequestCtx, b
 	return nil, nil
 }
 
-func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Request {
+func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}
@@ -538,8 +537,8 @@ func (r *BackupReconciler) handlePVCByBackupRepo(reqCtx intctrlutil.RequestCtx,
 	// add a special label and wait for the backup repo controller to create the PVC.
 	// we need to update the object meta immediately, because we are going to break the current reconciliation.
 	_, err = r.patchBackupObjectLabels(reqCtx, backup, map[string]string{
-		dataProtectionBackupRepoKey:  repo.Name,
-		dataProtectionNeedRepoPVCKey: trueVal,
+		dataProtectionBackupRepoKey:          repo.Name,
+		dataProtectionWaitRepoPreparationKey: trueVal,
 	})
 	if err != nil {
 		return "", "", err

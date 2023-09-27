@@ -47,7 +47,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -129,7 +128,7 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *BackupPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.BackupPolicy{}).
-		Watches(&source.Kind{Type: &dataprotectionv1alpha1.Backup{}}, r.backupDeleteHandler(),
+		Watches(&dataprotectionv1alpha1.Backup{}, r.backupDeleteHandler(),
 			builder.WithPredicates(predicate.NewPredicateFuncs(filterCreatedByPolicy))).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
@@ -139,9 +138,8 @@ func (r *BackupPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *BackupPolicyReconciler) backupDeleteHandler() *handler.Funcs {
 	return &handler.Funcs{
-		DeleteFunc: func(event event.DeleteEvent, limitingInterface workqueue.RateLimitingInterface) {
+		DeleteFunc: func(ctx context.Context, event event.DeleteEvent, limitingInterface workqueue.RateLimitingInterface) {
 			backup := event.Object.(*dataprotectionv1alpha1.Backup)
-			ctx := context.Background()
 			backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 			if err := r.Client.Get(ctx, types.NamespacedName{Name: backup.Spec.BackupPolicyName, Namespace: backup.Namespace}, backupPolicy); err != nil {
 				return

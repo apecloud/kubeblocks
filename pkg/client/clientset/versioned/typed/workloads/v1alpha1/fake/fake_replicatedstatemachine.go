@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +35,9 @@ type FakeReplicatedStateMachines struct {
 	ns   string
 }
 
-var replicatedstatemachinesResource = schema.GroupVersionResource{Group: "workloads", Version: "v1alpha1", Resource: "replicatedstatemachines"}
+var replicatedstatemachinesResource = v1alpha1.SchemeGroupVersion.WithResource("replicatedstatemachines")
 
-var replicatedstatemachinesKind = schema.GroupVersionKind{Group: "workloads", Version: "v1alpha1", Kind: "ReplicatedStateMachine"}
+var replicatedstatemachinesKind = v1alpha1.SchemeGroupVersion.WithKind("ReplicatedStateMachine")
 
 // Get takes name of the replicatedStateMachine, and returns the corresponding replicatedStateMachine object, and an error if there is any.
 func (c *FakeReplicatedStateMachines) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ReplicatedStateMachine, err error) {

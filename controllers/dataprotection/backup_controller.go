@@ -54,7 +54,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -154,7 +153,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&batchv1.Job{}).
 		Owns(&appsv1.StatefulSet{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
@@ -249,7 +248,7 @@ func (r *BackupReconciler) handleBackupDeletion(reqCtx intctrlutil.RequestCtx, b
 	return nil, nil
 }
 
-func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Request {
+func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}

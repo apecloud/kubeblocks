@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +35,9 @@ type FakeRestoreJobs struct {
 	ns   string
 }
 
-var restorejobsResource = schema.GroupVersionResource{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Resource: "restorejobs"}
+var restorejobsResource = v1alpha1.SchemeGroupVersion.WithResource("restorejobs")
 
-var restorejobsKind = schema.GroupVersionKind{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Kind: "RestoreJob"}
+var restorejobsKind = v1alpha1.SchemeGroupVersion.WithKind("RestoreJob")
 
 // Get takes name of the restoreJob, and returns the corresponding restoreJob object, and an error if there is any.
 func (c *FakeRestoreJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.RestoreJob, err error) {

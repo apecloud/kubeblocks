@@ -39,7 +39,7 @@ import (
 
 func ResourceNameCompletionFunc(f cmdutil.Factory, gvr schema.GroupVersionResource) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		comps := utilcomp.CompGetResource(f, cmd, GVRToString(gvr), toComplete)
+		comps := utilcomp.CompGetResource(f, GVRToString(gvr), toComplete)
 		seen := make(map[string]bool)
 
 		var availableComps []string
@@ -103,7 +103,7 @@ func CompGetFromTemplateWithLabels(template *string, f cmdutil.Factory, namespac
 		o.LabelSelector = strings.Join(labels, ",")
 	}
 
-	_ = o.Run(f, cmd, args)
+	_ = o.Run(f, args)
 
 	var comps []string
 	resources := strings.Split(buf.String(), " ")
@@ -123,7 +123,7 @@ func RegisterClusterCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, GVRToString(types.ClusterGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, GVRToString(types.ClusterGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 	))
 }

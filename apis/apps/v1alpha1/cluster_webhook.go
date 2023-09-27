@@ -30,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -47,31 +48,31 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &Cluster{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateCreate() error {
+func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	clusterlog.Info("validate create", "name", r.Name)
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateUpdate(old runtime.Object) error {
+func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	clusterlog.Info("validate update", "name", r.Name)
 	lastCluster := old.(*Cluster)
 	if lastCluster.Spec.ClusterDefRef != r.Spec.ClusterDefRef {
-		return newInvalidError(ClusterKind, r.Name, "spec.clusterDefinitionRef", "clusterDefinitionRef is immutable, you can not update it. ")
+		return nil, newInvalidError(ClusterKind, r.Name, "spec.clusterDefinitionRef", "clusterDefinitionRef is immutable, you can not update it. ")
 	}
 	if err := r.validate(); err != nil {
-		return err
+		return nil, err
 	}
-	return r.validateVolumeClaimTemplates(lastCluster)
+	return nil, r.validateVolumeClaimTemplates(lastCluster)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateDelete() error {
+func (r *Cluster) ValidateDelete() (admission.Warnings, error) {
 	clusterlog.Info("validate delete", "name", r.Name)
 	if r.Spec.TerminationPolicy == DoNotTerminate {
-		return fmt.Errorf("the deletion for a cluster with DoNotTerminate termination policy is denied")
+		return nil, fmt.Errorf("the deletion for a cluster with DoNotTerminate termination policy is denied")
 	}
-	return nil
+	return nil, nil
 }
 
 // validateVolumeClaimTemplates volumeClaimTemplates is forbidden modification except for storage size.

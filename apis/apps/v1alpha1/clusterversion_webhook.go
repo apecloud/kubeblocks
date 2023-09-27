@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -46,26 +47,26 @@ func (r *ClusterVersion) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &ClusterVersion{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterVersion) ValidateCreate() error {
+func (r *ClusterVersion) ValidateCreate() (admission.Warnings, error) {
 	clusterversionlog.Info("validate create", "name", r.Name)
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterVersion) ValidateUpdate(old runtime.Object) error {
+func (r *ClusterVersion) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	clusterversionlog.Info("validate update", "name", r.Name)
 	// determine whether r.spec content is modified
 	lastClusterVersion := old.(*ClusterVersion)
 	if !reflect.DeepEqual(lastClusterVersion.Spec, r.Spec) {
-		return newInvalidError(ClusterVersionKind, r.Name, "", "ClusterVersion.spec is immutable, you can not update it.")
+		return nil, newInvalidError(ClusterVersionKind, r.Name, "", "ClusterVersion.spec is immutable, you can not update it.")
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterVersion) ValidateDelete() error {
+func (r *ClusterVersion) ValidateDelete() (admission.Warnings, error) {
 	clusterversionlog.Info("validate delete", "name", r.Name)
-	return nil
+	return nil, nil
 }
 
 // Validate ClusterVersion.spec is legal

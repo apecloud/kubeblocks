@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -230,22 +229,22 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
 		Owns(&dataprotectionv1alpha1.Backup{}).
 		Owns(&batchv1.Job{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.ClusterRoleBinding{}).
 			Owns(&rbacv1.RoleBinding{}).
 			Owns(&corev1.ServiceAccount{})
 	} else {
-		b.Watches(&source.Kind{Type: &rbacv1.ClusterRoleBinding{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
-			Watches(&source.Kind{Type: &rbacv1.RoleBinding{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
-			Watches(&source.Kind{Type: &corev1.ServiceAccount{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
+		b.Watches(&rbacv1.ClusterRoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
+			Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
+			Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 	}
 
 	return b.Complete(r)
 }
 
-func (r *ClusterReconciler) filterClusterResources(obj client.Object) []reconcile.Request {
+func (r *ClusterReconciler) filterClusterResources(ctx context.Context, obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}

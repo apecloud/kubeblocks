@@ -1,0 +1,474 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package component
+
+import (
+	"fmt"
+	"reflect"
+	"strings"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+)
+
+// TODO(component): type check
+
+func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion) (*appsv1alpha1.ComponentDefinition, error) {
+	if clusterCompDef == nil {
+		return nil, nil
+	}
+	convertors := map[string]convertor{
+		"provider":               &providerConvertor{},
+		"description":            &descriptionConvertor{},
+		"servicekind":            &serviceKindConvertor{},
+		"serviceversion":         &serviceVersionConvertor{},
+		"runtime":                &runtimeConvertor{},
+		"volumes":                &volumeConvertor{},
+		"services":               &serviceConvertor{},
+		"configs":                &configConvertor{},
+		"logconfigs":             &logConfigConvertor{},
+		"monitor":                &monitorConvertor{},
+		"scripts":                &scriptConvertor{},
+		"policyrules":            &policyRuleConvertor{},
+		"labels":                 &labelConvertor{},
+		"systemaccounts":         &systemAccountConvertor{},
+		"connectioncredentials":  &connectionCredentialConvertor{},
+		"updatestrategy":         &updateStrategyConvertor{},
+		"roles":                  &roleConvertor{},
+		"rolearbitrator":         &roleArbitratorConvertor{},
+		"lifecycleactions":       &lifecycleActionConvertor{},
+		"servicerefdeclarations": &serviceRefDeclarationConvertor{},
+	}
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
+		return nil, err
+	}
+	return compDef, nil
+}
+
+func BuildComponentFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
+	if clusterCompDef == nil || clusterCompSpec == nil {
+		return nil, nil
+	}
+	convertors := map[string]convertor{
+		"cluster":              &clusterConvertor{},
+		"compdef":              &compDefConvertor{},
+		"classdefref":          &classDefRefConvertor{},
+		"servicerefs":          &serviceRefConvertor{},
+		"resources":            &resourceConvertor{},
+		"volumeclaimtemplates": &volumeClaimTemplateConvertor{},
+		"replicas":             &replicaConvertor{},
+		"configs":              &configConvertor2{},
+		"monitor":              &monitorConvertor2{},
+		"enabledlogs":          &enabledLogConvertor{},
+		"updatestrategy":       &updateStrategyConvertor2{},
+		"serviceaccountname":   &serviceAccountNameConvertor{},
+		"affinity":             &affinityConvertor{},
+		"tolerations":          &tolerationConvertor{},
+		"tls":                  &tlsConvertor{},
+		"issuer":               &issuerConvertor{},
+	}
+	comp := &appsv1alpha1.Component{}
+	if err := covertObject(convertors, &comp.Spec, clusterCompDef, clusterCompVer, clusterCompSpec); err != nil {
+		return nil, err
+	}
+	return comp, nil
+}
+
+func covertObject(convertors map[string]convertor, obj any, args ...any) error {
+	tp := reflect.TypeOf(obj)
+	for i := 0; i < tp.NumField(); i++ {
+		fieldName := tp.Field(i).Name
+		c, ok := convertors[strings.ToLower(fieldName)]
+		if !ok || c == nil {
+			continue // leave the origin (default) value
+		}
+		val, err := c.convert(args...)
+		if err != nil {
+			return err
+		}
+		fieldValue := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
+		if fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)) {
+			fieldValue.Set(reflect.ValueOf(val))
+		} else {
+			panic("not assignable")
+		}
+	}
+	return nil
+}
+
+type convertor interface {
+	convert(...any) (any, error)
+}
+
+type providerConvertor struct{}
+
+func (c *providerConvertor) convert(args ...any) (any, error) {
+	return "", nil
+}
+
+type descriptionConvertor struct{}
+
+func (c *descriptionConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.Description, nil
+}
+
+type serviceKindConvertor struct{}
+
+func (c *serviceKindConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.CharacterType, nil
+}
+
+type serviceVersionConvertor struct{}
+
+func (c *serviceVersionConvertor) convert(args ...any) (any, error) {
+	return "", nil
+}
+
+type runtimeConvertor struct{}
+
+func (c *runtimeConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	// TODO: cluster version definition
+	if clusterCompDef.PodSpec == nil {
+		return nil, fmt.Errorf("no pod spec")
+	}
+	return *clusterCompDef.PodSpec, nil
+}
+
+type volumeConvertor struct{}
+
+func (c *volumeConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	if clusterCompDef.VolumeTypes == nil {
+		return nil, nil
+	}
+
+	volumes := make([]appsv1alpha1.ComponentVolume, 0)
+	for _, vol := range clusterCompDef.VolumeTypes {
+		volumes = append(volumes, appsv1alpha1.ComponentVolume{
+			Name: vol.Name,
+		})
+	}
+
+	if clusterCompDef.VolumeProtectionSpec != nil {
+		defaultHighWatermark := clusterCompDef.VolumeProtectionSpec.HighWatermark
+		for i, _ := range volumes {
+			volumes[i].HighWatermark = defaultHighWatermark
+		}
+		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
+			if v.HighWatermark != nil && *v.HighWatermark != defaultHighWatermark {
+				for i, vv := range volumes {
+					if v.Name != vv.Name {
+						continue
+					}
+					volumes[i].HighWatermark = *v.HighWatermark
+				}
+			}
+		}
+	}
+	return volumes, nil
+}
+
+type serviceConvertor struct{}
+
+func (c *serviceConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return "", nil // TODO
+}
+
+type configConvertor struct{}
+
+func (c *configConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.ConfigSpecs, nil
+}
+
+type logConfigConvertor struct{}
+
+func (c *logConfigConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.LogConfigs, nil
+}
+
+type monitorConvertor struct{}
+
+func (c *monitorConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.Monitor, nil
+}
+
+type scriptConvertor struct{}
+
+func (c *scriptConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.ScriptSpecs, nil
+}
+
+type policyRuleConvertor struct{}
+
+func (c *policyRuleConvertor) convert(args ...any) (any, error) {
+	return nil, nil
+}
+
+type labelConvertor struct{}
+
+func (c *labelConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	if clusterCompDef.CustomLabelSpecs == nil {
+		return nil, nil
+	}
+
+	labels := make(map[string]appsv1alpha1.BuiltInString, 0)
+	// TODO: clusterCompDef.CustomLabelSpecs -> labels
+	return labels, nil
+}
+
+type systemAccountConvertor struct{}
+
+func (c *systemAccountConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return "", nil // TODO
+}
+
+type connectionCredentialConvertor struct{}
+
+func (c *connectionCredentialConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return "", nil // TODO
+}
+
+type updateStrategyConvertor struct{}
+
+func (c *updateStrategyConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	switch clusterCompDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		if clusterCompDef.ConsensusSpec == nil {
+			return nil, nil
+		}
+		return &clusterCompDef.ConsensusSpec.UpdateStrategy, nil
+	case appsv1alpha1.Replication:
+		if clusterCompDef.ReplicationSpec == nil {
+			return nil, nil
+		}
+		return &clusterCompDef.ReplicationSpec.UpdateStrategy, nil
+	case appsv1alpha1.Stateful:
+		if clusterCompDef.StatefulSpec == nil {
+			return nil, nil
+		}
+		return &clusterCompDef.StatefulSpec.UpdateStrategy, nil
+	case appsv1alpha1.Stateless:
+		if clusterCompDef.StatelessSpec == nil {
+			return nil, nil
+		}
+		// TODO: check the UpdateStrategy
+		return &clusterCompDef.StatelessSpec.UpdateStrategy.Type, nil
+	default:
+		panic(fmt.Sprintf("unknown workload type: %s", clusterCompDef.WorkloadType))
+	}
+}
+
+type roleConvertor struct{}
+
+func (c *roleConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	switch clusterCompDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		return c.convertConsensusRole(clusterCompDef)
+	case appsv1alpha1.Replication:
+		return nil, nil
+	case appsv1alpha1.Stateful:
+		return nil, nil
+	case appsv1alpha1.Stateless:
+		return nil, nil
+	default:
+		panic(fmt.Sprintf("unknown workload type: %s", clusterCompDef.WorkloadType))
+	}
+}
+
+func (c *roleConvertor) convertConsensusRole(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (any, error) {
+	if clusterCompDef.ConsensusSpec == nil {
+		return nil, nil
+	}
+
+	roles := make([]appsv1alpha1.ComponentReplicaRole, 0)
+	addRole := func(member appsv1alpha1.ConsensusMember) {
+		roles = append(roles, appsv1alpha1.ComponentReplicaRole{
+			Name:        member.Name,
+			Serviceable: member.AccessMode != appsv1alpha1.None,
+			Writable:    member.AccessMode == appsv1alpha1.ReadWrite,
+		})
+	}
+
+	addRole(clusterCompDef.ConsensusSpec.Leader)
+	for _, follower := range clusterCompDef.ConsensusSpec.Followers {
+		addRole(follower)
+	}
+	if clusterCompDef.ConsensusSpec.Learner != nil {
+		addRole(*clusterCompDef.ConsensusSpec.Learner)
+	}
+
+	return roles, nil
+}
+
+type roleArbitratorConvertor struct{}
+
+func (c *roleArbitratorConvertor) convert(args ...any) (any, error) {
+	return nil, nil
+}
+
+type lifecycleActionConvertor struct{}
+
+func (c *lifecycleActionConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return "", nil // TODO
+}
+
+type serviceRefDeclarationConvertor struct{}
+
+func (c *serviceRefDeclarationConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.ServiceRefDeclarations, nil
+}
+
+func parseComponentConvertorArgs(args ...any) (*appsv1alpha1.ClusterComponentDefinition,
+	*appsv1alpha1.ClusterComponentVersion, *appsv1alpha1.ClusterComponentSpec) {
+	def := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	ver := args[1].(*appsv1alpha1.ClusterComponentVersion)
+	spec := args[2].(*appsv1alpha1.ClusterComponentSpec)
+	return def, ver, spec
+}
+
+type clusterConvertor struct{}
+
+func (c *clusterConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type compDefConvertor struct{}
+
+func (c *compDefConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type classDefRefConvertor struct{}
+
+func (c *classDefRefConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type serviceRefConvertor struct{}
+
+func (c *serviceRefConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type resourceConvertor struct{}
+
+func (c *resourceConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type volumeClaimTemplateConvertor struct{}
+
+func (c *volumeClaimTemplateConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type replicaConvertor struct{}
+
+func (c *replicaConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type configConvertor2 struct{}
+
+func (c *configConvertor2) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type monitorConvertor2 struct{}
+
+func (c *monitorConvertor2) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type enabledLogConvertor struct{}
+
+func (c *enabledLogConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type updateStrategyConvertor2 struct{}
+
+func (c *updateStrategyConvertor2) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type serviceAccountNameConvertor struct{}
+
+func (c *serviceAccountNameConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type affinityConvertor struct{}
+
+func (c *affinityConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type tolerationConvertor struct{}
+
+func (c *tolerationConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type tlsConvertor struct{}
+
+func (c *tlsConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}
+
+type issuerConvertor struct{}
+
+func (c *issuerConvertor) convert(args ...any) (any, error) {
+	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	return "", nil // TODO
+}

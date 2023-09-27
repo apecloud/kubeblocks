@@ -222,7 +222,7 @@ func (f *MockComponentDefinitionFactory) AddConnectionCredential(name, serviceNa
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy appsv1alpha1.UpdateStrategy) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *appsv1alpha1.UpdateStrategy) *MockComponentDefinitionFactory {
 	f.get().Spec.UpdateStrategy = strategy
 	return f
 }
@@ -240,7 +240,7 @@ func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writa
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator appsv1alpha1.ComponentRoleArbitrator) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator *appsv1alpha1.ComponentRoleArbitrator) *MockComponentDefinitionFactory {
 	f.get().Spec.RoleArbitrator = arbitrator
 	return f
 }
@@ -260,13 +260,5 @@ func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val int
 			break
 		}
 	}
-	return f
-}
-
-func (f *MockComponentDefinitionFactory) AddComponentRef(ref appsv1alpha1.ComponentDefRef) *MockComponentDefinitionFactory {
-	if f.get().Spec.ComponentDefRef == nil {
-		f.get().Spec.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
-	}
-	f.get().Spec.ComponentDefRef = append(f.get().Spec.ComponentDefRef, ref)
 	return f
 }

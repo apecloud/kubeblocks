@@ -33,8 +33,7 @@ func NewComponentFactory(namespace, name, componentDefinition string) *MockCompo
 	f.init(namespace, name,
 		&appsv1alpha1.Component{
 			Spec: appsv1alpha1.ComponentSpec{
-				CompDef:           componentDefinition,
-				TerminationPolicy: appsv1alpha1.WipeOut,
+				CompDef: componentDefinition,
 			},
 		}, f)
 	return f

@@ -25,6 +25,15 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
+func buildMonitorConfigLegacy(
+	compDef *appsv1alpha1.ClusterComponentDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+	synthesizeComp *SynthesizedComponent) {
+	// TODO(component): appsv1alpha1.ClusterComponentDefinition -> appsv1alpha1.ComponentDefinition
+	//                  appsv1alpha1.ClusterComponentSpec -> appsv1alpha1.Component
+	buildMonitorConfig(nil, nil, synthesizeComp)
+}
+
 func buildMonitorConfig(
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component,

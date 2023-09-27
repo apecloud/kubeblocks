@@ -36,6 +36,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
+	cli roclient.ReadonlyClient,
+	cluster *appsv1alpha1.Cluster,
+	compDef *appsv1alpha1.ClusterComponentDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
+	// TODO(component): appsv1alpha1.ClusterComponentDefinition -> appsv1alpha1.ComponentDefinition
+	//                  appsv1alpha1.ClusterComponentSpec -> appsv1alpha1.Component
+	return GenServiceReferences(reqCtx, cli, cluster, nil, nil)
+}
+
 func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,

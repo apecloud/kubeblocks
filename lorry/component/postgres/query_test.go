@@ -200,3 +200,40 @@ func TestExec(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %v", err)
 	}
 }
+
+func TestGetPgCurrentSetting(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("query failed", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnError(fmt.Errorf("some error"))
+
+		res, err := manager.GetPgCurrentSetting(ctx, "test")
+		assert.NotNil(t, err)
+		assert.Equal(t, "", res)
+	})
+
+	t.Run("parse query failed", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}))
+
+		res, err := manager.GetPgCurrentSetting(ctx, "test")
+		assert.NotNil(t, err)
+		assert.Equal(t, "", res)
+	})
+
+	t.Run("query success", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("test"))
+
+		res, err := manager.GetPgCurrentSetting(ctx, "test")
+		assert.Nil(t, err)
+		assert.Equal(t, "test", res)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}

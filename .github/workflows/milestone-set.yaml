@@ -4,9 +4,10 @@ on:
   issues:
     types:
       - opened
-  pull_request:
+  pull_request_target:
     types:
       - opened
+
 
 jobs:
   issue-milestone:
@@ -17,7 +18,7 @@ jobs:
     secrets: inherit
     
   pr-milestone:
-    if: ${{ github.event_name  == 'pull_request' }}
+    if: ${{ github.event_name  == 'pull_request_target' }}
     uses: apecloud/apecloud-cd/.github/workflows/pull-request-milestone.yml@v0.1.30
     with:
       APECD_REF: "v0.1.30"

@@ -229,7 +229,7 @@ type CreateOptions struct {
 	// backup name to restore in creation
 	Backup                  string `json:"backup,omitempty"`
 	RestoreTime             string `json:"restoreTime,omitempty"`
-	RestoreManagementPolicy string `json:"volumeRestorePolicy,omitempty"`
+	RestoreManagementPolicy string `json:"restoreManagementPolicy,omitempty"`
 
 	// backup config
 	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`

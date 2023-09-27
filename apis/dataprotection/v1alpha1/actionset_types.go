@@ -25,9 +25,11 @@ import (
 type ActionSetSpec struct {
 	// backupType specifies the backup type, supported values: Full, Continuous.
 	// Full means full backup.
-	// Continuous will back up the transaction log continuously, the PITR (Point in Time Recovery)
+	// Incremental means back up data that have changed since the last backup (full or incremental).
+	// Differential means back up data that have changed since the last full backup.
+	// Continuous will back up the transaction log continuously, the PITR (Point in Time Recovery).
 	// can be performed based on the continuous backup and full backup.
-	// +kubebuilder:validation:Enum={Full,Continuous}
+	// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous}
 	// +kubebuilder:default=Full
 	// +kubebuilder:validation:Required
 	BackupType BackupType `json:"backupType"`
@@ -71,20 +73,16 @@ type ActionSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-func (r *ActionSetStatus) GetTerminalPhases() []Phase {
-	return []Phase{AvailablePhase}
-}
-
 // BackupType the backup type.
 // +enum
-// +kubebuilder:validation:Enum={Full,Continuous}
+// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous}
 type BackupType string
 
 const (
 	BackupTypeFull         BackupType = "Full"
-	BackupTypeContinuous   BackupType = "Continuous"
 	BackupTypeIncremental  BackupType = "Incremental"
 	BackupTypeDifferential BackupType = "Differential"
+	BackupTypeContinuous   BackupType = "Continuous"
 )
 
 type BackupActionSpec struct {

@@ -119,17 +119,6 @@ type ConnectionCredential struct {
 	PortKey string `json:"portKey,omitempty"`
 }
 
-// SecretReference represents a Secret Reference. It has enough information to
-// retrieve secret in any namespace
-type SecretReference struct {
-	// Name is unique within a namespace to reference a secret resource.
-	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty"`
-	// Namespace defines the space within which the secret name must be unique.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-}
-
 // KubeResources defines the kubernetes resources to back up.
 type KubeResources struct {
 	// selector is a metav1.LabelSelector to filter the target kubernetes resources
@@ -222,10 +211,6 @@ type BackupPolicyStatus struct {
 	// updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-}
-
-func (r *BackupPolicyStatus) GetTerminalPhases() []Phase {
-	return []Phase{AvailablePhase}
 }
 
 // BackupPolicyPhase defines phases for BackupPolicy.

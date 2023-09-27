@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 
-	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -61,15 +60,16 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, actionSet, dptypes.DataProtectionFinalizerName, func() (*ctrl.Result, error) {
-		return nil, r.deleteExternalResources(reqCtx, actionSet)
-	})
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, actionSet, dptypes.DataProtectionFinalizerName,
+		func() (*ctrl.Result, error) {
+			return nil, r.deleteExternalResources(reqCtx, actionSet)
+		})
 	if res != nil {
 		return *res, err
 	}
 
 	if actionSet.Status.ObservedGeneration == actionSet.Generation &&
-		slices.Contains(actionSet.Status.GetTerminalPhases(), actionSet.Status.Phase) {
+		actionSet.Status.Phase.IsAvailable() {
 		return ctrl.Result{}, nil
 	}
 

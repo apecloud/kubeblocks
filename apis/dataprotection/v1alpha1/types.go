@@ -34,6 +34,10 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
+func (p Phase) IsAvailable() bool {
+	return p == AvailablePhase
+}
+
 // BackupRepoPhase defines phases for BackupRepo CR.
 // +enum
 // +kubebuilder:validation:Enum={PreChecking,Failed,Ready,Deleting}

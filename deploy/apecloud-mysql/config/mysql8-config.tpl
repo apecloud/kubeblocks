@@ -94,13 +94,15 @@ mysqlx-port=33060
 mysqlx=0
 
 datadir={{ $data_root }}/data
-log_error=/data/mysql/log/mysqld-error.log
 
 {{ block "logsBlock" . }}
 log_statements_unsafe_for_binlog=OFF
 log_error_verbosity=2
 log_output=FILE
 {{- if hasKey $.component "enabledLogs" }}
+{{- if mustHas "error" $.component.enabledLogs }}
+log_error=/data/mysql/log/mysqld-error.log
+{{- end }}
 {{- if mustHas "slow" $.component.enabledLogs }}
 slow_query_log=ON
 long_query_time=5

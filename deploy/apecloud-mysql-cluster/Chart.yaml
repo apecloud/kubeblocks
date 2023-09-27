@@ -18,9 +18,6 @@ dependencies:
 # proxy of the MySQL being used is not relevant.
 appVersion: "8.0.30"
 
-kubeVersion: ">=1.16.0-0"
-kubeBlocksVersion: "test"
-
 keywords:
   - mysql
   - database

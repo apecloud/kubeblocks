@@ -7,6 +7,6 @@ if [ ! -z "${res}" ] && [ ! -f ${data_protection_file} ]; then
   exit 1
 fi
 # touch placeholder file
-touch ${data_protection_file} && sync
+touch ${data_protection_file}
 tar -xvf ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.tar.gz -C ${DATA_DIR}
 rm -rf ${data_protection_file} && sync

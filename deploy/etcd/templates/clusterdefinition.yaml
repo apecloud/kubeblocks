@@ -12,45 +12,54 @@ spec:
       workloadType: Consensus
       rsmSpec:
         roles:
-          - name: "leader"
+          - name: leader
             accessMode: ReadWrite
             isLeader: true
             canVote: true
-          - name: "follower"
+          - name: follower
             accessMode: ReadWrite
             isLeader: false
             canVote: true
         roleProbe:
           probeActions:
-            - image: "quay.io/coreos/etcd:v3.5.6"
+            - image: quay.io/coreos/etcd:v3.5.6
               command:
-                - "Status=$(etcdctl --endpoints=127.0.0.1:2379 endpoint status -w simple --command-timeout=300ms --dial-timeout=100m) &&"
-                - "IsLeader=$(echo $Status | awk -F ', ' '{print $5}') &&"
-                - "IsLearner=$(echo $Status | awk -F ', ' '{print $6}') &&"
-                - "if [ \"true\" = \"$IsLeader\" ]; then echo -n \"leader\"; elif [ \"true\" = \"$IsLearner\" ]; then echo -n \"learner\"; else echo -n \"follower\"; fi"
+                - |
+                  Status=$(etcdctl --endpoints=127.0.0.1:2379 endpoint status -w simple --command-timeout=300ms --dial-timeout=100m) &&
+                  IsLeader=$(echo $Status | awk -F ', ' '{print $5}') &&
+                  IsLearner=$(echo $Status | awk -F ', ' '{print $6}') &&
+                  if [ "true" = "$IsLeader" ]; then echo -n "leader"; elif [ "true" = "$IsLearner" ]; then echo -n "learner"; else echo -n "follower"; fi
           roleUpdateMechanism: DirectAPIServerEventUpdate
         memberUpdateStrategy: BestEffortParallel
         membershipReconfiguration:
           switchoverAction:
-            image: "quay.io/coreos/etcd:v3.5.6"
+            image: quay.io/coreos/etcd:v3.5.6
             command:
-              - "current_leader=$(etcdctl endpoint status --write-out=json | jq -r '.[] | select(.is_leader == true) | .clientURLs[0]') &&"
-              - "[[ -z $current_leader ]] && echo \"No current leader found. Exiting...\" && exit 1 &&"
-              - "echo \"Current Leader: $current_leader\" &&"
-              - "follower_id=$(etcdctl member list | awk '/isLeader=False/{print $1}') &&"
-              - "[[ -z $follower_id ]] && echo \"No follower found. Exiting...\" && exit 1 &&"
-              - "echo \"Promoting Follower: $follower_id\" &&"
-              - "etcdctl member promote $follower_id &&"
-              - "new_leader=$(etcdctl endpoint status --write-out=json | jq -r '.[] | select(.is_leader == true) | .clientURLs[0]') &&"
-              - "[[ $new_leader == $current_leader ]] && echo \"Switchover failed. New leader is the same as the previous leader.\" && exit 1 &&"
-              - "echo \"New Leader: $new_leader\" &&"
-              - "echo \"Etcd Switchover completed successfully.\""
+              - /bin/bash
+              - -c
+              - |
+                echo "Prepare to promote $KB_RSM_TARGET_HOST" &&
+                follower_id=$(etcdctl --endpoints="http://$KB_RSM_LEADER_HOST:$KB_RSM_SERVICE_PORT" member list | grep "$KB_RSM_TARGET_HOST" | awk -F',' '{print $1}') &&
+                [[ -z $follower_id ]] && echo "No follower found. Exiting..." && exit 1 &&
+                echo "Promoting Follower: $follower_id" &&
+                etcdctl --endpoints=http://$KB_RSM_LEADER_HOST:$KB_RSM_SERVICE_PORT member promote $follower_id &&
+                new_leader=$(etcdctl --endpoints=http://$KB_RSM_TARGET_HOST:$KB_RSM_SERVICE_PORT endpoint status --cluster | awk '{print $2,$6}' | grep 'true' | awk -F',' '{print $1}') &&
+                [[ $new_leader != $follower_id ]] && echo "Switchover failed. New leader is not the same as expected." && exit 1 &&
+                echo "New Leader: $new_leader" &&
+                echo "Etcd Switchover completed successfully."
           memberJoinAction:
             command:
-              - "etcdctl member add --peer-urls=http://$KB_RSM_TARGET_HOST:KB_RSM_SERVICE_PORT"
+              - /bin/bash
+              - -c
+              - |
+                etcdctl --endpoints=http://$KB_RSM_LEADER_HOST:$KB_RSM_SERVICE_PORT member add $KB_RSM_TARGET_HOST --peer-urls="http://$KB_RSM_TARGET_HOST:$KB_RSM_SERVICE_PORT"
           memberLeaveAction:
             command:
-              - "etcdctl member remove --peer-urls=http://$KB_RSM_TARGET_HOST:KB_RSM_SERVICE_PORT"
+              - /bin/bash
+              - -c
+              - |
+                member_id=$(etcdctl --endpoints=http://$KB_RSM_TARGET_HOST:$KB_RSM_SERVICE_PORT member list | grep "$KB_RSM_TARGET_HOST" | awk -F',' '{print $1}') &&
+                etcdctl member remove $member_id
       service:
         ports:
           - name: client
